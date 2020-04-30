@@ -18,27 +18,17 @@ package(
 )
 
 cc_library(
-    name = "HLOToVMLA",
+    name = "VMLAShapeBuilder",
     srcs = [
-        "ConvertConvOps.cpp",
-        "ConvertHLOToVMLA.cpp",
-        "ConvertReductionOps.cpp",
+        "VMLAShapeBuilder.cpp",
     ],
     hdrs = [
-        "ConvertHLOToVMLA.h",
+        "VMLAShapeBuilder.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/VMLA/Conversion",
         "//iree/compiler/Dialect/VMLA/IR",
-        "//iree/compiler/Dialect/VMLA/IR:VMLADialect",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_standard",
     ],
 )

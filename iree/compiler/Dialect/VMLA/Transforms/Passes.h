@@ -52,6 +52,9 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager);
 // dimension, from innermost to outermost.
 std::unique_ptr<OperationPass<FuncOp>> createUnrollReductionsPass();
 
+// Tensor-level pattern-based lowerings. Thrown into one pass for simplicity.
+std::unique_ptr<OperationPass<FuncOp>> createPreConversionLoweringPass();
+
 //===----------------------------------------------------------------------===//
 // Dialect conversion
 //===----------------------------------------------------------------------===//
@@ -66,6 +69,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 inline void registerVMLAPasses() {
   createUnrollReductionsPass();
   createConversionPass();
+  createPreConversionLoweringPass();
 }
 
 }  // namespace VMLA

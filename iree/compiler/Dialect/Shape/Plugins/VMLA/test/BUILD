@@ -12,28 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
-iree_cc_library(
-  NAME
-    HLOToVMLA
-  HDRS
-    "ConvertHLOToVMLA.h"
-  SRCS
-    "ConvertConvOps.cpp"
-    "ConvertHLOToVMLA.cpp"
-    "ConvertReductionOps.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Dialect::VMLA::IR::VMLADialect
-    tensorflow::mlir_xla
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )

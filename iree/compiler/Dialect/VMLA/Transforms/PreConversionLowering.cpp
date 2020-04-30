@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
-#include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
@@ -28,13 +28,17 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VMLA {
 
 namespace {
 
@@ -42,7 +46,7 @@ namespace {
 //
 // TODO(silvasean): This logically is part of a future HLO client -> HLO server
 // type of pass in the xla_hlo dialect proper.
-struct CanonicalizeDotOp : public OpRewritePattern<xla_hlo::DotOp> {
+struct LowerDotOp : public OpRewritePattern<xla_hlo::DotOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(xla_hlo::DotOp op,
                                 PatternRewriter &rewriter) const override {
@@ -91,8 +95,7 @@ struct CanonicalizeDotOp : public OpRewritePattern<xla_hlo::DotOp> {
 // VMLA::BatchMatMulPseudoOp which represents this transformation.
 //
 // TODO(silvasean): Move this to a "prepare" pass and test separately.
-struct CanonicalizeDotGeneralOp
-    : public OpRewritePattern<xla_hlo::DotGeneralOp> {
+struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(xla_hlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
@@ -102,15 +105,7 @@ struct CanonicalizeDotGeneralOp
     RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
     Type elementType = lhsType.getElementType();
     if (!lhsType || !rhsType) {
-      return failure();
-    }
-    // TODO(silvasean): Extend to support dynamic shapes.
-    // This op is a really good case for testing our e2e dynamic shape support.
-    // There's interesting questions at the TF2XLA level too.
-    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) {
-      emitWarning(op.getLoc())
-          << "unimplemented: vmla dynamic shapes for xla_hlo.dot_general";
-      return failure();
+      return rewriter.notifyMatchFailure(op, "requires ranked types");
     }
     xla_hlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
     auto extract1DVector = [](DenseIntElementsAttr elements) {
@@ -134,10 +129,12 @@ struct CanonicalizeDotGeneralOp
                                         rewriter.getIntegerType(64));
       return DenseIntElementsAttr::get(type, integers);
     };
-    auto totalElements = [](ArrayRef<int64_t> extents) {
-      int64_t numElements = 1;
-      for (int64_t extent : extents) {
-        numElements *= extent;
+    auto totalElements = [&](ArrayRef<Value> extents) {
+      Value numElements = rewriter.create<mlir::ConstantOp>(
+          op.getLoc(), IntegerAttr::get(rewriter.getIndexType(), 1));
+      for (Value extent : extents) {
+        numElements =
+            rewriter.create<mlir::MulIOp>(op.getLoc(), numElements, extent);
       }
       return numElements;
     };
@@ -145,13 +142,19 @@ struct CanonicalizeDotGeneralOp
                              ArrayRef<int64_t> contractingDims, Value &value,
                              RankedTensorType &type,
                              SmallVectorImpl<int64_t> &outFreeDims,
-                             SmallVectorImpl<int64_t> &outFreeDimExtents,
-                             SmallVectorImpl<int64_t> &outBatchingDimExtents) {
+                             SmallVectorImpl<Value> &outFreeDimExtents,
+                             SmallVectorImpl<Value> &outBatchingDimExtents) {
       outBatchingDimExtents.clear();
       RankedTensorType untransposedType = type;
       SmallVector<int64_t, 6> permutation;
       llvm::BitVector freeDims(untransposedType.getRank(), true);
-      SmallVector<int64_t, 6> contractingDimExtents;
+      SmallVector<Value, 6> contractingDimExtents;
+      Value valueShape =
+          rewriter.create<Shape::GetRankedShapeOp>(op.getLoc(), value);
+      auto getExtentValue = [&](int64_t dim) {
+        return rewriter.create<Shape::RankedDimOp>(op.getLoc(), valueShape,
+                                                   dim);
+      };
       for (auto dims : {batchingDims, contractingDims}) {
         for (int64_t dim : dims) {
           freeDims.reset(dim);
@@ -159,77 +162,159 @@ struct CanonicalizeDotGeneralOp
       }
       for (int64_t dim : batchingDims) {
         permutation.push_back(dim);
-        outBatchingDimExtents.push_back(untransposedType.getDimSize(dim));
+        outBatchingDimExtents.push_back(getExtentValue(dim));
       }
       for (int64_t dim : freeDims.set_bits()) {
         permutation.push_back(dim);
         outFreeDims.push_back(dim);
-        outFreeDimExtents.push_back(untransposedType.getDimSize(dim));
+        outFreeDimExtents.push_back(getExtentValue(dim));
       }
       for (int64_t dim : contractingDims) {
         permutation.push_back(dim);
-        contractingDimExtents.push_back(untransposedType.getDimSize(dim));
+        contractingDimExtents.push_back(getExtentValue(dim));
       }
       // Construct the type that the transpose will result in.
-      SmallVector<int64_t, 6> transposeShape;
+      SmallVector<int64_t, 6> transposeStaticShape;
       for (int64_t index : permutation) {
-        transposeShape.push_back(type.getDimSize(index));
+        (void)index;
+        transposeStaticShape.push_back(-1);
       }
-      auto transposeType = RankedTensorType::get(transposeShape, elementType);
+      auto transposeType =
+          RankedTensorType::get(transposeStaticShape, elementType);
       auto transpose = rewriter.create<xla_hlo::TransposeOp>(
           op.getLoc(), transposeType, value, make1DElementsAttr(permutation));
 
-      auto reshapeType =
-          RankedTensorType::get({totalElements(outBatchingDimExtents),
-                                 totalElements(outFreeDimExtents),
-                                 totalElements(contractingDimExtents)},
-                                elementType);
-      value = rewriter.create<xla_hlo::ReshapeOp>(op.getLoc(), reshapeType,
-                                                  transpose);
+      SmallVector<Value, 6> reshapeShape;
+      reshapeShape.push_back(totalElements(outBatchingDimExtents));
+      reshapeShape.push_back(totalElements(outFreeDimExtents));
+      reshapeShape.push_back(totalElements(contractingDimExtents));
+      auto reshapeType = RankedTensorType::get(
+          {static_cast<int64_t>(-1), static_cast<int64_t>(-1),
+           static_cast<int64_t>(-1)},
+          elementType);
+      auto reshapeRankedShape = rewriter.create<Shape::MakeRankedShapeOp>(
+          op.getLoc(),
+          Shape::RankedShapeType::get(reshapeType.getShape(),
+                                      rewriter.getContext()),
+          reshapeShape);
+      auto reshapeShapeExtentTensor = rewriter.create<Shape::ToExtentTensorOp>(
+          op.getLoc(), reshapeRankedShape);
+      value = rewriter.create<xla_hlo::DynamicReshapeOp>(
+          op.getLoc(), reshapeType, transpose, reshapeShapeExtentTensor);
     };
-    SmallVector<int64_t, 6> batchingDimExtents;
+    SmallVector<Value, 6> batchingDimExtents;
     SmallVector<int64_t, 6> lhsFreeDims;
-    SmallVector<int64_t, 6> lhsFreeDimExtents;
+    SmallVector<Value, 6> lhsFreeDimExtents;
     handleOneSide(lhsBatchingDims, lhsContractingDims, lhs, lhsType,
                   lhsFreeDims, lhsFreeDimExtents, batchingDimExtents);
     SmallVector<int64_t, 6> rhsFreeDims;
-    SmallVector<int64_t, 6> rhsFreeDimExtents;
+    SmallVector<Value, 6> rhsFreeDimExtents;
     handleOneSide(rhsBatchingDims, rhsContractingDims, rhs, rhsType,
                   rhsFreeDims, rhsFreeDimExtents, batchingDimExtents);
 
-    auto dstShape = llvm::to_vector<6>(llvm::makeArrayRef(
-        {totalElements(batchingDimExtents), totalElements(rhsFreeDimExtents),
-         totalElements(lhsFreeDimExtents)}));
-    auto dstType = RankedTensorType::get(dstShape, elementType);
+    auto dstStaticShape = llvm::to_vector<6>(
+        llvm::makeArrayRef({static_cast<int64_t>(-1), static_cast<int64_t>(-1),
+                            static_cast<int64_t>(-1)}));
+    auto dstType = RankedTensorType::get(dstStaticShape, elementType);
     Value dst = rewriter.create<IREE::VMLA::BatchMatMulPseudoOp>(
         op.getLoc(), dstType, lhs, rhs);
     RankedTensorType transposeType = RankedTensorType::get(
-        {dstShape[0], dstShape[2], dstShape[1]}, elementType);
+        {dstStaticShape[0], dstStaticShape[2], dstStaticShape[1]}, elementType);
     auto transpose = rewriter.create<xla_hlo::TransposeOp>(
         op.getLoc(), transposeType, dst, make1DElementsAttr({0, 2, 1}));
     auto reshapeShape = batchingDimExtents;
     reshapeShape.append(lhsFreeDimExtents.begin(), lhsFreeDimExtents.end());
     reshapeShape.append(rhsFreeDimExtents.begin(), rhsFreeDimExtents.end());
-    auto reshapeType = RankedTensorType::get(reshapeShape, elementType);
-    rewriter.replaceOpWithNewOp<xla_hlo::ReshapeOp>(op, reshapeType, transpose);
+    SmallVector<int64_t, 6> reshapeStaticShape;
+    for (int i = 0, e = batchingDimExtents.size() + lhsFreeDimExtents.size() +
+                        rhsFreeDimExtents.size();
+         i < e; i++) {
+      reshapeStaticShape.push_back(-1);
+    }
+    auto reshapeRankedShape = rewriter.create<Shape::MakeRankedShapeOp>(
+        op.getLoc(),
+        Shape::RankedShapeType::get(reshapeStaticShape, rewriter.getContext()),
+        reshapeShape);
+    auto reshapeShapeExtentTensor = rewriter.create<Shape::ToExtentTensorOp>(
+        op.getLoc(), reshapeRankedShape);
+    rewriter.replaceOpWithNewOp<xla_hlo::DynamicReshapeOp>(
+        op, op.getType(), transpose, reshapeShapeExtentTensor);
     return success();
   }
 };
 
+class LowerBroadcastInDimOp
+    : public OpRewritePattern<xla_hlo::BroadcastInDimOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(xla_hlo::BroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = op.getType().cast<RankedTensorType>();
+    auto shapeType =
+        Shape::RankedShapeType::get(type.getShape(), rewriter.getContext());
+    auto shape =
+        rewriter.create<Shape::ConstRankedShapeOp>(op.getLoc(), shapeType);
+    rewriter.replaceOpWithNewOp<Shape::RankedBroadcastInDimOp>(
+        op, op.getType(), op.operand(), shape, op.broadcast_dimensions());
+    return success();
+  }
+};
+
+// Lower xla_hlo::BroadcastOp via xla_hlo::BroadcastInDimOp.
+class LowerBroadcastOp : public OpRewritePattern<xla_hlo::BroadcastOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(xla_hlo::BroadcastOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = op.getOperand().getType().cast<RankedTensorType>();
+    auto resultType = op.getType().cast<RankedTensorType>();
+    auto broadcastDimensions = llvm::to_vector<6>(llvm::seq<int64_t>(
+        resultType.getRank() - type.getRank(), resultType.getRank()));
+    rewriter.replaceOpWithNewOp<xla_hlo::BroadcastInDimOp>(
+        op, op.getType(), op.getOperand(),
+        rewriter.getI64TensorAttr(broadcastDimensions));
+    return success();
+  }
+};
+
+class PreConversionLoweringPass
+    : public PassWrapper<PreConversionLoweringPass, OperationPass<FuncOp>> {
+ public:
+  void runOnOperation() {
+    MLIRContext *context = &getContext();
+    OwningRewritePatternList patterns;
+    ConversionTarget target(*context);
+    target.addLegalDialect<StandardOpsDialect>();
+    target.addLegalDialect<IREE::VMLA::VMLADialect>();
+    target.addLegalDialect<xla_hlo::XlaHloDialect>();
+    target.addLegalDialect<ShapeDialect>();
+
+    target.addIllegalOp<xla_hlo::DotGeneralOp>();
+    patterns.insert<LowerDotGeneralOp>(context);
+    target.addIllegalOp<xla_hlo::DotOp>();
+    patterns.insert<LowerDotOp>(context);
+    target.addIllegalOp<xla_hlo::BroadcastInDimOp>();
+    patterns.insert<LowerBroadcastInDimOp>(context);
+    target.addIllegalOp<xla_hlo::BroadcastOp>();
+    patterns.insert<LowerBroadcastOp>(context);
+
+    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
+      return signalPassFailure();
+    }
+  }
+};
+
+static PassRegistration<PreConversionLoweringPass> pass(
+    "iree-vmla-pre-conversion-lowering",
+    "Tensor-level pattern-based lowerings.");
+
 }  // namespace
 
-void populateHLODotToVMLAPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns,
-                                  TypeConverter &typeConverter) {
-  // Tensor-level preparation for lowering to the runtime BatchMatMul op.
-  patterns.insert<CanonicalizeDotGeneralOp>(context);
-  patterns.insert<CanonicalizeDotOp>(context);
-
-  // Lowering from tensor ops to VMLA runtime ops.
-  patterns.insert<VMLAOpConversion<IREE::VMLA::BatchMatMulPseudoOp,
-                                   IREE::VMLA::BatchMatMulOp>>(context,
-                                                               typeConverter);
+std::unique_ptr<OperationPass<FuncOp>> createPreConversionLoweringPass() {
+  return std::make_unique<PreConversionLoweringPass>();
 }
 
+}  // namespace VMLA
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

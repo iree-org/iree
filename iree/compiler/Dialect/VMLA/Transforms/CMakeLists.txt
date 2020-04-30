@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "Conversion.cpp"
     "Passes.cpp"
+    "PreConversionLowering.cpp"
     "UnrollReductions.cpp"
   DEPS
     LLVMSupport
@@ -39,6 +40,7 @@ iree_cc_library(
     iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
     iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
     iree::compiler::Dialect::VMLA::IR
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
     tensorflow::mlir_xla
   PUBLIC
 )

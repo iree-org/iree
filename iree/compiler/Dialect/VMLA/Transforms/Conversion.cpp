@@ -99,6 +99,21 @@ class ConversionPass
         });
     conversionTarget.addIllegalOp<Shape::RankedDimOp>();
     conversionTarget.addIllegalOp<Shape::RankedDimsOp>();
+    // XLA ops use tensors of extents, so we tend to launder back to
+    // !shapex.ranked_shape for most shape-related things. This is a problem
+    // because we don't have a lowering for the ops going back and forth between
+    // tensors of extents and !shapex.ranked_shape. So we mark this op as
+    // illegal and rely on our fold of `from_extent_tensor(to_extent_tensor(x))
+    // -> x` to eliminate these ops. Setting it illegal here triggers that fold.
+    // This is skating on thin ice.
+    // TODO(silvasean): Legalize ToExtentTensorOp and FromExtentTensorOp.
+    conversionTarget.addIllegalOp<Shape::FromExtentTensorOp>();
+    // RankedBroadcastInDimOp is an logically something that should be an
+    // xla_hlo op (or in a dialect at a similar level of abstraction), but since
+    // it isn't technically in that dialect, we need to special-case mark it as
+    // illegal here.
+    // TODO(silvasean): Reconcile the dialect layering here.
+    conversionTarget.addIllegalOp<Shape::RankedBroadcastInDimOp>();
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       conversionPatterns, &typeConverter))) {

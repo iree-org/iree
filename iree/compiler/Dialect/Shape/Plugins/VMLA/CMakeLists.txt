@@ -16,31 +16,15 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Transforms
+    VMLAShapeBuilder
   HDRS
-    "Passes.h"
-    "Patterns.h"
+    "VMLAShapeBuilder.h"
   SRCS
-    "CleanupPlaceholdersPass.cpp"
-    "ConvertHLOToShapeDialectPass.cpp"
-    "FunctionSignatureExpansionPass.cpp"
-    "HoistShapeCalculationsPass.cpp"
-    "MaterializeShapeCalculations.cpp"
-    "MaterializeShapeCalculationsPass.cpp"
-    "TieDynamicShapesPass.cpp"
+    "VMLAShapeBuilder.cpp"
   DEPS
     LLVMSupport
-    MLIRAnalysis
     MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRSupport
-    MLIRTransforms
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::VMLA::VMLAShapeBuilder
-    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
-    iree::compiler::Dialect::Shape::Utils::TypeConversion
-    iree::compiler::Utils
-    tensorflow::mlir_xla
+    iree::compiler::Dialect::VMLA::IR
   PUBLIC
 )

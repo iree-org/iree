@@ -60,7 +60,10 @@ struct IdentityOpConversion : public OpConversionPattern<SRC> {
   LogicalResult matchAndRewrite(
       SRC srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (srcOp.getOperand().hasOneUse()) {
+    // xla_hlo::DynamicReshape has multiple operands, so we cannot just say
+    // `getOperand()`. But `getOperand(0)` doesn't work for the other
+    // single-operand ops. So use the raw Operation to get the operand.
+    if (srcOp.getOperation()->getOperand(0).hasOneUse()) {
       // Can directly pass through the input buffer as we don't need to clone
       // for other users.
       rewriter.replaceOp(srcOp, operands[0]);
@@ -76,15 +79,22 @@ struct IdentityOpConversion : public OpConversionPattern<SRC> {
   }
 };
 
-// Converts a broadcast_in_dim op to either a broadcast or a tile depending on
-// the input shape.
+// Converts a shapex.ranked_broadcast_in_dim op to either a broadcast or a tile
+// depending on the input shape.
+//
+// We assume that xla_hlo.broadcast_in_dim and xla_hlo.dynamic_broadcast_in_dim
+// have been legalized into that op.
+//
+// Note that shapex.ranked_broadcast_in_dim is not strictly speaking an HLO op,
+// but we would like HLO to eventually have something like it, and the shapex
+// dialect is currently where we have it stuffed.
 struct BroadcastInDimOpConversion
-    : public OpConversionPattern<xla_hlo::BroadcastInDimOp> {
+    : public OpConversionPattern<Shape::RankedBroadcastInDimOp> {
   BroadcastInDimOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::BroadcastInDimOp srcOp, ArrayRef<Value> operands,
+      Shape::RankedBroadcastInDimOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto srcShape = VMLAConversionTarget::getTensorShape(
         srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
@@ -454,8 +464,10 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // xla_hlo.reduce and xla_hlo.reduce_window.
   populateHLOReductionToVMLAPatterns(context, patterns, typeConverter);
 
-  // xla_hlo.dot and xla_hlo.dot_general.
-  populateHLODotToVMLAPatterns(context, patterns, typeConverter);
+  // vmla.batch.matmul.pseudo
+  patterns.insert<VMLAOpConversion<IREE::VMLA::BatchMatMulPseudoOp,
+                                   IREE::VMLA::BatchMatMulOp>>(context,
+                                                               typeConverter);
 
   // Simple 1:1 conversion patterns using the automated trait-based converter.
   // Used for HLO ops that have equivalent VMLA ops such as most arithmetic ops.
@@ -534,6 +546,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<IdentityOpConversion<xla_hlo::BitcastConvertOp>>(context);
   patterns.insert<IdentityOpConversion<xla_hlo::CopyOp>>(context);
   patterns.insert<IdentityOpConversion<xla_hlo::ReshapeOp>>(context);
+  patterns.insert<IdentityOpConversion<xla_hlo::DynamicReshapeOp>>(context);
 
   // Conversions that don't have a 1:1 mapping, mostly involving buffer views
   // or transfers.

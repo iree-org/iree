@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Shape/Plugins/VMLA/VMLAShapeBuilder.h"
 #include "iree/compiler/Dialect/Shape/Plugins/XLA/XlaHloShapeBuilder.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
 #include "iree/compiler/Utils/PatternUtils.h"
@@ -47,6 +48,7 @@ const CustomOpShapeBuilderList *getCustomOpShapeBuilder() {
   static CustomOpShapeBuilderList globalBuilders = ([]() {
     CustomOpShapeBuilderList builders;
     xla_hlo::populateXlaHloCustomOpShapeBuilder(builders);
+    IREE::VMLA::populateVMLACustomOpShapeBuilder(builders);
     return builders;
   })();
   return &globalBuilders;

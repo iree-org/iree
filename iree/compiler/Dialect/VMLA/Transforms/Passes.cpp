@@ -43,8 +43,10 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
 
   // ---------------------------------------------------------------------------
   // Tensor-level rewrites.
-  // At this point, the computation is in tensor-level CFG form with the ability
-  // perform transformations that alter shapes.
+  // At this point, the computation is in tensor-level CFG form.
+  // There are no specific requirements on shape-related calculations at this
+  // point yet, so general tensor->tensor transformations in preparation
+  // for later conversion steps should go here.
   // ---------------------------------------------------------------------------
   // Legalize input types.
   // TODO(benvanik): legalize input.
@@ -55,6 +57,12 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
 
   // Unroll multi-dimensional reductions to one reduction per dimension.
   passManager.addNestedPass<FuncOp>(createUnrollReductionsPass());
+
+  // Tensor-level pattern-based lowerings. Thrown into one pass for simplicity.
+  passManager.addNestedPass<FuncOp>(createPreConversionLoweringPass());
+
+  // Clean up the IR before going into shape-materialized IR.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // ---------------------------------------------------------------------------
   // Shape calculation.

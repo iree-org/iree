@@ -14,26 +14,13 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    HLOToVMLA
-  HDRS
-    "ConvertHLOToVMLA.h"
+    lit
   SRCS
-    "ConvertConvOps.cpp"
-    "ConvertHLOToVMLA.cpp"
-    "ConvertReductionOps.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Dialect::VMLA::IR::VMLADialect
-    tensorflow::mlir_xla
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

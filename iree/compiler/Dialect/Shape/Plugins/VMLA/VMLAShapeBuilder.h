@@ -12,26 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_SHAPE_CONVERSION_PASSES_H_
-#define IREE_COMPILER_DIALECT_SHAPE_CONVERSION_PASSES_H_
+#ifndef IREE_COMPILER_DIALECT_SHAPE_IR_VMLASHAPEBUILDER_H_
+#define IREE_COMPILER_DIALECT_SHAPE_IR_VMLASHAPEBUILDER_H_
 
-#include "mlir/Pass/Pass.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VMLA {
+// Creates a custom op shape builder for VMLA ops that are not otherwise
+// supported through traits or other declarative means.
+void populateVMLACustomOpShapeBuilder(
+    iree_compiler::Shape::CustomOpShapeBuilderList &builders);
 
-// Convert `shape` dialect to `shapex` dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertShapeToShapexPass();
-
-namespace Shape {
-
-inline void registerShapeConversionPasses() {
-  createConvertShapeToShapexPass();
-}
-
-}  // namespace Shape
-
+}  // namespace VMLA
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_SHAPE_CONVERSION_PASSES_H_
+#endif  // IREE_COMPILER_DIALECT_SHAPE_IR_VMLASHAPEBUILDER_H_
