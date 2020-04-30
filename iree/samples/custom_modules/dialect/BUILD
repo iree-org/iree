@@ -93,7 +93,16 @@ cc_binary(
     srcs = ["custom_opt.cc"],
     deps = [
         ":init_dialect",
+        "//iree/compiler/Translation/CodegenPasses",
+        "//iree/compiler/Translation/SPIRV:init_translations",
         "//iree/tools:iree_opt_lib",
+        "//iree/tools:init_compiler_modules",
+        "//iree/tools:init_passes_and_dialects",
+        "//iree/tools:init_targets",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -102,6 +111,16 @@ cc_binary(
     srcs = ["custom_translate.cc"],
     deps = [
         ":init_dialect",
+        "//iree/compiler/Translation/SPIRV:init_translations",
         "//iree/tools:iree_translate_lib",
+        "//iree/tools:init_compiler_modules",
+        "//iree/tools:init_passes_and_dialects",
+        "//iree/tools:init_targets",
+        "//iree/tools:init_translations",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Translation",
     ],
 )

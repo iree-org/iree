@@ -87,6 +87,15 @@ iree_cc_binary(
     "custom_opt.cc"
   DEPS
     ::init_dialect
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    iree::compiler::Translation::CodegenPasses
+    iree::compiler::Translation::SPIRV::init_translations
+    iree::tools::init_compiler_modules
+    iree::tools::init_passes_and_dialects
+    iree::tools::init_targets
     iree::tools::iree_opt_lib
 )
 
@@ -99,5 +108,15 @@ iree_cc_binary(
     "custom_translate.cc"
   DEPS
     ::init_dialect
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTranslation
+    iree::compiler::Translation::SPIRV::init_translations
+    iree::tools::init_compiler_modules
+    iree::tools::init_passes_and_dialects
+    iree::tools::init_targets
+    iree::tools::init_translations
     iree::tools::iree_translate_lib
 )

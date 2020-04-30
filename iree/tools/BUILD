@@ -185,6 +185,15 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         ":iree_opt_lib",
+        ":init_compiler_modules",
+        ":init_passes_and_dialects",
+        ":init_targets",
+        "//iree/compiler/Translation/CodegenPasses",
+        "//iree/compiler/Translation/SPIRV:init_translations",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -284,6 +293,16 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         ":iree_translate_lib",
+        ":init_compiler_modules",
+        ":init_passes_and_dialects",
+        ":init_targets",
+        ":init_translations",
+        "//iree/compiler/Translation/SPIRV:init_translations",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Translation",
     ],
 )
 

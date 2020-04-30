@@ -226,6 +226,15 @@ if(${IREE_BUILD_COMPILER})
       "opt_main.cc"
     DEPS
       ::iree_opt_lib
+      ::init_compiler_modules
+      ::init_passes_and_dialects
+      ::init_targets
+      iree::compiler::Translation::SPIRV::init_translations
+      iree::compiler::Translation::CodegenPasses
+      LLVMSupport
+      MLIRIR
+      MLIRPass
+      MLIRSupport
   )
 
   iree_cc_binary(
@@ -296,6 +305,16 @@ if(${IREE_BUILD_COMPILER})
       "translate_main.cc"
     DEPS
       ::iree_translate_lib
+      ::init_compiler_modules
+      ::init_passes_and_dialects
+      ::init_targets
+      ::init_translations
+      iree::compiler::Translation::SPIRV::init_translations
+      LLVMSupport
+      MLIRIR
+      MLIRPass
+      MLIRSupport
+      MLIRTranslation
   )
 endif()
 
