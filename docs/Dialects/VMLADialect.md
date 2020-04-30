@@ -222,7 +222,7 @@ the lowering process.
 All operands are rank-3 with the following dimension structure:
 - lhs = [B, FLHS, C]
 - rhs = [B, FRHS, C]
-- dst = [B, FLHS, FRHS]
+- dst = [B, FRHS, FLHS]
 Where:
 - B = batch dimension
 - C = contracting dimension
