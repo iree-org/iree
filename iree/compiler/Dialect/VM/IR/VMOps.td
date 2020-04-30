@@ -100,7 +100,7 @@ def VM_FuncOp : VM_Op<"func", [
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       FunctionType type, ArrayRef<NamedAttribute> attrs = {},
-      ArrayRef<NamedAttributeList> argAttrs = {}
+      ArrayRef<MutableDictionaryAttr> argAttrs = {}
     }]>,
   ];
 
@@ -194,7 +194,7 @@ def VM_ImportOp : VM_Op<"import", [
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       FunctionType type, ArrayRef<NamedAttribute> attrs = {},
-      ArrayRef<NamedAttributeList> argAttrs = {}
+      ArrayRef<MutableDictionaryAttr> argAttrs = {}
     }]>,
   ];
 
@@ -1377,7 +1377,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 
     /// Erase the operand at 'index' from the true operand list.
     void eraseTrueOperand(unsigned index)  {
-      eraseSuccessorOperand(trueIndex, index);
+      trueDestOperandsMutable().erase(index);
     }
 
     /// Accessors for operands to the 'false' destination.
@@ -1396,7 +1396,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 
     /// Erase the operand at 'index' from the false operand list.
     void eraseFalseOperand(unsigned index) {
-      eraseSuccessorOperand(falseIndex, index);
+      falseDestOperandsMutable().erase(index);
     }
 
   private:
