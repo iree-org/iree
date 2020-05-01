@@ -140,7 +140,7 @@ Value ModelBuilder::call_tanhf(Value v) {
 Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
                                                     ArrayRef<Type> returnTypes,
                                                     ValueRange values) {
-  auto &builder = ScopedContext::getBuilder();
+  auto &builder = ScopedContext::getBuilderRef();
   auto funcOp =
       builder.getInsertionBlock()->getParent()->getParentOfType<FuncOp>();
   Operation *func = SymbolTable::lookupNearestSymbolFrom(funcOp, functionName);
