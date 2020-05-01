@@ -20,16 +20,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-///--------------------------------------------------------------------------///
-// Markers on Linalg operations that determine which processor heirarchy to use
-// for partitioning
-///--------------------------------------------------------------------------///
-
-/// Marker to denote that a linalg operation is to be partitioned to workitems
-inline StringRef getWorkItemMarker() { return "workitem"; }
-
-///--------------------------------------------------------------------------///
-
 /// Pass to tile and fuse linalg operations on buffers. The pass takes as
 /// argument the `workgroupSize` that the tiling should use. Note that the
 /// tile-sizes are the reverse of the workgroup size. So workgroup size along

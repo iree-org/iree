@@ -27,11 +27,13 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
+#include "iree/compiler/Translation/CodegenUtils/MarkerUtils.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
+#include "mlir/Dialect/Linalg/Transforms/LinalgTransforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
@@ -555,10 +557,7 @@ linalg::IndexedGenericOp PadOpConversion::apply(
            : inputVal;
   rewriter.create<linalg::YieldOp>(loc, result);
 
-  // This is a hacky flag to tell later passes that this operation can't be
-  // tiled.
-  linalgOp.setAttr("do_not_tile", rewriter.getUnitAttr());
-
+  setNoTileMarker(linalgOp);
   return linalgOp;
 }
 

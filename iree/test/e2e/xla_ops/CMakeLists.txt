@@ -36,6 +36,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "constant.mlir"
     "cosine.mlir"
+    "divide.mlir"
     "dot.mlir"
     "exponential.mlir"
     "gemm.mlir"
@@ -51,6 +52,7 @@ iree_check_single_backend_test_suite(
     "rsqrt.mlir"
     "select.mlir"
     "sqrt.mlir"
+    "subtract.mlir"
     "transpose.mlir"
   TARGET_BACKEND
     vulkan-spirv
@@ -70,6 +72,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convolution.mlir"
     "cosine.mlir"
+    "divide.mlir"
     "dot.mlir"
     "exponential.mlir"
     "gemm.mlir"
@@ -87,6 +90,7 @@ iree_check_single_backend_test_suite(
     "rsqrt.mlir"
     "select.mlir"
     "sqrt.mlir"
+    "subtract.mlir"
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND

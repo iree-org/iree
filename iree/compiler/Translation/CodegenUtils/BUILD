@@ -23,14 +23,18 @@ cc_library(
     name = "CodegenUtils",
     srcs = [
         "CodegenUtils.cpp",
+        "MarkerUtils.cpp",
     ],
     hdrs = [
         "CodegenUtils.h",
+        "MarkerUtils.h",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
+        "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",

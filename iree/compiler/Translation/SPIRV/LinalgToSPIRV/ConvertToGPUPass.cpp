@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
+#include "iree/compiler/Translation/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -190,7 +191,7 @@ static LogicalResult mapToProcessors(ConversionPatternRewriter &rewriter,
                                      ArrayRef<Value> numProcessors) {
   unsigned numLoops = pLoopOp.getNumLoops();
   assert(numLoops == processorIDs.size() &&
-         "expected as many pids as number of loops");
+         "expected as many ids as number of loops");
   assert(numLoops == numProcessors.size() &&
          "expected as many nprocs as number of loops");
   SmallVector<LoopBounds, 2> forBounds;
@@ -212,31 +213,69 @@ static LogicalResult mapToProcessors(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+namespace {
+struct ProcessorIdAndCount {
+  Value id;
+  Value count;
+};
+
+/// These are class declarations that are only used for template
+/// specialization. They wont be needed if GPU dialect has ops for global
+/// invocation ID directly.
+class GPUGlobalId;
+class GPUGlobalCount;
+}  // namespace
+
+template <typename GPUIdOp, typename GPUCountOp>
+static ProcessorIdAndCount getGPUProcessorIdAndCount(
+    Location loc, StringRef dim, ConversionPatternRewriter &rewriter) {
+  Type indexType = rewriter.getIndexType();
+  return {
+      rewriter.create<GPUIdOp>(loc, indexType, rewriter.getStringAttr(dim)),
+      rewriter.create<GPUCountOp>(loc, indexType, rewriter.getStringAttr(dim))};
+}
+
+template <>
+ProcessorIdAndCount getGPUProcessorIdAndCount<GPUGlobalId, GPUGlobalCount>(
+    Location loc, StringRef dim, ConversionPatternRewriter &rewriter) {
+  Type indexType = rewriter.getIndexType();
+  Value gridDim = rewriter.create<gpu::GridDimOp>(loc, indexType,
+                                                  rewriter.getStringAttr(dim));
+  Value blockId = rewriter.create<gpu::BlockIdOp>(loc, indexType,
+                                                  rewriter.getStringAttr(dim));
+  Value blockDim = rewriter.create<gpu::BlockDimOp>(
+      loc, indexType, rewriter.getStringAttr(dim));
+  Value threadId = rewriter.create<gpu::ThreadIdOp>(
+      loc, indexType, rewriter.getStringAttr(dim));
+  return {rewriter.create<AddIOp>(
+              loc, rewriter.create<MulIOp>(loc, blockId, blockDim), threadId),
+          rewriter.create<MulIOp>(loc, blockDim, gridDim)};
+}
+
 /// Distribute loop.parallel to processors where `IdOp` is used to get the
 /// processor ID and `DimOp` is used to get the number of processors along a
 /// dimension.
-template <typename IdOp, typename DimOp>
+template <typename GPUIdOp, typename GPUCountOp>
 static LogicalResult mapToProcessor(ConversionPatternRewriter &rewriter,
                                     loop::ParallelOp pLoopOp) {
   unsigned numLoops = pLoopOp.getNumLoops();
-  if (numLoops > 3)
+  if (numLoops > 3) {
     pLoopOp =
         cast<loop::ParallelOp>(serializeDimensionsFrom(rewriter, pLoopOp, 3));
-  SmallVector<Value, 2> pid, nprocs;
-  pid.reserve(numLoops);
-  nprocs.reserve(numLoops);
+    numLoops = 3;
+  }
+  SmallVector<Value, 2> id, count;
+  id.reserve(numLoops);
+  count.reserve(numLoops);
+  ArrayRef<StringRef> dims = {"x", "y", "z"};
   Location loc = pLoopOp.getLoc();
-  auto createIdAndNprocs = [&](StringRef dim) {
-    pid.insert(pid.begin(), rewriter.create<IdOp>(loc, rewriter.getIndexType(),
-                                                  rewriter.getStringAttr(dim)));
-    nprocs.insert(nprocs.begin(),
-                  rewriter.create<DimOp>(loc, rewriter.getIndexType(),
-                                         rewriter.getStringAttr(dim)));
-  };
-  createIdAndNprocs("x");
-  if (numLoops > 1) createIdAndNprocs("y");
-  if (numLoops > 2) createIdAndNprocs("z");
-  return mapToProcessors(rewriter, pLoopOp, pid, nprocs);
+  for (unsigned i = 0; i < numLoops; ++i) {
+    ProcessorIdAndCount idAndCount =
+        getGPUProcessorIdAndCount<GPUIdOp, GPUCountOp>(loc, dims[i], rewriter);
+    id.insert(id.begin(), idAndCount.id);
+    count.insert(count.begin(), idAndCount.count);
+  }
+  return mapToProcessors(rewriter, pLoopOp, id, count);
 }
 
 /// Distribute the loop.parallel to workgroups.
@@ -245,19 +284,18 @@ static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
   return mapToProcessor<gpu::BlockIdOp, gpu::GridDimOp>(rewriter, pLoopOp);
 }
 
-/// Distribute loop.parallel to workitems.
-static LogicalResult mapToWorkitems(ConversionPatternRewriter &rewriter,
-                                    loop::ParallelOp pLoopOp) {
+/// Distribute loop.parallel to workitems using local invocation ID.
+static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
+                                            loop::ParallelOp pLoopOp) {
   return mapToProcessor<gpu::ThreadIdOp, gpu::BlockDimOp>(rewriter, pLoopOp);
 }
 
-/// Check if the linalg operation has the specified attribute (set during
-/// tiling to denote what processor heirarchy executes this operation).
-template <typename LinalgOpTy>
-bool checkMarkerValue(LinalgOpTy linalgOp, StringRef marker = "") {
-  auto attr = linalgOp.template getAttrOfType<StringAttr>(
-      linalg::LinalgTransforms::kLinalgTransformMarker);
-  return attr && (marker == "" || attr.getValue() == marker);
+/// Distribute loop.parallel to workitems using global invocation ID. The GPU
+/// dialect doesn't have a direct operation to do this. This could be done using
+/// id = blockIdx * blockDim + gridIdx. count = blockDim * gridDim.
+static LogicalResult mapToGlobalInvocationId(
+    ConversionPatternRewriter &rewriter, loop::ParallelOp pLoopOp) {
+  return mapToProcessor<GPUGlobalId, GPUGlobalCount>(rewriter, pLoopOp);
 }
 
 //===----------------------------------------------------------------------===//
@@ -284,14 +322,14 @@ struct PartitionPLoopToWorkgroups
 /// Map tiled linalg op to workitems by lowering it to loop.parallel and
 /// partitioning it to workitems.
 template <typename LinalgOpTy>
-struct MapLinalgOpToWorkitems : public OpConversionPattern<LinalgOpTy> {
+struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   using OpConversionPattern<LinalgOpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Check for marker that specifies that the linalg op is to be partitioned
     // across threads within a workgroup.
-    if (!checkMarkerValue(linalgOp, getWorkItemMarker())) return failure();
+    if (!hasWorkItemMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<loop::ParallelOp, LinalgOpTy>(rewriter,
                                                                    linalgOp);
@@ -299,7 +337,7 @@ struct MapLinalgOpToWorkitems : public OpConversionPattern<LinalgOpTy> {
     if (!loops.getValue().empty()) {
       loop::ParallelOp pLoopOp =
           dyn_cast<loop::ParallelOp>(loops.getValue()[0]);
-      if (!pLoopOp || failed(mapToWorkitems(rewriter, pLoopOp)))
+      if (!pLoopOp || failed(mapToLocalInvocationId(rewriter, pLoopOp)))
         return failure();
     }
     rewriter.eraseOp(linalgOp);
@@ -307,17 +345,29 @@ struct MapLinalgOpToWorkitems : public OpConversionPattern<LinalgOpTy> {
   }
 };
 
-/// Map linalg operation to loops to be executed by a single thread on the GPU.
+/// Map linalg operation to execute on GPU in parallel by mapping the parallel
+/// loops to "GlobalInvocationId".
 template <typename LinalgOpTy>
-struct ExecuteLinalgOpSequentially : public OpConversionPattern<LinalgOpTy> {
+struct MapLinalgOpToGlobalInvocationId
+    : public OpConversionPattern<LinalgOpTy> {
   using OpConversionPattern<LinalgOpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // If marker exists, then dont execute the op sequentially.
-    if (checkMarkerValue(linalgOp) ||
-        failed(linalg::linalgOpToLoops<LinalgOpTy>(rewriter, linalgOp)))
-      return failure();
+    // If marker exists and its not no-tile, do nothing.
+    if (hasMarker(linalgOp) && !hasNoTileMarker(linalgOp)) return failure();
+    Optional<linalg::LinalgLoops> loops =
+        linalg::linalgLowerOpToLoops<loop::ParallelOp, LinalgOpTy>(rewriter,
+                                                                   linalgOp);
+    if (!loops) return failure();
+    if (!loops.getValue().empty()) {
+      loop::ParallelOp pLoopOp =
+          dyn_cast<loop::ParallelOp>(loops.getValue()[0]);
+      // If there are parallel loops partition them to threads using global
+      // invocation ID.
+      if (pLoopOp && failed(mapToGlobalInvocationId(rewriter, pLoopOp)))
+        return failure();
+    }
     rewriter.eraseOp(linalgOp);
     return success();
   }
@@ -359,8 +409,11 @@ void ConvertToGPUPass::runOnFunction() {
 
   OwningRewritePatternList patterns;
   patterns.insert<
-#define ADD_ALL_LINALG_PATTERNS(OP_NAME) \
-  ExecuteLinalgOpSequentially<OP_NAME>, MapLinalgOpToWorkitems<OP_NAME>
+
+#define ADD_ALL_LINALG_PATTERNS(OP_NAME)    \
+  MapLinalgOpToGlobalInvocationId<OP_NAME>, \
+      MapLinalgOpToLocalInvocationId<OP_NAME>
+
       ADD_ALL_LINALG_PATTERNS(linalg::ConvOp),
       ADD_ALL_LINALG_PATTERNS(linalg::CopyOp),
       ADD_ALL_LINALG_PATTERNS(linalg::FillOp),
@@ -370,7 +423,9 @@ void ConvertToGPUPass::runOnFunction() {
       ADD_ALL_LINALG_PATTERNS(linalg::PoolingMaxOp),
       ADD_ALL_LINALG_PATTERNS(linalg::PoolingMinOp),
       ADD_ALL_LINALG_PATTERNS(linalg::PoolingSumOp),
+
 #undef ADD_ALL_LINALG_PATTERNS
+
       PartitionPLoopToWorkgroups, RemoveLinalgRange>(context);
 
   if (failed(applyFullConversion(funcOp, target, patterns)))

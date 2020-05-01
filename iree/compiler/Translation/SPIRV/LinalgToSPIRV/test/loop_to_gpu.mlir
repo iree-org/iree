@@ -159,3 +159,43 @@ module {
 //     CHECK:           loop.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
 //     CHECK:             loop.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
 //     CHECK:               loop.for %{{.+}} = %[[C0]] to %{{.+}} step %[[C1]]
+
+// -----
+
+module {
+  func @no_tile(%arg0: memref<?x?xf32>, %arg1 : memref<?x?xf32>,
+                %arg2 : memref<?x?xf32>)
+  attributes {iree.dispatch_fn_name = "reduce_sum"} {
+    linalg.generic
+      {args_in = 2 : i64, args_out = 1 : i64,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      {__internal_linalg_tranform__ = "no-tile"} %arg0, %arg1, %arg2 {
+    ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+      %0 = addf %arg3, %arg4 : f32
+      linalg.yield %0 : f32
+    }: memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
+    return
+  }
+}
+
+// CHECK-DAG: %[[UBY:.+]] =  dim %{{.*}}, 0
+// CHECK-DAG: %[[UBX:.+]] =  dim %{{.*}}, 1
+// CHECK-DAG: %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
+// CHECK-DAG: %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
+// CHECK-DAG: %[[BLOCKSIZEX:.+]] = "gpu.block_dim"() {dimension = "x"}
+// CHECK-DAG: %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//     CHECK: %[[T6:.+]] =  muli %[[BIDX]], %[[BLOCKSIZEX]]
+//     CHECK: %[[GIDX:.+]] =  addi %[[T6]], %[[TIDX]]
+//     CHECK: %[[NPROCSX:.+]] =  muli %[[BLOCKSIZEX]], %[[NBLOCKSX]]
+// CHECK-DAG: %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
+// CHECK-DAG: %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
+// CHECK-DAG: %[[BLOCKSIZEY:.+]] = "gpu.block_dim"() {dimension = "y"}
+// CHECK-DAG: %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//     CHECK: %[[T6:.+]] =  muli %[[BIDY]], %[[BLOCKSIZEY]]
+//     CHECK: %[[GIDY:.+]] =  addi %[[T6]], %[[TIDY]]
+//     CHECK: %[[NPROCSY:.+]] =  muli %[[BLOCKSIZEY]], %[[NBLOCKSY]]
+//     CHECK: loop.for %{{.+}} = %[[GIDY]] to %[[UBY]] step %[[NPROCSY]]
+//     CHECK:   loop.for %{{.+}} = %[[GIDX]] to %[[UBX]] step %[[NPROCSX]]
