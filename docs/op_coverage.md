@@ -29,7 +29,7 @@ constant | ✓ | ✓ | ✓
 convert | ✓ | ✗ | ✗
 convolution | ✓ | ✗ | ✓
 cosine | ✓ | ✓ | ✓
-divide | ✓ | ✗ | ✗
+divide | ✓ | ✓ | ✓
 dot | ✓ | ✓ | ✓
 dot_general | ✓ | ✗ | ✗
 exponential | ✓ | ✓ | ✓
@@ -54,7 +54,7 @@ select | ✓ | ✓ | ✓
 sine | ✓ | ✗ | ✗
 slice | ✓ | ✗ | ✗
 sqrt | ✓ | ✓ | ✓
-subtract | ✓ | ✗ | ✗
+subtract | ✓ | ✓ | ✓
 torch_select | ✓ | ✗ | ✗
 transpose | ✓ | ✓ | ✓
 while | ✓ | ✗ | ✓
