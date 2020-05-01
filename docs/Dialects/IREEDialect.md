@@ -54,7 +54,7 @@ the final step in compilation.
 
 ### `iree.load_input` (IREE::LoadInputOp)
 
-
+Loading input from a buffer
 
 Syntax:
 
@@ -63,6 +63,7 @@ operation ::= `iree.load_input` `(` $src `:` type($src) `)` attr-dict `:` type(r
 ```
 
 
+Note: this is expected to be deprecated soon.
 
 #### Operands:
 
@@ -76,9 +77,38 @@ operation ::= `iree.load_input` `(` $src `:` type($src) `)` attr-dict `:` type(r
 | :----: | ----------- |
 &laquo;unnamed&raquo; | any type
 
+### `iree.placeholder` (IREE::PlaceholderOp)
+
+A placeholder op to feed a value/buffer into computation
+
+Syntax:
+
+```
+operation ::= `iree.placeholder` `for` $purpose attr-dict `:` type($output)
+```
+
+
+This op is intended as a way to represent a value or buffer that will be fed
+into computation. It can host additional attributes related to the value or
+buffer. This op can be used for the cases where one need to feed in value or
+buffer to computation in a function but cannot do that via the function
+argument due to ABI or contract issues.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`purpose` | StringAttr | string attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`output` | any type
+
 ### `iree.store_output` (IREE::StoreOutputOp)
 
-
+Storing output to a buffer
 
 Syntax:
 
@@ -87,6 +117,7 @@ operation ::= `iree.store_output` `(` $src `:` type($src) `,` $dst `:` type($dst
 ```
 
 
+Note: this is expected to be deprecated soon.
 
 #### Operands:
 
