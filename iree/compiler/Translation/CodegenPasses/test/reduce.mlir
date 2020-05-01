@@ -4,10 +4,10 @@
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1) -> ()>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
 module {
-  //      CHECK: func @reduction_entry(
-  // CHECK-SAME: %[[ARG0:.+]]: memref<5x4xf32>,
-  // CHECK-SAME: %[[ARG1:.+]]: memref<f32>,
-  // CHECK-SAME: %[[ARG2:.+]]: memref<5xf32>)
+  //      CHECK: func @reduction_entry
+  //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
+  //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
+  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<5xf32>
   //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
@@ -18,17 +18,22 @@ module {
   // CHECK-NEXT:   %[[RES:.+]] = addf %[[SRC]], %[[OPERAND]] : f32
   // CHECK-NEXT:   linalg.yield %[[RES]] : f32
   // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<5xf32>
-  func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<5xf32>)
-  attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
-    %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ( {
+  func @reduction_entry() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = "xla_hlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
       %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
-    iree.store_output(%2 : tensor<5xf32>, %arg2 : memref<5xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
@@ -36,18 +41,23 @@ module {
 
 module {
   //      CHECK:   %[[COND:.+]] = cmpf "olt", %{{.+}}, %{{.+}} : f32
-  // CHECK-NEXT:   %{{.+}} = select %[[COND]], %{{.+}}, %{{.+}} : f32
-  func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<5xf32>)
-  attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
-    %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ( {
+  // CHECK-NEXT:   select %[[COND]], %{{.+}}, %{{.+}} : f32
+  func @reduction_entry() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = "xla_hlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
       %3 = xla_hlo.minimum %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
-    iree.store_output(%2 : tensor<5xf32>, %arg2 : memref<5xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
@@ -55,18 +65,23 @@ module {
 
 module {
   //      CHECK:   %[[COND:.+]] = cmpf "ogt", %{{.+}}, %{{.+}} : f32
-  // CHECK-NEXT:   %{{.+}} = select %[[COND]], %{{.+}}, %{{.+}} : f32
-  func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<5xf32>)
-  attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
-    %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ( {
+  // CHECK-NEXT:   select %[[COND]], %{{.+}}, %{{.+}} : f32
+  func @reduction_entry() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = "xla_hlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
       %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
-    iree.store_output(%2 : tensor<5xf32>, %arg2 : memref<5xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
@@ -74,18 +89,23 @@ module {
 
 module {
   //      CHECK:   %[[COND:.+]] = cmpf "ogt", %{{.+}}, %{{.+}} : f32
-  // CHECK-NEXT:   %{{.+}} = select %[[COND]], %{{.+}}, %{{.+}} : f32
-  func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<4xf32>)
-  attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
-    %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ( {
+  // CHECK-NEXT:   select %[[COND]], %{{.+}}, %{{.+}} : f32
+  func @reduction_entry() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = "xla_hlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
       %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<4xf32>
-    iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
@@ -95,10 +115,10 @@ module {
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1) -> ()>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
 module {
-  //      CHECK: func @reduction_entry(
-  // CHECK-SAME: %[[ARG0:.+]]: memref<5x4xf32>,
-  // CHECK-SAME: %[[ARG1:.+]]: memref<f32>,
-  // CHECK-SAME: %[[ARG2:.+]]: memref<4xf32>)
+  //      CHECK: func @reduction_entry
+  //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
+  //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
+  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
@@ -109,40 +129,50 @@ module {
   // CHECK-NEXT:   %[[RES:.+]] = addf %[[SRC]], %[[OPERAND]] : f32
   // CHECK-NEXT:   linalg.yield %[[RES]] : f32
   // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<4xf32>
-  func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<4xf32>)
-  attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
-    %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ( {
+  func @reduction_entry() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = "xla_hlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
       %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<4xf32>
-    iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
 // -----
 
-module{
-  func @reduce_init_const(%arg0: memref<1x10xf32>, %arg1: memref<1xf32>) attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<1x10xf32>) : tensor<1x10xf32>
+module {
+  // CHECK-LABEL: func @reduce_init_const
+  func @reduce_init_const() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x10xf32>
     // CHECK: %[[CST:.+]] = constant 0xFF800000 : f32
     // CHECK: linalg.indexed_generic
     // CHECK-SAME: args_in = 1
     // CHECK-SAME: args_out = 1
     // CHECK: ^{{.+}}(%{{.+}}: index, %[[DIM:.+]]: index, %{{.+}}: f32, %[[OUTPUT:.+]]: f32):
-    // CHECK: %[[C0:.+]] = constant 0 : index
     // CHECK: select %{{.+}}, %[[CST]], %[[OUTPUT]] : f32
     %cst = constant dense<0xFF800000> : tensor<f32>
-    %1 = "xla_hlo.reduce"(%0, %cst) ( {
+    %1 = "xla_hlo.reduce"(%0, %cst) ({
     ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>): // no predecessors
       %2 = xla_hlo.add %arg2, %arg3 {name = "maximum.21"} : tensor<f32>
       "xla_hlo.return"(%2) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
-    iree.store_output(%1 : tensor<1xf32>, %arg1 : memref<1xf32>)
+    hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<1xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
   }
 }
 
@@ -152,10 +182,10 @@ module{
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> ()>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0)>
 module {
-  //      CHECK: func @reduction_multi_dimensions(
-  // CHECK-SAME: %[[ARG0:.+]]: memref<5x4x3xf32>,
-  // CHECK-SAME: %[[ARG1:.+]]: memref<f32>,
-  // CHECK-SAME: %[[ARG2:.+]]: memref<4xf32>)
+  //      CHECK: func @reduction_multi_dimensions
+  //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4x3xf32>
+  //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
+  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
@@ -171,16 +201,21 @@ module {
   // CHECK-NEXT:   %[[RES:.+]] = addf %[[SRC]], %[[OPERAND]] : f32
   // CHECK-NEXT:   linalg.yield %[[RES]] : f32
   // CHECK-NEXT: }: memref<5x4x3xf32>, memref<f32>, memref<4xf32>
-  func @reduction_multi_dimensions(%arg0: memref<5x4x3xf32>, %arg1: memref<f32>, %arg2: memref<4xf32>)
-  attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<5x4x3xf32>) : tensor<5x4x3xf32>
-    %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ( {
+  func @reduction_multi_dimensions() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4x3xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
+    %2 = "xla_hlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
       %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<[0, 2]> : tensor<2xi64>} : (tensor<5x4x3xf32>, tensor<f32>) -> tensor<4xf32>
-    iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }

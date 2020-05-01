@@ -20,6 +20,7 @@
 
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
@@ -62,102 +63,136 @@ struct WorkGroupOptions : public PassPipelineOptions<WorkGroupOptions> {
           "additional arguments will be ignored (used only for testing)"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
-}  // namespace
-
-/// Helper function to create a std.constant of index type to initialize the
-/// workgroup size as a SSA value.
-static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
-                                  SmallVectorImpl<Value> &constVal) {
-  OpBuilder builder(funcOp.getBody());
-  MLIRContext *context = funcOp.getContext();
-  for (auto val : intVal) {
-    constVal.push_back(builder.create<ConstantOp>(
-        funcOp.getLoc(), IntegerAttr::get(IndexType::get(context), val)));
-  }
-}
-
-namespace {
-
-/// Pattern to lower linalg.reshape to SPIR-V. Since all buffers are linearized
-/// in SPIR-V lowering, linalg.reshape becomes a no-op.
-// TODO(ravishankarm): Move this into MLIR Core.
-struct LinalgReshapeToSPIRVLowering
-    : public SPIRVOpLowering<linalg::ReshapeOp> {
-  using SPIRVOpLowering<linalg::ReshapeOp>::SPIRVOpLowering;
-  LogicalResult matchAndRewrite(
-      linalg::ReshapeOp reshapeOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(reshapeOp, operands);
-    return success();
-  }
-};
-
-/// To be able to use the workgroup size from the dispatch function attribute to
-/// convert GPU kernel into SPIR-V kernel, need to actually implement a pass to
-/// retrieve the attribute value from the function and pass it along.
-// TODO(ravishankarm): Move this into MLIR core.
-struct IREEGPUToSPIRVPass
-    : public PassWrapper<IREEGPUToSPIRVPass, OperationPass<ModuleOp>> {
-  void runOnOperation() {
-    MLIRContext *context = &getContext();
-    ModuleOp moduleOp = getOperation();
-
-    auto kernelModules = moduleOp.getOps<gpu::GPUModuleOp>();
-    if (kernelModules.empty()) return;
-    if (!llvm::hasSingleElement(kernelModules)) {
-      moduleOp.emitError(
-          "unhandled multiple gpu modules within a dispatch module");
-      return signalPassFailure();
-    }
-    gpu::GPUModuleOp gpuModule = *kernelModules.begin();
-    auto targetAttr = spirv::lookupTargetEnvOrDefault(gpuModule);
-    SPIRVTypeConverter typeConverter(targetAttr);
-    OwningRewritePatternList patterns;
-
-    populateGPUToSPIRVPatterns(context, typeConverter, patterns);
-    populateStandardToSPIRVPatterns(context, typeConverter, patterns);
-    patterns.insert<LinalgReshapeToSPIRVLowering>(context, typeConverter);
-
-    std::unique_ptr<ConversionTarget> target =
-        spirv::SPIRVConversionTarget::get(targetAttr);
-    target->addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
-      return typeConverter.isSignatureLegal(op.getType());
-    });
-
-    if (failed(applyFullConversion(gpuModule, *target, patterns,
-                                   &typeConverter))) {
-      return signalPassFailure();
-    }
-  }
-};
-}  // namespace
 
 void addLinalgToSPIRVPasses(OpPassManager &pm,
                             ArrayRef<int64_t> workGroupSize) {
-  // Linalg to loops.
-  pm.addPass(createLinalgTileAndFusePass(workGroupSize));
-  pm.addPass(createConvertToGPUPass());
+  //===--------------------------------------------------------------------===//
+  // Initial clean up.
+  //===--------------------------------------------------------------------===//
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  OpPassManager &gpuModulePM = pm.nest<gpu::GPUModuleOp>();
 
-  // GPU to SPIR-V.
-  gpuModulePM.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
-  gpuModulePM.addPass(createCanonicalizerPass());
-  gpuModulePM.addPass(createCSEPass());
-  pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
+  //===--------------------------------------------------------------------===//
+  // Tile Linalg on buffers.
+  //
+  // Pre-conditions:
+  //   - All Linalg ops have buffer semantics.
+  //
+  // Post-conditions:
+  //   - loop.parallel ops are generated for mapping to workgroups.
+  //   - Linalg ops are nested inside loop.parallel ops and ready for mapping
+  //     to workitems.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createLinalgTileAndFusePass(workGroupSize));
 
-  // SPIR-V passes for lowering attributes.
+  //===--------------------------------------------------------------------===//
+  // Map to GPU processor IDs.
+  //
+  // Post-conditions:
+  //   - loop.parallel ops are converted to loop.for ops and mapped to
+  //     workgroups.
+  //   - Linalg ops are converted to loop.for ops and mapped to workitems.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createConvertToGPUPass());
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  //===--------------------------------------------------------------------===//
+  // Resolve shape related ops.
+  //
+  // Pre-conditions:
+  //   - All dynamic tensors bridge through a shapex.tie_shape op with the
+  //     appropriate shape.
+  //   - No shapex.get_ranked_shape ops exist.
+  //   - Shape folding and canonicalization has been done.
+  // Post-conditions:
+  //   - shapex.tie_shape and other shapex ops are all converted away.
+  //   - std.dim ops are traced back and replaced by the corresponding
+  //     hal.inteface.load.constant op. There are no std.dim ops left
+  //     in the IR.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createResolveShapeOpsPass());
+
+  //===--------------------------------------------------------------------===//
+  // Prepare stdandard ops for SPIR-V conversion.
+  //
+  // Post-conditions:
+  //   - Load/store on std.subview ops are converted into load/store on the
+  //     original buffers.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  //===--------------------------------------------------------------------===//
+  // Final conversion to SPIR-V dialect.
+  //
+  // Post-conditions:
+  //   - All ops are converted to SPIR-V counterparts.
+  //   - spv.module ops are formed to hold all SPIR-V ops.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createConvertToSPIRVPass());
+
+  //===--------------------------------------------------------------------===//
+  // SPIR-V dialect level conversions.
+  //
+  // Post-conditions:
+  //   - SPIR-V Entry point ops are inserted.
+  //   - Required version/extension/capability are deduced.
+  //===--------------------------------------------------------------------===//
   OpPassManager &spirvModulePM = pm.nest<spirv::ModuleOp>();
   spirvModulePM.addPass(spirv::createLowerABIAttributesPass());
   spirvModulePM.addPass(createCanonicalizerPass());
   spirvModulePM.addPass(createCSEPass());
   spirvModulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
+}  // namespace
 
-void addHLOToLinalgToSPIRVPasses(OpPassManager &pm,
-                                 ArrayRef<int64_t> workGroupSize) {
+void buildSPIRVTransformPassPipeline(OpPassManager &pm,
+                                     ArrayRef<int64_t> workGroupSize) {
+  //===--------------------------------------------------------------------===//
+  // Inline the impl dispatch function into the wrapper dispatch function.
+  //
+  // TODO(antiagainst): re-evaluate the inlining timing.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createInlinerPass());
+
+  //===--------------------------------------------------------------------===//
+  // Inject shape calculation for output buffers.
+  //
+  // Pre-conditions:
+  //   - All transformations altering the tensor-level shapes have been done.
+  //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
+  //     use which associates them to their shape.
+  //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
+  //     and will be resolved.
+  // Post-conditions:
+  //   - All dynamic tensors bridge through a shapex.tie_shape op with the
+  //     appropriate shape.
+  //   - No shapex.get_ranked_shape ops exist.
+  //   - Shape folding and canonicalization has been done.
+  //===--------------------------------------------------------------------===//
+  pm.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+  pm.addNestedPass<FuncOp>(Shape::createMaterializeShapeCalculationsPass());
+  pm.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
+
+  //===--------------------------------------------------------------------===//
+  // Convert XLA HLO ops to Linalg ops with buffer semantics.
+  //
+  // Post-conditions:
+  //   - All XLA HLO ops are converted.
+  //   - All Linalg ops are operating on buffers.
+  //===--------------------------------------------------------------------===//
   addHLOToLinalgOnBuffersPasses(pm);
+
+  //===--------------------------------------------------------------------===//
+  // Convert Linalg ops to SPIR-V ops.
+  //
+  // Post-conditions:
+  //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
+  //   - The module contains the final spv.module ready for serialization.
+  //===--------------------------------------------------------------------===//
   addLinalgToSPIRVPasses(pm, workGroupSize);
 }
 
@@ -171,14 +206,14 @@ static PassPipelineRegistration<WorkGroupOptions> linalgToSPIRVPipeline(
       addLinalgToSPIRVPasses(passManager, workGroupSize);
     });
 
-static PassPipelineRegistration<WorkGroupOptions> xlaToLinalgSPIRVPipeline(
-    "iree-xla-to-linalg-to-spirv",
+static PassPipelineRegistration<WorkGroupOptions> hloToLinalgSPIRVPipeline(
+    "iree-hlo-to-linalg-to-spirv",
     "Runs the progressive lowering pipeline from XLA HLO to Linalg to SPIR-V",
     [](OpPassManager &passManager, const WorkGroupOptions &options) {
       SmallVector<int64_t, 2> workGroupSize;
       workGroupSize.assign(options.workGroupSize.begin(),
                            options.workGroupSize.end());
-      addHLOToLinalgToSPIRVPasses(passManager, workGroupSize);
+      buildSPIRVTransformPassPipeline(passManager, workGroupSize);
     });
 
 }  // namespace iree_compiler

@@ -16,8 +16,9 @@
 #define IREE_DIALECT_SHAPE_OPS
 
 include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
-include "mlir/Interfaces/SideEffects.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpAsmInterface.td"
 
 //===----------------------------------------------------------------------===//
@@ -37,8 +38,10 @@ class Shape_PureOp<string mnemonic, list<OpTrait> traits = []> :
 // RankedShapeType manipulation
 //===----------------------------------------------------------------------===//
 
-def Shape_TieShapeOp : Shape_PureOp<"tie_shape",
-    [AllTypesMatch<["operand", "result"]>]> {
+def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
+    AllTypesMatch<["operand", "result"]>,
+    DeclareOpInterfaceMethods<ViewLikeOpInterface>
+  ]> {
   let summary = "Ties a tensor and a shape together.";
   let description = [{
     Ties a specific tensor and its shape together in the IR, allowing further

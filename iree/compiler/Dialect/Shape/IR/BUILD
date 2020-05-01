@@ -58,6 +58,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
 
@@ -75,6 +76,7 @@ gentbl(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
         "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/ViewLikeInterface.td",
         "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
     ],
 )
@@ -92,6 +94,7 @@ iree_tablegen_doc(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
         "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/ViewLikeInterface.td",
         "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
     ],
 )

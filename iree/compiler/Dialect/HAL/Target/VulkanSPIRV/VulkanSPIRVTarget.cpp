@@ -124,8 +124,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpPassManager &passManager) override {
-    passManager.addPass(createHALInterfaceToMemrefPass());
-    addHLOToLinalgToSPIRVPasses(passManager, options_.workgroupSize);
+    buildSPIRVTransformPassPipeline(passManager, options_.workgroupSize);
   }
 
   // Finds the spv.ExecutionMode operation to get the workgroup size from.

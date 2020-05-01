@@ -41,7 +41,13 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass();
+std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass();
+
+/// Pass to perform the final conversion to SPIR-V dialect.
+/// This pass converts remaining interface ops into SPIR-V global variables,
+/// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
+/// corresponding SPIR-V ops.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

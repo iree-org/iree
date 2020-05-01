@@ -44,6 +44,7 @@ iree_cc_library(
     "LinalgFusion.cpp"
     "LinalgVectorTransform.cpp"
     "Passes.cpp"
+    "ResolveShapeOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -55,7 +56,9 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
     iree::compiler::Translation::CodegenUtils
     tensorflow::mlir_xla
   PUBLIC

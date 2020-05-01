@@ -144,8 +144,6 @@ LogicalResult updateWorkGroupSize(Operation *op,
   // attribute, and the hal.executable.
   FuncOp funcOp =
       (isa<FuncOp>(op) ? cast<FuncOp>(op) : op->getParentOfType<FuncOp>());
-  if (!isDispatchFuncImpl(funcOp))
-    return op->emitError("expected operation to be within a dispatch function");
   MLIRContext *context = op->getContext();
   SmallVector<int32_t, 3> workGroupSizeVec(llvm::map_range(
       workGroupSize,

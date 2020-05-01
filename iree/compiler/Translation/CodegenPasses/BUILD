@@ -44,6 +44,7 @@ cc_library(
         "LinalgFusion.cpp",
         "LinalgVectorTransform.cpp",
         "Passes.cpp",
+        "ResolveShapeOps.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -51,7 +52,9 @@ cc_library(
     deps = [
         ":LinalgVectorTransformPatternsIncGen",
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Translation/CodegenUtils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",

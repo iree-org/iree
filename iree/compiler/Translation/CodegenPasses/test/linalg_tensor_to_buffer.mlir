@@ -4,14 +4,13 @@
 
 module {
   // CHECK: func @element_wise
-  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<2x2xf32>
-  // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<2x2xf32>
-  // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<2x2xf32>
-  func @element_wise(%arg0: memref<2x2xf32>, %arg1: memref<2x2xf32>,
-                     %arg2: memref<2x2xf32>)
-    attributes {iree.dispatch_fn_name = ""} {
-    %0 = iree.load_input(%arg0 : memref<2x2xf32>) : tensor<2x2xf32>
-    %1 = iree.load_input(%arg1 : memref<2x2xf32>) : tensor<2x2xf32>
+  // CHECK: %[[ARG0:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x2xf32>
+  // CHECK: %[[ARG1:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2x2xf32>
+  // CHECK: %[[ARG2:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x2xf32>
+  func @element_wise() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2x2xf32>
     // CHECK: linalg.generic
     // CHECK-SAME: %[[ARG0]], %[[ARG1]], %[[ARG2]]
     %2 = linalg.generic {args_in = 2 : i64, args_out = 1 : i64, indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} %0, %1 {
@@ -24,8 +23,13 @@ module {
       %3 = addf %arg3, %arg4 : f32
       linalg.yield %3 : f32
     }: tensor<2x2xf32>, tensor<2x2xf32> -> tensor<2x2xf32>
-    iree.store_output(%2 : tensor<2x2xf32>, %arg2 : memref<2x2xf32>)
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<2x2xf32>
     // CHECK: return
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }

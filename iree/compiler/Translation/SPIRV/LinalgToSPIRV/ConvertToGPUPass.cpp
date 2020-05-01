@@ -37,7 +37,7 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Utility functions used in the conversion
+// Loop utilities
 //===----------------------------------------------------------------------===//
 
 /// Builds an empty loop.for operation. The default builder adds an entry basic
@@ -48,22 +48,6 @@ static loop::ForOp buildEmptyForOp(Location loc, OpBuilder &builder, Value lb,
   state.addOperands({lb, ub, step});
   state.addRegion();
   return cast<loop::ForOp>(builder.createOperation(state));
-}
-
-/// Builds an empty gpu.func operation. The default method always adds entry
-/// block.
-static gpu::GPUFuncOp buildEmptyGPUFuncOp(Location loc, OpBuilder &builder,
-                                          StringRef name, FunctionType type) {
-  OperationState state(loc, gpu::GPUFuncOp::getOperationName());
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
-  state.addAttribute(gpu::GPUFuncOp::getTypeAttrName(), TypeAttr::get(type));
-  state.addAttribute(gpu::GPUDialect::getKernelFuncAttrName(),
-                     builder.getUnitAttr());
-  state.addAttribute(gpu::GPUFuncOp::getNumWorkgroupAttributionsAttrName(),
-                     builder.getI64IntegerAttr(0));
-  state.addRegion();
-  return cast<gpu::GPUFuncOp>(builder.createOperation(state));
 }
 
 namespace {
@@ -190,6 +174,10 @@ static Operation *serializeDimensionsFrom(ConversionPatternRewriter &rewriter,
   return serializeDimensions(rewriter, pLoopOp, serializedDimensions);
 }
 
+//===----------------------------------------------------------------------===//
+// GPU processor ID mapping utilities
+//===----------------------------------------------------------------------===//
+
 /// Distribute loop.parallel to processors with the processors logically
 /// arranged with same dimensionality as the number of loops, i.e. a
 /// loop.parallel with 2 loops to a 2D grid of processors. `processorIDs` and
@@ -278,87 +266,8 @@ bool checkMarkerValue(LinalgOpTy linalgOp, StringRef marker = "") {
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
-struct ConvertToGPUPass
-    : public PassWrapper<ConvertToGPUPass, OperationPass<ModuleOp>> {
-  void runOnOperation() override;
-};
-
-/// Convert from FuncOp to gpu::GPUFuncOp.
-// TODO(ravishankarm, antiagainst): We dont need to actually create a gpu.func
-// (or the gpu.module that this needs to live in). Eventually when the pipeline
-// works on the dispatch function directly, this should be removed.
-struct GPUFuncConversionPattern : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      FuncOp funcOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!isDispatchFuncImpl(funcOp)) return failure();
-    Location loc = funcOp.getLoc();
-
-    rewriter.startRootUpdate(funcOp);
-
-    // Create a gpu.module within which the gpu.func exists.
-    std::string moduleName = Twine(funcOp.getName(), "_gpumodule").str();
-    auto kernelModule = rewriter.create<gpu::GPUModuleOp>(loc, moduleName);
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(&kernelModule.body().front());
-
-    // Create a gpu.func and move the body of the funcOp into this.
-    StringRef dispatchFuncImplAttrName = getDispatchFuncAttrName();
-    auto dispatchFuncNameAttr =
-        funcOp.getAttrOfType<StringAttr>(dispatchFuncImplAttrName);
-    auto gpuFuncOp = buildEmptyGPUFuncOp(
-        loc, rewriter, dispatchFuncNameAttr.getValue(), funcOp.getType());
-    TypeConverter::SignatureConversion signatureConversion(
-        funcOp.getNumArguments());
-    for (auto argType : enumerate(funcOp.getType().getInputs()))
-      signatureConversion.addInputs(argType.index(), argType.value());
-    rewriter.applySignatureConversion(&funcOp.getBody(), signatureConversion);
-    rewriter.inlineRegionBefore(funcOp.getBody(), gpuFuncOp.getBody(),
-                                gpuFuncOp.getBody().begin());
-
-    // Move the attributes needed for SPIR-V ABI lowering onto the gpu.func if
-    // they exist.
-    auto targetEnvAttrName = spirv::getTargetEnvAttrName();
-    auto targetEnvAttr = spirv::lookupTargetEnv(funcOp);
-    if (targetEnvAttr)
-      kernelModule.setAttr(targetEnvAttrName,
-                           spirv::lookupTargetEnvOrDefault(funcOp));
-
-    StringRef attrName = spirv::getInterfaceVarABIAttrName();
-    for (unsigned argIndex :
-         llvm::seq<unsigned>(0, gpuFuncOp.getNumArguments())) {
-      if (auto attr = funcOp.getArgAttrOfType<spirv::InterfaceVarABIAttr>(
-              argIndex, attrName)) {
-        gpuFuncOp.setArgAttr(argIndex, attrName, attr);
-        funcOp.removeArgAttr(argIndex,
-                             Identifier::get(attrName, rewriter.getContext()));
-      }
-    }
-
-    StringRef entryAttrName = spirv::getEntryPointABIAttrName();
-    auto attr = funcOp.getAttrOfType<spirv::EntryPointABIAttr>(entryAttrName);
-    if (attr) {
-      gpuFuncOp.setAttr(entryAttrName, attr);
-      funcOp.removeAttr(entryAttrName);
-    }
-    funcOp.removeAttr(getDispatchFuncAttrName());
-    rewriter.finalizeRootUpdate(funcOp);
-    return success();
-  }
-};
-
-/// gpu.func needs to terminate with a gpu.return operation. Convert std.return
-/// to gpu.return.
-// TODO(ravishankarm, antiagainst): Remove this when gpu.func is not created.
-struct ReturnConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      ReturnOp returnOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<gpu::ReturnOp>(returnOp);
-    return success();
-  }
+struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
+  void runOnFunction() override;
 };
 
 /// Pattern to map loop.parallel to workgroups.
@@ -427,20 +336,9 @@ struct RemoveLinalgRange : public OpConversionPattern<linalg::RangeOp> {
 };
 }  // namespace
 
-void ConvertToGPUPass::runOnOperation() {
-  ModuleOp moduleOp = getOperation();
-  // Find all functions that are dispatch function impls.
-  // TODO(ravishankarm, antiagainst) : Eventually this pass should just
-  // operate on the dispatch function directly.
-  SmallVector<FuncOp, 1> dispatchFnImplFns;
-  for (FuncOp fn : moduleOp.getOps<FuncOp>())
-    if (isDispatchFuncImpl(fn)) dispatchFnImplFns.push_back(fn);
-  if (!llvm::hasSingleElement(dispatchFnImplFns)) {
-    moduleOp.emitError("unhandled multiple dispatch function impl fns");
-    return signalPassFailure();
-  }
+void ConvertToGPUPass::runOnFunction() {
+  FuncOp funcOp = getFunction();
 
-  FuncOp funcOp = dispatchFnImplFns[0];
   Region &body = funcOp.getBody();
   if (!llvm::hasSingleElement(body)) {
     funcOp.emitError("unhandled dispatch function with multiple blocks");
@@ -449,49 +347,42 @@ void ConvertToGPUPass::runOnOperation() {
 
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
-  target.addLegalDialect<StandardOpsDialect, gpu::GPUDialect,
-                         loop::LoopOpsDialect>();
-  target.addDynamicallyLegalOp<FuncOp>(
-      [](FuncOp fn) -> bool { return !isDispatchFuncImpl(fn); });
-  target.addIllegalOp<ReturnOp>();
+  // Ater this pass Linalg and loop.parallel ops should be gone.
   target.addIllegalOp<loop::ParallelOp>();
   target.addIllegalDialect<linalg::LinalgDialect>();
   // Reshape ops are treated legal since they just change the way the underlying
   // buffer is viewed. These are legalized downstream. They become no ops when
   // lowering to SPIR-V since the SPIR-V code uses linearized arrays.
   target.addLegalOp<linalg::ReshapeOp>();
+  // Let the rest fall through.
+  target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
   OwningRewritePatternList patterns;
-  patterns
-      .insert<GPUFuncConversionPattern,
+  patterns.insert<
 #define ADD_ALL_LINALG_PATTERNS(OP_NAME) \
   ExecuteLinalgOpSequentially<OP_NAME>, MapLinalgOpToWorkitems<OP_NAME>
-
-              ADD_ALL_LINALG_PATTERNS(linalg::ConvOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::CopyOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::FillOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::GenericOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::IndexedGenericOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::MatmulOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::PoolingMaxOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::PoolingMinOp),
-              ADD_ALL_LINALG_PATTERNS(linalg::PoolingSumOp),
-
+      ADD_ALL_LINALG_PATTERNS(linalg::ConvOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::CopyOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::FillOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::GenericOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::IndexedGenericOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::MatmulOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::PoolingMaxOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::PoolingMinOp),
+      ADD_ALL_LINALG_PATTERNS(linalg::PoolingSumOp),
 #undef ADD_ALL_LINALG_PATTERNS
-              PartitionPLoopToWorkgroups, RemoveLinalgRange, ReturnConversion>(
-          context);
+      PartitionPLoopToWorkgroups, RemoveLinalgRange>(context);
 
-  populateAffineToStdConversionPatterns(patterns, context);
-  if (failed(applyPartialConversion(funcOp, target, patterns)))
+  if (failed(applyFullConversion(funcOp, target, patterns)))
     return signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass() {
+std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass() {
   return std::make_unique<ConvertToGPUPass>();
 }
 
 static PassRegistration<ConvertToGPUPass> pass(
-    "iree-convert-to-gpu", "Convert tiled linalg operation to GPU function",
+    "iree-convert-to-gpu", "Map tiled linalg and loop ops to GPU",
     [] { return std::make_unique<ConvertToGPUPass>(); });
 
 }  // namespace iree_compiler

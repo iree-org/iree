@@ -21,6 +21,7 @@ cc_library(
     name = "LinalgToSPIRV",
     srcs = [
         "ConvertToGPUPass.cpp",
+        "ConvertToSPIRVPass.cpp",
         "LinalgTileAndFusePass.cpp",
         "LowerToSPIRV.cpp",
     ],
@@ -29,7 +30,9 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Translation/CodegenPasses",
         "//iree/compiler/Translation/CodegenUtils",
         "@llvm-project//llvm:support",
