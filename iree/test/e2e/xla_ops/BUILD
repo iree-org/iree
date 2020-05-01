@@ -57,6 +57,7 @@ iree_check_single_backend_test_suite(
         # "convert.mlir",
         #
         "cosine.mlir",
+        "divide.mlir",
         "dot.mlir",
         "exponential.mlir",
 
@@ -93,6 +94,7 @@ iree_check_single_backend_test_suite(
         # "slice.mlir",
         #
         "sqrt.mlir",
+        "subtract.mlir",
         "transpose.mlir",
 
         # TODO(GH-1688): Enable after integer widths are handled
@@ -115,6 +117,7 @@ iree_check_single_backend_test_suite(
         "constant.mlir",
         "convolution.mlir",
         "cosine.mlir",
+        "divide.mlir",
         "dot.mlir",
         "exponential.mlir",
         "gemm.mlir",
@@ -132,6 +135,7 @@ iree_check_single_backend_test_suite(
         "rsqrt.mlir",
         "select.mlir",
         "sqrt.mlir",
+        "subtract.mlir",
         "transpose.mlir",
         "while.mlir",
     ],
