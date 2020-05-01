@@ -30,34 +30,23 @@ func @outerOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 // -----
 
-flow.executable @nondependentOuterOps_ex_dispatch_0 {
-  flow.dispatch.entry @nondependentOuterOps_rgn_dispatch_0 attributes {
-    workload = 4 : index
-  }
-  module {
-    func @nondependentOuterOps_rgn_dispatch_0(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg1 : tensor<4xf32>
-      return %0 : tensor<4xf32>
-    }
-  }
-}
 // CHECK-LABEL: func @nondependentOuterOps(
 func @nondependentOuterOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4 : index
   %cst = constant 4 : index
-  %0 = flow.dispatch @nondependentOuterOps_ex_dispatch_0::@nondependentOuterOps_rgn_dispatch_0[%cst : index](%arg0, %arg0) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT: %0 = addf %arg0, %arg0 : tensor<4xf32>
-  %1 = addf %arg0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT: %1 = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD]] : index, %arg2 = %arg0 : tensor<4xf32>, %arg3 = %0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %3 = flow.dispatch @nondependentOuterOps_ex_dispatch_0::@nondependentOuterOps_rgn_dispatch_0[%arg1 : index](%arg2, %arg2) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   %4 = flow.dispatch @nondependentOuterOps_ex_dispatch_0::@nondependentOuterOps_rgn_dispatch_0[%arg1 : index](%3, %arg3) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   flow.return %4 : tensor<4xf32>
+  // CHECK-NEXT: %[[ADD1:.+]] = addf %arg0, %arg0 : tensor<4xf32>
+  %add1 = addf %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT: %[[S:.+]] = flow.ex.stream.fragment(%arg1 = %[[WORKLOAD]] : index, %arg2 = %arg0 : tensor<4xf32>, %arg3 = %[[ADD1]] : tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK-NEXT:   %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1[%arg1 : index](%arg2, %arg2) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  %d1 = flow.dispatch @dispatch_1::@dispatch_1[%cst : index](%arg0, %arg0) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT:   %[[D2:.+]] = flow.dispatch @dispatch_2::@dispatch_2[%arg1 : index](%[[D1]], %arg3) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  %d2 = flow.dispatch @dispatch_2::@dispatch_2[%cst : index](%d1, %add1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT:   flow.return %[[D2]] : tensor<4xf32>
   // CHECK-NEXT: }
-  %2 = flow.dispatch @nondependentOuterOps_ex_dispatch_0::@nondependentOuterOps_rgn_dispatch_0[%cst : index](%0, %1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT: %2 = addf %1, %arg0 : tensor<4xf32>
-  %3 = addf %2, %arg0 : tensor<4xf32>
-  // CHECK-NEXT: return %2 : tensor<4xf32>
-  return %3 : tensor<4xf32>
+  // CHECK-NEXT: %[[ADD2:.+]] = addf %[[S]], %arg0 : tensor<4xf32>
+  %add2 = addf %d2, %arg0 : tensor<4xf32>
+  // CHECK-NEXT: return %[[ADD2]] : tensor<4xf32>
+  return %add2 : tensor<4xf32>
 }
 
 // -----
@@ -261,4 +250,57 @@ func @simple_unary(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>) -
   %6 = flow.dispatch @simple_unary_ex_dispatch_0::@simple_unary_ex_dispatch_0[%2 : index](%3, %4, %5) : (tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
   %7 = shapex.tie_shape %6, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %7, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+}
+
+
+// -----
+
+// CHECK-LABEL: @unordered
+func @unordered() -> (tensor<i32>, tensor<f32>) {
+  //      CHECK: %[[W:.+]] = constant 1 : index
+  %workload = constant 1 : index
+  //      CHECK: %[[C2:.+]] = constant 2 : i32
+  //      CHECK: %[[S:.+]]:2 = flow.ex.stream.fragment
+  // CHECK-SAME: {
+  //  CHECK-DAG:   %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1
+  %0 = flow.dispatch @dispatch_1::@dispatch_1[%workload : index]() : () -> tensor<i32>
+  %c2 = constant 2 : i32
+  //  CHECK-DAG:   %[[D2:.+]] = flow.dispatch @dispatch_2::@dispatch_2
+  %1 = flow.dispatch @dispatch_2::@dispatch_2[%workload : index](%c2) : (i32) -> tensor<f32>
+                   // Could be returned in either order
+  //      CHECK:   flow.return
+  // CHECK-NEXT: }
+  //      CHECK: return
+  // CHECK-SAME: tensor<i32>, tensor<f32>
+  return %0, %1 : tensor<i32>, tensor<f32>
+}
+
+// -----
+
+// CHECK-LABEL: @earlier_dependency
+func @earlier_dependency() -> (tensor<i32>, tensor<f32>, tensor<2xf32>) {
+  //      CHECK: %[[W:.+]] = constant 1 : index
+  %w = constant 1 : index
+  //      CHECK: %[[S1:.+]] = flow.ex.stream.fragment
+  // CHECK-SAME: {
+  //      CHECK:        %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1
+  // CHECK-NEXT:   flow.return %[[D1]]
+  // CHECK-NEXT: }
+  %d1 = flow.dispatch @dispatch_1::@dispatch_1[%w : index]() : () -> tensor<i32>
+  //      CHECK: %[[READBACK:.+]] = flow.tensor.load %[[S1]]
+  //      CHECK: %[[S2:.+]]:2 = flow.ex.stream.fragment
+  // CHECK-SAME: {
+  //  CHECK-DAG:    %[[D2:.+]] = flow.dispatch @dispatch_2::@dispatch_2
+  //  CHECK-DAG:    %[[D3:.+]] = flow.dispatch @dispatch_3::@dispatch_3
+                    // Could be returned in either order
+  //      CHECK:    flow.return
+  // CHECK-NEXT: }
+  %d2 = flow.dispatch @dispatch_2::@dispatch_2[%w : index]() : () -> tensor<f32>
+  %readback = flow.tensor.load %d1 : tensor<i32>
+  %d3 = flow.dispatch @dispatch_3::@dispatch_3[%w : index](%readback) : (i32) -> tensor<2xf32>
+  //      CHECK: return %[[S1]]
+  // CHECK-SAME:   %[[S2]]#
+  // CHECK-SAME:   %[[S2]]#
+  // CHECK-SAME:   tensor<i32>, tensor<f32>, tensor<2xf32>
+  return %d1, %d2, %d3 : tensor<i32>, tensor<f32>, tensor<2xf32>
 }

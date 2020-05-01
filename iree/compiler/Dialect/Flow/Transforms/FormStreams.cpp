@@ -124,8 +124,6 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
       }
     };
 
-    // Returns true if the stream can continue growing and false if the stream
-    // should be split at the current op.
     auto scanAndFormStream = [&](Operation *op, Operation *blockerOp) {
       if (processedOps.count(op)) {
         // Op has already been added to a stream and can be skipped.
@@ -222,9 +220,17 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
   // the originals from the parent block.
   void formStreamFragmentInBlock(Block &block,
                                  SmallVector<Operation *, 8> streamOps) {
+    // Ensure that the stream is inserted after the position of all operations
+    // in the stream so that all operands are available.
+    auto lastStreamOp = streamOps.back();
+    for (auto *streamOp : streamOps) {
+      if (lastStreamOp->isBeforeInBlock(streamOp)) {
+        lastStreamOp = streamOp;
+      }
+    }
     auto *context = block.getParent()->getContext();
     OpBuilder blockBuilder = OpBuilder::atBlockEnd(&block);
-    blockBuilder.setInsertionPointAfter(streamOps.back());
+    blockBuilder.setInsertionPointAfter(lastStreamOp);
     auto fragmentLoc = FusedLoc::get(
         llvm::to_vector<8>(llvm::map_range(
             streamOps, [](Operation *op) { return op->getLoc(); })),
