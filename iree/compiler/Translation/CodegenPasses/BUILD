@@ -20,28 +20,12 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-gentbl(
-    name = "LinalgVectorTransformPatternsIncGen",
-    tbl_outs = [
-        (
-            "-gen-rewriters",
-            "LinalgVectorTransformPatterns.h.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LinalgVectorTransformPatterns.td",
-    td_srcs = [
-        "@llvm-project//mlir:LinalgTransformPatternsTdFiles",
-    ],
-)
-
 cc_library(
     name = "CodegenPasses",
     srcs = [
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "LinalgFusion.cpp",
-        "LinalgVectorTransform.cpp",
         "Passes.cpp",
         "ResolveShapeOps.cpp",
     ],
@@ -49,7 +33,6 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        ":LinalgVectorTransformPatternsIncGen",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
