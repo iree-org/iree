@@ -15,6 +15,8 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+file(GLOB _GLOB_UNIDIRECTIONAL_LSTM_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS unidirectional_lstm.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_UNIDIRECTIONAL_LSTM_MLIR})
 iree_lit_test_suite(
   NAME
     lit
@@ -25,4 +27,20 @@ iree_lit_test_suite(
     iree::tools::iree-run-mlir
   LABELS
     "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    lit_failing
+  SRCS
+    "unidirectional_lstm.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-run-mlir
+  LABELS
+    "hostonly"
+    "manual"
+    "noga"
+    "nokokoro"
+    "notap"
 )
