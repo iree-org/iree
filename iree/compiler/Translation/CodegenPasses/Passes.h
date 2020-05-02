@@ -35,10 +35,6 @@ namespace iree_compiler {
 /// IREE::HAL::ExecutableTargetOp.
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
 
-/// Creates a pass to convert HAL interface on tensors to HAL interface on
-/// memrefs.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createHALInterfaceToMemrefPass();
-
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 
@@ -74,7 +70,6 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
 
 /// Register all Codegen passes
 inline void registerCodegenPasses() {
-  createHALInterfaceToMemrefPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
   createLinalgOnTensorsFusionPass();

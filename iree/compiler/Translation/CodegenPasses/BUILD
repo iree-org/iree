@@ -38,7 +38,6 @@ gentbl(
 cc_library(
     name = "CodegenPasses",
     srcs = [
-        "HALInterfaceToMemrefPass.cpp",
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "LinalgFusion.cpp",
