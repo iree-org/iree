@@ -189,12 +189,12 @@ func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, 
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: func @dynamicUpdateSlice(%arg0: tensor<2x4xi32>, %arg1: tensor<1x1xi32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> tensor<2x4xi32> {
-// CHECK-NEXT:   %[[WORKLOAD0:.+]] = constant 8 : index
-// CHECK-NEXT:   %0 = flow.tensor.load %arg2 : tensor<i32>
-// CHECK-NEXT:   %1 = index_cast %0 : i32 to index
-// CHECK-NEXT:   %2 = flow.tensor.load %arg3 : tensor<i32>
-// CHECK-NEXT:   %3 = index_cast %2 : i32 to index
-// CHECK-NEXT:   %4 = flow.ex.stream.fragment(%arg4 = %arg1 : tensor<1x1xi32>, %arg5 = %arg0 : tensor<2x4xi32>, %arg6 = %1 : index, %arg7 = %3 : index, %arg8 = %[[WORKLOAD0]] : index) -> tensor<2x4xi32> {
+// CHECK-DAG:   %[[WORKLOAD0:.+]] = constant 8 : index
+// CHECK-DAG:   %[[ARG2_LOAD:.+]] = flow.tensor.load %arg2 : tensor<i32>
+// CHECK-DAG:   %[[ARG2_INDEX:.+]] = index_cast %[[ARG2_LOAD]] : i32 to index
+// CHECK-DAG:   %[[ARG3_LOAD:.+]] = flow.tensor.load %arg3 : tensor<i32>
+// CHECK-DAG:   %[[ARG3_INDEX:.+]] = index_cast %[[ARG3_LOAD]] : i32 to index
+// CHECK-NEXT:   %4 = flow.ex.stream.fragment(%arg4 = %arg1 : tensor<1x1xi32>, %arg5 = %arg0 : tensor<2x4xi32>, %arg6 = %[[ARG2_INDEX]] : index, %arg7 = %[[ARG3_INDEX]] : index, %arg8 = %[[WORKLOAD0]] : index) -> tensor<2x4xi32> {
 // CHECK-NEXT:     %5 = flow.tensor.update %arg4, %arg5[%arg6, %arg7] : tensor<1x1xi32> -> tensor<2x4xi32>
 // CHECK-NEXT:     %6 = flow.dispatch @dynamicUpdateSlice_ex_dispatch_0::@dynamicUpdateSlice_ex_dispatch_0[%arg8 : index](%arg5, %5) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
 // CHECK-NEXT:     flow.return %6 : tensor<2x4xi32>

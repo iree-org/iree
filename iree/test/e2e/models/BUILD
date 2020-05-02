@@ -23,30 +23,10 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(
-        ["*.mlir"],
-        exclude = ["unidirectional_lstm.mlir"],
-    ),
+    srcs = glob(["*.mlir"]),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
     ],
     tags = ["hostonly"],
-)
-
-iree_lit_test_suite(
-    name = "lit_failing",
-    srcs = ["unidirectional_lstm.mlir"],
-    data = [
-        "//iree/tools:IreeFileCheck",
-        "//iree/tools:iree-run-mlir",
-    ],
-    tags = [
-        "hostonly",
-        # TODO(GH-1754): Fix and reenable this test.
-        "manual",
-        "noga",
-        "nokokoro",
-        "notap",
-    ],
 )

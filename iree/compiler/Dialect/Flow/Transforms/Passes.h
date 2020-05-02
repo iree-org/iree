@@ -124,6 +124,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 // Identifies dispatches that can be grouped into streams within functions.
 std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass();
 
+// Reorders blocks to hoist ops that cannot be put into streams.
+std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
+
 // TODO(benvanik): cross-function stream flows.
 
 //===----------------------------------------------------------------------===//
@@ -146,6 +149,7 @@ inline void registerFlowPasses() {
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
   createFormStreamsPass();
+  createHoistUnstreamableOpsPass();
 }
 
 }  // namespace Flow

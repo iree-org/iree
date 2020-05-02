@@ -69,7 +69,7 @@ static void expandFragmentToPrimitiveTypes(ExStreamFragmentOp fragmentOp) {
 // this will run an analysis to identify compatible dispatches across the entire
 // function CFG, create the streams, and then thread the streams through the CFG
 // to append additional stream work. For now, we just look at basic blocks and
-// cluster all of the dispatches and flow ops together.
+// cluster adjacent dispatches and flow ops together.
 class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
  public:
   void runOnFunction() override {
@@ -84,137 +84,21 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
   // Returns an ordered list of streams within the block.
   // Each stream contains one or more ops that are stream-compatible.
   SmallVector<SmallVector<Operation *, 8>, 8> findStreamsInBlock(Block &block) {
-    // Identify all ops with side-effects so that we can quickly identify when
-    // we need to bail.
-    SmallVector<Operation *, 8> opsWithSideEffects;
-    for (auto &op : block) {
-      // TODO: Handle region side effects.
-      if (!MemoryEffectOpInterface::hasNoEffect(&op) ||
-          op.hasTrait<OpTrait::IREE::YieldPoint>() || op.getNumRegions() != 0) {
-        opsWithSideEffects.push_back(&op);
-      }
-    }
-
-    llvm::SmallSetVector<Operation *, 8> processedOps;
     SmallVector<Operation *, 8> currentStreamOps;
-    llvm::SmallSetVector<Operation *, 8> currentOutsideOps;
     SmallVector<SmallVector<Operation *, 8>, 8> streams;
-    llvm::SmallSetVector<Operation *, 8> scanList;
-
-    auto resetCurrentStream = [&]() {
-      if (!currentStreamOps.empty()) {
-        streams.push_back(std::move(currentStreamOps));
+    for (Operation &op : block) {
+      if (isStreamableOp(&op)) {
+        currentStreamOps.push_back(&op);
+      } else if (!currentStreamOps.empty()) {
+        streams.push_back(currentStreamOps);
         currentStreamOps = {};
       }
-      currentOutsideOps.clear();
-      scanList.clear();
-    };
-
-    auto markOpDAGOutside = [&](Operation *op) {
-      llvm::SmallSetVector<Operation *, 8> markList;
-      markList.insert(op);
-      while (!markList.empty()) {
-        auto *nextOp = markList.pop_back_val();
-        if (!currentOutsideOps.insert(nextOp)) continue;
-        for (auto operand : nextOp->getOperands()) {
-          if (operand.getDefiningOp()) {
-            markList.insert(operand.getDefiningOp());
-          }
-        }
-      }
-    };
-
-    // Returns true if the stream can continue growing and false if the stream
-    // should be split at the current op.
-    auto scanAndFormStream = [&](Operation *op, Operation *blockerOp) {
-      if (processedOps.count(op)) {
-        // Op has already been added to a stream and can be skipped.
-        return;
-      }
-      processedOps.insert(op);
-
-      // TODO: Handle region side effects.
-      if (!MemoryEffectOpInterface::hasNoEffect(op) ||
-          op->getNumRegions() != 0) {
-        // Op has side-effects and should split the current stream.
-        resetCurrentStream();
-        return;
-      } else if (!isStreamableOp(op)) {
-        // Op is not from the flow dialect and should be ignored.
-        markOpDAGOutside(op);
-        return;
-      }
-
-      if (currentOutsideOps.count(op)) {
-        resetCurrentStream();
-      }
-      // Add the flow op to the current stream.
-      currentStreamOps.push_back(op);
-
-      // Recursively work through the inputs of the op to pull in any
-      // dependencies that we are able to (are flow ops, have no side-effects).
-      for (auto operand : op->getOperands()) {
-        auto *depOp = operand.getDefiningOp();
-        if (!depOp) {
-          // Op is a block arg.
-          continue;
-        } else if (depOp->getBlock() != op->getBlock()) {
-          // Op is from another block; we only are interested in ops defined
-          // within this block as future optimizations will deal with
-          // cross-block dependencies.
-          markOpDAGOutside(depOp);
-          continue;
-
-          // TODO: Handle region side effects.
-        } else if (!MemoryEffectOpInterface::hasNoEffect(depOp) ||
-                   !isStreamableOp(depOp) || depOp->getNumRegions() != 0) {
-          // Source op has side effects or isn't streamable meaning that we
-          // can't fold it into the stream region.
-          markOpDAGOutside(depOp);
-          continue;
-        } else if (blockerOp && depOp->isBeforeInBlock(blockerOp)) {
-          // The dep reaches across an op with side effects (even though it
-          // doesn't have any data flowing through it). We are strict here and
-          // even if the dep doesn't have side-effects we assume that all
-          // side-effecting ops act as barriers.
-          markOpDAGOutside(depOp);
-          continue;
-        }
-        if (!currentOutsideOps.count(depOp)) {
-          scanList.insert(depOp);
-        }
-      }
-    };
-
-    for (auto &op : llvm::reverse(block.getOperations())) {
-      // Find the op prior to |op| that has side-effects.
-      // We use this to block formation so that we don't try to pull in ops
-      // across any op with side-effects.
-      // TODO(benvanik): maybe make this less strict? Maybe just YieldPoint?
-      while (!opsWithSideEffects.empty() &&
-             op.isBeforeInBlock(opsWithSideEffects.back())) {
-        opsWithSideEffects.pop_back();
-      }
-      Operation *blockerOp =
-          opsWithSideEffects.empty() ? nullptr : opsWithSideEffects.back();
-
-      // Scan all ops and try to pull them into a stream.
-      if (isStreamableOp(&op)) {
-        scanList.insert(&op);
-        while (!scanList.empty()) {
-          scanAndFormStream(scanList.pop_back_val(), blockerOp);
-        }
-      }
     }
-    resetCurrentStream();
-
-    // Reverse the streams as we iterated in reverse order.
-    // We need to sort all of the ops within each stream as they may have been
-    // inserted out of order during the scan.
-    for (auto &stream : streams) {
-      stream = sortOpsTopologically<8>(stream);
+    if (!currentStreamOps.empty()) {
+      streams.push_back(currentStreamOps);
+      currentStreamOps = {};
     }
-    std::reverse(streams.begin(), streams.end());
+
     return streams;
   }
 

@@ -25,6 +25,7 @@ cc_library(
         "FoldCompatibleDispatchRegions.cpp",
         "FormStreams.cpp",
         "HLOToHLOPreprocessing.cpp",
+        "HoistUnstreamableOps.cpp",
         "IdentifyDispatchRegions.cpp",
         "LegalizeInputTypes.cpp",
         "MaterializeExportedReflection.cpp",
