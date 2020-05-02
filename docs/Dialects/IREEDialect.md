@@ -52,31 +52,6 @@ the final step in compilation.
 | :----: | ----------- |
 `results` | any type
 
-### `iree.load_input` (IREE::LoadInputOp)
-
-Loading input from a buffer
-
-Syntax:
-
-```
-operation ::= `iree.load_input` `(` $src `:` type($src) `)` attr-dict `:` type(results)
-```
-
-
-Note: this is expected to be deprecated soon.
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`src` | memref of signless integer or floating-point values
-
-#### Results:
-
-| Result | Description |
-| :----: | ----------- |
-&laquo;unnamed&raquo; | any type
-
 ### `iree.placeholder` (IREE::PlaceholderOp)
 
 A placeholder op to feed a value/buffer into computation
@@ -105,26 +80,6 @@ argument due to ABI or contract issues.
 | Result | Description |
 | :----: | ----------- |
 `output` | any type
-
-### `iree.store_output` (IREE::StoreOutputOp)
-
-Storing output to a buffer
-
-Syntax:
-
-```
-operation ::= `iree.store_output` `(` $src `:` type($src) `,` $dst `:` type($dst) `)` attr-dict
-```
-
-
-Note: this is expected to be deprecated soon.
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`src` | any type
-`dst` | memref of signless integer or floating-point values
 
 ### `iree.unfoldable_constant` (IREE::UnfoldableConstantOp)
 
