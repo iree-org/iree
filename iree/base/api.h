@@ -113,6 +113,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(_WIN32)
+// Safe alloca that may fall back to heap in the case of stack overflows:
+// https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/malloca?view=vs-2019
+#include <malloc.h>
+#define iree_alloca(sz) _malloca(sz)
+#define iree_freea(ptr) _freea(ptr)
+#else
+#include <alloca.h>
+#define iree_alloca(sz) alloca(sz)
+#define iree_freea(ptr)
+#endif  // _WIN32
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -297,6 +309,10 @@ typedef uintptr_t iree_status_t;
   IREE_API_STATUS_MACROS_IMPL_RETURN_IF_API_ERROR_( \
       IREE_API_STATUS_MACROS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
 
+// TODO(#265): clean up the status object.
+// Ignores the status result of (expr).
+#define IREE_IGNORE_ERROR(expr) (void)(expr)
+
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Returns a NUL-terminated string constant for the given status code, such as
@@ -363,6 +379,13 @@ typedef enum {
   // fresh pages from the system. It is always safe to zero contents if the
   // behavior of the allocator is not under our control.
   IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1 << 0,
+  // Tries to reuse an existing allocation provided via |out_ptr| if possible.
+  // If the existing allocation is not reused then it is freed as if a call to
+  // iree_allocator_free had been called on it. If the allocation fails then
+  // the provided existing allocation is unmodified.
+  //
+  // This models the C realloc behavior.
+  IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1 << 1,
 } iree_allocation_mode_t;
 
 // An allocator for host-memory allocations.
@@ -397,6 +420,11 @@ typedef struct {
 // Allocates a block of |byte_length| bytes from the given allocator.
 // The contents of the returned memory is guaranteed to be zeroed.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
+
+// Reallocates |out_ptr| to |byte_length| bytes with the given allocator.
+// If the reallocation fails then the original |out_ptr| is unmodified.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.
