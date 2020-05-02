@@ -18,7 +18,6 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"

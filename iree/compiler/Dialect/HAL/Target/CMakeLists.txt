@@ -16,27 +16,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    LegacyUtil
-  HDRS
-    "LegacyUtil.h"
-  SRCS
-    "LegacyUtil.cpp"
-  DEPS
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRSupport
-    MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     Target
   HDRS
     "TargetBackend.h"

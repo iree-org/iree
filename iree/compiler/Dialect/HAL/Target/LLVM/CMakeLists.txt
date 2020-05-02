@@ -39,7 +39,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Target::LegacyUtil
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::CodegenPasses
     iree::schemas::llvmir_executable_def_cc_fbs

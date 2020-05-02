@@ -34,7 +34,6 @@ iree_cc_library(
     flatbuffers
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Target::LegacyUtil
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils

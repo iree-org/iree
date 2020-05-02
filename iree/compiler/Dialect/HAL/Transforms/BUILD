@@ -27,7 +27,6 @@ cc_library(
         "MemoizeDeviceQueries.cpp",
         "Passes.cpp",
         "PublicAbiGeneration.cpp",
-        "RewriteLegacyIO.cpp",
         "SerializeExecutables.cpp",
         "TranslateExecutables.cpp",
     ],

@@ -35,18 +35,6 @@ class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
 // Executable ABI
 //===----------------------------------------------------------------------===//
 
-def IREE_LoadInputOp : IREE_PureOp<"load_input"> {
-  let summary = "Loading input from a buffer";
-  let description = "Note: this is expected to be deprecated soon.";
-
-  let arguments = (ins IREE_MemRef:$src);
-  let results = (outs AnyType);
-
-  let assemblyFormat = [{
-    `(` $src `:` type($src) `)` attr-dict `:` type(results)
-  }];
-}
-
 def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
   let summary = "A placeholder op to feed a value/buffer into computation";
   let description = [{
@@ -61,17 +49,6 @@ def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
   let results = (outs Res<AnyType, "", [MemAlloc]>:$output);
 
   let assemblyFormat = [{ `for` $purpose attr-dict `:` type($output) }];
-}
-
-def IREE_StoreOutputOp : IREE_Op<"store_output"> {
-  let summary = "Storing output to a buffer";
-  let description = "Note: this is expected to be deprecated soon.";
-
-  let arguments = (ins AnyType:$src, IREE_MemRef:$dst);
-
-  let assemblyFormat = [{
-    `(` $src `:` type($src) `,` $dst `:` type($dst) `)` attr-dict
-  }];
 }
 
 //===----------------------------------------------------------------------===//
