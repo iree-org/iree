@@ -34,7 +34,7 @@ struct SemaphoreValue {
   uint64_t value = 0;
 };
 
-// Synchronization mechanism for host->device, device->host, and host->host,
+// Synchronization mechanism for host->device, device->host, host->host,
 // and device->device notification. Semaphores behave like Vulkan timeline
 // semaphores (or D3D12 fences) and contain a monotonically increasing
 // uint64_t payload. They may be waited on any number of times even if they
@@ -87,7 +87,7 @@ class Semaphore : public Resource {
   // Blocks the caller until the semaphore reaches or exceedes the specified
   // payload value or the |deadline| elapses.
   //
-  // Returns success if the wait is successful and the semaphore has at met or
+  // Returns success if the wait is successful and the semaphore has met or
   // exceeded the required payload value.
   //
   // Returns DEADLINE_EXCEEDED if the |deadline| elapses without the semaphore

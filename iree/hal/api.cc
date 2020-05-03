@@ -1080,8 +1080,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   }
 
   // For now we always go to the first compute queue. TBD cleanup pending the
-  // device modeling in the IR as to how we really want to handle this.
-  auto* command_queue = handle->dispatch_queues().front();
+  // device modeling in the IR as to how we really want to handle this. We'll
+  // want to use queue_affinity in a way that ensures we have some control over
+  // things on the compiler side and may require that devices are declared by
+  // the number and types of queues they support.
+  uint64_t queue_index = queue_affinity % handle->dispatch_queues().size();
+  auto* command_queue = handle->dispatch_queues()[queue_index];
   return ToApiStatus(command_queue->Submit(dst_batches));
 }
 

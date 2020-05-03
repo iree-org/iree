@@ -21,12 +21,34 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
+// static
+StatusOr<ref_ptr<Semaphore>> NativeTimelineSemaphore::Create(
+    ref_ptr<VkDeviceHandle> logical_device, uint64_t initial_value) {
+  IREE_TRACE_SCOPE0("NativeTimelineSemaphore::Create");
+
+  VkSemaphoreTypeCreateInfo timeline_create_info;
+  timeline_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+  timeline_create_info.pNext = nullptr;
+  timeline_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  timeline_create_info.initialValue = initial_value;
+
+  VkSemaphoreCreateInfo create_info;
+  create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  create_info.pNext = &timeline_create_info;
+  create_info.flags = 0;
+  VkSemaphore semaphore_handle = VK_NULL_HANDLE;
+  VK_RETURN_IF_ERROR(logical_device->syms()->vkCreateSemaphore(
+      *logical_device, &create_info, logical_device->allocator(),
+      &semaphore_handle));
+
+  return make_ref<NativeTimelineSemaphore>(std::move(logical_device),
+                                           semaphore_handle, initial_value);
+}
+
 NativeTimelineSemaphore::NativeTimelineSemaphore(
     ref_ptr<VkDeviceHandle> logical_device, VkSemaphore handle,
     uint64_t initial_value)
-    : logical_device_(std::move(logical_device)), handle_(handle) {
-  IREE_TRACE_SCOPE0("NativeTimelineSemaphore::ctor");
-}
+    : logical_device_(std::move(logical_device)), handle_(handle) {}
 
 NativeTimelineSemaphore::~NativeTimelineSemaphore() {
   IREE_TRACE_SCOPE0("NativeTimelineSemaphore::dtor");

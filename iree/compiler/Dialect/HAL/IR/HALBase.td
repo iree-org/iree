@@ -398,7 +398,7 @@ def HAL_Semaphore : DialectType<
     CPred<"$_self.isa<IREE::HAL::SemaphoreType>()">,
     "semaphore"> {
   let typeDescription = [{
-    Synchronization mechanism for host->device, device->host, and host->host,
+    Synchronization mechanism for host->device, device->host, host->host,
     and device->device notification. Semaphores behave like Vulkan timeline
     semaphores (or D3D12 fences) and contain a monotonically increasing
     uint64_t payload. They may be waited on any number of times even if they

@@ -2042,14 +2042,6 @@ def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
     HAL_Semaphore:$result
   );
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state, Value device,
-      int32_t initial_value
-    }]>,
-  ];
-
   let assemblyFormat = [{
     $device `,` `initial_value` `=` $initial_value
     attr-dict-with-keyword `:` type($result)
@@ -2117,7 +2109,7 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
 // TODO(benvanik): rework this to make it a terminator with branch targets
 // for ^success and ^fail(status).
 def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
-  let summary = [{semaphore payload value signal operation}];
+  let summary = [{asynchronous semaphore wait operation}];
   let description = [{
     Yields the caller until the semaphore reaches or exceeds the specified
     payload `min_value`. Returns the `status` of the semaphore after the wait,

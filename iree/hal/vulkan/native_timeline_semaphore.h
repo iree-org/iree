@@ -30,6 +30,10 @@ namespace vulkan {
 // an extension.
 class NativeTimelineSemaphore final : public Semaphore {
  public:
+  // Creates a timeline semaphore with the given |initial_value|.
+  static StatusOr<ref_ptr<Semaphore>> Create(
+      ref_ptr<VkDeviceHandle> logical_device, uint64_t initial_value);
+
   NativeTimelineSemaphore(ref_ptr<VkDeviceHandle> logical_device,
                           VkSemaphore handle, uint64_t initial_value);
   ~NativeTimelineSemaphore() override;

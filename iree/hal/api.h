@@ -1020,7 +1020,7 @@ iree_hal_device_id(iree_hal_device_t* device);
 // |queue_affinity|. As the number of available queues can vary the
 // |queue_affinity| is used to hash into the available queues for the required
 // categories. For example if 2 queues support transfer commands and the
-// affinity is 5 the resulting queue could  be index hash(5)=1. The affinity can
+// affinity is 5 the resulting queue could be index hash(5)=1. The affinity can
 // thus be treated as just a way to indicate whether two submissions must be
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
@@ -1268,7 +1268,7 @@ iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
 // Blocks the caller until the semaphore reaches or exceedes the specified
 // payload value or the |deadline_ns| elapses.
 //
-// Returns success if the wait is successful and the semaphore has at met or
+// Returns success if the wait is successful and the semaphore has met or
 // exceeded the required payload value.
 //
 // Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the semaphore

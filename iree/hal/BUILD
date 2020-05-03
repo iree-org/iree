@@ -214,9 +214,9 @@ cc_library(
         ":device_info",
         ":event",
         ":executable_cache",
-
         "//iree/base:ref_ptr",
         "//iree/base:status",
+        "//iree/base:target_platform",
         "//iree/base:time",
         "@com_google_absl//absl/time",
     ],

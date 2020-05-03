@@ -80,7 +80,8 @@ class HostSubmissionQueue {
   };
 
   // Returns true if all wait semaphores in the |batch| are signaled.
-  // Returns any failure that status set on any of the wait semaphores.
+  // If one or more of the wait semaphores have failed then returns a status
+  // from one of them arbitrarily.
   StatusOr<bool> CheckBatchReady(const PendingBatch& batch) const;
 
   // Processes a batch by resetting semaphores, dispatching the command buffers

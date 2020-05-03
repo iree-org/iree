@@ -645,24 +645,8 @@ StatusOr<ref_ptr<Event>> VulkanDevice::CreateEvent() {
 StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
     uint64_t initial_value) {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateSemaphore");
-
-  VkSemaphoreTypeCreateInfo timeline_create_info;
-  timeline_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-  timeline_create_info.pNext = nullptr;
-  timeline_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-  timeline_create_info.initialValue = initial_value;
-
-  VkSemaphoreCreateInfo create_info;
-  create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  create_info.pNext = &timeline_create_info;
-  create_info.flags = 0;
-  VkSemaphore semaphore_handle = VK_NULL_HANDLE;
-  VK_RETURN_IF_ERROR(syms()->vkCreateSemaphore(*logical_device_, &create_info,
-                                               logical_device_->allocator(),
-                                               &semaphore_handle));
-
-  return make_ref<NativeTimelineSemaphore>(add_ref(logical_device_),
-                                           semaphore_handle, initial_value);
+  return NativeTimelineSemaphore::Create(add_ref(logical_device_),
+                                         initial_value);
 }
 
 Status VulkanDevice::WaitAllSemaphores(

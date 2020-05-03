@@ -21,6 +21,7 @@
 #include "absl/time/time.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/time.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
@@ -33,8 +34,10 @@
 #include "iree/hal/executable_layout.h"
 #include "iree/hal/semaphore.h"
 
+#if defined(IREE_PLATFORM_WINDOWS)
 // Win32 macro name conflict:
 #undef CreateSemaphore
+#endif  // IREE_PLATFORM_WINDOWS
 
 namespace iree {
 namespace hal {

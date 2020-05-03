@@ -237,6 +237,7 @@ iree_cc_library(
     absl::time
     iree::base::ref_ptr
     iree::base::status
+    iree::base::target_platform
     iree::base::time
   PUBLIC
 )

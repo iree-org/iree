@@ -153,13 +153,13 @@ class DeviceManager final {
   // indicating immediate submission and absl::InfiniteFuture indicating that
   // Flush must be called.
   //
-  // If signal_semaphores are provided they will be signaled when their
-  // corresponding submission has completed. If a sequence of submissions are
-  // performed then the semaphore value relationships can be used to elide
+  // If |batches| signal_semaphores are provided they will be signaled when
+  // their corresponding submission has completed. If a sequence of submissions
+  // are performed then the semaphore value relationships can be used to elide
   // waits.
   //
-  // All provided resources must remain alive until the provided |semaphore|
-  // resolves or Scheduler::WaitIdle succeeds.
+  // All provided resources must remain alive until the provided semaphores are
+  // signaled indicating that the resources used are no longer required.
   //
   // Submissions may be made from any thread. Behavior is undefined
   // if a thread is performing a WaitIdle while another thread submits work.
@@ -184,7 +184,8 @@ class DeviceManager final {
   Status Flush();
 
   // Blocks until all outstanding requests have been completed.
-  // This is equivalent to having waited on all outstanding semaphores.
+  // This is equivalent to having waited on all outstanding semaphore signal
+  // operations in all previously submitted batches.
   // Implicitly calls Flush to ensure delayed requests are scheduled.
   // Work submitted from other threads during a wait may not be included in the
   // wait set.

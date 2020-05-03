@@ -152,13 +152,12 @@ void HostSubmissionQueue::CompleteSubmission(Submission* submission,
                                              Status status) {
   IREE_TRACE_SCOPE0("HostSubmissionQueue::CompleteSubmission");
 
-  if (status.ok()) {
-    if (!submission->pending_batches.empty()) {
-      // Completed with work remaining? Cause a failure.
-      status = FailedPreconditionErrorBuilder(IREE_LOC)
-               << "Submission ended prior to completion of all batches";
-    }
-  } else {
+  if (status.ok() && !submission->pending_batches.empty()) {
+    // Completed with work remaining? Cause a failure.
+    status = FailedPreconditionErrorBuilder(IREE_LOC)
+             << "Submission ended prior to completion of all batches";
+  }
+  if (!status.ok()) {
     // Fail all pending batch semaphores that we would have signaled.
     for (auto& batch : submission->pending_batches) {
       for (auto& signal_point : batch.signal_semaphores) {
