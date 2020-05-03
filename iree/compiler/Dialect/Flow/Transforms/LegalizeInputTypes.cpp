@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
-#include "mlir/Analysis/Verifier.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -22,6 +21,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/DialectConversion.h"

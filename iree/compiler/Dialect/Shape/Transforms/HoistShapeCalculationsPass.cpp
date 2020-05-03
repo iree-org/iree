@@ -18,8 +18,8 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
-#include "mlir/Analysis/Dominance.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 

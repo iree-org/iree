@@ -24,9 +24,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Analysis/Dominance.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Dominance.h"
 
 namespace mlir {
 namespace iree_compiler {
