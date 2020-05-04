@@ -52,7 +52,7 @@ iree_check_single_backend_test_suite(
         #
         "constant.mlir",
 
-        # TODO(GH-1688): Enable after integer widths are handled
+        # TODO(GH-1687): Enable after casting from fp to int is handled
         # on structured ops path in vulkan
         # "convert.mlir",
         #
