@@ -15,6 +15,9 @@
 #include "experimental/ModelBuilder/ModelBuilder.h"
 
 #include "mlir/Dialect/Affine/EDSC/Builders.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -55,6 +58,39 @@ FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
                      mlir::UnitAttr::get(getContext()));
   module->push_back(function);
   return function;
+}
+
+static spirv::TargetEnvAttr getTargetEnv(MLIRContext *context) {
+  auto triple = spirv::VerCapExtAttr::get(
+      spirv::Version::V_1_0, {spirv::Capability::Shader},
+      {spirv::Extension::SPV_KHR_storage_buffer_storage_class}, context);
+  return spirv::TargetEnvAttr::get(triple,
+                                   spirv::getDefaultResourceLimits(context));
+}
+
+gpu::GPUModuleOp mlir::ModelBuilder::makeGPUModule(StringRef name) {
+  // Add module attributes required first.
+  module->setAttr(gpu::GPUDialect::getContainerModuleAttrName(),
+                  UnitAttr::get(module->getContext()));
+  spirv::TargetEnvAttr targetEnv = getTargetEnv(module->getContext());
+  module->setAttr(spirv::getTargetEnvAttrName(), targetEnv);
+  OpBuilder b(&module->getBodyRegion());
+  auto kernelModule = b.create<gpu::GPUModuleOp>(loc, name);
+  return kernelModule;
+}
+
+gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(StringRef name,
+                                                 gpu::GPUModuleOp GPUModule,
+                                                 ArrayRef<Type> args,
+                                                 ArrayRef<Type> results) {
+  auto fnType = FunctionType::get(args, results, module->getContext());
+  OpBuilder b(&GPUModule.body());
+  auto kernelFunc = b.create<gpu::GPUFuncOp>(loc, name, fnType);
+  kernelFunc.setAttr(gpu::GPUDialect::getKernelFuncAttrName(), b.getUnitAttr());
+  kernelFunc.setAttr(
+      spirv::getEntryPointABIAttrName(),
+      spirv::getEntryPointABIAttr({1, 1, 1}, module->getContext()));
+  return kernelFunc;
 }
 
 VectorType mlir::ModelBuilder::getVectorType(ArrayRef<int64_t> shape,
@@ -135,6 +171,21 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
 Value ModelBuilder::call_tanhf(Value v) {
   assert(v.getType().isF32() && "f32 expected");
   return emitCallToRegisteredSymbol("tanhf", v.getType(), v)->getResult(0);
+}
+
+void ModelBuilder::call_print_memref_f32(Value v) {
+  auto &builder = ScopedContext::getBuilderRef();
+  auto loc = builder.getInsertionBlock()
+                 ->getParent()
+                 ->getParentOfType<FuncOp>()
+                 .getLoc();
+  auto elementType = v.getType().cast<MemRefType>().getElementType();
+  auto unrankedType = UnrankedMemRefType::get(elementType, 0);
+  auto castMemRef = builder.create<MemRefCastOp>(loc, v, unrankedType);
+  if (elementType.isF32())
+    emitCallToRegisteredSymbol("print_memref_f32", {}, {castMemRef});
+  else
+    llvm_unreachable("Incorrect argument type for print_memref_f32");
 }
 
 Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,

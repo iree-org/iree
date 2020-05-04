@@ -47,7 +47,10 @@
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELRUNNER_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELRUNNER_H_
 
+#include <functional>
+
 #include "experimental/ModelBuilder/MemRefUtils.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/IR/Module.h"
@@ -57,7 +60,7 @@ class TargetMachine;
 }  // namespace llvm
 
 namespace mlir {
-
+class PassManager;
 class ExecutionEngine;
 
 struct CompilationOptions {
@@ -69,9 +72,11 @@ struct CompilationOptions {
 
 class ModelRunner {
  public:
+  enum class Target { CPUTarget, GPUTarget };
   // Initialize the runner with an OwningModuleRef, typically constructed with
   // a ModelBiulder.
-  ModelRunner(mlir::OwningModuleRef &m) : module(m) {}
+  ModelRunner(mlir::OwningModuleRef &m, Target t = Target::CPUTarget)
+      : module(m), target(t) {}
 
   // Get the underlying ModuleOp.
   ModuleOp getOperation() { return *module; }
@@ -80,10 +85,10 @@ class ModelRunner {
   // For now, the MLIR passes and transformations are kept to a minimum and only
   // perform straightforward lowering to LLVMIR.
   // An optional CompilationOptions object is passed to control special passes
-  // An optional shared runtime
-  // support library is passed to the execution engine.
+  // An optional array of shared runtime support libraries is passed to the
+  // execution engine.
   void compile(CompilationOptions compilationOptions,
-               const std::string &runtime = {});
+               llvm::ArrayRef<const std::string> runtime = None);
 
   // Reference to the compiled module.
   mlir::OwningModuleRef &module;
@@ -121,7 +126,11 @@ class ModelRunner {
                           llvm::MutableArrayRef<void *>{argsArray2});
   }
 
- private:
+ protected:
+  std::function<void(mlir::PassManager &)> getDefaultMLIRPassBuilder();
+  void runLoweringPass(std::function<void(mlir::PassManager &)> passBuilder);
+
+  Target target;
   // An execution engine and an associated target machine. The latter must
   // outlive the former since it may be used by the transformation layers.
   std::unique_ptr<mlir::ExecutionEngine> engine;

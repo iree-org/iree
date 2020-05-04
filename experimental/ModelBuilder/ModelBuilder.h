@@ -46,6 +46,7 @@
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 
 #include "mlir/Dialect/Affine/EDSC/Intrinsics.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/EDSC/Builders.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
 #include "mlir/Dialect/LoopOps/EDSC/Builders.h"
@@ -111,6 +112,14 @@ class ModelBuilder : public OpBuilder {
                       ArrayRef<Type> args = {}, bool emitCInterface = true,
                       bool declOnly = false);
 
+  // Build a MLIR GPU module. GPUFuncOp can later be added to the module.
+  gpu::GPUModuleOp makeGPUModule(StringRef name);
+
+  // Build a MLIR GPU kernel within a GPU module.
+  gpu::GPUFuncOp makeGPUKernel(StringRef name, gpu::GPUModuleOp GPUModule,
+                               ArrayRef<Type> args = {},
+                               ArrayRef<Type> results = {});
+
   // Build an MLIR VectorType with a base `elementalType` and a `shape`.
   VectorType getVectorType(ArrayRef<int64_t> shape, Type elementalType);
 
@@ -151,6 +160,7 @@ class ModelBuilder : public OpBuilder {
   // Support for emitting special function calls.
   // ---------------------------------------------------------------------------
   static Value call_tanhf(Value v);
+  static void call_print_memref_f32(Value v);  // needs libmlir_runner_utils.so
 
  protected:
   // Helper function to support calling into known functions (e.g. libmath).

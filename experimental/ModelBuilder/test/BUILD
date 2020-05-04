@@ -96,6 +96,24 @@ cc_binary(
 )
 
 cc_binary(
+    name = "test-simple-jit-vulkan",
+    srcs = ["TestSimpleJITVulkan.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SPIRVDialect",
+    ],
+)
+
+cc_binary(
     name = "test-simple-mlir",
     srcs = ["TestSimpleMLIR.cpp"],
     tags = [
