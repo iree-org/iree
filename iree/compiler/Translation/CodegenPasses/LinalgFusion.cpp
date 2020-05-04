@@ -21,7 +21,7 @@
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Operation.h"

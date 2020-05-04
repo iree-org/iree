@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Translation/CodegenUtils/MarkerUtils.h"
 
-#include "mlir/Dialect/Linalg/Transforms/LinalgTransforms.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
 
