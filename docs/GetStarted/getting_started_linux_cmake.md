@@ -18,11 +18,18 @@ documented separately, as they require further setup.
 
 ### Install CMake
 
-Install CMake version >= 3.13:
+IREE uses CMake version `>= 3.13`. First try installing via your distribution's
+package manager and verify the version:
 
 ```shell
 $ sudo apt install cmake
+$ cmake --version # >= 3.13
 ```
+
+Some package managers (like `apt`) distribute old versions of cmake. If your
+package manager installs a version `< 3.13`, then follow the installation
+instructions [here](https://cmake.org/install/) to install a newer version (e.g.
+the latest).
 
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
