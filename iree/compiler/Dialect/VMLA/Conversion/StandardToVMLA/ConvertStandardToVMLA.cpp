@@ -102,8 +102,8 @@ struct CmpIOpConversion
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
     auto newOp = rewriter.create<IREE::VMLA::CmpOp>(
-        srcOp.getLoc(), static_cast<uint32_t>(predicate), operands[0],
-        operands[1], dst, TypeAttr::get(inputType.getElementType()));
+        srcOp.getLoc(), predicate, operands[0], operands[1], dst,
+        TypeAttr::get(inputType.getElementType()));
     if (forceUnsigned) {
       newOp.setAttr("force_unsigned", UnitAttr::get(rewriter.getContext()));
     }
@@ -158,8 +158,8 @@ class CmpFOpConversion
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
     auto newOp = rewriter.create<IREE::VMLA::CmpOp>(
-        srcOp.getLoc(), static_cast<uint32_t>(predicate), operands[0],
-        operands[1], dst, TypeAttr::get(inputType.getElementType()));
+        srcOp.getLoc(), predicate, operands[0], operands[1], dst,
+        TypeAttr::get(inputType.getElementType()));
     rewriter.replaceOp(srcOp, newOp.dst());
     return success();
   }
