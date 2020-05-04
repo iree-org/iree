@@ -43,6 +43,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install clang libsdl2-dev
+          sudo apt-get install -y python-pip
+          python -m pip install --upgrade pip
+          python -m pip install numpy
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Initializing submodules
