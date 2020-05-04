@@ -46,6 +46,10 @@ jobs:
           # Update pip before using it so it picks up the latest versions of our dependencies.
           sudo python3 -m pip install --upgrade pip
           sudo python3 -m pip install numpy tf-nightly
+          # Install python2 numpy. Temporary fix for issue #1737.
+          sudo apt-get install -y python-pip
+          python -m pip install --upgrade pip
+          python -m pip install numpy
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Initializing submodules
