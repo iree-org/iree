@@ -29,6 +29,8 @@ flags.DEFINE_string(
     'for example https://storage.googleapis.com/iree_models/')
 flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
+flags.DEFINE_integer('include_top', 0, 'if 1 top level is appended')
+
 APP_MODELS = {
     'ResNet50':
         tf.keras.applications.resnet.ResNet50,
@@ -71,9 +73,9 @@ APP_MODELS = {
 
 def get_input_shape(data):
   if data == 'imagenet':
-    return [1, 224, 224, 3]
+    return (1, 224, 224, 3)
   elif data == 'cifar10':
-    return [1, 32, 32, 3]
+    return (1, 32, 32, 3)
   else:
     raise ValueError('Not supported data ', data)
 
@@ -87,19 +89,24 @@ def models():
   # where batch size is not specified - by default it is dynamic
   if FLAGS.model in APP_MODELS:
     weights = 'imagenet' if FLAGS.data == 'imagenet' else None
-    # TODO(rybakov) with the fix of https://github.com/google/iree/issues/1660
-    # add include_top=True
 
     # if weights == 'imagenet' it will load weights from external tf.keras URL
     model = APP_MODELS[FLAGS.model](
-        weights=weights, include_top=False, input_shape=input_shape[1:])
+        weights=weights,
+        include_top=FLAGS.include_top,
+        input_shape=input_shape[1:])
 
     if FLAGS.data == 'cifar10' and FLAGS.url:
       file_name = 'cifar10' + FLAGS.model
       # it will download model weights from publically available folder: PATH
       # and save it to cache_dir=~/.keras and return path to it
       weights_path = tf.keras.utils.get_file(
-          file_name, os.path.join(FLAGS.url, file_name + '.h5'))
+          file_name,
+          os.path.join(
+              FLAGS.url,
+              'cifar10_include_top_{}_{}'.format(FLAGS.include_top,
+                                                 FLAGS.model + '.h5')))
+
       model.load_weights(weights_path)
   else:
     raise ValueError('Unsupported model', FLAGS.model)

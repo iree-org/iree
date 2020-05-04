@@ -60,6 +60,8 @@ package(
         name = "_".join([
             "keras_vision_model",
             data,
+            "top",
+            str(include_top),
             model_name,
             "test",
         ]),
@@ -70,10 +72,10 @@ package(
             "--model=%s" % model_name,
             "--override_backends=%s" % backends,
             "--data=%s" % data,
+            "--include_top=%d" % include_top,
         ],
         main = "keras_vision_model_test.py",
         python_version = "PY3",
-        # TODO(rybakov): Get this down to a manageable size for CI.
         tags = [
             "large",
             "manual",
@@ -86,9 +88,14 @@ package(
     )
     # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
     # and add other supported vision models
-    for data, model_name, backends in [
+    # ResNet50 test is hermetic - does not access any extrnal urls
+    # all other tests need real weights loaded from url
+    for data, include_top, model_name, backends in [
         # "cifar10" has toy models with input 32x32, is good for debugging
-        ("cifar10", "ResNet50", "tf,iree_vmla,iree_vulkan,iree_llvmjit"),
+        ("cifar10", 0, "ResNet50", "tf,iree_vmla,iree_vulkan,iree_llvmjit"),
+        # TODO(rybakov) with the fix of https://github.com/google/iree/issues/1660
+        # ucomment test and remove it from below tests which are reading weights from external url
+        # ("cifar10", 1, "ResNet50", "tf,iree_vmla,iree_vulkan,iree_llvmjit"),
     ]
 ]
 
@@ -98,6 +105,8 @@ package(
         name = "_".join([
             "keras_vision_model",
             data,
+            "top",
+            str(include_top),
             model_name,
             "test",
         ]),
@@ -108,6 +117,7 @@ package(
             "--model=%s" % model_name,
             "--override_backends=%s" % backends,
             "--data=%s" % data,
+            "--include_top=%d" % include_top,
             "--url=https://storage.googleapis.com/iree_models/",
         ],
         main = "keras_vision_model_test.py",
@@ -125,13 +135,21 @@ package(
     )
     # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
     # and add other supported vision models
-    for data, model_name, backends in [
+    for data, include_top, model_name, backends in [
         # "cifar10" has toy models with input 32x32, is good for debugging
         # "imagenet" has real model weights for input 224x224
-        ("cifar10", "MobileNet", "tf,iree_vmla"),
-        ("imagenet", "ResNet50", "tf"),
-        ("imagenet", "MobileNet", "tf"),
-        ("imagenet", "MobileNetV2", "tf"),
+        # TODO(rybakov) remove tests with include_top=0 as soon as include_top=1 works
+        ("cifar10", 1, "ResNet50", "tf"),
+        ("cifar10", 0, "MobileNet", "tf,iree_vmla"),
+        ("cifar10", 1, "MobileNet", "tf,iree_vmla"),
+        ("cifar10", 0, "MobileNetV2", "tf"),
+        ("cifar10", 1, "MobileNetV2", "tf"),
+        ("imagenet", 0, "ResNet50", "tf"),
+        ("imagenet", 1, "ResNet50", "tf"),
+        ("imagenet", 0, "MobileNet", "tf"),
+        ("imagenet", 1, "MobileNet", "tf"),
+        ("imagenet", 0, "MobileNetV2", "tf"),
+        ("imagenet", 1, "MobileNetV2", "tf"),
     ]
 ]
 

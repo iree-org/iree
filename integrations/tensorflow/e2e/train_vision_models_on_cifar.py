@@ -17,12 +17,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
 import os
-import sys
+from absl import flags
 from absl import logging
 import numpy as np
 import tensorflow.compat.v1 as tf
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string('model_name', 'MobileNet', 'keras vision model name')
+flags.DEFINE_string('model_path', '',
+                    'Path to a location where model will be saved.')
+flags.DEFINE_integer('include_top', 0, 'if 1 top level is appended')
 
 APP_MODELS = {
     'ResNet50':
@@ -65,7 +70,6 @@ APP_MODELS = {
 
 # minimum size for keras vision models
 INPUT_SHAPE = [1, 32, 32, 3]
-FLAGS = None
 
 
 def main(_):
@@ -80,9 +84,14 @@ def main(_):
   # Normalize image values to be between 0 and 1
   train_images, test_images = train_images / 255.0, test_images / 255.0
 
+  # reduce training samples for quick training
+  # we do not need to use all data for getting non zero output scores
+  train_images = train_images[:4000]
+  train_labels = train_labels[:4000]
+
   # It is a toy model for debugging (not optimized for accuracy or speed).
   model = APP_MODELS[FLAGS.model_name](
-      weights=None, include_top=True, input_shape=INPUT_SHAPE[1:])
+      weights=None, include_top=FLAGS.include_top, input_shape=INPUT_SHAPE[1:])
   model.summary()
   model.compile(
       optimizer='adam',
@@ -96,8 +105,10 @@ def main(_):
       epochs=1,
       validation_data=(test_images, test_labels))
 
-  file_name = os.path.join(FLAGS.model_path,
-                           'cifar10' + FLAGS.model_name + '.h5')
+  file_name = os.path.join(
+      FLAGS.model_path,
+      'cifar10_include_top_{}_{}'.format(FLAGS.include_top,
+                                         FLAGS.model_name + '.h5'))
   try:
     model.save_weights(file_name)
   except IOError as e:
@@ -109,16 +120,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument(
-      '--model_name',
-      type=str,
-      default='MobileNet',
-      help='keras vision model name.')
-  parser.add_argument(
-      '--model_path',
-      type=str,
-      default='',
-      help='Path to a location where model will be saved.')
-  FLAGS, unparsed = parser.parse_known_args()
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run(main=main)
