@@ -60,7 +60,6 @@ TF_IMPORT_PASS_PIPELINE = (
     # Some further cleanups now that control flow is in better shape.
     "tf-saved-model-mark-func-visibility",
     "symbol-dce",
-    "tf-shape-inference",
     "canonicalize",
 
     # Legalize to XLA
