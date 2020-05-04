@@ -139,8 +139,10 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "iree_opt_lib",
+cc_binary(
+    name = "iree-opt",
+    srcs = ["opt_main.cc"],
+    tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
@@ -176,24 +178,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
-    ],
-)
-
-cc_binary(
-    name = "iree-opt",
-    srcs = ["opt_main.cc"],
-    tags = ["hostonly"],
-    deps = [
-        ":iree_opt_lib",
-        ":init_compiler_modules",
-        ":init_passes_and_dialects",
-        ":init_targets",
-        "//iree/compiler/Translation/CodegenPasses",
-        "//iree/compiler/Translation/SPIRV:init_translations",
-        "@llvm-project//llvm:support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -267,8 +251,10 @@ cc_binary(
     ],
 )
 
-cc_library(
-    name = "iree_translate_lib",
+cc_binary(
+    name = "iree-translate",
+    srcs = ["translate_main.cc"],
+    tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
@@ -284,25 +270,6 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
-    ],
-)
-
-cc_binary(
-    name = "iree-translate",
-    srcs = ["translate_main.cc"],
-    tags = ["hostonly"],
-    deps = [
-        ":iree_translate_lib",
-        ":init_compiler_modules",
-        ":init_passes_and_dialects",
-        ":init_targets",
-        ":init_translations",
-        "//iree/compiler/Translation/SPIRV:init_translations",
-        "@llvm-project//llvm:support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Translation",
     ],
 )
 
