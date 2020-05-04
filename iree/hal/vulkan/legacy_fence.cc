@@ -275,7 +275,7 @@ StatusOr<VkFence> LegacyFence::AcquireWaitFence(uint64_t value) {
   // Since the value is monotonically increasing we can do a lock-free peek
   // here to see if we need to bother taking a full lock.
   if (value_.load() >= value) {
-    return VK_NULL_HANDLE;
+    return static_cast<VkFence>(VK_NULL_HANDLE);
   }
 
   absl::MutexLock lock(&mutex_);
@@ -283,7 +283,7 @@ StatusOr<VkFence> LegacyFence::AcquireWaitFence(uint64_t value) {
   // Try to resolve any outstanding fence signals.
   RETURN_IF_ERROR(TryResolveOutstandingFencesLocked(value));
   if (value_.load() >= value) {
-    return VK_NULL_HANDLE;
+    return static_cast<VkFence>(VK_NULL_HANDLE);
   }
 
   // Try to find an existing fence we can reuse based on the required value.
