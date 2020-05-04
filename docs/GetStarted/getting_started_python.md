@@ -33,7 +33,14 @@ $ python3 -m pip install tf-nightly
 
 ## Running Python Tests
 
-To run tests for core Python bindings:
+To run tests for core Python bindings built with CMake:
+
+```shell
+$ cd build
+$ ctest -L bindings/python
+```
+
+To run tests for core Python bindings built with Bazel:
 
 ```shell
 $ bazel test bindings/python/...
