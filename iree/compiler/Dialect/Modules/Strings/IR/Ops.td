@@ -91,6 +91,20 @@ def STRINGS_StringTensorToStringOp : Op<STRINGS_Dialect, "string_tensor_to_strin
   );
 }
 
+def STRINGS_GatherOp : Op<STRINGS_Dialect, "gather", [NoSideEffect]> {
+  let summary = [{gathers all the strings from a Tensor by id}];
+  let description = [{
+    Gathers all the strings from a Tensor by ID.
+  }];
+
+  let arguments = (ins STRINGS_StringTensor:$dict,
+                  HAL_BufferView:$ids);
+
+  let results = (outs
+    STRINGS_StringTensor:$result
+  );
+}
+
 def STRINGS_PrintOp : Op<STRINGS_Dialect, "print"> {
   let summary = [{prints the contents of a string}];
   let description = [{

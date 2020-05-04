@@ -27,3 +27,8 @@ func @to_string_tensor(%arg0 : !hal.buffer_view) -> !strings.string_tensor attri
   %0 = "strings.to_string_tensor"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
   return %0 : !strings.string_tensor
 }
+
+func @gather(%arg0 : !strings.string_tensor, %arg1 : !hal.buffer_view) -> !strings.string_tensor attributes { iree.module.export, iree.abi.none } {
+  %0 = "strings.gather"(%arg0, %arg1) : (!strings.string_tensor, !hal.buffer_view) -> !strings.string_tensor
+  return %0 : !strings.string_tensor
+}

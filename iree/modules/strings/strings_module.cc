@@ -152,7 +152,7 @@ class StringsModuleState final {
     iree_hal_mapped_memory_t tensor_mapping;
     RETURN_IF_ERROR(FromApiStatus(
         iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                            /*element_offset=*/0, tensor_size, &tensor_mapping),
+                            /*byte_offset=*/0, tensor_size, &tensor_mapping),
         IREE_LOC));
 
     iree_hal_element_type_t type =
@@ -228,6 +228,62 @@ class StringsModuleState final {
     return string_tensor;
   }
 
+  // strings.gather(%str_tensor, %hal_buffer) -> %str_tensor
+  StatusOr<vm::ref<strings_string_tensor_t>> Gather(
+      vm::ref<strings_string_tensor_t> dict,
+      vm::ref<iree_hal_buffer_view_t> ids) {
+    // The dict must be a simple list, and the indices must be integers.
+    if (dict->rank != 1 || iree_hal_buffer_view_element_type(ids.get()) !=
+                               IREE_HAL_ELEMENT_TYPE_SINT_32) {
+      return FromApiStatus(IREE_STATUS_INVALID_ARGUMENT, IREE_LOC);
+    }
+
+    const size_t rank = iree_hal_buffer_view_shape_rank(ids.get());
+    absl::InlinedVector<int32_t, 6> shape(rank);
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_view_shape(ids.get(), rank, shape.data(), nullptr),
+        IREE_LOC));
+
+    size_t num_elements = 1;
+    for (auto val : shape) {
+      num_elements *= val;
+    }
+
+    // Pull the values down.
+    size_t element_size = iree_hal_buffer_view_element_size(ids.get());
+    size_t tensor_size = element_size * num_elements;
+    iree_hal_buffer_t* hal_buffer = iree_hal_buffer_view_buffer(ids.get());
+    iree_hal_mapped_memory_t tensor_mapping;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                            /*byte_offset=*/0, tensor_size, &tensor_mapping),
+        IREE_LOC));
+    iree_string_view_t str;
+    const auto& contents = tensor_mapping.contents;
+    std::vector<iree_string_view_t> string_views;
+    string_views.reserve(num_elements);
+
+    for (int32_t *p = (int32_t*)contents.data,
+                 *s = (int32_t*)(contents.data + contents.data_length);
+         p < s; p++) {
+      RETURN_IF_ERROR(FromApiStatus(
+          strings_string_tensor_get_element(dict.get(), p, 1, &str), IREE_LOC));
+      string_views.push_back(str);
+    }
+
+    // Unmap used buffer.
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_unmap(hal_buffer, &tensor_mapping), IREE_LOC));
+
+    strings_string_tensor_t* string_tensor;
+    RETURN_IF_ERROR(FromApiStatus(
+        strings_string_tensor_create(allocator_, string_views.data(),
+                                     string_views.size(), shape.data(), rank,
+                                     &string_tensor),
+        IREE_LOC));
+    return string_tensor;
+  }
+
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
@@ -255,6 +311,7 @@ static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
                                &StringsModuleState::StringTensorToString),
         vm::MakeNativeFunction("to_string_tensor",
                                &StringsModuleState::ToStringTensor),
+        vm::MakeNativeFunction("gather", &StringsModuleState::Gather),
 };
 
 class StringsModule final : public vm::NativeModule<StringsModuleState> {

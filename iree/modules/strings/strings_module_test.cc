@@ -14,6 +14,8 @@
 
 #include "iree/modules/strings/strings_module.h"
 
+#include <cstdint>
+
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
@@ -199,6 +201,67 @@ class StringsModuleTest : public ::testing::Test {
                                   /*policy=*/nullptr, inputs, outputs,
                                   IREE_ALLOCATOR_SYSTEM));
 
+    // Compare the output to the expected result.
+    CompareResults(expected, shape, outputs);
+
+    // Free the lists.
+    iree_vm_variant_list_free(inputs);
+    iree_vm_variant_list_free(outputs);
+  }
+
+  void TestGather(absl::Span<const iree_string_view_t> dict,
+                  absl::Span<const int32_t> dict_shape,
+                  absl::Span<const int32_t> ids,
+                  absl::Span<const int32_t> ids_shape,
+                  absl::Span<const iree_string_view_t> expected) {
+    vm::ref<strings_string_tensor_t> dict_string_tensor;
+    IREE_ASSERT_OK(strings_string_tensor_create(
+        IREE_ALLOCATOR_SYSTEM, dict.data(), dict.size(), dict_shape.data(),
+        dict_shape.size(), &dict_string_tensor));
+
+    // Construct the input list for execution.
+    iree_vm_variant_list_t* inputs = nullptr;
+    IREE_ASSERT_OK(
+        iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
+
+    // Add the dict to the input list.
+    iree_vm_ref_t dict_string_tensor_ref =
+        strings_string_tensor_move_ref(dict_string_tensor.get());
+    IREE_ASSERT_OK(iree_vm_variant_list_append_ref_retain(
+        inputs, &dict_string_tensor_ref));
+
+    vm::ref<iree_hal_buffer_view_t> input_buffer_view;
+    CreateBufferView<int32_t, IREE_HAL_ELEMENT_TYPE_SINT_32>(
+        ids, ids_shape, &input_buffer_view);
+
+    // Add the ids tensor to the input list.
+    iree_vm_ref_t input_buffer_view_ref =
+        iree_hal_buffer_view_move_ref(input_buffer_view.get());
+
+    IREE_ASSERT_OK(
+        iree_vm_variant_list_append_ref_retain(inputs, &input_buffer_view_ref));
+
+    // Construct the output list for accepting results from the invocation.
+    iree_vm_variant_list_t* outputs = nullptr;
+    IREE_ASSERT_OK(
+        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+
+    // Invoke the function.
+    IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("gather"),
+                                  /*policy=*/nullptr, inputs, outputs,
+                                  IREE_ALLOCATOR_SYSTEM));
+
+    // Compare the output to the expected result.
+    CompareResults(expected, ids_shape, outputs);
+
+    // Free the lists.
+    iree_vm_variant_list_free(inputs);
+    iree_vm_variant_list_free(outputs);
+  }
+
+  void CompareResults(absl::Span<const iree_string_view_t> expected,
+                      absl::Span<const int32_t> expected_shape,
+                      iree_vm_variant_list_t* outputs) {
     // Retrieve and validate the string tensor;
     strings_string_tensor_t* output_tensor =
         strings_string_tensor_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
@@ -206,19 +269,19 @@ class StringsModuleTest : public ::testing::Test {
     // Validate the count.
     size_t count;
     IREE_ASSERT_OK(strings_string_tensor_get_count(output_tensor, &count));
-    EXPECT_EQ(count, contents.size());
+    EXPECT_EQ(count, expected.size());
 
     // Validate the rank.
     int32_t rank;
     IREE_ASSERT_OK(strings_string_tensor_get_rank(output_tensor, &rank));
-    ASSERT_EQ(rank, shape.size());
+    ASSERT_EQ(rank, expected_shape.size());
 
     // Validate the shape.
     std::vector<int32_t> out_shape(rank);
     IREE_ASSERT_OK(
         strings_string_tensor_get_shape(output_tensor, out_shape.data(), rank));
     for (int i = 0; i < rank; i++) {
-      EXPECT_EQ(out_shape[i], shape[i])
+      EXPECT_EQ(out_shape[i], expected_shape[i])
           << "Dimension : " << i << " does not match";
     }
 
@@ -231,10 +294,6 @@ class StringsModuleTest : public ::testing::Test {
           << "Expected: " << expected[i].data << " found "
           << out_strings[i].data;
     }
-
-    // Free the lists.
-    iree_vm_variant_list_free(inputs);
-    iree_vm_variant_list_free(outputs);
   }
 
   iree_hal_device_t* device_ = nullptr;
@@ -425,6 +484,53 @@ TEST_F(StringsModuleTest, ToString_Vector_Float_64) {
   absl::InlinedVector<int32_t, 4> shape{2};
   TestToStringTensor<double, IREE_HAL_ELEMENT_TYPE_FLOAT_64>(contents, shape,
                                                              expected);
+}
+
+TEST_F(StringsModuleTest, GatherSingleElement) {
+  absl::InlinedVector<iree_string_view_t, 1> expected{
+      iree_make_cstring_view("World")};
+
+  absl::InlinedVector<iree_string_view_t, 3> dict{
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("!")};
+  absl::InlinedVector<int32_t, 1> dict_shape{3};
+
+  absl::InlinedVector<int32_t, 1> ids{1};
+  absl::InlinedVector<int32_t, 1> ids_shape{1};
+
+  TestGather(dict, dict_shape, ids, ids_shape, expected);
+}
+
+TEST_F(StringsModuleTest, GatherMultipleElements) {
+  absl::InlinedVector<iree_string_view_t, 2> expected{
+      iree_make_cstring_view("World"), iree_make_cstring_view("Hello")};
+
+  absl::InlinedVector<iree_string_view_t, 3> dict{
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("!")};
+  absl::InlinedVector<int32_t, 1> dict_shape{3};
+
+  absl::InlinedVector<int32_t, 2> ids{1, 0};
+  absl::InlinedVector<int32_t, 1> ids_shape{2};
+
+  TestGather(dict, dict_shape, ids, ids_shape, expected);
+}
+
+TEST_F(StringsModuleTest, GatherHigherRank) {
+  absl::InlinedVector<iree_string_view_t, 6> expected{
+      iree_make_cstring_view("!"),     iree_make_cstring_view("!"),
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("!"),     iree_make_cstring_view("!")};
+
+  absl::InlinedVector<iree_string_view_t, 3> dict{
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("!")};
+  absl::InlinedVector<int32_t, 1> dict_shape{3};
+
+  absl::InlinedVector<int32_t, 6> ids{2, 2, 0, 1, 2, 2};
+  absl::InlinedVector<int32_t, 4> ids_shape{2, 3, 1, 1};
+
+  TestGather(dict, dict_shape, ids, ids_shape, expected);
 }
 
 }  // namespace
