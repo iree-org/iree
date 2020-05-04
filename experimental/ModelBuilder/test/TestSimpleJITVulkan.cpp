@@ -17,8 +17,7 @@
 // NOLINTNEXTLINE
 // TODO(thomasraoux): Set the right path to vulkan wrapper shared library. The
 // test won't run until this is done.
-// RUN: test-simple-jit -vulkan-wrapper=%vulkan_wrapper_library_dir/libvulkan-runtime-wrappers%shlibext \
-// RUN: -runtime-support=%linalg_test_lib_dir/libmlir_runner_utils%shlibext 2>&1 | IreeFileCheck %s
+// RUN: test-simple-jit-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so -runtime-support=$(dirname %s)/../../../../llvm/llvm-project/mlir/test/mlir-cpu-runner/libmlir_runner_utils.so 2>&1 | IreeFileCheck %s
 
 #include <string>
 
@@ -31,6 +30,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Parser.h"
+#include "iree/base/initializer.h"
 
 static llvm::cl::opt<std::string> vulkanWrapper(
     "vulkan-wrapper", llvm::cl::desc("Vulkan wrapper library"),
@@ -111,10 +111,12 @@ void testVectorAdd1d() {
 }
 
 int main(int argc, char **argv) {
+  iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "TestSimpleJITVulkan\n");
 
+  // CHECK: [2,  3,  4,  5,  6,  7,  8,  9]
   testVectorAdd1d();
 }
