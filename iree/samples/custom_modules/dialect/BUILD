@@ -134,7 +134,6 @@ cc_binary(
     srcs = ["custom_translate.cc"],
     deps = [
         ":init_dialect",
-        "//iree/compiler/Translation/SPIRV:init_translations",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV:init_translations",
