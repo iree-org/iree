@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-convert-to-gpu -canonicalize -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-convert-to-gpu -canonicalize -split-input-file %s | IreeFileCheck %s
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1 - d2)>
 #map1 = affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hlo-to-linalg-on-buffers -iree-linalg-vector-transforms %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers -iree-codegen-linalg-vector-transforms %s | IreeFileCheck %s
 
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>

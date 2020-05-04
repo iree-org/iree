@@ -295,7 +295,8 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
 }
 
 static PassRegistration<LinalgTileAndFusePass> pass(
-    "iree-linalg-tile-and-fuse", "Tile and fuse Linalg operations on buffers",
+    "iree-codegen-linalg-tile-and-fuse",
+    "Tile and fuse Linalg operations on buffers",
     [] { return std::make_unique<LinalgTileAndFusePass>(); });
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -170,6 +170,7 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass() {
 }
 
 static PassRegistration<IREELinalgFusionPass> pass(
-    "iree-linalg-fusion", "Fuse Linalg operations within a dispatch region");
+    "iree-codegen-linalg-fusion",
+    "Fuse Linalg operations within a dispatch region");
 }  // namespace iree_compiler
 }  // namespace mlir

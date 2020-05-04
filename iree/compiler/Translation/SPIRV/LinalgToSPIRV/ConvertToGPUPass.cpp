@@ -436,7 +436,7 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass() {
 }
 
 static PassRegistration<ConvertToGPUPass> pass(
-    "iree-convert-to-gpu", "Map tiled linalg and loop ops to GPU",
+    "iree-codegen-convert-to-gpu", "Map tiled linalg and loop ops to GPU",
     [] { return std::make_unique<ConvertToGPUPass>(); });
 
 }  // namespace iree_compiler

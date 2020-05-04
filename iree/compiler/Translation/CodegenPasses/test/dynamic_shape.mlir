@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hlo-to-linalg-on-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors %s | IreeFileCheck %s
 
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @dynamic_shape

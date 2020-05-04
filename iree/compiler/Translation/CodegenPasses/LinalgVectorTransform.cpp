@@ -38,7 +38,7 @@ void IREELinalgVectorTransformPass::runOnFunction() {
 }
 
 static PassRegistration<IREELinalgVectorTransformPass> pass(
-    "iree-linalg-vector-transforms", "Lower linalg to vector dialect");
+    "iree-codegen-linalg-vector-transforms", "Lower linalg to vector dialect");
 
 }  // namespace
 

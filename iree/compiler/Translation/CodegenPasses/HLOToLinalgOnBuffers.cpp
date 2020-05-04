@@ -1093,7 +1093,7 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass() {
 }
 
 static PassRegistration<ConvertHLOToLinalgOnBuffersPass> pass(
-    "iree-hlo-to-linalg-on-buffers",
+    "iree-codegen-hlo-to-linalg-on-buffers",
     "Convert from XLA-HLO ops to Linalg ops on buffers");
 }  // namespace iree_compiler
 }  // namespace mlir

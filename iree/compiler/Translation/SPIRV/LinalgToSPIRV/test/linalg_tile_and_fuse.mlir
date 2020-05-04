@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-linalg-tile-and-fuse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse %s | IreeFileCheck %s
 
 module {
   // CHECK-LABEL: func @tile_only

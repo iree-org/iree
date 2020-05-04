@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-linalg-fusion %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-linalg-fusion %s | IreeFileCheck %s
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @scalar_const_fusion

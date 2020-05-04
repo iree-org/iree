@@ -196,7 +196,7 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
 }
 
 static PassPipelineRegistration<WorkGroupOptions> linalgToSPIRVPipeline(
-    "iree-linalg-to-spirv",
+    "iree-codegen-linalg-to-spirv-pipeline",
     "Runs the progressive lowering pipeline from Linalg to SPIR-V",
     [](OpPassManager &passManager, const WorkGroupOptions &options) {
       SmallVector<int64_t, 2> workGroupSize;
@@ -206,7 +206,7 @@ static PassPipelineRegistration<WorkGroupOptions> linalgToSPIRVPipeline(
     });
 
 static PassPipelineRegistration<WorkGroupOptions> hloToLinalgSPIRVPipeline(
-    "iree-hlo-to-linalg-to-spirv",
+    "iree-codegen-hlo-to-spirv-pipeline",
     "Runs the progressive lowering pipeline from XLA HLO to Linalg to SPIR-V",
     [](OpPassManager &passManager, const WorkGroupOptions &options) {
       SmallVector<int64_t, 2> workGroupSize;

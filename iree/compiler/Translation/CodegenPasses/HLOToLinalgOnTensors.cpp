@@ -142,7 +142,7 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {
 }
 
 static PassRegistration<ConvertHLOToLinalgOnTensorsPass> legalize_pass(
-    "iree-hlo-to-linalg-on-tensors",
+    "iree-codegen-hlo-to-linalg-on-tensors",
     "Convert from XLA-HLO ops to Linalg ops on tensors");
 
 }  // namespace iree_compiler
