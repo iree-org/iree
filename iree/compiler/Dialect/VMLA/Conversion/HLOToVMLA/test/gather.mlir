@@ -9,11 +9,11 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
   // CHECK-DAG: %[[INDEX0_I32:.+]] = vmla.buffer.load.i32 %[[INDICES]][%c0] : i32
   // CHECK-DAG: %[[INDEX0:.+]] = index_cast %[[INDEX0_I32]]
   // CHECK-DAG: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c20 : !vmla.buffer
-  // CHECK-NEXT: "vmla.copy"(
-  // CHECK-SAME: %[[SRC]], %[[SRC_SHAPE]], %[[INDEX0]], %c0, %c0,
-  // CHECK-SAME: %[[DST]], %[[DST_SHAPE]], %c0, %c0, %c0,
-  // CHECK-SAME: %c1, %c1, %c5
-  // CHECK-SAME: ) {element_type = i32}
+  // CHECK:      vmla.copy
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[5,1,5]>),
+  // CHECK-SAME: src_indices = [%[[INDEX0]], %c0, %c0],
+  // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[1,1,5]>),
+  // CHECK-SAME: dst_indices = [%c0, %c0, %c0], lengths = [%c1, %c1, %c5] : i32
   %0 = "xla_hlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
@@ -42,11 +42,11 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
   // CHECK-DAG: %[[INDEX2_I32:.+]] = vmla.buffer.load.i32 %[[INDICES]][%c8] : i32
   // CHECK-DAG: %[[INDEX2:.+]] = index_cast %[[INDEX2_I32]]
   // CHECK-DAG: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c24 : !vmla.buffer
-  // CHECK-NEXT: "vmla.copy"(
-  // CHECK-SAME: %[[SRC]], %[[SRC_SHAPE]], %[[INDEX0]], %[[INDEX1]], %[[INDEX2]],
-  // CHECK-SAME: %[[DST]], %[[DST_SHAPE]], %c0, %c0, %c0,
-  // CHECK-SAME: %c1, %c2, %c3
-  // CHECK-SAME: ) {element_type = f32}
+  // CHECK:      vmla.copy
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[5,2,3]>),
+  // CHECK-SAME: src_indices = [%[[INDEX0]], %[[INDEX1]], %[[INDEX2]]],
+  // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[1,2,3]>),
+  // CHECK-SAME: dst_indices = [%c0, %c0, %c0], lengths = [%c1, %c2, %c3] : f32
   %0 = "xla_hlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,

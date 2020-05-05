@@ -41,8 +41,8 @@ func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_convert
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
 func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
   // CHECK: vmla.convert %[[SRC]], out %[[DST]] : f32 -> i8
   vmla.convert %src, out %dst : f32 -> i8
@@ -52,8 +52,8 @@ func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
 // -----
 
 // CHECK-LABEL: @vmla_batch_matmul_pseudo
-// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
 func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
                                %rhs : tensor<32x1x128xf32>) {
   // CHECK: vmla.batch.matmul.pseudo %[[LHS]], %[[RHS]] :
@@ -67,12 +67,12 @@ func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
 // -----
 
 // CHECK-LABEL: @vmla_batch_matmul
-// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[LHS_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[RHS_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[LHS_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_batch_matmul(%lhs : !vmla.buffer,
                         %lhs_shape : !shapex.ranked_shape<[8,4,4]>,
                         %rhs : !vmla.buffer,
@@ -92,22 +92,51 @@ func @vmla_batch_matmul(%lhs : !vmla.buffer,
 
 // -----
 
-// CHECK-LABEL: @vmla_transpose
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
-func @vmla_transpose(%src : !vmla.buffer,
-                     %src_shape : !shapex.ranked_shape<[64,32,32,10]>,
-                     %dst : !vmla.buffer,
-                     %dst_shape : !shapex.ranked_shape<[64,10,32,32]>) {
-  // CHECK:      vmla.transpose
-  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[64,32,32,10]>),
-  // CHECK-SAME: out
-  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[64,10,32,32]>)
-  // CHECK-SAME: {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
-  vmla.transpose %src(%src_shape : !shapex.ranked_shape<[64,32,32,10]>),
-                 out %dst(%dst_shape : !shapex.ranked_shape<[64,10,32,32]>)
-                 {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
+// CHECK-LABEL: @vmla_cmp
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @vmla_cmp(%lhs : !vmla.buffer, %rhs : !vmla.buffer, %dst : !vmla.buffer) {
+  // CHECK: vmla.cmp "NE", %[[LHS]], %[[RHS]], out %[[DST]] : f16
+  vmla.cmp "NE", %lhs, %rhs, out %dst : f16
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @vmla_select
+// CHECK-SAME: %[[COND:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @vmla_select(%cond : !vmla.buffer,
+                  %lhs : !vmla.buffer,
+                  %rhs : !vmla.buffer,
+                  %dst : !vmla.buffer) {
+  // CHECK: vmla.select %[[COND]], %[[LHS]], %[[RHS]], out %[[DST]] : f16
+  vmla.select %cond, %lhs, %rhs, out %dst : f16
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @vmla_interface_const
+// CHECK-SAME: %[[INTERFACE:[a-zA-Z0-9$._-]+]]
+func @vmla_interface_const(%interface : !vmla.interface) {
+  // CHECK:      vmla.interface.const %[[INTERFACE]]
+  // CHECK-SAME: {offset = 3 : index} : i32
+  vmla.interface.const %interface {offset = 3 : index} : i32
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @vmla_interface_binding
+// CHECK-SAME: %[[INTERFACE:[a-zA-Z0-9$._-]+]]
+func @vmla_interface_binding(%interface : !vmla.interface) {
+  // CHECK:      vmla.interface.binding %[[INTERFACE]]
+  // CHECK-SAME: {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
+  vmla.interface.binding %interface
+                         {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
   return
 }

@@ -6,15 +6,15 @@ func @inc_rgn_dispatch_0() attributes {iree.module.export} {
   // CHECK-DAG: %[[C0:.+]] = constant 0
   // CHECK-DAG: %[[C4:.+]] = constant 4
   %c0 = constant 0 : index
-  // CHECK-DAG: %[[CST1:.+]] = "vmla.constant"
+  // CHECK-DAG: %[[CST1:.+]] = vmla.constant dense<1.000000e+00> : tensor<f32> -> !vmla.buffer
   %cst = constant dense<1.000000e+00> : tensor<f32>
-  // CHECK-NEXT: %[[SET0BINDING0:.+]] = "vmla.interface.binding"(%[[INTERFACE]]) {binding = 0 : i32, set = 0 : i32}
+  // CHECK-NEXT: %[[SET0BINDING0:.+]] = vmla.interface.binding %[[INTERFACE]] {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
   // CHECK-NEXT: %[[ARG0:.+]] = vmla.buffer.view %[[SET0BINDING0]][%[[C0]]], byte_length = %[[C4]] : !vmla.buffer
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<f32>
   // CHECK-NEXT: %[[TEMP:.+]] = vmla.buffer.alloc byte_length = %[[C4]] : !vmla.buffer
   // CHECK-NEXT: vmla.add %[[ARG0]], %[[CST1]], out %[[TEMP]] : f32
   %1 = xla_hlo.add %0, %cst : tensor<f32>
-  // CHECK-NEXT: %[[SET0BINDING1:.+]] = "vmla.interface.binding"(%[[INTERFACE]]) {binding = 1 : i32, set = 0 : i32}
+  // CHECK-NEXT: %[[SET0BINDING1:.+]] = vmla.interface.binding %[[INTERFACE]] {binding = 1 : i32, set = 0 : i32} : !vmla.buffer
   // CHECK-NEXT: vmla.buffer.copy %[[TEMP]][%[[C0]]], out %[[SET0BINDING1]][%[[C0]]], byte_length = %[[C4]]
   hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<f32>
   return

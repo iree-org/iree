@@ -96,6 +96,8 @@ def VMLA_Interface : DialectType<
   let typeDescription = [{
     Binding and parameter interface (derived from `hal.interface`).
   }];
+
+  let builderCall = "$_builder.getType<IREE::VMLA::InterfaceType>()";
 }
 
 // TODO(benvanik): figure out how to get constraints to work.
