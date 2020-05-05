@@ -182,9 +182,9 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVSerialization
   )
 
-  iree_cc_binary(
+  iree_cc_library(
     NAME
-      iree-opt
+      iree_opt_main
     SRCS
       "opt_main.cc"
     DEPS
@@ -218,6 +218,16 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::init_translations
       iree::compiler::Translation::CodegenPasses
       tensorflow::mlir_xla
+    PUBLIC
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-opt
+    OUT
+      iree-opt
+    DEPS
+      ::iree_opt_main
   )
 
   iree_cc_binary(
@@ -260,9 +270,9 @@ if(${IREE_BUILD_COMPILER})
       ${IREE_HAL_DRIVER_MODULES}
   )
 
-  iree_cc_binary(
+  iree_cc_library(
     NAME
-      iree-translate
+      iree_translate_main
     SRCS
       "translate_main.cc"
     DEPS
@@ -280,6 +290,16 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::init_translations
       tensorflow::mlir_xla
+    PUBLIC
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-translate
+    OUT
+      iree-translate
+    DEPS
+      ::iree_translate_main
   )
 endif()
 

@@ -139,10 +139,9 @@ cc_library(
     ],
 )
 
-cc_binary(
-    name = "iree-opt",
+cc_library(
+    name = "iree_opt_main",
     srcs = ["opt_main.cc"],
-    tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
@@ -178,6 +177,14 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
+    ],
+)
+
+cc_binary(
+    name = "iree-opt",
+    tags = ["hostonly"],
+    deps = [
+        ":iree_opt_main",
     ],
 )
 
@@ -251,10 +258,9 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "iree-translate",
+cc_library(
+    name = "iree_translate_main",
     srcs = ["translate_main.cc"],
-    tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
@@ -270,6 +276,14 @@ cc_binary(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
+    ],
+)
+
+cc_binary(
+    name = "iree-translate",
+    tags = ["hostonly"],
+    deps = [
+        ":iree_translate_main",
     ],
 )
 
