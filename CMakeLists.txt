@@ -150,7 +150,6 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
-  set_alwayslink_tensorflow_libs()
 endif()
 
 if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
