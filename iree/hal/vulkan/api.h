@@ -60,9 +60,9 @@ typedef enum {
 
 // Vulkan driver creation options.
 typedef struct {
-  // Vulkan version that will be requested.
+  // Vulkan version that will be requested, e.g. `VK_API_VERSION_1_0`.
   // Driver creation will fail if the required version is not available.
-  uint32_t api_version = VK_API_VERSION_1_0;
+  uint32_t api_version;
 
   // Vulkan features to request.
   iree_hal_vulkan_features_t features;

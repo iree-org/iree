@@ -562,6 +562,7 @@ int iree::IreeMain(int argc, char** argv) {
   // Create the driver sharing our VkInstance.
   iree_hal_driver_t* iree_vk_driver = nullptr;
   iree_hal_vulkan_driver_options_t options;
+  options.api_version = VK_API_VERSION_1_0;
   options.features = static_cast<iree_hal_vulkan_features_t>(
       IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
       IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
