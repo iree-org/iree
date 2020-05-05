@@ -47,6 +47,10 @@ Visual Studio":
     > "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
     ```
 
+### Install Python3
+
+Instructions for installation can be found [here](https://www.python.org/downloads/windows/).
+
 ## Clone and Build
 
 ### Clone
