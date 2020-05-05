@@ -140,6 +140,18 @@ cc_library(
 )
 
 cc_library(
+    name = "init_xla_dialects",
+    hdrs = [
+        "init_xla_dialects.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:IR",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:lhlo",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [

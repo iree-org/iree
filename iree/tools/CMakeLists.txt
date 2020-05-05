@@ -175,6 +175,16 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_xla_dialects
+    HDRS
+      "init_xla_dialects.h"
+    DEPS
+      tensorflow::mlir_xla
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
       init_translations
     HDRS
       "init_translations.h"
