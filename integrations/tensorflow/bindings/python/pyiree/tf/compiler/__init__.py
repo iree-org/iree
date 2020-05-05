@@ -50,6 +50,7 @@ TF_IMPORT_PASS_PIPELINE = (
     "tf-saved-model-mark-func-visibility",
     "symbol-dce",
     "tf-executor-graph-pruning",
+    "iree-guarantee-all-funcs-one-use",
     "tf-standard-pipeline",
     "canonicalize",
 
