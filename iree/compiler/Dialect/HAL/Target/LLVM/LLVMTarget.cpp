@@ -256,6 +256,7 @@ class LLVMIRTargetBackend final : public TargetBackend {
     passManager.addPass(createInlinerPass());
 
     // HLO -> Linalg on buffers.
+    passManager.addPass(createDecomposeHLOClampPass());
     addHLOToLinalgOnBuffersPasses(passManager);
 
     // Linalg -> Loops

@@ -44,6 +44,7 @@ iree_check_single_backend_test_suite(
 
         # TODO(GH-1688): Enable compare tests after integer widths are handled
         # on structured ops path in vulkan
+        # "clamp.mlir",
         # "compare.mlir",
 
         # TODO(GH-1695): Enable when xla.concat can be lowered to linalg
@@ -113,6 +114,7 @@ iree_check_single_backend_test_suite(
         "add.mlir",
         "batch_norm_inference.mlir",
         "broadcast_in_dim.mlir",
+        "clamp.mlir",
         "compare.mlir",
         "constant.mlir",
         "convolution.mlir",

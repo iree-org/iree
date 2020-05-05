@@ -38,6 +38,7 @@ gentbl(
 cc_library(
     name = "CodegenPasses",
     srcs = [
+        "DecomposeHLOClamp.cpp",
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "LinalgFusion.cpp",

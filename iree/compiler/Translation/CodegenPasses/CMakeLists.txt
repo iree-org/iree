@@ -38,6 +38,7 @@ iree_cc_library(
     "Passes.h"
     "LinalgVectorTransformPatterns.h.inc"
   SRCS
+    "DecomposeHLOClamp.cpp"
     "HLOToLinalgOnBuffers.cpp"
     "HLOToLinalgOnTensors.cpp"
     "LinalgFusion.cpp"
