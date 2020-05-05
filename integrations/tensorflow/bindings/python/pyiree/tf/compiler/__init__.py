@@ -52,10 +52,20 @@ TF_IMPORT_PASS_PIPELINE = (
     "tf-executor-graph-pruning",
     "iree-guarantee-all-funcs-one-use",
     "tf-standard-pipeline",
-    "canonicalize",
 
-    # Clean up control flow
+    # Try to get the IR in good condition.
+    # In particular, because IREE doesn't handle dynamic shapes, we need to
+    # guarantee here that all dynamic shapes are gone.
+    # TODO(silvasean): Add a verifier pass that enforces that.
+    "inline",
+    "canonicalize",
+    "tf-shape-inference",
+
+    # Lower to CFG.
+    # After this point, most TF optimizations won't work properly besides
+    # simple canonicalizations.
     "tf-functional-control-flow-to-cfg",
+    # Inline, as tf-functional-control-flow-to-cfg leaves in calls.
     "inline",
 
     # Some further cleanups now that control flow is in better shape.
