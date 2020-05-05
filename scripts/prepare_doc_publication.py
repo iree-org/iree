@@ -94,6 +94,7 @@ NAVI_ORDER_DICT = {
     'roadmap_design.md': 4,
     'roadmap.md': 5,
     'op_coverage.md': 6,
+    'testing_guide.md': 7,
 
     # Within 'Getting Started' use explicit ordering.
     # Alphabetical would put 'bazel' before 'cmake' and 'python' between 'linux'
