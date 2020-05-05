@@ -50,6 +50,14 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
+### Install Python
+
+LLVM requires python and its libraries:
+
+```shell
+sudo apt install python3 python3-pip python3-setuptools
+```
+
 ## Clone and Build
 
 ### Clone
