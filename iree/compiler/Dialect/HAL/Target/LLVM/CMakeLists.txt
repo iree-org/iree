@@ -16,19 +16,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    LLVMTargetOptions
-  HDRS
-    "LLVMTargetOptions.h"
-  SRCS
-    "LLVMTargetOptions.cpp"
-  DEPS
-    LLVMPasses
-    LLVMSupport
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     LLVM
   HDRS
     "LLVMTarget.h"
@@ -75,5 +62,18 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     MLIRSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LLVMTargetOptions
+  HDRS
+    "LLVMTargetOptions.h"
+  SRCS
+    "LLVMTargetOptions.cpp"
+  DEPS
+    LLVMPasses
+    LLVMSupport
   PUBLIC
 )
