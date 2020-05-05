@@ -38,6 +38,15 @@ Binding and parameter interface (derived from `hal.interface`).
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.conv` $input`(`$input_shape `:` type($input_shape)`)` `:` $input_type`,`
+              $filter`(`$filter_shape `:` type($filter_shape)`)` `:` $filter_type`,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` `:` $dst_type attr-dict
+```
+
+
 
 #### Attributes:
 
@@ -256,6 +265,14 @@ We insert the relevant transposes as needed in the compiler.
 
 ### `vmla.broadcast` (IREE::VMLA::BroadcastOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.broadcast` $src`(`$src_shape `:` type($src_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
 
 
 
@@ -523,6 +540,13 @@ operation ::= `vmla.clamp` $a`,` $b`,` $c`,` `out` $dst attr-dict `:` $element_t
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.cmp` $predicate`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -542,6 +566,13 @@ operation ::= `vmla.clamp` $a`,` $b`,` $c`,` `out` $dst attr-dict `:` $element_t
 ### `vmla.constant` (IREE::VMLA::ConstantOp)
 
 constant buffer declaration
+
+Syntax:
+
+```
+operation ::= `vmla.constant` attr-dict $value `->` type($result)
+```
+
 
 A pseudo-op used to represent a buffer with constant contents. This is later
 expanded into VM ops and the vmla.buffer.const op.
@@ -586,6 +617,17 @@ operation ::= `vmla.convert` $src`,` `out` $dst attr-dict `:` $src_type `->` $ds
 
 ### `vmla.copy` (IREE::VMLA::CopyOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.copy` $src`(`$src_shape `:` type($src_shape)`)``,`
+              (`src_indices` `=` `[` $src_indices^ `]``,`)?
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)`
+              (`,` `dst_indices` `=` `[` $dst_indices^ `]`)?
+              (`,` `lengths` `=` `[` $lengths^ `]`)? attr-dict `:` $element_type
+```
 
 
 
@@ -716,6 +758,15 @@ operation ::= `vmla.floor` $src`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.gather` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $indices`(`$indices_shape `:` type($indices_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -740,6 +791,13 @@ operation ::= `vmla.floor` $src`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.interface.binding` $interface attr-dict `:` type($result)
+```
+
+
 
 #### Attributes:
 
@@ -762,6 +820,13 @@ operation ::= `vmla.floor` $src`,` `out` $dst attr-dict `:` $element_type
 
 ### `vmla.interface.const` (IREE::VMLA::InterfaceConstOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.interface.const` $interface attr-dict `:` type($result)
+```
 
 
 
@@ -973,6 +1038,15 @@ operation ::= `vmla.or` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.pad` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $value`(`$value_shape `:` type($value_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -996,6 +1070,15 @@ operation ::= `vmla.or` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 ### `vmla.pooling.max` (IREE::VMLA::PoolingMaxOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.pooling.max` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
 
 
 
@@ -1023,6 +1106,15 @@ operation ::= `vmla.or` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.pooling.min` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -1046,6 +1138,15 @@ operation ::= `vmla.or` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 ### `vmla.pooling.sum` (IREE::VMLA::PoolingSumOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.pooling.sum` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
 
 
 
@@ -1100,6 +1201,15 @@ operation ::= `vmla.pow` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.reduce.max` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -1123,6 +1233,15 @@ operation ::= `vmla.pow` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.reduce.min` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -1144,6 +1263,15 @@ operation ::= `vmla.pow` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 ### `vmla.reduce.sum` (IREE::VMLA::ReduceSumOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.reduce.sum` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $init`(`$init_shape `:` type($init_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
 
 
 
@@ -1196,6 +1324,14 @@ operation ::= `vmla.rem` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.reverse` $src`(`$src_shape `:` type($src_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
 
 #### Attributes:
 
@@ -1241,6 +1377,13 @@ operation ::= `vmla.rsqrt` $src`,` `out` $dst attr-dict `:` $element_type
 
 ### `vmla.select` (IREE::VMLA::SelectOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.select` $cond`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
+```
 
 
 
@@ -1420,6 +1563,14 @@ operation ::= `vmla.tanh` $src`,` `out` $dst attr-dict `:` $element_type
 
 ### `vmla.tile` (IREE::VMLA::TileOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.tile` $src`(`$src_shape `:` type($src_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
 
 
 
