@@ -201,6 +201,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
+      ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIROptLib
@@ -290,6 +291,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_passes_and_dialects
       ::init_targets
       ::init_translations
+      ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIRLoopOpsTransforms
