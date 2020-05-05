@@ -15,9 +15,6 @@
 set(RUY_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/ruy/ruy/"
 )
-set(GEMMLOWP_SRC_ROOT
-  "${IREE_ROOT_DIR}/third_party/gemmlowp/"
-)
 
 # TODO(benvanik): if android_arm then add -O3/-mfpu=neon.
 # TODO(benvanik): if andoird_arm64 then add -O3
@@ -34,42 +31,6 @@ set(RUY_COPTS_AVX2)
 set(RUY_COPTS_AVX_VNNI)
 set(RUY_COPTS_SSE42)
 set(RUY_COPTS_SKYLAKE)
-
-external_cc_library(
-  PACKAGE
-    gemmlowp
-  NAME
-    fixedpoint
-  ROOT
-    ${GEMMLOWP_SRC_ROOT}
-  HDRS
-    "fixedpoint/fixedpoint.h"
-    "fixedpoint/fixedpoint_avx.h"
-    "fixedpoint/fixedpoint_msa.h"
-    "fixedpoint/fixedpoint_neon.h"
-    "fixedpoint/fixedpoint_sse.h"
-  COPTS
-    ${RUY_COPTS_BASE}
-  INCLUDES
-    "${IREE_ROOT_DIR}/third_party/gemmlowp"
-)
-
-external_cc_library(
-  PACKAGE
-    gemmlowp
-  NAME
-    profiler
-  ROOT
-    ${GEMMLOWP_SRC_ROOT}
-  HDRS
-    "profiling/instrumentation.h"
-    "profiling/profiler.h"
-    "profiling/pthread_everywhere.h"
-  COPTS
-    ${RUY_COPTS_BASE}
-  INCLUDES
-    "${IREE_ROOT_DIR}/third_party/gemmlowp"
-)
 
 external_cc_library(
   PACKAGE
@@ -191,7 +152,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::allocator
     ruy::matrix
     ruy::opt_set
@@ -246,7 +206,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::opt_set
     ruy::side_pair
@@ -446,8 +405,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::fixedpoint
-    gemmlowp::profiler
     ruy::check_macros
     ruy::common
     ruy::internal_matrix
@@ -476,7 +433,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::common
     ruy::internal_matrix
@@ -500,7 +456,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::common
     ruy::kernel_common
     ruy::opt_set
@@ -519,7 +474,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::common
     ruy::opt_set
     ruy::pack_common
@@ -539,7 +493,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_SKYLAKE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::kernel_common
     ruy::opt_set
@@ -559,7 +512,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_SKYLAKE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::matrix
     ruy::opt_set
@@ -600,7 +552,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_AVX2}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::kernel_common
     ruy::opt_set
@@ -620,7 +571,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_AVX2}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::matrix
     ruy::opt_set
@@ -661,7 +611,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_SSE42}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::kernel_common
     ruy::opt_set
@@ -681,7 +630,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_SSE42}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::matrix
     ruy::opt_set
@@ -722,7 +670,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_SKYLAKE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::kernel_common
     ruy::opt_set
@@ -742,7 +689,6 @@ external_cc_library(
     ${RUY_COPTS_BASE}
     ${RUY_COPTS_AVX_VNNI}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::matrix
     ruy::opt_set
@@ -783,8 +729,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::fixedpoint
-    gemmlowp::profiler
     ruy::check_macros
     ruy::common
     ruy::internal_matrix
@@ -817,7 +761,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::common
     ruy::internal_matrix
@@ -936,7 +879,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::allocator
     ruy::block_map
     ruy::check_macros
@@ -971,7 +913,6 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    gemmlowp::profiler
     ruy::check_macros
     ruy::common
     ruy::context
