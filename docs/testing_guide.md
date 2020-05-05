@@ -2,6 +2,7 @@
 layout: default
 permalink: TestingGuide
 title: "Testing Guide"
+nav_order: 7
 ---
 
 # Testing Guide
