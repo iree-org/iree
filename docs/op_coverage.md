@@ -22,7 +22,7 @@ add | ✓ | ✓ | ✓
 batch_norm_inference | ✓ | ✗ | ✓
 broadcast | ✓ | ✓ | ✗
 broadcast_in_dim | ✓ | ✓ | ✓
-clamp | ✓ | ✗ | ✗
+clamp | ✓ | ✗ | ✓
 compare | ✓ | ✗ | ✓
 concatenate | ✓ | ✗ | ✗
 constant | ✓ | ✓ | ✓
