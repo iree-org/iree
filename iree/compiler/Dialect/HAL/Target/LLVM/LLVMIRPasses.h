@@ -11,26 +11,34 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMIRPASSES_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMIRPASSES_H_
+
+#include <memory>
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Target/TargetMachine.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Registers the LLVM backends.
-void registerLLVMTargetBackends(
-    std::function<LLVMTargetOptions()> queryOptions);
+// Creates target machine form target options.
+std::unique_ptr<llvm::TargetMachine> createTargetMachine(
+    const LLVMTargetOptions& options);
+
+// Creates and runs LLVMIR optimization passes defined in LLVMTargetOptions.
+LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
+                              std::unique_ptr<llvm::TargetMachine> machine,
+                              llvm::Module* module);
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMIRPASSES_H_

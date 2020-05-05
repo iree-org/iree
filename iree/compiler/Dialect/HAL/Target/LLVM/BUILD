@@ -26,6 +26,8 @@ cc_library(
         "LLVMTarget.h",
     ],
     deps = [
+        ":LLVMIRPasses",
+        ":LLVMTargetOptions",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
@@ -46,5 +48,39 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:Transforms",
+        # TODO(ataei): Link with native target dep.
+        "@llvm-project//llvm:x86_code_gen",
+    ],
+)
+
+cc_library(
+    name = "LLVMIRPasses",
+    srcs = [
+        "LLVMIRPasses.cpp",
+    ],
+    hdrs = [
+        "LLVMIRPasses.h",
+    ],
+    deps = [
+        ":LLVMTargetOptions",
+        "@llvm-project//llvm:core",
+        "@llvm-project//llvm:passes",
+        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:target",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
+    name = "LLVMTargetOptions",
+    srcs = [
+        "LLVMTargetOptions.cpp",
+    ],
+    hdrs = [
+        "LLVMTargetOptions.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:passes",
+        "@llvm-project//llvm:support",
     ],
 )

@@ -11,26 +11,37 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
-
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+
+#include "llvm/Support/Host.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Registers the LLVM backends.
-void registerLLVMTargetBackends(
-    std::function<LLVMTargetOptions()> queryOptions);
+LLVMTargetOptions getDefaultLLVMTargetOptions() {
+  LLVMTargetOptions targetOptions;
+  // Host target triple.
+  targetOptions.targetTriple = llvm::sys::getDefaultTargetTriple();
+  // LLVM loop optimization options.
+  targetOptions.pipelineTuningOptions.LoopInterleaving = true;
+  targetOptions.pipelineTuningOptions.LoopVectorization = true;
+  targetOptions.pipelineTuningOptions.LoopUnrolling = true;
+  // LLVM SLP Auto vectorizer.
+  targetOptions.pipelineTuningOptions.SLPVectorization = true;
+  // LLVM -O3.
+  targetOptions.optLevel = llvm::PassBuilder::OptimizationLevel::O3;
+  return targetOptions;
+}
+
+LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
+  // TODO(ataei): Add flags and construct options.
+  return getDefaultLLVMTargetOptions();
+}
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_

@@ -11,26 +11,30 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "llvm/Passes/PassBuilder.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Registers the LLVM backends.
-void registerLLVMTargetBackends(
-    std::function<LLVMTargetOptions()> queryOptions);
+struct LLVMTargetOptions {
+  llvm::PipelineTuningOptions pipelineTuningOptions;
+  llvm::PassBuilder::OptimizationLevel optLevel;
+  std::string targetTriple;
+};
+
+// Returns LLVMTargetOptions struct intialized with the
+// iree-hal-llvm-ir-* flags.
+LLVMTargetOptions getLLVMTargetOptionsFromFlags();
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_

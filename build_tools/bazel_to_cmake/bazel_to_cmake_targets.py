@@ -28,6 +28,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:asm_parser": ["LLVMAsmParser"],
     "@llvm-project//llvm:core": ["LLVMCore"],
     "@llvm-project//llvm:execution_engine": ["LLVMExecutionEngine"],
+    "@llvm-project//llvm:passes": ["LLVMPasses"],
+    "@llvm-project//llvm:target": ["LLVMTarget"],
     "@llvm-project//llvm:support": ["LLVMSupport"],
     "@llvm-project//llvm:orc_jit": ["LLVMOrcJIT"],
     "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
