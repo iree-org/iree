@@ -45,10 +45,10 @@ class B : public iree::RefObject<B> {
 };
 iree_vm_ref_type_t B::kTypeID = IREE_VM_REF_TYPE_NULL;
 
-typedef struct {
+struct ref_object_c_t {
   iree_vm_ref_object_t ref_object = {1};
   int data = 1;
-} ref_object_c_t;
+};
 
 template <typename T>
 static iree_vm_ref_t MakeRef() {
