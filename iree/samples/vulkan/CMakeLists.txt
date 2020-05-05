@@ -24,42 +24,44 @@ iree_bytecode_module(
     "-iree-hal-target-backends=vulkan-spirv"
 )
 
-# bazel_to_cmake: DO NOT EDIT
-# TODO(scotttodd): handle vulkan in bazel_to_cmake
-# Statically link against Vulkan.
-# Requires installing the Vulkan SDK from https://vulkan.lunarg.com/.
+# bazel_to_cmake: DO NOT EDIT (special Vulkan and Windows logic is needed)
+
+# This sample statically links against Vulkan.
+# One way to achieve this is by installing the Vulkan SDK from
+# https://vulkan.lunarg.com/.
+# If Vulkan is not found, omit the target.
 include(FindVulkan)
 if(NOT Vulkan_FOUND)
-  message(FATAL_ERROR "Vulkan library was not found")
-endif()
-
-if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
+  message(NOTICE "Vulkan was not found, skipping vulkan_inference_gui sample")
 else()
-  set(_GUI_LINKOPTS "")
-endif()
+  if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+    set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
+  else()
+    set(_GUI_LINKOPTS "")
+  endif()
 
-iree_cc_binary(
-    NAME
-      vulkan_inference_gui
-    SRCS
-      "vulkan_inference_gui.cc"
-    DEPS
-      absl::base
-      dear_imgui::dear_imgui
-      dear_imgui::impl_sdl
-      dear_imgui::impl_vulkan
-      iree::base::api
-      iree::base::logging
-      iree::base::main
-      iree::hal::api
-      iree::hal::vulkan::api
-      iree::modules::hal
-      iree::samples::vulkan::simple_mul_bytecode_module_cc
-      iree::vm
-      iree::vm::bytecode_module
-      SDL2-static
-      Vulkan::Vulkan
-    LINKOPTS
-      "${_GUI_LINKOPTS}"
-)
+  iree_cc_binary(
+      NAME
+        vulkan_inference_gui
+      SRCS
+        "vulkan_inference_gui.cc"
+      DEPS
+        absl::base
+        dear_imgui::dear_imgui
+        dear_imgui::impl_sdl
+        dear_imgui::impl_vulkan
+        iree::base::api
+        iree::base::logging
+        iree::base::main
+        iree::hal::api
+        iree::hal::vulkan::api
+        iree::modules::hal
+        iree::samples::vulkan::simple_mul_bytecode_module_cc
+        iree::vm
+        iree::vm::bytecode_module
+        SDL2-static
+        Vulkan::Vulkan
+      LINKOPTS
+        "${_GUI_LINKOPTS}"
+  )
+endif()

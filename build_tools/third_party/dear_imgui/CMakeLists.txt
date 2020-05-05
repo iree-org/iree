@@ -53,41 +53,43 @@ external_cc_library(
     SDL2-static
 )
 
-# Statically link against Vulkan.
-# Requires installing the Vulkan SDK from https://vulkan.lunarg.com/.
+# Dear ImGui's Vulkan implementation requires statically link against Vulkan.
+# One way to achieve this is by installing the Vulkan SDK from
+# https://vulkan.lunarg.com/.
+# If Vulkan is not found, omit these targets (and users must do the same).
 include(FindVulkan)
 if(NOT Vulkan_FOUND)
-  message(FATAL_ERROR "Vulkan library was not found")
+  message(NOTICE "Vulkan was not found, skipping Dear ImGui Vulkan support")
+else()
+  external_cc_library(
+    PACKAGE
+      dear_imgui
+    NAME
+      impl_vulkan
+    ROOT
+      ${IMGUI_ROOT}
+    SRCS
+      "examples/imgui_impl_vulkan.cpp"
+    HDRS
+      "examples/imgui_impl_vulkan.h"
+    INCLUDES
+      ${IMGUI_ROOT}
+    DEPS
+      dear_imgui::dear_imgui
+      Vulkan::Vulkan
+  )
+
+  add_executable(dear_imgui_example_sdl_vulkan
+    ${IMGUI_ROOT}/examples/example_sdl_vulkan/main.cpp
+  )
+  target_include_directories(dear_imgui_example_sdl_vulkan
+    PUBLIC
+      ${IMGUI_ROOT}/examples/
+  )
+  target_link_libraries(dear_imgui_example_sdl_vulkan
+    PRIVATE
+      dear_imgui::dear_imgui
+      dear_imgui::impl_sdl
+      dear_imgui::impl_vulkan
+  )
 endif()
-
-external_cc_library(
-  PACKAGE
-    dear_imgui
-  NAME
-    impl_vulkan
-  ROOT
-    ${IMGUI_ROOT}
-  SRCS
-    "examples/imgui_impl_vulkan.cpp"
-  HDRS
-    "examples/imgui_impl_vulkan.h"
-  INCLUDES
-    ${IMGUI_ROOT}
-  DEPS
-    dear_imgui::dear_imgui
-    Vulkan::Vulkan
-)
-
-add_executable(dear_imgui_example_sdl_vulkan
-  ${IMGUI_ROOT}/examples/example_sdl_vulkan/main.cpp
-)
-target_include_directories(dear_imgui_example_sdl_vulkan
-  PUBLIC
-    ${IMGUI_ROOT}/examples/
-)
-target_link_libraries(dear_imgui_example_sdl_vulkan
-  PRIVATE
-    dear_imgui::dear_imgui
-    dear_imgui::impl_sdl
-    dear_imgui::impl_vulkan
-)
