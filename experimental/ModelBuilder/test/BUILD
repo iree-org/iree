@@ -39,6 +39,7 @@ iree_lit_test_suite(
         ":test-simple-jit",
         ":test-simple-jit-vulkan",
         ":test-simple-mlir",
+        ":test-vector-transfers-jit",
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
@@ -54,6 +55,24 @@ cc_binary(
         "noga",
     ],
     deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
+    ],
+)
+
+cc_binary(
+    name = "test-vector-transfers-jit",
+    srcs = ["TestVectorTransfersJIT.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        ":runtime-support.so",
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
         "@llvm-project//llvm:support",

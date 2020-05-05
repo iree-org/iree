@@ -34,6 +34,10 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool> mlirDebug(
+    "mlir-debug", llvm::cl::desc("Single thread and print-ir-after-all"),
+    llvm::cl::init(false));
+
 struct LLVMInitializer {
   LLVMInitializer() {
     llvm::InitializeNativeTarget();
@@ -137,6 +141,12 @@ mlir::ModelRunner::getDefaultMLIRPassBuilder() {
 void mlir::ModelRunner::runLoweringPass(
     std::function<void(mlir::PassManager&)> passBuilder) {
   PassManager manager(module->getContext());
+  if (mlirDebug) {
+    manager.getContext()->disableMultithreading();
+    manager.enableIRPrinting([](Pass*, Operation*) { return true; },
+                             [](Pass*, Operation*) { return true; }, true, true,
+                             llvm::errs());
+  }
   passBuilder(manager);
   if (failed(manager.run(*module))) {
     llvm::errs() << "conversion to the LLVM IR dialect failed\n";
