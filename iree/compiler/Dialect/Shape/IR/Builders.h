@@ -25,7 +25,7 @@ namespace iree_compiler {
 namespace Shape {
 
 // Given an arbitrary list of inputs, builds IR to obtain their shapes and
-// cast them to a given !shape.ranked_shape. Statically verifiable invariants
+// cast them to a given !shapex.ranked_shape. Statically verifiable invariants
 // will be checked within this call and runtime code will be emitted to verify
 // the rest.
 // Returns nullptr and emits an error on violation of an invariant.

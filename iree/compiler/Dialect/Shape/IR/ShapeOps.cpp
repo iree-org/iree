@@ -39,7 +39,7 @@ namespace iree_compiler {
 namespace Shape {
 
 //===----------------------------------------------------------------------===//
-// shape.tie_shape
+// shapex.tie_shape
 //===----------------------------------------------------------------------===//
 
 void TieShapeOp::build(OpBuilder &builder, OperationState &result,
@@ -66,7 +66,7 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
 Value TieShapeOp::getViewSource() { return operand(); }
 
 //===----------------------------------------------------------------------===//
-// shape.cast_compatible_shape
+// shapex.cast_compatible_shape
 //===----------------------------------------------------------------------===//
 
 static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
@@ -94,7 +94,7 @@ static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// shape.get_ranked_shape
+// shapex.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
 void GetRankedShapeOp::build(OpBuilder &builder, OperationState &result,
@@ -122,7 +122,7 @@ static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// shape.const_ranked_shape
+// shapex.const_ranked_shape
 //===----------------------------------------------------------------------===//
 
 void ConstRankedShapeOp::build(OpBuilder &builder, OperationState &result,
@@ -151,7 +151,7 @@ void ConstRankedShapeOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// shape.make_ranked_shape
+// shapex.make_ranked_shape
 //===----------------------------------------------------------------------===//
 
 static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
@@ -163,7 +163,7 @@ static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// shape.ranked_dim
+// shapex.ranked_dim
 //===----------------------------------------------------------------------===//
 
 void RankedDimOp::build(OpBuilder &builder, OperationState &result,
@@ -221,7 +221,7 @@ static LogicalResult verifyRankedDimOp(RankedDimOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// shape.ranked_dims
+// shapex.ranked_dims
 //===----------------------------------------------------------------------===//
 
 void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
@@ -239,7 +239,7 @@ void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
 }
 
 //===----------------------------------------------------------------------===//
-// shape.gather_extents
+// shapex.gather_extents
 //===----------------------------------------------------------------------===//
 
 // Helper for accessing attributes for inferReturnTypes callback.

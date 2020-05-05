@@ -53,7 +53,7 @@ std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass();
 std::unique_ptr<OperationPass<FuncOp>> createConvertHLOToShapePass();
 
 // Best-effort hoisting of shape calculations to attempt to establish the
-// invariant that shape.tie_shape second operand dominates the first operand.
+// invariant that shapex.tie_shape second operand dominates the first operand.
 std::unique_ptr<OperationPass<FuncOp>> createHoistShapeCalculationsPass();
 
 // Register all Passes

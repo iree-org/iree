@@ -224,7 +224,7 @@ LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
 }
 
 //===----------------------------------------------------------------------===//
-// shape.tie_shape
+// shapex.tie_shape
 //===----------------------------------------------------------------------===//
 
 void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
@@ -233,7 +233,7 @@ void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
 }
 
 //===----------------------------------------------------------------------===//
-// shape.cast_compatible_shape
+// shapex.cast_compatible_shape
 //===----------------------------------------------------------------------===//
 
 void CastCompatibleShapeOp::getCanonicalizationPatterns(
@@ -242,7 +242,7 @@ void CastCompatibleShapeOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// shape.get_ranked_shape
+// shapex.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
 void GetRankedShapeOp::getCanonicalizationPatterns(
@@ -253,7 +253,7 @@ void GetRankedShapeOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// shape.make_ranked_shape
+// shapex.make_ranked_shape
 //===----------------------------------------------------------------------===//
 
 void MakeRankedShapeOp::getCanonicalizationPatterns(
@@ -262,7 +262,7 @@ void MakeRankedShapeOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// shape.ranked_dim
+// shapex.ranked_dim
 //===----------------------------------------------------------------------===//
 
 OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
@@ -281,7 +281,7 @@ void RankedDimOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// shape.ranked_dims
+// shapex.ranked_dims
 //===----------------------------------------------------------------------===//
 
 void RankedDimsOp::getCanonicalizationPatterns(

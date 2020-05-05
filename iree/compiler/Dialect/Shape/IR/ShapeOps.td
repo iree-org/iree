@@ -49,7 +49,7 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
     will be removed late in conversion.
 
     Usage:
-      %0 = shape.tie_shape %1, %2 : tensor<...>, shape.ranked_shape<...>
+      %0 = shapex.tie_shape %1, %2 : tensor<...>, shapex.ranked_shape<...>
   }];
 
   let arguments = (ins AnyType:$operand, Shape_RankedShape:$shape);
@@ -82,8 +82,8 @@ def Shape_CastCompatibleShapeOp : Shape_PureOp<"cast_compatible_shape"> {
     all of the shapes are strictly the same.
 
     Usage:
-      %0 = shape.cast_compatible_shape %1, ... %3 :
-          !shape.ranked_shape<...>...
+      %0 = shapex.cast_compatible_shape %1, ... %3 :
+          !shapex.ranked_shape<...>...
   }];
 
   let arguments = (ins Variadic<Shape_RankedShape>:$operands);
@@ -108,10 +108,10 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
     to a static_ranked_shape op and will never cause a further SSA dependency.
 
     Usage:
-      %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-          !shape.ranked_shape<[2,?]>  // based on index type
-      %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-          !shape.ranked_shape<[2,?],i32>  // explicit dim type
+      %0 = shapex.get_ranked_shape %arg0 : tensor<2x?xf32> ->
+          !shapex.ranked_shape<[2,?]>  // based on index type
+      %0 = shapex.get_ranked_shape %arg0 : tensor<2x?xf32> ->
+          !shapex.ranked_shape<[2,?],i32>  // explicit dim type
 
     Canonicalization: This op includes a canonicalization pattern such that
     if its operand is supplied by a tie_shape op, then it will replace itself
@@ -121,7 +121,7 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
     Any get_ranked_shape on a fully static shape will canonicalize to a const
     with unit value:
-      %0 = constant_ranked_shape : !shape.ranked_shape<[1,2],i32>
+      %0 = constant_ranked_shape : !shapex.ranked_shape<[1,2],i32>
   }];
 
   let arguments = (ins AnyTensor:$operand);
@@ -205,7 +205,7 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
     in the type, not have dims represented as const SSA values.
 
     Usage:
-      %0 = shape.const_ranked_shape : !shape.ranked_shape<[1,2]>
+      %0 = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2]>
   }];
 
   let arguments = (ins);
@@ -229,8 +229,8 @@ def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape"> {
     ranked_shape.
 
     Usage:
-      %0 = shape.make_ranked_shape %dim0, %dim1 : (i32, i32) ->
-          !shape.ranked_shape<[?,?,128]>
+      %0 = shapex.make_ranked_shape %dim0, %dim1 : (i32, i32) ->
+          !shapex.ranked_shape<[?,?,128]>
 
     Note that the type of the dims is is implied by the dim type of the result.
   }];
@@ -255,8 +255,8 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
     Static dimensions will fold to constants.
 
     Usage:
-      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2]>
-      %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<[1,2]> -> i32
+      %0 = shapex.const ranked_shape : !shapex.ranked_shape<[1,2]>
+      %1 = shapex.ranked_dim %0[0] : !shapex.ranked_shape<[1,2]> -> i32
   }];
 
   let arguments = (ins Shape_RankedShape:$shape,
@@ -294,8 +294,8 @@ def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
     Static dimensions will fold to constants.
 
     Usage:
-      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2]>
-      %1, %2 = shape.ranked_dims %0 : !shape.ranked_shape<[1,2]> -> (i32, i32)
+      %0 = shapex.const ranked_shape : !shapex.ranked_shape<[1,2]>
+      %1, %2 = shapex.ranked_dims %0 : !shapex.ranked_shape<[1,2]> -> (i32, i32)
   }];
 
   let arguments = (ins Shape_RankedShape:$shape);
@@ -330,8 +330,8 @@ def Shape_RankedBroadcastShapeOp : Shape_PureOp<"ranked_broadcast_shape"> {
     Applies numpy broadcasting semantics to shape operands.
 
     Usage:
-      %0 = shape.ranked_broadcast_shape %shp0, %shp1 :
-          !shape.ranked_shape<...>, !shape.ranked_shape<...>
+      %0 = shapex.ranked_broadcast_shape %shp0, %shp1 :
+          !shapex.ranked_shape<...>, !shapex.ranked_shape<...>
   }];
 
   let arguments = (ins Shape_RankedShape:$lhs,
@@ -349,8 +349,8 @@ def Shape_RankedBroadcastInDimOp : Shape_PureOp<"ranked_broadcast_in_dim"> {
   let summary = "Broadcasts dimensions from the input into the result.";
   let description = [{
     Usage:
-      %0 = shape.ranked_broadcast_in_dim [...] (%operand, %result_shp) :
-          tensor<...xf32>, !shape.ranked_shape<...xi32>
+      %0 = shapex.ranked_broadcast_in_dim [...] (%operand, %result_shp) :
+          tensor<...xf32>, !shapex.ranked_shape<...xi32>
 
       Note that the result type will be a RankedTensorType with dims from
       %result_shp and the element type from %operand.
