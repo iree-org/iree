@@ -52,11 +52,7 @@ iree_check_single_backend_test_suite(
         # "concatenate.mlir",
         #
         "constant.mlir",
-
-        # TODO(GH-1687): Enable after casting from fp to int is handled
-        # on structured ops path in vulkan
-        # "convert.mlir",
-        #
+        "convert.mlir",
         "cosine.mlir",
         "divide.mlir",
         "dot.mlir",
@@ -117,6 +113,7 @@ iree_check_single_backend_test_suite(
         "clamp.mlir",
         "compare.mlir",
         "constant.mlir",
+        "convert.mlir",
         "convolution.mlir",
         "cosine.mlir",
         "divide.mlir",
