@@ -38,8 +38,8 @@ TODO: This op is currently very conservative, statically verifying that
 all of the shapes are strictly the same.
 
 Usage:
-  %0 = shape.cast_compatible_shape %1, ... %3 :
-      !shape.ranked_shape<...>...
+  %0 = shapex.cast_compatible_shape %1, ... %3 :
+      !shapex.ranked_shape<...>...
 
 #### Operands:
 
@@ -69,7 +69,7 @@ RankedShape that is fully static, as anything more specific should be
 in the type, not have dims represented as const SSA values.
 
 Usage:
-  %0 = shape.const_ranked_shape : !shape.ranked_shape<[1,2]>
+  %0 = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2]>
 
 #### Results:
 
@@ -194,10 +194,10 @@ Getting the RankedShape of a statically shaped tensor will canonicalize
 to a static_ranked_shape op and will never cause a further SSA dependency.
 
 Usage:
-  %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-      !shape.ranked_shape<[2,?]>  // based on index type
-  %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-      !shape.ranked_shape<[2,?],i32>  // explicit dim type
+  %0 = shapex.get_ranked_shape %arg0 : tensor<2x?xf32> ->
+      !shapex.ranked_shape<[2,?]>  // based on index type
+  %0 = shapex.get_ranked_shape %arg0 : tensor<2x?xf32> ->
+      !shapex.ranked_shape<[2,?],i32>  // explicit dim type
 
 Canonicalization: This op includes a canonicalization pattern such that
 if its operand is supplied by a tie_shape op, then it will replace itself
@@ -207,7 +207,7 @@ to contain no get_ranked_shape ops.
 
 Any get_ranked_shape on a fully static shape will canonicalize to a const
 with unit value:
-  %0 = constant_ranked_shape : !shape.ranked_shape<[1,2],i32>
+  %0 = constant_ranked_shape : !shapex.ranked_shape<[1,2],i32>
 
 #### Operands:
 
@@ -236,8 +236,8 @@ Given a list of SSA values holding compatible dims, makes a corresponding
 ranked_shape.
 
 Usage:
-  %0 = shape.make_ranked_shape %dim0, %dim1 : (i32, i32) ->
-      !shape.ranked_shape<[?,?,128]>
+  %0 = shapex.make_ranked_shape %dim0, %dim1 : (i32, i32) ->
+      !shapex.ranked_shape<[?,?,128]>
 
 Note that the type of the dims is is implied by the dim type of the result.
 
@@ -258,8 +258,8 @@ Note that the type of the dims is is implied by the dim type of the result.
 Broadcasts dimensions from the input into the result.
 
 Usage:
-  %0 = shape.ranked_broadcast_in_dim [...] (%operand, %result_shp) :
-      tensor<...xf32>, !shape.ranked_shape<...xi32>
+  %0 = shapex.ranked_broadcast_in_dim [...] (%operand, %result_shp) :
+      tensor<...xf32>, !shapex.ranked_shape<...xi32>
 
   Note that the result type will be a RankedTensorType with dims from
   %result_shp and the element type from %operand.
@@ -290,8 +290,8 @@ Broadcasts operands to a result shape.
 Applies numpy broadcasting semantics to shape operands.
 
 Usage:
-  %0 = shape.ranked_broadcast_shape %shp0, %shp1 :
-      !shape.ranked_shape<...>, !shape.ranked_shape<...>
+  %0 = shapex.ranked_broadcast_shape %shp0, %shp1 :
+      !shapex.ranked_shape<...>, !shapex.ranked_shape<...>
 
 #### Attributes:
 
@@ -320,8 +320,8 @@ Gets a dimension value from a ranked_shape.
 Static dimensions will fold to constants.
 
 Usage:
-  %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2]>
-  %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<[1,2]> -> i32
+  %0 = shapex.const ranked_shape : !shapex.ranked_shape<[1,2]>
+  %1 = shapex.ranked_dim %0[0] : !shapex.ranked_shape<[1,2]> -> i32
 
 #### Attributes:
 
@@ -355,8 +355,8 @@ operation ::= `shapex.ranked_dims` $shape `:` type($shape) `->` type($result) at
 Static dimensions will fold to constants.
 
 Usage:
-  %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2]>
-  %1, %2 = shape.ranked_dims %0 : !shape.ranked_shape<[1,2]> -> (i32, i32)
+  %0 = shapex.const ranked_shape : !shapex.ranked_shape<[1,2]>
+  %1, %2 = shapex.ranked_dims %0 : !shapex.ranked_shape<[1,2]> -> (i32, i32)
 
 #### Operands:
 
@@ -386,7 +386,7 @@ conversions to re-associate the two. This has no runtime implication and
 will be removed late in conversion.
 
 Usage:
-  %0 = shape.tie_shape %1, %2 : tensor<...>, shape.ranked_shape<...>
+  %0 = shapex.tie_shape %1, %2 : tensor<...>, shapex.ranked_shape<...>
 
 #### Operands:
 
