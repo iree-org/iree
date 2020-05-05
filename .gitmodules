@@ -19,16 +19,10 @@
 [submodule "third_party/vulkan_memory_allocator"]
 	path = third_party/vulkan_memory_allocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-[submodule "third_party/gemmlowp"]
-	path = third_party/gemmlowp
-	url = https://github.com/google/gemmlowp.git
 [submodule "third_party/google_tracing_framework"]
 	path = third_party/google_tracing_framework
 	url = https://github.com/google/tracing-framework.git
 	fetchRecurseSubmodules = false
-[submodule "third_party/spirv_tools"]
-	path = third_party/spirv_tools
-	url = https://github.com/KhronosGroup/SPIRV-Tools.git
 [submodule "third_party/spirv_headers"]
 	path = third_party/spirv_headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
