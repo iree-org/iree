@@ -23,28 +23,26 @@ on:
 jobs:
   linux:
     runs-on: ubuntu-18.04
+    container: l.gcr.io/google/bazel:2.1.0
     env:
       CXX: clang++
       CC: clang
       PYTHON_BIN: /usr/bin/python3
-      # Install the version of Bazel that is required by our .bazelversion file.
-      BAZEL_VERSION: 2.1.0
     steps:
-      - name: Installing bazel
+      - name: Installing IREE dependencies
         run: |
-          # https://docs.bazel.build/versions/master/install-ubuntu.html
-          sudo apt-get install unzip zip
-          wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
-          chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
-          ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user
-          rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
-          echo "::add-path::${HOME?}/bin"
-      - name: Installing dependencies
+          apt-get update
+          apt-get install -y clang libsdl2-dev
+      - name: Installing actions/checkout@v2 dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install clang libsdl2-dev
+          # Update git to version >= 2.18 for actions/checkout@v2.
+          add-apt-repository ppa:git-core/ppa
+          apt-get update
+          apt-get install -y git
+      - name: Installing tensorflow dependencies
+        run: |
           # Install python2 numpy. Temporary fix for issue #1737.
-          sudo apt-get install -y python-pip
+          apt-get install -y python-pip
           python -m pip install --upgrade pip
           python -m pip install numpy
       - name: Checking out repository
