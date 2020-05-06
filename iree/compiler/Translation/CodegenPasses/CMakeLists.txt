@@ -12,37 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT
-# TODO: The follwing tablegen_library doesn't convert with bazel_to_cmake
-# see https://github.com/google/iree/issues/1083
-
 iree_add_all_subdirs()
-
-iree_tablegen_library(
-  NAME
-    LinalgVectorTransformPatternsIncGen
-  TD_FILE
-    "LinalgVectorTransformPatterns.td"
-  OUTS
-    -gen-rewriters LinalgVectorTransformPatterns.h.inc
-)
-
-#TODO(GH-1673): Remove this once we can properly model dependencies between
-# TableGen targets.
-add_dependencies(iree_compiler_Translation_CodegenPasses_LinalgVectorTransformPatternsIncGen_target MLIRLinalgTransformPatternsIncGen)
 
 iree_cc_library(
   NAME
     CodegenPasses
   HDRS
     "Passes.h"
-    "LinalgVectorTransformPatterns.h.inc"
   SRCS
     "DecomposeHLOClamp.cpp"
     "HLOToLinalgOnBuffers.cpp"
     "HLOToLinalgOnTensors.cpp"
     "LinalgFusion.cpp"
-    "LinalgVectorTransform.cpp"
     "Passes.cpp"
     "ResolveShapeOps.cpp"
   DEPS
@@ -59,6 +40,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::Translation::CodegenUtils
     tensorflow::mlir_xla
   PUBLIC
 )

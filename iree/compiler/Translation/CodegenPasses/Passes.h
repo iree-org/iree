@@ -40,9 +40,6 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
 /// producer consumer fusion.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass();
 
-/// Creates IREE Linalg Vector transformation pass.
-std::unique_ptr<FunctionPass> createIREELinalgVectorTransformPass();
-
 /// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
 /// them back to the original HAL interface bindings.
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();
@@ -72,7 +69,6 @@ inline void registerCodegenPasses() {
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
   createLinalgOnTensorsFusionPass();
-  createIREELinalgVectorTransformPass();
 }
 
 }  // namespace iree_compiler
