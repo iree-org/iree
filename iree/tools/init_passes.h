@@ -76,6 +76,10 @@ inline void registerMlirPasses() {
 #define GEN_PASS_REGISTRATION_ConvertSimpleLoopsToGPU
 #define GEN_PASS_REGISTRATION_ConvertLoopsToGPU
 #define GEN_PASS_REGISTRATION_ConvertLinalgToLLVM
+#define GEN_PASS_REGISTRATION_ConvertGPUToSPIRV
+#define GEN_PASS_REGISTRATION_ConvertStandardToSPIRV
+#define GEN_PASS_REGISTRATION_LegalizeStandardForSPIRV
+#define GEN_PASS_REGISTRATION_ConvertLinalgToSPIRV
 #include "mlir/Conversion/Passes.h.inc"
 
   // Affine
@@ -113,11 +117,8 @@ inline void registerMlirPasses() {
 #include "mlir/Dialect/Quant/Passes.h.inc"
 
   // SPIR-V
-  spirv::createLowerABIAttributesPass();
-  createConvertGPUToSPIRVPass();
-  createConvertStandardToSPIRVPass();
-  createLegalizeStdOpsForSPIRVLoweringPass();
-  createLinalgToSPIRVPass();
+#define GEN_PASS_REGISTRATION_SPIRVLowerABIAttributes
+#include "mlir/Dialect/SPIRV/Passes.h.inc"
 }
 
 }  // namespace mlir
