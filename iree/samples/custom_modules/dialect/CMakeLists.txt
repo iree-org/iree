@@ -116,6 +116,7 @@ iree_cc_binary(
     iree::tools::init_compiler_modules
     iree::tools::init_passes_and_dialects
     iree::tools::init_targets
+    iree::tools::init_xla_dialects
     tensorflow::mlir_xla
 )
 
@@ -141,5 +142,5 @@ iree_cc_binary(
     iree::tools::init_passes_and_dialects
     iree::tools::init_targets
     iree::tools::init_translations
-    tensorflow::mlir_xla
+    iree::tools::init_xla_dialects
 )

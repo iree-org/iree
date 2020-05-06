@@ -140,12 +140,25 @@ cc_library(
 )
 
 cc_library(
+    name = "init_xla_dialects",
+    hdrs = [
+        "init_xla_dialects.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:IR",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:lhlo",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
         ":init_targets",
+        ":init_xla_dialects",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
@@ -174,7 +187,6 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
     ],
@@ -266,6 +278,7 @@ cc_library(
         ":init_passes_and_dialects",
         ":init_targets",
         ":init_translations",
+        ":init_xla_dialects",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV:init_translations",
@@ -275,7 +288,6 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Translation",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ],
 )
 

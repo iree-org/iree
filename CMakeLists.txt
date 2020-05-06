@@ -75,7 +75,6 @@ include(iree_py_extension)
 include(iree_py_library)
 include(iree_py_test)
 include(iree_lit_test)
-include(iree_alwayslink)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 
@@ -150,7 +149,6 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
-  set_alwayslink_tensorflow_libs()
 endif()
 
 if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})

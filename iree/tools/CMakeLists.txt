@@ -175,6 +175,16 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_xla_dialects
+    HDRS
+      "init_xla_dialects.h"
+    DEPS
+      tensorflow::mlir_xla
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
       init_translations
     HDRS
       "init_translations.h"
@@ -191,6 +201,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
+      ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIROptLib
@@ -280,6 +291,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_passes_and_dialects
       ::init_targets
       ::init_translations
+      ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIRLoopOpsTransforms
@@ -289,7 +301,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::init_translations
-      tensorflow::mlir_xla
     PUBLIC
   )
 

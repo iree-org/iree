@@ -23,6 +23,7 @@
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
+#include "iree/tools/init_xla_dialects.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
@@ -66,6 +67,7 @@ static llvm::cl::opt<bool> allowUnregisteredDialects(
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
   mlir::registerMlirPasses();
+  mlir::registerXLADialects();
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerAllIreePasses();

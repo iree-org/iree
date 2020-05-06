@@ -24,6 +24,7 @@
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_targets.h"
 #include "iree/tools/init_translations.h"
+#include "iree/tools/init_xla_dialects.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -55,6 +56,7 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
   mlir::registerMlirDialects();
+  mlir::registerXLADialects();
   mlir::iree_compiler::registerIreeDialects();
   // Register the custom dialect
   mlir::iree_compiler::registerCustomDialect();

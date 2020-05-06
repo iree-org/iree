@@ -76,7 +76,6 @@ external_cc_library(
     MLIRPass
     MLIRShape
     MLIRTransformUtils
-  ALWAYSLINK
   PUBLIC
 )
 
