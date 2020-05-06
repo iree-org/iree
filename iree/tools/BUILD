@@ -84,6 +84,7 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/Transforms",
         "//iree/compiler/Dialect/Vulkan/IR",
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffinePassIncGen",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ConversionPassIncGen",
         "@llvm-project//mlir:GPUDialect",
