@@ -18,6 +18,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -49,7 +50,12 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
   llvm::CGSCCAnalysisManager cGSCCAnalysisManager;
   llvm::ModuleAnalysisManager moduleAnalysisManager;
 
-  llvm::PassBuilder passBuilder(machine.get(), options.pipelineTuningOptions);
+  llvm::PassInstrumentationCallbacks passInstrumentationCallbacks;
+  llvm::StandardInstrumentations standardInstrumentations;
+  standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
+
+  llvm::PassBuilder passBuilder(machine.get(), options.pipelineTuningOptions,
+                                {}, &passInstrumentationCallbacks);
   llvm::AAManager aa = passBuilder.buildDefaultAAPipeline();
   functionAnalysisManager.registerPass([&] { return std::move(aa); });
 
