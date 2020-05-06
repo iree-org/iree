@@ -103,8 +103,9 @@ inline void registerMlirPasses() {
 #include "mlir/Dialect/Linalg/Passes.h.inc"
 
   // Loop
-  createParallelLoopFusionPass();
-  createParallelLoopTilingPass();
+#define GEN_PASS_REGISTRATION_LoopParallelLoopFusion
+#define GEN_PASS_REGISTRATION_LoopParallelLoopTiling
+#include "mlir/Dialect/LoopOps/Passes.h.inc"
 
   // Quant
   quant::createConvertSimulatedQuantPass();
