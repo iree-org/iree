@@ -103,6 +103,7 @@ cc_library(
         "@llvm-project//mlir:LoopPassIncGen",
         "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:QuantOps",
+        "@llvm-project//mlir:QuantPassIncGen",
         "@llvm-project//mlir:SDBM",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",
