@@ -14,8 +14,6 @@
 
 // This files defines a helper to trigger the registration of dialects to
 // the system.
-//
-// Based on MLIR's InitAllDialects but without dialects we don't care about.
 
 #ifndef IREE_TOOLS_INIT_XLA_DIALECTS_H_
 #define IREE_TOOLS_INIT_XLA_DIALECTS_H_
