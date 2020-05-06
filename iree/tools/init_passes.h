@@ -73,6 +73,8 @@ inline void registerMlirPasses() {
 
   // Conversion passes
 #define GEN_PASS_REGISTRATION_ConvertAffineToStandard
+#define GEN_PASS_REGISTRATION_ConvertSimpleLoopsToGPU
+#define GEN_PASS_REGISTRATION_ConvertLoopsToGPU
 #include "mlir/Conversion/Passes.h.inc"
 
   // Affine
@@ -86,9 +88,8 @@ inline void registerMlirPasses() {
 #include "mlir/Dialect/Affine/Passes.h.inc"
 
   // GPU
-  createGpuKernelOutliningPass();
-  createSimpleLoopsToGPUPass(0, 0);
-  createLoopToGPUPass({}, {});
+#define GEN_PASS_REGISTRATION_GpuKernelOutlining
+#include "mlir/Dialect/GPU/Passes.h.inc"
 
   // Linalg
   createLinalgFusionPass();
