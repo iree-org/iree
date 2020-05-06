@@ -75,6 +75,7 @@ inline void registerMlirPasses() {
 #define GEN_PASS_REGISTRATION_ConvertAffineToStandard
 #define GEN_PASS_REGISTRATION_ConvertSimpleLoopsToGPU
 #define GEN_PASS_REGISTRATION_ConvertLoopsToGPU
+#define GEN_PASS_REGISTRATION_ConvertLinalgToLLVM
 #include "mlir/Conversion/Passes.h.inc"
 
   // Affine
@@ -92,14 +93,14 @@ inline void registerMlirPasses() {
 #include "mlir/Dialect/GPU/Passes.h.inc"
 
   // Linalg
-  createLinalgFusionPass();
-  createLinalgTilingPass();
-  createLinalgTilingToParallelLoopsPass();
-  createLinalgPromotionPass(0);
-  createConvertLinalgToLoopsPass();
-  createConvertLinalgToParallelLoopsPass();
-  createConvertLinalgToAffineLoopsPass();
-  createConvertLinalgToLLVMPass();
+#define GEN_PASS_REGISTRATION_LinalgFusion
+#define GEN_PASS_REGISTRATION_LinalgTiling
+#define GEN_PASS_REGISTRATION_LinalgTilingToParallelLoops
+#define GEN_PASS_REGISTRATION_LinalgPromotion
+#define GEN_PASS_REGISTRATION_LinalgLowerToLoops
+#define GEN_PASS_REGISTRATION_LinalgLowerToParallelLoops
+#define GEN_PASS_REGISTRATION_LinalgLowerToAffineLoops
+#include "mlir/Dialect/Linalg/Passes.h.inc"
 
   // Loop
   createParallelLoopFusionPass();
