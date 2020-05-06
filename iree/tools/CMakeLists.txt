@@ -301,7 +301,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::init_translations
-      tensorflow::mlir_xla
     PUBLIC
   )
 

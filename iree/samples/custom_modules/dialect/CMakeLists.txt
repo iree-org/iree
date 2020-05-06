@@ -143,5 +143,4 @@ iree_cc_binary(
     iree::tools::init_targets
     iree::tools::init_translations
     iree::tools::init_xla_dialects
-    tensorflow::mlir_xla
 )
