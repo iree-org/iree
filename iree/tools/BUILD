@@ -100,6 +100,7 @@ cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LoopOps",
         "@llvm-project//mlir:LoopOpsTransforms",
+        "@llvm-project//mlir:LoopPassIncGen",
         "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:QuantOps",
         "@llvm-project//mlir:SDBM",
