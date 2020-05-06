@@ -16,7 +16,7 @@ func @torch_select_index_0() attributes { iree.module.export } {
 
 func @torch_select_index_1() attributes { iree.module.export } {
   %input = iree.unfoldable_constant dense<[
-		[[ 1,  2],[ 3,  4]],
+    [[ 1,  2],[ 3,  4]],
     [[ 5,  6],[ 7,  8]],
     [[ 9, 10],[11, 12]]]> : tensor<3x2x2xi32>
   %indices = iree.unfoldable_constant dense<[0, 1]> : tensor<2xi32>
