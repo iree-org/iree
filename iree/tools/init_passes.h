@@ -75,13 +75,15 @@ inline void registerMlirPasses() {
 #define GEN_PASS_REGISTRATION_ConvertAffineToStandard
 #include "mlir/Conversion/Passes.h.inc"
 
-  createSuperVectorizePass({});
-  createLoopUnrollPass();
-  createLoopUnrollAndJamPass();
-  createSimplifyAffineStructuresPass();
-  createAffineLoopInvariantCodeMotionPass();
-  createLoopTilingPass(0);
-  createAffineDataCopyGenerationPass(0, 0);
+  // Affine
+#define GEN_PASS_REGISTRATION_AffineVectorize
+#define GEN_PASS_REGISTRATION_AffineLoopUnroll
+#define GEN_PASS_REGISTRATION_AffineLoopUnrollAndJam
+#define GEN_PASS_REGISTRATION_SimplifyAffineStructures
+#define GEN_PASS_REGISTRATION_AffineLoopInvariantCodeMotion
+#define GEN_PASS_REGISTRATION_AffineLoopTiling
+#define GEN_PASS_REGISTRATION_AffineDataCopyGeneration
+#include "mlir/Dialect/Affine/Passes.h.inc"
 
   // GPU
   createGpuKernelOutliningPass();
