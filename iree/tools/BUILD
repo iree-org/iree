@@ -88,6 +88,7 @@ cc_library(
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ConversionPassIncGen",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUPassIncGen",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
