@@ -85,6 +85,7 @@ cc_library(
         "//iree/compiler/Dialect/Vulkan/IR",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:ConversionPassIncGen",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
