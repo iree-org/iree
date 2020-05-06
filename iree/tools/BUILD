@@ -105,6 +105,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:TransformsPassIncGen",
         "@llvm-project//mlir:VectorOps",
     ],
 )
