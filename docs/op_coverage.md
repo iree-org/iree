@@ -55,6 +55,6 @@ sine | ✓ | ✗ | ✗
 slice | ✓ | ✗ | ✗
 sqrt | ✓ | ✓ | ✓
 subtract | ✓ | ✓ | ✓
-torch_select | ✓ | ✗ | ✗
+torch_index_select | ✓ | ✗ | ✗
 transpose | ✓ | ✓ | ✓
 while | ✓ | ✗ | ✓
