@@ -108,8 +108,9 @@ inline void registerMlirPasses() {
 #include "mlir/Dialect/LoopOps/Passes.h.inc"
 
   // Quant
-  quant::createConvertSimulatedQuantPass();
-  quant::createConvertConstPass();
+#define GEN_PASS_REGISTRATION_QuantConvertSimulatedQuant
+#define GEN_PASS_REGISTRATION_QuantConvertConst
+#include "mlir/Dialect/Quant/Passes.h.inc"
 
   // SPIR-V
   spirv::createLowerABIAttributesPass();
