@@ -51,7 +51,6 @@ cc_library(
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -79,18 +78,75 @@ cc_embed_data(
     h_file_output = "custom.imports.h",
 )
 
-cc_binary(
-    name = "custom-opt",
+cc_library(
+    name = "init_dialect",
+    hdrs = ["init_dialect.h"],
     deps = [
         ":dialect",
-        "//iree/tools:iree_opt_main",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_binary(
+    name = "custom-opt",
+    srcs = ["custom_opt.cc"],
+    deps = [
+        ":init_dialect",
+        "//iree/compiler/Dialect/Flow/Analysis",
+        "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/Transforms",
+        "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
+        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//iree/compiler/Dialect/HAL/Transforms",
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/IREE/Transforms",
+        "//iree/compiler/Dialect/Shape/Conversion",
+        "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
+        "//iree/compiler/Dialect/VM/Analysis",
+        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
+        "//iree/compiler/Dialect/VM/IR",
+        "//iree/compiler/Dialect/VM/Transforms",
+        "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",
+        "//iree/compiler/Dialect/VMLA/Conversion/VMLAToVM",
+        "//iree/compiler/Dialect/VMLA/Transforms",
+        "//iree/compiler/Dialect/Vulkan/IR",
+        "//iree/compiler/Translation:IREEVM",
+        "//iree/compiler/Translation/CodegenPasses",
+        "//iree/compiler/Translation/SPIRV:init_translations",
+        "//iree/tools:init_compiler_modules",
+        "//iree/tools:init_passes_and_dialects",
+        "//iree/tools:init_targets",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
     ],
 )
 
 cc_binary(
     name = "custom-translate",
+    srcs = ["custom_translate.cc"],
     deps = [
-        ":dialect",
-        "//iree/tools:iree_translate_main",
+        ":init_dialect",
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Translation:IREEVM",
+        "//iree/compiler/Translation/SPIRV:init_translations",
+        "//iree/tools:init_compiler_modules",
+        "//iree/tools:init_passes_and_dialects",
+        "//iree/tools:init_targets",
+        "//iree/tools:init_translations",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Translation",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ],
 )
