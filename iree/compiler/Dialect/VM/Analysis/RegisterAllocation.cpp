@@ -149,9 +149,9 @@ struct RegisterUsage {
 
   void releaseRegister(uint16_t reg) {
     if (isRefRegister(reg)) {
-      refRegisters.reset(reg & 0x3F);
+      refRegisters.reset(reg & kRefRegisterCount);
     } else {
-      intRegisters.reset(reg & 0x7F);
+      intRegisters.reset(reg & kIntRegisterCount);
     }
   }
 };
