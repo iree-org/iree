@@ -55,83 +55,30 @@ namespace mlir {
 // individual passes.
 // The global registry is interesting to interact with the command-line tools.
 inline void registerMlirPasses() {
-  // A local workaround until we can use individual pass registration from
-  // https://reviews.llvm.org/D77322
-  ::mlir::registerPass(
-      "affine-loop-fusion", "Fuse affine loop nests",
-      []() -> std::unique_ptr<Pass> { return mlir::createLoopFusionPass(); });
-  ::mlir::registerPass("affine-pipeline-data-transfer",
-                       "Pipeline non-blocking data transfers between "
-                       "explicitly managed levels of the memory hierarchy",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createPipelineDataTransferPass();
-                       });
-  ::mlir::registerPass(
-      "cse", "Eliminate common sub-expressions",
-      []() -> std::unique_ptr<Pass> { return mlir::createCSEPass(); });
-  ::mlir::registerPass("canonicalize", "Canonicalize operations",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createCanonicalizerPass();
-                       });
-  ::mlir::registerPass(
-      "inline", "Inline function calls",
-      []() -> std::unique_ptr<Pass> { return mlir::createInlinerPass(); });
-  ::mlir::registerPass("snapshot-op-locations",
-                       "Generate new locations from the current IR",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createLocationSnapshotPass();
-                       });
-  ::mlir::registerPass(
-      "loop-coalescing",
-      "Coalesce nested loops with independent bounds into a single loop",
-      []() -> std::unique_ptr<Pass> {
-        return mlir::createLoopCoalescingPass();
-      });
-  ::mlir::registerPass("loop-invariant-code-motion",
-                       "Hoist loop invariant instructions outside of the loop",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createLoopInvariantCodeMotionPass();
-                       });
-  ::mlir::registerPass("memref-dataflow-opt",
-                       "Perform store/load forwarding for memrefs",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createMemRefDataFlowOptPass();
-                       });
-  ::mlir::registerPass(
-      "parallel-loop-collapsing",
-      "Collapse parallel loops to use less induction variables",
-      []() -> std::unique_ptr<Pass> {
-        return mlir::createParallelLoopCollapsingPass();
-      });
-  ::mlir::registerPass(
-      "print-op-stats", "Print statistics of operations",
-      []() -> std::unique_ptr<Pass> { return mlir::createPrintOpStatsPass(); });
-  ::mlir::registerPass("strip-debuginfo",
-                       "Strip debug info from all operations",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createStripDebugInfoPass();
-                       });
-  ::mlir::registerPass(
-      "symbol-dce", "Eliminate dead symbols",
-      []() -> std::unique_ptr<Pass> { return mlir::createSymbolDCEPass(); });
-  createCanonicalizerPass();
-  createCSEPass();
+  // Init general passes
+#define GEN_PASS_REGISTRATION_AffineLoopFusion
+#define GEN_PASS_REGISTRATION_AffinePipelineDataTransfer
+#define GEN_PASS_REGISTRATION_CSE
+#define GEN_PASS_REGISTRATION_Canonicalizer
+#define GEN_PASS_REGISTRATION_Inliner
+#define GEN_PASS_REGISTRATION_LocationSnapshot
+#define GEN_PASS_REGISTRATION_LoopCoalescing
+#define GEN_PASS_REGISTRATION_LoopInvariantCodeMotion
+#define GEN_PASS_REGISTRATION_MemRefDataFlowOpt
+#define GEN_PASS_REGISTRATION_ParallelLoopCollapsing
+#define GEN_PASS_REGISTRATION_PrintOpStats
+#define GEN_PASS_REGISTRATION_StripDebugInfo
+#define GEN_PASS_REGISTRATION_SymbolDCE
+#include "mlir/Transforms/Passes.h.inc"
+
   createSuperVectorizePass({});
   createLoopUnrollPass();
   createLoopUnrollAndJamPass();
   createSimplifyAffineStructuresPass();
-  createLoopFusionPass();
-  createLoopInvariantCodeMotionPass();
   createAffineLoopInvariantCodeMotionPass();
-  createPipelineDataTransferPass();
   createLowerAffinePass();
   createLoopTilingPass(0);
-  createLoopCoalescingPass();
   createAffineDataCopyGenerationPass(0, 0);
-  createMemRefDataFlowOptPass();
-  createInlinerPass();
-  createSymbolDCEPass();
-  createLocationSnapshotPass({});
 
   // GPU
   createGpuKernelOutliningPass();
