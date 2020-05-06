@@ -107,6 +107,7 @@ cc_library(
         "@llvm-project//mlir:SDBM",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SPIRVPassIncGen",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRVConversions",
