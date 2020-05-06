@@ -46,7 +46,8 @@ void testValueVectorAdd() {
   // 1. Build a simple vector_add.
   {
     // CHECK-LABEL: func @test_value_vector_add()
-    auto f = modelBuilder.makeFunction(kFuncName, {}, {});
+    auto f = modelBuilder.makeFunction(
+        kFuncName, {}, {}, MLIRFuncOpConfig().setEmitCInterface(true));
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
 

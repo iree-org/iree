@@ -43,7 +43,9 @@ void DotProdOnVectors() {
   auto vectorType = modelBuilder.getVectorType(N, f32);
   auto refType = modelBuilder.getMemRefType(1, vectorType);
 
-  auto func = modelBuilder.makeFunction(funcName, {}, {refType, refType});
+  auto func =
+      modelBuilder.makeFunction(funcName, {}, {refType, refType},
+                                MLIRFuncOpConfig().setEmitCInterface(true));
 
   SmallVector<AffineMap, 3> accesses;
   accesses.push_back(modelBuilder.getDimIdentityMap());

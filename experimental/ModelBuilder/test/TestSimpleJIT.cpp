@@ -42,7 +42,9 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
 
   // 1. Build a simple vector_add.
   {
-    auto f = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
+    auto f =
+        modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC},
+                                  MLIRFuncOpConfig().setEmitCInterface(true));
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
 
@@ -98,7 +100,9 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
 
   // 1. Build a simple vector_add.
   {
-    auto f = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
+    auto f =
+        modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC},
+                                  MLIRFuncOpConfig().setEmitCInterface(true));
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
 
@@ -158,7 +162,9 @@ void testMatmulOnVectors(StringLiteral funcName) {
   auto mnVectorType = modelBuilder.getVectorType({M, N}, f32);
   auto typeC = modelBuilder.getMemRefType({-1, -1}, mnVectorType);
 
-  auto func = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
+  auto func =
+      modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC},
+                                MLIRFuncOpConfig().setEmitCInterface(true));
 
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());

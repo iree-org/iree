@@ -38,7 +38,8 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   auto typeB = typeA;
   auto typeC = typeA;
 
-  auto f = mb.makeFunction(fn, {}, {typeA, typeB, typeC});
+  auto f = mb.makeFunction(fn, {}, {typeA, typeB, typeC},
+                           MLIRFuncOpConfig().setEmitCInterface(true));
   OpBuilder b(&f.getBody());
   ScopedContext scope(b, f.getLoc());
 

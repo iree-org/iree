@@ -47,7 +47,9 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
   auto f32 = modelBuilder.f32;
   auto inputType = modelBuilder.getMemRefType({-1, W0}, f32);
   auto outputType = modelBuilder.getMemRefType({-1, W3}, f32);
-  auto func = modelBuilder.makeFunction(funcName, {}, {inputType, outputType});
+  auto func =
+      modelBuilder.makeFunction(funcName, {}, {inputType, outputType},
+                                MLIRFuncOpConfig().setEmitCInterface(true));
 
   // Fill the body (3 blocks of FCBiasTanh), alloc everything manually atm.
   OpBuilder b(&func.getBody());

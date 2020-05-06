@@ -71,6 +71,7 @@ cc_library(
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToLLVM",
+        "@llvm-project//mlir:VectorToLoops",
         "@llvm-project//mlir:mlir_c_runner_utils",
     ],
 )

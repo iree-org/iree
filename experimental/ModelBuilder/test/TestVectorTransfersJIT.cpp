@@ -33,13 +33,6 @@ static llvm::cl::opt<std::string> runtimeSupport(
     "runtime-support", llvm::cl::desc("Runtime support library filename"),
     llvm::cl::value_desc("filename"), llvm::cl::init("-"));
 
-AffineMap createMinorIdentityMap(unsigned dims, unsigned results,
-                                 MLIRContext *context) {
-  assert(dims >= results && "Dimension mismatch");
-  auto id = AffineMap::getMultiDimIdentityMap(dims, context);
-  return AffineMap::get(dims, 0, id.getResults().take_back(results), context);
-}
-
 void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
                          ArrayRef<int64_t> szVec, ArrayRef<int64_t> shA,
                          ArrayRef<int64_t> shBWr, ArrayRef<int64_t> shBRd) {
@@ -52,7 +45,8 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
   ModelBuilder mb;
   // Build a func "vector_transfers".
   constexpr StringLiteral funcName = "vector_transfers";
-  auto func = mb.makeFunction(funcName, {}, {});
+  auto func = mb.makeFunction(funcName, {}, {},
+                              MLIRFuncOpConfig().setEmitCInterface(true));
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());
 
@@ -67,29 +61,30 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
   for (auto s : shBRd) indicesBRd.push_back(std_constant_index(s));
 
   // clang-format off
-  Value flt_0 = std_constant_float(APFloat(0.0f), mb.f32);
-  Value flt_1 = std_constant_float(APFloat(1.0f), mb.f32);
+  MLIRContext *ctx = mb.getContext();
+  Value flt_0 = mb.constant_f32(0.0f);
+  Value flt_1 = mb.constant_f32(1.0f);
+  Value flt_42 = mb.constant_f32(42.0f);
 
   Value A = std_alloc(mb.getMemRefType(szA, mb.f32));
   Value B = std_alloc(mb.getMemRefType(szB, mb.f32));
   linalg_fill(A, flt_0);
   linalg_fill(B, flt_1);
 
-  Value flt_42 = std_constant_float(APFloat(42.0f), mb.f32);
   Value vFullA = vector_transfer_read(
       mb.getVectorType(szA, mb.f32),
       A,
       SmallVector<Value, 4>(szA.size(), std_constant_index(0)),
-      createMinorIdentityMap(szA.size(), szA.size(), mb.getContext()),
+      AffineMap::getMinorIdentityMap(szA.size(), szA.size(), ctx),
       flt_42);
   Value vA = vector_transfer_read(
       mb.getVectorType(szVec, mb.f32),
       A,
       indicesA,
-      createMinorIdentityMap(szA.size(), szVec.size(), mb.getContext()),
+      AffineMap::getMinorIdentityMap(szA.size(), szVec.size(), ctx),
       flt_42);
 
-  auto mapB = createMinorIdentityMap(szB.size(), szVec.size(), mb.getContext());
+  auto mapB = AffineMap::getMinorIdentityMap(szB.size(), szVec.size(), ctx);
   vector_transfer_write(vA, B, indicesBWr, mapB);
 
   Value flt_13 = std_constant_float(APFloat(13.0f), mb.f32);
@@ -97,13 +92,13 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
       mb.getVectorType(szB, mb.f32),
       B,
       SmallVector<Value, 4>(szB.size(), std_constant_index(0)),
-      createMinorIdentityMap(szB.size(), szB.size(), mb.getContext()),
+      AffineMap::getMinorIdentityMap(szB.size(), szB.size(), ctx),
       flt_13);
   Value vB = vector_transfer_read(
       mb.getVectorType(szVec, mb.f32),
       B,
       indicesBRd,
-      createMinorIdentityMap(szB.size(), szVec.size(), mb.getContext()),
+      AffineMap::getMinorIdentityMap(szB.size(), szVec.size(), ctx),
       flt_13);
 
   (vector_print(vFullA));

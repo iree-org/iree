@@ -68,7 +68,8 @@ void testVectorAdd1d() {
   const std::string funcName("add_dispatch");
   {
     // Add host side code, simple dispatch:
-    auto f = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
+    auto f = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC},
+      MLIRFuncOpConfig().setEmitCInterface(true));
     OpBuilder b(&f.getBody());
     ScopedContext scope(b, f.getLoc());
     auto eight = std_constant_index(8);
