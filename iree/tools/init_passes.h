@@ -71,12 +71,15 @@ inline void registerMlirPasses() {
 #define GEN_PASS_REGISTRATION_SymbolDCE
 #include "mlir/Transforms/Passes.h.inc"
 
+  // Conversion passes
+#define GEN_PASS_REGISTRATION_ConvertAffineToStandard
+#include "mlir/Conversion/Passes.h.inc"
+
   createSuperVectorizePass({});
   createLoopUnrollPass();
   createLoopUnrollAndJamPass();
   createSimplifyAffineStructuresPass();
   createAffineLoopInvariantCodeMotionPass();
-  createLowerAffinePass();
   createLoopTilingPass(0);
   createAffineDataCopyGenerationPass(0, 0);
 
