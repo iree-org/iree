@@ -28,6 +28,7 @@ iree_cc_library(
     "ResolveShapeOps.cpp"
   DEPS
     LLVMSupport
+    MLIRDialectUtils
     MLIRIR
     MLIRLinalgOps
     MLIRLinalgTransforms

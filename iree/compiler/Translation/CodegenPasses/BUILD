@@ -40,6 +40,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Translation/CodegenUtils",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
