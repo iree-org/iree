@@ -36,7 +36,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
-    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )

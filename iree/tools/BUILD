@@ -188,7 +188,6 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
     ],
 )
 
