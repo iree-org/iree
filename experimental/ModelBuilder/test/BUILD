@@ -34,6 +34,7 @@ iree_lit_test_suite(
         "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
         ":runtime-support.so",
         # Tests.
+        ":test-broadcast-jit",
         ":test-dot-prod",
         ":test-mnist-jit",
         ":test-simple-jit",
@@ -112,6 +113,23 @@ cc_binary(
         "//experimental/ModelBuilder:ModelRunner",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
+    ],
+)
+
+cc_binary(
+    name = "test-broadcast-jit",
+    srcs = ["TestBroadcastJIT.cpp"],
+    deps = [
+        ":runtime-support.so",
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        # mlir_runner_utils with iostream needed for printMemRef atm
+        "@llvm-project//mlir:mlir_runner_utils",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
