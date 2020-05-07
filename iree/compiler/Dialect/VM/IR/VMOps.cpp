@@ -773,19 +773,44 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
     return parser.emitError(calleeLoc) << "invalid callee symbol";
   }
 
+  // Parsing here is a bit tricky as we want to be able to support things like
+  // variadic lists of tuples while we don't know that the types are tuples yet.
+  // We'll instead parse each segment as a flat list so `[(%a, %b), (%c, %d)]`
+  // parses as `[%a, %b, %c, %d]` and then do the accounting below when parsing
+  // types.
   SmallVector<OpAsmParser::OperandType, 4> flatOperands;
-  SmallVector<int16_t, 4> segmentSizes;
+  SmallVector<int16_t, 4> flatSegmentSizes;
   while (failed(parser.parseOptionalRParen())) {
     if (succeeded(parser.parseOptionalLSquare())) {
       // Variadic list.
-      SmallVector<OpAsmParser::OperandType, 4> segmentOperands;
+      SmallVector<OpAsmParser::OperandType, 4> flatSegmentOperands;
       while (failed(parser.parseOptionalRSquare())) {
-        OpAsmParser::OperandType segmentOperand;
-        if (failed(parser.parseOperand(segmentOperand))) {
-          return parser.emitError(parser.getCurrentLocation())
-                 << "invalid operand";
+        if (succeeded(parser.parseOptionalLParen())) {
+          // List contains tuples, so track the () and parse inside of it.
+          while (failed(parser.parseOptionalRParen())) {
+            OpAsmParser::OperandType segmentOperand;
+            if (failed(parser.parseOperand(segmentOperand))) {
+              return parser.emitError(parser.getCurrentLocation())
+                     << "invalid operand";
+            }
+            flatSegmentOperands.push_back(segmentOperand);
+            if (failed(parser.parseOptionalComma())) {
+              if (failed(parser.parseRParen())) {
+                return parser.emitError(parser.getCurrentLocation())
+                       << "malformed nested variadic tuple operand list";
+              }
+              break;
+            }
+          }
+        } else {
+          // Flat list of operands.
+          OpAsmParser::OperandType segmentOperand;
+          if (failed(parser.parseOperand(segmentOperand))) {
+            return parser.emitError(parser.getCurrentLocation())
+                   << "invalid operand";
+          }
+          flatSegmentOperands.push_back(segmentOperand);
         }
-        segmentOperands.push_back(segmentOperand);
         if (failed(parser.parseOptionalComma())) {
           if (failed(parser.parseRSquare())) {
             return parser.emitError(parser.getCurrentLocation())
@@ -794,8 +819,9 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
           break;
         }
       }
-      segmentSizes.push_back(segmentOperands.size());
-      flatOperands.append(segmentOperands.begin(), segmentOperands.end());
+      flatSegmentSizes.push_back(flatSegmentOperands.size());
+      flatOperands.append(flatSegmentOperands.begin(),
+                          flatSegmentOperands.end());
     } else {
       // Normal single operand.
       OpAsmParser::OperandType operand;
@@ -803,7 +829,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
         return parser.emitError(parser.getCurrentLocation())
                << "malformed non-variadic operand";
       }
-      segmentSizes.push_back(-1);
+      flatSegmentSizes.push_back(-1);
       flatOperands.push_back(operand);
     }
     if (failed(parser.parseOptionalComma())) {
@@ -831,8 +857,17 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
     }
     bool isVariadic = succeeded(parser.parseOptionalEllipsis());
     if (isVariadic) {
-      for (int i = 0; i < segmentSizes[segmentIndex]; ++i) {
-        flatOperandTypes.push_back(operandType);
+      if (auto tupleType = operandType.dyn_cast<TupleType>()) {
+        for (int i = 0; i < flatSegmentSizes[segmentIndex] / tupleType.size();
+             ++i) {
+          for (auto type : tupleType) {
+            flatOperandTypes.push_back(type);
+          }
+        }
+      } else {
+        for (int i = 0; i < flatSegmentSizes[segmentIndex]; ++i) {
+          flatOperandTypes.push_back(operandType);
+        }
       }
     } else {
       flatOperandTypes.push_back(operandType);
@@ -856,9 +891,9 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
   result->addAttribute(
       "segment_sizes",
       DenseIntElementsAttr::get(
-          VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+          VectorType::get({static_cast<int64_t>(flatSegmentSizes.size())},
                           parser.getBuilder().getIntegerType(16)),
-          segmentSizes));
+          flatSegmentSizes));
   result->addAttribute("segment_types",
                        parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
                            llvm::map_range(segmentTypes, [&](Type type) {
@@ -876,18 +911,38 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
 static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
   p << op.getOperationName() << ' ' << op.getAttr("callee") << '(';
   int operand = 0;
-  llvm::interleaveComma(op.segment_sizes(), p, [&](APInt segmentSize) {
-    if (segmentSize.getSExtValue() == -1) {
-      p.printOperand(op.getOperand(operand++));
-    } else {
-      p << '[';
-      SmallVector<Value, 4> segmentOperands;
-      for (int i = 0; i < segmentSize.getZExtValue(); ++i) {
-        segmentOperands.push_back(op.getOperand(operand++));
-      }
-      p << segmentOperands << ']';
-    }
-  });
+  llvm::interleaveComma(
+      llvm::zip(op.segment_sizes(), op.segment_types()), p,
+      [&](std::tuple<APInt, Attribute> segmentSizeType) {
+        int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
+        Type segmentType =
+            std::get<1>(segmentSizeType).cast<TypeAttr>().getValue();
+        if (segmentSize == -1) {
+          p.printOperand(op.getOperand(operand++));
+        } else {
+          p << '[';
+          if (auto tupleType = segmentType.dyn_cast<TupleType>()) {
+            int tupleCount = segmentSize / tupleType.size();
+            for (int i = 0; i < tupleCount; ++i) {
+              p << '(';
+              SmallVector<Value, 4> tupleOperands;
+              for (int i = 0; i < tupleType.size(); ++i) {
+                tupleOperands.push_back(op.getOperand(operand++));
+              }
+              p << tupleOperands;
+              p << ')';
+              if (i < tupleCount - 1) p << ", ";
+            }
+          } else {
+            SmallVector<Value, 4> segmentOperands;
+            for (int i = 0; i < segmentSize; ++i) {
+              segmentOperands.push_back(op.getOperand(operand++));
+            }
+            p << segmentOperands;
+          }
+          p << ']';
+        }
+      });
   p << ')';
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
                               "callee",
