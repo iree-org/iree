@@ -57,8 +57,8 @@ cc_binary(
     deps = [
         ":tensorflow",
         "//iree/tools:iree_opt_main",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_lib",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
 )
