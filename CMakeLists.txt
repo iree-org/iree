@@ -43,9 +43,11 @@ option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 
-#TODO: Generated IREE_BACKEND_* don't have any effect yet. Make is functional!
-set(IREE_BACKENDS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of backends to build, or \"all\"." FORCE)
+#TODO: Make is functional!
+set(IREE_HAL_BACKENDS_TO_BUILD "all"
+  CACHE STRING "Semicolon-separated list of HAL backends to build, or \"all\"." FORCE)
+set(IREE_COMPILER_BACKENDS_TO_BUILD "all"
+  CACHE STRING "Semicolon-separated list of compiler backends to build, or \"all\"." FORCE)
 
 if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
@@ -66,22 +68,40 @@ set(IREE_ALL_BACKENDS
   VMLA
 )
 
-if( IREE_BACKENDS_TO_BUILD STREQUAL "all" )
-  set( IREE_BACKENDS_TO_BUILD ${IREE_ALL_BACKENDS} )
+
+if( IREE_HAL_BACKENDS_TO_BUILD STREQUAL "all" )
+  set( IREE_HAL_BACKENDS_TO_BUILD ${IREE_ALL_BACKENDS} )
 endif()
+message(STATUS "Building HAL backends ${IREE_HAL_BACKENDS_TO_BUILD}")
 
-message(STATUS "Building IREE backends ${IREE_BACKENDS_TO_BUILD}")
-
-# Default every IREE_BACKEND_* to OFF
-foreach(_backend ${IREE_ALL_BACKENDS})
+# Default every IREE_HAL_BACKEND_* to OFF
+foreach(_backend ${IREE_HAL_BACKENDS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_BACKEND_${uppercase_backend} OFF CACHE BOOL "" FORCE)
+  set(IREE_HAL_BACKEND_${uppercase_backend} OFF CACHE BOOL "" FORCE)
 endforeach()
 
-# Set IREE_BACKEND_* based on configuration
-foreach(_backend ${IREE_BACKENDS_TO_BUILD})
+# Set IREE_HAL_BACKEND_* based on configuration
+foreach(_backend ${IREE_HAL_BACKENDS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
+  set(IREE_HAL_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
+endforeach()
+
+
+if( IREE_COMPILER_BACKENDS_TO_BUILD STREQUAL "all" )
+  set( IREE_COMPILER_BACKENDS_TO_BUILD ${IREE_ALL_BACKENDS} )
+endif()
+message(STATUS "Building compiler backends ${IREE_COMPILER_BACKENDS_TO_BUILD}")
+
+# Default every IREE_COMPILER_BACKENDS_* to OFF
+foreach(_backend ${IREE_COMPILER_BACKENDS_TO_BUILD})
+  string(TOUPPER "${_backend}" uppercase_backend)
+  set(IREE_COMPILER_BACKENDS_${uppercase_backend} OFF CACHE BOOL "" FORCE)
+endforeach()
+
+# Set IREE_COMPILER_BACKENDS_* based on configuration
+foreach(_backend ${IREE_COMPILER_BACKENDS_TO_BUILD})
+  string(TOUPPER "${_backend}" uppercase_backend)
+  set(IREE_COMPILER_BACKENDS_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
 
