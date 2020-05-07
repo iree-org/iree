@@ -32,7 +32,7 @@ void createIreeTfImportPipeline(OpPassManager &pm) {
   // Lowering shape-related constructs.
   ////////////////////////////////////////////////////////////////////////////
   pm.addPass(Shape::createConvertHLOToShapePass());
-  pm.addPass(createConvertShapeToShapexPass());
+  pm.addPass(Shape::createConvertShapeToShapexPass());
   // Clean up trivial redundancies.
   pm.addPass(createCanonicalizerPass());
 

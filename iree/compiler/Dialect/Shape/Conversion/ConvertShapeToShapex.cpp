@@ -199,14 +199,13 @@ class ConvertShapeToShapex
 };
 }  // namespace
 
-}  // namespace Shape
-
 std::unique_ptr<OperationPass<ModuleOp>> createConvertShapeToShapexPass() {
-  return std::make_unique<Shape::ConvertShapeToShapex>();
+  return std::make_unique<ConvertShapeToShapex>();
 }
 
-static PassRegistration<Shape::ConvertShapeToShapex> registration(
+static PassRegistration<ConvertShapeToShapex> registration(
     "convert-shape-to-shapex", "Convert `shape` dialect to `shapex` dialect");
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir
