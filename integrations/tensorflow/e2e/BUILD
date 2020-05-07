@@ -63,8 +63,10 @@ package(
             "top",
             str(include_top),
             model_name,
+            backends,
             "test",
         ]),
+        size = "large",
         srcs = [
             "keras_vision_model_test.py",
         ],
@@ -77,10 +79,7 @@ package(
         main = "keras_vision_model_test.py",
         python_version = "PY3",
         tags = [
-            "large",
             "manual",
-            "noga",
-            "notap",
         ],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
@@ -92,10 +91,10 @@ package(
     # all other tests need real weights loaded from url
     for data, include_top, model_name, backends in [
         # "cifar10" has toy models with input 32x32, is good for debugging
-        ("cifar10", 0, "ResNet50", "tf,iree_vmla,iree_vulkan,iree_llvmjit"),
-        # TODO(rybakov) with the fix of https://github.com/google/iree/issues/1660
-        # ucomment test and remove it from below tests which are reading weights from external url
-        # ("cifar10", 1, "ResNet50", "tf,iree_vmla,iree_vulkan,iree_llvmjit"),
+        ("cifar10", 1, "ResNet50", "tf,iree_vmla"),
+        # TODO(ataei) enable iree_llvmjit
+        # ("cifar10", 1, "ResNet50", "tf,iree_llvmjit"),
+        ("cifar10", 1, "ResNet50", "tf,iree_vulkan"),
     ]
 ]
 
