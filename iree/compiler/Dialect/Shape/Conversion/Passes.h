@@ -19,18 +19,16 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace Shape {
 
 // Convert `shape` dialect to `shapex` dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertShapeToShapexPass();
-
-namespace Shape {
 
 inline void registerShapeConversionPasses() {
   createConvertShapeToShapexPass();
 }
 
 }  // namespace Shape
-
 }  // namespace iree_compiler
 }  // namespace mlir
 
