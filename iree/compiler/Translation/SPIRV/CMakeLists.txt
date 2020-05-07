@@ -22,6 +22,5 @@ iree_cc_library(
   DEPS
     MLIRPass
     iree::compiler::Translation::SPIRV::LinalgToSPIRV
-    iree::compiler::Translation::SPIRV::Passes
   PUBLIC
 )

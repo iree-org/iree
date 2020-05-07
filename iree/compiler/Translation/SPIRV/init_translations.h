@@ -16,7 +16,6 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_INIT_TRANSLATIONS_H_
 
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
-#include "iree/compiler/Translation/SPIRV/Passes/Passes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -27,9 +26,6 @@ namespace iree_compiler {
 // automatically.
 inline void registerSPRIVTranslation() {
   static bool init_once = []() {
-    // Generic Passes
-    createAdjustIntegerWidthPass();
-
     // LinalgToSPIRV
     createConvertToGPUPass();
     createLinalgTileAndFusePass();

@@ -24,7 +24,6 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
-        "//iree/compiler/Translation/SPIRV/Passes",
         "@llvm-project//mlir:Pass",
     ],
 )
