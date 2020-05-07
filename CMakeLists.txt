@@ -43,6 +43,10 @@ option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 
+#TODO: Generated IREE_BACKEND_* don't have any effect yet. Make is functional!
+set(IREE_BACKENDS_TO_BUILD "all"
+  CACHE STRING "Semicolon-separated list of backends to build, or \"all\"." FORCE)
+
 if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
@@ -54,6 +58,32 @@ endif()
 #-------------------------------------------------------------------------------
 # IREE-specific CMake configuration
 #-------------------------------------------------------------------------------
+
+# List of all backends to be built by default:
+set(IREE_ALL_BACKENDS
+  LLVM
+  Vulkan_SPIRV
+  VMLA
+)
+
+if( IREE_BACKENDS_TO_BUILD STREQUAL "all" )
+  set( IREE_BACKENDS_TO_BUILD ${IREE_ALL_BACKENDS} )
+endif()
+
+message(STATUS "Building IREE backends ${IREE_BACKENDS_TO_BUILD}")
+
+# Default every IREE_BACKEND_* to OFF
+foreach(_backend ${IREE_ALL_BACKENDS})
+  string(TOUPPER "${_backend}" uppercase_backend)
+  set(IREE_BACKEND_${uppercase_backend} OFF CACHE BOOL "" FORCE)
+endforeach()
+
+# Set IREE_BACKEND_* based on configuration
+foreach(_backend ${IREE_BACKENDS_TO_BUILD})
+  string(TOUPPER "${_backend}" uppercase_backend)
+  set(IREE_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
+endforeach()
+
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
