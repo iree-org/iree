@@ -27,6 +27,5 @@ iree_cc_library(
     MLIRSPIRV
     MLIRSupport
     iree::compiler::Dialect::Vulkan::IR
-  ALWAYSLINK
   PUBLIC
 )
