@@ -14,7 +14,6 @@ cc_library(
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
