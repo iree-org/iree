@@ -32,5 +32,4 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:Support",
     ],
-    alwayslink = 1,
 )
