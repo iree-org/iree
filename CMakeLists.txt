@@ -64,7 +64,7 @@ endif()
 # List of all backends to be built by default:
 set(IREE_ALL_BACKENDS
   LLVM
-  Vulkan_SPIRV
+  Vulkan
   VMLA
 )
 
