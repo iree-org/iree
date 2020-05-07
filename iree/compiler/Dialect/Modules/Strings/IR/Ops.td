@@ -105,6 +105,22 @@ def STRINGS_GatherOp : Op<STRINGS_Dialect, "gather", [NoSideEffect]> {
   );
 }
 
+def STRINGS_ConcatOp : Op<STRINGS_Dialect, "concat", [NoSideEffect]> {
+  let summary = [{
+  concatenates the strings in the tensor along the last dimension
+  }];
+
+  let description = [{
+    Concatenates the strings in the tensor along the last dimension.
+  }];
+
+  let arguments = (ins STRINGS_StringTensor:$value);
+
+  let results = (outs
+    STRINGS_StringTensor:$result
+  );
+}
+
 def STRINGS_PrintOp : Op<STRINGS_Dialect, "print"> {
   let summary = [{prints the contents of a string}];
   let description = [{

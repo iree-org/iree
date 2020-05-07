@@ -259,6 +259,46 @@ class StringsModuleTest : public ::testing::Test {
     iree_vm_variant_list_free(outputs);
   }
 
+  void TestConcat(absl::Span<const iree_string_view_t> string_views,
+                  absl::Span<const int32_t> shape,
+                  absl::Span<const iree_string_view_t> expected) {
+    vm::ref<strings_string_tensor_t> string_tensor;
+    IREE_ASSERT_OK(strings_string_tensor_create(
+        IREE_ALLOCATOR_SYSTEM, string_views.data(), string_views.size(),
+        shape.data(), shape.size(), &string_tensor));
+
+    // Construct the input list for execution.
+    iree_vm_variant_list_t* inputs = nullptr;
+    IREE_ASSERT_OK(
+        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+
+    // Add the dict to the input list.
+    iree_vm_ref_t string_tensor_ref =
+        strings_string_tensor_move_ref(string_tensor.get());
+    IREE_ASSERT_OK(
+        iree_vm_variant_list_append_ref_retain(inputs, &string_tensor_ref));
+
+    // Construct the output list for accepting results from the invocation.
+    iree_vm_variant_list_t* outputs = nullptr;
+    IREE_ASSERT_OK(
+        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+
+    // Invoke the function.
+    IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("concat"),
+                                  /*policy=*/nullptr, inputs, outputs,
+                                  IREE_ALLOCATOR_SYSTEM));
+
+    // Remove the last dimension from the shape to get the expected shape
+    shape.remove_suffix(1);
+
+    // Compare the output to the expected result.
+    CompareResults(expected, shape, outputs);
+
+    // Free the lists.
+    iree_vm_variant_list_free(inputs);
+    iree_vm_variant_list_free(outputs);
+  }
+
   void CompareResults(absl::Span<const iree_string_view_t> expected,
                       absl::Span<const int32_t> expected_shape,
                       iree_vm_variant_list_t* outputs) {
@@ -531,6 +571,63 @@ TEST_F(StringsModuleTest, GatherHigherRank) {
   absl::InlinedVector<int32_t, 4> ids_shape{2, 3, 1, 1};
 
   TestGather(dict, dict_shape, ids, ids_shape, expected);
+}
+
+TEST_F(StringsModuleTest, Concat) {
+  absl::InlinedVector<iree_string_view_t, 2> expected{
+      iree_make_cstring_view("abc"), iree_make_cstring_view("def")};
+
+  absl::InlinedVector<iree_string_view_t, 6> contents{
+      iree_make_cstring_view("a"), iree_make_cstring_view("b"),
+      iree_make_cstring_view("c"), iree_make_cstring_view("d"),
+      iree_make_cstring_view("e"), iree_make_cstring_view("f")};
+  absl::InlinedVector<int32_t, 2> shape{2, 3};
+
+  TestConcat(contents, shape, expected);
+}
+
+TEST_F(StringsModuleTest, ConcatMultiDim) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("abc"), iree_make_cstring_view("def"),
+      iree_make_cstring_view("ghi"), iree_make_cstring_view("jkl")};
+
+  absl::InlinedVector<iree_string_view_t, 6> contents{
+      iree_make_cstring_view("a"), iree_make_cstring_view("b"),
+      iree_make_cstring_view("c"), iree_make_cstring_view("d"),
+      iree_make_cstring_view("e"), iree_make_cstring_view("f"),
+      iree_make_cstring_view("g"), iree_make_cstring_view("h"),
+      iree_make_cstring_view("i"), iree_make_cstring_view("j"),
+      iree_make_cstring_view("k"), iree_make_cstring_view("l")};
+  absl::InlinedVector<int32_t, 3> shape{2, 2, 3};
+
+  TestConcat(contents, shape, expected);
+}
+
+TEST_F(StringsModuleTest, IdsToStrings) {
+  absl::InlinedVector<iree_string_view_t, 12> intermediate_expected{
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("World"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("!"),     iree_make_cstring_view("!"),
+      iree_make_cstring_view("World"), iree_make_cstring_view("!")};
+
+  absl::InlinedVector<iree_string_view_t, 3> dict{
+      iree_make_cstring_view("Hello"), iree_make_cstring_view("World"),
+      iree_make_cstring_view("!")};
+  absl::InlinedVector<int32_t, 1> dict_shape{3};
+
+  absl::InlinedVector<int32_t, 12> ids{0, 1, 1, 1, 0, 1, 0, 1, 2, 2, 1, 2};
+  absl::InlinedVector<int32_t, 4> ids_shape{1, 1, 4, 3};
+
+  TestGather(dict, dict_shape, ids, ids_shape, intermediate_expected);
+
+  absl::InlinedVector<iree_string_view_t, 4> final_expected{
+      iree_make_cstring_view("HelloWorldWorld"),
+      iree_make_cstring_view("WorldHelloWorld"),
+      iree_make_cstring_view("HelloWorld!"), iree_make_cstring_view("!World!")};
+
+  TestConcat(intermediate_expected, ids_shape, final_expected);
 }
 
 }  // namespace

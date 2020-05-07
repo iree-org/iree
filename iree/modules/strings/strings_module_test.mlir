@@ -32,3 +32,8 @@ func @gather(%arg0 : !strings.string_tensor, %arg1 : !hal.buffer_view) -> !strin
   %0 = "strings.gather"(%arg0, %arg1) : (!strings.string_tensor, !hal.buffer_view) -> !strings.string_tensor
   return %0 : !strings.string_tensor
 }
+
+func @concat(%arg0 : !strings.string_tensor) -> !strings.string_tensor attributes { iree.module.export, iree.abi.none } {
+  %0 = "strings.concat"(%arg0) : (!strings.string_tensor) -> !strings.string_tensor
+  return %0 : !strings.string_tensor
+}

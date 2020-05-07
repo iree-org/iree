@@ -284,6 +284,47 @@ class StringsModuleState final {
     return string_tensor;
   }
 
+  // strings.concat(%str_tensor) -> %str_tensor
+  StatusOr<vm::ref<strings_string_tensor_t>> Concat(
+      vm::ref<strings_string_tensor_t> str_tensor) {
+    size_t new_rank = str_tensor->rank - 1;
+    const int32_t* shape = str_tensor->shape;
+    int32_t last_dim = shape[new_rank];
+
+    int32_t rank_mul = 1;
+    for (int32_t i = 0; i < new_rank; i++) {
+      rank_mul *= shape[i];
+    }
+
+    // Place into iree_string_views.
+    std::vector<iree_string_view_t> string_views;
+    string_views.reserve(rank_mul);
+    std::vector<std::string> strings;
+    strings.reserve(rank_mul);
+
+    for (int32_t i = 0; i < rank_mul; i++) {
+      std::string str;
+      for (int32_t j = 0; j < last_dim; j++) {
+        int32_t curr_pos = i * last_dim + j;
+        iree_string_view_t curr_str = str_tensor->values[curr_pos];
+        str.append(curr_str.data, curr_str.size);
+      }
+      strings.push_back(str);
+    }
+
+    for (int i = 0; i < strings.size(); i++) {
+      string_views.push_back(iree_make_cstring_view(strings[i].data()));
+    }
+
+    strings_string_tensor_t* string_tensor;
+    RETURN_IF_ERROR(FromApiStatus(
+        strings_string_tensor_create(allocator_, string_views.data(),
+                                     string_views.size(), shape, new_rank,
+                                     &string_tensor),
+        IREE_LOC));
+    return string_tensor;
+  }
+
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
@@ -312,6 +353,7 @@ static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
         vm::MakeNativeFunction("to_string_tensor",
                                &StringsModuleState::ToStringTensor),
         vm::MakeNativeFunction("gather", &StringsModuleState::Gather),
+        vm::MakeNativeFunction("concat", &StringsModuleState::Concat),
 };
 
 class StringsModule final : public vm::NativeModule<StringsModuleState> {
