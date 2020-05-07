@@ -26,7 +26,6 @@ iree_cc_library(
     MLIRShape
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
-  ALWAYSLINK
   PUBLIC
 )
 
