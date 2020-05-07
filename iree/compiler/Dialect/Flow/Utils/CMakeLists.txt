@@ -31,6 +31,5 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )
