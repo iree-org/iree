@@ -64,6 +64,7 @@ def find_bazel_runfiles_dir():
     "python")
   if not os.path.isdir(package_path):
     print("ERROR: Could not find built python package:", package_path)
+    sys.exit(1)
   return package_path
 
 
