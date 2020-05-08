@@ -92,8 +92,7 @@ package(
     for data, include_top, model_name, backends in [
         # "cifar10" has toy models with input 32x32, is good for debugging
         ("cifar10", 1, "ResNet50", "tf,iree_vmla"),
-        # TODO(ataei) enable iree_llvmjit
-        # ("cifar10", 1, "ResNet50", "tf,iree_llvmjit"),
+        ("cifar10", 1, "ResNet50", "tf,iree_llvmjit"),
         ("cifar10", 1, "ResNet50", "tf,iree_vulkan"),
     ]
 ]
