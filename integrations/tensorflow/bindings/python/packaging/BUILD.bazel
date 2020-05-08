@@ -1,0 +1,28 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This is a dummy binary that has the side-effect of building all of the TF
+# python bindings. It is used to build wheel files.
+py_binary(
+    name = "all_tf_packages",
+    srcs = ["dummy_exclude_from_package.py"],
+    legacy_create_init = False,
+    main = "dummy_exclude_from_package.py",
+    python_version = "PY3",
+    deps = [
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",  # build_cleaner: keep
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",  # build_cleaner: keep
+    ],
+)

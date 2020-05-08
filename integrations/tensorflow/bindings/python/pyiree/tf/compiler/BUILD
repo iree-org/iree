@@ -30,18 +30,32 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+config_setting(
+    name = "disable_kernels",
+    define_values = {"PYIREE_TF_DISABLE_KERNELS": "1"},
+)
+
 # Runtime deps needed to compile the tensorflow compiler.
+# As of 2020-04-13, robust constant folding is dependent on the legacy
+# TensorFlow executor, which requires kernels to operate on/simplify
+# the graph. This should become less necessary as more robust support
+# is implemented as part of the MLIR-based tf2xla bridge. This adds
+# about ~350 files to the system, many of which are quite heavy to
+# compile. Excluding them disables TensorFlow constant propagation,
+# which can cause non-optimized binaries (and tickle bugs and unimplemented
+# features). However, it is allowed, especially for development because it
+# is such a burden to build them. Disable kernels with this command line
+# options:
+#   --define=PYIREE_TF_DISABLE_KERNELS=1
+# See: https://github.com/google/iree/issues/1506
 SAVED_MODEL_TF_RUNTIME_DEPS = [
     "@org_tensorflow//tensorflow/core:ops",
-    # As of 2020-04-13, robust constant folding is dependent on the legacy
-    # TensorFlow executor, which requires kernels to operate on/simplify
-    # the graph. This should become less necessary as more robust support
-    # is implemented as part of the MLIR-based tf2xla bridge. This adds
-    # about ~350 files to the system, many of which are quite heavy to
-    # compile.
-    # See: https://github.com/google/iree/issues/1506
-    "@org_tensorflow//tensorflow/core/kernels:array",
-]
+] + select({
+    ":disable_kernels": [],
+    "//conditions:default": [
+        "@org_tensorflow//tensorflow/core/kernels:array",
+    ],
+})
 
 TF_XLA_PASS_DEPS = [
     "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",

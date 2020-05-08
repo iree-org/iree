@@ -40,9 +40,11 @@ def get_default_date_version():
   return today.strftime("%Y%m%d")
 
 
-def get_setup_defaults(sub_project, description):
+def get_setup_defaults(sub_project, description, package_dir=None):
+  if not package_dir:
+    package_dir = get_package_dir()
   return {
-      "name": "google-iree-%s-pkg" % (sub_project,),
+      "name": "google-iree-%s" % (sub_project,),
       "version": get_default_date_version(),
       "author": "The IREE Team at Google",
       "author_email": "iree-discuss@googlegroups.com",
@@ -51,7 +53,7 @@ def get_setup_defaults(sub_project, description):
       "long_description_content_type": "text/plain",
       "url": "https://github.com/google/iree",
       "package_dir": {
-          "": get_package_dir()
+          "": package_dir,
       },
       "classifiers": [
           "Programming Language :: Python :: 3",
