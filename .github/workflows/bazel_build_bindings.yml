@@ -30,6 +30,11 @@ jobs:
       # Install the version of Bazel that is required by our .bazelversion file.
       BAZEL_VERSION: 2.1.0
     steps:
+      - name: Printing environment
+        run: |
+          "$CXX" --version
+          "$CC" --version
+          "$PYTHON_BIN" --version
       - name: Installing bazel
         run: |
           # https://docs.bazel.build/versions/master/install-ubuntu.html
