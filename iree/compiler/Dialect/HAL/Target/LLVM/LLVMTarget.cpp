@@ -135,10 +135,15 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
       return rewriter.notifyMatchFailure(
           funcOp, "entry function should not have inputs");
 
-    // Get interface buffers. They should only exist in the entry block.
+    // Get interface buffers from all the blocks.
     // TODO: Also handle hal.interface.load.constant for dynamic shape.
-    auto bufferOps = llvm::to_vector<4>(
-        funcOp.getBlocks().front().getOps<IREE::PlaceholderOp>());
+    SmallVector<IREE::PlaceholderOp, 8> bufferOps;
+    for (Block& block : funcOp.getBlocks()) {
+      for (Operation& op : block)
+        if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
+          bufferOps.push_back(phOp);
+    }
+
     if (bufferOps.empty()) return failure();
 
     // A map from buffer ops to their corresponding interface binding ops.
