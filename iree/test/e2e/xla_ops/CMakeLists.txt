@@ -34,6 +34,7 @@ iree_check_single_backend_test_suite(
     "add.mlir"
     "broadcast.mlir"
     "broadcast_in_dim.mlir"
+    "compare.mlir"
     "constant.mlir"
     "cosine.mlir"
     "divide.mlir"

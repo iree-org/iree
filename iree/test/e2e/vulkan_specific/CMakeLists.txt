@@ -14,24 +14,7 @@
 
 iree_add_all_subdirs()
 
-iree_lit_test_suite(
-  NAME
-    lit
-  SRCS
-    "pw_add_multiwg.mlir"
-    "reduce.mlir"
-  DATA
-    iree::tools::IreeFileCheck
-    iree::tools::iree-run-mlir
-  LABELS
-    "hostonly"
-)
-
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_PW_ADD_MULTIWG_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS pw_add_multiwg.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_PW_ADD_MULTIWG_MLIR})
-file(GLOB _GLOB_REDUCE_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS reduce.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REDUCE_MLIR})
 iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
