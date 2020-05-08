@@ -46,11 +46,10 @@ function(iree_check_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  set(_MODULE_TARGET_NAME "${_RULE_NAME}_module")
-
+  set(_MODULE_NAME "${_RULE_NAME}_module")
   iree_bytecode_module(
     NAME
-      "${_MODULE_TARGET_NAME}"
+      "${_MODULE_NAME}"
     SRC
       "${_RULE_SRC}"
     FLAGS
@@ -62,13 +61,14 @@ function(iree_check_test)
 
   # TODO(b/146898896): It would be nice if this were something we could query
   # rather than having to know the conventions used by iree_bytecode_module.
-  set(_MODULE_FILE_NAME "${_MODULE_TARGET_NAME}.module")
+  set(_MODULE_FILE_NAME "${_MODULE_NAME}.module")
 
   # iree_bytecode_module does not define a target, only a custom command.
   # We need to create a target that depends on the command to ensure the
   # module gets built.
   # TODO(b/146898896): Do this in iree_bytecode_module and avoid having to
   # reach into the internals.
+  set(_MODULE_TARGET_NAME "${_NAME}_module")
   add_custom_target(
     "${_MODULE_TARGET_NAME}"
      DEPENDS
