@@ -31,9 +31,9 @@ namespace HAL {
 
 template <typename T>
 static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
-                                   SmallVectorImpl<NamedAttribute> &attrs) {
+                                   NamedAttrList &attrs) {
   Attribute genericAttr;
-  SmallVector<NamedAttribute, 1> attrList;
+  NamedAttrList attrList;
   auto loc = parser.getCurrentLocation();
   if (failed(parser.parseAttribute(genericAttr,
                                    parser.getBuilder().getNoneType(), attrName,
@@ -737,7 +737,7 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
   SmallVector<Attribute, 4> bindingAttrs;
   do {
     IntegerAttr bindingAttr;
-    SmallVector<NamedAttribute, 1> attrList;
+    NamedAttrList attrList;
     OpAsmParser::OperandType buffer;
     OpAsmParser::OperandType bufferOffset;
     OpAsmParser::OperandType bufferLength;
@@ -997,7 +997,7 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
   SmallVector<Attribute, 4> conditionAttrs;
   do {
     Attribute conditionAttr;
-    SmallVector<NamedAttribute, 1> dummyAttrs;
+    NamedAttrList dummyAttrs;
     if (failed(parser.parseAttribute(conditionAttr, "condition", dummyAttrs)) ||
         failed(parser.parseLParen())) {
       return failure();
