@@ -29,6 +29,19 @@ cc_library(
         "//iree/base:logging",
         # TODO(jennik): Update this for OSS side.
         "//third_party/java/jdk:jni",
+        ":context",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "context",
+    srcs = ["context_wrapper.cc"],
+    hdrs = ["context_wrapper.h"],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:logging",
+        "//iree/base:status",
+        "//iree/vm:context",
+    ],
 )

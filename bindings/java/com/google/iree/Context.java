@@ -18,11 +18,26 @@ package com.google.iree;
 
 /** An isolated execution context. */
 final class Context {
-  private Context() {}
-
-  public static void create() {
+  public Context() {
+    nativeAddress = nativeNew();
     nativeCreate();
   }
 
-  private static native void nativeCreate();
+  public int getId() {
+    return nativeGetId();
+  }
+
+  public void free() {
+    nativeFree();
+  }
+
+  private final long nativeAddress;
+
+  private native long nativeNew();
+
+  private native void nativeCreate();
+
+  private native void nativeFree();
+
+  private native int nativeGetId();
 }

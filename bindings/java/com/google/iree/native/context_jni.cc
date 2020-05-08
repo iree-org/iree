@@ -14,11 +14,56 @@
 
 #include <jni.h>
 
+#include "bindings/java/com/google/iree/native/context_wrapper.h"
 #include "iree/base/logging.h"
 
 #define JNI_FUNC extern "C" JNIEXPORT
 #define JNI_PREFIX(METHOD) Java_com_google_iree_Context_##METHOD
 
+using iree::java::ContextWrapper;
+
+namespace {
+
+// Returns a pointer to the native IREE context stored by the ContextWrapper
+// object.
+static ContextWrapper* GetContextWrapper(JNIEnv* env, jobject obj) {
+  jclass clazz = env->GetObjectClass(obj);
+  CHECK(clazz);
+
+  jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
+  CHECK(field);
+
+  return reinterpret_cast<ContextWrapper*>(env->GetLongField(obj, field));
+}
+
+}  // namespace
+
+JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz) {
+  return reinterpret_cast<jlong>(new ContextWrapper());
+}
+
+JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz, jlong handle) {
+  ContextWrapper* context = GetContextWrapper(env, thiz);
+  CHECK_NE(context, nullptr);
+  delete context;
+}
+
 JNI_FUNC void JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz) {
-  LOG(INFO) << "Implement IREE java bindings";
+  ContextWrapper* context = GetContextWrapper(env, thiz);
+  CHECK_NE(context, nullptr);
+
+  auto status = context->Create();
+
+  // TODO(jennik): Propogate this status through to java side.
+  if (!status.ok()) {
+    LOG(ERROR) << status.message();
+  }
+}
+
+JNI_FUNC jint JNI_PREFIX(nativeGetId)(JNIEnv* env, jobject thiz) {
+  ContextWrapper* context = GetContextWrapper(env, thiz);
+  CHECK_NE(context, nullptr);
+
+  int context_id = context->GetId();
+  return (jint)context_id;
 }

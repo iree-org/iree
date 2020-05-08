@@ -17,6 +17,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# TODO(jennik): Update build rules to be android specific.
 java_library(
     name = "Context",
     srcs = ["Context.java"],
