@@ -45,7 +45,7 @@ vm.module @cond_br_folds {
 
   // CHECK-LABEL: @swap_inverted_cond_br
   vm.func @swap_inverted_cond_br(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
-    // CHECK-NEXT: vm.cond_br %arg0, ^bb2(%arg1 : i32), ^bb1(%arg0 : i32)
+    // CHECK-NEXT: vm.cond_br %arg0, ^bb1(%arg1 : i32), ^bb1(%arg0 : i32)
     %inv = vm.not.i32 %arg0 : i32
     vm.cond_br %inv, ^bb1(%arg0 : i32), ^bb2(%arg1 : i32)
   ^bb1(%0 : i32):
