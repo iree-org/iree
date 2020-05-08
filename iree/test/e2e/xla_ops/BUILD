@@ -15,9 +15,8 @@
 # Tests of end-to-end IREE support for individual ops in the XLA HLO dialect.
 # Each test file should have a name matching the corresponding XLA HLO op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
-# written using the IREE Check framework (https://github.com/google/iree/tree/master/iree/modules/check) and
-# should always pass on the reference VMLA backend.
-# TODO(b/146898896): Documentation.
+# written using the IREE Check framework and should always pass on the reference VMLA backend.
+# See https://google.github.io/iree/TestingGuide#iree-core-end-to-end-tests.
 # TODO(hanchung): Reorganize/fix existing tests so the above is true.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
