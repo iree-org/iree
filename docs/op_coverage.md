@@ -23,7 +23,7 @@ batch_norm_inference | ✓ | ✗ | ✓
 broadcast | ✓ | ✓ | ✗
 broadcast_in_dim | ✓ | ✓ | ✓
 clamp | ✓ | ✗ | ✓
-compare | ✓ | ✗ | ✓
+compare | ✓ | ✓ | ✓
 concatenate | ✓ | ✗ | ✗
 constant | ✓ | ✓ | ✓
 convert | ✓ | ✗ | ✗
