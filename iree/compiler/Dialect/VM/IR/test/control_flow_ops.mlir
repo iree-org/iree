@@ -126,6 +126,18 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @call_variadic_tuples
+vm.module @my_module {
+  vm.import @import_fn(%arg0 : tuple<i32, i32, i32>...)
+  vm.func @call_variadic_tuples(%arg0 : i32, %arg1 : i32) {
+    // CHECK: vm.call.variadic @import_fn([(%arg0, %arg0, %arg0), (%arg1, %arg1, %arg1)]) : (tuple<i32, i32, i32>...)
+    vm.call.variadic @import_fn([(%arg0, %arg0, %arg0), (%arg1, %arg1, %arg1)]) : (tuple<i32, i32, i32>...)
+    vm.return
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @return_empty
 vm.module @my_module {
   vm.func @return_empty() {
