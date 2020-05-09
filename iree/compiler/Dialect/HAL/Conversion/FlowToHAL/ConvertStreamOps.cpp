@@ -277,12 +277,15 @@ static LogicalResult recordPushBindings(
   auto pushBinding = [&](Value tensorValue) -> LogicalResult {
     auto &bufferRange = bufferSet.rangeMap[tensorValue];
     assert(bufferRange.buffer && "buffer not preallocated");
-    IREE::HAL::TensorRewriteAdaptor value(dispatchOp.getLoc(), tensorValue,
-                                          bufferRange.buffer, rewriter);
-    auto byteLength = value.getByteLength();
+    auto value = IREE::HAL::TensorRewriteAdaptor::getChecked(
+        dispatchOp.getLoc(), tensorValue, bufferRange.buffer, rewriter);
+    if (!value.hasValue()) {
+      return dispatchOp.emitOpError() << "cannot create adaptor for tensor";
+    }
+    auto byteLength = value->getByteLength();
     if (!byteLength) return failure();
 
-    bindings.push_back(std::make_tuple(bindingOrdinal++, value.getBuffer(),
+    bindings.push_back(std::make_tuple(bindingOrdinal++, value->getBuffer(),
                                        zeroOffset, byteLength));
     return success();
   };
@@ -369,8 +372,13 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
     if (!value.getType().isa<TensorType>()) continue;
     auto &bufferRange = bufferSet.rangeMap[value];
     assert(bufferRange.buffer && "operand buffer not allocated");
-    operandAdaptors.emplace_back(IREE::HAL::TensorRewriteAdaptor{
-        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter});
+    auto adaptor = IREE::HAL::TensorRewriteAdaptor::getChecked(
+        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter);
+    if (!adaptor.hasValue()) {
+      return dispatchOp.emitOpError()
+             << "cannot create adaptor for tensor operand";
+    }
+    operandAdaptors.emplace_back(adaptor.getValue());
   }
   dispatchState.operands = operandAdaptors;
   SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> resultAdaptors;
@@ -379,8 +387,14 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
     if (!value.getType().isa<TensorType>()) continue;
     auto &bufferRange = bufferSet.rangeMap[value];
     assert(bufferRange.buffer && "result buffer not preallocated");
-    resultAdaptors.emplace_back(IREE::HAL::TensorRewriteAdaptor{
-        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter});
+    auto adaptor = IREE::HAL::TensorRewriteAdaptor::getChecked(
+        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter);
+    if (!adaptor.hasValue()) {
+      return dispatchOp.emitOpError()
+             << "cannot create adaptor for tensor result";
+      ;
+    }
+    resultAdaptors.emplace_back(adaptor.getValue());
   }
   dispatchState.results = resultAdaptors;
 
@@ -420,12 +434,16 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
 
   // TODO(benvanik): use something other than the BufferRange::buffer?
   // This may require us to subview the buffer first.
-  IREE::HAL::TensorRewriteAdaptor update(updateOp.getLoc(), updateOp.update(),
-                                         updateBuffer.buffer, rewriter);
-  IREE::HAL::TensorRewriteAdaptor target(updateOp.getLoc(), updateOp.target(),
-                                         targetBuffer.buffer, rewriter);
-  IREE::HAL::TensorRewriteAdaptor result(updateOp.getLoc(), updateOp.result(),
-                                         resultBuffer.buffer, rewriter);
+  auto update = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      updateOp.getLoc(), updateOp.update(), updateBuffer.buffer, rewriter);
+  auto target = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      updateOp.getLoc(), updateOp.target(), targetBuffer.buffer, rewriter);
+  auto result = IREE::HAL::TensorRewriteAdaptor::getChecked(
+      updateOp.getLoc(), updateOp.result(), resultBuffer.buffer, rewriter);
+  if (!update.hasValue() || !target.hasValue() || !result.hasValue()) {
+    return updateOp.emitOpError()
+           << "cannot create adaptors for tensor update operands/results";
+  }
 
   auto zeroOffset =
       rewriter.createOrFold<mlir::ConstantIndexOp>(updateOp.getLoc(), 0);
@@ -434,31 +452,32 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   auto startIndices = llvm::to_vector<4>(llvm::map_range(
       updateOp.start_indices(),
       [&](Value value) { return rewriter.getRemappedValue(value); }));
-  auto shapeDims = update.getShapeDims();
+  auto shapeDims = update->getShapeDims();
   if (!shapeDims) return failure();
-  auto targetRange = target.computeRange(startIndices, *update.getShapeDims());
+  auto targetRange =
+      target->computeRange(startIndices, *update->getShapeDims());
   if (!targetRange) return failure();
 
   // TODO(benvanik): actual buffer allocation so we aren't doing this copy.
-  auto targetByteLength = target.getByteLength();
+  auto targetByteLength = target->getByteLength();
   if (!targetByteLength) return failure();
 
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
-      updateOp.getLoc(), commandBuffer, target.getBuffer(), zeroOffset,
-      result.getBuffer(), zeroOffset, targetByteLength);
+      updateOp.getLoc(), commandBuffer, target->getBuffer(), zeroOffset,
+      result->getBuffer(), zeroOffset, targetByteLength);
   // TODO(benvanik): slice left/mid/right, but really just don't do this.
   recordFullExecutionBarrier(commandBuffer, updateOp.getLoc(), rewriter);
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
-      updateOp.getLoc(), commandBuffer, update.getBuffer(), zeroOffset,
-      result.getBuffer(), targetRange->offset, targetRange->length);
+      updateOp.getLoc(), commandBuffer, update->getBuffer(), zeroOffset,
+      result->getBuffer(), targetRange->offset, targetRange->length);
 
   // TODO(benvanik): implement resource sets.
   rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               targetBuffer.buffer);
+                                               target->getBuffer());
   rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               updateBuffer.buffer);
+                                               update->getBuffer());
   rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               resultBuffer.buffer);
+                                               result->getBuffer());
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could
@@ -521,12 +540,6 @@ class ExStreamFragmentOpConversion
     auto &entryBlock = streamOp.body().front();
     for (int i = 0; i < operands.size(); ++i) {
       if (streamOp.getOperand(i).getType().isa<TensorType>()) {
-        if (!IREE::HAL::TensorRewriteAdaptor::isValidType(
-                operands[i].getType())) {
-          return streamOp.emitOpError()
-                 << "tensor operand " << i << " rewritten to invalid type "
-                 << operands[i].getType();
-        }
         bufferSet.rangeMap[entryBlock.getArgument(i)] =
             BufferRange{operands[i]};
       } else {

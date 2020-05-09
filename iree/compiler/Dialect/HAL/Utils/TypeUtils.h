@@ -43,17 +43,26 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(
 // conversion between buffers and buffer views. Always prefer using this when
 // mapping between the types to ensure that the conversion framework can
 // flexibly choose which type to use based on target ops.
-struct TensorRewriteAdaptor {
-  TensorRewriteAdaptor(Location loc, Value oldValue, Value newValue,
-                       ConversionPatternRewriter &rewriter)
-      : loc(loc), oldValue(oldValue), newValue(newValue), rewriter(rewriter) {}
+class TensorRewriteAdaptor {
+ public:
+  // Returns whether the given type can adapted from a Tensor.
+  static bool isValidNewType(Type newType);
 
-  static bool isValidType(Type type);
+  // Emits an error and returns failure if invariants are not satisfied.
+  static LogicalResult verifyConstructionInvariants(
+      Location loc, Value oldValue, Value newValue,
+      ConversionPatternRewriter &rewriter);
 
-  Location loc;
-  Value oldValue;
-  Value newValue;
-  ConversionPatternRewriter &rewriter;
+  // Create an adaptor between the given values.
+  // Aborts if the values cannot be adapted.
+  static TensorRewriteAdaptor get(Location loc, Value oldValue, Value newValue,
+                                  ConversionPatternRewriter &rewriter);
+
+  // Create an adaptor between the given values.
+  // If the values cannot be adapted, emits an error and returns empty.
+  static llvm::Optional<TensorRewriteAdaptor> getChecked(
+      Location loc, Value oldValue, Value newValue,
+      ConversionPatternRewriter &rewriter);
 
   // Gets the allocator this buffer was allocated with.
   Value getAllocator();
@@ -90,6 +99,19 @@ struct TensorRewriteAdaptor {
 
   // Performs the equivalent of a hal.buffer_view.compute_range.
   llvm::Optional<Range> computeRange(ValueRange indices, ValueRange lengths);
+
+ private:
+  TensorRewriteAdaptor(Location loc, Value oldValue, Value newValue,
+                       ConversionPatternRewriter &rewriter)
+      : loc_(loc),
+        oldValue_(oldValue),
+        newValue_(newValue),
+        rewriter_(rewriter) {}
+
+  Location loc_;
+  Value oldValue_;
+  Value newValue_;
+  ConversionPatternRewriter &rewriter_;
 };
 
 }  // namespace HAL

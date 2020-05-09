@@ -78,13 +78,16 @@ class TensorLoadOpConversion
       IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorLoadOpOperandAdaptor operands(newOperands);
-    IREE::HAL::TensorRewriteAdaptor source(loadOp.getLoc(), loadOp.source(),
-                                           operands.source(), rewriter);
+    auto source = IREE::HAL::TensorRewriteAdaptor::getChecked(
+        loadOp.getLoc(), loadOp.source(), operands.source(), rewriter);
+    if (!source.hasValue()) {
+      return loadOp.emitOpError() << "cannot create adaptor for source";
+    }
 
-    auto sourceOffset = source.computeOffset(operands.indices());
+    auto sourceOffset = source->computeOffset(operands.indices());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
-        source.getBuffer(), sourceOffset);
+        source->getBuffer(), sourceOffset);
     return success();
   }
 
@@ -102,12 +105,16 @@ class TensorStoreOpConversion
       IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorStoreOpOperandAdaptor operands(newOperands);
-    IREE::HAL::TensorRewriteAdaptor target(storeOp.getLoc(), storeOp.target(),
-                                           operands.target(), rewriter);
+    auto target = IREE::HAL::TensorRewriteAdaptor::getChecked(
+        storeOp.getLoc(), storeOp.target(), operands.target(), rewriter);
 
-    auto targetOffset = target.computeOffset(operands.indices());
+    if (!target.hasValue()) {
+      return storeOp.emitOpError() << "cannot create adaptor for target";
+    }
+
+    auto targetOffset = target->computeOffset(operands.indices());
     rewriter.create<IREE::HAL::BufferStoreOp>(
-        storeOp.getLoc(), operands.value(), target.getBuffer(), targetOffset);
+        storeOp.getLoc(), operands.value(), target->getBuffer(), targetOffset);
     rewriter.replaceOp(storeOp, {operands.value()});
     return success();
   }

@@ -19,11 +19,13 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -73,41 +75,82 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(
 }
 
 // static
-bool TensorRewriteAdaptor::isValidType(Type type) {
-  return type.isa<IREE::HAL::BufferViewType>() ||
-         type.isa<IREE::HAL::BufferType>();
+bool TensorRewriteAdaptor::isValidNewType(Type newType) {
+  return newType.isa<IREE::HAL::BufferViewType>() ||
+         newType.isa<IREE::HAL::BufferType>();
+}
+
+// static
+LogicalResult TensorRewriteAdaptor::verifyConstructionInvariants(
+    Location loc, Value oldValue, Value newValue,
+    ConversionPatternRewriter &rewriter) {
+  if (!oldValue || !newValue) {
+    return emitError(loc) << "TensorRewriteAdaptor values are null";
+  }
+  if (!oldValue.getType().isa<TensorType>()) {
+    return emitError(loc) << "TensorRewriteAdaptor oldValue is not a Tensor";
+  }
+  if (!TensorRewriteAdaptor::isValidNewType(newValue.getType())) {
+    return emitError(loc) << "TensorRewriteAdaptor newValue is invalid type "
+                          << newValue.getType();
+  }
+  return success();
+}
+
+// static
+TensorRewriteAdaptor TensorRewriteAdaptor::get(
+    Location loc, Value oldValue, Value newValue,
+    ConversionPatternRewriter &rewriter) {
+  assert(succeeded(TensorRewriteAdaptor::verifyConstructionInvariants(
+      loc, oldValue, newValue, rewriter)));
+  return TensorRewriteAdaptor(loc, oldValue, newValue, rewriter);
+}
+// static
+llvm::Optional<TensorRewriteAdaptor> TensorRewriteAdaptor::getChecked(
+    Location loc, Value oldValue, Value newValue,
+    ConversionPatternRewriter &rewriter) {
+  if (failed(TensorRewriteAdaptor::verifyConstructionInvariants(
+          loc, oldValue, newValue, rewriter))) {
+    return llvm::None;
+  }
+  return TensorRewriteAdaptor(loc, oldValue, newValue, rewriter);
 }
 
 Value TensorRewriteAdaptor::getAllocator() {
-  return rewriter.createOrFold<IREE::HAL::BufferAllocatorOp>(loc, getBuffer());
+  return rewriter_.createOrFold<IREE::HAL::BufferAllocatorOp>(loc_,
+                                                              getBuffer());
 }
 
 bool TensorRewriteAdaptor::isBufferView() {
-  return newValue.getType().isa<IREE::HAL::BufferViewType>();
+  return newValue_.getType().isa<IREE::HAL::BufferViewType>();
 }
 
 Value TensorRewriteAdaptor::getBuffer() {
   if (isBufferView()) {
-    return rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(loc, newValue);
+    return rewriter_.createOrFold<IREE::HAL::BufferViewBufferOp>(loc_,
+                                                                 newValue_);
   } else {
-    return newValue;
+    return newValue_;
   }
 }
 
 Value TensorRewriteAdaptor::getBufferView() {
-  auto shapeDims = getShapeDims();
-  if (!shapeDims) return {};
-
   if (isBufferView()) {
-    return newValue;
+    return newValue_;
+  } else if (auto bufferViewBufferOp =
+                 llvm::dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
+                     newValue_.getDefiningOp())) {
+    return bufferViewBufferOp.buffer_view();
   } else {
-    return rewriter.createOrFold<IREE::HAL::BufferViewCreateOp>(
-        loc, newValue, *shapeDims, getElementType());
+    auto shapeDims = getShapeDims();
+    if (!shapeDims) return {};
+    return rewriter_.createOrFold<IREE::HAL::BufferViewCreateOp>(
+        loc_, newValue_, *shapeDims, getElementType());
   }
 }
 
 TensorType TensorRewriteAdaptor::getTensorType() {
-  return oldValue.getType().cast<TensorType>();
+  return oldValue_.getType().cast<TensorType>();
 }
 
 int32_t TensorRewriteAdaptor::getElementType() {
@@ -120,44 +163,44 @@ IntegerAttr TensorRewriteAdaptor::getElementTypeAttr() {
 }
 
 llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims() {
-  return IREE::HAL::getShapeDims(loc, oldValue, rewriter);
+  return IREE::HAL::getShapeDims(loc_, oldValue_, rewriter_);
 }
 
 Value TensorRewriteAdaptor::getByteLength() {
   if (isBufferView()) {
-    return rewriter.createOrFold<IREE::HAL::BufferViewByteLengthOp>(
-        loc, getBufferView());
+    return rewriter_.createOrFold<IREE::HAL::BufferViewByteLengthOp>(
+        loc_, getBufferView());
   } else {
     auto shapeDims = getShapeDims();
     if (!shapeDims) return {};
-    return rewriter.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
-        loc, getAllocator(), *shapeDims, getElementType());
+    return rewriter_.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
+        loc_, getAllocator(), *shapeDims, getElementType());
   }
 }
 
 Value TensorRewriteAdaptor::computeOffset(ValueRange indices) {
   if (isBufferView()) {
-    return rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
-        loc, getBufferView(), indices);
+    return rewriter_.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
+        loc_, getBufferView(), indices);
   } else {
     auto shapeDims = getShapeDims();
     if (!shapeDims) return {};
-    return rewriter.createOrFold<IREE::HAL::AllocatorComputeOffsetOp>(
-        loc, getAllocator(), *shapeDims, getElementType(), indices);
+    return rewriter_.createOrFold<IREE::HAL::AllocatorComputeOffsetOp>(
+        loc_, getAllocator(), *shapeDims, getElementType(), indices);
   }
 }
 
 llvm::Optional<TensorRewriteAdaptor::Range> TensorRewriteAdaptor::computeRange(
     ValueRange indices, ValueRange lengths) {
   if (isBufferView()) {
-    auto range = rewriter.create<IREE::HAL::BufferViewComputeRangeOp>(
-        loc, getBufferView(), indices, lengths);
+    auto range = rewriter_.create<IREE::HAL::BufferViewComputeRangeOp>(
+        loc_, getBufferView(), indices, lengths);
     return Range{range.offset(), range.length()};
   } else {
     auto shapeDims = getShapeDims();
     if (!shapeDims) return llvm::None;
-    auto range = rewriter.create<IREE::HAL::AllocatorComputeRangeOp>(
-        loc, getAllocator(), *shapeDims, getElementType(), indices, lengths);
+    auto range = rewriter_.create<IREE::HAL::AllocatorComputeRangeOp>(
+        loc_, getAllocator(), *shapeDims, getElementType(), indices, lengths);
     return Range{range.offset(), range.length()};
   }
 }

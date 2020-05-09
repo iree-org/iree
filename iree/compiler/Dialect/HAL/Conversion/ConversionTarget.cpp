@@ -78,9 +78,12 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
       // Create the buffer view that we'll pass to the function.
       // Note that we expect this to be CSE'd if there are multiple calls
       // using the same buffer.
-      IREE::HAL::TensorRewriteAdaptor operand(srcOp->getLoc(), srcOperand,
-                                              dstOperand, rewriter);
-      state.addOperands({operand.getBufferView()});
+      auto operand = IREE::HAL::TensorRewriteAdaptor::getChecked(
+          srcOp->getLoc(), srcOperand, dstOperand, rewriter);
+      if (!operand.hasValue()) {
+        return srcOp->emitOpError() << "unable to create adaptor for operand";
+      }
+      state.addOperands({operand->getBufferView()});
     } else {
       // Normal pass-through operand.
       state.addOperands({dstOperand});
