@@ -52,6 +52,39 @@ the final step in compilation.
 | :----: | ----------- |
 `results` | any type
 
+### `iree.dynamic_shape_constant` (IREE::DynamicShapeConstantOp)
+
+A tensor constant that can have dynamic dimensions
+
+Syntax:
+
+```
+operation ::= `iree.dynamic_shape_constant` $value attr-dict `->` type($result)
+```
+
+
+Allows specifying a constant where the return value can erase shape
+information. This operation is declared as having side effects and has no
+folder, so will not be optimized away by the compiler. The underlying shape
+information should be hidden from the compiler and resolved at runtime.
+
+```mlir
+%c = iree.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
+%res = "xla_hlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`value` | ElementsAttr | constant vector/tensor attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | tensor of any type values
+
 ### `iree.placeholder` (IREE::PlaceholderOp)
 
 A placeholder op to feed a value/buffer into computation
