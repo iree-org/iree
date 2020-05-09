@@ -39,5 +39,4 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Translation",
     ],
-    alwayslink = 1,
 )
