@@ -12,39 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "ConvertToHAL",
-    srcs = [
-        "ConvertToHAL.cpp",
-    ],
-    hdrs = [
-        "ConvertToHAL.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Transforms",
-    ],
-)
-
-cc_library(
-    name = "PreserveCompilerHints",
-    srcs = [
-        "PreserveCompilerHints.cpp",
-    ],
-    hdrs = [
-        "PreserveCompilerHints.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Transforms",
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
     ],
 )

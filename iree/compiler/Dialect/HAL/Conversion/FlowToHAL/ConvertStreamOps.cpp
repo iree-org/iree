@@ -520,7 +520,13 @@ class ExStreamFragmentOpConversion
     // Remap non-tensor operands (such as workloads).
     auto &entryBlock = streamOp.body().front();
     for (int i = 0; i < operands.size(); ++i) {
-      if (operands[i].getType().isa<IREE::HAL::BufferType>()) {
+      if (streamOp.getOperand(i).getType().isa<TensorType>()) {
+        if (!IREE::HAL::TensorRewriteAdaptor::isValidType(
+                operands[i].getType())) {
+          return streamOp.emitOpError()
+                 << "tensor operand " << i << " rewritten to invalid type "
+                 << operands[i].getType();
+        }
         bufferSet.rangeMap[entryBlock.getArgument(i)] =
             BufferRange{operands[i]};
       } else {

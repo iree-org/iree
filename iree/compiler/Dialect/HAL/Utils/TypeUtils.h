@@ -48,6 +48,8 @@ struct TensorRewriteAdaptor {
                        ConversionPatternRewriter &rewriter)
       : loc(loc), oldValue(oldValue), newValue(newValue), rewriter(rewriter) {}
 
+  static bool isValidType(Type type);
+
   Location loc;
   Value oldValue;
   Value newValue;

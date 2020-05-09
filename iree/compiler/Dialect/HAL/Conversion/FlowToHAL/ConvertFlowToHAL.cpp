@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/IREE/Conversion/ConvertToHAL.h"
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
@@ -91,6 +92,8 @@ class ConvertFlowToHALPass
     populateFlowTensorToHALPatterns(context, patterns, typeConverter);
     populateFlowVariableToHALPatterns(context, patterns, typeConverter);
     populateHalBufferViewShapePatterns(context, patterns, typeConverter);
+    populateIREEToHALPatterns(context, patterns);
+    setupIREEToHALLegality(context, target);
     populatePreserveCompilerHintsPatterns(context, patterns);
     setupCompilerHintsLegality(context, target, typeConverter);
 

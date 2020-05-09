@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-transformation-pipeline -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-transformation-pipeline -iree-hal-target-backends=vmla -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @add
 func @add() -> i32 {
@@ -41,4 +41,15 @@ func @unfoldable_constant() -> i32 {
   // CHECK: vm.add.i32
   %result = addi %input, %input : i32
   return %result : i32
+}
+
+// -----
+
+// CHECK-LABEL: vm.rodata @dynamic_constant_const_0 dense<3.000000e+00> : tensor<2x3xf32>
+// CHECK: vm.func @dynamic_constant
+func @dynamic_constant() -> tensor<?x?xf32> {
+  // CHECK: vm.call @hal.buffer_view.dim
+  %input = iree.dynamic_shape_constant dense<3.0> : tensor<2x3xf32> -> tensor<?x?xf32>
+  %res = "xla_hlo.abs"(%input) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %res : tensor<?x?xf32>
 }

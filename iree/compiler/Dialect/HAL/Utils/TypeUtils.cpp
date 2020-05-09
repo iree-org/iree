@@ -72,6 +72,12 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(
   }
 }
 
+// static
+bool TensorRewriteAdaptor::isValidType(Type type) {
+  return type.isa<IREE::HAL::BufferViewType>() ||
+         type.isa<IREE::HAL::BufferType>();
+}
+
 Value TensorRewriteAdaptor::getAllocator() {
   return rewriter.createOrFold<IREE::HAL::BufferAllocatorOp>(loc, getBuffer());
 }

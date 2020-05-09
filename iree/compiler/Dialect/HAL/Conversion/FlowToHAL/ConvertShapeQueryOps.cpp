@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
@@ -23,11 +24,25 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+static Value getBackingView(Value v) {
+  if (v.getType().isa<IREE::HAL::BufferViewType>()) {
+    return v;
+  } else if (auto bufferViewBufferOp =
+                 llvm::dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
+                     v.getDefiningOp())) {
+    return bufferViewBufferOp.buffer_view();
+  }
+  return {};
+}
+
 // Matches:
+//   %0 = ... buffer_view
+//   %1 = dim %0, ...
+// or
 //   %0 = ... buffer_view ...
 //   %1 = hal.buffer_view_buffer %0
 //   %2 = dim %1, ...
-// Note that such a pattern is not legal but is created in various custom op
+// Note that such patterns are not legal but are created in various custom op
 // conversions.
 class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
  public:
@@ -37,23 +52,23 @@ class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
       DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
     DimOpOperandAdaptor operands(rawOperands);
-    auto backingBufferOp =
-        llvm::dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
-            operands.memrefOrTensor().getDefiningOp());
-    if (!backingBufferOp) return failure();
+    auto view = getBackingView(operands.memrefOrTensor());
+    if (!view) return failure();
 
     auto dimIndex = rewriter.getI32IntegerAttr(dimOp.getIndex());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
-        dimOp, dimOp.getResult().getType(), backingBufferOp.buffer_view(),
-        dimIndex);
+        dimOp, dimOp.getResult().getType(), view, dimIndex);
     return success();
   }
 };
 
 // Matches:
+//   %0 = ... buffer_view
+//   %1 = rank %0, ...
+// or
 //   %0 = ... buffer_view ...
 //   %1 = hal.buffer_view_buffer %0
-//   %2 = rank %1
+//   %2 = rank %1, ...
 // Note that such a pattern is not legal but is created in various custom op
 // conversions.
 class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
@@ -63,13 +78,11 @@ class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
   LogicalResult matchAndRewrite(
       RankOp rankOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    auto backingBufferOp =
-        llvm::dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
-            rawOperands[0].getDefiningOp());
-    if (!backingBufferOp) return failure();
+    auto view = getBackingView(rawOperands[0]);
+    if (!view) return failure();
 
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), backingBufferOp.buffer_view());
+        rankOp, rankOp.getResult().getType(), view);
     return success();
   }
 };
