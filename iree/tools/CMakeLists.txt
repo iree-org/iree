@@ -189,6 +189,7 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_translations.h"
     DEPS
+      iree::compiler::Translation::IREEVM
       MLIRSPIRVSerialization
   )
 

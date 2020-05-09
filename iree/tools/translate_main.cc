@@ -59,6 +59,7 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::registerMlirTranslations();
+  mlir::iree_compiler::registerIreeTranslations();
   mlir::iree_compiler::registerSPRIVTranslation();
 
   // Register MLIRContext command-line options like
