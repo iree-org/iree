@@ -18,7 +18,11 @@ name: Bazel Build - Bindings
 
 on:
   push:
-    branches: [master]
+    branches:
+      - 'master'
+      # Run on pushes to branches with a special name indicating they'd like
+      # to run these actions.
+      - 'test-ga-bazel*'
 
 jobs:
   linux:

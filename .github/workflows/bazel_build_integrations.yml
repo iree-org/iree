@@ -18,13 +18,22 @@ name: Bazel Build - Integrations
 
 on:
   push:
-    branches: [master]
+    branches:
+      - 'master'
+      # Run on pushes to branches with a special name indicating they'd like
+      # to run these actions.
+      - 'test-ga-bazel*'
 
 jobs:
   linux:
     runs-on: ubuntu-18.04
     container: gcr.io/iree-oss/bazel-tensorflow
     steps:
+      - name: Printing environment
+        run: |
+          "$CXX" --version
+          "$CC" --version
+          "$PYTHON_BIN" --version
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Initializing submodules
