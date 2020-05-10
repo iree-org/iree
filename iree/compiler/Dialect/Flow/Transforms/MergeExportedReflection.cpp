@@ -78,7 +78,7 @@ class MergeExportedReflectionPass
         return;
       }
       l.remove(fPartialIdent);
-      auto updatedReflection = l.getDictionary();
+      auto updatedReflection = l.getDictionary(&getContext());
       if (updatedReflection) {
         func.setArgAttr(i, reflectionIdent, updatedReflection);
       } else {
@@ -94,7 +94,7 @@ class MergeExportedReflectionPass
         return;
       }
       l.remove(fPartialIdent);
-      auto updatedReflection = l.getDictionary();
+      auto updatedReflection = l.getDictionary(&getContext());
       if (updatedReflection) {
         func.setResultAttr(i, reflectionIdent, updatedReflection);
       } else {
@@ -112,7 +112,7 @@ class MergeExportedReflectionPass
         func.getAttrOfType<DictionaryAttr>(reflectionIdent));
     l.set(fIdent, builder.getStringAttr(functionSignature.encoded()));
     l.set(fVersionIdent, builder.getStringAttr("1"));
-    func.setAttr(reflectionIdent, l.getDictionary());
+    func.setAttr(reflectionIdent, l.getDictionary(&getContext()));
   }
 };
 

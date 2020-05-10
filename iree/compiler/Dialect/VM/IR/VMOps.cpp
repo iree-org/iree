@@ -113,7 +113,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
          "expected as many argument attribute lists as arguments");
   SmallString<8> argAttrName;
   for (unsigned i = 0; i < numInputs; ++i) {
-    if (auto argDict = argAttrs[i].getDictionary()) {
+    if (auto argDict = argAttrs[i].getDictionary(builder.getContext())) {
       result.addAttribute(getArgAttrName(i, argAttrName), argDict);
     }
   }
@@ -232,7 +232,8 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
   for (int i = 0; i < argAttrs.size(); ++i) {
     SmallString<8> argName;
     mlir::impl::getArgAttrName(i, argName);
-    result->addAttribute(argName, argAttrs[i].getDictionary());
+    result->addAttribute(argName,
+                         argAttrs[i].getDictionary(builder.getContext()));
   }
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
@@ -296,7 +297,7 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
          "expected as many argument attribute lists as arguments");
   SmallString<8> argAttrName;
   for (unsigned i = 0; i < numInputs; ++i) {
-    if (auto argDict = argAttrs[i].getDictionary()) {
+    if (auto argDict = argAttrs[i].getDictionary(builder.getContext())) {
       result.addAttribute(getArgAttrName(i, argAttrName), argDict);
     }
   }
@@ -555,7 +556,7 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
 static ParseResult parseConstI32Op(OpAsmParser &parser,
                                    OperationState *result) {
   Attribute valueAttr;
-  SmallVector<NamedAttribute, 1> dummyAttrs;
+  NamedAttrList dummyAttrs;
   if (failed(parser.parseAttribute(valueAttr, "value", dummyAttrs))) {
     return parser.emitError(parser.getCurrentLocation())
            << "Invalid attribute encoding";
