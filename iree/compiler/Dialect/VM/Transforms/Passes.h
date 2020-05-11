@@ -42,6 +42,8 @@ namespace VM {
 //   <run target serialization/etc>
 void buildVMTransformPassPipeline(OpPassManager &passManager);
 
+void registerVMTransformPassPipeline();
+
 //===----------------------------------------------------------------------===//
 // Conversion
 //===----------------------------------------------------------------------===//
@@ -82,6 +84,7 @@ createConvertStandardToVMTestPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerVMPasses() {
+  registerVMTransformPassPipeline();
   createConversionPass();
   createGlobalInitializationPass();
   createOrdinalAllocationPass();

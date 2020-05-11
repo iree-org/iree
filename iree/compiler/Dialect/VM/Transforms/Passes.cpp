@@ -35,12 +35,14 @@ void buildVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createSymbolDCEPass());
 }
 
-static PassPipelineRegistration<> transformPassPipeline(
-    "iree-vm-transformation-pipeline",
-    "Runs the full IREE VM dialect transformation pipeline",
-    [](OpPassManager &passManager) {
-      buildVMTransformPassPipeline(passManager);
-    });
+void registerVMTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-vm-transformation-pipeline",
+      "Runs the full IREE VM dialect transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildVMTransformPassPipeline(passManager);
+      });
+}
 
 }  // namespace VM
 }  // namespace IREE
