@@ -462,7 +462,7 @@ typedef int32_t iree_hal_dim_t;
 
 #ifndef IREE_API_NO_PROTOTYPES
 
-// Parses a serialized set of shape dimensions the canonical shape format
+// Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by iree_hal_format_shape).
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
@@ -493,7 +493,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
     char* buffer, iree_host_size_t* out_buffer_length);
 
 // Parses a serialized element of |element_type| to its in-memory form.
-// |data_ptr| be at least large enough to contain the bytes of the element.
+// |data_ptr| must be at least large enough to contain the bytes of the element.
 // For example, "1.2" of type IREE_HAL_ELEMENT_TYPE_FLOAT32 will write the 4
 // byte float value of 1.2 to |data_ptr|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(

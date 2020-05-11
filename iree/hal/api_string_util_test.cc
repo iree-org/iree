@@ -33,7 +33,7 @@ using ::testing::Eq;
 // TODO(benvanik): move these utils to C++ bindings.
 using Shape = absl::InlinedVector<iree_hal_dim_t, 6>;
 
-// Parses a serialized set of shape dimensions the canonical shape format
+// Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by FormatShape).
 StatusOr<Shape> ParseShape(absl::string_view value) {
   Shape shape(6);
