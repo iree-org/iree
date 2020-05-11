@@ -197,12 +197,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createSymbolDCEPass());
 }
 
-static PassPipelineRegistration<> transformPassPipeline(
-    "iree-flow-transformation-pipeline",
-    "Runs the full IREE flow dialect transformation pipeline",
-    [](OpPassManager &passManager) {
-      buildFlowTransformPassPipeline(passManager);
-    });
+void registerFlowTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-flow-transformation-pipeline",
+      "Runs the full IREE flow dialect transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildFlowTransformPassPipeline(passManager);
+      });
+}
 
 }  // namespace Flow
 }  // namespace IREE
