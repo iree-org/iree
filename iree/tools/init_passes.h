@@ -148,6 +148,10 @@ inline void registerMlirPasses() {
   createConvertLinalgToAffineLoopsPass();
   createConvertLinalgToLLVMPass();
 
+  // Loop
+  createParallelLoopFusionPass();
+  createParallelLoopTilingPass();
+
   // Quant
   quant::createConvertSimulatedQuantPass();
   quant::createConvertConstPass();

@@ -132,7 +132,7 @@ iree_cc_binary(
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRSCF
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTranslation
     iree::compiler::Dialect::VM::Target::Bytecode
