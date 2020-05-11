@@ -55,6 +55,8 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
 
 // TODO(benvanik): versions with multiple targets, etc.
 
+void registerIREEVMTransformPassPipeline();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

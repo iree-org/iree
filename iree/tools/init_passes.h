@@ -31,6 +31,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
+#include "iree/compiler/Translation/IREEVM.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
@@ -182,6 +183,7 @@ inline void registerAllIreePasses() {
   IREE::VM::registerVMAnalysisTestPasses();
   IREE::VM::registerVMTestPasses();
   IREE::VMLA::registerVMLAPasses();
+  registerIREEVMTransformPassPipeline();
 }
 }  // namespace iree_compiler
 }  // namespace mlir
