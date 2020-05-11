@@ -33,7 +33,8 @@ RUN apt-get install -y git
 # Install core IREE dependencies.
 RUN apt-get install -y clang libsdl2-dev
 
-# Install python2 numpy. Temporary fix for issue #1737.
+# Install python2 numpy. Temporary fix for issue #1737:
+# https://github.com/google/iree/issues/1737
 RUN apt-get install -y python-pip
 RUN python -m pip install --upgrade pip
 RUN python -m pip install numpy
