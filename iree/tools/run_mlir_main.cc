@@ -53,6 +53,7 @@
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
+#include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
@@ -466,6 +467,7 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerHALTargetBackends();
+  mlir::iree_compiler::registerVMTargets();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

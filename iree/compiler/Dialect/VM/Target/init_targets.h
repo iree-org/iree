@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
-#include "mlir/IR/Module.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Translation.h"
+#ifndef IREE_COMPILER_DIALECT_VM_TARGET_INIT_TARGETS_H_
+#define IREE_COMPILER_DIALECT_VM_TARGET_INIT_TARGETS_H_
 
 namespace mlir {
 namespace iree_compiler {
+
 namespace IREE {
 namespace VM {
-
-void registerToVMBytecodeTranslation() {
-  TranslateFromMLIRRegistration toBytecodeModule(
-      "iree-vm-ir-to-bytecode-module",
-      [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
-        return translateModuleToBytecode(
-            moduleOp, getBytecodeTargetOptionsFromFlags(), output);
-      });
-}
-
+void registerToVMBytecodeTranslation();
 }  // namespace VM
 }  // namespace IREE
+
+// This function should be called before creating any MLIRContext if one
+// expects all the possible target backends to be available. Custom tools can
+// select which targets they want to support by only registering those they
+// need.
+inline void registerVMTargets() {
+  static bool init_once = []() {
+    IREE::VM::registerToVMBytecodeTranslation();
+    return true;
+  }();
+  (void)init_once;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_DIALECT_VM_TARGET_INIT_TARGETS_H_

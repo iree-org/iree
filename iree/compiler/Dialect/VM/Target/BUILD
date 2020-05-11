@@ -16,3 +16,11 @@ package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
+
+cc_library(
+    name = "init_targets",
+    hdrs = ["init_targets.h"],
+    deps = [
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+    ],
+)

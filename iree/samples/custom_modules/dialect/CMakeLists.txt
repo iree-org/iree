@@ -136,6 +136,7 @@ iree_cc_binary(
     MLIRSupport
     MLIRTranslation
     iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Translation::IREEVM
     iree::compiler::Translation::SPIRV::init_translations
     iree::tools::init_compiler_modules

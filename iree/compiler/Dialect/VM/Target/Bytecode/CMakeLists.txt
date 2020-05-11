@@ -41,6 +41,5 @@ iree_cc_library(
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
     iree::schemas::bytecode_module_def_cc_fbs
-  ALWAYSLINK
   PUBLIC
 )
