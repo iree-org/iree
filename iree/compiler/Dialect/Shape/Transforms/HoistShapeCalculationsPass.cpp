@@ -100,17 +100,16 @@ void hoistOps(DenseSet<Operation *> opsToHoistSet, Block &block) {
   });
 
   for (Operation *op : opsToHoist) {
-    Operation *insertAfter = nullptr;
+    Operation *moveAfter = nullptr;
     for (Value operand : op->getOperands()) {
       if (Operation *definingOp = getDefiningOpInBlock(operand, block)) {
-        if (insertAfter == nullptr ||
-            insertAfter->isBeforeInBlock(definingOp)) {
-          insertAfter = definingOp;
+        if (moveAfter == nullptr || moveAfter->isBeforeInBlock(definingOp)) {
+          moveAfter = definingOp;
         }
       }
     }
-    if (insertAfter != nullptr) {
-      op->moveBefore(&*std::next(insertAfter->getIterator()));
+    if (moveAfter != nullptr) {
+      op->moveAfter(moveAfter);
     } else {
       op->moveBefore(&block, block.begin());
     }
