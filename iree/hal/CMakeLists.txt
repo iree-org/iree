@@ -70,6 +70,22 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    api_string_util_test
+  SRCS
+    "api_string_util_test.cc"
+  DEPS
+    ::api
+    absl::inlined_vector
+    absl::strings
+    iree::base::api_util
+    iree::base::memory
+    iree::base::status
+    iree::base::status_matchers
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     buffer

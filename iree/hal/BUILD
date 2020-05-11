@@ -72,6 +72,21 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "api_string_util_test",
+    srcs = ["api_string_util_test.cc"],
+    deps = [
+        ":api",
+        "//iree/base:api_util",
+        "//iree/base:memory",
+        "//iree/base:status",
+        "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 cc_library(
     name = "buffer",
     srcs = ["buffer.cc"],
