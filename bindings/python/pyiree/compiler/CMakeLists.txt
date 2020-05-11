@@ -56,6 +56,7 @@ iree_pybind_cc_library(
     iree::compiler::Dialect::HAL::Target::LLVM
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Target::init_targets
     iree::tools::init_compiler_modules
     iree::tools::init_passes_and_dialects
     iree::tools::init_targets
