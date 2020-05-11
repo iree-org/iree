@@ -38,3 +38,15 @@ cc_library(
         "@llvm-project//mlir:Transforms",
     ],
 )
+
+cc_library(
+    name = "Passes",
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
+        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "@llvm-project//mlir:Pass",
+    ],
+)
