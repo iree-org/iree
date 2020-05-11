@@ -39,7 +39,7 @@ function(iree_check_test)
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
-  if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
     return()
   endif()
 

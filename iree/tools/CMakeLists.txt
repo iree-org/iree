@@ -358,10 +358,12 @@ iree_cc_test(
     iree::vm::variant_list
 )
 
-add_custom_target(IreeFileCheck ALL
-  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
-)
-add_custom_target(LLVMFileCheck ALL
-  COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-  DEPENDS FileCheck
-)
+if(${IREE_ENABLE_LLVM})
+  add_custom_target(IreeFileCheck ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
+  )
+  add_custom_target(LLVMFileCheck ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+    DEPENDS FileCheck
+  )
+endif()
