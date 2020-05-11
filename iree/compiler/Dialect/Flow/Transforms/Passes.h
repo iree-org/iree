@@ -143,6 +143,8 @@ inline void registerFlowPasses() {
   createHLOPreprocessingPass();
   createPrePartitioningConversionPass();
   createPostPartitioningConversionPass();
+  createMaterializeExportedReflection();
+  createMergeExportedReflection();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegionsPass();
   createFoldCompatibleDispatchRegionsPass();
