@@ -156,7 +156,8 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
             IREE_LOC))
             << "Populating buffer contents ";
 
-        absl::InlinedVector<int32_t, 5> dims(shaped_buffer.shape().size());
+        absl::InlinedVector<iree_hal_dim_t, 5> dims(
+            shaped_buffer.shape().size());
         // TODO(laurenzo): The following should work but Shape iterators
         // cause access violations.
         // std::copy(shaped_buffer.shape().begin(), shaped_buffer.shape().end(),
@@ -240,7 +241,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
         int8_t element_size = 4;
 
         // Copy the dims out of the buffer view.
-        absl::InlinedVector<int32_t, 5> dims32(
+        absl::InlinedVector<iree_hal_dim_t, 5> dims32(
             iree_hal_buffer_view_shape_rank(buffer_view));
         iree_hal_buffer_view_shape(buffer_view, dims32.size(), dims32.data(),
                                    nullptr);

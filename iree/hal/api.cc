@@ -77,16 +77,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
   } else if (absl::StartsWith(str_value, "f")) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
     str_value.remove_prefix(1);
-  } else if (absl::StartsWith(str_value, "x")) {
+  } else if (absl::StartsWith(str_value, "x") ||
+             absl::StartsWith(str_value, "*")) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
     str_value.remove_prefix(1);
   } else {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  int32_t bit_count = 0;
-  if (!absl::SimpleAtoi(str_value, &bit_count)) {
-    return IREE_STATUS_OUT_OF_RANGE;
+  uint32_t bit_count = 0;
+  if (!absl::SimpleAtoi(str_value, &bit_count) || bit_count > 0xFFu) {
+    return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   *out_element_type = iree_hal_make_element_type(numerical_type, bit_count);
@@ -94,10 +95,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
-    iree_hal_element_type_t element_type, iree_host_size_t capacity,
-    char* buffer, iree_host_size_t* out_length) {
-  if (out_length) {
-    *out_length = 0;
+    iree_hal_element_type_t element_type, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length) {
+  if (out_buffer_length) {
+    *out_buffer_length = 0;
   }
   const char* prefix;
   switch (iree_hal_element_numerical_type(element_type)) {
@@ -111,19 +112,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
       prefix = "f";
       break;
     default:
-      prefix = "x";
+      prefix = "*";
       break;
   }
   int n = std::snprintf(
-      buffer, capacity, "%s%d", prefix,
+      buffer, buffer_capacity, "%s%d", prefix,
       static_cast<int32_t>(iree_hal_element_bit_count(element_type)));
   if (n < 0) {
     return IREE_STATUS_FAILED_PRECONDITION;
   }
-  if (out_length) {
-    *out_length = n;
+  if (out_buffer_length) {
+    *out_buffer_length = n;
   }
-  return n >= capacity ? IREE_STATUS_OUT_OF_RANGE : IREE_STATUS_OK;
+  return n >= buffer_capacity ? IREE_STATUS_OUT_OF_RANGE : IREE_STATUS_OK;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -133,7 +135,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 IREE_HAL_API_RETAIN_RELEASE(allocator, Allocator);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
-    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_device_size_t* out_allocation_size) {
   if (!out_allocation_size) {
@@ -154,9 +156,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
-    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    const int32_t* indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* indices, iree_host_size_t indices_count,
     iree_device_size_t* out_offset) {
   if (!out_offset) {
     return IREE_STATUS_INVALID_ARGUMENT;
@@ -188,10 +190,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
-    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    const int32_t* start_indices, iree_host_size_t indices_count,
-    const int32_t* lengths, iree_host_size_t lengths_count,
+    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_device_size_t* out_start_offset, iree_device_size_t* out_length) {
   if (!out_start_offset || !out_length) {
     return IREE_STATUS_INVALID_ARGUMENT;
@@ -206,7 +208,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
   }
 
   // TODO(benvanik): layout/padding.
-  absl::InlinedVector<int32_t, 6> end_indices(shape_rank);
+  absl::InlinedVector<iree_hal_dim_t, 6> end_indices(shape_rank);
   iree_device_size_t element_size = iree_hal_element_byte_count(element_type);
   iree_device_size_t subspan_length = element_size;
   for (int i = 0; i < lengths_count; ++i) {
@@ -520,7 +522,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 IREE_HAL_API_RETAIN_RELEASE(buffer_view, iree_hal_buffer_view);
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, const int32_t* shape,
+    iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_create");
@@ -538,7 +540,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
   // Note that we have the dynamically-sized shape dimensions on the end.
   iree_hal_buffer_view* buffer_view = nullptr;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(*buffer_view) + sizeof(int32_t) * shape_rank,
+      allocator, sizeof(*buffer_view) + sizeof(iree_hal_dim_t) * shape_rank,
       reinterpret_cast<void**>(&buffer_view)));
   new (buffer_view) iree_hal_buffer_view();
   buffer_view->allocator = allocator;
@@ -558,10 +560,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
-    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
-    iree_host_size_t indices_count, const int32_t* lengths,
-    iree_host_size_t lengths_count, iree_allocator_t allocator,
-    iree_hal_buffer_view_t** out_buffer_view) {
+    const iree_hal_buffer_view_t* buffer_view,
+    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
+    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
   if (!out_buffer_view) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -606,9 +608,19 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
   return buffer_view->shape[index];
 }
 
+IREE_API_EXPORT iree_host_size_t
+iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view) {
+  CHECK(buffer_view) << "NULL buffer_view handle";
+  iree_host_size_t element_count = 1;
+  for (iree_host_size_t i = 0; i < buffer_view->shape_rank; ++i) {
+    element_count *= buffer_view->shape[i];
+  }
+  return element_count;
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
-    int32_t* out_shape, iree_host_size_t* out_shape_rank) {
+    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
   if (out_shape_rank) {
     *out_shape_rank = 0;
   }
@@ -649,7 +661,7 @@ iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view) {
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
-    const iree_hal_buffer_view_t* buffer_view, const int32_t* indices,
+    const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset) {
   if (!buffer_view) {
     return IREE_STATUS_INVALID_ARGUMENT;
@@ -661,10 +673,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
-    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
-    iree_host_size_t indices_count, const int32_t* lengths,
-    iree_host_size_t lengths_count, iree_device_size_t* out_start_offset,
-    iree_device_size_t* out_length) {
+    const iree_hal_buffer_view_t* buffer_view,
+    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
+    iree_device_size_t* out_start_offset, iree_device_size_t* out_length) {
   if (!buffer_view) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
