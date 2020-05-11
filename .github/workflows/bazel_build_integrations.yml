@@ -27,8 +27,8 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
-        with:
-          submodules: true
+      - name: Initializing submodules
+        run: ./scripts/git/submodule_versions.py init
       - name: Building and testing with bazel
         run: |
           # Build and test everything in the integrations/ directory not explicitly
