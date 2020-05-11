@@ -108,12 +108,14 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   // TODO(benvanik): run symbol DCE pass.
 }
 
-static PassPipelineRegistration<> transformPassPipeline(
-    "iree-vmla-transformation-pipeline",
-    "Runs the full IREE VMLA dialect transformation pipeline",
-    [](OpPassManager &passManager) {
-      buildVMLATransformPassPipeline(passManager);
-    });
+void createVMLATransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-vmla-transformation-pipeline",
+      "Runs the full IREE VMLA dialect transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildVMLATransformPassPipeline(passManager);
+      });
+}
 
 }  // namespace VMLA
 }  // namespace IREE

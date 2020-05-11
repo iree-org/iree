@@ -44,6 +44,8 @@ namespace VMLA {
 //   <serialize VM module>
 void buildVMLATransformPassPipeline(OpPassManager &passManager);
 
+void createVMLATransformPassPipeline();
+
 //===----------------------------------------------------------------------===//
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
@@ -67,6 +69,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerVMLAPasses() {
+  createVMLATransformPassPipeline();
   createUnrollReductionsPass();
   createConversionPass();
   createPreConversionLoweringPass();
