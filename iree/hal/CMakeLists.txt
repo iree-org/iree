@@ -56,6 +56,7 @@ iree_cc_library(
     iree::base::ref_ptr
     iree::base::shape
     iree::base::tracing
+    iree::hal::host::host_local_allocator
   PUBLIC
 )
 
@@ -67,6 +68,22 @@ iree_cc_library(
   DEPS
     iree::base::api_hdrs
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    api_string_util_test
+  SRCS
+    "api_string_util_test.cc"
+  DEPS
+    ::api
+    absl::inlined_vector
+    absl::strings
+    iree::base::api_util
+    iree::base::memory
+    iree::base::status
+    iree::base::status_matchers
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

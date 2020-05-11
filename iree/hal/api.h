@@ -55,8 +55,8 @@ typedef struct {
 } iree_hal_mapped_memory_t;
 
 // A bitfield specifying properties for a memory type.
-typedef enum {
-  IREE_HAL_MEMORY_TYPE_NONE = 0,
+enum iree_hal_memory_type_e {
+  IREE_HAL_MEMORY_TYPE_NONE = 0u,
 
   // Memory is lazily allocated by the device and only exists transiently.
   // This is the optimal mode for memory used only within a single command
@@ -69,16 +69,16 @@ typedef enum {
   // it set _may_ return the same as if it had not be set. Certain allocation
   // routines may use the hint to more tightly control reuse or defer wiring the
   // memory.
-  IREE_HAL_MEMORY_TYPE_TRANSIENT = 1 << 0,
+  IREE_HAL_MEMORY_TYPE_TRANSIENT = 1u << 0,
 
   // Memory allocated with this type can be mapped for host access using
   // iree_hal_buffer_map.
-  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE = 1 << 1,
+  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE = 1u << 1,
 
   // The host cache management commands MappedMemory::Flush and
   // MappedMemory::Invalidate are not needed to flush host writes
   // to the device or make device writes visible to the host, respectively.
-  IREE_HAL_MEMORY_TYPE_HOST_COHERENT = 1 << 2,
+  IREE_HAL_MEMORY_TYPE_HOST_COHERENT = 1u << 2,
 
   // Memory allocated with this type is cached on the host. Host memory
   // accesses to uncached memory are slower than to cached memory, however
@@ -86,7 +86,7 @@ typedef enum {
   // to ensure the device has visibility into any changes made on the host and
   // Invalidate must be used to ensure the host has visibility into any changes
   // made on the device.
-  IREE_HAL_MEMORY_TYPE_HOST_CACHED = 1 << 3,
+  IREE_HAL_MEMORY_TYPE_HOST_CACHED = 1u << 3,
 
   // Memory is accessible as normal host allocated memory.
   IREE_HAL_MEMORY_TYPE_HOST_LOCAL =
@@ -97,7 +97,7 @@ typedef enum {
   // IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL. Though an allocation may be visible to
   // the device and therefore useable for execution it may require expensive
   // mapping or implicit transfers.
-  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE = 1 << 4,
+  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE = 1u << 4,
 
   // Memory allocated with this type is the most efficient for device access.
   // Devices may support using memory that is not device local via
@@ -105,26 +105,27 @@ typedef enum {
   // performance penalties. Device local memory, on the other hand, is
   // guaranteed to be fast for all operations.
   IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL =
-      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | (1 << 5),
-} iree_hal_memory_type_t;
+      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | (1u << 5),
+};
+typedef uint32_t iree_hal_memory_type_t;
 
 // A bitfield specifying how memory will be accessed in a mapped memory region.
-typedef enum {
+enum iree_hal_memory_access_e {
   // Memory is not mapped.
-  IREE_HAL_MEMORY_ACCESS_NONE = 0,
+  IREE_HAL_MEMORY_ACCESS_NONE = 0u,
   // Memory will be read.
   // If a buffer is only mapped for reading it may still be possible to write to
   // it but the results will be undefined (as it may present coherency issues).
-  IREE_HAL_MEMORY_ACCESS_READ = 1 << 0,
+  IREE_HAL_MEMORY_ACCESS_READ = 1u << 0,
   // Memory will be written.
   // If a buffer is only mapped for writing it may still be possible to read
   // from it but the results will be undefined or incredibly slow (as it may
   // be mapped by the driver as uncached).
-  IREE_HAL_MEMORY_ACCESS_WRITE = 1 << 1,
+  IREE_HAL_MEMORY_ACCESS_WRITE = 1u << 1,
   // Memory will be discarded prior to mapping.
   // The existing contents will be undefined after mapping and must be written
   // to ensure validity.
-  IREE_HAL_MEMORY_ACCESS_DISCARD = 1 << 2,
+  IREE_HAL_MEMORY_ACCESS_DISCARD = 1u << 2,
   // Memory will be discarded and completely overwritten in a single operation.
   IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE =
       IREE_HAL_MEMORY_ACCESS_WRITE | IREE_HAL_MEMORY_ACCESS_DISCARD,
@@ -132,25 +133,26 @@ typedef enum {
   // storage being accessed may alias with other accesses occurring concurrently
   // within or across operations. The lack of the flag indicates that the access
   // is guaranteed not to alias (ala C's `restrict` keyword).
-  IREE_HAL_MEMORY_ACCESS_MAY_ALIAS = 1 << 3,
+  IREE_HAL_MEMORY_ACCESS_MAY_ALIAS = 1u << 3,
   // Memory may have any operation performed on it.
   IREE_HAL_MEMORY_ACCESS_ALL = IREE_HAL_MEMORY_ACCESS_READ |
                                IREE_HAL_MEMORY_ACCESS_WRITE |
                                IREE_HAL_MEMORY_ACCESS_DISCARD,
-} iree_hal_memory_access_t;
+};
+typedef uint32_t iree_hal_memory_access_t;
 
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
 // efficient operations of the specified types.
-typedef enum {
-  IREE_HAL_BUFFER_USAGE_NONE = 0,
+enum iree_hal_buffer_usage_e {
+  IREE_HAL_BUFFER_USAGE_NONE = 0u,
 
   // The buffer, once defined, will not be mapped or updated again.
   // This should be used for uniform parameter values such as runtime
   // constants for executables. Doing so may allow drivers to inline values or
   // represent them in command buffers more efficiently (avoiding memory reads
   // or swapping, etc).
-  IREE_HAL_BUFFER_USAGE_CONSTANT = 1 << 0,
+  IREE_HAL_BUFFER_USAGE_CONSTANT = 1u << 0,
 
   // The buffer can be used as the source or target of a transfer command
   // (CopyBuffer, UpdateBuffer, etc).
@@ -158,7 +160,7 @@ typedef enum {
   // If |IREE_HAL_BUFFER_USAGE_MAPPING| is not specified drivers may safely
   // assume that the host may never need visibility of this buffer as all
   // accesses will happen via command buffers.
-  IREE_HAL_BUFFER_USAGE_TRANSFER = 1 << 1,
+  IREE_HAL_BUFFER_USAGE_TRANSFER = 1u << 1,
 
   // The buffer can be mapped by the host application for reading and writing.
   //
@@ -166,17 +168,18 @@ typedef enum {
   // calls to enable visibility the driver can use the presence (or lack of)
   // this flag to perform allocation-type setup and avoid initial mapping
   // overhead.
-  IREE_HAL_BUFFER_USAGE_MAPPING = 1 << 2,
+  IREE_HAL_BUFFER_USAGE_MAPPING = 1u << 2,
 
   // The buffer can be provided as an input or output to an executable.
   // Buffers of this type may be directly used by drivers during dispatch.
-  IREE_HAL_BUFFER_USAGE_DISPATCH = 1 << 3,
+  IREE_HAL_BUFFER_USAGE_DISPATCH = 1u << 3,
 
   // Buffer may be used for any operation.
   IREE_HAL_BUFFER_USAGE_ALL = IREE_HAL_BUFFER_USAGE_TRANSFER |
                               IREE_HAL_BUFFER_USAGE_MAPPING |
                               IREE_HAL_BUFFER_USAGE_DISPATCH,
-} iree_hal_buffer_usage_t;
+};
+typedef uint32_t iree_hal_buffer_usage_t;
 
 // An opaque driver-specific handle to identify different devices.
 typedef uintptr_t iree_hal_device_id_t;
@@ -190,28 +193,31 @@ typedef struct {
 } iree_hal_device_info_t;
 
 // A bitfield specifying the mode of operation for a command buffer.
-typedef enum {
+enum iree_hal_command_buffer_mode_e {
   // Command buffer will be submitted once and never used again.
   // This may enable in-place patching of command buffers that reduce overhead
   // when it's known that command buffers will not be reused.
-  IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT = 1 << 0,
-} iree_hal_command_buffer_mode_t;
+  IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT = 1u << 0,
+};
+typedef uint32_t iree_hal_command_buffer_mode_t;
 
 // A bitfield specifying the category of commands in a command queue.
-typedef enum {
+enum iree_hal_command_category_e {
   // Command is considered a transfer operation (memcpy, etc).
-  IREE_HAL_COMMAND_CATEGORY_TRANSFER = 1 << 0,
+  IREE_HAL_COMMAND_CATEGORY_TRANSFER = 1u << 0,
   // Command is considered a dispatch operation (dispatch/execute).
-  IREE_HAL_COMMAND_CATEGORY_DISPATCH = 1 << 1,
-} iree_hal_command_category_t;
+  IREE_HAL_COMMAND_CATEGORY_DISPATCH = 1u << 1,
+};
+typedef uint32_t iree_hal_command_category_t;
 
 // Specifies the type of a descriptor in a descriptor set.
-typedef enum {
-  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
-  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
-  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
-  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
-} iree_hal_descriptor_type_t;
+enum iree_hal_descriptor_type_e {
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6u,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7u,
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8u,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9u,
+};
+typedef uint32_t iree_hal_descriptor_type_t;
 
 // Specifies a descriptor set binding.
 // The range specified by [offset, length) will be made available to executables
@@ -243,12 +249,13 @@ typedef struct {
 } iree_hal_descriptor_set_binding_t;
 
 // Specifies the usage type of the descriptor set.
-typedef enum {
+enum iree_hal_descriptor_set_layout_usage_type_e {
   // Descriptor set will be initialized once and never changed.
-  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE = 0,
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE = 0u,
   // Descriptor set is never created and instead used with push descriptors.
-  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY = 1,
-} iree_hal_descriptor_set_layout_usage_type_t;
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY = 1u,
+};
+typedef uint32_t iree_hal_descriptor_set_layout_usage_type_t;
 
 // Specifies a descriptor set layout binding.
 //
@@ -267,35 +274,35 @@ typedef struct {
 typedef uint32_t iree_hal_executable_format_t;
 
 // Defines how the executable cache performs preparation.
-typedef enum {
+enum iree_hal_executable_caching_mode_e {
   // Allows the cache to reference the provided executable_data after it has
   // prepared the executable. Callers must ensure the data remains valid for the
   // lifetime of the cache. If memory mapping constant executable data from
   // disk this can be used to avoid copies.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA = 1 << 0,
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA = 1u << 0,
   // Allows the prepared executable to be cached persistently (on disk/etc).
   // Enable for any executable that is likely to be used in future runs.
   // Note that not all caches support persistent serialization and this is just
   // a hint.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING = 1 << 1,
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING = 1u << 1,
   // Allows the cache to optimize the executable as much as it can.
   // This may cause preparation to take significantly longer while (hopefully)
   // improving runtime performance. Avoid for one-shot executables.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION = 1 << 2,
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION = 1u << 2,
   // Enables Executable debugging methods if supported by the device and
   // executable. This may disable certain optimizations or retain additional
   // data to allow disassembly, stepping, etc.
   //
   // Device must support the DeviceFeature::kDebugging feature and executables
   // must support the ExecutableFeature::kDebugging feature.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_DEBUGGING = 1 << 3,
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_DEBUGGING = 1u << 3,
   // Enables Executable coverage if supported by the device and executable.
   // Depending on the optimization mode this may produce partial coverage
   // results (for example, when certain source operations were optimized away).
   //
   // Device must support the DeviceFeature::kCoverage feature and executables
   // must support the ExecutableFeature::kCoverage feature.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE = 1 << 4,
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE = 1u << 4,
   // Enables Executable profiling if supported by the device and executable.
   // Depending on the optimization mode this may produce partial profiling
   // results. Profiling attribution (whether to the entire executable or
@@ -303,56 +310,59 @@ typedef enum {
   //
   // Device must support the DeviceFeature::kProfiling feature and executables
   // must support the ExecutableFeature::kProfiling feature.
-  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1 << 5,
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1u << 5,
   // Default caching mode.
   IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT =
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING |
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION,
-} iree_hal_executable_caching_mode_t;
+};
+typedef uint32_t iree_hal_executable_caching_mode_t;
 
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
-typedef enum {
+enum iree_hal_execution_stage_e {
   // Top of the pipeline when commands are initially issued by the device.
-  IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE = 1 << 0,
+  IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE = 1u << 0,
   // Stage of the pipeline when dispatch parameter data is consumed.
-  IREE_HAL_EXECUTION_STAGE_COMMAND_PROCESS = 1 << 1,
+  IREE_HAL_EXECUTION_STAGE_COMMAND_PROCESS = 1u << 1,
   // Stage where dispatch commands execute.
-  IREE_HAL_EXECUTION_STAGE_DISPATCH = 1 << 2,
+  IREE_HAL_EXECUTION_STAGE_DISPATCH = 1u << 2,
   // Stage where transfer (copy/clear/fill/etc) commands execute.
-  IREE_HAL_EXECUTION_STAGE_TRANSFER = 1 << 3,
+  IREE_HAL_EXECUTION_STAGE_TRANSFER = 1u << 3,
   // Final stage in the pipeline when commands are retired on the device.
-  IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE = 1 << 4,
+  IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE = 1u << 4,
   // Pseudo-stage for read/writes by the host. Not executed on device.
-  IREE_HAL_EXECUTION_STAGE_HOST = 1 << 5,
-} iree_hal_execution_stage_t;
+  IREE_HAL_EXECUTION_STAGE_HOST = 1u << 5,
+};
+typedef uint32_t iree_hal_execution_stage_t;
 
 // Bitfield specifying which scopes will access memory and how.
 //
 // Maps to VkAccessFlagBits.
-typedef enum {
+enum iree_hal_access_scope_e {
   // Read access to indirect command data as part of an indirect dispatch.
-  IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ = 1 << 0,
+  IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ = 1u << 0,
   // Constant uniform buffer reads by the device.
-  IREE_HAL_ACCESS_SCOPE_CONSTANT_READ = 1 << 1,
+  IREE_HAL_ACCESS_SCOPE_CONSTANT_READ = 1u << 1,
   // Storage buffer reads by dispatch commands.
-  IREE_HAL_ACCESS_SCOPE_DISPATCH_READ = 1 << 2,
+  IREE_HAL_ACCESS_SCOPE_DISPATCH_READ = 1u << 2,
   // Storage buffer writes by dispatch commands.
-  IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE = 1 << 3,
+  IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE = 1u << 3,
   // Source of a transfer operation.
-  IREE_HAL_ACCESS_SCOPE_TRANSFER_READ = 1 << 4,
+  IREE_HAL_ACCESS_SCOPE_TRANSFER_READ = 1u << 4,
   // Target of a transfer operation.
-  IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE = 1 << 5,
+  IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE = 1u << 5,
   // Read operation by the host through mapped memory.
-  IREE_HAL_ACCESS_SCOPE_HOST_READ = 1 << 6,
+  IREE_HAL_ACCESS_SCOPE_HOST_READ = 1u << 6,
   // Write operation by the host through mapped memory.
-  IREE_HAL_ACCESS_SCOPE_HOST_WRITE = 1 << 7,
+  IREE_HAL_ACCESS_SCOPE_HOST_WRITE = 1u << 7,
   // External/non-specific read.
-  IREE_HAL_ACCESS_SCOPE_MEMORY_READ = 1 << 8,
+  IREE_HAL_ACCESS_SCOPE_MEMORY_READ = 1u << 8,
   // External/non-specific write.
-  IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE = 1 << 9,
-} iree_hal_access_scope_t;
+  IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE = 1u << 9,
+};
+typedef uint32_t iree_hal_access_scope_t;
 
 // Defines a global memory barrier.
 // These are cheaper to encode than buffer-specific barriers but may cause
@@ -390,13 +400,14 @@ typedef struct {
 
 // LINT.IfChange(element_type)
 
-typedef enum {
-  IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00,
-  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01,
-  IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02,
+enum iree_hal_numerical_type_e {
+  IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00u,
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01u,
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02u,
   // TODO(benvanik): specialize with semantics from APFloat.
-  IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE = 0x03,
-} iree_hal_numerical_type_t;
+  IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE = 0x03u,
+};
+typedef uint8_t iree_hal_numerical_type_t;
 
 #define IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count) \
   (((uint32_t)(numerical_type) << 24) | (uint32_t)(bit_count))
@@ -415,11 +426,11 @@ typedef enum {
 // Composed as a 32-bit bitfield to allow for opaque data types. Use
 // iree_hal_make_element_type to make a bitfield with the appropriate ordering.
 //
-//   MSB --------------------------------- LSB
-//   [numerical type] [x] [x] [number of bits]
+//   MSB ----------------------------------------------- LSB
+//   [numerical type] [reserved] [reserved] [number of bits]
 //
 // clang-format off
-typedef enum {
+enum iree_hal_element_type_e {
   IREE_HAL_ELEMENT_TYPE_NONE             = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             0),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_8         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             8),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
@@ -436,16 +447,34 @@ typedef enum {
   IREE_HAL_ELEMENT_TYPE_FLOAT_16         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         16),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_FLOAT_32         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         32),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_FLOAT_64         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         64),  // NOLINT
-} iree_hal_element_type_t;
+};
+typedef uint32_t iree_hal_element_type_t;
 // clang-format on
 
 // LINT.ThenChange(https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
+
+// A dimension within a shape.
+typedef int32_t iree_hal_dim_t;
 
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_API_NO_PROTOTYPES
+
+// Parses a serialized set of shape dimensions using the canonical shape format
+// (the same as produced by iree_hal_format_shape).
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
+    iree_string_view_t value, iree_host_size_t shape_capacity,
+    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank);
+
+// Converts shape dimensions into a `4x5x6` format.
+//
+// Follows the standard API string formatting rules. See iree/base/api.h.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
+                      iree_host_size_t buffer_capacity, char* buffer,
+                      iree_host_size_t* out_buffer_length);
 
 // Parses a serialized iree_hal_element_type_t and sets |out_element_type| if
 // it is valid. The format is the same as produced by
@@ -455,11 +484,62 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
 
 // Converts an iree_hal_element_type_t enum value to a canonical string
 // representation, like `IREE_HAL_ELEMENT_TYPE_FLOAT_16` to `f16`.
-// |capacity| defines the size of |buffer| in bytes and |out_length| will return
-// the string length in characters.
+// |buffer_capacity| defines the size of |buffer| in bytes and
+// |out_buffer_length| will return the string length in characters.
+//
+// Follows the standard API string formatting rules. See iree/base/api.h.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
-    iree_hal_element_type_t element_type, iree_host_size_t capacity,
-    char* buffer, iree_host_size_t* out_length);
+    iree_hal_element_type_t element_type, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length);
+
+// Parses a serialized element of |element_type| to its in-memory form.
+// |data_ptr| must be at least large enough to contain the bytes of the element.
+// For example, "1.2" of type IREE_HAL_ELEMENT_TYPE_FLOAT32 will write the 4
+// byte float value of 1.2 to |data_ptr|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(
+    iree_string_view_t data_str, iree_hal_element_type_t element_type,
+    iree_byte_span_t data_ptr);
+
+// Converts a single element of |element_type| to a string.
+//
+// |buffer_capacity| defines the size of |buffer| in bytes and
+// |out_buffer_length| will return the string length in characters. Returns
+// IREE_STATUS_OUT_OF_RANGE if the buffer capacity is insufficient to hold the
+// formatted elements and |out_buffer_length| will contain the required size.
+//
+// Follows the standard API string formatting rules. See iree/base/api.h.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
+    iree_const_byte_span_t data, iree_hal_element_type_t element_type,
+    iree_host_size_t buffer_capacity, char* buffer,
+    iree_host_size_t* out_buffer_length);
+
+// Parses a serialized set of elements of the given |element_type|.
+// The resulting parsed data is written to |data_ptr|, which must be at least
+// large enough to contain the parsed elements. The format is the same as
+// produced by iree_hal_format_buffer_elements. Supports additional inputs of
+// empty to denote a 0 fill and a single element to denote a splat.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
+    iree_string_view_t data_str, iree_hal_element_type_t element_type,
+    iree_byte_span_t data_ptr);
+
+// Converts a shaped buffer of |element_type| elements to a string.
+// This will include []'s to denote each dimension, for example for a shape of
+// 2x3 the elements will be formatted as `[1 2 3][4 5 6]`.
+//
+// |max_element_count| can be used to limit the total number of elements printed
+// when the count may be large. Elided elements will be replaced with `...`.
+//
+// |buffer_capacity| defines the size of |buffer| in bytes and
+// |out_buffer_length| will return the string length in characters. Returns
+// IREE_STATUS_OUT_OF_RANGE if the buffer capacity is insufficient to hold the
+// formatted elements and |out_buffer_length| will contain the required size.
+//
+// Follows the standard API string formatting rules. See iree/base/api.h.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
+    iree_const_byte_span_t data, const iree_hal_dim_t* shape,
+    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -468,6 +548,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a host-local heap allocator that can be used when buffers are
+// required that will not interact with a real hardware device (such as those
+// used in file IO or tests). Buffers allocated with this will not be compatible
+// with real device allocators and will likely incur a copy if used.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_allocator_create_host_local(iree_allocator_t allocator,
+                                     iree_hal_allocator** out_allocator);
 
 // Retains the given |allocator| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -479,23 +567,23 @@ iree_hal_allocator_release(iree_hal_allocator_t* allocator);
 
 // Calculates the allocation size of a buffer.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
-    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_device_size_t* out_allocation_size);
 
 // Calculates a byte offset into a buffer at the given indices.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
-    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    const int32_t* indices, size_t indices_count,
+    const iree_hal_dim_t* indices, size_t indices_count,
     iree_device_size_t* out_offset);
 
 // Calculates a byte range into a buffer of the given contiguous range.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
-    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    const int32_t* start_indices, iree_host_size_t indices_count,
-    const int32_t* lengths, iree_host_size_t lengths_count,
+    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_device_size_t* out_start_offset, iree_device_size_t* out_length);
 
 // Allocates a buffer from the allocator.
@@ -658,19 +746,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 
 #ifndef IREE_API_NO_PROTOTYPES
 
-// Creates a buffer view with the given |buffer|, which may be nullptr.
+// Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, const int32_t* shape, size_t shape_rank,
-    iree_hal_element_type_t element_type, iree_allocator_t allocator,
-    iree_hal_buffer_view_t** out_buffer_view);
+    iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
+    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
 
 // Creates a buffer view referencing a subview of the given |buffer_view|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
-    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
-    iree_host_size_t indices_count, const int32_t* lengths,
-    iree_host_size_t lengths_count, iree_allocator_t allocator,
-    iree_hal_buffer_view_t** out_buffer_view);
+    const iree_hal_buffer_view_t* buffer_view,
+    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
+    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -700,7 +788,11 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
 // |out_shape_rank| can be omitted if the rank is already known.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
-    int32_t* out_shape, iree_host_size_t* out_shape_rank);
+    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank);
+
+// Returns the total number of elements stored in the view.
+IREE_API_EXPORT iree_host_size_t
+iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the element type of the buffer.
 IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
@@ -718,15 +810,40 @@ iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view);
 
 // Calculates a byte offset into the |buffer_view| at the given indices.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
-    const iree_hal_buffer_view_t* buffer_view, const int32_t* indices,
+    const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset);
 
 // Calculates a byte range into the |buffer_view| of the given contiguous range.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
-    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
-    iree_host_size_t indices_count, const int32_t* lengths,
-    iree_host_size_t lengths_count, iree_device_size_t* out_start_offset,
-    iree_device_size_t* out_length);
+    const iree_hal_buffer_view_t* buffer_view,
+    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
+    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
+    iree_device_size_t* out_start_offset, iree_device_size_t* out_length);
+
+// Parses a serialized set of buffer elements in the canonical tensor format
+// (the same as produced by iree_hal_buffer_view_format). The underlying buffer
+// will be allocated with |buffer_allocator| as a host-local/device-visible
+// buffer.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
+    iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
+    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
+
+// Converts buffer view elements into a fully-specified string-form format like
+// `2x4xi16=[[1 2][3 4]]`.
+//
+// |max_element_count| can be used to limit the total number of elements printed
+// when the count may be large. Elided elements will be replaced with `...`.
+//
+// |buffer_capacity| defines the size of |buffer| in bytes and
+// |out_buffer_length| will return the string length in characters. Returns
+// IREE_STATUS_OUT_OF_RANGE if the buffer capacity is insufficient to hold the
+// formatted elements and |out_buffer_length| will contain the required size.
+//
+// Follows the standard API string formatting rules. See iree/base/api.h.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
+    const iree_hal_buffer_view_t* buffer_view,
+    iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

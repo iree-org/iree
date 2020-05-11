@@ -103,10 +103,8 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
   auto result = FromApiStatus(iree_vm_context_create_with_modules(
                                   instance, modules.data(), modules.size(),
                                   IREE_ALLOCATOR_SYSTEM, &context_),
-                              IREE_LOC);
-  if (!result.ok()) {
-    result = Annotate(result, "Failed resolving imports for executable module");
-  }
+                              IREE_LOC)
+                << "Failed resolving imports for executable module";
   iree_vm_module_release(bytecode_module);
   RETURN_IF_ERROR(result);
 

@@ -58,6 +58,7 @@ cc_library(
         "//iree/base:ref_ptr",
         "//iree/base:shape",
         "//iree/base:tracing",
+        "//iree/hal/host:host_local_allocator",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
@@ -68,6 +69,21 @@ cc_library(
     hdrs = ["api.h"],
     deps = [
         "//iree/base:api_hdrs",
+    ],
+)
+
+cc_test(
+    name = "api_string_util_test",
+    srcs = ["api_string_util_test.cc"],
+    deps = [
+        ":api",
+        "//iree/base:api_util",
+        "//iree/base:memory",
+        "//iree/base:status",
+        "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
     ],
 )
 

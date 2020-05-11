@@ -17,7 +17,6 @@
 #include "absl/base/macros.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
-#include "absl/strings/str_join.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
@@ -31,11 +30,6 @@
 namespace iree {
 namespace hal {
 namespace {
-
-// Pretty prints an array, e.g. [1, 2, 3, 4]
-static std::string PrettyPrint(absl::Span<const int32_t> arr) {
-  return "[" + absl::StrJoin(arr, ",") + "]";
-}
 
 //===----------------------------------------------------------------------===//
 // Type registration

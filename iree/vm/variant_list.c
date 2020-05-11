@@ -55,7 +55,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_variant_list_init(
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_variant_list_free(iree_vm_variant_list_t* list) {
-  for (int i = 0; i < list->count; ++i) {
+  for (iree_host_size_t i = 0; i < list->count; ++i) {
     if (IREE_VM_VARIANT_IS_REF(&list->values[i])) {
       iree_vm_ref_release(&list->values[i].ref);
     }
@@ -73,7 +73,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_variant_list_append_value(
   if (list->count + 1 > list->capacity) {
     return IREE_STATUS_OUT_OF_RANGE;
   }
-  int i = list->count++;
+  iree_host_size_t i = list->count++;
   list->values[i].value_type = value.type;
   list->values[i].ref_type = IREE_VM_REF_TYPE_NULL;
   list->values[i].i32 = value.i32;
@@ -86,7 +86,7 @@ iree_vm_variant_list_append_ref_retain(iree_vm_variant_list_t* list,
   if (list->count + 1 > list->capacity) {
     return IREE_STATUS_OUT_OF_RANGE;
   }
-  int i = list->count++;
+  iree_host_size_t i = list->count++;
   list->values[i].value_type = IREE_VM_VALUE_TYPE_NONE;
   list->values[i].ref_type = ref->type;
   iree_vm_ref_retain(ref, &list->values[i].ref);
@@ -99,7 +99,7 @@ iree_vm_variant_list_append_ref_move(iree_vm_variant_list_t* list,
   if (list->count + 1 > list->capacity) {
     return IREE_STATUS_OUT_OF_RANGE;
   }
-  int i = list->count++;
+  iree_host_size_t i = list->count++;
   list->values[i].value_type = IREE_VM_VALUE_TYPE_NONE;
   list->values[i].ref_type = ref->type;
   iree_vm_ref_move(ref, &list->values[i].ref);
@@ -111,7 +111,7 @@ iree_vm_variant_list_append_null_ref(iree_vm_variant_list_t* list) {
   if (list->count + 1 > list->capacity) {
     return IREE_STATUS_OUT_OF_RANGE;
   }
-  int i = list->count++;
+  iree_host_size_t i = list->count++;
   list->values[i].value_type = IREE_VM_VALUE_TYPE_NONE;
   list->values[i].ref_type = IREE_VM_REF_TYPE_NULL;
   return IREE_STATUS_OK;

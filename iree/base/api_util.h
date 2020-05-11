@@ -32,7 +32,8 @@ inline iree_status_t ToApiStatus(const Status& status) {
   return iree_make_status(status.code());
 }
 
-inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
+inline StatusBuilder FromApiStatus(iree_status_t status_code,
+                                   SourceLocation loc) {
   return StatusBuilder(static_cast<StatusCode>(status_code), loc);
 }
 

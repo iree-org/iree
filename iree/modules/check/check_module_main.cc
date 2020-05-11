@@ -195,11 +195,12 @@ extern "C" int main(int argc, char** argv) {
   }
   auto input_file_path = std::string(argv[1]);
 
-  int ret = Run(std::move(input_file_path)).value();
-
+  auto ret_or = Run(std::move(input_file_path));
+  int ret = ret_or.ok() ? ret_or.value() : 1;
   if (absl::GetFlag(FLAGS_expect_failure)) {
     if (ret == 0) {
       std::cout << "Test passed but expected failure\n";
+      std::cout << ret_or.status();
       return 1;
     }
     std::cout << "Test failed as expected\n";

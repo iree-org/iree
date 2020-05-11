@@ -29,8 +29,8 @@ struct iree_hal_buffer_view final
   iree_hal_buffer_t* buffer = nullptr;
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_device_size_t byte_length = 0;
-  size_t shape_rank = 0;
-  int32_t shape[];
+  iree_host_size_t shape_rank = 0;
+  iree_hal_dim_t shape[];
 
   static void Delete(iree_hal_buffer_view* ptr) {
     iree_hal_buffer_release(ptr->buffer);

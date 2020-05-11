@@ -104,10 +104,11 @@ static iree_status_t iree_vm_invoke_empty_function(
 }
 
 static void iree_vm_context_release_modules(iree_vm_context_t* context,
-                                            iree_vm_stack_t* stack, int start,
-                                            int end) {
+                                            iree_vm_stack_t* stack,
+                                            iree_host_size_t start,
+                                            iree_host_size_t end) {
   // Run module __deinit functions, if present (in reverse init order).
-  for (int i = end; i >= start; --i) {
+  for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     iree_vm_module_state_t* module_state = context->list.module_states[i];
     if (!module_state) {
@@ -123,7 +124,7 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
   }
 
   // Release all module state (in reverse init order).
-  for (int i = end; i >= start; --i) {
+  for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     // It is possible in error states to have partially initialized.
     if (context->list.module_states[i]) {
@@ -133,7 +134,7 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
   }
 
   // Release modules now that there are no import tables remaining.
-  for (int i = end; i >= start; --i) {
+  for (int i = (int)end; i >= (int)start; --i) {
     if (context->list.modules[i]) {
       iree_vm_module_release(context->list.modules[i]);
     }
@@ -262,7 +263,7 @@ iree_vm_context_release(iree_vm_context_t* context) {
   return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT int32_t IREE_API_CALL
+IREE_API_EXPORT intptr_t IREE_API_CALL
 iree_vm_context_id(const iree_vm_context_t* context) {
   if (!context) {
     return -1;
@@ -340,8 +341,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
-  int orig_count = context->list.count;
-  for (int i = 0; i < module_count; ++i) {
+  iree_host_size_t orig_count = context->list.count;
+  for (iree_host_size_t i = 0; i < module_count; ++i) {
     iree_vm_module_t* module = modules[i];
     context->list.modules[orig_count + i] = module;
     context->list.module_states[orig_count + i] = NULL;
@@ -420,7 +421,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  for (int i = context->list.count - 1; i >= 0; --i) {
+  for (int i = (int)context->list.count - 1; i >= 0; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     if (iree_string_view_compare(module_name, iree_vm_module_name(module)) ==
         0) {
