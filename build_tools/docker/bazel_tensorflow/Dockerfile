@@ -1,0 +1,42 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Builds an image for running IREE on bazel with python bindings and tensorflow
+# integrations. Requires that the bazel image has already been built. Build
+# using:
+# docker build --tag bazel-tensorflow build_tools/docker/bazel_tensorflow/
+
+# Set up the image and working directory.
+FROM bazel
+WORKDIR /usr/src/git
+
+# Update python3 to 3.6
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt-get update
+RUN apt-get install -y python3.6 python3.6-dev
+
+# Replace with the block below with
+#     ENV PYTHON_BIN /usr/bin/python3.6
+# once PYTHON_BIN also controls Bazel's runtime interpreter (issue:
+# https://github.com/google/iree/issues/1875).
+# For now, create a symlink from correct python version to the system's python3
+# (which PYTHON_BIN currently points to).
+# This makes many things unhappy (e.g. add-apt-repository).
+RUN rm /usr/bin/python3
+RUN ln -s /usr/bin/python3.6 /usr/bin/python3
+
+# Install tensorflow and numpy
+RUN apt-get install -y python3-pip python3-setuptools
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install numpy tf-nightly

@@ -23,28 +23,8 @@ on:
 jobs:
   linux:
     runs-on: ubuntu-18.04
-    container: l.gcr.io/google/bazel:2.1.0
-    env:
-      CXX: clang++
-      CC: clang
-      PYTHON_BIN: /usr/bin/python3
+    container: gcr.io/iree-oss/bazel
     steps:
-      - name: Installing IREE dependencies
-        run: |
-          apt-get update
-          apt-get install -y clang libsdl2-dev
-      - name: Installing actions/checkout@v2 dependencies
-        run: |
-          # Update git to version >= 2.18 for actions/checkout@v2.
-          add-apt-repository ppa:git-core/ppa
-          apt-get update
-          apt-get install -y git
-      - name: Installing tensorflow dependencies
-        run: |
-          # Install python2 numpy. Temporary fix for issue #1737.
-          apt-get install -y python-pip
-          python -m pip install --upgrade pip
-          python -m pip install numpy
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Initializing submodules
