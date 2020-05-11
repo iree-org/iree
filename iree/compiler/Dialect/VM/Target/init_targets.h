@@ -21,8 +21,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 void registerToVMBytecodeTranslation();
-}  // namespace IREE
 }  // namespace VM
+}  // namespace IREE
 
 // This function should be called before creating any MLIRContext if one
 // expects all the possible target backends to be available. Custom tools can
