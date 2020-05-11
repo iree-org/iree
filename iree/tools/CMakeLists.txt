@@ -147,6 +147,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VMLA::IR::VMLADialect
       iree::compiler::Dialect::VMLA::Transforms
       iree::compiler::Dialect::Vulkan::IR
+      iree::compiler::Translation::IREEVM
     PUBLIC
   )
 
