@@ -47,6 +47,8 @@ namespace HAL {
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    TargetOptions executableOptions);
 
+void registerHALTransformPassPipeline();
+
 //===----------------------------------------------------------------------===//
 // Device management
 //===----------------------------------------------------------------------===//
@@ -102,6 +104,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 //===----------------------------------------------------------------------===//
 
 inline void registerHALPasses() {
+  registerHALTransformPassPipeline();
   auto executableOptions = getTargetOptionsFromFlags();
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
