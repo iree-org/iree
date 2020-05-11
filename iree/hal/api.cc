@@ -520,7 +520,6 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
         out_buffer_length);
   } else if (shape_rank > 1) {
     // Nested dimension; recurse into the next innermost dimension.
-    iree_hal_dim_t offset = 0;
     iree_hal_dim_t dim_length = 1;
     for (iree_host_size_t i = 1; i < shape_rank; ++i) {
       dim_length *= shape[i];

@@ -481,7 +481,7 @@ struct BufferView final
       shape.resize(actual_rank);
     } while (iree_status_is_out_of_range(status));
     DCHECK(iree_status_is_ok(status));
-    return std::move(shape);
+    return shape;
   }
 
   // Returns the total number of elements stored in the view.
