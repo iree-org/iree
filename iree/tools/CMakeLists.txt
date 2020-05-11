@@ -271,6 +271,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Dialect::VM::Transforms
       iree::compiler::Translation::IREEVM
       iree::hal::api
@@ -299,6 +300,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSupport
       MLIRTranslation
       iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::init_translations
     PUBLIC

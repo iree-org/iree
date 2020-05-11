@@ -13,3 +13,13 @@
 # limitations under the License.
 
 iree_add_all_subdirs()
+
+iree_cc_library(
+  NAME
+    init_targets
+  HDRS
+    "init_targets.h"
+  DEPS
+    iree::compiler::Dialect::VM::Target::Bytecode
+  PUBLIC
+)
