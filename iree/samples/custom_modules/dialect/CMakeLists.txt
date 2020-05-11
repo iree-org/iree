@@ -131,8 +131,8 @@ iree_cc_binary(
     ::init_dialect
     LLVMSupport
     MLIRIR
-    MLIRLoopOpsTransforms
     MLIRPass
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTranslation
     iree::compiler::Dialect::VM::Target::Bytecode

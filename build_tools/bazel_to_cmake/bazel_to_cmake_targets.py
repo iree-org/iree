@@ -48,6 +48,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:LoopsToGPUPass": ["MLIRLoopsToGPU"],
+    "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
+    "@llvm-project//mlir:SCFTransforms": ["MLIRSCFTransforms"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
     "@llvm-project//mlir:SPIRVTranslateRegistration": [

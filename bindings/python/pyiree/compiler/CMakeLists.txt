@@ -63,7 +63,7 @@ iree_pybind_cc_library(
     bindings::python::pyiree::common
     LLVMSupport
     MLIRIR
-    MLIRLoopOpsTransforms
+    MLIRSCFTransforms
     MLIRParser
     MLIRPass
   COPTS

@@ -120,10 +120,10 @@ if(${IREE_BUILD_COMPILER})
       MLIRLinalgToLLVM
       MLIRLinalgToSPIRVTransforms
       MLIRLinalgTransforms
-      MLIRLoopOps
-      MLIRLoopOpsTransforms
       MLIRLoopsToGPU
       MLIRQuant
+      MLIRSCF
+      MLIRSCFTransforms
       MLIRSDBM
       MLIRSPIRV
       MLIRSPIRVTransforms
@@ -255,7 +255,7 @@ if(${IREE_BUILD_COMPILER})
       ::vm_util
       LLVMSupport
       MLIRIR
-      MLIRLoopOpsTransforms
+      MLIRSCFTransforms
       MLIRParser
       MLIRPass
       MLIRSupport
@@ -295,7 +295,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_xla_dialects
       LLVMSupport
       MLIRIR
-      MLIRLoopOpsTransforms
+      MLIRSCFTransforms
       MLIRPass
       MLIRSupport
       MLIRTranslation
