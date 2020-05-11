@@ -486,6 +486,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 
 #ifndef IREE_API_NO_PROTOTYPES
 
+// Creates a host-local heap allocator that can be used when buffers are
+// required that will not interact with a real hardware device (such as those
+// used in file IO or tests). Buffers allocated with this will not be compatible
+// with real device allocators and will likely incur a copy if used.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_allocator_create_host_local(iree_allocator_t allocator,
+                                     iree_hal_allocator** out_allocator);
+
 // Retains the given |allocator| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_allocator_retain(iree_hal_allocator_t* allocator);

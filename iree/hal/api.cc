@@ -32,6 +32,7 @@
 #include "iree/hal/driver_registry.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/heap_buffer.h"
+#include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {
@@ -133,6 +134,18 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 //===----------------------------------------------------------------------===//
 
 IREE_HAL_API_RETAIN_RELEASE(allocator, Allocator);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_allocator_create_host_local(iree_allocator_t allocator,
+                                     iree_hal_allocator** out_allocator) {
+  IREE_TRACE_SCOPE0("iree_hal_allocator_create_host_local");
+  if (!out_allocator) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_allocator =
+      reinterpret_cast<iree_hal_allocator_t*>(new HostLocalAllocator());
+  return IREE_STATUS_OK;
+}
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
     const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
