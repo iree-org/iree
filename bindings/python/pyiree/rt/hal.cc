@@ -126,7 +126,7 @@ HalDevice HalDriver::CreateDefaultDevice() {
 
 void SetupHalBindings(pybind11::module m) {
   // Enums.
-  py::enum_<iree_hal_memory_type_t>(m, "MemoryType")
+  py::enum_<enum iree_hal_memory_type_e>(m, "MemoryType")
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
       .value("TRANSIENT", IREE_HAL_MEMORY_TYPE_TRANSIENT)
       .value("HOST_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
@@ -136,7 +136,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("DEVICE_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
       .value("DEVICE_LOCAL", IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
       .export_values();
-  py::enum_<iree_hal_buffer_usage_t>(m, "BufferUsage")
+  py::enum_<enum iree_hal_buffer_usage_e>(m, "BufferUsage")
       .value("NONE", IREE_HAL_BUFFER_USAGE_NONE)
       .value("CONSTANT", IREE_HAL_BUFFER_USAGE_CONSTANT)
       .value("TRANSFER", IREE_HAL_BUFFER_USAGE_TRANSFER)
@@ -144,7 +144,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("DISPATCH", IREE_HAL_BUFFER_USAGE_DISPATCH)
       .value("ALL", IREE_HAL_BUFFER_USAGE_ALL)
       .export_values();
-  py::enum_<iree_hal_memory_access_t>(m, "MemoryAccess")
+  py::enum_<enum iree_hal_memory_access_e>(m, "MemoryAccess")
       .value("NONE", IREE_HAL_MEMORY_ACCESS_NONE)
       .value("READ", IREE_HAL_MEMORY_ACCESS_READ)
       .value("WRITE", IREE_HAL_MEMORY_ACCESS_WRITE)
