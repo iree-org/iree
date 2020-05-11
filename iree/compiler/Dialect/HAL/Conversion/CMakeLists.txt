@@ -41,7 +41,8 @@ iree_cc_library(
   HDRS
     "Passes.h"
   DEPS
+    MLIRPass
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::Conversion::HALToVM
-    MLIRPass
+  PUBLIC
 )
