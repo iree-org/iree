@@ -28,3 +28,4 @@ iree/tools/web
 
 # TODO: enable this when Java bindings are wired up.
 bindings/java
+bindings/javatests
