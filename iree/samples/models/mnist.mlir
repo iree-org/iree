@@ -34,14 +34,14 @@ module attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, p
     %14 = "xla_hlo.dot"(%13, %7) : (tensor<1x128xf32>, tensor<128x10xf32>) -> tensor<1x10xf32>
     %15 = "xla_hlo.add"(%14, %6) {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
     %16 = "xla_hlo.reduce"(%15, %4) ( {
-    ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):	// no predecessors
+    ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
       %21 = xla_hlo.maximum %arg1, %arg2 : tensor<f32>
       "xla_hlo.return"(%21) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
     %17 = "xla_hlo.subtract"(%15, %16) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<1xf32>) -> tensor<1x10xf32>
     %18 = "xla_hlo.exponential"(%17) : (tensor<1x10xf32>) -> tensor<1x10xf32>
     %19 = "xla_hlo.reduce"(%18, %5) ( {
-    ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):	// no predecessors
+    ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
       %21 = xla_hlo.add %arg1, %arg2 : tensor<f32>
       "xla_hlo.return"(%21) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>

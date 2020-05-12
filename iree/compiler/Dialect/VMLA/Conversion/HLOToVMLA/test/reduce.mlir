@@ -14,7 +14,7 @@ func @single_reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> attributes { sym
   // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4]>)
   // CHECK-SaME: {dimension = 1 : i32} : f32
   %0 = "xla_hlo.reduce"(%arg0, %cst) ( {
-  ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):	// no predecessors
+  ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
     %1 = xla_hlo.add %arg1, %arg2 : tensor<f32>
     "xla_hlo.return"(%1) : (tensor<f32>) -> ()
   }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
