@@ -77,7 +77,7 @@ If these tests pass, you can skip down to the next section.
 ### Setting up the Vulkan Loader
 
 IREE relies on the `VK_KHR_timeline_semaphore` extension. The minimal loader
-version recognizes this extenion is `1.1.124`. So if you see failures regarding
+version supporting this extenion is `1.1.124`. So if you see failures regarding
 timeline semaphore, please also check to make sure the loader is at a proper
 version.
 

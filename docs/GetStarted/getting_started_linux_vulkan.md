@@ -126,7 +126,7 @@ $ export VK_LAYER_PATH=$PWD/bazel-bin/external/vulkan_extensionlayer/:$VK_LAYER_
 ### Setting up the Vulkan Loader
 
 IREE relies on the `VK_KHR_timeline_semaphore` extension. The minimal loader
-version recognizes this extenion is `1.1.124`. So if you see failures regarding
+version supporting this extenion is `1.1.124`. So if you see failures regarding
 timeline semaphore, in addtion to setting up the extension layer, please also
 check to make sure the loader is at a proper version.
 
