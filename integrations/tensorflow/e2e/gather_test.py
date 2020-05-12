@@ -21,6 +21,13 @@ class GatherModule(tf.Module):
 
   @tf.function(input_signature=[
       tf.TensorSpec([4, 8], tf.float32),
+      tf.TensorSpec([], tf.int32)
+  ])
+  def gather_axis0_scalar(self, params, indices):
+    return tf.gather(params, indices)
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([4, 8], tf.float32),
       tf.TensorSpec([2], tf.int32)
   ])
   def gather_axis0_batch0(self, params, indices):
@@ -43,6 +50,12 @@ class GatherModule(tf.Module):
 
 @tf_test_utils.compile_modules(backends=["tf"], gather=GatherModule)
 class GatherTest(tf_test_utils.SavedModelTestCase):
+
+  def test_gather_axis0_scalar(self):
+    indices = np.array(2, dtype=np.int32)
+    params = np.arange(32, dtype=np.float32).reshape(4, 8)
+    result = self.modules.gather.all.gather_axis0_scalar(params, indices)
+    result.print().assert_all_close()
 
   def test_gather_axis0_batch0(self):
     indices = np.array([2, 3], dtype=np.int32)

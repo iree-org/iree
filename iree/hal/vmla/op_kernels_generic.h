@@ -349,7 +349,9 @@ Status Gather::Execute(absl::Span<const T> src_buffer,
       dim > 0 ? output_strides[dim - 1] : output_strides[0];
   const size_t slize_size = input_strides[dim];
   const int indices_size =
-      indices_shape[batch_dims] * indices_strides[batch_dims];
+      indices_shape.size() == 0
+          ? 1
+          : indices_shape[batch_dims] * indices_strides[batch_dims];
   // This is equivalent to the linearized version of followng array expression:
   // clang-format off
   // dst[d_0,...,d_{dim-1},                     i_B,...,i_{M-1}, d_{dim+1},...,d_{N-1}] =
