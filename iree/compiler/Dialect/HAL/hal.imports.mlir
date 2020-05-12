@@ -403,4 +403,50 @@ vm.import @executable_layout.create(
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 
+//===----------------------------------------------------------------------===//
+// iree::hal::Semaphore
+//===----------------------------------------------------------------------===//
+
+// Returns a semaphore from the device pool with the given initial value.
+vm.import @semaphore.create(
+  %device : !vm.ref<!hal.device>,
+  %initial_value : i32
+) -> !vm.ref<!hal.semaphore>
+attributes {nosideeffects}
+
+// Queries the current payload and returns a tuple of `(status, value)`.
+// As the payload is monotonically increasing it is guaranteed that
+// the value is at least equal to the previous result of a
+// `hal.semaphore.signal` call and coherent with any waits for a
+// specified value via `hal.semaphore.await`.
+vm.import @semaphore.query(
+  %semaphore : !vm.ref<!hal.semaphore>
+) -> (i32, i32)
+
+// Signals the semaphore to the given payload value.
+// The call is ignored if the current payload value exceeds |new_value|.
+vm.import @semaphore.signal(
+  %semaphore : !vm.ref<!hal.semaphore>,
+  %new_value : i32
+)
+
+// Signals the semaphore with a failure. The |status| will be returned from
+// `hal.semaphore.query` and `hal.semaphore.signal` for the lifetime
+// of the semaphore.
+vm.import @semaphore.fail(
+  %semaphore : !vm.ref<!hal.semaphore>,
+  %status : i32
+)
+
+// Yields the caller until the semaphore reaches or exceeds the specified
+// payload |value|.
+//
+// Returns the status of the semaphore after the wait, with a non-zero value
+// indicating failure.
+vm.import @semaphore.await(
+  %semaphore : !vm.ref<!hal.semaphore>,
+  %min_value : i32
+) -> i32
+// TODO(benvanik): yield point trait.
+
 }  // module

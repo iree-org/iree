@@ -31,11 +31,9 @@ cc_library(
         "//iree/hal:command_queue",
         "//iree/hal:device",
         "//iree/hal:executable_cache",
-        "//iree/hal:fence",
+        "//iree/hal:semaphore",
         "//iree/hal/host:host_local_allocator",
-        "//third_party/dawn:dawn_headers",
         "//third_party/dawn:dawn_native",
-        "//third_party/dawn:dawncpp",
         "//third_party/dawn:dawncpp_headers",
         "//third_party/dawn:libdawn_proc",  # build-cleaner: keep
         "@com_google_absl//absl/container:inlined_vector",

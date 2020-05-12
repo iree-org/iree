@@ -124,6 +124,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 
   auto syms = make_ref<DynamicSymbols>();
   RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
+  syms->FixupExtensionFunctions();
   return syms;
 }
 
@@ -142,6 +143,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
       syms.get(), [loader_library_ptr](const char* function_name) {
         return loader_library_ptr->GetSymbol<PFN_vkVoidFunction>(function_name);
       }));
+  syms->FixupExtensionFunctions();
   return syms;
 }
 
@@ -188,12 +190,25 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
     }
   }
 
+  FixupExtensionFunctions();
+
   return OkStatus();
 }
 
 DynamicSymbols::DynamicSymbols() = default;
 
 DynamicSymbols::~DynamicSymbols() = default;
+
+void DynamicSymbols::FixupExtensionFunctions() {
+  this->vkGetSemaphoreCounterValue = this->vkGetSemaphoreCounterValue
+                                         ? this->vkGetSemaphoreCounterValue
+                                         : this->vkGetSemaphoreCounterValueKHR;
+  this->vkWaitSemaphores = this->vkWaitSemaphores ? this->vkWaitSemaphores
+                                                  : this->vkWaitSemaphoresKHR;
+  this->vkSignalSemaphore = this->vkSignalSemaphore
+                                ? this->vkSignalSemaphore
+                                : this->vkSignalSemaphoreKHR;
+}
 
 }  // namespace vulkan
 }  // namespace hal

@@ -24,7 +24,8 @@ namespace iree {
 namespace hal {
 
 // Abstract resource type whose lifetime is managed by a ResourceSet.
-// Used mostly just to get a virtual dtor, though we could add nicer logging.
+// Used mostly just to get a virtual dtor, though we could add nicer logging
+// by allowing resources to capture debug names, stack traces of creation, etc.
 class Resource : public RefObject<Resource> {
  public:
   virtual ~Resource() = default;

@@ -25,7 +25,6 @@
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/hal/command_buffer.h"
-#include "iree/hal/fence.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {
@@ -33,9 +32,8 @@ namespace hal {
 
 // A batch of command buffers with synchronization information for submission.
 struct SubmissionBatch {
-  // Semaphores that must be signaled prior to the execution of any command
-  // buffer in this submission. For TimelineSemaphores the specified payload
-  // must be reached or exceeded.
+  // A set of semaphores that must have their payload values meet or exceed the
+  // specified values prior to any command buffer within this batch executing.
   absl::Span<const SemaphoreValue> wait_semaphores;
 
   // Command buffers that will execute in this batch.
@@ -44,16 +42,16 @@ struct SubmissionBatch {
   absl::Span<CommandBuffer* const> command_buffers;
 
   // Semaphores to signal after execution of all command buffers complete.
-  // TimelineSemaphores will be set to the maximum of the specified payload or
+  // Semaphore playloads will be set to the maximum of the specified payload or
   // their current payload.
   absl::Span<const SemaphoreValue> signal_semaphores;
 };
 
 // Asynchronous command execution queue.
 //
-// CommandQueues may capture device status at Fence barriers, including
+// CommandQueues may capture device status at Semaphore barriers, including
 // information about device state such as thermal throttling. This information
-// is a snapshot of the state at the time the fence was signaled and not
+// is a snapshot of the state at the time the semaphore was signaled and not
 // necessarily live at the time of the application query.
 //
 // Command queues are thread-safe and submissions may occur from multiple
@@ -82,19 +80,13 @@ class CommandQueue {
   }
 
   // Submits one or more command batches for execution on the queue.
-  // Dependencies between |batches| on BinarySemaphores must be sorted in order
-  // such that all semaphores are signaled prior to any waits on them.
-  // Dependencies between TimelineSemaphores may occur in any order.
-  //
-  // The provided |fence| will be signaled when all |batches| have retired.
-  virtual Status Submit(absl::Span<const SubmissionBatch> batches,
-                        FenceValue fence) = 0;
-  inline Status Submit(const SubmissionBatch& batch, FenceValue fence) {
-    return Submit(absl::MakeConstSpan(&batch, 1), std::move(fence));
+  virtual Status Submit(absl::Span<const SubmissionBatch> batches) = 0;
+  inline Status Submit(const SubmissionBatch& batch) {
+    return Submit(absl::MakeConstSpan(&batch, 1));
   }
 
   // Blocks until all outstanding requests have been completed.
-  // This is equivalent to having waited on all outstanding fences.
+  // This is equivalent to having waited on all outstanding semaphores.
   // Implicitly calls Flush to ensure delayed requests are scheduled.
   //
   // If the command queue has encountered an error during submission at any

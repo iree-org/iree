@@ -23,7 +23,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/api_detail.h"
-#include "iree/hal/command_queue.h"
 #include "iree/hal/device.h"
 #include "iree/vm/module_abi_cc.h"
 
@@ -47,6 +46,7 @@ static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_cache_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_layout_descriptor = {
     0};
+static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
   static bool has_registered = false;
@@ -70,6 +70,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
                            iree_hal_executable_cache_descriptor);
   IREE_VM_REGISTER_CC_TYPE(ExecutableLayout, "hal.executable_layout",
                            iree_hal_executable_layout_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(Semaphore, "hal.semaphore",
+                           iree_hal_semaphore_descriptor);
 
   has_registered = true;
   return IREE_STATUS_OK;
@@ -94,6 +96,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_cache,
                              iree_hal_executable_cache_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_layout,
                              iree_hal_executable_layout_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -135,15 +138,31 @@ class HALModuleState final {
                          vm::ref<iree_hal_command_buffer_t> command_buffer) {
     IREE_TRACE_SCOPE0("HALModuleState::ExSubmitAndWait");
 
-    auto* device_ptr = reinterpret_cast<Device*>(device.get());
-    auto* queue = device_ptr->dispatch_queues().front();
-    ASSIGN_OR_RETURN(auto fence, device_ptr->CreateFence(0u));
-    SubmissionBatch batch;
-    CommandBuffer* command_buffers[1] = {
-        reinterpret_cast<CommandBuffer*>(command_buffer.get())};
-    batch.command_buffers = absl::MakeConstSpan(command_buffers);
-    RETURN_IF_ERROR(queue->Submit(batch, {fence.get(), 1u}));
-    RETURN_IF_ERROR(queue->WaitIdle());
+    vm::ref<iree_hal_semaphore_t> semaphore;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_semaphore_create(device.get(), 0ull, IREE_ALLOCATOR_SYSTEM,
+                                  &semaphore),
+        IREE_LOC));
+
+    iree_hal_submission_batch_t batch;
+    memset(&batch, 0, sizeof(batch));
+    batch.command_buffer_count = 1;
+    iree_hal_command_buffer_t* command_buffer_ptrs[] = {command_buffer.get()};
+    batch.command_buffers = command_buffer_ptrs;
+    batch.signal_semaphores.count = 1;
+    iree_hal_semaphore_t* semaphore_ptrs[] = {semaphore.get()};
+    batch.signal_semaphores.semaphores = semaphore_ptrs;
+    uint64_t signal_value = 1ull;
+    batch.signal_semaphores.payload_values = &signal_value;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_device_queue_submit(
+            device.get(), IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch),
+        IREE_LOC));
+
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_semaphore_wait_with_deadline(
+                          semaphore.get(), 1ull, IREE_TIME_INFINITE_FUTURE),
+                      IREE_LOC));
 
     for (auto& ref : deferred_releases_) {
       iree_vm_ref_release(&ref);
@@ -746,6 +765,56 @@ class HALModuleState final {
     return std::move(executable_layout);
   }
 
+  //===--------------------------------------------------------------------===//
+  // iree::hal::Semaphore
+  //===--------------------------------------------------------------------===//
+
+  StatusOr<vm::ref<iree_hal_semaphore_t>> SemaphoreCreate(
+      vm::ref<iree_hal_device_t> device, uint32_t initial_value) {
+    IREE_TRACE_SCOPE0("HALModuleState::SemaphoreCreate");
+    vm::ref<iree_hal_semaphore_t> semaphore;
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_semaphore_create(device.get(), initial_value,
+                                                allocator_, &semaphore),
+                      IREE_LOC));
+    return std::move(semaphore);
+  }
+
+  StatusOr<std::tuple<int32_t, uint32_t>> SemaphoreQuery(
+      vm::ref<iree_hal_semaphore_t> semaphore) {
+    uint64_t value = 0;
+    iree_status_t query_status =
+        iree_hal_semaphore_query(semaphore.get(), &value);
+    return std::make_tuple<int32_t, uint32_t>(iree_status_code(query_status),
+                                              static_cast<uint32_t>(value));
+  }
+
+  Status SemaphoreSignal(vm::ref<iree_hal_semaphore_t> semaphore,
+                         uint32_t new_value) {
+    IREE_TRACE_SCOPE0("HALModuleState::SemaphoreSignal");
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_semaphore_signal(semaphore.get(), new_value), IREE_LOC));
+    return OkStatus();
+  }
+
+  Status SemaphoreFail(vm::ref<iree_hal_semaphore_t> semaphore,
+                       int32_t status) {
+    IREE_TRACE_SCOPE0("HALModuleState::SemaphoreFail");
+    iree_hal_semaphore_fail(semaphore.get(), iree_make_status(status));
+    return OkStatus();
+  }
+
+  StatusOr<int32_t> SemaphoreAwait(vm::ref<iree_hal_semaphore_t> semaphore,
+                                   uint32_t new_value) {
+    IREE_TRACE_SCOPE0("HALModuleState::SemaphoreAwait");
+    iree_status_t wait_status = iree_hal_semaphore_wait_with_deadline(
+        semaphore.get(), new_value, IREE_TIME_INFINITE_FUTURE);
+    // TODO(benvanik): allow for deadline exceeded returns? We don't allow
+    // setting deadlines now (and when we do in the future it'll be the fiber
+    // manager that  handles them), so any failure indicates total failure.
+    return FromApiStatus(iree_make_status(wait_status), IREE_LOC);
+  }
+
  private:
   iree_allocator_t allocator_;
   ref_ptr<Device> shared_device_;
@@ -849,6 +918,14 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
 
     vm::MakeNativeFunction("executable_layout.create",
                            &HALModuleState::ExecutableLayoutCreate),
+
+    vm::MakeNativeFunction("semaphore.create",
+                           &HALModuleState::SemaphoreCreate),
+    vm::MakeNativeFunction("semaphore.query", &HALModuleState::SemaphoreQuery),
+    vm::MakeNativeFunction("semaphore.signal",
+                           &HALModuleState::SemaphoreSignal),
+    vm::MakeNativeFunction("semaphore.fail", &HALModuleState::SemaphoreFail),
+    vm::MakeNativeFunction("semaphore.await", &HALModuleState::SemaphoreAwait),
 };
 
 class HALModule final : public vm::NativeModule<HALModuleState> {

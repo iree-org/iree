@@ -15,45 +15,88 @@
 #ifndef IREE_HAL_SEMAPHORE_H_
 #define IREE_HAL_SEMAPHORE_H_
 
-#include "absl/types/variant.h"
+#include <cstdint>
+
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "iree/base/status.h"
+#include "iree/base/time.h"
 #include "iree/hal/resource.h"
 
 namespace iree {
 namespace hal {
 
-// A synchronization primitive used to indicate submission dependencies.
-// Semaphores are either of type binary (signaled or unsignaled) or timeline
-// (uint64 payload with >= semantics).
+class Semaphore;
+
+// A reference to a semaphore and associated payload value.
+struct SemaphoreValue {
+  Semaphore* semaphore = nullptr;
+  uint64_t value = 0;
+};
+
+// Synchronization mechanism for host->device, device->host, host->host,
+// and device->device notification. Semaphores behave like Vulkan timeline
+// semaphores (or D3D12 fences) and contain a monotonically increasing
+// uint64_t payload. They may be waited on any number of times even if they
+// have already been signaled for a particular value. They may also be waited
+// on for a particular value prior to the signal for that value.
+//
+// A semaphore is updated to its new value after all prior commands have
+// completed but the delay between completion and the host being woken varies.
+// Some implementations may coalesce semaphores to avoid spurious waking while
+// others will immediately synchronize with the host.
+//
+// One use of semaphores is for resource lifetime management: all resources used
+// by a set of submission batches must be considered live until the semaphore
+// attached to the submission has signaled.
+//
+// Another use of semaphores is device->device synchronization for setting up
+// the DAG of command buffers across queue submissions. This allows devices to
+// perform non-trivial scheduling behavior without the need to wake the host.
+//
+// Semaphores may be set to a permanently failed state by implementations when
+// errors occur during asynchronous execution. Users are expected to propagate
+// the failures and possibly reset the entire device that produced the error.
+//
+// For more information on semaphores see the following docs describing how
+// timelines are generally used (specifically in the device->host case):
+// https://www.youtube.com/watch?v=SpE--Rf516Y
+// https://www.khronos.org/assets/uploads/developers/library/2018-xdc/Vulkan-Timeline-Semaphores-Part-1_Sep18.pdf
+// https://docs.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization
 class Semaphore : public Resource {
  public:
-};
+  // Queries the current payload of the semaphore. As the payload is
+  // monotonically increasing it is guaranteed that the value is at least equal
+  // to the previous result of a Query call and coherent with any waits for
+  // a specified value via Device::WaitAllSemaphores.
+  //
+  // Returns the status/payload at the time the method is called without
+  // blocking and as such is only valid after a semaphore has been signaled. The
+  // same failure status will be returned regardless of when in the timeline the
+  // error occurred.
+  virtual StatusOr<uint64_t> Query() = 0;
 
-// Binary semaphores have strict ordering requirements and must be carefully
-// balanced. Each binary semaphore must only be waited on after a signal
-// operation has been issued and each wait requires exactly one signal. They
-// are commonly used only when interacting with external handles that may
-// cross device or process boundaries.
-class BinarySemaphore : public Semaphore {
- public:
-};
+  // Signals the semaphore to the given payload value.
+  // The call is ignored if the current payload value exceeds |value|.
+  virtual Status Signal(uint64_t value) = 0;
 
-// Timeline semaphores act as a fence along a per-semaphore timeline where
-// signaling is done by setting the payload to a monotonically increasing
-// 64-bit integer and waiting is done by blocking until the payload is set
-// greater-than or equal-to the specified value. Timeline semaphores may be
-// waited on or signaled in any order and can be significantly more
-// efficient due to system-level coalescing.
-class TimelineSemaphore : public Semaphore {
- public:
-  // TODO(benvanik): add value query support.
-  // TODO(benvanik): add host-side signal/wait.
-};
+  // Signals the semaphore with a failure. The |status| will be returned from
+  // Query and Signal for the lifetime of the semaphore.
+  virtual void Fail(Status status) = 0;
 
-// A reference to a strongly-typed semaphore and associated information.
-// For TimelineSemaphores the provided payload is used to specify either the
-// payload to wait for or new payload value.
-using SemaphoreValue =
-    absl::variant<BinarySemaphore*, std::pair<TimelineSemaphore*, uint64_t>>;
+  // Blocks the caller until the semaphore reaches or exceedes the specified
+  // payload value or the |deadline| elapses.
+  //
+  // Returns success if the wait is successful and the semaphore has met or
+  // exceeded the required payload value.
+  //
+  // Returns DEADLINE_EXCEEDED if the |deadline| elapses without the semaphore
+  // reaching the required value.
+  virtual Status Wait(uint64_t value, absl::Time deadline) = 0;
+  inline Status Wait(uint64_t value, absl::Duration timeout) {
+    return Wait(value, RelativeTimeoutToDeadline(timeout));
+  }
+};
 
 }  // namespace hal
 }  // namespace iree

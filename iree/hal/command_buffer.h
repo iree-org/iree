@@ -141,13 +141,13 @@ struct BufferBarrier {
 //
 // Buffers and synchronization objects referenced must remain valid and not be
 // modified or read while there are commands in-flight. The usual flow is to
-// populate input buffers, Dispatch using those buffers, wait on a Fence until
-// the buffers are guaranteed to no longer be in use, and then reuse or release
-// the buffers.
+// populate input buffers, Dispatch using those buffers, wait on a Semaphore
+// until the buffers are guaranteed to no longer be in use, and then reuse or
+// release the buffers.
 //
 // Errors that can be recognized when operations are enqueued will be returned
 // immediately, such as invalid argument errors. Errors that can only be
-// determined at execution time will be returned on fences. Once a failure
+// determined at execution time will be returned on semaphores. Once a failure
 // occurs the device queue will enter an error state that invalidates all
 // operations on the device queue (as ordering is not strict and any may still
 // be in-flight). In this case the user of the device queue should treat all
@@ -160,7 +160,7 @@ struct BufferBarrier {
 // Command buffers are thread-compatible. Use multiple command buffers if trying
 // to record commands from multiple threads. Command buffers must not be mutated
 // between when they have are submitted for execution on a queue and when the
-// fence fires indicating the completion of their execution.
+// semaphore fires indicating the completion of their execution.
 class CommandBuffer : public Resource {
  public:
   virtual CommandBuffer* impl() { return this; }

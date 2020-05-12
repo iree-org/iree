@@ -46,14 +46,15 @@ class DirectCommandQueue final : public CommandQueue {
     return logical_device_->syms();
   }
 
-  Status Submit(absl::Span<const SubmissionBatch> batches,
-                FenceValue fence) override;
+  Status Submit(absl::Span<const SubmissionBatch> batches) override;
 
   Status WaitIdle(absl::Time deadline) override;
 
  private:
   Status TranslateBatchInfo(const SubmissionBatch& batch,
-                            VkSubmitInfo* submit_info, Arena* arena);
+                            VkSubmitInfo* submit_info,
+                            VkTimelineSemaphoreSubmitInfo* timeline_submit_info,
+                            Arena* arena);
 
   ref_ptr<VkDeviceHandle> logical_device_;
 

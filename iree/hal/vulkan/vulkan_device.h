@@ -27,11 +27,11 @@
 #include "iree/hal/debug_capture_manager.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
+#include "iree/hal/semaphore.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
-#include "iree/hal/vulkan/legacy_fence.h"
 
 namespace iree {
 namespace hal {
@@ -103,16 +103,11 @@ class VulkanDevice final : public Device {
 
   StatusOr<ref_ptr<Event>> CreateEvent() override;
 
-  StatusOr<ref_ptr<BinarySemaphore>> CreateBinarySemaphore(
-      bool initial_value) override;
-  StatusOr<ref_ptr<TimelineSemaphore>> CreateTimelineSemaphore(
-      uint64_t initial_value) override;
-
-  StatusOr<ref_ptr<Fence>> CreateFence(uint64_t initial_value) override;
-  Status WaitAllFences(absl::Span<const FenceValue> fences,
-                       absl::Time deadline) override;
-  StatusOr<int> WaitAnyFence(absl::Span<const FenceValue> fences,
-                             absl::Time deadline) override;
+  StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
+  Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                           absl::Time deadline) override;
+  StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
+                                 absl::Time deadline) override;
 
   Status WaitIdle(absl::Time deadline) override;
 
@@ -124,8 +119,10 @@ class VulkanDevice final : public Device {
       absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
       ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
       ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-      ref_ptr<LegacyFencePool> legacy_fence_pool,
       DebugCaptureManager* debug_capture_manager);
+
+  Status WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                        absl::Time deadline, VkSemaphoreWaitFlags wait_flags);
 
   ref_ptr<Driver> driver_;
   VkPhysicalDevice physical_device_;
@@ -141,10 +138,6 @@ class VulkanDevice final : public Device {
 
   ref_ptr<VkCommandPoolHandle> dispatch_command_pool_;
   ref_ptr<VkCommandPoolHandle> transfer_command_pool_;
-
-  // TODO(b/140141417): implement timeline semaphore fences and conditionally
-  // compile the legacy fence pool out.
-  ref_ptr<LegacyFencePool> legacy_fence_pool_;
 
   DebugCaptureManager* debug_capture_manager_ = nullptr;
 };

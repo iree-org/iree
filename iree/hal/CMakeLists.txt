@@ -46,13 +46,13 @@ iree_cc_library(
     ::device
     ::driver
     ::driver_registry
-    ::fence
     ::heap_buffer
     ::semaphore
     absl::span
     absl::strings
     iree::base::api
     iree::base::api_util
+    iree::base::memory
     iree::base::ref_ptr
     iree::base::shape
     iree::base::tracing
@@ -95,7 +95,6 @@ iree_cc_library(
     "buffer.cc"
   DEPS
     ::resource
-    absl::core_headers
     absl::span
     absl::strings
     absl::variant
@@ -136,7 +135,6 @@ iree_cc_library(
     ::executable
     ::executable_layout
     ::resource
-    absl::core_headers
     iree::base::bitfield
     iree::base::shape
     iree::base::status
@@ -165,7 +163,6 @@ iree_cc_library(
     "command_queue.h"
   DEPS
     ::command_buffer
-    ::fence
     ::semaphore
     absl::span
     absl::time
@@ -233,7 +230,6 @@ iree_cc_library(
   DEPS
     ::buffer
     ::resource
-    iree::base::status
   PUBLIC
 )
 
@@ -256,6 +252,7 @@ iree_cc_library(
     absl::time
     iree::base::ref_ptr
     iree::base::status
+    iree::base::target_platform
     iree::base::time
   PUBLIC
 )
@@ -266,7 +263,6 @@ iree_cc_library(
   HDRS
     "device_info.h"
   DEPS
-    absl::core_headers
     absl::strings
     iree::base::bitfield
   PUBLIC
@@ -286,8 +282,8 @@ iree_cc_library(
     ::device
     ::device_placement
     ::executable_format
-    ::fence
     ::heap_buffer
+    ::semaphore
     absl::span
     absl::synchronization
     absl::time
@@ -380,8 +376,6 @@ iree_cc_library(
     executable_format
   HDRS
     "executable_format.h"
-  DEPS
-    absl::core_headers
   PUBLIC
 )
 
@@ -392,7 +386,6 @@ iree_cc_library(
     "executable_layout.h"
   DEPS
     ::resource
-    iree::base::status
   PUBLIC
 )
 
@@ -409,17 +402,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    fence
-  HDRS
-    "fence.h"
-  DEPS
-    ::resource
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     heap_buffer
   HDRS
     "heap_buffer.h"
@@ -428,7 +410,6 @@ iree_cc_library(
   DEPS
     ::allocator
     ::buffer
-    absl::core_headers
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -453,7 +434,9 @@ iree_cc_library(
     "semaphore.h"
   DEPS
     ::resource
-    absl::variant
+    absl::time
+    iree::base::status
+    iree::base::time
   PUBLIC
 )
 

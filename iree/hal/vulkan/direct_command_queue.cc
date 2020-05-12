@@ -23,8 +23,7 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
-#include "iree/hal/vulkan/legacy_fence.h"
-#include "iree/hal/vulkan/native_binary_semaphore.h"
+#include "iree/hal/vulkan/native_timeline_semaphore.h"
 #include "iree/hal/vulkan/status_util.h"
 
 namespace iree {
@@ -44,9 +43,9 @@ DirectCommandQueue::~DirectCommandQueue() {
   syms()->vkQueueWaitIdle(queue_);
 }
 
-Status DirectCommandQueue::TranslateBatchInfo(const SubmissionBatch& batch,
-                                              VkSubmitInfo* submit_info,
-                                              Arena* arena) {
+Status DirectCommandQueue::TranslateBatchInfo(
+    const SubmissionBatch& batch, VkSubmitInfo* submit_info,
+    VkTimelineSemaphoreSubmitInfo* timeline_submit_info, Arena* arena) {
   // TODO(benvanik): see if we can go to finer-grained stages.
   // For example, if this was just queue ownership transfers then we can use
   // the pseudo-stage of VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT.
@@ -55,35 +54,29 @@ Status DirectCommandQueue::TranslateBatchInfo(const SubmissionBatch& batch,
 
   auto wait_semaphore_handles =
       arena->AllocateSpan<VkSemaphore>(batch.wait_semaphores.size());
+  auto wait_semaphore_values =
+      arena->AllocateSpan<uint64_t>(batch.wait_semaphores.size());
   auto wait_dst_stage_masks =
       arena->AllocateSpan<VkPipelineStageFlags>(batch.wait_semaphores.size());
   for (int i = 0; i < batch.wait_semaphores.size(); ++i) {
-    const auto& semaphore_value = batch.wait_semaphores[i];
-    if (semaphore_value.index() == 0) {
-      const auto& binary_semaphore =
-          static_cast<NativeBinarySemaphore*>(absl::get<0>(semaphore_value));
-      wait_semaphore_handles[i] = binary_semaphore->handle();
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(IREE_LOC)
-             << "Timeline semaphores not yet implemented";
-    }
+    const auto& wait_point = batch.wait_semaphores[i];
+    const auto* semaphore =
+        static_cast<NativeTimelineSemaphore*>(wait_point.semaphore);
+    wait_semaphore_handles[i] = semaphore->handle();
+    wait_semaphore_values[i] = wait_point.value;
     wait_dst_stage_masks[i] = dst_stage_mask;
   }
 
   auto signal_semaphore_handles =
       arena->AllocateSpan<VkSemaphore>(batch.signal_semaphores.size());
+  auto signal_semaphore_values =
+      arena->AllocateSpan<uint64_t>(batch.signal_semaphores.size());
   for (int i = 0; i < batch.signal_semaphores.size(); ++i) {
-    const auto& semaphore_value = batch.signal_semaphores[i];
-    if (semaphore_value.index() == 0) {
-      const auto& binary_semaphore =
-          static_cast<NativeBinarySemaphore*>(absl::get<0>(semaphore_value));
-      signal_semaphore_handles[i] = binary_semaphore->handle();
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(IREE_LOC)
-             << "Timeline semaphores not yet implemented";
-    }
+    const auto& signal_point = batch.signal_semaphores[i];
+    const auto* semaphore =
+        static_cast<NativeTimelineSemaphore*>(signal_point.semaphore);
+    signal_semaphore_handles[i] = semaphore->handle();
+    signal_semaphore_values[i] = signal_point.value;
   }
 
   auto command_buffer_handles =
@@ -96,7 +89,7 @@ Status DirectCommandQueue::TranslateBatchInfo(const SubmissionBatch& batch,
   }
 
   submit_info->sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info->pNext = nullptr;
+  submit_info->pNext = timeline_submit_info;
   submit_info->waitSemaphoreCount = wait_semaphore_handles.size();
   submit_info->pWaitSemaphores = wait_semaphore_handles.data();
   submit_info->pWaitDstStageMask = wait_dst_stage_masks.data();
@@ -105,11 +98,19 @@ Status DirectCommandQueue::TranslateBatchInfo(const SubmissionBatch& batch,
   submit_info->signalSemaphoreCount = signal_semaphore_handles.size();
   submit_info->pSignalSemaphores = signal_semaphore_handles.data();
 
+  timeline_submit_info->sType =
+      VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+  timeline_submit_info->pNext = nullptr;
+  timeline_submit_info->waitSemaphoreValueCount = wait_semaphore_values.size();
+  timeline_submit_info->pWaitSemaphoreValues = wait_semaphore_values.data();
+  timeline_submit_info->signalSemaphoreValueCount =
+      signal_semaphore_values.size();
+  timeline_submit_info->pSignalSemaphoreValues = signal_semaphore_values.data();
+
   return OkStatus();
 }
 
-Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches,
-                                  FenceValue fence) {
+Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
   IREE_TRACE_SCOPE0("DirectCommandQueue::Submit");
 
   // Map the submission batches to VkSubmitInfos.
@@ -117,19 +118,17 @@ Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches,
   // completes and since there are a bunch of them we use an arena.
   Arena arena(4 * 1024);
   auto submit_infos = arena.AllocateSpan<VkSubmitInfo>(batches.size());
+  auto timeline_submit_infos =
+      arena.AllocateSpan<VkTimelineSemaphoreSubmitInfo>(batches.size());
   for (int i = 0; i < batches.size(); ++i) {
-    RETURN_IF_ERROR(TranslateBatchInfo(batches[i], &submit_infos[i], &arena));
+    RETURN_IF_ERROR(TranslateBatchInfo(batches[i], &submit_infos[i],
+                                       &timeline_submit_infos[i], &arena));
   }
-
-  // TODO(b/140141417): implement timeline semaphore fences and switch here.
-  auto legacy_fence = reinterpret_cast<LegacyFence*>(fence.first);
-  ASSIGN_OR_RETURN(VkFence fence_handle,
-                   legacy_fence->AcquireSignalFence(fence.second));
 
   {
     absl::MutexLock lock(&queue_mutex_);
     VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(
-        queue_, submit_infos.size(), submit_infos.data(), fence_handle));
+        queue_, submit_infos.size(), submit_infos.data(), VK_NULL_HANDLE));
   }
 
   return OkStatus();

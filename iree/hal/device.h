@@ -21,6 +21,7 @@
 #include "absl/time/time.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/time.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
@@ -32,6 +33,11 @@
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/executable_layout.h"
 #include "iree/hal/semaphore.h"
+
+#if defined(IREE_PLATFORM_WINDOWS)
+// Win32 macro name conflict:
+#undef CreateSemaphore
+#endif  // IREE_PLATFORM_WINDOWS
 
 namespace iree {
 namespace hal {
@@ -111,65 +117,53 @@ class Device : public RefObject<Device> {
   // only be used to synchronize within the same queue.
   virtual StatusOr<ref_ptr<Event>> CreateEvent() = 0;
 
-  // Creates a binary semaphore that can be used with command queues owned by
-  // this device. To use the semaphores with other devices or instances they
-  // must first be exported.
-  virtual StatusOr<ref_ptr<BinarySemaphore>> CreateBinarySemaphore(
-      bool initial_value) = 0;
-
-  // Creates a timeline semaphore that can be used with command queues owned by
-  // this device. To use the semaphores with other devices or instances they
-  // must first be exported.
-  virtual StatusOr<ref_ptr<TimelineSemaphore>> CreateTimelineSemaphore(
+  // Creates a semaphore that can be used with command queues owned by this
+  // device. To use the semaphores with other devices or instances they must
+  // first be exported.
+  virtual StatusOr<ref_ptr<Semaphore>> CreateSemaphore(
       uint64_t initial_value) = 0;
 
-  // Creates a fence that can be used with command queues owned by this device.
-  // To use the fences with other devices or instances they must first be
-  // exported.
-  virtual StatusOr<ref_ptr<Fence>> CreateFence(uint64_t initial_value) = 0;
-
   // TODO(benvanik): import/export semaphore utilities.
-  // TODO(benvanik): import/export fence utilities.
-  // TODO(benvanik): fences to wait handles.
+  // TODO(benvanik): semaphores to wait handles.
 
-  // Blocks the caller until all passed |fences| reach or exceed the specified
-  // payload values or the |deadline| elapses. All |fences| must be created from
-  // this device (or be imported into it).
+  // Blocks the caller until all passed |semaphores| reach or exceed the
+  // specified payload values or the |deadline| elapses. All |semaphores| must
+  // be created from this device (or be imported into it).
   //
-  // Returns success if the wait is successful and all fences have been
+  // Returns success if the wait is successful and all semaphores have been
   // signaled.
   //
-  // Returns DEADLINE_EXCEEDED if the |deadline| elapses without all fences
-  // having been signaled. Note that a subset of the |fences| may have been
+  // Returns DEADLINE_EXCEEDED if the |deadline| elapses without all semaphores
+  // having been signaled. Note that a subset of the |semaphores| may have been
   // signaled and each can be queried to see which ones.
-  virtual Status WaitAllFences(absl::Span<const FenceValue> fences,
-                               absl::Time deadline) = 0;
-  inline Status WaitAllFences(absl::Span<const FenceValue> fences,
-                              absl::Duration timeout) {
-    return WaitAllFences(fences, RelativeTimeoutToDeadline(timeout));
+  virtual Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                                   absl::Time deadline) = 0;
+  inline Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                                  absl::Duration timeout) {
+    return WaitAllSemaphores(semaphores, RelativeTimeoutToDeadline(timeout));
   }
 
-  // Blocks the caller until at least one of the |fences| reaches or exceeds the
-  // specified payload value or the |deadline| elapses. All |fences| must be
-  // created from this device (or be imported into it).
+  // Blocks the caller until at least one of the |semaphores| reaches or exceeds
+  // the specified payload value or the |deadline| elapses. All |semaphores|
+  // must be created from this device (or be imported into it).
   //
-  // Returns an arbitrary index into |fences| of a fence that was signaled. Note
-  // that more than one fence may have been signaled and all of the other
-  // |fences| should be queried or waited on again until waits for them
-  // succeed.
+  // Returns an arbitrary index into |semaphores| of a semaphore that was
+  // signaled. Note that more than one semaphore may have been signaled and all
+  // of the other |semaphores| should be queried or waited on again until waits
+  // for them succeed.
   //
-  // Returns DEADLINE_EXCEEDED if the |deadline| elapses without any fences
+  // Returns DEADLINE_EXCEEDED if the |deadline| elapses without any semaphores
   // having been signaled.
-  virtual StatusOr<int> WaitAnyFence(absl::Span<const FenceValue> fences,
-                                     absl::Time deadline) = 0;
-  inline StatusOr<int> WaitAnyFence(absl::Span<const FenceValue> fences,
-                                    absl::Duration timeout) {
-    return WaitAnyFence(fences, RelativeTimeoutToDeadline(timeout));
+  virtual StatusOr<int> WaitAnySemaphore(
+      absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) = 0;
+  inline StatusOr<int> WaitAnySemaphore(
+      absl::Span<const SemaphoreValue> semaphores, absl::Duration timeout) {
+    return WaitAnySemaphore(semaphores, RelativeTimeoutToDeadline(timeout));
   }
 
   // Blocks until all outstanding requests on all queues have been
   // completed. This is equivalent to having waited on all outstanding
-  // fences.
+  // semaphores.
   virtual Status WaitIdle(absl::Time deadline) = 0;
   inline Status WaitIdle(absl::Duration timeout) {
     return WaitIdle(RelativeTimeoutToDeadline(timeout));

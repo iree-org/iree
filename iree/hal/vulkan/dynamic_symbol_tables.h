@@ -286,6 +286,13 @@ namespace vulkan {
   DEV_PFN(REQUIRED, vkUpdateDescriptorSets)                             \
   DEV_PFN(REQUIRED, vkWaitForFences)                                    \
                                                                         \
+  DEV_PFN(OPTIONAL, vkGetSemaphoreCounterValue)                         \
+  DEV_PFN(OPTIONAL, vkGetSemaphoreCounterValueKHR)                      \
+  DEV_PFN(OPTIONAL, vkWaitSemaphores)                                   \
+  DEV_PFN(OPTIONAL, vkWaitSemaphoresKHR)                                \
+  DEV_PFN(OPTIONAL, vkSignalSemaphore)                                  \
+  DEV_PFN(OPTIONAL, vkSignalSemaphoreKHR)                               \
+                                                                        \
   INS_PFN(OPTIONAL, vkCreateDebugReportCallbackEXT)                     \
   INS_PFN(OPTIONAL, vkCreateDebugUtilsMessengerEXT)                     \
   INS_PFN(EXCLUDED, vkCreateDisplayPlaneSurfaceKHR)                     \
@@ -360,12 +367,7 @@ namespace vulkan {
   DEV_PFN(OPTIONAL, vkQueueInsertDebugUtilsLabelEXT)                    \
   DEV_PFN(EXCLUDED, vkQueuePresentKHR)                                  \
   DEV_PFN(REQUIRED, vkQueueSubmit)                                      \
-  DEV_PFN(REQUIRED, vkQueueWaitIdle)                                    \
-                                                                        \
-  /* Device extension: VK_KHR_timeline_semaphore */                     \
-  DEV_PFN(REQUIRED, vkGetSemaphoreCounterValueKHR)                      \
-  DEV_PFN(REQUIRED, vkWaitSemaphoresKHR)                                \
-  DEV_PFN(REQUIRED, vkSignalSemaphoreKHR)
+  DEV_PFN(REQUIRED, vkQueueWaitIdle)
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 #define IREE_VULKAN_DYNAMIC_SYMBOL_TABLE_ANDROID_KHR(INS_PFN, DEV_PFN) \

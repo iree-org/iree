@@ -28,6 +28,7 @@
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
+#include "iree/base/memory.h"
 #include "iree/base/shape.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api_detail.h"
@@ -36,7 +37,6 @@
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
 #include "iree/hal/driver_registry.h"
-#include "iree/hal/fence.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/semaphore.h"
@@ -1721,6 +1721,115 @@ iree_hal_device_id(iree_hal_device_t* device) {
   return iree_string_view_t{id.data(), id.size()};
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
+    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
+    uint64_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches) {
+  IREE_TRACE_SCOPE0("iree_hal_device_queue_submit");
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
+  if (batch_count > 0 && !batches) return IREE_STATUS_INVALID_ARGUMENT;
+
+  // We need to allocate storage to marshal in the semaphores. Ideally we'd
+  // change the C++ API to make this 1:1 with a reinterpret_cast, however that
+  // makes the C API more difficult. Bleh.
+  int total_semaphore_count = 0;
+  for (int i = 0; i < batch_count; ++i) {
+    total_semaphore_count += batches[i].wait_semaphores.count;
+    total_semaphore_count += batches[i].signal_semaphores.count;
+  }
+  absl::InlinedVector<SemaphoreValue, 4> semaphore_values(
+      total_semaphore_count);
+  absl::InlinedVector<SubmissionBatch, 2> dst_batches(batch_count);
+  int base_semaphore_index = 0;
+  for (int i = 0; i < batch_count; ++i) {
+    const auto& src_batch = batches[i];
+    auto& dst_batch = dst_batches[i];
+    for (int j = 0; j < src_batch.wait_semaphores.count; ++j) {
+      semaphore_values[base_semaphore_index + j] = {
+          reinterpret_cast<Semaphore*>(src_batch.wait_semaphores.semaphores[j]),
+          src_batch.wait_semaphores.payload_values[j]};
+    }
+    dst_batch.wait_semaphores =
+        absl::MakeConstSpan(&semaphore_values[base_semaphore_index],
+                            src_batch.wait_semaphores.count);
+    base_semaphore_index += src_batch.wait_semaphores.count;
+    dst_batch.command_buffers =
+        iree::ReinterpretSpan<CommandBuffer*>(absl::MakeConstSpan(
+            src_batch.command_buffers, src_batch.command_buffer_count));
+    for (int j = 0; j < src_batch.signal_semaphores.count; ++j) {
+      semaphore_values[base_semaphore_index + j] = {
+          reinterpret_cast<Semaphore*>(
+              src_batch.signal_semaphores.semaphores[j]),
+          src_batch.signal_semaphores.payload_values[j]};
+    }
+    dst_batch.signal_semaphores =
+        absl::MakeConstSpan(&semaphore_values[base_semaphore_index],
+                            src_batch.signal_semaphores.count);
+    base_semaphore_index += src_batch.signal_semaphores.count;
+  }
+
+  // For now we always go to the first compute queue. TBD cleanup pending the
+  // device modeling in the IR as to how we really want to handle this. We'll
+  // want to use queue_affinity in a way that ensures we have some control over
+  // things on the compiler side and may require that devices are declared by
+  // the number and types of queues they support.
+  uint64_t queue_index = queue_affinity % handle->dispatch_queues().size();
+  auto* command_queue = handle->dispatch_queues()[queue_index];
+  return ToApiStatus(command_queue->Submit(dst_batches));
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_wait_semaphores_with_deadline(
+    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns) {
+  IREE_TRACE_SCOPE0("iree_hal_device_wait_semaphores_with_deadline");
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!semaphore_list || semaphore_list->count == 0) return IREE_STATUS_OK;
+
+  absl::InlinedVector<SemaphoreValue, 4> semaphore_values(
+      semaphore_list->count);
+  for (int i = 0; i < semaphore_list->count; ++i) {
+    semaphore_values[i] = {
+        reinterpret_cast<Semaphore*>(semaphore_list->semaphores[i]),
+        semaphore_list->payload_values[i]};
+  }
+
+  Status wait_status;
+  switch (wait_mode) {
+    case IREE_HAL_WAIT_MODE_ALL:
+      wait_status =
+          handle->WaitAllSemaphores(semaphore_values, ToAbslTime(deadline_ns));
+      break;
+    case IREE_HAL_WAIT_MODE_ANY:
+      wait_status = std::move(handle->WaitAnySemaphore(semaphore_values,
+                                                       ToAbslTime(deadline_ns)))
+                        .status();
+      break;
+    default:
+      return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // NOTE: we avoid capturing stack traces on deadline exceeded as it's not a
+  // real error.
+  if (IsDeadlineExceeded(wait_status)) {
+    return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED);
+  }
+  return ToApiStatus(wait_status);
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_wait_semaphores_with_timeout(
+    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    const iree_hal_semaphore_list_t* semaphore_list,
+    iree_duration_t timeout_ns) {
+  iree_time_t deadline_ns =
+      FromAbslTime(iree::RelativeTimeoutToDeadline(ToAbslDuration(timeout_ns)));
+  return iree_hal_device_wait_semaphores_with_deadline(
+      device, wait_mode, semaphore_list, deadline_ns);
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Driver
 //===----------------------------------------------------------------------===//
@@ -1998,16 +2107,77 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Fence
-//===----------------------------------------------------------------------===//
-
-IREE_HAL_API_RETAIN_RELEASE(fence, Fence);
-
-//===----------------------------------------------------------------------===//
 // iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
 
 IREE_HAL_API_RETAIN_RELEASE(semaphore, Semaphore);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_create(
+    iree_hal_device_t* device, uint64_t initial_value,
+    iree_allocator_t allocator, iree_hal_semaphore_t** out_semaphore) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_create");
+  if (!out_semaphore) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_semaphore = nullptr;
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(auto semaphore,
+                            handle->CreateSemaphore(initial_value));
+
+  *out_semaphore = reinterpret_cast<iree_hal_semaphore_t*>(semaphore.release());
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
+  if (!out_value) return IREE_STATUS_INVALID_ARGUMENT;
+  *out_value = 0;
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
+  auto result = handle->Query();
+  if (!result.ok()) return ToApiStatus(std::move(result).status());
+  *out_value = result.value();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_signal");
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
+  return ToApiStatus(handle->Signal(new_value));
+}
+
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_fail");
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+  if (!handle) return;
+  handle->Fail(FromApiStatus(status, IREE_LOC));
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
+                                      uint64_t value, iree_time_t deadline_ns) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_deadline");
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
+  return ToApiStatus(handle->Wait(value, ToAbslTime(deadline_ns)));
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
+                                     uint64_t value,
+                                     iree_duration_t timeout_ns) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_timeout");
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
+  return ToApiStatus(handle->Wait(value, ToAbslDuration(timeout_ns)));
+}
 
 }  // namespace hal
 }  // namespace iree

@@ -29,7 +29,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_queue",
-        "//iree/hal:fence",
+        "//iree/hal:semaphore",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/synchronization",
     ],
@@ -62,7 +62,6 @@ cc_library(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/hal:buffer",
-        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -99,33 +98,6 @@ cc_library(
 )
 
 cc_library(
-    name = "host_fence",
-    srcs = ["host_fence.cc"],
-    hdrs = ["host_fence.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:fence",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "host_fence_test",
-    srcs = ["host_fence_test.cc"],
-    deps = [
-        ":host_fence",
-        "//iree/base:status",
-        "//iree/base:status_matchers",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/time",
-    ],
-)
-
-cc_library(
     name = "host_local_allocator",
     srcs = ["host_local_allocator.cc"],
     hdrs = ["host_local_allocator.h"],
@@ -155,17 +127,42 @@ cc_library(
 )
 
 cc_library(
+    name = "host_semaphore",
+    srcs = ["host_semaphore.cc"],
+    hdrs = ["host_semaphore.h"],
+    deps = [
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:semaphore",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "host_semaphore_test",
+    srcs = ["host_semaphore_test.cc"],
+    deps = [
+        ":host_semaphore",
+        "//iree/base:status",
+        "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+cc_library(
     name = "host_submission_queue",
     srcs = ["host_submission_queue.cc"],
     hdrs = ["host_submission_queue.h"],
     deps = [
-        ":host_fence",
+        ":host_semaphore",
         "//iree/base:intrusive_list",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_queue",
-        "//iree/hal:fence",
-        "//iree/hal:semaphore",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",

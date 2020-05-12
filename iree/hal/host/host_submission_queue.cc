@@ -24,92 +24,23 @@
 namespace iree {
 namespace hal {
 
-HostBinarySemaphore::HostBinarySemaphore(bool initial_value) {
-  State state = {0};
-  state.signaled = initial_value ? 1 : 0;
-  state_ = state;
-}
-
-bool HostBinarySemaphore::is_signaled() const {
-  return state_.load(std::memory_order_acquire).signaled == 1;
-}
-
-Status HostBinarySemaphore::BeginSignaling() {
-  State old_state = state_.load(std::memory_order_acquire);
-  if (old_state.signal_pending != 0) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "A signal operation on a binary semaphore is already pending";
-  }
-  State new_state = old_state;
-  new_state.signal_pending = 1;
-  state_.compare_exchange_strong(old_state, new_state);
-  return OkStatus();
-}
-
-Status HostBinarySemaphore::EndSignaling() {
-  State old_state = state_.load(std::memory_order_acquire);
-  DCHECK_EQ(old_state.signal_pending, 1)
-      << "A signal operation on a binary semaphore was not pending";
-  if (old_state.signaled != 0) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "A binary semaphore cannot be signaled multiple times";
-  }
-  State new_state = old_state;
-  new_state.signal_pending = 0;
-  new_state.signaled = 1;
-  state_.compare_exchange_strong(old_state, new_state);
-  return OkStatus();
-}
-
-Status HostBinarySemaphore::BeginWaiting() {
-  State old_state = state_.load(std::memory_order_acquire);
-  if (old_state.wait_pending != 0) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "A wait operation on a binary semaphore is already pending";
-  }
-  State new_state = old_state;
-  new_state.wait_pending = 1;
-  state_.compare_exchange_strong(old_state, new_state);
-  return OkStatus();
-}
-
-Status HostBinarySemaphore::EndWaiting() {
-  State old_state = state_.load(std::memory_order_acquire);
-  DCHECK_EQ(old_state.wait_pending, 1)
-      << "A wait operation on a binary semaphore was not pending";
-  if (old_state.signaled != 1) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "A binary semaphore cannot be reset multiple times";
-  }
-  State new_state = old_state;
-  new_state.wait_pending = 0;
-  new_state.signaled = 0;
-  state_.compare_exchange_strong(old_state, new_state);
-  return OkStatus();
-}
-
 HostSubmissionQueue::HostSubmissionQueue() = default;
 
 HostSubmissionQueue::~HostSubmissionQueue() = default;
 
-bool HostSubmissionQueue::IsBatchReady(const PendingBatch& batch) const {
+StatusOr<bool> HostSubmissionQueue::CheckBatchReady(
+    const PendingBatch& batch) const {
   for (auto& wait_point : batch.wait_semaphores) {
-    if (wait_point.index() == 0) {
-      auto* binary_semaphore =
-          reinterpret_cast<HostBinarySemaphore*>(absl::get<0>(wait_point));
-      if (!binary_semaphore->is_signaled()) {
-        return false;
-      }
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
+    auto* semaphore = reinterpret_cast<HostSemaphore*>(wait_point.semaphore);
+    ASSIGN_OR_RETURN(uint64_t value, semaphore->Query());
+    if (value < wait_point.value) {
       return false;
     }
   }
   return true;
 }
 
-Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
-                                    FenceValue fence) {
+Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches) {
   IREE_TRACE_SCOPE0("HostSubmissionQueue::Enqueue");
 
   if (has_shutdown_) {
@@ -119,35 +50,8 @@ Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
     return permanent_error_;
   }
 
-  // Verify waiting/signaling behavior on semaphores and prepare them all.
-  // We need to track this to ensure that we are modeling the Vulkan behavior
-  // and are consistent across HAL implementations.
-  for (auto& batch : batches) {
-    for (auto& semaphore_value : batch.wait_semaphores) {
-      if (semaphore_value.index() == 0) {
-        auto* binary_semaphore = reinterpret_cast<HostBinarySemaphore*>(
-            absl::get<0>(semaphore_value));
-        RETURN_IF_ERROR(binary_semaphore->BeginWaiting());
-      } else {
-        // TODO(b/140141417): implement timeline semaphores.
-        return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-      }
-    }
-    for (auto& semaphore_value : batch.signal_semaphores) {
-      if (semaphore_value.index() == 0) {
-        auto* binary_semaphore = reinterpret_cast<HostBinarySemaphore*>(
-            absl::get<0>(semaphore_value));
-        RETURN_IF_ERROR(binary_semaphore->BeginSignaling());
-      } else {
-        // TODO(b/140141417): implement timeline semaphores.
-        return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-      }
-    }
-  }
-
-  // Add to list - order does not matter as Process evaluates semaphores.
+  // Add to list in submission order.
   auto submission = absl::make_unique<Submission>();
-  submission->fence = std::move(fence);
   submission->pending_batches.resize(batches.size());
   for (int i = 0; i < batches.size(); ++i) {
     submission->pending_batches[i] = PendingBatch{
@@ -176,49 +80,50 @@ Status HostSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
     // list we need to always start from the beginning. If we wanted we could
     // track a list of ready submissions however that's a lot of bookkeeping and
     // the list is usually short.
-    bool restart_iteration = false;
-    for (auto* submission : list_) {
-      for (int i = 0; i < submission->pending_batches.size(); ++i) {
-        auto& batch = submission->pending_batches[i];
-        if (!IsBatchReady(batch)) {
-          // Try the next batch in the submission until we find one that is
-          // ready. If none are ready we'll return to the caller.
-          continue;
-        }
+    auto* submission = list_.front();
+    for (int i = 0; i < submission->pending_batches.size(); ++i) {
+      auto& batch = submission->pending_batches[i];
+      auto wait_status_or = CheckBatchReady(batch);
+      if (!wait_status_or.ok()) {
+        // Batch dependencies failed; set the permanent error flag and abort
+        // so we don't try to process anything else.
+        permanent_error_ = std::move(wait_status_or).status();
+        CompleteSubmission(submission, permanent_error_);
+        FailAllPending(permanent_error_);
+        return permanent_error_;
+      } else if (wait_status_or.ok() && !wait_status_or.value()) {
+        // To preserve submission order we bail if we encounter a batch that
+        // is not ready and wait for something to become ready before pumping
+        // again.
+        // Note that if we were properly threading here we would potentially
+        // be evaluating this while previous batches were still processing
+        // but for now we do everything serially.
+        return OkStatus();
+      }
 
-        // Batch can run! Process now and remove it from the list so we don't
-        // try to run it again.
-        auto batch_status = ProcessBatch(batch, execute_fn);
-        submission->pending_batches.erase(submission->pending_batches.begin() +
-                                          i);
-        if (batch_status.ok()) {
-          // Batch succeeded. Since we want to preserve submission order we'll
-          // break out of the loop and try from the first submission again.
-          if (submission->pending_batches.empty()) {
-            // All work for this submission completed successfully. Signal the
-            // fence and remove the submission from the list.
-            RETURN_IF_ERROR(CompleteSubmission(submission, OkStatus()));
-            list_.take(submission).reset();
-          }
-        } else {
-          // Batch failed; set the permanent error flag and abort so we don't
-          // try to process anything else.
-          permanent_error_ = batch_status;
-          RETURN_IF_ERROR(CompleteSubmission(submission, batch_status));
-          list_.take(submission).reset();
-        }
-        restart_iteration = true;
+      // Batch can run! Process now and remove it from the list so we don't
+      // try to run it again.
+      auto batch_status = ProcessBatch(batch, execute_fn);
+      if (!batch_status.ok()) {
+        // Batch failed; set the permanent error flag and abort so we don't
+        // try to process anything else.
+        permanent_error_ = batch_status;
+        CompleteSubmission(submission, batch_status);
+        FailAllPending(permanent_error_);
+        return permanent_error_;
+      }
+      submission->pending_batches.erase(submission->pending_batches.begin() +
+                                        i);
+
+      // Batch succeeded. Since we want to preserve submission order we'll
+      // break out of the loop and try from the first submission again.
+      if (submission->pending_batches.empty()) {
+        // All work for this submission completed successfully. Signal the
+        // semaphore and remove the submission from the list.
+        CompleteSubmission(submission, OkStatus());
         break;
       }
-      if (restart_iteration) break;
     }
-  }
-
-  if (!permanent_error_.ok()) {
-    // If the sticky error got set while processing we need to abort all
-    // remaining submissions (simulating a device loss).
-    FailAllPending(permanent_error_);
-    return permanent_error_;
   }
 
   return OkStatus();
@@ -228,61 +133,49 @@ Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
                                          const ExecuteFn& execute_fn) {
   IREE_TRACE_SCOPE0("HostSubmissionQueue::ProcessBatch");
 
-  // Complete the waits on all semaphores and reset them.
-  for (auto& semaphore_value : batch.wait_semaphores) {
-    if (semaphore_value.index() == 0) {
-      auto* binary_semaphore =
-          reinterpret_cast<HostBinarySemaphore*>(absl::get<0>(semaphore_value));
-      RETURN_IF_ERROR(binary_semaphore->EndWaiting());
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-    }
-  }
+  // NOTE: the precondition is that the batch is ready to execute so we don't
+  // need to check the wait semaphores here.
 
   // Let the caller handle execution of the command buffers.
   RETURN_IF_ERROR(execute_fn(batch.command_buffers));
 
   // Signal all semaphores to allow them to unblock waiters.
-  for (auto& semaphore_value : batch.signal_semaphores) {
-    if (semaphore_value.index() == 0) {
-      auto* binary_semaphore =
-          reinterpret_cast<HostBinarySemaphore*>(absl::get<0>(semaphore_value));
-      RETURN_IF_ERROR(binary_semaphore->EndSignaling());
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-    }
+  for (auto& signal_point : batch.signal_semaphores) {
+    auto* semaphore = reinterpret_cast<HostSemaphore*>(signal_point.semaphore);
+    RETURN_IF_ERROR(semaphore->Signal(signal_point.value));
   }
 
   return OkStatus();
 }
 
-Status HostSubmissionQueue::CompleteSubmission(Submission* submission,
-                                               Status status) {
+void HostSubmissionQueue::CompleteSubmission(Submission* submission,
+                                             Status status) {
   IREE_TRACE_SCOPE0("HostSubmissionQueue::CompleteSubmission");
 
-  // It's safe to drop any remaining batches - their semaphores will never be
-  // signaled but that's fine as we should be the only thing relying on them.
-  submission->pending_batches.clear();
-
-  // Signal the fence.
-  auto* fence = static_cast<HostFence*>(submission->fence.first);
-  if (status.ok()) {
-    RETURN_IF_ERROR(fence->Signal(submission->fence.second));
-  } else {
-    RETURN_IF_ERROR(fence->Fail(std::move(status)));
+  if (status.ok() && !submission->pending_batches.empty()) {
+    // Completed with work remaining? Cause a failure.
+    status = FailedPreconditionErrorBuilder(IREE_LOC)
+             << "Submission ended prior to completion of all batches";
+  }
+  if (!status.ok()) {
+    // Fail all pending batch semaphores that we would have signaled.
+    for (auto& batch : submission->pending_batches) {
+      for (auto& signal_point : batch.signal_semaphores) {
+        auto* semaphore =
+            reinterpret_cast<HostSemaphore*>(signal_point.semaphore);
+        semaphore->Fail(status);
+      }
+    }
+    submission->pending_batches.clear();
   }
 
-  return OkStatus();
+  list_.take(submission).reset();
 }
 
 void HostSubmissionQueue::FailAllPending(Status status) {
   IREE_TRACE_SCOPE0("HostSubmissionQueue::FailAllPending");
   while (!list_.empty()) {
-    auto submission = list_.take(list_.front());
-    CompleteSubmission(submission.get(), status).IgnoreError();
-    submission.reset();
+    CompleteSubmission(list_.front(), status);
   }
 }
 

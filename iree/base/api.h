@@ -163,6 +163,13 @@ typedef int64_t iree_time_t;
 // Like absl::InfiniteFuture.
 #define IREE_TIME_INFINITE_FUTURE INT64_MAX
 
+// Like absl::Duration, represented as relative nanoseconds.
+typedef int64_t iree_duration_t;
+// Like absl::InfiniteDuration.
+#define IREE_DURATION_INFINITE INT64_MIN
+// Like absl::ZeroDuration.
+#define IREE_DURATION_ZERO 0
+
 // A span of mutable bytes (ala std::span of uint8_t).
 typedef struct {
   uint8_t* data;

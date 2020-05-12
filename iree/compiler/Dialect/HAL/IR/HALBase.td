@@ -383,18 +383,6 @@ def HAL_ExecutableLayout : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableLayoutType>()";
 }
 
-def HAL_Fence : DialectType<
-    HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::FenceType>()">,
-    "fence"> {
-  let typeDescription = [{
-    Synchronization mechanism for device->host notification.
-    Fences behave like timeline semaphores and contain a monotonically
-    increasing uint64_t payload. They may be waited on any number of times -
-    even if they have already been signaled.
-  }];
-}
-
 def HAL_RingBuffer : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::RingBufferType>()">,
@@ -402,6 +390,7 @@ def HAL_RingBuffer : DialectType<
   let typeDescription = [{
     Ringbuffer used for transient buffer allocation.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::RingBufferType>()";
 }
 
 def HAL_Semaphore : DialectType<
@@ -409,10 +398,14 @@ def HAL_Semaphore : DialectType<
     CPred<"$_self.isa<IREE::HAL::SemaphoreType>()">,
     "semaphore"> {
   let typeDescription = [{
-    A synchronization primitive used to indicate submission dependencies.
-    Semaphores are either of type binary (signaled or unsignaled) or timeline
-    (uint64_t payload with >= semantics).
+    Synchronization mechanism for host->device, device->host, host->host,
+    and device->device notification. Semaphores behave like Vulkan timeline
+    semaphores (or D3D12 fences) and contain a monotonically increasing
+    uint64_t payload. They may be waited on any number of times even if they
+    have already been signaled for a particular value. They may also be waited
+    on for a particular value prior to the signal for that value.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::SemaphoreType>()";
 }
 
 def HAL_ObjectType : AnyTypeOf<[
@@ -427,7 +420,6 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Executable,
   HAL_ExecutableCache,
   HAL_ExecutableLayout,
-  HAL_Fence,
   HAL_RingBuffer,
   HAL_Semaphore,
 ]>;
@@ -533,21 +525,12 @@ def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
 
-def HAL_FenceValue : NamedTupleOf<[
-    NamedTupleElement<0, "fence", HAL_Fence>,
-    NamedTupleElement<1, "value", I64>
-  ], "FenceValue"> {
-  let typeDescription = [{
-    A reference to a fence and associated payload value.
-  }];
-}
-
 def HAL_SemaphoreValue : NamedTupleOf<[
     NamedTupleElement<0, "semaphore", HAL_Semaphore>,
-    NamedTupleElement<1, "value", I64>
+    NamedTupleElement<1, "value", HAL_TimelineValue>
   ], "SemaphoreValue"> {
   let typeDescription = [{
-    A reference to a timline semaphore and associated payload value.
+    A reference to a semaphore and associated payload value.
   }];
 }
 

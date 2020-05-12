@@ -30,7 +30,6 @@ iree_cc_library(
     iree::base::api_util
     iree::base::tracing
     iree::hal::api
-    iree::hal::command_queue
     iree::hal::device
     iree::vm
     iree::vm::module_abi_cc

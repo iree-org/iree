@@ -21,62 +21,14 @@
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/host_fence.h"
-#include "iree/hal/semaphore.h"
+#include "iree/hal/host/host_semaphore.h"
 
 namespace iree {
 namespace hal {
 
-class HostSubmissionQueue;
-
-// Simple host-only binary semaphore implemented with a mutex.
-// To match the expected HAL behavior (mostly dictated by Vulkan) we can only
-// have a single waiter and waits can only occur once a signal has been
-// enqueued.
-//
-// Thread-safe (as instances may be imported and used by others).
-class HostBinarySemaphore final : public BinarySemaphore {
- public:
-  explicit HostBinarySemaphore(bool initial_value);
-
-  // Returns true if the semaphore has been signaled.
-  bool is_signaled() const;
-
- private:
-  friend class HostSubmissionQueue;
-
-  // Begins a signal operation and ensures no other signal operation is pending.
-  Status BeginSignaling();
-  // Ends a signal operation by setting the semaphore to the signaled state.
-  Status EndSignaling();
-
-  // Begins a wait operation and ensures no other wait operation is pending.
-  Status BeginWaiting();
-  // Ends a wait operation by resetting the semaphore to the unsignaled state.
-  Status EndWaiting();
-
-  // A single 32-bit int for lock-free semaphore behavior. We need to do this
-  // extra tracking so that we get consistent behavior across HAL
-  // implementations that have strict semaphore semantics.
-  struct State {
-    uint32_t signal_pending : 1;
-    uint32_t wait_pending : 1;
-    uint32_t signaled : 1;
-  };
-  std::atomic<State> state_{{0, 0, 0}};
-};
-
-// Simple host-only timeline semaphore implemented with a mutex.
-//
-// Thread-safe (as instances may be imported and used by others).
-class HostTimelineSemaphore final : public TimelineSemaphore {
- public:
-  // TODO(b/140141417): implement timeline semaphores.
-};
-
 // A queue managing CommandQueue submissions that uses host-local
 // synchronization primitives. Evaluates submission order by respecting the
-// wait and signal semaphores defined per batch and notifies fences upon
+// wait and signal semaphores defined per batch and notifies semaphores upon
 // submission completion.
 //
 // Note that it's possible for HAL users to deadlock themselves; we don't try to
@@ -101,7 +53,7 @@ class HostSubmissionQueue {
 
   // Enqueues a new submission.
   // No work will be performed until Process is called.
-  Status Enqueue(absl::Span<const SubmissionBatch> batches, FenceValue fence);
+  Status Enqueue(absl::Span<const SubmissionBatch> batches);
 
   // Processes all ready batches using the provided |execute_fn|.
   // The function may be called several times if new batches become ready due to
@@ -125,20 +77,22 @@ class HostSubmissionQueue {
   };
   struct Submission : public IntrusiveLinkBase<void> {
     absl::InlinedVector<PendingBatch, 4> pending_batches;
-    FenceValue fence;
   };
 
   // Returns true if all wait semaphores in the |batch| are signaled.
-  bool IsBatchReady(const PendingBatch& batch) const;
+  // If one or more of the wait semaphores have failed then returns a status
+  // from one of them arbitrarily.
+  StatusOr<bool> CheckBatchReady(const PendingBatch& batch) const;
 
   // Processes a batch by resetting semaphores, dispatching the command buffers
   // to the specified |execute_fn|, and signaling semaphores.
   //
-  // Preconditions: IsBatchReady(batch) == true
+  // Preconditions: CheckBatchReady(batch) == true
   Status ProcessBatch(const PendingBatch& batch, const ExecuteFn& execute_fn);
 
-  // Completes a submission by signaling the fence with the given |status|.
-  Status CompleteSubmission(Submission* submission, Status status);
+  // Completes a submission. Assumes that all batches have had their semaphores
+  // signaled and that any remaining here will need to be signaled for failure.
+  void CompleteSubmission(Submission* submission, Status status);
 
   // Fails all pending submissions with the given status.
   // Errors that occur during this process are silently ignored.
@@ -148,7 +102,7 @@ class HostSubmissionQueue {
   bool has_shutdown_ = false;
 
   // A sticky error that is set on the first failed submit. All future
-  // submissions will be skipped except for fences, which will receive this
+  // submissions will be skipped except for semaphores, which will receive this
   // error.
   Status permanent_error_;
 

@@ -41,7 +41,6 @@ typedef struct iree_hal_driver iree_hal_driver_t;
 typedef struct iree_hal_executable iree_hal_executable_t;
 typedef struct iree_hal_executable_cache iree_hal_executable_cache_t;
 typedef struct iree_hal_executable_layout iree_hal_executable_layout_t;
-typedef struct iree_hal_fence iree_hal_fence_t;
 typedef struct iree_hal_semaphore iree_hal_semaphore_t;
 
 // Reference to a buffer's mapped memory.
@@ -207,6 +206,12 @@ enum iree_hal_command_category_e {
   IREE_HAL_COMMAND_CATEGORY_TRANSFER = 1u << 0,
   // Command is considered a dispatch operation (dispatch/execute).
   IREE_HAL_COMMAND_CATEGORY_DISPATCH = 1u << 1,
+  // Commands may be of any type.
+  // Using this value may prevent optimizations and if possible callers should
+  // always specify the strictest set possible (for example, only transfer
+  // commands to ensure they get placed on a DMA queue).
+  IREE_HAL_COMMAND_CATEGORY_ANY =
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER | IREE_HAL_COMMAND_CATEGORY_DISPATCH,
 };
 typedef uint32_t iree_hal_command_category_t;
 
@@ -397,6 +402,50 @@ typedef struct {
   iree_device_size_t offset;
   iree_device_size_t length;
 } iree_hal_buffer_barrier_t;
+
+// A list of semaphores and their corresponding payloads.
+// When signaling each semaphore will be set to the new payload value provided.
+// When waiting each semaphore must reach or exceed the payload value.
+typedef struct {
+  iree_host_size_t count;
+  iree_hal_semaphore_t** semaphores;
+  uint64_t* payload_values;
+} iree_hal_semaphore_list_t;
+
+// A single batch of command buffers submitted to a device queue.
+// All of the wait semaphores must reach or exceed the given payload value prior
+// to the batch beginning execution. Each command buffer begins execution in the
+// order it is present in the list, though note that the command buffers
+// execute concurrently and require internal synchronization via events if there
+// are any dependencies between them. Only after all command buffers have
+// completed will the signal semaphores be updated to the provided payload
+// values.
+//
+// Matches Vulkan's VkSubmitInfo:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkSubmitInfo.html
+// Note that as the HAL only models timeline semaphores we take the payload
+// values directly in this struct; see:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkTimelineSemaphoreSubmitInfo.html
+typedef struct {
+  // Semaphores to wait on prior to executing any command buffer.
+  iree_hal_semaphore_list_t wait_semaphores;
+
+  // Command buffers to execute, in order.
+  iree_host_size_t command_buffer_count;
+  iree_hal_command_buffer_t** command_buffers;
+
+  // Semaphores to signal once all command buffers have completed execution.
+  iree_hal_semaphore_list_t signal_semaphores;
+} iree_hal_submission_batch_t;
+
+// Defines how a multi-wait operation treats the results of multiple semaphores.
+enum iree_hal_wait_mode_e {
+  // Waits for all semaphores to reach or exceed their specified values.
+  IREE_HAL_WAIT_MODE_ALL = 0,
+  // Waits for one or more semaphores to reach or exceed their specified values.
+  IREE_HAL_WAIT_MODE_ANY = 1,
+};
+typedef uint8_t iree_hal_wait_mode_t;
 
 // LINT.IfChange(element_type)
 
@@ -1083,6 +1132,55 @@ iree_hal_device_allocator(iree_hal_device_t* device);
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_hal_device_id(iree_hal_device_t* device);
 
+// Submits one or more batches of work to a device queue.
+//
+// The queue is selected based on the flags set in |command_categories| and the
+// |queue_affinity|. As the number of available queues can vary the
+// |queue_affinity| is used to hash into the available queues for the required
+// categories. For example if 2 queues support transfer commands and the
+// affinity is 5 the resulting queue could be index hash(5)=1. The affinity can
+// thus be treated as just a way to indicate whether two submissions must be
+// placed on to the same queue. Note that the exact hashing function is
+// implementation dependent.
+//
+// The submission behavior matches Vulkan's vkQueueSubmit, with each batch
+// executing its command buffers in the order they are defined but allowing the
+// command buffers to complete out-of-order. See:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkQueueSubmit.html
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
+    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
+    uint64_t queue_affinity, iree_host_size_t batch_count,
+    const iree_hal_submission_batch_t* batches);
+
+// Blocks the caller until the semaphores reach or exceed the specified payload
+// values or the |deadline_ns| elapses. All semaphores in |semaphore_list| must
+// be created from this device (or be imported into it).
+//
+// |wait_mode| can be used to decide when the wait will proceed; whether *all*
+// semaphores in |semaphore_list| must be signaled or whether *any* (one or
+// more) can be signaled before an early return.
+//
+// Returns success if the wait is successful and semaphores have been signaled
+// satisfying the |wait_mode|.
+//
+// Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the
+// |wait_mode| being satisfied. Note that even on success only a subset of the
+// semaphores may have been signaled and each can be queried to see which ones.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_wait_semaphores_with_deadline(
+    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns);
+
+// Blocks the caller until the semaphores reach or exceed the specified payload
+// values or the |timeout_ns| elapses.
+// A relative-time version of iree_hal_device_wait_semaphores_with_deadline
+// using the relative nanoseconds from the time the call is made.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_wait_semaphores_with_timeout(
+    iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
+    const iree_hal_semaphore_list_t* semaphore_list,
+    iree_duration_t timeout_ns);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
@@ -1241,26 +1339,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_release(
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Fence
-//===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
-
-// Retains the given |fence| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_fence_retain(iree_hal_fence_t* fence);
-
-// Releases the given |fence| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_fence_release(iree_hal_fence_t* fence);
-
-#endif  // IREE_API_NO_PROTOTYPES
-
-//===----------------------------------------------------------------------===//
 // iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a semaphore that can be used with command queues owned by this
+// device. To use the semaphores with other devices or instances they must
+// first be exported.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_create(
+    iree_hal_device_t* device, uint64_t initial_value,
+    iree_allocator_t allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Retains the given |semaphore| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1269,6 +1358,52 @@ iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
 // Releases the given |semaphore| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
+
+// Queries the current payload of the semaphore and stores the result in
+// |out_value|. As the payload is monotonically increasing it is guaranteed that
+// the value is at least equal to the previous result of a
+// iree_hal_semaphore_query call and coherent with any waits for a
+// specified value via iree_device_wait_all_semaphores.
+//
+// Returns the status at the time the method is called without blocking and as
+// such is only valid after a semaphore has been signaled. The same failure
+// status will be returned regardless of when in the timeline the error
+// occurred.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value);
+
+// Signals the |semaphore| to the given payload value.
+// The call is ignored if the current payload value exceeds |new_value|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value);
+
+// Signals the |semaphore| with a failure. The |status| will be returned from
+// iree_hal_semaphore_query and iree_hal_semaphore_signal for the lifetime
+// of the semaphore.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
+
+// Blocks the caller until the semaphore reaches or exceedes the specified
+// payload value or the |deadline_ns| elapses.
+//
+// Returns success if the wait is successful and the semaphore has met or
+// exceeded the required payload value.
+//
+// Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the semaphore
+// reaching the required value. If an asynchronous failure occured this will
+// return the failure status that was set immediately.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
+                                      uint64_t value, iree_time_t deadline_ns);
+
+// Blocks the caller until the semaphore reaches or exceedes the specified
+// payload value or the |timeout_ns| elapses.
+// A relative-time version of iree_hal_semaphore_wait_with_deadline using the
+// relative nanoseconds from the time the call is made.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
+                                     uint64_t value,
+                                     iree_duration_t timeout_ns);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

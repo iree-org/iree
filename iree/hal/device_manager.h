@@ -29,7 +29,7 @@
 #include "iree/hal/device.h"
 #include "iree/hal/device_placement.h"
 #include "iree/hal/executable_format.h"
-#include "iree/hal/fence.h"
+#include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
@@ -153,30 +153,27 @@ class DeviceManager final {
   // indicating immediate submission and absl::InfiniteFuture indicating that
   // Flush must be called.
   //
-  // If a |fence| is provided it will be signaled when the submission has
-  // completed and otherwise the caller must use WaitIdle to ensure completion.
-  // If a sequence of submissions are performed then the semaphore relationships
-  // can be used to elide waits. Submit(A)+Submit(B, fence) where there is a
-  // dependency from A->B is safe.
+  // If |batches| signal_semaphores are provided they will be signaled when
+  // their corresponding submission has completed. If a sequence of submissions
+  // are performed then the semaphore value relationships can be used to elide
+  // waits.
   //
-  // All provided resources must remain alive until the provided |fence|
-  // resolves or Scheduler::WaitIdle succeeds.
+  // All provided resources must remain alive until the provided semaphores are
+  // signaled indicating that the resources used are no longer required.
   //
   // Submissions may be made from any thread. Behavior is undefined
   // if a thread is performing a WaitIdle while another thread submits work.
   Status Submit(Device* device, CommandQueue* command_queue,
-                absl::Span<const SubmissionBatch> batches, absl::Time deadline,
-                FenceValue fence = {});
+                absl::Span<const SubmissionBatch> batches, absl::Time deadline);
   Status Submit(Device* device, CommandQueue* command_queue,
                 absl::Span<const SubmissionBatch> batches,
-                absl::Duration timeout, FenceValue fence = {}) {
+                absl::Duration timeout) {
     return Submit(device, command_queue, batches,
-                  RelativeTimeoutToDeadline(timeout), fence);
+                  RelativeTimeoutToDeadline(timeout));
   }
   Status Submit(Device* device, CommandQueue* command_queue,
-                absl::Span<const SubmissionBatch> batches,
-                FenceValue fence = {}) {
-    return Submit(device, command_queue, batches, absl::InfinitePast(), fence);
+                absl::Span<const SubmissionBatch> batches) {
+    return Submit(device, command_queue, batches, absl::InfinitePast());
   }
 
   // Flushes any requests that are pending in the scheduler and ensures they
@@ -187,7 +184,8 @@ class DeviceManager final {
   Status Flush();
 
   // Blocks until all outstanding requests have been completed.
-  // This is equivalent to having waited on all outstanding fences.
+  // This is equivalent to having waited on all outstanding semaphore signal
+  // operations in all previously submitted batches.
   // Implicitly calls Flush to ensure delayed requests are scheduled.
   // Work submitted from other threads during a wait may not be included in the
   // wait set.

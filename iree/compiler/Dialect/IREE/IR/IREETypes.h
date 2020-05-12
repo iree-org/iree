@@ -83,7 +83,6 @@ enum Kind {
   Executable,
   ExecutableCache,
   ExecutableLayout,
-  Fence,
   RingBuffer,
   Semaphore,
 };
