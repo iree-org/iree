@@ -101,13 +101,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   buildHALTransformPassPipeline(passManager, targetOptions, transformOptions);
 }
 
-static PassPipelineRegistration<TransformOptions> transformPassPipeline(
-    "iree-hal-transformation-pipeline",
-    "Runs the full IREE HAL dialect transformation pipeline",
-    [](OpPassManager &passManager, const TransformOptions &transformOptions) {
-      buildHALTransformPassPipeline(passManager, getTargetOptionsFromFlags(),
-                                    transformOptions);
-    });
+void registerHALTransformPassPipeline() {
+  PassPipelineRegistration<TransformOptions>(
+      "iree-hal-transformation-pipeline",
+      "Runs the full IREE HAL dialect transformation pipeline",
+      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+        buildHALTransformPassPipeline(passManager, getTargetOptionsFromFlags(),
+                                      transformOptions);
+      });
+}
 
 }  // namespace HAL
 }  // namespace IREE

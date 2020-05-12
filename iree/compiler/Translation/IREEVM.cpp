@@ -60,16 +60,18 @@ LogicalResult convertToVMModule(ModuleOp moduleOp) {
   return success();
 }
 
-static PassPipelineRegistration<> transformPassPipeline(
-    "iree-transformation-pipeline",
-    "Runs the full IREE input to VM transformation pipeline",
-    [](OpPassManager &passManager) {
-      IREE::Flow::buildFlowTransformPassPipeline(passManager);
-      IREE::HAL::buildHALTransformPassPipeline(
-          passManager, IREE::HAL::getTargetOptionsFromFlags());
-      IREE::VM::buildVMTransformPassPipeline(passManager);
-      passManager.addPass(IREE::createDropCompilerHintsPass());
-    });
+void registerIREEVMTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-transformation-pipeline",
+      "Runs the full IREE input to VM transformation pipeline",
+      [](OpPassManager &passManager) {
+        IREE::Flow::buildFlowTransformPassPipeline(passManager);
+        IREE::HAL::buildHALTransformPassPipeline(
+            passManager, IREE::HAL::getTargetOptionsFromFlags());
+        IREE::VM::buildVMTransformPassPipeline(passManager);
+        passManager.addPass(IREE::createDropCompilerHintsPass());
+      });
+}
 
 LogicalResult translateFromMLIRToVMBytecodeModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,

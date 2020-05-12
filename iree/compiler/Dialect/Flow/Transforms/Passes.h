@@ -44,6 +44,8 @@ namespace Flow {
 //   <run conversion from flow to sequencer/hal/vm/etc>
 void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
+void registerFlowTransformPassPipeline();
+
 //===----------------------------------------------------------------------===//
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
@@ -138,6 +140,7 @@ std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerFlowPasses() {
+  registerFlowTransformPassPipeline();
   createFlattenTuplesInCFGPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
