@@ -92,22 +92,18 @@ as the cache does.
 
 An executable layout describing the descriptor sets and push constants used.
 
-### fence
-
-Synchronization mechanism for device->host notification.
-Fences behave like timeline semaphores and contain a monotonically
-increasing uint64_t payload. They may be waited on any number of times -
-even if they have already been signaled.
-
 ### ring_buffer
 
 Ringbuffer used for transient buffer allocation.
 
 ### semaphore
 
-A synchronization primitive used to indicate submission dependencies.
-Semaphores are either of type binary (signaled or unsignaled) or timeline
-(uint64_t payload with >= semantics).
+Synchronization mechanism for host->device, device->host, host->host,
+and device->device notification. Semaphores behave like Vulkan timeline
+semaphores (or D3D12 fences) and contain a monotonically increasing
+uint64_t payload. They may be waited on any number of times even if they
+have already been signaled for a particular value. They may also be waited
+on for a particular value prior to the signal for that value.
 
 ## Operation definition
 
@@ -128,13 +124,13 @@ Returns a copy of the variable value.
 
 | Operand | Description |
 | :-----: | ----------- |
-`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore>
+`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore
+`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 
 ### `hal.allocator.allocate.const` (IREE::HAL::AllocatorAllocateConstOp)
 
@@ -1374,7 +1370,7 @@ operation ::= `hal.ex.defer_release` $operand `:` type($operand) attr-dict
 
 | Operand | Description |
 | :-----: | ----------- |
-`operand` | allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore
+`operand` | allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 
 ### `hal.ex.shared_device` (IREE::HAL::ExSharedDeviceOp)
 
@@ -2031,6 +2027,134 @@ Returns the given values from the region and back to the host code.
 | :-----: | ----------- |
 `operands` | any type
 
+### `hal.semaphore.await` (IREE::HAL::SemaphoreAwaitOp)
+
+asynchronous semaphore wait operation
+
+Syntax:
+
+```
+operation ::= `hal.semaphore.await` $semaphore `,` `min_value` `=` $min_value attr-dict-with-keyword `:` type($status)
+```
+
+
+Yields the caller until the semaphore reaches or exceeds the specified
+payload `min_value`. Returns the `status` of the semaphore after the wait,
+with a non-zero value indicating failure.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`semaphore` | semaphore
+`min_value` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`status` | 32-bit signless integer
+
+### `hal.semaphore.create` (IREE::HAL::SemaphoreCreateOp)
+
+semaphore allocation operation
+
+Syntax:
+
+```
+operation ::= `hal.semaphore.create` $device `,` `initial_value` `=` $initial_value
+              attr-dict-with-keyword `:` type($result)
+```
+
+
+Returns a semaphore from the device pool with the given initial value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`device` | device
+`initial_value` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | semaphore
+
+### `hal.semaphore.fail` (IREE::HAL::SemaphoreFailOp)
+
+semaphore asynchronous failure operation
+
+Syntax:
+
+```
+operation ::= `hal.semaphore.fail` $semaphore `,` `status` `=` $status attr-dict-with-keyword
+```
+
+
+Signals the semaphore with a failure. The `status` will be returned from
+`hal.semaphore.query` and `hal.semaphore.signal` for the lifetime
+of the semaphore.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`semaphore` | semaphore
+`status` | 32-bit signless integer
+
+### `hal.semaphore.query` (IREE::HAL::SemaphoreQueryOp)
+
+semaphore payload value query
+
+Syntax:
+
+```
+operation ::= `hal.semaphore.query` $semaphore attr-dict-with-keyword `:` type($status) `,` type($value)
+```
+
+
+Queries the current payload and returns a tuple of `(status, value)`.
+As the payload is monotonically increasing it is guaranteed that
+the value is at least equal to the previous result of a
+`hal.semaphore.signal` call and coherent with any waits for a
+specified value via `hal.semaphore.await`.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`semaphore` | semaphore
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`status` | 32-bit signless integer
+`value` | index
+
+### `hal.semaphore.signal` (IREE::HAL::SemaphoreSignalOp)
+
+semaphore payload value signal operation
+
+Syntax:
+
+```
+operation ::= `hal.semaphore.signal` $semaphore `,` `value` `=` $new_value attr-dict-with-keyword
+```
+
+
+Signals the semaphore to the given payload value.
+The call is ignored if the current payload value exceeds `new_value`.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`semaphore` | semaphore
+`new_value` | index
+
 ### `hal.variable.address` (IREE::HAL::VariableAddressOp)
 
 returns an address reference to a variable
@@ -2055,7 +2179,7 @@ variable load and store indirect ops.
 
 | Result | Description |
 | :----: | ----------- |
-`result` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore>
+`result` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
 
 ### `hal.variable.load` (IREE::HAL::VariableLoadOp)
 
@@ -2080,7 +2204,7 @@ Returns a copy of the variable value.
 
 | Result | Description |
 | :----: | ----------- |
-`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore
+`result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 
 ### `hal.variable` (IREE::HAL::VariableOp)
 
@@ -2117,8 +2241,8 @@ Stores a copy of the value into a variable.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore
-`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore>
+`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
+`variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
 
 ### `hal.variable.store` (IREE::HAL::VariableStoreOp)
 
@@ -2143,4 +2267,4 @@ Stores a copy of the value into a variable.
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or fence or ring_buffer or semaphore
+`value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
