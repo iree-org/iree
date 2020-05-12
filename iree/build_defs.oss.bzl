@@ -63,6 +63,7 @@ IREE_DRIVER_MODULES = [
 
 # Aliases to the Starlark cc rules.
 cc_library = _cc_library
+cc_binary = _cc_binary
 
 def iree_build_test(name, targets):
     """Dummy rule to ensure that targets build.
@@ -83,15 +84,4 @@ def iree_flatbuffer_cc_library(**kwargs):
     flatbuffer_cc_library(
         gen_reflections = False,
         **kwargs
-    )
-
-def cc_binary(linkopts = [], **kwargs):
-    """Wrapper around low-level cc_binary that adds flags."""
-    _cc_binary(
-        linkopts = linkopts + [
-            # Just include libraries that should be presumed in 2020.
-            "-ldl",
-            "-lpthread",
-        ],
-        **kwargs,
     )
