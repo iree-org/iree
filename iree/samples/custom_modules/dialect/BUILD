@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", iree_cc_binary = "cc_binary")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
@@ -88,7 +87,7 @@ cc_library(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "custom-opt",
     srcs = ["custom_opt.cc"],
     deps = [
@@ -130,7 +129,7 @@ iree_cc_binary(
     ],
 )
 
-iree_cc_binary(
+cc_binary(
     name = "custom-translate",
     srcs = ["custom_translate.cc"],
     deps = [

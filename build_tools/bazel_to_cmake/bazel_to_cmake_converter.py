@@ -243,7 +243,7 @@ class BuildFileFunctions(object):
   # Each function that may be found in a BUILD file must be listed here.      #
   # ------------------------------------------------------------------------- #
 
-  def load(self, *args, **kwargs):
+  def load(self, *args):
     # No mapping to CMake, ignore.
     pass
 
@@ -407,9 +407,6 @@ class BuildFileFunctions(object):
                             f"{deps_block}"
                             f"{testonly_block}"
                             f")\n\n")
-
-  # Effectively an alias in IREE code.
-  iree_cc_binary = cc_binary
 
   def cc_embed_data(self,
                     name,
