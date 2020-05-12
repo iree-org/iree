@@ -50,12 +50,6 @@ StatusOr<std::vector<const char*>> MatchAvailableInstanceLayers(
 StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
     const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms);
 
-// Returns a list of layer names available for the given |physical_device|.
-// Fails if any required_layers are unavailable.
-StatusOr<std::vector<const char*>> MatchAvailableDeviceLayers(
-    VkPhysicalDevice physical_device,
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms);
-
 // Returns a list of extension names available for the given |physical_device|.
 // Fails if any required_extensions are unavailable.
 StatusOr<std::vector<const char*>> MatchAvailableDeviceExtensions(

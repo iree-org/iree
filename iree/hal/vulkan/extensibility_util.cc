@@ -153,23 +153,6 @@ StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
   return enabled_extensions;
 }
 
-StatusOr<std::vector<const char*>> MatchAvailableDeviceLayers(
-    VkPhysicalDevice physical_device,
-    const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms) {
-  uint32_t layer_property_count = 0;
-  VK_RETURN_IF_ERROR(syms.vkEnumerateDeviceLayerProperties(
-      physical_device, &layer_property_count, nullptr));
-  std::vector<VkLayerProperties> layer_properties(layer_property_count);
-  VK_RETURN_IF_ERROR(syms.vkEnumerateDeviceLayerProperties(
-      physical_device, &layer_property_count, layer_properties.data()));
-  ASSIGN_OR_RETURN(auto enabled_layers,
-                   MatchAvailableLayers(extensibility_spec.required_layers,
-                                        extensibility_spec.optional_layers,
-                                        layer_properties),
-                   _ << "Unable to find all required device layers");
-  return enabled_layers;
-}
-
 StatusOr<std::vector<const char*>> MatchAvailableDeviceExtensions(
     VkPhysicalDevice physical_device,
     const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms) {
