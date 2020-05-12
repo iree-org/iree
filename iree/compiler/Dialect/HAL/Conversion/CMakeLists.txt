@@ -34,3 +34,15 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    Passes
+  HDRS
+    "Passes.h"
+  DEPS
+    MLIRPass
+    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
+    iree::compiler::Dialect::HAL::Conversion::HALToVM
+  PUBLIC
+)

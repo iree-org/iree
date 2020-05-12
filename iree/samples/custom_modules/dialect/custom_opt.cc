@@ -18,6 +18,7 @@
 // We need this entry function because we want to register the custom
 // dialect, which is missing in IREE's opt main entry function.
 
+#include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/SPIRV/init_translations.h"
 #include "iree/samples/custom_modules/dialect/init_dialect.h"
@@ -75,6 +76,7 @@ int main(int argc, char **argv) {
   // Register the custom dialect
   mlir::iree_compiler::registerCustomDialect();
   mlir::iree_compiler::registerAllIreePasses();
+  mlir::iree_compiler::registerHALConversionPasses();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerSPRIVTranslation();
   mlir::iree_compiler::registerCodegenPasses();

@@ -96,6 +96,7 @@ iree_cc_binary(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::Conversion::HALToVM
+    iree::compiler::Dialect::HAL::Conversion::Passes
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::IREE::Transforms
