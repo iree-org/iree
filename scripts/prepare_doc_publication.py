@@ -54,6 +54,7 @@ DOC_TITLE_DICT = {
     'getting_started_windows_bazel.md': 'Windows with Bazel',
     'getting_started_windows_cmake.md': 'Windows with CMake',
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
+    'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
     'getting_started_python.md': 'Python',
     'op_coverage.md': 'XLA HLO Operation Coverage',
     'roadmap.md': 'Short-term Focus Areas',
@@ -74,6 +75,7 @@ PERMALINK_DICT = {
     'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
     'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
+    'generic_vulkan_env_setup.md': 'GetStarted/GenericVulkanSetup',
     'getting_started_python.md': 'GetStarted/Python',
     'developer_overview.md': 'DeveloperOverview',
     'testing_guide.md': 'TestingGuide',
@@ -106,6 +108,7 @@ NAVI_ORDER_DICT = {
     'getting_started_windows_bazel.md': 5,
     'getting_started_windows_vulkan.md': 6,
     'getting_started_python.md': 7,
+    'generic_vulkan_env_setup.md': 8,
 }
 
 # A dictionary containing source directory to section tile mappings.
