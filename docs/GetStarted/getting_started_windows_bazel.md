@@ -40,6 +40,15 @@ the specific version IREE uses) by following the
 
 Also install [MSYS2](https://www.msys2.org/) by following Bazel's documentation.
 
+### Install Python3
+
+Instructions for installation can be found
+[here](https://www.python.org/downloads/windows/).
+
+### Install Clang
+
+Install Clang for `clang-cl.exe` from https://releases.llvm.org/download.html.
+
 ### Install Build Tools For Visual Studio
 
 Install the full Visual Studio or "Build Tools For Visual Studio" from the
