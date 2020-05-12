@@ -46,7 +46,8 @@ the graphics card is Vulkan capable or update the driver.
 
 ### Debian/Ubuntu
 
-The following packages should be installed for a proper Vulkan runtime:
+The following packages should be installed for a proper Vulkan runtime to test
+the runtime functions properly:
 
 * [libvulkan1][PackageLibVulkan1] for the Vulkan loader `libvulkan.so`.
 * (AMD) [mesa-vulkan-drivers][PackageMesaVulkan] for Mesa AMD Vulkan ICD.
@@ -58,8 +59,6 @@ application should be able to run. You may additionally want to install
 * [vulkan-tools][PackageVulkanTools] for command-line tools like `vulkaninfo`
   (dumping available ICDs and their capabilities) and GUI application like
   `vulkancube` (rendering a rotating cube).
-
-To test the runtime functions properly.
 
 In order to develop Vulkan applications, you additionally need the following
 pacages:
