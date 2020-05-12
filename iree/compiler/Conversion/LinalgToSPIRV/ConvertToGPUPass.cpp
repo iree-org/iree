@@ -330,8 +330,7 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
     // across threads within a workgroup.
     if (!hasWorkItemMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
-        linalg::linalgLowerOpToLoops<scf::ParallelOp, LinalgOpTy>(rewriter,
-                                                                  linalgOp);
+        linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();
     if (!loops.getValue().empty()) {
       scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
@@ -355,8 +354,7 @@ struct MapLinalgOpToGlobalInvocationId
     // If marker exists and its not no-tile, do nothing.
     if (hasMarker(linalgOp) && !hasNoTileMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
-        linalg::linalgLowerOpToLoops<scf::ParallelOp, LinalgOpTy>(rewriter,
-                                                                  linalgOp);
+        linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();
     if (!loops.getValue().empty()) {
       scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
