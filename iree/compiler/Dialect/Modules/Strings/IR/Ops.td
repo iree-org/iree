@@ -18,7 +18,7 @@
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def STRINGS_Dialect : Dialect {
   let name = "strings";

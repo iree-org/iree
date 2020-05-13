@@ -16,7 +16,7 @@
 #define IREE_DIALECT_IREE_OPS
 
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Op types

@@ -17,7 +17,7 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def CUSTOM_Dialect : Dialect {
   let name = "custom";

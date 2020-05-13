@@ -17,7 +17,7 @@
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "mlir/IR/SymbolInterfaces.td"
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
     FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
