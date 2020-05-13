@@ -32,6 +32,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "abs.mlir"
     "add.mlir"
+    "broadcast_add.mlir"
     "broadcast.mlir"
     "broadcast_in_dim.mlir"
     "compare.mlir"

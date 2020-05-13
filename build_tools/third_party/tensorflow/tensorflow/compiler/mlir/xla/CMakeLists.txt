@@ -40,6 +40,7 @@ external_cc_library(
     "ir/hlo_ops.cc"
     "ir/hlo_utils.cc"
     "ir/lhlo_ops.cc"
+    "transforms/chlo_legalize_to_hlo.cc"
     "transforms/legalize_control_flow.cc"
     "transforms/legalize_to_standard.cc"
     "transforms/lower_general_dot.cc"

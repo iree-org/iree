@@ -29,11 +29,16 @@ namespace Flow {
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
   // Input dialect sanitization and type legalization.
+  // On completion:
+  //   - All ops remain at the input-dialect tensor-level.
+  //   - Loose shapex.get_ranked_shape ops can exist at points where dynamic
+  //     dims are required.
   //----------------------------------------------------------------------------
   passManager.addPass(createCanonicalizerPass());
 
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
+  passManager.addPass(createHLOPreprocessingPass());
 
   // Flatten tuples (like tuple<tensor<...>, tensor<...>>) so we can do
   // fine-grained tensor tracking.
@@ -78,19 +83,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // it should happen after the HAL has further annotated the exported
   // functions (such as with synthetic barrier arguments).
   passManager.addPass(IREE::Flow::createMergeExportedReflection());
-
-  // ---------------------------------------------------------------------------
-  // Common input-dialect tensor-level rewrites.
-  // Pre-conditions:
-  //   - Input dialect ops must still be present
-  // On completion:
-  //   - All ops remain at the input-dialect tensor-level.
-  //   - Loose shapex.get_ranked_shape ops can exist at points where dynamic
-  //     dims are required.
-  // ---------------------------------------------------------------------------
-  // Rewrite some hlo ops to a form that is compatible for all
-  // backends.
-  passManager.addPass(createHLOPreprocessingPass());
 
   //----------------------------------------------------------------------------
   // Shape materialization for buffer assignment and stream formation.

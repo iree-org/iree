@@ -121,6 +121,10 @@ struct HLOToHLOPreprocessing
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
     xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
+    // Note that various input modalities may do their own legalization of
+    // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
+    // whether it was legalized away at a higher level.
+    xla_chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape>(context);
     applyPatternsAndFoldGreedily(getOperation(), patterns);

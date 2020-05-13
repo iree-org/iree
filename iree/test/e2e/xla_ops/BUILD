@@ -38,6 +38,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "abs.mlir",
         "add.mlir",
+        "broadcast_add.mlir",
         "broadcast.mlir",
         "broadcast_in_dim.mlir",
         # TODO(GH-1851): Enalbe the test.
