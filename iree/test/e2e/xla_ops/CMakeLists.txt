@@ -71,6 +71,7 @@ iree_check_single_backend_test_suite(
     "abs.mlir"
     "add.mlir"
     "batch_norm_inference.mlir"
+    "broadcast.mlir"
     "broadcast_in_dim.mlir"
     "clamp.mlir"
     "compare.mlir"
