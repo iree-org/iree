@@ -52,7 +52,7 @@ reshape | ✓ | ✓ | ✓
 reverse | ✓ | ✗ | ✗
 rsqrt | ✓ | ✓ | ✓
 select | ✓ | ✓ | ✓
-sine | ✓ | ✗ | ✗
+sine | ✓ | ✓ | ✓
 slice | ✓ | ✗ | ✗
 sqrt | ✓ | ✓ | ✓
 subtract | ✓ | ✓ | ✓
