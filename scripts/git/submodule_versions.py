@@ -121,13 +121,7 @@ def init_submodules(repo_dir):
 
 def parallel_shallow_update_submodules(repo_dir):
   print("*** Making shallow clone of submodules")
-  # TODO(gcmn) Figure out a way to quickly fetch submodules without relying on
-  # target SHA being within 10000 commits of HEAD.
-  magic_depth = 10000
-  utils.execute([
-      "git", "submodule", "update", "--jobs", "8", "--depth",
-      str(magic_depth)
-  ],
+  utils.execute(["git", "submodule", "update", "--jobs", "8", "--depth", "1"],
                 cwd=repo_dir)
 
 
