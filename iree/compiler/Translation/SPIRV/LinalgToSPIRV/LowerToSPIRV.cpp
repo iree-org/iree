@@ -78,8 +78,8 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - All Linalg ops have buffer semantics.
   //
   // Post-conditions:
-  //   - loop.parallel ops are generated for mapping to workgroups.
-  //   - Linalg ops are nested inside loop.parallel ops and ready for mapping
+  //   - scf.parallel ops are generated for mapping to workgroups.
+  //   - Linalg ops are nested inside scf.parallel ops and ready for mapping
   //     to workitems.
   //===--------------------------------------------------------------------===//
   pm.addPass(createLinalgTileAndFusePass(workGroupSize));
@@ -88,9 +88,9 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   // Map to GPU processor IDs.
   //
   // Post-conditions:
-  //   - loop.parallel ops are converted to loop.for ops and mapped to
+  //   - scf.parallel ops are converted to scf.for ops and mapped to
   //     workgroups.
-  //   - Linalg ops are converted to loop.for ops and mapped to workitems.
+  //   - Linalg ops are converted to scf.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
   pm.addPass(createConvertToGPUPass());
   pm.addPass(createLowerAffinePass());

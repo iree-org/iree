@@ -7,7 +7,7 @@ module {
   //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
   //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
-  //       CHECK: loop.parallel
+  //       CHECK: scf.parallel
   //       CHECK:   %[[VIEW0:.+]] = subview %[[ARG0]]
   //       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]]
   //       CHECK:   %[[VIEW2:.+]] = subview %[[ARG2]]
@@ -41,7 +41,7 @@ module {
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
   //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
   //  CHECK-SAME: %[[ARG3:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
-  //       CHECK: loop.parallel
+  //       CHECK: scf.parallel
   //   CHECK-DAG:   %[[VIEW0:.+]] = subview %[[ARG0]]
   //   CHECK-DAG:   %[[VIEW1:.+]] = subview %[[ARG1]]
   //   CHECK-DAG:   %[[VIEW2READ:.+]] = subview %[[ARG2]]
@@ -88,7 +88,7 @@ module {
   //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
   //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-  //       CHECK: loop.parallel (%{{.+}})
+  //       CHECK: scf.parallel (%{{.+}})
   //       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]]
   //       CHECK:   %[[VIEW2:.+]] = subview %[[ARG2]]
   //       CHECK:   linalg.conv
@@ -113,7 +113,7 @@ module {
   //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
   //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-  //       CHECK: loop.parallel (%{{.+}}, %{{.+}}, %{{.+}})
+  //       CHECK: scf.parallel (%{{.+}}, %{{.+}}, %{{.+}})
   //       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]]
   //       CHECK:   %[[VIEW2:.+]] = subview %[[ARG2]]
   //       CHECK:   linalg.conv
@@ -134,7 +134,7 @@ module {
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 module {
   // CHECK-LABEL: func @parallel_4D
-  //       CHECK: loop.parallel (%{{.+}}, %{{.+}}, %{{.+}})
+  //       CHECK: scf.parallel (%{{.+}}, %{{.+}}, %{{.+}})
   func @parallel_4D(%arg0: memref<?x?x?x?xf32>,
                     %arg1 : memref<?x?x?x?xf32>,
                     %arg2 : memref<?x?x?x?xf32>)

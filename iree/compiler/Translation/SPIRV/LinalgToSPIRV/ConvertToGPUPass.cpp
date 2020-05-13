@@ -40,7 +40,7 @@ namespace iree_compiler {
 // Loop utilities
 //===----------------------------------------------------------------------===//
 
-/// Builds an empty loop.for operation. The default builder adds an entry basic
+/// Builds an empty scf.for operation. The default builder adds an entry basic
 /// block which needs to be avoided here.
 static scf::ForOp buildEmptyForOp(Location loc, OpBuilder &builder, Value lb,
                                   Value ub, Value step) {
@@ -58,10 +58,10 @@ struct LoopBounds {
 };
 }  // namespace
 
-/// Replaces a loop.parallelOp with an optional loop.parallel op and nested
-/// loop.for operations. To create the loop.parallel op as the outermost loop,
+/// Replaces a scf.parallelOp with an optional scf.parallel op and nested
+/// scf.for operations. To create the scf.parallel op as the outermost loop,
 /// pass the lower bound, upper bound and steps in `newPLoopLbs`, `newPLoopUbs`,
-/// and `newPLoopStep` respectively. The bounds of the inner loop.for operations
+/// and `newPLoopStep` respectively. The bounds of the inner scf.for operations
 /// to be created are passed in `forLbs`, `forUbs`, and `forStep`. The
 /// `permutation` vector contains a mapping from the original loop order, to the
 /// loop order to be generated.
@@ -70,21 +70,21 @@ static Operation *replacePLoopOp(ConversionPatternRewriter &rewriter,
                                  ArrayRef<LoopBounds> newPLoopBounds,
                                  ArrayRef<LoopBounds> forBounds,
                                  ArrayRef<unsigned> permutation) {
-  assert(!forBounds.empty() && "unhandled case of no loop.for created");
+  assert(!forBounds.empty() && "unhandled case of no scf.for created");
   unsigned numLoops = pLoopOp.getNumLoops();
   Location loc = pLoopOp.getLoc();
   assert(forBounds.size() + newPLoopBounds.size() == numLoops &&
-         "cannot drop loops when splitting loop.parallel operation");
+         "cannot drop loops when splitting scf.parallel operation");
   assert(permutation.size() == numLoops);
   OpBuilder::InsertionGuard guard(rewriter);
 
-  // Need a signature conversion for the body of the loop.parallel operation,
+  // Need a signature conversion for the body of the scf.parallel operation,
   // before can it can be used as the body of the innermost loop created here.
   TypeConverter::SignatureConversion signatureConverter(numLoops);
   Operation *outermostLoop = nullptr;
   auto permuteIt = permutation.begin();
 
-  // Create the loop.parallel operation as the outermost loop, if specified.
+  // Create the scf.parallel operation as the outermost loop, if specified.
   if (!newPLoopBounds.empty()) {
     auto lbs = llvm::to_vector<2>(llvm::map_range(
         newPLoopBounds, [](LoopBounds bounds) -> Value { return bounds.lb; }));
@@ -101,7 +101,7 @@ static Operation *replacePLoopOp(ConversionPatternRewriter &rewriter,
     outermostLoop = newPLoop.getOperation();
   }
 
-  // Generate the nested loop.for operations with the bounds passed.
+  // Generate the nested scf.for operations with the bounds passed.
   for (auto it : enumerate(forBounds)) {
     Value lb = it.value().lb, ub = it.value().ub, step = it.value().step;
     if (it.index() != forBounds.size() - 1) {
@@ -110,7 +110,7 @@ static Operation *replacePLoopOp(ConversionPatternRewriter &rewriter,
       signatureConverter.remapInput(*permuteIt, forOp.getInductionVar());
       rewriter.setInsertionPointToStart(forOp.getBody());
     } else {
-      // For the last loop, move the body of the loop.parallel op as the body of
+      // For the last loop, move the body of the scf.parallel op as the body of
       // the loop after signature conversion.
       auto forOp = buildEmptyForOp(loc, rewriter, lb, ub, step);
       if (!outermostLoop) outermostLoop = forOp.getOperation();
@@ -127,8 +127,8 @@ static Operation *replacePLoopOp(ConversionPatternRewriter &rewriter,
   return outermostLoop;
 }
 
-/// Serializes the dimensions of the loop.parallel specified in
-/// `serializedDimensions`, by creating an nested loop.for operation for each
+/// Serializes the dimensions of the scf.parallel specified in
+/// `serializedDimensions`, by creating an nested scf.for operation for each
 /// dimension.
 // TODO(ravishankarm): Move this into LoopUtils.h in MLIR.
 static Operation *serializeDimensions(ConversionPatternRewriter &rewriter,
@@ -141,7 +141,7 @@ static Operation *serializeDimensions(ConversionPatternRewriter &rewriter,
   serializedDimSet.insert(serializedDimensions.begin(),
                           serializedDimensions.end());
   assert(serializedDimSet.size() == serializedDimensions.size() &&
-         "cannot repeat dimensions during serialization of loop.parallel");
+         "cannot repeat dimensions during serialization of scf.parallel");
   SmallVector<LoopBounds, 2> newPLoopBounds, forBounds;
   SmallVector<unsigned, 2> permutation;
   auto lbs = pLoopOp.lowerBound();
@@ -178,9 +178,9 @@ static Operation *serializeDimensionsFrom(ConversionPatternRewriter &rewriter,
 // GPU processor ID mapping utilities
 //===----------------------------------------------------------------------===//
 
-/// Distribute loop.parallel to processors with the processors logically
+/// Distribute scf.parallel to processors with the processors logically
 /// arranged with same dimensionality as the number of loops, i.e. a
-/// loop.parallel with 2 loops to a 2D grid of processors. `processorIDs` and
+/// scf.parallel with 2 loops to a 2D grid of processors. `processorIDs` and
 /// `numProcessors` must be of same size as the number of loops and are the
 /// values to use for process ID and number of processors along each dimension
 /// in the distributed code.
@@ -251,7 +251,7 @@ ProcessorIdAndCount getGPUProcessorIdAndCount<GPUGlobalId, GPUGlobalCount>(
           rewriter.create<MulIOp>(loc, blockDim, gridDim)};
 }
 
-/// Distribute loop.parallel to processors where `IdOp` is used to get the
+/// Distribute scf.parallel to processors where `IdOp` is used to get the
 /// processor ID and `DimOp` is used to get the number of processors along a
 /// dimension.
 template <typename GPUIdOp, typename GPUCountOp>
@@ -277,19 +277,19 @@ static LogicalResult mapToProcessor(ConversionPatternRewriter &rewriter,
   return mapToProcessors(rewriter, pLoopOp, id, count);
 }
 
-/// Distribute the loop.parallel to workgroups.
+/// Distribute the scf.parallel to workgroups.
 static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
                                      scf::ParallelOp pLoopOp) {
   return mapToProcessor<gpu::BlockIdOp, gpu::GridDimOp>(rewriter, pLoopOp);
 }
 
-/// Distribute loop.parallel to workitems using local invocation ID.
+/// Distribute scf.parallel to workitems using local invocation ID.
 static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
                                             scf::ParallelOp pLoopOp) {
   return mapToProcessor<gpu::ThreadIdOp, gpu::BlockDimOp>(rewriter, pLoopOp);
 }
 
-/// Distribute loop.parallel to workitems using global invocation ID. The GPU
+/// Distribute scf.parallel to workitems using global invocation ID. The GPU
 /// dialect doesn't have a direct operation to do this. This could be done using
 /// id = blockIdx * blockDim + gridIdx. count = blockDim * gridDim.
 static LogicalResult mapToGlobalInvocationId(
@@ -307,7 +307,7 @@ struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
   void runOnFunction() override;
 };
 
-/// Pattern to map loop.parallel to workgroups.
+/// Pattern to map scf.parallel to workgroups.
 struct PartitionPLoopToWorkgroups
     : public OpConversionPattern<scf::ParallelOp> {
   using OpConversionPattern<scf::ParallelOp>::OpConversionPattern;
@@ -318,7 +318,7 @@ struct PartitionPLoopToWorkgroups
   }
 };
 
-/// Map tiled linalg op to workitems by lowering it to loop.parallel and
+/// Map tiled linalg op to workitems by lowering it to scf.parallel and
 /// partitioning it to workitems.
 template <typename LinalgOpTy>
 struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
@@ -394,7 +394,7 @@ void ConvertToGPUPass::runOnFunction() {
 
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
-  // Ater this pass Linalg and loop.parallel ops should be gone.
+  // Ater this pass Linalg and scf.parallel ops should be gone.
   target.addIllegalOp<scf::ParallelOp>();
   target.addIllegalDialect<linalg::LinalgDialect>();
   // Reshape ops are treated legal since they just change the way the underlying
