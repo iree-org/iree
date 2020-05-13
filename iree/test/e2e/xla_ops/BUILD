@@ -85,9 +85,7 @@ iree_check_single_backend_test_suite(
         #
         "rsqrt.mlir",
         "select.mlir",
-
-        # TODO(GH-1693): Enable after standard dialect supports sine op.
-        # "sine.mlir",
+        "sine.mlir",
 
         # TODO(GH-1698): Enable after xla_hlo.slice is lowered to linalg and can
         # be handled effectively.
@@ -135,6 +133,7 @@ iree_check_single_backend_test_suite(
         "reshape.mlir",
         "rsqrt.mlir",
         "select.mlir",
+        "sine.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "transpose.mlir",
