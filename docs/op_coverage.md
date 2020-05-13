@@ -21,6 +21,7 @@ abs | ✓ | ✓ | ✓
 add | ✓ | ✓ | ✓
 batch_norm_inference | ✓ | ✗ | ✓
 broadcast | ✓ | ✓ | ✗
+broadcast_add | ✓ | ✓ | ✗
 broadcast_in_dim | ✓ | ✓ | ✓
 clamp | ✓ | ✗ | ✓
 compare | ✓ | ✓ | ✓
