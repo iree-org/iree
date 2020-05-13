@@ -986,8 +986,8 @@ struct LinalgOpOnTensorConversion
     SmallVector<Value, 2> opArgs(args.begin(), args.end());
     opArgs.append(results.begin(), results.end());
 
-    // Create a new op with the same traits as the original generic op, but with
-    // memrefs.
+    // Create a new op with the same traits as the original
+    // generic/indexed_generic op, but with memrefs.
     // TODO(ravishankarm): Figure out how to do this inplace.
     auto linalgBufferOp = rewriter.template create<LinalgOpTy>(
         op.getLoc(), ArrayRef<Type>(), opArgs, op.args_in(), op.args_out(),
@@ -996,15 +996,22 @@ struct LinalgOpOnTensorConversion
         /*library_call=*/nullptr);
     // Move the region from the replaced op into the new op.
     unsigned numTensorOperands = op.getNumOperands();
+    // indexed_generic op has arguments for each index. In the case of generic
+    // op, `numIndices` is zero.
+    unsigned numIndices =
+        op.region().begin()->getNumArguments() - numTensorOperands;
     auto &region = linalgBufferOp.region();
     region.takeBody(op.region());
     // Need to convert the signature to take extra arguments for the return
     // type.
-    TypeConverter::SignatureConversion signatureConverter(numTensorOperands);
+    TypeConverter::SignatureConversion signatureConverter(numIndices +
+                                                          numTensorOperands);
+    for (int i = 0; i < numIndices; ++i)
+      signatureConverter.addInputs(i, rewriter.getIndexType());
     for (auto arg : llvm::enumerate(opArgs)) {
       if (arg.index() < numTensorOperands) {
         signatureConverter.addInputs(
-            arg.index(),
+            numIndices + arg.index(),
             arg.value().getType().cast<MemRefType>().getElementType());
       } else {
         signatureConverter.addInputs(
@@ -1132,9 +1139,10 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
   patterns
       .insert<ConvOpConversion,
               DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
-              LinalgOpOnTensorConversion<linalg::GenericOp>, PadOpConversion,
-              SingleReshapeOpInDispatchConversion, TensorReshapeOpConversion,
-              TorchIndexSelectOpConversion>(context);
+              LinalgOpOnTensorConversion<linalg::GenericOp>,
+              LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
+              PadOpConversion, SingleReshapeOpInDispatchConversion,
+              TensorReshapeOpConversion, TorchIndexSelectOpConversion>(context);
   // Reduce Operation conversions.
   patterns.insert<ReduceOpConversion, ReduceWindowOpConversion,
                   ReduceRegionXLAOpConversion<xla_hlo::AddOp>,
