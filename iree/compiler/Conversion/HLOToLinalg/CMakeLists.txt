@@ -16,7 +16,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    CodegenPasses
+    HLOToLinalg
   HDRS
     "Passes.h"
   SRCS
@@ -36,11 +36,11 @@ iree_cc_library(
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Conversion::CodegenUtils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Translation::CodegenUtils
     tensorflow::mlir_xla
   PUBLIC
 )

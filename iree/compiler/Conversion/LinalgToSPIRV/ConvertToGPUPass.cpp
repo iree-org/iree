@@ -17,8 +17,8 @@
 // Partition computation within dispatch function to workgroups/workitems.
 //
 //===----------------------------------------------------------------------===//
-#include "iree/compiler/Translation/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -394,7 +394,7 @@ void ConvertToGPUPass::runOnFunction() {
 
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
-  // Ater this pass Linalg and loop.parallel ops should be gone.
+  // After this pass Linalg and loop.parallel ops should be gone.
   target.addIllegalOp<scf::ParallelOp>();
   target.addIllegalDialect<linalg::LinalgDialect>();
   // Reshape ops are treated legal since they just change the way the underlying

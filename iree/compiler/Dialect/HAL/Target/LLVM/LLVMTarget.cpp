@@ -14,13 +14,13 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
 
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ScopeExit.h"

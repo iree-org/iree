@@ -91,6 +91,8 @@ iree_cc_binary(
     MLIROptLib
     MLIRPass
     MLIRSupport
+    iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::init_conversions
     iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
@@ -111,9 +113,7 @@ iree_cc_binary(
     iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
     iree::compiler::Dialect::VMLA::Transforms
     iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::Translation::CodegenPasses
     iree::compiler::Translation::IREEVM
-    iree::compiler::Translation::SPIRV::init_translations
     iree::tools::init_compiler_modules
     iree::tools::init_passes_and_dialects
     iree::tools::init_targets
@@ -136,10 +136,10 @@ iree_cc_binary(
     MLIRSCFTransforms
     MLIRSupport
     MLIRTranslation
+    iree::compiler::Conversion::init_conversions
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Translation::IREEVM
-    iree::compiler::Translation::SPIRV::init_translations
     iree::tools::init_compiler_modules
     iree::tools::init_passes_and_dialects
     iree::tools::init_targets

@@ -12,19 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INIT_TRANSLATIONS_H_
-#define IREE_COMPILER_TRANSLATION_SPIRV_INIT_TRANSLATIONS_H_
+#ifndef IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
+#define IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 
-#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
-#include "mlir/Pass/Pass.h"
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// This function should be called before creating any MLIRContext if one
-// expects all the possible translations to be made available to the context
+// These functions should be called before creating any MLIRContext if one
+// expects all the possible conversions to be made available to the context
 // automatically.
-inline void registerSPRIVTranslation() {
+
+inline void registerHLOToLinalgPasses() {
+  createDecomposeHLOClampPass();
+  createHLOToLinalgOnBuffersPass();
+  createHLOToLinalgOnTensorsPass();
+  createLinalgOnTensorsFusionPass();
+}
+
+inline void registerLinalgToSPIRVPasses() {
   static bool init_once = []() {
     // LinalgToSPIRV
     createConvertToGPUPass();
@@ -37,4 +45,4 @@ inline void registerSPRIVTranslation() {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INIT_TRANSLATIONS_H_
+#endif  // IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_

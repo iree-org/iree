@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 #include <memory>
 
-#include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"

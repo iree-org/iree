@@ -17,8 +17,8 @@
 // IREE specific passes used in the XLA to Linalg conversion
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H_
-#define IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H_
+#ifndef IREE_COMPILER_CONVERSION_HLOTOLINALG_PASSES_H_
+#define IREE_COMPILER_CONVERSION_HLOTOLINALG_PASSES_H_
 #include <memory>
 
 #include "mlir/IR/Function.h"
@@ -63,15 +63,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
 /// IREE::HAL::ExecutableTargetOp.
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
 
-/// Register all Codegen passes
-inline void registerCodegenPasses() {
-  createDecomposeHLOClampPass();
-  createHLOToLinalgOnBuffersPass();
-  createHLOToLinalgOnTensorsPass();
-  createLinalgOnTensorsFusionPass();
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H_
+#endif  // IREE_COMPILER_CONVERSION_HLOTOLINALG_PASSES_H_

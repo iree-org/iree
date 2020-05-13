@@ -16,11 +16,11 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    init_translations
+    init_conversions
   HDRS
-    "init_translations.h"
+    "init_conversions.h"
   DEPS
-    MLIRPass
-    iree::compiler::Translation::SPIRV::LinalgToSPIRV
+    iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::LinalgToSPIRV
   PUBLIC
 )

@@ -17,8 +17,9 @@
 // Implements a pass to tile and fuse linalg operations on buffers.
 //
 //===----------------------------------------------------------------------===//
-#include "iree/compiler/Translation/CodegenUtils/MarkerUtils.h"
-#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
+
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"

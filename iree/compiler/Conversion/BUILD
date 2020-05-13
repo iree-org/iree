@@ -18,12 +18,12 @@ package(
 )
 
 cc_library(
-    name = "init_translations",
+    name = "init_conversions",
     hdrs = [
-        "init_translations.h",
+        "init_conversions.h",
     ],
     deps = [
-        "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
-        "@llvm-project//mlir:Pass",
+        "//iree/compiler/Conversion/HLOToLinalg",
+        "//iree/compiler/Conversion/LinalgToSPIRV",
     ],
 )

@@ -18,7 +18,7 @@
 // operation.
 //
 //===----------------------------------------------------------------------===//
-#include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"

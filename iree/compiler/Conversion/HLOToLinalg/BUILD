@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Utilities for working with IREE MLIR types.
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
-
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
 cc_library(
-    name = "CodegenPasses",
+    name = "HLOToLinalg",
     srcs = [
         "DecomposeHLOClamp.cpp",
         "HLOToLinalgOnBuffers.cpp",
@@ -34,11 +31,11 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Translation/CodegenUtils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",

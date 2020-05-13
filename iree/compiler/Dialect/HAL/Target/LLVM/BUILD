@@ -28,12 +28,12 @@ cc_library(
     deps = [
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
+        "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Translation/CodegenPasses",
         "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",

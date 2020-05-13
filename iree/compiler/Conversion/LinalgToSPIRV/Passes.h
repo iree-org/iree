@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H_
-#define IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H_
+#ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_PASSES_H_
+#define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_PASSES_H_
 
 #include "mlir/Pass/Pass.h"
 
@@ -39,7 +39,16 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass();
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
+/// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
+/// structured ops path. The pass manager `pm` in here operate on the module
+/// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
+/// control the work group size used in the code generation and is intended for
+/// testing purposes only. The pass pipeline will set an appropriate workgroup
+/// size.
+void buildSPIRVTransformPassPipeline(OpPassManager &pm,
+                                     ArrayRef<int64_t> workGroupSize);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H_
+#endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_PASSES_H_

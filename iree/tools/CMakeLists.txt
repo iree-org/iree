@@ -209,6 +209,8 @@ if(${IREE_BUILD_COMPILER})
       MLIROptLib
       MLIRPass
       MLIRSupport
+      iree::compiler::Conversion::init_conversions
+      iree::compiler::Conversion::HLOToLinalg
       iree::compiler::Dialect::Flow::Analysis
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
@@ -229,8 +231,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VMLA::Transforms
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::IREEVM
-      iree::compiler::Translation::SPIRV::init_translations
-      iree::compiler::Translation::CodegenPasses
       tensorflow::mlir_xla
     PUBLIC
   )
@@ -302,10 +302,10 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTranslation
+      iree::compiler::Conversion::init_conversions
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
-      iree::compiler::Translation::SPIRV::init_translations
     PUBLIC
   )
 

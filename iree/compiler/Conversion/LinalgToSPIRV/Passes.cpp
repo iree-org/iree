@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- LowerToSPIRV.cpp - Lower from XLA to Linalg to SPIR-V dialect-------===//
+//===- Passes.cpp - Pipeline from HLO to Linalg to SPIR-V -----------------===//
 //
 // Implementation of conversion from XLA-HLO to Linalg to SPIR-V dialect.
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
-#include "iree/compiler/Translation/CodegenPasses/Passes.h"
-#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"

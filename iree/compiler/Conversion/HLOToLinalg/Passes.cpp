@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 
 #include "mlir/Pass/PassManager.h"
 
