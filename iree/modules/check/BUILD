@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
+load(
+    "//iree:build_defs.oss.bzl",
+    "IREE_DRIVER_MODULES",
+    "PLATFORM_VULKAN_DEPS",
+    iree_cc_binary = "cc_binary",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -42,7 +47,7 @@ cc_test(
     ],
 )
 
-cc_binary(
+iree_cc_binary(
     name = "iree-check-module",
     testonly = True,
     srcs = ["check_module_main.cc"],
