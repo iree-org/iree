@@ -56,6 +56,7 @@ iree_check_single_backend_test_suite(
     "sine.mlir"
     "sqrt.mlir"
     "subtract.mlir"
+    "torch_index_select.mlir"
     "transpose.mlir"
   TARGET_BACKEND
     vulkan-spirv
@@ -96,6 +97,7 @@ iree_check_single_backend_test_suite(
     "sine.mlir"
     "sqrt.mlir"
     "subtract.mlir"
+    "torch_index_select.mlir"
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND

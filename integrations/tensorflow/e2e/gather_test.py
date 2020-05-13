@@ -48,7 +48,7 @@ class GatherModule(tf.Module):
     return tf.gather(params, indices, axis=2, batch_dims=1)
 
 
-@tf_test_utils.compile_modules(backends=["tf"], gather=GatherModule)
+@tf_test_utils.compile_modules(gather=GatherModule)
 class GatherTest(tf_test_utils.SavedModelTestCase):
 
   def test_gather_axis0_scalar(self):

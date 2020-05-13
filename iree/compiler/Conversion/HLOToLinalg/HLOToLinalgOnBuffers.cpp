@@ -561,6 +561,92 @@ linalg::IndexedGenericOp PadOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
+// xla_hlo.torch_index_select conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts xla-hlo.torch_index_select op to a linalg.indexed_generic op.
+/// Different from other ops on buffers, torch_index_select op needs indirect
+/// access based on the `index` operand. Thus, an accessing on buffer is
+/// involved inside the indexed_generic op and the input buffer is not passed as
+/// an argument of the op. However, it doesn't affect anything on dependency
+/// graph. It is just a magic buffer outside operations.
+struct TorchIndexSelectOpConversion
+    : public ConvertToLinalgBufferOp<TorchIndexSelectOpConversion,
+                                     xla_hlo::TorchIndexSelectOp,
+                                     linalg::IndexedGenericOp> {
+  using ConvertToLinalgBufferOp<
+      TorchIndexSelectOpConversion, xla_hlo::TorchIndexSelectOp,
+      linalg::IndexedGenericOp>::ConvertToLinalgBufferOp;
+
+  linalg::IndexedGenericOp apply(xla_hlo::TorchIndexSelectOp op,
+                                 ArrayRef<Value> args, ArrayRef<Value> results,
+                                 ConversionPatternRewriter &rewriter) const;
+};
+}  // namespace
+
+linalg::IndexedGenericOp TorchIndexSelectOpConversion::apply(
+    xla_hlo::TorchIndexSelectOp op, ArrayRef<Value> args,
+    ArrayRef<Value> results, ConversionPatternRewriter &rewriter) const {
+  xla_hlo::TorchIndexSelectOpOperandAdaptor adaptor(args);
+  int axis = op.dim().getSExtValue();
+  int batch = op.batch_dims().getSExtValue();
+  auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
+  int nIndices = indexShapeType.getRank();
+  if (batch < 0) {
+    op.emitError("expected batch_dims is greater than or equal to zero");
+    return nullptr;
+  }
+
+  Location loc = op.getLoc();
+  Value output = op.getResult();
+  int rank = output.getType().cast<ShapedType>().getRank();
+  SmallVector<Attribute, 2> indexingMaps;
+  SmallVector<AffineExpr, 4> exprs;
+  for (int i = 0; i < batch; ++i) exprs.push_back(rewriter.getAffineDimExpr(i));
+  for (int i = 0, e = nIndices - batch; i < e; ++i)
+    exprs.push_back(rewriter.getAffineDimExpr(axis + i));
+  indexingMaps.emplace_back(AffineMapAttr::get(
+      AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext())));
+  indexingMaps.emplace_back(
+      AffineMapAttr::get(rewriter.getMultiDimIdentityMap(rank)));
+
+  SmallVector<Type, 4> bodyArgTypes, opResultTypes;
+  SmallVector<Value, 2> linalgOpArgs = {adaptor.index(), results[0]};
+  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
+      loc, opResultTypes, linalgOpArgs,
+      rewriter.getI64IntegerAttr(1),  // args_in
+      rewriter.getI64IntegerAttr(1),  // args_out
+      rewriter.getArrayAttr(indexingMaps),
+      getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
+      /*doc=*/nullptr, /*library_call=*/nullptr);
+
+  // Add a block to the region.
+  auto *region = &linalgOp.region();
+  auto *block = rewriter.createBlock(region, region->end());
+  bodyArgTypes.append(rank, rewriter.getIndexType());
+  for (auto blockArgs : linalgOpArgs) {
+    bodyArgTypes.push_back(
+        blockArgs.getType().cast<ShapedType>().getElementType());
+  }
+  block->addArguments(bodyArgTypes);
+  rewriter.setInsertionPointToEnd(block);
+
+  SmallVector<Value, 4> indices;
+  Value castedValue = rewriter.create<IndexCastOp>(
+      loc, block->getArgument(rank), rewriter.getIndexType());
+  for (int i = 0; i < axis; ++i) indices.push_back(block->getArgument(i));
+  indices.push_back(castedValue);
+  for (int i = axis + nIndices - batch; i < rank; ++i)
+    indices.push_back(block->getArgument(i));
+
+  Value res = rewriter.create<LoadOp>(loc, adaptor.input(), indices);
+  rewriter.create<linalg::YieldOp>(loc, res);
+
+  return linalgOp;
+}
+
+//===----------------------------------------------------------------------===//
 // xla_hlo.reduce_window conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
@@ -1047,8 +1133,8 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       .insert<ConvOpConversion,
               DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
               LinalgOpOnTensorConversion<linalg::GenericOp>, PadOpConversion,
-              SingleReshapeOpInDispatchConversion, TensorReshapeOpConversion>(
-          context);
+              SingleReshapeOpInDispatchConversion, TensorReshapeOpConversion,
+              TorchIndexSelectOpConversion>(context);
   // Reduce Operation conversions.
   patterns.insert<ReduceOpConversion, ReduceWindowOpConversion,
                   ReduceRegionXLAOpConversion<xla_hlo::AddOp>,

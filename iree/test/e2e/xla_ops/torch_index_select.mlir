@@ -39,7 +39,7 @@ func @torch_select_index_2() attributes { iree.module.export } {
   %res = "xla_hlo.torch_index_select"(%input, %indices) {
     dim = 0 : i64,
     batch_dims = 0 : i64
-  } : (tensor<5x1x5xi32>, tensor<i32>) -> tensor<1x1x5xi32>
-  check.expect_eq_const(%res, dense<[[[01, 02, 03, 04, 05]]]> : tensor<1x1x5xi32>) : tensor<1x1x5xi32>
+  } : (tensor<5x1x5xi32>, tensor<i32>) -> tensor<1x5xi32>
+  check.expect_eq_const(%res, dense<[[01, 02, 03, 04, 05]]> : tensor<1x5xi32>) : tensor<1x5xi32>
   return
 }
