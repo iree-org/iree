@@ -95,6 +95,14 @@ $ LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/
 $ LD_PRELOAD=libvulkan.so.1
 ```
 
+## Vulkan debugging and profiling
+
+### RenderDoc
+
+RenderDoc is an awesome tool that one can use to capture and introspect Vulkan
+applications. It can be downloaded from https://renderdoc.org/ or compiled
+from [source][RenderDocSource].
+
 ## Vulkan development environment troubleshooting
 
 ### Useful environment variables
@@ -102,13 +110,45 @@ $ LD_PRELOAD=libvulkan.so.1
 There are a few environmet variables that can alter the default Vulkan loader
 behavior and print verbose information, notably:
 
-*   `VK_LOADER_DEBUG`: enable loader debug messages.
-*   `VK_ICD_FILENAMES`: force the loader to use a specific ICD.
-*   `VK_INSTANCE_LAYERS`: force the loader to enable the given layers.
+*   `VK_LOADER_DEBUG`: enable loader debug messages. Setting it to `all` will
+    enable the most verbose logging from the loader. This is especially useful
+    when trying to see what layers/ICDs are searched and used.
+*   `VK_ICD_FILENAMES`: force the loader to use a specific ICD. This is
+    especially useful when you have multiple Vulkan capable devices and want
+    to select which one to use manually.
+*   `VK_INSTANCE_LAYERS`: force the loader to enable the given layers. For
+    example, You can force enable `VK_LAYER_LUNARG_api_dump` to have a detailed
+    dump of all Vulkan API calls made by the application. You can force enable
+    `VK_LAYER_LUNARG_core_validation` to validate the API calls made by the
+    application.
 *   `VK_LAYER_PATH`: override the loader's standard layer libary search folders.
 
 Please see the [Vulkan loader's documentation][VulkanLoaderEnvVars] for detailed
 explanation for these variables.
+
+### Setting environmet variables for Bazel test
+
+Bazel runs tests in a sandbox and environment variables must be passed through
+to the test runner. Consider putting environment setup in a `user.bazelrc` to
+trouble shooting a test run by Bazel. For example:
+
+```
+test --test_env="LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/"
+test --test_env="LD_PRELOAD=libvulkan.so.1"
+test --test_env="VK_LAYER_PATH=/absolute/path/to/additional/layers/:$VK_LAYER_PATH"
+```
+
+### SSH on Linux and X forwarding
+
+Physical devices enumerated on NVIDIA drivers can be affected by the `DISPLAY`
+environment variable. If you are running under an SSH session to Linux or using
+chrome remote desktop and have problems with physical device enumeration, you
+probably want to check the `DISPLAY` environment and set it to point to a
+display at the server side, for example:
+
+```
+export DISPLAY=:0
+```
 
 [VulkanArchOverview]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#overview
 [VulkanArchPicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/loader/images/high_level_loader.png
@@ -125,3 +165,4 @@ explanation for these variables.
 [PackageVulkanDev]: https://packages.ubuntu.com/focal/libvulkan-dev
 [PackageVulkanTools]: https://packages.ubuntu.com/focal/vulkan-tools
 [PackageVulkanValidation]: https://packages.ubuntu.com/eoan/vulkan-validationlayers
+[RenderDocSource]: https://github.com/baldurk/renderdoc
