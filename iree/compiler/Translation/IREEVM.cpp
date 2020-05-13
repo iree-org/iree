@@ -103,9 +103,11 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
                                              bytecodeTargetOptions, output);
 }
 
-static TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
-    "iree-mlir-to-vm-bytecode-module",
-    translateFromMLIRToVMBytecodeModuleWithFlags);
+void registerIREEVMTranslation() {
+  TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
+      "iree-mlir-to-vm-bytecode-module",
+      translateFromMLIRToVMBytecodeModuleWithFlags);
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
