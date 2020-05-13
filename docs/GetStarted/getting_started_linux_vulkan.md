@@ -18,7 +18,8 @@ backend designed for executing advanced ML models in a deeply pipelined and
 tightly integrated fashion on accelerators like GPUs.
 
 This guide will walk you through using IREE's compiler and runtime Vulkan
-components.
+components. For generic Vulkan development environment set up and trouble
+shooting, please see [this doc](generic_vulkan_env_setup.md).
 
 ## Prerequisites
 
@@ -41,10 +42,9 @@ support.
 
 ### Background
 
-Vulkan applications interface with Vulkan "drivers", "layers", and "extensions"
-through the Vulkan loader. See LunarG's
-[Architecture of the Vulkan Loader Interfaces](https://vulkan.lunarg.com/doc/view/latest/windows/loader_and_layer_interface.html)
-page for more information.
+Please see
+[Generic Vulkan Development Environment Setup and Troubleshooting](generic_vulkan_env_setup.md)
+for generic Vulkan concepts and development environment setup.
 
 ### Quick Start
 
@@ -81,24 +81,6 @@ $ bazel test iree/hal/cts:device_creation_test --test_env=VK_LOADER_DEBUG=all --
 ```
 
 If these tests pass, you can skip down to the next section.
-
-### Setting up the Vulkan Loader
-
-If you see failures to find `libvulkan.so.1` (the Vulkan loader), install it by
-either:
-
-*   Updating your system's GPU drivers
-*   Installing the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
-*   Building the Vulkan loader
-    [from source](https://github.com/KhronosGroup/Vulkan-Loader)
-
-You may also need to set `LD_LIBRARY_PATH` and `LD_PRELOAD` to load the desired
-version of the loader. For example:
-
-```shell
-$ LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/
-$ LD_PRELOAD=libvulkan.so.1
-```
 
 ### Setting up SwiftShader
 
@@ -148,6 +130,13 @@ $ export VK_LAYER_PATH=$PWD/build/third_party/vulkan_extensionlayer/layers/:$VK_
 # -- Bazel --
 $ export VK_LAYER_PATH=$PWD/bazel-bin/external/vulkan_extensionlayer/:$VK_LAYER_PATH
 ```
+
+### Setting up the Vulkan Loader
+
+IREE relies on the `VK_KHR_timeline_semaphore` extension. The minimal loader
+version supporting this extenion is `1.1.124`. So if you see failures regarding
+timeline semaphore, in addtion to setting up the extension layer, please also
+check to make sure the loader is at a proper version.
 
 ### Support in Bazel Tests
 

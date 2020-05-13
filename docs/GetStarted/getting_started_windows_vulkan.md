@@ -18,7 +18,8 @@ backend designed for executing advanced ML models in a deeply pipelined and
 tightly integrated fashion on accelerators like GPUs.
 
 This guide will walk you through using IREE's compiler and runtime Vulkan
-components.
+components. For generic Vulkan development environment set up and trouble
+shooting, please see [this doc](generic_vulkan_env_setup.md).
 
 ## Prerequisites
 
@@ -41,10 +42,9 @@ with support for the `VK_KHR_timeline_semaphore` extension may also work.
 
 ### Background
 
-Vulkan applications interface with Vulkan "drivers", "layers", and "extensions"
-through the Vulkan loader. See LunarG's
-[Architecture of the Vulkan Loader Interfaces](https://vulkan.lunarg.com/doc/view/latest/windows/loader_and_layer_interface.html)
-page for more information.
+Please see
+[Generic Vulkan Development Environment Setup and Troubleshooting](generic_vulkan_env_setup.md)
+for generic Vulkan concepts and development environment setup.
 
 ### Quick Start
 
@@ -84,13 +84,10 @@ If these tests pass, you can skip down to the next section.
 
 ### Setting up the Vulkan Loader
 
-If you see failures to find `vulkan-1.dll` (the Vulkan loader), install it by
-either:
-
-*   Updating your system's GPU drivers
-*   Installing the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
-*   Building the Vulkan loader
-    [from source](https://github.com/KhronosGroup/Vulkan-Loader)
+IREE relies on the `VK_KHR_timeline_semaphore` extension. The minimal loader
+version supporting this extenion is `1.1.124`. So if you see failures regarding
+timeline semaphore, please also check to make sure the loader is at a proper
+version.
 
 <!--
 ### Setting up SwiftShader
