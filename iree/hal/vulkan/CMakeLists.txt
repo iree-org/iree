@@ -506,5 +506,6 @@ iree_cc_library(
     iree::hal::driver_registry
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::vulkan_driver
+  ALWAYSLINK
   PUBLIC
 )
