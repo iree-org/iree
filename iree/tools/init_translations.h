@@ -21,6 +21,8 @@
 #ifndef IREE_TOOLS_INIT_TRANSLATIONS_H_
 #define IREE_TOOLS_INIT_TRANSLATIONS_H_
 
+#include "iree/compiler/Translation/IREEVM.h"
+
 namespace mlir {
 
 void registerToSPIRVTranslation();
@@ -37,8 +39,6 @@ inline void registerMlirTranslations() {
 }
 
 namespace iree_compiler {
-
-void registerIREEVMTranslation();
 
 // This function should be called before creating any MLIRContext if one
 // expects all the possible translations to be made available to the context
