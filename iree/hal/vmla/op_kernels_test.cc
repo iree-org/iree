@@ -14,6 +14,7 @@
 
 #include "iree/hal/vmla/op_kernels.h"
 
+#include "absl/container/inlined_vector.h"
 #include "iree/base/memory.h"
 #include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
@@ -27,6 +28,16 @@ namespace {
 
 constexpr float kEpsilon = 0.0001f;
 
+using Shape = absl::InlinedVector<int32_t, 6>;
+
+size_t GetShapeElementCount(const Shape& shape) {
+  size_t count = 1;
+  for (size_t i = 0; i < shape.size(); ++i) {
+    count *= shape[i];
+  }
+  return count;
+}
+
 template <typename T>
 std::vector<T> MakeIota(int size) {
   std::vector<T> v(size);
@@ -39,7 +50,7 @@ TEST(Copy, WholeBuffer) {
   auto src_buffer = MakeIota<uint8_t>(4);
   std::vector<int32_t> src_indices = {0, 0};
   Shape dst_shape = src_shape;
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {2, 2};
   auto expected_dst = src_buffer;
@@ -55,7 +66,7 @@ TEST(Copy, FirstRow) {
   auto src_buffer = MakeIota<uint8_t>(12);
   std::vector<int32_t> src_indices = {0, 0};
   Shape dst_shape = {1, 4};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {1, 4};
   std::vector<uint8_t> expected_dst = {1, 2, 3, 4};
@@ -71,7 +82,7 @@ TEST(Copy, RowPart) {
   auto src_buffer = MakeIota<uint8_t>(12);
   std::vector<int32_t> src_indices = {1, 1};
   Shape dst_shape = {1, 2};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {1, 2};
   std::vector<uint8_t> expected_dst = {6, 7};
@@ -87,7 +98,7 @@ TEST(Copy, MultiRow) {
   auto src_buffer = MakeIota<uint8_t>(12);
   std::vector<int32_t> src_indices = {1, 0};
   Shape dst_shape = {2, 4};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {2, 4};
   std::vector<uint8_t> expected_dst = {5, 6, 7, 8, 9, 10, 11, 12};
@@ -103,7 +114,7 @@ TEST(Copy, NonContiguous) {
   auto src_buffer = MakeIota<uint8_t>(12);
   std::vector<int32_t> src_indices = {1, 1};
   Shape dst_shape = {2, 2};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {2, 2};
   std::vector<uint8_t> expected_dst = {6, 7, 10, 11};
@@ -120,7 +131,8 @@ TEST(Copy, MultiByte) {
   auto src_buffer = ReinterpretSpan<uint8_t>(absl::MakeSpan(src_vals));
   std::vector<int32_t> src_indices = {1, 1};
   Shape dst_shape = {2, 2};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count() * sizeof(int32_t));
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape) *
+                                  sizeof(int32_t));
   std::vector<int32_t> dst_indices = {0, 0};
   std::vector<int32_t> lengths = {2, 2};
   std::vector<int32_t> expected_dst = {6, 7, 10, 11};
@@ -161,7 +173,7 @@ TEST(Copy, HighRank) {
   auto src_buffer = MakeIota<uint8_t>(81);
   std::vector<int32_t> src_indices = {1, 1, 1, 1};
   Shape dst_shape = {2, 2, 2, 2};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {0, 0, 0, 0};
   std::vector<int32_t> lengths = {2, 2, 2, 2};
   std::vector<uint8_t> expected_dst = {41, 42, 44, 45, 50, 51, 53, 54,
@@ -178,7 +190,7 @@ TEST(Copy, Scalar) {
   std::vector<uint8_t> src_buffer = {42};
   std::vector<int32_t> src_indices = {};
   Shape dst_shape = {};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
+  std::vector<uint8_t> dst_buffer(GetShapeElementCount(dst_shape));
   std::vector<int32_t> dst_indices = {};
   std::vector<int32_t> lengths = {};
   std::vector<uint8_t> expected_dst = {42};
@@ -212,13 +224,13 @@ TEST(Copy, ScalarMultiByte) {
 
 TEST(Pad, NoPadding) {
   Shape src_shape = {2, 3};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {0, 0};
   std::vector<int32_t> edge_padding_high = {0, 0};
   std::vector<int32_t> interior_padding = {0, 0};
   Shape dst_shape = src_shape;
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   auto expected_dst = src_buffer;
 
   EXPECT_OK(Pad::Execute<uint16_t>(
@@ -229,13 +241,13 @@ TEST(Pad, NoPadding) {
 
 TEST(Pad, LowHighPadding) {
   Shape src_shape = {2, 3};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {0, 1};
   std::vector<int32_t> edge_padding_high = {1, 2};
   std::vector<int32_t> interior_padding = {0, 0};
   Shape dst_shape = {3, 6};
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   // clang-format off
   std::vector<uint16_t> expected_dst = {0, 1, 2, 3, 0, 0,
                                       0, 4, 5, 6, 0, 0,
@@ -250,13 +262,13 @@ TEST(Pad, LowHighPadding) {
 
 TEST(Pad, OnlyHighPadding) {
   Shape src_shape = {2, 3};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {0, 0};
   std::vector<int32_t> edge_padding_high = {1, 3};
   std::vector<int32_t> interior_padding = {0, 0};
   Shape dst_shape = {3, 6};
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   // clang-format off
   std::vector<uint16_t> expected_dst = {1, 2, 3, 0, 0, 0,
                                       4, 5, 6, 0, 0, 0,
@@ -271,13 +283,13 @@ TEST(Pad, OnlyHighPadding) {
 
 TEST(Pad, OnlyLowPadding) {
   Shape src_shape = {2, 3};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {1, 3};
   std::vector<int32_t> edge_padding_high = {0, 0};
   std::vector<int32_t> interior_padding = {0, 0};
   Shape dst_shape = {3, 6};
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   // clang-format off
   std::vector<uint16_t> expected_dst = {0, 0, 0, 0, 0, 0,
                                       0, 0, 0, 1, 2, 3,
@@ -292,13 +304,13 @@ TEST(Pad, OnlyLowPadding) {
 
 TEST(Pad, OnlyInteriorPadding) {
   Shape src_shape = {2, 3};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {0, 0};
   std::vector<int32_t> edge_padding_high = {0, 0};
   std::vector<int32_t> interior_padding = {1, 1};
   Shape dst_shape = {3, 5};
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   // clang-format off
   std::vector<uint16_t> expected_dst = {1, 0, 2, 0, 3,
                                       0, 0, 0, 0, 0,
@@ -313,13 +325,13 @@ TEST(Pad, OnlyInteriorPadding) {
 
 TEST(Pad, AllPaddingTypes) {
   Shape src_shape = {2, 3};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {1, 1};
   std::vector<int32_t> edge_padding_high = {1, 2};
   std::vector<int32_t> interior_padding = {1, 1};
   Shape dst_shape = {5, 8};
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   // clang-format off
   std::vector<uint16_t> expected_dst = {0, 0, 0, 0, 0, 0, 0, 0,
                                       0, 1, 0, 2, 0, 3, 0, 0,
@@ -336,13 +348,13 @@ TEST(Pad, AllPaddingTypes) {
 
 TEST(Pad, HighRank) {
   Shape src_shape = {2, 2, 2, 2};
-  auto src_buffer = MakeIota<uint16_t>(src_shape.element_count());
+  auto src_buffer = MakeIota<uint16_t>(GetShapeElementCount(src_shape));
   std::vector<uint16_t> pad_value_buffer = {0};
   std::vector<int32_t> edge_padding_low = {1, 0, 0, 0};
   std::vector<int32_t> edge_padding_high = {0, 1, 0, 0};
   std::vector<int32_t> interior_padding = {0, 0, 1, 0};
   Shape dst_shape = {3, 3, 3, 2};
-  std::vector<uint16_t> dst_buffer(dst_shape.element_count(), UINT16_MAX);
+  std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   // clang-format off
   std::vector<uint16_t> expected_dst = { 0,  0,   0, 0,   0,  0,
                                        0,  0,   0, 0,   0,  0,
@@ -371,7 +383,7 @@ TEST(ReduceSum, Scalar) {
   Shape dst_shape = {1};
   std::vector<float> src_buffer = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
   std::vector<float> init_buffer = {0.0f};
-  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<float> expected_dst = {5.0f};
 
   EXPECT_OK(ReduceSum::Execute<float>(src_buffer, init_buffer,
@@ -387,9 +399,10 @@ TEST(ReduceMin, TwoDimensionsToOne) {
   Shape src_shape = {3, 3};
   int32_t dimension = 0;
   Shape dst_shape = {3};
-  std::vector<float> src_buffer = MakeIota<float>(src_shape.element_count());
+  std::vector<float> src_buffer =
+      MakeIota<float>(GetShapeElementCount(src_shape));
   std::vector<float> init_buffer = {std::numeric_limits<float>::max()};
-  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<float> expected_dst = {1.0f, 2.0f, 3.0f};
 
   EXPECT_OK(ReduceMin::Execute<float>(src_buffer, init_buffer,
@@ -407,9 +420,9 @@ TEST(PoolingMax, NoOverlapping) {
   Shape window_sizes = {1, 2, 3, 1};
   Shape strides = {1, 2, 3, 1};
   Shape pad_low = {0, 0, 0, 0};
-  std::vector<int> src_buffer = MakeIota<int>(src_shape.element_count());
+  std::vector<int> src_buffer = MakeIota<int>(GetShapeElementCount(src_shape));
   std::vector<int> init_buffer(1, 0.0f);
-  std::vector<int> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<int> expected_dst = {9, 12, 21, 24};
 
   EXPECT_OK(PoolingMax::Execute<int>(
@@ -428,9 +441,9 @@ TEST(PoolingMin, Padding) {
   Shape window_sizes = {2, 2};
   Shape strides = {1, 1};
   Shape pad_low = {1, 1};
-  std::vector<int> src_buffer = MakeIota<int>(src_shape.element_count());
+  std::vector<int> src_buffer = MakeIota<int>(GetShapeElementCount(src_shape));
   std::vector<int> init_buffer(1, 100.0);
-  std::vector<int> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<int> expected_dst = {1, 1, 2, 1, 1, 2};
 
   EXPECT_OK(PoolingMin::Execute<int>(
@@ -445,9 +458,10 @@ TEST(PoolingSum, Overlapping) {
   Shape window_sizes = {2, 3};
   Shape strides = {1, 1};
   Shape pad_low = {0, 0};
-  std::vector<float> src_buffer = MakeIota<float>(src_shape.element_count());
+  std::vector<float> src_buffer =
+      MakeIota<float>(GetShapeElementCount(src_shape));
   std::vector<float> init_buffer(1, 0.0f);
-  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<float> expected_dst = {24, 30, 48, 54};
 
   EXPECT_OK(PoolingSum::Execute<float>(
@@ -466,17 +480,17 @@ TEST(Conv2d, NoDilation) {
   Shape pad_h = {0, 0};
   Shape pad_w = {0, 0};
   Shape dilation = {1, 1};
-  std::vector<float> input_buffer(input_shape.element_count());
-  std::vector<float> filter_buffer(filter_shape.element_count());
+  std::vector<float> input_buffer(GetShapeElementCount(input_shape));
+  std::vector<float> filter_buffer(GetShapeElementCount(filter_shape));
   std::vector<float> expected_dst = {1310, 1466, 1622, 1778,
                                      2090, 2246, 2402, 2558};
-  for (int i = 0; i < input_shape.element_count(); ++i) {
+  for (int i = 0; i < GetShapeElementCount(input_shape); ++i) {
     input_buffer[i] = i + 1;
-    if (i < filter_shape.element_count()) {
+    if (i < GetShapeElementCount(filter_shape)) {
       filter_buffer[i] = i + 1;
     }
   }
-  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
 
   EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
                                    filter_shape, absl::MakeSpan(dst_buffer),
@@ -496,19 +510,19 @@ TEST(Conv2d, DepthwiseConv) {
   Shape pad_h = {0, 0};
   Shape pad_w = {0, 0};
   Shape dilation = {1, 1};
-  std::vector<float> input_buffer(input_shape.element_count());
-  std::vector<float> filter_buffer(filter_shape.element_count());
+  std::vector<float> input_buffer(GetShapeElementCount(input_shape));
+  std::vector<float> filter_buffer(GetShapeElementCount(filter_shape));
   std::vector<float> expected_dst = {
       1124, 1196, 1346, 1424, 1256, 1340, 1502, 1592, 1388, 1484, 1658,
       1760, 1520, 1628, 1814, 1928, 1784, 1916, 2126, 2264, 1916, 2060,
       2282, 2432, 2048, 2204, 2438, 2600, 2180, 2348, 2594, 2768};
-  for (int i = 0; i < input_shape.element_count(); ++i) {
+  for (int i = 0; i < GetShapeElementCount(input_shape); ++i) {
     input_buffer[i] = i + 1;
-    if (i < filter_shape.element_count()) {
+    if (i < GetShapeElementCount(filter_shape)) {
       filter_buffer[i] = i + 1;
     }
   }
-  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
 
   EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
                                    filter_shape, absl::MakeSpan(dst_buffer),

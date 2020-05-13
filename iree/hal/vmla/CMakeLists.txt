@@ -29,7 +29,6 @@ iree_cc_library(
     absl::inlined_vector
     absl::memory
     absl::span
-    iree::base::shape
     iree::base::status
     iree::base::tracing
     ruy
@@ -43,6 +42,7 @@ iree_cc_test(
     "op_kernels_test.cc"
   DEPS
     ::op_kernels
+    absl::inlined_vector
     iree::base::memory
     iree::base::status_matchers
     iree::testing::gtest_main

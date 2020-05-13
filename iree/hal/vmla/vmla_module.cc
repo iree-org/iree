@@ -422,16 +422,16 @@ class VMLAModuleState final {
   // VMLA Ops: shape/structure
   //===--------------------------------------------------------------------===//
 
-#define IREE_VMLA_COPY_OP(name, size)                                          \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
-              absl::Span<const int32_t> src_indices, vm::ref<Buffer> dst,      \
-              iree_vmla_shape_t dst_shape,                                     \
-              absl::Span<const int32_t> dst_indices,                           \
-              absl::Span<const int32_t> lengths) {                             \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
-    return kernels::Copy::Execute<size>(                                       \
-        src->As<uint8_t>(), Shape(src_shape), src_indices, dst->As<uint8_t>(), \
-        Shape(dst_shape), dst_indices, lengths);                               \
+#define IREE_VMLA_COPY_OP(name, size)                                     \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
+              absl::Span<const int32_t> src_indices, vm::ref<Buffer> dst, \
+              iree_vmla_shape_t dst_shape,                                \
+              absl::Span<const int32_t> dst_indices,                      \
+              absl::Span<const int32_t> lengths) {                        \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                         \
+    return kernels::Copy::Execute<size>(src->As<uint8_t>(), src_shape,    \
+                                        src_indices, dst->As<uint8_t>(),  \
+                                        dst_shape, dst_indices, lengths); \
   }
   IREE_VMLA_COPY_OP(CopyX8, sizeof(uint8_t));
   IREE_VMLA_COPY_OP(CopyX16, sizeof(uint16_t));
@@ -443,7 +443,7 @@ class VMLAModuleState final {
               iree_vmla_shape_t dst_shape) {                                   \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Transpose::Execute<type>(src->As<type>(), dst->As<type>(), \
-                                             Shape(src_shape), permutation);   \
+                                             src_shape, permutation);          \
   }
   IREE_VMLA_TRANSPOSE_OP(TransposeX8, uint8_t);
   IREE_VMLA_TRANSPOSE_OP(TransposeX16, uint16_t);
@@ -455,39 +455,37 @@ class VMLAModuleState final {
               iree_vmla_shape_t dst_shape) {                                 \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
     return kernels::Reverse::Execute<type>(src->As<type>(), dst->As<type>(), \
-                                           Shape(src_shape), dims);          \
+                                           src_shape, dims);                 \
   }
   IREE_VMLA_REVERSE_OP(ReverseX8, uint8_t);
   IREE_VMLA_REVERSE_OP(ReverseX16, uint16_t);
   IREE_VMLA_REVERSE_OP(ReverseX32, uint32_t);
 
-#define IREE_VMLA_PAD_OP(name, type)                                         \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,              \
-              vm::ref<Buffer> value, iree_vmla_shape_t value_shape,          \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,              \
-              absl::Span<const int32_t> edge_padding_low,                    \
-              absl::Span<const int32_t> edge_padding_high,                   \
-              absl::Span<const int32_t> interior_padding) {                  \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
-    return kernels::Pad::Execute<type>(src->As<type>(), value->As<type>(),   \
-                                       dst->As<type>(), Shape(src_shape),    \
-                                       Shape(dst_shape), edge_padding_low,   \
-                                       edge_padding_high, interior_padding); \
+#define IREE_VMLA_PAD_OP(name, type)                                       \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,            \
+              vm::ref<Buffer> value, iree_vmla_shape_t value_shape,        \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,            \
+              absl::Span<const int32_t> edge_padding_low,                  \
+              absl::Span<const int32_t> edge_padding_high,                 \
+              absl::Span<const int32_t> interior_padding) {                \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                          \
+    return kernels::Pad::Execute<type>(                                    \
+        src->As<type>(), value->As<type>(), dst->As<type>(), src_shape,    \
+        dst_shape, edge_padding_low, edge_padding_high, interior_padding); \
   }
   IREE_VMLA_PAD_OP(PadX8, uint8_t);
   IREE_VMLA_PAD_OP(PadX16, uint16_t);
   IREE_VMLA_PAD_OP(PadX32, uint32_t);
 
-#define IREE_VMLA_GATHER_OP(name, type)                                        \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
-              vm::ref<Buffer> indices, iree_vmla_shape_t indices_shape,        \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,                \
-              const int32_t dim, const int32_t batch_dims) {                   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
-    return kernels::Gather::Execute<type>(src->As<type>(), indices->As<int>(), \
-                                          dst->As<type>(), Shape(src_shape),   \
-                                          Shape(indices_shape),                \
-                                          Shape(dst_shape), dim, batch_dims);  \
+#define IREE_VMLA_GATHER_OP(name, type)                                  \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,          \
+              vm::ref<Buffer> indices, iree_vmla_shape_t indices_shape,  \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,          \
+              const int32_t dim, const int32_t batch_dims) {             \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                        \
+    return kernels::Gather::Execute<type>(                               \
+        src->As<type>(), indices->As<int>(), dst->As<type>(), src_shape, \
+        indices_shape, dst_shape, dim, batch_dims);                      \
   }
   IREE_VMLA_GATHER_OP(GatherX8, uint8_t);
   IREE_VMLA_GATHER_OP(GatherX16, uint16_t);
@@ -504,12 +502,12 @@ class VMLAModuleState final {
   IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX32, uint32_t);
 
-#define IREE_VMLA_TILE_OP(name, type)                                        \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,              \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {            \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
-    return kernels::Tile::Execute<type>(src->As<type>(), dst->As<type>(),    \
-                                        Shape(src_shape), Shape(dst_shape)); \
+#define IREE_VMLA_TILE_OP(name, type)                                     \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {         \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                         \
+    return kernels::Tile::Execute<type>(src->As<type>(), dst->As<type>(), \
+                                        src_shape, dst_shape);            \
   }
   IREE_VMLA_TILE_OP(TileX8, uint8_t);
   IREE_VMLA_TILE_OP(TileX16, uint16_t);
@@ -646,25 +644,24 @@ class VMLAModuleState final {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Expecting 4-d tensors for Conv2D kernel";
     }
-    // 2D conv
+
     const int32_t batch_size = input_shape[0];
-    const Shape input_example_shape{input_shape[1], input_shape[2],
-                                    input_shape[3]};
-    const Shape output_example_shape{dst_shape[1], dst_shape[2], dst_shape[3]};
-    const Shape filter_shape_4d(filter_shape.data(), 4);
-    const Shape dilation(lhs_dilation.data(), 2);
-    const Shape pad_h(padding.data(), 2);
-    const Shape pad_w(padding.subspan(2).data(), 2);
-    const Shape window_strides_2d(window_strides.data(), 2);
+    const auto input_example_shape = input_shape.subspan(1, 3);
+    const auto output_example_shape = dst_shape.subspan(1, 3);
+    const auto filter_shape_4d = filter_shape.subspan(0, 4);
+    const auto dilation = lhs_dilation.subspan(0, 2);
+    const auto pad_h = padding.subspan(0, 2);
+    const auto pad_w = padding.subspan(2, 2);
+    const auto window_strides_2d = window_strides.subspan(0, 2);
 
     const float* raw_inputs_data = input->As<float>().data();
     const float* raw_filter_data = filter->As<float>().data();
     float* raw_dst_data = dst->As<float>().data();
-    auto filter_buffer =
-        absl::MakeConstSpan(raw_filter_data, filter_shape_4d.element_count());
+    auto filter_buffer = absl::MakeConstSpan(
+        raw_filter_data, kernels::GetElementCount(filter_shape_4d));
 
-    const int input_stride = input_example_shape.element_count();
-    const int output_stride = output_example_shape.element_count();
+    const size_t input_stride = kernels::GetElementCount(input_example_shape);
+    const size_t output_stride = kernels::GetElementCount(output_example_shape);
 
     for (int i = 0; i < batch_size; ++i) {
       auto input_example =
@@ -693,23 +690,15 @@ class VMLAModuleState final {
            dst_shape.size() == 3);
     assert(lhs_shape[0] == rhs_shape[0] && rhs_shape[0] == dst_shape[0]);
 
-    auto total_elements = [](absl::Span<const int32_t> extents) {
-      int32_t result = 1;
-      for (int32_t extent : extents) {
-        result *= extent;
-      }
-      return result;
-    };
-
     iree_vmla_shape_t lhs_batch_element_shape = lhs_shape.subspan(1);
     iree_vmla_shape_t rhs_batch_element_shape = rhs_shape.subspan(1);
     iree_vmla_shape_t dst_batch_element_shape = dst_shape.subspan(1);
-    Shape lhs_batch_element_shape2(lhs_batch_element_shape.data(), 2);
-    Shape rhs_batch_element_shape2(rhs_batch_element_shape.data(), 2);
-    Shape dst_batch_element_shape2(dst_batch_element_shape.data(), 2);
-    int32_t lhs_batch_stride = total_elements(lhs_batch_element_shape);
-    int32_t rhs_batch_stride = total_elements(rhs_batch_element_shape);
-    int32_t dst_batch_stride = total_elements(dst_batch_element_shape);
+    auto lhs_batch_element_shape2 = lhs_batch_element_shape.subspan(0, 2);
+    auto rhs_batch_element_shape2 = rhs_batch_element_shape.subspan(0, 2);
+    auto dst_batch_element_shape2 = dst_batch_element_shape.subspan(0, 2);
+    size_t lhs_batch_stride = kernels::GetElementCount(lhs_batch_element_shape);
+    size_t rhs_batch_stride = kernels::GetElementCount(rhs_batch_element_shape);
+    size_t dst_batch_stride = kernels::GetElementCount(dst_batch_element_shape);
     float* lhs_batch_base = lhs->As<float>().data();
     float* rhs_batch_base = rhs->As<float>().data();
     float* dst_batch_base = dst->As<float>().data();
@@ -736,15 +725,15 @@ class VMLAModuleState final {
   // VMLA Ops: reduction
   //===--------------------------------------------------------------------===//
 
-#define IREE_VMLA_REDUCTION_OP(name, kernel, type)                             \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
-              vm::ref<Buffer> init, iree_vmla_shape_t init_shape,              \
-              int32_t dimension, vm::ref<Buffer> dst,                          \
-              iree_vmla_shape_t dst_shape) {                                   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
-    return kernel::Execute<type>(src->As<type>(), init->As<type>(),            \
-                                 dst->As<type>(), dimension, Shape(src_shape), \
-                                 Shape(dst_shape));                            \
+#define IREE_VMLA_REDUCTION_OP(name, kernel, type)                      \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,         \
+              vm::ref<Buffer> init, iree_vmla_shape_t init_shape,       \
+              int32_t dimension, vm::ref<Buffer> dst,                   \
+              iree_vmla_shape_t dst_shape) {                            \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                       \
+    return kernel::Execute<type>(src->As<type>(), init->As<type>(),     \
+                                 dst->As<type>(), dimension, src_shape, \
+                                 dst_shape);                            \
   }
   IREE_VMLA_REDUCTION_OP(ReduceSumI8, kernels::ReduceSum, int8_t);
   IREE_VMLA_REDUCTION_OP(ReduceSumI16, kernels::ReduceSum, int16_t);
@@ -767,9 +756,8 @@ class VMLAModuleState final {
               iree_vmla_shape_t pad_low) {                                    \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
     return kernel::Execute<type>(src->As<type>(), init->As<type>(),           \
-                                 dst->As<type>(), Shape(src_shape),           \
-                                 Shape(dst_shape), Shape(window_dimensions),  \
-                                 Shape(strides), Shape(pad_low));             \
+                                 dst->As<type>(), src_shape, dst_shape,       \
+                                 window_dimensions, strides, pad_low);        \
   }
   IREE_VMLA_POOLING_OP(PoolingSumI8, kernels::PoolingSum, int8_t);
   IREE_VMLA_POOLING_OP(PoolingSumI16, kernels::PoolingSum, int16_t);

@@ -37,7 +37,6 @@
 #include <cstdint>
 
 #include "absl/types/span.h"
-#include "iree/base/shape.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -45,6 +44,16 @@ namespace iree {
 namespace hal {
 namespace vmla {
 namespace kernels {
+
+using ShapeSpan = absl::Span<const int32_t>;
+
+inline size_t GetElementCount(ShapeSpan shape) {
+  size_t count = 1;
+  for (size_t i = 0; i < shape.size(); ++i) {
+    count *= shape[i];
+  }
+  return count;
+}
 
 struct CompareEQ {
   template <typename T>
@@ -85,21 +94,20 @@ struct CompareGE {
 
 struct Conv2D {
   template <typename T>
-  static Status Execute(absl::Span<const T> input_buffer,
-                        const Shape& input_shape,
+  static Status Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
                         absl::Span<const T> filter_buffer,
-                        const Shape& filter_shape, absl::Span<T> dst_buffer,
-                        const Shape& dst_shape, const Shape& strides,
-                        const Shape& pad_h, const Shape& pad_w,
-                        const Shape& dilation, const int32_t groups);
+                        ShapeSpan filter_shape, absl::Span<T> dst_buffer,
+                        ShapeSpan dst_shape, ShapeSpan strides, ShapeSpan pad_h,
+                        ShapeSpan pad_w, ShapeSpan dilation,
+                        const int32_t groups);
 };
 
 struct Copy {
   template <int element_size>
   static Status Execute(absl::Span<const uint8_t> src_buffer,
-                        const Shape& src_shape,
+                        ShapeSpan src_shape,
                         absl::Span<const int32_t> src_indices,
-                        absl::Span<uint8_t> dst_buffer, const Shape& dst_shape,
+                        absl::Span<uint8_t> dst_buffer, ShapeSpan dst_shape,
                         absl::Span<const int32_t> dst_indices,
                         absl::Span<const int32_t> lengths);
 };
@@ -115,7 +123,7 @@ struct Select {
 struct Transpose {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
                         absl::Span<const int32_t> perm);
 };
 
@@ -123,8 +131,8 @@ struct Pad {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> padding_value,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
-                        const Shape& dst_shape,
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan dst_shape,
                         absl::Span<const int32_t> edge_padding_low,
                         absl::Span<const int32_t> edge_padding_high,
                         absl::Span<const int32_t> interior_padding);
@@ -134,15 +142,15 @@ struct Gather {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const int32_t> indices_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
-                        const Shape& indices_shape, const Shape& dst_shape,
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan indices_shape, ShapeSpan dst_shape,
                         const int32_t dim, const int32_t batch_dims);
 };
 
 struct Reverse {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
                         absl::Span<const int32_t> dimensions);
 };
 
@@ -155,8 +163,8 @@ struct Broadcast {
 struct Tile {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
-                        const Shape& dst_shape);
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan dst_shape);
 };
 
 struct Not {
@@ -350,11 +358,11 @@ struct MatMul {
 
   template <typename T, typename ACC>
   struct Buffers {
-    Shape lhs_shape;
+    ShapeSpan lhs_shape;
     absl::Span<const T> lhs_buffer;
-    Shape rhs_shape;
+    ShapeSpan rhs_shape;
     absl::Span<const T> rhs_buffer;
-    Shape dst_shape;
+    ShapeSpan dst_shape;
     absl::Span<T> dst_buffer;
 
     // Optional bias buffer.
@@ -382,7 +390,7 @@ struct ReduceSum {
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> init_buffer,
                         absl::Span<T> dst_buffer, int32_t dimension,
-                        const Shape& src_shape, const Shape& dst_shape);
+                        ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct ReduceMin {
@@ -390,7 +398,7 @@ struct ReduceMin {
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> init_buffer,
                         absl::Span<T> dst_buffer, int32_t dimension,
-                        const Shape& src_shape, const Shape& dst_shape);
+                        ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct ReduceMax {
@@ -398,34 +406,34 @@ struct ReduceMax {
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> init_buffer,
                         absl::Span<T> dst_buffer, int32_t dimension,
-                        const Shape& src_shape, const Shape& dst_shape);
+                        ShapeSpan src_shape, ShapeSpan dst_shape);
 };
 
 struct PoolingSum {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
-                        const Shape& dst_shape, const Shape& window_dimensions,
-                        const Shape& strides, const Shape& pad_low);
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                        ShapeSpan strides, ShapeSpan pad_low);
 };
 
 struct PoolingMin {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
-                        const Shape& dst_shape, const Shape& window_dimensions,
-                        const Shape& strides, const Shape& pad_low);
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                        ShapeSpan strides, ShapeSpan pad_low);
 };
 
 struct PoolingMax {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<const T> init_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
-                        const Shape& dst_shape, const Shape& window_dimensions,
-                        const Shape& strides, const Shape& pad_low);
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                        ShapeSpan strides, ShapeSpan pad_low);
 };
 
 }  // namespace kernels
