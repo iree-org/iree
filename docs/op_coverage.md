@@ -20,7 +20,7 @@ op | vmla | vulkan-spirv | llvm-ir
 abs | ✓ | ✓ | ✓
 add | ✓ | ✓ | ✓
 batch_norm_inference | ✓ | ✗ | ✓
-broadcast | ✓ | ✓ | ✗
+broadcast | ✓ | ✓ | ✓
 broadcast_add | ✓ | ✓ | ✗
 broadcast_in_dim | ✓ | ✓ | ✓
 clamp | ✓ | ✗ | ✓
