@@ -198,6 +198,8 @@ class VMLAModuleState final {
 
   ~VMLAModuleState() = default;
 
+  Interface* interface() const { return interface_.get(); }
+
   //===--------------------------------------------------------------------===//
   // vmla.interface.*
   //===--------------------------------------------------------------------===//
@@ -1004,6 +1006,10 @@ Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module) {
   RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return OkStatus();
+}
+
+Interface* ModuleStateInterface(iree_vm_module_state_t* module_state) {
+  return reinterpret_cast<VMLAModuleState*>(module_state)->interface();
 }
 
 }  // namespace vmla

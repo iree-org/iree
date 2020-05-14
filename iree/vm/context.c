@@ -279,6 +279,14 @@ iree_vm_context_state_resolver(const iree_vm_context_t* context) {
   return state_resolver;
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_context_resolve_module_state(
+    const iree_vm_context_t* context, iree_vm_module_t* module,
+    iree_vm_module_state_t** out_module_state) {
+  return iree_vm_context_query_module_state((void*)context, module,
+                                            out_module_state);
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
     iree_vm_context_t* context, iree_vm_module_t** modules,
     iree_host_size_t module_count) {
