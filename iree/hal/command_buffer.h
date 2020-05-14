@@ -18,7 +18,6 @@
 #include <cstdint>
 
 #include "iree/base/bitfield.h"
-#include "iree/base/shape.h"
 #include "iree/base/status.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"

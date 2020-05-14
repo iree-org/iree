@@ -29,7 +29,6 @@
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/memory.h"
-#include "iree/base/shape.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api_detail.h"
 #include "iree/hal/buffer.h"

@@ -56,7 +56,6 @@ cc_library(
         "//iree/base:api_util",
         "//iree/base:memory",
         "//iree/base:ref_ptr",
-        "//iree/base:shape",
         "//iree/base:tracing",
         "//iree/hal/host:host_local_allocator",
         "@com_google_absl//absl/strings",
@@ -132,7 +131,6 @@ cc_library(
         ":executable_layout",
         ":resource",
         "//iree/base:bitfield",
-        "//iree/base:shape",
         "//iree/base:status",
     ],
 )

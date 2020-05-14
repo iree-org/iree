@@ -28,7 +28,6 @@ cc_library(
         "op_kernels_ruy.h",
     ],
     deps = [
-        "//iree/base:shape",
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/algorithm",
@@ -50,6 +49,7 @@ cc_test(
         "//iree/base:memory",
         "//iree/base:status_matchers",
         "//iree/testing:gtest_main",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

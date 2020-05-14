@@ -86,7 +86,7 @@ Status CompareGE::Execute(absl::Span<const T> lhs_buffer,
 }
 
 namespace impl {
-inline absl::InlinedVector<size_t, 6> ComputeCopyStrides(const Shape& shape,
+inline absl::InlinedVector<size_t, 6> ComputeCopyStrides(ShapeSpan shape,
                                                          size_t element_size) {
   absl::InlinedVector<size_t, 6> strides(shape.size());
   strides.back() = element_size;
@@ -130,10 +130,9 @@ inline void CopyRegion(absl::Span<const uint8_t> src_buffer,
 // TODO(benvanik): replace with a real implementation once copy is defined.
 // TODO(gcmn): More consistent/principled handling for scalars.
 template <int element_size>
-Status Copy::Execute(absl::Span<const uint8_t> src_buffer,
-                     const Shape& src_shape,
+Status Copy::Execute(absl::Span<const uint8_t> src_buffer, ShapeSpan src_shape,
                      absl::Span<const int32_t> src_indices,
-                     absl::Span<uint8_t> dst_buffer, const Shape& dst_shape,
+                     absl::Span<uint8_t> dst_buffer, ShapeSpan dst_shape,
                      absl::Span<const int32_t> dst_indices,
                      absl::Span<const int32_t> lengths) {
   DCHECK_EQ(src_indices.size(), lengths.size());
@@ -157,19 +156,19 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer,
 }
 
 template <typename T>
-Status Conv2D::Execute(absl::Span<const T> input_buffer,
-                       const Shape& input_shape,
+Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
                        absl::Span<const T> filter_buffer,
-                       const Shape& filter_shape, absl::Span<T> dst_buffer,
-                       const Shape& dst_shape, const Shape& window_strides,
-                       const Shape& pad_h, const Shape& pad_w,
-                       const Shape& dilation, const int32_t groups) {
-  const Shape input_strides = {input_shape[1] * input_shape[2], input_shape[2],
-                               1};
-  const Shape filter_strides = {
+                       ShapeSpan filter_shape, absl::Span<T> dst_buffer,
+                       ShapeSpan dst_shape, ShapeSpan window_strides,
+                       ShapeSpan pad_h, ShapeSpan pad_w, ShapeSpan dilation,
+                       const int32_t groups) {
+  const std::array<int32_t, 3> input_strides = {input_shape[1] * input_shape[2],
+                                                input_shape[2], 1};
+  const std::array<int32_t, 4> filter_strides = {
       filter_shape[1] * filter_shape[2] * filter_shape[3],
       filter_shape[2] * filter_shape[3], filter_shape[3], 1};
-  const Shape dst_strides = {dst_shape[1] * dst_shape[2], dst_shape[2], 1};
+  const std::array<int32_t, 3> dst_strides = {dst_shape[1] * dst_shape[2],
+                                              dst_shape[2], 1};
   // Direct 2d (grouped) convolution slow implementation. ref:
   // https://www.tensorflow.org/versions/r2.0/api_docs/python/tf/nn/convolution)
   // TODO(ataei): Implement tiled GEMM based implementation.
@@ -222,7 +221,7 @@ Status Select::Execute(absl::Span<const uint8_t> cond_buffer,
 
 template <typename T>
 Status Transpose::Execute(absl::Span<const T> src_buffer,
-                          absl::Span<T> dst_buffer, const Shape& src_shape,
+                          absl::Span<T> dst_buffer, ShapeSpan src_shape,
                           absl::Span<const int32_t> perm) {
   // This implementation is .... not fast.
   int rank = src_shape.size();
@@ -250,15 +249,14 @@ Status Transpose::Execute(absl::Span<const T> src_buffer,
 }
 
 namespace impl {
-inline void IncrementShapeIndex(absl::Span<int32_t> indices,
-                                const Shape& shape) {
+inline void IncrementShapeIndex(absl::Span<int32_t> indices, ShapeSpan shape) {
   for (int i = indices.size() - 1; i >= 0; --i) {
     if (++indices[i] < shape[i]) return;
     indices[i] = 0;
   }
 }
 
-inline bool IsPadding(absl::Span<const int32_t> indices, const Shape& shape,
+inline bool IsPadding(absl::Span<const int32_t> indices, ShapeSpan shape,
                       absl::Span<const int32_t> edge_padding_low,
                       absl::Span<const int32_t> edge_padding_high,
                       absl::Span<const int32_t> interior_padding) {
@@ -278,8 +276,8 @@ inline bool IsPadding(absl::Span<const int32_t> indices, const Shape& shape,
 template <typename T>
 Status Pad::Execute(absl::Span<const T> src_buffer,
                     absl::Span<const T> padding_value_buffer,
-                    absl::Span<T> dst_buffer, const Shape& src_shape,
-                    const Shape& dst_shape,
+                    absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                    ShapeSpan dst_shape,
                     absl::Span<const int32_t> edge_padding_low,
                     absl::Span<const int32_t> edge_padding_high,
                     absl::Span<const int32_t> interior_padding) {
@@ -320,13 +318,13 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
 template <typename T>
 Status Gather::Execute(absl::Span<const T> src_buffer,
                        absl::Span<const int32_t> indices_buffer,
-                       absl::Span<T> dst_buffer, const Shape& src_shape,
-                       const Shape& indices_shape, const Shape& dst_shape,
+                       absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                       ShapeSpan indices_shape, ShapeSpan dst_shape,
                        const int32_t dim, const int32_t batch_dims) {
   std::vector<int32_t> output_strides(dst_shape.size(), 1);
   std::vector<int32_t> input_strides(src_shape.size(), 1);
   std::vector<int32_t> indices_strides(indices_shape.size(), 1);
-  auto compute_strides = [](const Shape& shape, std::vector<int32_t>& strides) {
+  auto compute_strides = [](ShapeSpan shape, std::vector<int32_t>& strides) {
     for (int i = shape.size() - 2; i >= 0; --i) {
       strides[i] = strides[i + 1] * shape[i + 1];
     }
@@ -376,7 +374,7 @@ Status Gather::Execute(absl::Span<const T> src_buffer,
 
 template <typename T>
 Status Reverse::Execute(absl::Span<const T> src_buffer,
-                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
                         absl::Span<const int32_t> dimensions) {
   // This implementation is not fast either.
   int rank = src_shape.size();
@@ -413,7 +411,7 @@ Status Broadcast::Execute(absl::Span<const T> src_buffer,
 
 template <typename T>
 Status Tile::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
-                     const Shape& src_shape, const Shape& dst_shape) {
+                     ShapeSpan src_shape, ShapeSpan dst_shape) {
   // This implementation is .... not fast.
   int rank = dst_shape.size();
   absl::InlinedVector<int, 8> src_strides(rank);
@@ -714,7 +712,7 @@ struct MaxKernel {
 
 template <typename T, typename KernelImpl>
 inline void ReduceDimension(absl::Span<const T> src_buffer,
-                            absl::Span<T> dst_buffer, const Shape& src_shape,
+                            absl::Span<T> dst_buffer, ShapeSpan src_shape,
                             absl::Span<const int32_t> reduce_dims,
                             absl::Span<const int> dst_strides, int dim,
                             absl::Span<int> src_indices, size_t flat_src_i,
@@ -779,8 +777,8 @@ inline void ReduceDimension(absl::Span<const T> src_buffer,
 template <typename T, typename KernelImpl>
 Status GenericReduce(absl::Span<const T> src_buffer,
                      absl::Span<const T> init_buffer, absl::Span<T> dst_buffer,
-                     int32_t dimension, const Shape& src_shape,
-                     const Shape& dst_shape) {
+                     int32_t dimension, ShapeSpan src_shape,
+                     ShapeSpan dst_shape) {
   // Initialize using init_buffer, which is expected to be a scalar.
   std::fill_n(dst_buffer.data(), dst_buffer.size(), init_buffer[0]);
 
@@ -813,7 +811,7 @@ template <typename T>
 Status ReduceSum::Execute(absl::Span<const T> src_buffer,
                           absl::Span<const T> init_buffer,
                           absl::Span<T> dst_buffer, int32_t dimension,
-                          const Shape& src_shape, const Shape& dst_shape) {
+                          ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::SumKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
@@ -822,7 +820,7 @@ template <typename T>
 Status ReduceMin::Execute(absl::Span<const T> src_buffer,
                           absl::Span<const T> init_buffer,
                           absl::Span<T> dst_buffer, int32_t dimension,
-                          const Shape& src_shape, const Shape& dst_shape) {
+                          ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::MinKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
@@ -831,7 +829,7 @@ template <typename T>
 Status ReduceMax::Execute(absl::Span<const T> src_buffer,
                           absl::Span<const T> init_buffer,
                           absl::Span<T> dst_buffer, int32_t dimension,
-                          const Shape& src_shape, const Shape& dst_shape) {
+                          ShapeSpan src_shape, ShapeSpan dst_shape) {
   return impl::GenericReduce<T, impl::MaxKernel>(
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
@@ -841,8 +839,8 @@ namespace impl {
 template <typename T, typename KernelImpl>
 Status ComputePoolingWindow(absl::Span<const T> src_buffer,
                             absl::Span<const int> src_indices,
-                            const Shape& src_shape, T init_value,
-                            const Shape& window_dimensions, T* dst_value) {
+                            ShapeSpan src_shape, T init_value,
+                            ShapeSpan window_dimensions, T* dst_value) {
   int rank = src_shape.size();
   absl::InlinedVector<int, 8> window_indices(rank, 0);
   auto getSrcValue = [&]() -> T {
@@ -856,7 +854,7 @@ Status ComputePoolingWindow(absl::Span<const T> src_buffer,
   };
 
   *dst_value = init_value;
-  for (int i = 0, e = window_dimensions.element_count(); i < e; ++i) {
+  for (int i = 0, e = GetElementCount(window_dimensions); i < e; ++i) {
     KernelImpl()(dst_value, getSrcValue());
     IncrementShapeIndex(absl::MakeSpan(window_indices), window_dimensions);
   }
@@ -866,19 +864,20 @@ Status ComputePoolingWindow(absl::Span<const T> src_buffer,
 template <typename T, typename KernelImpl>
 Status GenericPooling(absl::Span<const T> src_buffer,
                       absl::Span<const T> init_buffer, absl::Span<T> dst_buffer,
-                      const Shape& src_shape, const Shape& dst_shape,
-                      const Shape& window_dimensions, const Shape& strides,
-                      const Shape& pad_low) {
+                      ShapeSpan src_shape, ShapeSpan dst_shape,
+                      ShapeSpan window_dimensions, ShapeSpan strides,
+                      ShapeSpan pad_low) {
   int rank = src_shape.size();
   absl::InlinedVector<int, 8> src_indices(rank, 0);
   absl::InlinedVector<int, 8> dst_indices(rank, 0);
-  for (int i = 0, e = dst_shape.element_count(); i < e; ++i) {
-    for (int j = 0; j < rank; ++j)
+  for (int i = 0, e = GetElementCount(dst_shape); i < e; ++i) {
+    for (int j = 0; j < rank; ++j) {
       src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];
-    Status status = ComputePoolingWindow<T, KernelImpl>(
+    }
+    auto status = ComputePoolingWindow<T, KernelImpl>(
         src_buffer, src_indices, src_shape, init_buffer[0], window_dimensions,
         &dst_buffer[i]);
-    if (!status.ok()) return status;
+    RETURN_IF_ERROR(status);
     IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
   }
   return OkStatus();
@@ -889,10 +888,9 @@ Status GenericPooling(absl::Span<const T> src_buffer,
 template <typename T>
 Status PoolingSum::Execute(absl::Span<const T> src_buffer,
                            absl::Span<const T> init_buffer,
-                           absl::Span<T> dst_buffer, const Shape& src_shape,
-                           const Shape& dst_shape,
-                           const Shape& window_dimensions, const Shape& strides,
-                           const Shape& pad_low) {
+                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                           ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                           ShapeSpan strides, ShapeSpan pad_low) {
   return impl::GenericPooling<T, impl::SumKernel>(
       src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
       window_dimensions, strides, pad_low);
@@ -901,10 +899,9 @@ Status PoolingSum::Execute(absl::Span<const T> src_buffer,
 template <typename T>
 Status PoolingMin::Execute(absl::Span<const T> src_buffer,
                            absl::Span<const T> init_buffer,
-                           absl::Span<T> dst_buffer, const Shape& src_shape,
-                           const Shape& dst_shape,
-                           const Shape& window_dimensions, const Shape& strides,
-                           const Shape& pad_low) {
+                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                           ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                           ShapeSpan strides, ShapeSpan pad_low) {
   return impl::GenericPooling<T, impl::MinKernel>(
       src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
       window_dimensions, strides, pad_low);
@@ -913,10 +910,9 @@ Status PoolingMin::Execute(absl::Span<const T> src_buffer,
 template <typename T>
 Status PoolingMax::Execute(absl::Span<const T> src_buffer,
                            absl::Span<const T> init_buffer,
-                           absl::Span<T> dst_buffer, const Shape& src_shape,
-                           const Shape& dst_shape,
-                           const Shape& window_dimensions, const Shape& strides,
-                           const Shape& pad_low) {
+                           absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                           ShapeSpan dst_shape, ShapeSpan window_dimensions,
+                           ShapeSpan strides, ShapeSpan pad_low) {
   return impl::GenericPooling<T, impl::MaxKernel>(
       src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
       window_dimensions, strides, pad_low);

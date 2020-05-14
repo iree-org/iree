@@ -20,7 +20,6 @@
 #include "absl/time/time.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
-#include "iree/base/shape.h"
 #include "iree/base/status.h"
 
 namespace iree {

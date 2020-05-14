@@ -57,7 +57,6 @@ iree_cc_library(
   DEPS
     ::api_hdrs
     ::logging
-    ::shape
     ::status
     absl::core_headers
     absl::inlined_vector
