@@ -13,7 +13,7 @@ module {
     %c4 = constant 4 : index
     %c8 = constant 8 : index
     %c1 = constant 1 : index
-    loop.parallel (%arg3, %arg4) = (%c0, %c0) to (%c4, %c8) step (%c4, %c32) {
+    scf.parallel (%arg3, %arg4) = (%c0, %c0) to (%c4, %c8) step (%c4, %c32) {
       %0 = affine.min #map0(%c4, %c4, %arg3)
       %1 = affine.min #map0(%c32, %c8, %arg4)
       %2 = subview %arg0[%arg3, %arg4] [%0, %1] [%c1, %c1]
@@ -35,7 +35,7 @@ module {
         %9 = addi %arg5, %arg6 : i32
         linalg.yield %9 : i32
       } : memref<?x?xi32, #map1>, memref<?x?xi32, #map1>, memref<?x?xi32, #map1>
-      loop.yield
+      scf.yield
     }
     return
   }
@@ -50,14 +50,14 @@ module {
 //       CHECK:   %[[NEWSTEPY:.+]] = muli %[[NBLOCKSY]], %[[STEPY]]
 //       CHECK:   %[[NEWLBX:.+]] = muli %[[BIDX]], %[[STEPX]]
 //       CHECK:   %[[NEWSTEPX:.+]] = muli %[[NBLOCKSX]], %[[STEPX]]
-//       CHECK:   loop.for %{{.+}} = %[[NEWLBY]] to %{{.+}} step %[[NEWSTEPY]]
-//       CHECK:     loop.for %{{.+}} = %[[NEWLBX]] to %{{.+}} step %[[NEWSTEPX]]
+//       CHECK:   scf.for %{{.+}} = %[[NEWLBY]] to %{{.+}} step %[[NEWSTEPY]]
+//       CHECK:     scf.for %{{.+}} = %[[NEWLBX]] to %{{.+}} step %[[NEWSTEPX]]
 //   CHECK-DAG:       %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:       %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:       %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:       %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//       CHECK:       loop.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
-//       CHECK:         loop.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
+//       CHECK:       scf.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
+//       CHECK:         scf.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
 
 // -----
 
@@ -84,8 +84,8 @@ module {
 // CHECK-DAG: %[[C0:.+]] = constant 0 : index
 // CHECK-DAG: %[[C4:.+]] = constant 4 : index
 // CHECK-DAG: %[[C1:.+]] = constant 1 : index
-//     CHECK:   loop.for %{{.+}} = %[[C0]] to %[[C4]] step %[[C1]]
-// CHECK-NOT:   loop
+//     CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C4]] step %[[C1]]
+// CHECK-NOT:   scf
 
 // -----
 
@@ -104,7 +104,7 @@ module {
     %1 = dim %arg0, 1 : memref<?x?x?x?xf32>
     %2 = dim %arg0, 2 : memref<?x?x?x?xf32>
     %3 = dim %arg0, 3 : memref<?x?x?x?xf32>
-    loop.parallel (%arg3, %arg4, %arg5, %arg6) = (%c0, %c0, %c0, %c0) to (%0, %1, %2, %3) step (%c2, %c2, %c2, %c32) {
+    scf.parallel (%arg3, %arg4, %arg5, %arg6) = (%c0, %c0, %c0, %c0) to (%0, %1, %2, %3) step (%c2, %c2, %c2, %c32) {
       %12 = affine.min #map0(%arg3)[%0]
       %13 = affine.min #map0(%arg4)[%1]
       %14 = affine.min #map0(%arg5)[%2]
@@ -122,7 +122,7 @@ module {
           %19 = addf %arg7, %arg8 : f32
           linalg.yield %19 : f32
       } : memref<?x?x?x?xf32, #map2>, memref<?x?x?x?xf32, #map2>, memref<?x?x?x?xf32, #map2>
-      loop.yield
+      scf.yield
     }
     return
   }
@@ -145,20 +145,20 @@ module {
 // CHECK-DAG: %[[STEP1:.+]] = muli %[[NBLOCKSY]], %[[C2]]
 // CHECK-DAG: %[[LB2:.+]] = muli %[[BIDX]], %[[C2]]
 // CHECK-DAG: %[[STEP2:.+]] = muli %[[NBLOCKSX]], %[[C2]]
-//     CHECK: loop.for %{{.+}} = %[[LB0]] to %{{.+}} step %[[STEP0]]
-//     CHECK:   loop.for %{{.+}} = %[[LB1]] to %{{.+}} step %[[STEP1]]
-//     CHECK:     loop.for %{{.+}} = %[[LB2]] to %{{.+}} step %[[STEP2]]
-//     CHECK:       loop.for %{{.+}} = %[[C0]] to %[[SERIALDIMOUTER]] step %[[C32]]
+//     CHECK: scf.for %{{.+}} = %[[LB0]] to %{{.+}} step %[[STEP0]]
+//     CHECK:   scf.for %{{.+}} = %[[LB1]] to %{{.+}} step %[[STEP1]]
+//     CHECK:     scf.for %{{.+}} = %[[LB2]] to %{{.+}} step %[[STEP2]]
+//     CHECK:       scf.for %{{.+}} = %[[C0]] to %[[SERIALDIMOUTER]] step %[[C32]]
 // CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
 // CHECK-DAG:         %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"} : () -> index
 // CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"} : () -> index
 // CHECK-DAG:         %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"} : () -> index
 // CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"} : () -> index
 // CHECK-DAG:         %[[NTHREADSZ:.+]] = "gpu.block_dim"() {dimension = "z"} : () -> index
-//     CHECK:         loop.for %{{.+}} = %[[TIDZ]] to %{{.+}} step %[[NTHREADSZ]]
-//     CHECK:           loop.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
-//     CHECK:             loop.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
-//     CHECK:               loop.for %{{.+}} = %[[C0]] to %{{.+}} step %[[C1]]
+//     CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.+}} step %[[NTHREADSZ]]
+//     CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
+//     CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
+//     CHECK:               scf.for %{{.+}} = %[[C0]] to %{{.+}} step %[[C1]]
 
 // -----
 
@@ -197,5 +197,5 @@ module {
 //     CHECK: %[[T6:.+]] =  muli %[[BIDY]], %[[BLOCKSIZEY]]
 //     CHECK: %[[GIDY:.+]] =  addi %[[T6]], %[[TIDY]]
 //     CHECK: %[[NPROCSY:.+]] =  muli %[[BLOCKSIZEY]], %[[NBLOCKSY]]
-//     CHECK: loop.for %{{.+}} = %[[GIDY]] to %[[UBY]] step %[[NPROCSY]]
-//     CHECK:   loop.for %{{.+}} = %[[GIDX]] to %[[UBX]] step %[[NPROCSX]]
+//     CHECK: scf.for %{{.+}} = %[[GIDY]] to %[[UBY]] step %[[NPROCSY]]
+//     CHECK:   scf.for %{{.+}} = %[[GIDX]] to %[[UBX]] step %[[NPROCSX]]
