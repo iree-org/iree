@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds an image for running IREE on bazel with python bindings and tensorflow
-# integrations. Requires that the bazel image has already been built. Build
-# using:
-# docker build --tag bazel-tensorflow build_tools/docker/bazel_tensorflow/
+# An image for building IREE with python bindings and tensorflow integrations
+# using bazel.
+
+# Build using:
+# docker build --tag gcr.io/iree-oss/bazel-tensorflow build_tools/docker/bazel_tensorflow/
 
 # Set up the image and working directory.
-FROM bazel
+FROM gcr.io/iree-oss/bazel
 WORKDIR /usr/src/git
 
 # Update python3 to 3.6

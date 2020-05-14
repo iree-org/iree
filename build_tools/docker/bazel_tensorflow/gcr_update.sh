@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds and pushes bazel and bazel-tensorflow images to gcr.io/iree-oss/ from
-# within the GCP IREE-OSS project.
+# Builds and pushes the bazel-tensorflow image to gcr.io/iree-oss/
 
 set -x
 set -e
@@ -22,12 +21,6 @@ set -e
 # Ensure correct authorization.
 gcloud auth configure-docker
 
-# Build and push the bazel image.
-docker build --tag bazel build_tools/docker/bazel/
-docker tag bazel gcr.io/iree-oss/bazel
-docker push gcr.io/iree-oss/bazel
-
 # Build and push the bazel-tensorflow image.
-docker build --tag bazel-tensorflow build_tools/docker/bazel_tensorflow/
-docker tag bazel-tensorflow gcr.io/iree-oss/bazel-tensorflow
+docker build --tag gcr.io/iree-oss/bazel-tensorflow build_tools/docker/bazel_tensorflow/
 docker push gcr.io/iree-oss/bazel-tensorflow
