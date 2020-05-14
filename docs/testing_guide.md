@@ -25,6 +25,27 @@ With Bazel, run this from the repo root:
 $ bazel test iree/base:arena_test
 ```
 
+### Setting test environments
+
+To use the Vulkan backend as test driver, you may need to select between a
+Vulkan implementation from SwiftShader and multiple Vulkan-capable hardware
+devices. This can be done via environment variables. See the
+[generic Vulkan setup](GetStarted/generic_vulkan_env_setup.md#useful-environment-variables)
+page for details regarding these variables.
+
+For Bazel, you can persist the configuration in `user.bazelrc` to save typing.
+For example:
+
+```shell
+test:vkswiftshader --test_env="LD_LIBRARY_PATH=..."
+test:vkswiftshader --test_env="VK_LAYER_PATH=..."
+test:vknative --test_env="LD_LIBRARY_PATH=..."
+test:vknative --test_env="VK_LAYER_PATH=..."
+```
+
+Then you can use `bazel test --config=vkswiftshader` to select SwiftShader as
+the Vulkan implementation. Similarly for other implementations.
+
 ### Writing a Test
 
 For advice on writing tests in the Googletest framework, see the
@@ -179,6 +200,11 @@ With Bazel, run this from the repo root:
 ```shell
 $ bazel test iree/test/e2e/xla_ops:check_vmla_vmla_floor.mlir
 ```
+
+### Setting test environments
+
+Similarly, you can use environment variables to select Vulkan implementations
+for running tests as explained in the [Runtime Tests](#runtime-tests) section.
 
 ### Writing a Test
 
