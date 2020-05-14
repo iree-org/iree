@@ -45,7 +45,7 @@ class ConvertTfTensorlistConcatV2
 
   LogicalResult matchAndRewrite(TF::TensorListConcatV2Op op,
                                 PatternRewriter &rewriter) const override {
-    Value tensor_list= op.input_handle();
+    Value tensor_list = op.input_handle();
     Value out_tensor = op.tensor();
     Value out_lengths = op.lengths();
 
