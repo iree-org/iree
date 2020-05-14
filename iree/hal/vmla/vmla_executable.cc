@@ -19,7 +19,6 @@
 #include "iree/hal/vmla/vmla_module.h"
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/invocation.h"
 #include "iree/vm/module.h"
 #include "iree/vm/variant_list.h"
 
@@ -109,24 +108,22 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
   RETURN_IF_ERROR(result);
 
   // Query the Interface block we'll use to set bindings during invocation.
-  iree_vm_function_t current_function;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_module_lookup_function_by_name(
-          vmla_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-          iree_make_cstring_view("interface.current"), &current_function),
-      IREE_LOC));
+  iree_vm_module_state_t* module_state = nullptr;
+  RETURN_IF_ERROR(FromApiStatus(iree_vm_context_resolve_module_state(
+                                    context(), vmla_module, &module_state),
+                                IREE_LOC));
+  interface_ = ModuleStateInterface(module_state);
+
+  // Preallocate the variant list we'll use to pass the interface into
+  // executables. This makes dispatches zero-allocation (well, on the outside
+  // anyway!).
   RETURN_IF_ERROR(FromApiStatus(
       iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &interface_inputs_),
       IREE_LOC));
+  auto interface_ref = Interface_retain_ref(interface_);
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_invoke(context(), current_function,
-                     /*policy=*/nullptr, /*inputs=*/nullptr,
-                     /*outputs=*/interface_inputs_, IREE_ALLOCATOR_SYSTEM),
+      iree_vm_variant_list_append_ref_move(interface_inputs_, &interface_ref),
       IREE_LOC));
-  auto* output = iree_vm_variant_list_get(interface_inputs_, 0);
-  interface_ = Interface_deref(&output->ref);
-  // NOTE: we reuse the output list as the entry point interface inputs for all
-  // invocations into the executable.
 
   return OkStatus();
 }
