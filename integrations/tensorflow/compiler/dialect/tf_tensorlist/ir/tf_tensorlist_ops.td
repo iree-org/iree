@@ -157,9 +157,8 @@ def TfTensorList_Concat : TfTensorList_Op<"Concat", [NoSideEffect]> {
   );
 }
 
-// TODO(suderman): This op purely exists to be optimized away right now.
-// The module still require a lowering and implementation if it becomes
-// required.
+// TODO(suderman): If gradients are not being calculated, the value will be
+// DCE'd.
 def TfTensorList_GetDim0 : TfTensorList_Op<"GetDim0", [NoSideEffect]> {
   let summary = "Returns a tensor of the lengths of Dim0 for the tensorlists' tensors";
 

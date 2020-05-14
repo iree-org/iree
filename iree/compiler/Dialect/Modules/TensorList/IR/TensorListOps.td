@@ -119,7 +119,7 @@ def TensorList_Concat : Op<TensorList_Dialect, "Concat"> {
 
     Requires the list to be non-empty.
     Requires all tensors contained in `list` to have the same dimensions along
-    the non-leading axis.
+    the non-leading axes.
   }];
   let arguments = (ins
     TensorList_TensorList:$list
