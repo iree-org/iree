@@ -27,6 +27,11 @@ func @GetItem(%arg0: !tf_tensorlist.list, %arg1: tensor<i32>, %arg2: tensor<0xi3
   return %0 : tensor<f32>
 }
 
-
-
-
+// CHECK-LABEL: func @Stack(%arg0: !tensorlist.list, %arg1: !hal.buffer, %arg2: !hal.buffer) -> !hal.buffer {
+func @Stack(%arg0: !tf_tensorlist.list, %arg1: tensor<1xi32>, %arg2: tensor<i32>) -> tensor<1xf32> {
+// CHECK:         [[VIEW1:%.+]] = hal.buffer_view.create %arg1{{.*}}
+// CHECK:         [[VIEW2:%.+]] = hal.buffer_view.create %arg2{{.*}}
+// CHECK:         "tensorlist.Stack"(%arg0, [[VIEW1]], [[VIEW2]])
+  %0 = "tf_tensorlist.Stack"(%arg0, %arg1, %arg2) : (!tf_tensorlist.list, tensor<1xi32>, tensor<i32>) -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}

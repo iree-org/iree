@@ -10,6 +10,15 @@ func @identity_through_set_item_get_item(%arg0: !hal.buffer_view) -> !hal.buffer
   return %5 : !hal.buffer_view
 }
 
+func @identity_through_concat(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.module.export, iree.abi.none} {
+  %dev = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator %dev : !hal.allocator
+  %element_shape = hal.buffer_view.const %allocator, "HostLocal|DeviceVisible", "All" : !hal.buffer_view = dense<[]> : tensor<0xi32>
+  %list = "tensorlist.FromTensor"(%arg0, %element_shape) : (!hal.buffer_view, !hal.buffer_view) -> !tensorlist.list
+  %concat = "tensorlist.Concat"(%list) : (!tensorlist.list) -> !hal.buffer_view
+  return %concat : !hal.buffer_view
+}
+
 func @identity_through_stack(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.module.export, iree.abi.none} {
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator

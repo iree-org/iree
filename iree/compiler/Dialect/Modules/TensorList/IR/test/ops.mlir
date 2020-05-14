@@ -19,8 +19,26 @@ func @GetItem(%list: !tensorlist.list, %index: !hal.buffer_view, %element_shape:
 // -----
 
 // CHECK-LABEL: @SetItem
-func @SetItem(%list: !tensorlist.list, %index: !hal.buffer_view, %item: !hal.buffer_view) -> !tensorlist.list{
+func @SetItem(%list: !tensorlist.list, %index: !hal.buffer_view, %item: !hal.buffer_view) -> !tensorlist.list {
   // CHECK: tensorlist.SetItem
   %0 = "tensorlist.SetItem"(%list, %index, %item) : (!tensorlist.list, !hal.buffer_view, !hal.buffer_view) -> !tensorlist.list
   return %0 : !tensorlist.list
+}
+
+// -----
+
+// CHECK-LABEL: @Stack
+func @Stack(%list: !tensorlist.list, %element_shape: !hal.buffer_view, %num_elements: !hal.buffer_view) -> !hal.buffer_view {
+  // CHECK: tensorlist.Stack
+  %0 = "tensorlist.Stack"(%list, %element_shape, %num_elements) : (!tensorlist.list, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+  return %0 : !hal.buffer_view
+}
+
+// -----
+
+// CHECK-LABEL: @Concat
+func @Concat(%list: !tensorlist.list) -> !hal.buffer_view {
+  // CHECK: tensorlist.Concat
+  %0 = "tensorlist.Concat"(%list) : (!tensorlist.list) -> !hal.buffer_view
+  return %0 : !hal.buffer_view
 }
