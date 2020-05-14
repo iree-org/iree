@@ -209,7 +209,8 @@ TEST_F(TensorListModulesTest, IdentityThroughConcat) {
   ASSERT_EQ(returned_rank, shape.size() - 1);
 
   iree_hal_dim_t returned_shape[shape.size() - 1];
-  iree_hal_buffer_view_shape(returned_buffer_view, shape.size() - 1, returned_shape, &returned_rank);
+  iree_hal_buffer_view_shape(returned_buffer_view, shape.size() - 1,
+                             returned_shape, &returned_rank);
   EXPECT_EQ(returned_shape[0], shape[0] * shape[1]);
 
   iree_hal_mapped_memory_t mapped_memory;

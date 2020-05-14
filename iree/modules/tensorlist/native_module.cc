@@ -169,7 +169,8 @@ class TensorList final : public RefObject<TensorList> {
             IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer),
         IREE_LOC));
 
-    RETURN_IF_ERROR(FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
+    RETURN_IF_ERROR(
+        FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
 
     absl::InlinedVector<int32_t, 4> result_shape;
     result_shape.push_back(Size());
@@ -210,8 +211,7 @@ class TensorList final : public RefObject<TensorList> {
       size_t element_rank = iree_hal_buffer_view_shape_rank(GetItem(i).get());
       if (element_rank < 1) {
         return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "stacking rank must be greater than zero."
-               << i;
+               << "stacking rank must be greater than zero." << i;
       }
 
       absl::InlinedVector<int32_t, 6> element_shape(element_rank);
@@ -221,7 +221,8 @@ class TensorList final : public RefObject<TensorList> {
           IREE_LOC));
       num_rows += element_shape.front();
 
-      if (absl::MakeSpan(shape).subspan(1) != absl::MakeSpan(element_shape).subspan(1) ||
+      if (absl::MakeSpan(shape).subspan(1) !=
+              absl::MakeSpan(element_shape).subspan(1) ||
           iree_hal_buffer_view_element_type(GetItem(i).get()) != type) {
         return InvalidArgumentErrorBuilder(IREE_LOC)
                << "stacking list with elements of different shapes or element "
@@ -250,7 +251,8 @@ class TensorList final : public RefObject<TensorList> {
             IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer),
         IREE_LOC));
 
-    RETURN_IF_ERROR(FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
+    RETURN_IF_ERROR(
+        FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
 
     absl::InlinedVector<int32_t, 4> result_shape;
     result_shape.push_back(num_rows);
@@ -274,8 +276,7 @@ class TensorList final : public RefObject<TensorList> {
     IREE_RETURN_IF_ERROR(
         iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_WRITE,
                             /*byte_offset=*/0,
-                            /*byte_length=*/dest_byte_size,
-                            &result_mapping));
+                            /*byte_length=*/dest_byte_size, &result_mapping));
 
     // Copy each buffer into the result at the right offset.
     // This is just a naive map+memcpy.
@@ -294,15 +295,15 @@ class TensorList final : public RefObject<TensorList> {
       iree_hal_buffer_view_t* tensor = GetItem(i).get();
       iree_hal_buffer_t* tensor_buffer = iree_hal_buffer_view_buffer(tensor);
       iree_hal_mapped_memory_t tensor_mapping;
-      iree_device_size_t tensor_byte_size = iree_hal_buffer_byte_length(tensor_buffer);
+      iree_device_size_t tensor_byte_size =
+          iree_hal_buffer_byte_length(tensor_buffer);
 
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
-        tensor_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-        tensor_byte_size, &tensor_mapping));
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_map(tensor_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
+                              tensor_byte_size, &tensor_mapping));
 
       memcpy(result_mapping.contents.data + offset,
-             tensor_mapping.contents.data,
-             tensor_byte_size);
+             tensor_mapping.contents.data, tensor_byte_size);
       offset += tensor_byte_size;
 
       IREE_RETURN_IF_ERROR(

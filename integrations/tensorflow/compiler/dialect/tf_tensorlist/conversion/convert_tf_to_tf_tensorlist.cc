@@ -38,27 +38,29 @@ bool isTfVariant(Type type) {
 }
 
 namespace {
-class ConvertTfTensorlistConcatV2 : public OpRewritePattern<TF::TensorListConcatV2Op>{
+class ConvertTfTensorlistConcatV2
+    : public OpRewritePattern<TF::TensorListConcatV2Op> {
  public:
   using OpRewritePattern<TF::TensorListConcatV2Op>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-    TF::TensorListConcatV2Op op, PatternRewriter& rewriter) const override {
-    llvm::errs() <<"Found op\n";
+  LogicalResult matchAndRewrite(TF::TensorListConcatV2Op op,
+                                PatternRewriter &rewriter) const override {
+    llvm::errs() << "Found op\n";
     op.dump();
     Value tensor_lists = op.input_handle();
     Value out_tensor = op.tensor();
     Value out_lengths = op.lengths();
 
-    auto concat = rewriter.create<tf_tensorlist::Concat>(op.getLoc(), out_tensor.getType(), tensor_lists);
-    auto dim0Lengths = rewriter.create<tf_tensorlist::GetDim0>(op.getLoc(), out_lengths.getType(), tensor_lists);
+    auto concat = rewriter.create<tf_tensorlist::Concat>(
+        op.getLoc(), out_tensor.getType(), tensor_lists);
+    auto dim0Lengths = rewriter.create<tf_tensorlist::GetDim0>(
+        op.getLoc(), out_lengths.getType(), tensor_lists);
 
     out_tensor.replaceAllUsesWith(concat);
     out_lengths.replaceAllUsesWith(dim0Lengths);
     rewriter.eraseOp(op);
     return success();
   }
-
 };
 }  // namespace
 
