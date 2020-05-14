@@ -34,6 +34,13 @@ use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
+## Presubmits
+
+Several of our presubmit builds will only run automatically if you are a project
+collaborator. Otherwise a collaborator must label the PR with "kokoro:run". If
+you are sending code changes to the project, please ask to be added as a
+collaborator, so that these can run automatically.
+
 ## Peculiarities
 
 We use a GitHub integration to import PRs into our upstream (Google internal)
