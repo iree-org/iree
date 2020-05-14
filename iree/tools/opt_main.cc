@@ -65,6 +65,10 @@ static llvm::cl::opt<bool> allowUnregisteredDialects(
     llvm::cl::desc("Allow operation with no registered dialects"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> showDialects(
+    "show-dialects", llvm::cl::desc("Print the list of registered dialects"),
+    llvm::cl::init(false));
+
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
   mlir::registerMlirPasses();
@@ -92,6 +96,15 @@ int main(int argc, char **argv) {
   // Parse pass names in main to ensure static initialization completed.
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "IREE modular optimizer driver\n");
+
+  if (showDialects) {
+    llvm::outs() << "Registered Dialects:\n";
+    mlir::MLIRContext context;
+    for (mlir::Dialect *dialect : context.getRegisteredDialects()) {
+      llvm::outs() << dialect->getNamespace() << "\n";
+    }
+    return 0;
+  }
 
   // Set up the input file.
   std::string errorMessage;
