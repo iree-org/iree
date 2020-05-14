@@ -35,7 +35,7 @@
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
-#include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
+#include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
@@ -136,7 +136,7 @@ inline void registerMlirPasses() {
 
   // GPU
   createGpuKernelOutliningPass();
-  createSimpleLoopsToGPUPass(0, 0);
+  createSimpleSCFToGPUPass(0, 0);
   createLoopToGPUPass({}, {});
 
   // Linalg

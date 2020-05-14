@@ -120,9 +120,9 @@ if(${IREE_BUILD_COMPILER})
       MLIRLinalgToLLVM
       MLIRLinalgToSPIRVTransforms
       MLIRLinalgTransforms
-      MLIRLoopsToGPU
       MLIRQuant
       MLIRSCF
+      MLIRSCFToGPU
       MLIRSCFTransforms
       MLIRSDBM
       MLIRSPIRV
