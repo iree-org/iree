@@ -208,11 +208,14 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     DebugCaptureManager* debug_capture_manager) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
 
-  // Find the layers and extensions we need (or want) that are also available
+  if (!extensibility_spec.optional_layers.empty() ||
+      !extensibility_spec.required_layers.empty()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Device layers are deprecated and unsupported by IREE";
+  }
+
+  // Find the extensions we need (or want) that are also available
   // on the device. This will fail when required ones are not present.
-  ASSIGN_OR_RETURN(
-      auto enabled_layer_names,
-      MatchAvailableDeviceLayers(physical_device, extensibility_spec, *syms));
   ASSIGN_OR_RETURN(auto enabled_extension_names,
                    MatchAvailableDeviceExtensions(physical_device,
                                                   extensibility_spec, *syms));
@@ -280,8 +283,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   // Create device and its queues.
   VkDeviceCreateInfo device_create_info = {};
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  device_create_info.enabledLayerCount = enabled_layer_names.size();
-  device_create_info.ppEnabledLayerNames = enabled_layer_names.data();
+  device_create_info.enabledLayerCount = 0;
+  device_create_info.ppEnabledLayerNames = nullptr;
   device_create_info.enabledExtensionCount = enabled_extension_names.size();
   device_create_info.ppEnabledExtensionNames = enabled_extension_names.data();
   device_create_info.queueCreateInfoCount = queue_create_info.size();
@@ -305,7 +308,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   auto logical_device =
       make_ref<VkDeviceHandle>(syms, enabled_device_extensions,
                                /*owns_device=*/true, /*allocator=*/nullptr);
-  // The Vulkan loader can leak here, depending on which layers are enabled.
+  // The Vulkan loader can leak here, depending on which features are enabled.
   // This is out of our control, so disable leak checks.
   IREE_DISABLE_LEAK_CHECKS();
   VK_RETURN_IF_ERROR(syms->vkCreateDevice(physical_device, &device_create_info,
