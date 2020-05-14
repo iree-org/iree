@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds an image for running IREE on bazel.
+# An image for building IREE using bazel.
+
+# Build using:
+# docker build --tag gcr.io/iree-oss/bazel build_tools/docker/bazel/
 
 # Set up the image and working directory.
 FROM l.gcr.io/google/bazel:2.1.0

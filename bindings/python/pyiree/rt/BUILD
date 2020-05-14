@@ -118,7 +118,10 @@ iree_py_test(
     srcs = ["function_abi_test.py"],
     python_version = "PY3",
     # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-    tags = ["noga"],
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
