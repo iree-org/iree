@@ -155,7 +155,6 @@ class TensorList final : public RefObject<TensorList> {
       num_elements_per_tensor *= dim;
     }
     size_t element_size = iree_hal_buffer_view_element_size(GetItem(0).get());
-    size_t tensor_byte_size = num_elements_per_tensor * element_size;
     size_t num_result_elements = num_elements_per_tensor * num_tensors;
     size_t result_byte_size = num_result_elements * element_size;
     iree_hal_allocator_t* hal_allocator = iree_hal_buffer_allocator(
@@ -237,7 +236,6 @@ class TensorList final : public RefObject<TensorList> {
       num_elements_per_row *= dim;
     }
     size_t element_size = iree_hal_buffer_view_element_size(GetItem(0).get());
-    size_t row_byte_size = num_elements_per_row * element_size;
     size_t num_result_elements = num_elements_per_row * num_rows;
     size_t result_byte_size = num_result_elements * element_size;
     iree_hal_allocator_t* hal_allocator = iree_hal_buffer_allocator(
