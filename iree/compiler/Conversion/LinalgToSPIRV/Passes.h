@@ -39,6 +39,15 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass();
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
+/// Pass to split computation workload to multiple sequential dispatch
+/// functions. This pass operates on Linalg ops and prepares for lowering to
+/// GPU, where we need to tile the workload to workgroups and workitems. If the
+/// workload involves computation A and B, where B is dependent on A and A needs
+/// all workgroups to complete, then we need to split A and B into different
+/// kernels because there is no mechanism to perform cross-workgroup
+/// synchronization within a single kernel.
+std::unique_ptr<OperationPass<ModuleOp>> createSplitDispatchFunctionPass();
+
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
 /// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to

@@ -24,8 +24,10 @@ cc_library(
         "ConvertToSPIRVPass.cpp",
         "LinalgTileAndFusePass.cpp",
         "Passes.cpp",
+        "SplitDispatchFunctionPass.cpp",
     ],
     hdrs = [
+        "Attributes.h",
         "Passes.h",
     ],
     deps = [
@@ -33,6 +35,7 @@ cc_library(
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:Affine",

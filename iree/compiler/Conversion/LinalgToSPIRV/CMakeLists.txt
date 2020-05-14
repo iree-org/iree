@@ -18,12 +18,14 @@ iree_cc_library(
   NAME
     LinalgToSPIRV
   HDRS
+    "Attributes.h"
     "Passes.h"
   SRCS
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "LinalgTileAndFusePass.cpp"
     "Passes.cpp"
+    "SplitDispatchFunctionPass.cpp"
   DEPS
     LLVMSupport
     MLIRAffineOps
@@ -47,6 +49,7 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     tensorflow::mlir_xla
   PUBLIC

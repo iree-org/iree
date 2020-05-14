@@ -37,6 +37,7 @@ inline void registerLinalgToSPIRVPasses() {
     // LinalgToSPIRV
     createConvertToGPUPass();
     createLinalgTileAndFusePass();
+    createSplitDispatchFunctionPass();
     return true;
   }();
   (void)init_once;

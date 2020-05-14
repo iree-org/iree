@@ -18,8 +18,10 @@ iree_cc_library(
   NAME
     CodegenUtils
   HDRS
+    "FunctionUtils.h"
     "MarkerUtils.h"
   SRCS
+    "FunctionUtils.cpp"
     "MarkerUtils.cpp"
   DEPS
     LLVMSupport
