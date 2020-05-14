@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
   mlir::iree_compiler::registerHLOToLinalgPasses();
+  mlir::iree_compiler::registerLinalgToLLVMPasses();
   llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like

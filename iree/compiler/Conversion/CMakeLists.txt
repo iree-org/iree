@@ -21,6 +21,7 @@ iree_cc_library(
     "init_conversions.h"
   DEPS
     iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Conversion::LinalgToSPIRV
   PUBLIC
 )

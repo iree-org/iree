@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,24 @@ package(
 )
 
 cc_library(
-    name = "init_conversions",
+    name = "LinalgToLLVM",
+    srcs = [
+        "HALInterfaceToMemrefArguments.cpp",
+        "Passes.cpp",
+    ],
     hdrs = [
-        "init_conversions.h",
+        "Passes.h",
     ],
     deps = [
         "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToLLVM",
-        "//iree/compiler/Conversion/LinalgToSPIRV",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//iree/compiler/Dialect/IREE/IR",
+        "@llvm-project//mlir:CFGTransforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
     ],
 )

@@ -16,6 +16,7 @@
 #define IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 
 namespace mlir {
@@ -38,6 +39,15 @@ inline void registerLinalgToSPIRVPasses() {
     createConvertToGPUPass();
     createLinalgTileAndFusePass();
     createSplitDispatchFunctionPass();
+    return true;
+  }();
+  (void)init_once;
+}
+
+inline void registerLinalgToLLVMPasses() {
+  static bool init_once = []() {
+    // LinalgToLLVM
+    createHALInterfaceToMemrefArgumentsPass();
     return true;
   }();
   (void)init_once;

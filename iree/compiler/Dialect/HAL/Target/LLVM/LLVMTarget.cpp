@@ -14,31 +14,16 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
 
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/TargetSelect.h"
-#include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR.h"
-#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -83,169 +68,6 @@ static void createInvocationFunc(const std::string& name,
   builder.CreateRetVoid();
 }
 
-namespace {
-
-/// Returns true if the given function contains interface related operations
-/// that are used by other ops.
-bool containsUsedInterfaceOp(FuncOp funcOp) {
-  for (Block& block : funcOp.getBlocks()) {
-    for (Operation& op : block) {
-      if (!op.getUses().empty() &&
-          (isa<IREE::PlaceholderOp>(op) ||
-           isa<IREE::HAL::InterfaceLoadConstantOp>(op))) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-/// Returns true if `aOp` has a desciptor (set, binding) pair smaller than
-/// `bOp`. Note that this ignores the offset.
-bool operator<(InterfaceBindingOp aOp, InterfaceBindingOp bOp) {
-  if (aOp.set().getZExtValue() == bOp.set().getZExtValue())
-    return aOp.binding().getZExtValue() < bOp.binding().getZExtValue();
-  return aOp.set().getZExtValue() < bOp.set().getZExtValue();
-}
-
-/// A pattern to process function interface. It replaces interface related ops
-/// with function arguments to match LLVM's CodeGen's ABI contract.
-///
-/// IREE scheduler passes interface ABI information via hal.interface.* ops to
-/// all backends. We create iree.placeholder ops to represent buffers behind
-/// those hal.interface.* ops. However the LLVM CodeGen uses function parameters
-/// and memref descriptors for ABI. So we need to bridge the gap somewhere.
-///
-/// This pass finds all interface buffers used in the function, sort them
-/// according to the descriptor (set, binding) pair, and put unique ones as
-/// function parameters in order.
-/// Note: This should be kept consistent with LLVM's HAL backend.
-struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      FuncOp funcOp, ArrayRef<Value> Operands,
-      ConversionPatternRewriter& rewriter) const override {
-    // Only process entry functions.
-    if (SymbolTable::getSymbolVisibility(funcOp) !=
-        SymbolTable::Visibility::Public)
-      return failure();
-
-    FunctionType fnType = funcOp.getType();
-    if (fnType.getNumInputs() != 0)
-      return rewriter.notifyMatchFailure(
-          funcOp, "entry function should not have inputs");
-
-    // Get interface buffers from all the blocks.
-    // TODO: Also handle hal.interface.load.constant for dynamic shape.
-    SmallVector<IREE::PlaceholderOp, 8> bufferOps;
-    for (Block& block : funcOp.getBlocks()) {
-      for (Operation& op : block)
-        if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
-          bufferOps.push_back(phOp);
-    }
-
-    if (bufferOps.empty()) return failure();
-
-    // A map from buffer ops to their corresponding interface binding ops.
-    llvm::DenseMap<Operation*, IREE::HAL::InterfaceBindingOp> bufferBindingMap;
-    for (auto bufferOp : bufferOps) {
-      auto symbol = SymbolTable::lookupNearestSymbolFrom(
-          bufferOp, bufferOp.getAttrOfType<SymbolRefAttr>("binding"));
-      bufferBindingMap[bufferOp] = cast<IREE::HAL::InterfaceBindingOp>(symbol);
-    }
-
-    // Sort buffers according to their descriptor (set, binding) pair.
-    llvm::sort(bufferOps, [&bufferBindingMap](IREE::PlaceholderOp aBuffer,
-                                              IREE::PlaceholderOp bBuffer) {
-      return bufferBindingMap[aBuffer] < bufferBindingMap[bBuffer];
-    });
-
-    // Create a function argument for each of the unique binding pointed by the
-    // buffer ops.
-    TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
-    // A map from buffer ops to their corresponding function argument indices.
-    llvm::DenseMap<Operation*, unsigned> bufferArgMap;
-    // A map from binding ops to their corresponding function argument indices.
-    llvm::DenseMap<Operation*, unsigned> bindingArgMap;
-    unsigned argIndex = 0;
-    for (auto bufferOp : bufferOps) {
-      auto binding = bufferBindingMap[bufferOp];
-      auto it = bindingArgMap.find(binding);
-      if (it != bindingArgMap.end()) {
-        bufferArgMap[bufferOp] = it->second;
-      } else {
-        bindingArgMap[binding] = argIndex;
-        bufferArgMap[bufferOp] = argIndex;
-        signatureConverter.addInputs(bufferOp.getType());
-        ++argIndex;
-      }
-    }
-
-    // Create the new function's signature.
-    Location loc = funcOp.getLoc();
-    auto newFuncOp = rewriter.create<FuncOp>(
-        loc, funcOp.getName(),
-        rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
-                                 llvm::None),
-        ArrayRef<NamedAttribute>());
-    newFuncOp.setAttr("llvm.emit_c_interface",
-                      mlir::UnitAttr::get(funcOp.getContext()));
-
-    // Move all ops in the old function's region to the new function.
-    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                newFuncOp.end());
-    rewriter.applySignatureConversion(&newFuncOp.getBody(), signatureConverter);
-
-    // Replace all buffer ops' uses with the newly created function arguments
-    // and erase them.
-    for (auto bufferOp : bufferOps) {
-      bufferOp.replaceAllUsesWith(
-          newFuncOp.getArgument(bufferArgMap[bufferOp]));
-      rewriter.eraseOp(bufferOp);
-    }
-
-    rewriter.eraseOp(funcOp);
-    return success();
-  }
-};
-
-struct RemoveInterfaceOpPattern
-    : public OpRewritePattern<IREE::HAL::InterfaceOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceOp interfaceOp,
-                                PatternRewriter& rewriter) const override {
-    rewriter.eraseOp(interfaceOp);
-    return success();
-  }
-};
-
-/// Converting from Linalg to LLVM needs to run on a module and since it
-/// applies a full conversion, make a module with jst the impl function.
-struct PrepareForLLVMLoweringPass
-    : PassWrapper<PrepareForLLVMLoweringPass, OperationPass<ModuleOp>> {
-  void runOnOperation() override {
-    MLIRContext& context = getContext();
-
-    OwningRewritePatternList patterns;
-    patterns.insert<ProcessFuncInterfacePattern>(&context);
-    patterns.insert<RemoveInterfaceOpPattern>(&context);
-
-    ConversionTarget target(context);
-    // Convert the interface related ops away.
-    target.addDynamicallyLegalOp<FuncOp>(
-        [](FuncOp funcOp) { return !containsUsedInterfaceOp(funcOp); });
-    target.addIllegalOp<IREE::PlaceholderOp>();
-    target.addIllegalDialect<IREE::HAL::HALDialect>();
-    // Allow the rest.
-    target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
-
-    if (failed(applyFullConversion(getOperation(), target, patterns, nullptr)))
-      return signalPassFailure();
-  }
-};
-
-}  // namespace
-
 class LLVMIRTargetBackend final : public TargetBackend {
  public:
   LLVMIRTargetBackend(LLVMTargetOptions options)
@@ -258,28 +80,7 @@ class LLVMIRTargetBackend final : public TargetBackend {
   // from HLO to LLVM throught linalg dialect.
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpPassManager& passManager) override {
-    passManager.addPass(createInlinerPass());
-
-    // HLO -> Linalg on buffers.
-    passManager.addPass(createDecomposeHLOClampPass());
-    addHLOToLinalgOnBuffersPasses(passManager);
-
-    // Linalg -> Loops
-    passManager.addPass(createConvertLinalgToLoopsPass());
-    passManager.addPass(createCanonicalizerPass());
-    passManager.addPass(createCSEPass());
-
-    // Loops -> STD
-    passManager.addPass(createLowerToCFGPass());
-    passManager.addPass(createCanonicalizerPass());
-    passManager.addPass(createCSEPass());
-
-    // (Linalg, STD) -> LLVM
-    passManager.addPass(std::make_unique<PrepareForLLVMLoweringPass>());
-    // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
-    passManager.addPass(createConvertLinalgToLLVMPass());
-    passManager.addPass(createCanonicalizerPass());
-    passManager.addPass(createCSEPass());
+    buildLLVMTransformPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,

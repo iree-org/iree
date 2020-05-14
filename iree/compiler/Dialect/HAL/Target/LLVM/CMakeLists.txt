@@ -27,23 +27,9 @@ iree_cc_library(
     LLVMCore
     LLVMSupport
     LLVMX86CodeGen
-    MLIRIR
-    MLIRLinalgOps
-    MLIRLinalgToLLVM
-    MLIRLinalgTransforms
-    MLIRLoopToStandard
-    MLIRPass
-    MLIRStandardOps
-    MLIRStandardToLLVM
-    MLIRSupport
     MLIRTargetLLVMIR
-    MLIRTransforms
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::IREE::IR
     iree::schemas::llvmir_executable_def_cc_fbs
   PUBLIC
 )

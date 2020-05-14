@@ -12,19 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
-)
+iree_add_all_subdirs()
 
-cc_library(
-    name = "init_conversions",
-    hdrs = [
-        "init_conversions.h",
-    ],
-    deps = [
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToLLVM",
-        "//iree/compiler/Conversion/LinalgToSPIRV",
-    ],
+iree_cc_library(
+  NAME
+    LinalgToLLVM
+  HDRS
+    "Passes.h"
+  SRCS
+    "HALInterfaceToMemrefArguments.cpp"
+    "Passes.cpp"
+  DEPS
+    MLIRIR
+    MLIRLinalgToLLVM
+    MLIRLinalgTransforms
+    MLIRLoopToStandard
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Conversion::HLOToLinalg
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::IREE::IR
+  PUBLIC
 )
