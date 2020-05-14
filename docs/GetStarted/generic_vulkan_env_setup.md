@@ -24,7 +24,7 @@ The Vulkan loader sits between the Vulkan application, which calls Vulkan APIs,
 and the ICDs, which implements these Vulkan APIs. Vulkan layers agument the
 Vulkan system to provide optional features like validation and debugging. The
 Vulkan loader composes a chain of requested layers, which processes the Vulkan
-application's API calls one by one, and finallly redirects the API calls made by
+application's API calls one by one, and finally redirects the API calls made by
 the Vulkan application to one or more ICDs.
 
 It's highly recommned to read the
