@@ -38,6 +38,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "abs.mlir",
         "add.mlir",
+        "batch_norm_inference.mlir",
         "broadcast_add.mlir",
         "broadcast.mlir",
         "broadcast_in_dim.mlir",
@@ -75,6 +76,7 @@ iree_check_single_backend_test_suite(
         "maximum.mlir",
         "minimum.mlir",
         "multiply.mlir",
+        "negate.mlir",
         "pad.mlir",
         "reduce.mlir",
         "remainder.mlir",
