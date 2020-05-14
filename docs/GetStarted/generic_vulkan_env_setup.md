@@ -24,7 +24,7 @@ The Vulkan loader sits between the Vulkan application, which calls Vulkan APIs,
 and the ICDs, which implements these Vulkan APIs. Vulkan layers agument the
 Vulkan system to provide optional features like validation and debugging. The
 Vulkan loader composes a chain of requested layers, which processes the Vulkan
-application's API calls one by one and finallly redirects the API calls made by
+application's API calls one by one, and finallly redirects the API calls made by
 the Vulkan application to one or more ICDs.
 
 It's highly recommned to read the
@@ -39,7 +39,7 @@ with one another.
 You need to install the [Vulkan SDK][VulkanSDK] from LunarG to get the Vulkan
 loader.
 
-Typically the Vulkan SDK will be installed at ``C:\VulkanSDK\<version>\` and
+Typically the Vulkan SDK will be installed at ``C:\VulkanSDK\<version>\\` and
 there will be an environment variable``VULKAN_SDK`pointing to it. You can run
 the`vulkancube`executable under the`Bin\` subdirectory of the Vulkan SDK to make
 sure everything works properly. If not, you probably need to check whether the
@@ -51,8 +51,8 @@ The following packages should be installed for a proper Vulkan runtime to test
 the runtime functions properly:
 
 *   [libvulkan1][PackageLibVulkan1] for the Vulkan loader `libvulkan.so`.
-*   (AMD) [mesa-vulkan-drivers][PackageMesaVulkan] for Mesa AMD Vulkan ICD.
-*   (NVIDIA) [nvidia-vulkan-icd][PackageNvidiaVulkan] for NVIDIA Vulkan ICD.
+*   [AMD] [mesa-vulkan-drivers][PackageMesaVulkan] for Mesa AMD Vulkan ICD.
+*   [NVIDIA] [nvidia-vulkan-icd][PackageNvidiaVulkan] for NVIDIA Vulkan ICD.
 
 The above packages provide the Vulkan loader and ICDs. With them an Vulkan
 application should be able to run. You may additionally want to install
@@ -107,7 +107,7 @@ from [source][RenderDocSource].
 
 ### Useful environment variables
 
-There are a few environmet variables that can alter the default Vulkan loader
+There are a few environment variables that can alter the default Vulkan loader
 behavior and print verbose information, notably:
 
 *   `VK_LOADER_DEBUG`: enable loader debug messages. Setting it to `all` will
@@ -126,11 +126,11 @@ behavior and print verbose information, notably:
 Please see the [Vulkan loader's documentation][VulkanLoaderEnvVars] for detailed
 explanation for these variables.
 
-### Setting environmet variables for Bazel test
+### Setting environment variables for Bazel test
 
 Bazel runs tests in a sandbox and environment variables must be passed through
 to the test runner. Consider putting environment setup in a `user.bazelrc` to
-trouble shooting a test run by Bazel. For example:
+save typing. For example:
 
 ```
 test --test_env="LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/"
