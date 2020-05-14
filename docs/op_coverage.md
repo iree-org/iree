@@ -19,7 +19,7 @@ op | vmla | vulkan-spirv | llvm-ir
 :-: | :-: | :-: | :-:
 abs | ✓ | ✓ | ✓
 add | ✓ | ✓ | ✓
-batch_norm_inference | ✓ | ✗ | ✓
+batch_norm_inference | ✓ | ✓ | ✓
 broadcast | ✓ | ✓ | ✓
 broadcast_add | ✓ | ✓ | ✗
 broadcast_in_dim | ✓ | ✓ | ✓
@@ -43,7 +43,7 @@ log | ✓ | ✓ | ✓
 maximum | ✓ | ✓ | ✓
 minimum | ✓ | ✓ | ✓
 multiply | ✓ | ✓ | ✓
-negate | ✓ | ✗ | ✓
+negate | ✓ | ✓ | ✓
 pad | ✓ | ✓ | ✓
 reduce | ✓ | ✓ | ✓
 reduce_window | ✓ | ✗ | ✓
