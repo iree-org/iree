@@ -16,7 +16,7 @@
 
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -31,12 +31,12 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createDecomposeHLOClampPass());
   addHLOToLinalgOnBuffersPasses(passManager);
 
-  // Linalg -> Loops
+  // Linalg -> SCF
   passManager.addPass(createConvertLinalgToLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // Loops -> STD
+  // SCF -> STD
   passManager.addPass(createLowerToCFGPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
