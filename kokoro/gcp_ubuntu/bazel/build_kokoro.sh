@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Build and test the project within the gcr.io/iree-oss/bazel-tensorflow
-# iamge using Kokoro.
+# image using Kokoro.
 
 set -e
 set -x
