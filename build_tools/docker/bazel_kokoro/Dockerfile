@@ -26,4 +26,4 @@ WORKDIR /usr/src/git/iree/
 
 # Copy the PR that Kokoro checked out into the image.
 COPY . .
-ENTRYPOINT ["kokoro/gcp_ubuntu/bazel/build_docker.sh"]
+ENTRYPOINT ["kokoro/gcp_ubuntu/bazel/build.sh"]
