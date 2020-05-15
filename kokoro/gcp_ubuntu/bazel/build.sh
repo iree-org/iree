@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For use within the gcr.io/iree-oss/bazel-kokoro docker image on a kokoro VM.
+# For use within a IREE bazel docker image on a Kokoro VM.
 # Log some infomration about the environment, initalize the submodules and then
 # run the bazel tests.
 

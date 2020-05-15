@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the project with bazel using Kokoro.
+# Build and test the project within the gcr.io/iree-oss/bazel-tensorflow
+# iamge using Kokoro.
 
 set -e
 set -x
@@ -33,6 +34,8 @@ export PYTHON_BIN="$(which python3)"
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 
+# Mount the checked out repository to /usr/src/git/iree/, make that the working
+# directory and run the tests in the bazel-tensorflow image.
 docker run \
   --volume ${KOKORO_ARTIFACTS_DIR?}/github/iree/:/usr/src/git/iree/ \
   --workdir="/usr/src/git/iree/" \
