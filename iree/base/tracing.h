@@ -79,7 +79,7 @@
 // IREE_TRACING_MODE simple setting
 //===----------------------------------------------------------------------===//
 
-// Set IREE_TRACING_FEATURES based on IREE_TRACING_MODEif the user hasn't
+// Set IREE_TRACING_FEATURES based on IREE_TRACING_MODE if the user hasn't
 // overridden it with more specific settings.
 //
 // IREE_TRACING_MODE = 0: tracing disabled
@@ -260,7 +260,7 @@ enum {
       name, name_length)
 
 // Appends a string value to the parent zone. May be called multiple times.
-// The |value| string will be copied and can be freed after calling.
+// The |value| string will be copied into the trace buffer.
 #define IREE_TRACE_ZONE_APPEND_TEXT(...)                                  \
   IREE_TRACE_IMPL_GET_VARIADIC_((__VA_ARGS__,                             \
                                  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW, \
@@ -402,22 +402,10 @@ inline void operator delete(void* ptr) noexcept {
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-// Tracing scope that emits WTF tracing scopes depending on whether
-// profiling/tracing are enabled.
-// See WTF_SCOPE0 for more information.
+// TODO(#1886): update these to tracy and drop the 0.
 #define IREE_TRACE_SCOPE0(name_spec) ZoneScopedNS(name_spec, 13)
-
-// Tracing scope that emits WTF tracing scopes with additional
-// arguments depending on whether profiling/tracing is enabled.
-// See WTF_SCOPE for more information.
 #define IREE_TRACE_SCOPE(name_spec, ...)
-
-// Tracing event that emits a WTF event.
-// See WTF_EVENT0 for more information.
 #define IREE_TRACE_EVENT0
-
-// Tracing event that emits a WTF event with additional arguments.
-// See WTF_EVENT for more information.
 #define IREE_TRACE_EVENT
 
 #else
