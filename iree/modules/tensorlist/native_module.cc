@@ -155,7 +155,6 @@ class TensorList final : public RefObject<TensorList> {
       num_elements_per_tensor *= dim;
     }
     size_t element_size = iree_hal_buffer_view_element_size(GetItem(0).get());
-    size_t tensor_byte_size = num_elements_per_tensor * element_size;
     size_t num_result_elements = num_elements_per_tensor * num_tensors;
     size_t result_byte_size = num_result_elements * element_size;
     iree_hal_allocator_t* hal_allocator = iree_hal_buffer_allocator(
@@ -169,43 +168,8 @@ class TensorList final : public RefObject<TensorList> {
             IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer),
         IREE_LOC));
 
-    iree_hal_mapped_memory_t result_mapping;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_map(result_buffer.get(), IREE_HAL_MEMORY_ACCESS_WRITE,
-                            /*element_offset=*/0,
-                            /*element_length=*/num_result_elements,
-                            &result_mapping),
-        IREE_LOC));
-
-    // Copy each buffer into the result at the right offset.
-    // This is just a naive map+memcpy.
-    // If this is a bottleneck, simply optimizing this code here locally is
-    // probably not the best answer. A better solution will use
-    // iree_hal_command_buffer_copy_buffer to do the copies, but that will
-    // require changing this op signature to take a command buffer and to make
-    // sure that each of the contained tensors have
-    // IREE_HAL_BUFFER_USAGE_TRANSFER. Both of these will probably require
-    // compiler changes. In fact, we might want to expand this operation fully
-    // in the compiler at which point there will be no "stack" function inside
-    // this module at all.
-    for (size_t i = 0; i < num_tensors; i++) {
-      iree_hal_buffer_view_t* tensor = GetItem(i).get();
-      iree_hal_buffer_t* tensor_buffer = iree_hal_buffer_view_buffer(tensor);
-      iree_hal_mapped_memory_t tensor_mapping;
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_map(tensor_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                              tensor_byte_size, &tensor_mapping),
-          IREE_LOC));
-
-      memcpy(result_mapping.contents.data + i * tensor_byte_size,
-             tensor_mapping.contents.data, tensor_mapping.contents.data_length);
-
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_unmap(tensor_buffer, &tensor_mapping), IREE_LOC));
-    }
-
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_unmap(result_buffer.get(), &result_mapping), IREE_LOC));
+    RETURN_IF_ERROR(
+        FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
 
     absl::InlinedVector<int32_t, 4> result_shape;
     result_shape.push_back(Size());
@@ -221,7 +185,132 @@ class TensorList final : public RefObject<TensorList> {
     return std::move(result_view);
   }
 
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> Concat() {
+    size_t num_tensors = Size();
+    if (num_tensors == 0) {
+      return InvalidArgumentErrorBuilder(IREE_LOC) << "expected non-empty list";
+    }
+    for (size_t i = 0; i < num_tensors; i++) {
+      if (!GetItem(i).get()) {
+        return InvalidArgumentErrorBuilder(IREE_LOC)
+               << "uninitialized element in list";
+      }
+    }
+
+    size_t rank = iree_hal_buffer_view_shape_rank(GetItem(0).get());
+    iree_hal_element_type_t type =
+        iree_hal_buffer_view_element_type(GetItem(0).get());
+    absl::InlinedVector<int32_t, 6> shape(rank);
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
+                                                 shape.data(), nullptr),
+                      IREE_LOC));
+    size_t num_rows = 0;
+    for (size_t i = 0; i < num_tensors; i++) {
+      size_t element_rank = iree_hal_buffer_view_shape_rank(GetItem(i).get());
+      if (element_rank < 1) {
+        return InvalidArgumentErrorBuilder(IREE_LOC)
+               << "stacking rank must be greater than zero." << i;
+      }
+
+      absl::InlinedVector<int32_t, 6> element_shape(element_rank);
+      RETURN_IF_ERROR(FromApiStatus(
+          iree_hal_buffer_view_shape(GetItem(i).get(), element_rank,
+                                     element_shape.data(), nullptr),
+          IREE_LOC));
+      num_rows += element_shape.front();
+
+      if (absl::MakeSpan(shape).subspan(1) !=
+              absl::MakeSpan(element_shape).subspan(1) ||
+          iree_hal_buffer_view_element_type(GetItem(i).get()) != type) {
+        return InvalidArgumentErrorBuilder(IREE_LOC)
+               << "stacking list with elements of different shapes or element "
+                  "types. Mismatch between element 0 and element "
+               << i;
+      }
+    }
+
+    vm::ref<iree_hal_buffer_t> result_buffer;
+    size_t num_elements_per_row = 1;
+    for (int32_t dim : absl::MakeSpan(shape).subspan(1)) {
+      num_elements_per_row *= dim;
+    }
+    size_t element_size = iree_hal_buffer_view_element_size(GetItem(0).get());
+    size_t num_result_elements = num_elements_per_row * num_rows;
+    size_t result_byte_size = num_result_elements * element_size;
+    iree_hal_allocator_t* hal_allocator = iree_hal_buffer_allocator(
+        iree_hal_buffer_view_buffer(GetItem(0).get()));
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_allocator_allocate_buffer(
+            hal_allocator,
+            static_cast<iree_hal_memory_type_t>(
+                IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+            IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer),
+        IREE_LOC));
+
+    RETURN_IF_ERROR(
+        FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
+
+    absl::InlinedVector<int32_t, 4> result_shape;
+    result_shape.push_back(num_rows);
+    for (int32_t dim : absl::MakeSpan(shape).subspan(1)) {
+      result_shape.push_back(dim);
+    }
+    vm::ref<iree_hal_buffer_view_t> result_view;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
+                                    result_shape.size(), type,
+                                    IREE_ALLOCATOR_SYSTEM, &result_view),
+        IREE_LOC));
+
+    return std::move(result_view);
+  }
+
  private:
+  iree_status_t CopyTensorBytes(iree_hal_buffer_t* buffer) {
+    iree_hal_mapped_memory_t result_mapping;
+    iree_device_size_t dest_byte_size = iree_hal_buffer_byte_length(buffer);
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_WRITE,
+                            /*byte_offset=*/0,
+                            /*byte_length=*/dest_byte_size, &result_mapping));
+
+    // Copy each buffer into the result at the right offset.
+    // This is just a naive map+memcpy.
+    // If this is a bottleneck, simply optimizing this code here locally is
+    // probably not the best answer. A better solution will use
+    // iree_hal_command_buffer_copy_buffer to do the copies, but that will
+    // require changing this op signature to take a command buffer and to make
+    // sure that each of the contained tensors have
+    // IREE_HAL_BUFFER_USAGE_TRANSFER. Both of these will probably require
+    // compiler changes. In fact, we might want to expand this operation fully
+    // in the compiler at which point there will be no "stack" function inside
+    // this module at all.
+    size_t num_tensors = Size();
+    size_t offset = 0;
+    for (size_t i = 0; i < num_tensors; i++) {
+      iree_hal_buffer_view_t* tensor = GetItem(i).get();
+      iree_hal_buffer_t* tensor_buffer = iree_hal_buffer_view_buffer(tensor);
+      iree_hal_mapped_memory_t tensor_mapping;
+      iree_device_size_t tensor_byte_size =
+          iree_hal_buffer_byte_length(tensor_buffer);
+
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_map(tensor_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
+                              tensor_byte_size, &tensor_mapping));
+
+      memcpy(result_mapping.contents.data + offset,
+             tensor_mapping.contents.data, tensor_byte_size);
+      offset += tensor_byte_size;
+
+      IREE_RETURN_IF_ERROR(
+          iree_hal_buffer_unmap(tensor_buffer, &tensor_mapping));
+    }
+
+    return iree_hal_buffer_unmap(buffer, &result_mapping);
+  }
+
   std::vector<vm::ref<iree_hal_buffer_view_t>> list_;
 };
 }  // namespace
@@ -329,6 +418,11 @@ class TensorListModuleState final {
     return TensorList::FromTensor(tensor);
   }
 
+  // tensorlist.concat(%list) -> %list
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> Concat(vm::ref<TensorList> list) {
+    return list->Concat();
+  }
+
   // tensorlist.stack(%list, %element_shape, %num_elements) -> %list
   StatusOr<vm::ref<iree_hal_buffer_view_t>> Stack(
       vm::ref<TensorList> list,
@@ -355,6 +449,7 @@ static const vm::NativeFunction<TensorListModuleState>
         vm::MakeNativeFunction("set_item", &TensorListModuleState::SetItem),
         vm::MakeNativeFunction("from_tensor",
                                &TensorListModuleState::FromTensor),
+        vm::MakeNativeFunction("concat", &TensorListModuleState::Concat),
         vm::MakeNativeFunction("stack", &TensorListModuleState::Stack),
 };
 

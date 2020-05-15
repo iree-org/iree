@@ -111,4 +111,22 @@ def TensorList_Stack : Op<TensorList_Dialect, "Stack"> {
   );
 }
 
+def TensorList_Concat : Op<TensorList_Dialect, "Concat"> {
+  let summary = "Creates a tensor by concatenate the tensors in the tensorlist";
+  let description = [{
+    Creates a new tensor `tensor` by concatenating the tensors in `list` along
+    the leading dimension.
+
+    Requires the list to be non-empty.
+    Requires all tensors contained in `list` to have the same dimensions along
+    the non-leading axes.
+  }];
+  let arguments = (ins
+    TensorList_TensorList:$list
+  );
+  let results = (outs
+    HAL_BufferView:$tensor
+  );
+}
+
 #endif  // IREE_DIALECT_MODULES_TENSORLIST_OPS

@@ -44,6 +44,12 @@ vm.import @from_tensor(
 ) -> !vm.ref<!tensorlist.list>
 attributes {nosideeffects}
 
+// Maps to IREE:TensorList::Concat
+vm.import @concat(
+  %list : !vm.ref<!tensorlist.list>
+) -> !vm.ref<!hal.buffer_view>
+attributes {nosideeffects}
+
 // Maps to IREE:TensorList::Stack
 vm.import @stack(
   %list : !vm.ref<!tensorlist.list>,

@@ -14,5 +14,11 @@ func @f(
   %3 = "tf_tensorlist.GetItem"(%list, %index, %element_shape) : (!tf_tensorlist.list, tensor<i32>, tensor<1xi32>) -> tensor<?xf32>
   // CHECK: tf_tensorlist.SetItem
   %4 = "tf_tensorlist.SetItem"(%list, %index, %item) : (!tf_tensorlist.list, tensor<i32>, tensor<?xf32>) -> !tf_tensorlist.list
+  // CHECK: tf_tensorlist.Stack
+  %5 = "tf_tensorlist.Stack"(%list, %element_shape, %index) : (!tf_tensorlist.list, tensor<1xi32>, tensor<i32>) -> tensor<1x2xf32>
+  // CHECK: tf_tensorlist.Concat
+  %6 = "tf_tensorlist.Concat"(%list) : (!tf_tensorlist.list) -> tensor<1x2xf32>
+  // CHECK: tf_tensorlist.GetDim0
+  %7 = "tf_tensorlist.GetDim0"(%list) : (!tf_tensorlist.list) -> tensor<1x2xf32>
   return
 }

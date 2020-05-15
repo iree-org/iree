@@ -41,6 +41,9 @@ void populateTensorListToHALPatterns(MLIRContext *context,
       HALOpConversion<tf_tensorlist::FromTensor, IREE::TensorList::FromTensor>>(
       context, typeConverter);
   patterns
+      .insert<HALOpConversion<tf_tensorlist::Concat, IREE::TensorList::Concat>>(
+          context, typeConverter);
+  patterns
       .insert<HALOpConversion<tf_tensorlist::Stack, IREE::TensorList::Stack>>(
           context, typeConverter);
 }

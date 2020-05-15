@@ -18,6 +18,7 @@
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_types.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Interfaces/SideEffects.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {

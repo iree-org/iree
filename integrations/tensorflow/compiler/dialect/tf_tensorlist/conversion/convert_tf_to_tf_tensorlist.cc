@@ -37,6 +37,31 @@ bool isTfVariant(Type type) {
   return false;
 }
 
+namespace {
+class ConvertTfTensorlistConcatV2
+    : public OpRewritePattern<TF::TensorListConcatV2Op> {
+ public:
+  using OpRewritePattern<TF::TensorListConcatV2Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TF::TensorListConcatV2Op op,
+                                PatternRewriter &rewriter) const override {
+    Value tensor_list = op.input_handle();
+    Value out_tensor = op.tensor();
+    Value out_lengths = op.lengths();
+
+    auto concat = rewriter.create<tf_tensorlist::Concat>(
+        op.getLoc(), out_tensor.getType(), tensor_list);
+    auto dim0Lengths = rewriter.create<tf_tensorlist::GetDim0>(
+        op.getLoc(), out_lengths.getType(), tensor_list);
+
+    out_tensor.replaceAllUsesWith(concat);
+    out_lengths.replaceAllUsesWith(dim0Lengths);
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+}  // namespace
+
 void ConvertTfToTfTensorList::runOnOperation() {
   auto func = getOperation();
 
@@ -55,6 +80,8 @@ void ConvertTfToTfTensorList::runOnOperation() {
 
   OwningRewritePatternList patterns;
   populateWithGenerated(&getContext(), &patterns);
+  patterns.insert<ConvertTfTensorlistConcatV2>(&getContext());
+
   ConversionTarget target(getContext());
   target.addLegalDialect<TfTensorListDialect>();
   target.addLegalDialect<TF::TensorFlowDialect>();
@@ -63,6 +90,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   target.addIllegalOp<TF::TensorListGetItemOp>();
   target.addIllegalOp<TF::TensorListSetItemOp>();
   target.addIllegalOp<TF::TensorListFromTensorOp>();
+  target.addIllegalOp<TF::TensorListConcatV2Op>();
   target.addIllegalOp<TF::TensorListStackOp>();
 
   if (failed(applyPartialConversion(func, target, patterns))) {

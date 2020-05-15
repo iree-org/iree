@@ -90,7 +90,7 @@ def TfTensorList_SetItem : TfTensorList_Op<"SetItem"> {
   );
 }
 
-def TfTensorList_FromTensor : TfTensorList_Op<"FromTensor"> {
+def TfTensorList_FromTensor : TfTensorList_Op<"FromTensor", [NoSideEffect]> {
   let summary = [{
     Creates a TensorList which, when stacked, has the value of `tensor`.
   }];
@@ -112,7 +112,7 @@ def TfTensorList_FromTensor : TfTensorList_Op<"FromTensor"> {
   );
 }
 
-def TfTensorList_Stack : TfTensorList_Op<"Stack"> {
+def TfTensorList_Stack : TfTensorList_Op<"Stack", [NoSideEffect]> {
   let summary = "Stacks all tensors in the list.";
 
   let description = [{
@@ -131,6 +131,46 @@ def TfTensorList_Stack : TfTensorList_Op<"Stack"> {
     // comes in as i64. IREE then proceeds to blindly truncate it to I32
     // in-place. So relax this from I64Tensor to I32Or64Tensor.
     TF_I32OrI64Tensor:$num_elements
+  );
+
+  let results = (outs
+    TF_Tensor:$tensor
+  );
+}
+
+def TfTensorList_Concat : TfTensorList_Op<"Concat", [NoSideEffect]> {
+  let summary = "Concatenates all tensors in the list along the first dimension.";
+
+  let description = [{
+    Requires that all tensors have the same shape along dimensions 1+.
+
+    list: the input list
+    tensor: the concatenated result
+  }];
+
+  let arguments = (ins
+    TfTensorList_TensorList:$list
+  );
+
+  let results = (outs
+    TF_Tensor:$tensor
+  );
+}
+
+// TODO(suderman): If gradients are not being calculated, the value will be
+// DCE'd.
+def TfTensorList_GetDim0 : TfTensorList_Op<"GetDim0", [NoSideEffect]> {
+  let summary = "Returns a tensor of the lengths of Dim0 for the tensorlists' tensors";
+
+  let description = [{
+    Requires that all tensors have 1+ dimensions.
+
+    list: the input list
+    tensor: a 1-D tensor of length size of Dim-1 for each tensor.
+  }];
+
+  let arguments = (ins
+    TfTensorList_TensorList:$list
   );
 
   let results = (outs

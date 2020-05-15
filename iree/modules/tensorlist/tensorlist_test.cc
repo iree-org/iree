@@ -171,6 +171,61 @@ TEST_F(TensorListModulesTest, IdentityThroughSetItemGetItem) {
   iree_vm_variant_list_free(outputs);
 }
 
+TEST_F(TensorListModulesTest, IdentityThroughConcat) {
+  // Allocate the buffer we'll be passing through.
+  static float kBufferContents[4] = {42.0f, 43.0f, 44.0f, 45.0f};
+  absl::InlinedVector<int32_t, 4> shape = {4, 1};
+  vm::ref<iree_hal_buffer_view_t> input_buffer_view;
+  CreateBufferView(kBufferContents, shape, device_, &input_buffer_view);
+
+  // Pass in the tensor as a HAL buffer view.
+  iree_vm_variant_list_t* inputs = nullptr;
+  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+  iree_vm_ref_t input_buffer_view_ref =
+      iree_hal_buffer_view_move_ref(input_buffer_view.get());
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_retain(inputs, &input_buffer_view_ref));
+
+  // Prepare outputs list to accept the results from the invocation.
+  iree_vm_variant_list_t* outputs = nullptr;
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+
+  // Synchronously invoke the function.
+  IREE_ASSERT_OK(iree_vm_invoke(
+      context_, LookupFunction("identity_through_concat"),
+      /*policy=*/nullptr, inputs, outputs, IREE_ALLOCATOR_SYSTEM));
+  iree_vm_variant_list_free(inputs);
+
+  iree_hal_buffer_view_t* returned_buffer_view =
+      iree_hal_buffer_view_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+  ASSERT_NE(nullptr, returned_buffer_view);
+  iree_hal_buffer_t* returned_buffer =
+      iree_hal_buffer_view_buffer(returned_buffer_view);
+  ASSERT_NE(nullptr, returned_buffer);
+
+  // Dimemsionality is reduced by 1.
+  auto returned_rank = iree_hal_buffer_view_shape_rank(returned_buffer_view);
+  ASSERT_EQ(returned_rank, shape.size() - 1);
+
+  iree_hal_dim_t returned_shape[1];
+  iree_hal_buffer_view_shape(returned_buffer_view, 1, returned_shape,
+                             &returned_rank);
+  EXPECT_EQ(returned_shape[0], shape[0] * shape[1]);
+
+  iree_hal_mapped_memory_t mapped_memory;
+  IREE_ASSERT_OK(iree_hal_buffer_map(returned_buffer,
+                                     IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                     IREE_WHOLE_BUFFER, &mapped_memory));
+  EXPECT_EQ(std::memcmp(mapped_memory.contents.data,
+                        static_cast<void*>(&kBufferContents[0]),
+                        mapped_memory.contents.data_length),
+            0);
+  IREE_ASSERT_OK(iree_hal_buffer_unmap(returned_buffer, &mapped_memory));
+
+  iree_vm_variant_list_free(outputs);
+}
+
 TEST_F(TensorListModulesTest, IdentityThroughStack) {
   // Allocate the buffer we'll be passing through.
   static float kBufferContents[2] = {42.0f, 43.0f};
