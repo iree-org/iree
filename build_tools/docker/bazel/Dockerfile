@@ -21,6 +21,9 @@
 FROM l.gcr.io/google/bazel:2.1.0
 WORKDIR /usr/src/git
 
+# Undo inherited bazel command line entrypoint.
+ENTRYPOINT []
+
 # Set environment variables.
 ENV CXX clang++
 ENV CC clang
