@@ -147,11 +147,3 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}/third_party/tensorflow
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
 )
-
-#-------------------------------------------------------------------------------
-# Third party: tracing
-#-------------------------------------------------------------------------------
-
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}/third_party/google_tracing_framework/bindings/cpp/include
-)
