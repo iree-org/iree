@@ -379,7 +379,7 @@ typedef struct {
                                      iree_host_size_t byte_length,
                                      void** out_ptr);
   // Frees |ptr| from a previous alloc call.
-  iree_status_t(IREE_API_PTR* free)(void* self, void* ptr);
+  void(IREE_API_PTR* free)(void* self, void* ptr);
 } iree_allocator_t;
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
@@ -400,7 +400,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_allocator_free(iree_allocator_t allocator, void* ptr);
 
 // Allocates a block of |byte_length| bytes from the default system allocator.
@@ -409,8 +409,8 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
                                iree_host_size_t byte_length, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the default system allocator.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_allocator_system_free(void* self, void* ptr);
+IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
+                                                              void* ptr);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

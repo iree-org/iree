@@ -44,11 +44,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
     iree_allocator_t allocator, iree_vm_instance_t** out_instance);
 
 // Retains the given |instance| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_instance_retain(iree_vm_instance_t* instance);
 
 // Releases the given |instance| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_instance_release(iree_vm_instance_t* instance);
 
 #endif  // IREE_API_NO_PROTOTYPES

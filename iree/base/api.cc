@@ -101,12 +101,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
                          byte_length, out_ptr);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_allocator_free(iree_allocator_t allocator, void* ptr) {
   if (ptr && allocator.free) {
     return allocator.free(allocator.self, ptr);
   }
-  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -137,13 +136,12 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
   return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_allocator_system_free(void* self, void* ptr) {
+IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
+                                                              void* ptr) {
   IREE_TRACE_SCOPE0("iree_allocator_system_free");
   if (ptr) {
     std::free(ptr);
   }
-  return IREE_STATUS_OK;
 }
 
 //===----------------------------------------------------------------------===//

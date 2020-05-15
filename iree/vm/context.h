@@ -56,11 +56,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
     iree_vm_context_t** out_context);
 
 // Retains the given |context| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_retain(iree_vm_context_t* context);
 
 // Releases the given |context| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context);
 
 // Returns a process-unique ID for the |context|.

@@ -202,7 +202,7 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
   return IREE_STATUS_OK;
 }
 
-static iree_status_t iree_vm_bytecode_module_destroy(void* self) {
+static void iree_vm_bytecode_module_destroy(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
 
   iree_allocator_free(module->flatbuffer_allocator,
@@ -210,7 +210,7 @@ static iree_status_t iree_vm_bytecode_module_destroy(void* self) {
   module->flatbuffer_data = {NULL, 0};
   module->flatbuffer_allocator = IREE_ALLOCATOR_NULL;
 
-  return iree_allocator_free(module->allocator, module);
+  iree_allocator_free(module->allocator, module);
 }
 
 static iree_string_view_t iree_vm_bytecode_module_name(void* self) {
@@ -472,18 +472,19 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   return IREE_STATUS_OK;
 }
 
-static iree_status_t iree_vm_bytecode_module_free_state(
+static void iree_vm_bytecode_module_free_state(
     void* self, iree_vm_module_state_t* module_state) {
+  if (!module_state) return;
+
   iree_vm_bytecode_module_state_t* state =
       (iree_vm_bytecode_module_state_t*)module_state;
-  if (!state) return IREE_STATUS_INVALID_ARGUMENT;
 
   // Release remaining global references.
   for (int i = 0; i < state->global_ref_count; ++i) {
     iree_vm_ref_release(&state->global_ref_table[i]);
   }
 
-  return state->allocator.free(state->allocator.self, module_state);
+  iree_allocator_free(state->allocator, module_state);
 }
 
 static iree_status_t iree_vm_bytecode_module_resolve_import(
