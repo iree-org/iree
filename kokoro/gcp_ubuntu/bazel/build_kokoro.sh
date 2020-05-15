@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For use within the gcr.io/iree-oss/bazel-kokoro docker image on a kokoro VM.
-# Log some infomration about the environment, initalize the submodules and then
-# run the bazel tests.
+# Build the project with bazel using Kokoro.
 
 set -e
 set -x
@@ -28,8 +26,22 @@ export PS4='[$(date -u "+%T %Z")] '
 bazel --version
 python3 -V
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
+export CXX=clang++-6.0
+export CC=clang-6.0
+export PYTHON_BIN="$(which python3)"
 
-echo "Building and testing with bazel"
-./build_tools/bazel/build.sh
+# Kokoro checks out the repository here.
+cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
+
+# Build the bazel-kokoro image, which copys the current repo over to the image
+# and runs via an entrypoint.
+# Caching can't be done at this level (without replicating checking out a
+# specific PR ourselves), but we can cache gcr.io/iree-oss/bazel-tensorflow
+# to much the same effect.
+docker build \
+  --tag gcr.io/iree-oss/bazel-kokoro \
+  --file build_tools/docker/bazel_kokoro/Dockerfile \
+  .
+
+# Run the tests.
+docker run gcr.io/iree-oss/bazel-kokoro
