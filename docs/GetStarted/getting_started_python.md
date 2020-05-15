@@ -52,8 +52,8 @@ comparison tests:
 ```shell
 # Exclude tests that are skipped in the GitHub Actions ("ga") CI
 $ bazel test \
-  --build_tag_filters="noga" \
-  --test_tag_filters="noga" \
+  --build_tag_filters="-noga" \
+  --test_tag_filters="-noga" \
   --define=iree_tensorflow=true \
   integrations/tensorflow/...
 ```
