@@ -28,11 +28,16 @@ namespace hal {
 namespace vmla {
 
 VMLACommandProcessor::VMLACommandProcessor(
-    Allocator* allocator, CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories)
-    : HostLocalCommandProcessor(allocator, mode, command_categories) {}
+    Allocator* allocator, CommandCategoryBitfield command_categories)
+    : HostLocalCommandProcessor(allocator, command_categories) {
+  // TODO(#1172): embed the stack allocation within the command processor.
+  iree_allocator_malloc(IREE_ALLOCATOR_SYSTEM, sizeof(iree_vm_stack_t),
+                        (void**)&stack_);
+}
 
-VMLACommandProcessor::~VMLACommandProcessor() = default;
+VMLACommandProcessor::~VMLACommandProcessor() {
+  iree_allocator_free(IREE_ALLOCATOR_SYSTEM, stack_);
+}
 
 Status VMLACommandProcessor::DispatchInline(
     Executable* executable, int32_t entry_point,
@@ -64,12 +69,19 @@ Status VMLACommandProcessor::DispatchInline(
     }
   }
 
-  return FromApiStatus(
-      iree_vm_invoke(vmla_executable->context(),
-                     vmla_executable->entry_functions()[entry_point],
-                     /*policy=*/nullptr, vmla_executable->interface_inputs(),
-                     /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
-      IREE_LOC);
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_stack_init(
+          iree_vm_context_state_resolver(vmla_executable->context()), stack_),
+      IREE_LOC));
+  auto status =
+      FromApiStatus(iree_vm_invoke_within(
+                        vmla_executable->context(), stack_,
+                        vmla_executable->entry_functions()[entry_point],
+                        /*policy=*/nullptr, vmla_executable->interface_inputs(),
+                        /*outputs=*/nullptr),
+                    IREE_LOC);
+  iree_vm_stack_deinit(stack_);
+  return status;
 }
 
 }  // namespace vmla

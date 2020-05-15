@@ -24,9 +24,9 @@ namespace iree {
 namespace hal {
 
 HostLocalCommandProcessor::HostLocalCommandProcessor(
-    Allocator* allocator, CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories)
-    : CommandBuffer(allocator, mode, command_categories) {}
+    Allocator* allocator, CommandCategoryBitfield command_categories)
+    : CommandBuffer(allocator, CommandBufferMode::kOneShot,
+                    command_categories) {}
 
 HostLocalCommandProcessor::~HostLocalCommandProcessor() = default;
 

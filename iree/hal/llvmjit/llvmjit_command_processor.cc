@@ -27,9 +27,8 @@ namespace hal {
 namespace llvmjit {
 
 LLVMJITCommandProcessor::LLVMJITCommandProcessor(
-    Allocator* allocator, CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories)
-    : HostLocalCommandProcessor(allocator, mode, command_categories) {}
+    Allocator* allocator, CommandCategoryBitfield command_categories)
+    : HostLocalCommandProcessor(allocator, command_categories) {}
 
 LLVMJITCommandProcessor::~LLVMJITCommandProcessor() = default;
 

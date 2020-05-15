@@ -22,7 +22,7 @@ namespace llvmjit {
 
 class LLVMJITCommandProcessor final : public HostLocalCommandProcessor {
  public:
-  LLVMJITCommandProcessor(Allocator* allocator, CommandBufferModeBitfield mode,
+  LLVMJITCommandProcessor(Allocator* allocator,
                           CommandCategoryBitfield command_categories);
   ~LLVMJITCommandProcessor() override;
 
