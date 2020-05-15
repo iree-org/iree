@@ -55,12 +55,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
-if(${IREE_ENABLE_TRACING})
-  list(APPEND IREE_DEFAULT_COPTS
-    "-DGLOBAL_WTF_ENABLE=1"
-  )
-endif()
-
 #-------------------------------------------------------------------------------
 # Compiler: Clang/LLVM
 #-------------------------------------------------------------------------------
@@ -152,12 +146,4 @@ set(IREE_TABLEGEN_EXE iree-tblgen)
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}/third_party/tensorflow
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
-)
-
-#-------------------------------------------------------------------------------
-# Third party: tracing
-#-------------------------------------------------------------------------------
-
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}/third_party/google_tracing_framework/bindings/cpp/include
 )

@@ -34,9 +34,6 @@ iree_py_extension(
     ::rt_library
     bindings::python::pyiree::common
     iree::base::initializer
-    iree::base::tracing
-    # TODO(marbre): Add dependency
-    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
   COPTS
     ${PYBIND_COPTS}
     ${PYBIND_EXTENSION_COPTS}

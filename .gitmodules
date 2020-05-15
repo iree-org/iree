@@ -19,10 +19,6 @@
 [submodule "third_party/vulkan_memory_allocator"]
 	path = third_party/vulkan_memory_allocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-[submodule "third_party/google_tracing_framework"]
-	path = third_party/google_tracing_framework
-	url = https://github.com/google/tracing-framework.git
-	fetchRecurseSubmodules = false
 [submodule "third_party/spirv_headers"]
 	path = third_party/spirv_headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
@@ -48,3 +44,6 @@
 [submodule "third_party/ruy"]
 	path = third_party/ruy
 	url = https://github.com/google/ruy
+[submodule "third_party/tracy"]
+	path = third_party/tracy
+	url = https://github.com/wolfpld/tracy.git

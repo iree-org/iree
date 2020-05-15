@@ -550,8 +550,6 @@ class SavedModelTestCase(tf.test.TestCase):
   # instances mirroring _modules_to_compile.
   compiled_modules = None
 
-  TRACE_FILE_NAME = None
-
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.modules = None
@@ -626,13 +624,6 @@ class SavedModelTestCase(tf.test.TestCase):
 
   @classmethod
   def tearDownClass(cls):
-    trace_file_name = cls.TRACE_FILE_NAME
-    if not trace_file_name:
-      trace_file_name = cls.__name__ + ".wtf-trace"
-    trace_file = os.path.join(tempfile.gettempdir(), trace_file_name)
-    print("Flushing trace file to:", trace_file)
-    rt.binding.tracing.flush(trace_file)
-    print("Flush complete")
     super().tearDownClass()
 
   def setUp(self):

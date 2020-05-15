@@ -40,6 +40,7 @@ iree_cc_binary(
     iree::base::localfile
     iree::base::source_location
     iree::base::status
+    iree::base::tracing
     iree::modules::hal
     iree::testing::benchmark_main
     iree::vm::bytecode_module
@@ -80,6 +81,7 @@ iree_cc_binary(
     iree::base::localfile
     iree::base::source_location
     iree::base::status
+    iree::base::tracing
     iree::modules::hal
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
@@ -270,6 +272,7 @@ if(${IREE_BUILD_COMPILER})
       iree::base::init
       iree::base::source_location
       iree::base::status
+      iree::base::tracing
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::Transforms

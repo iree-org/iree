@@ -18,6 +18,7 @@
 #include "iree/base/file_io.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
+#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX)
@@ -30,6 +31,7 @@ namespace iree {
 namespace file_io {
 
 Status FileExists(const std::string& path) {
+  IREE_TRACE_SCOPE0("file_io::FileExists");
   struct stat stat_buf;
   return stat(path.c_str(), &stat_buf) == 0
              ? OkStatus()
@@ -37,6 +39,7 @@ Status FileExists(const std::string& path) {
 }
 
 StatusOr<std::string> GetFileContents(const std::string& path) {
+  IREE_TRACE_SCOPE0("file_io::GetFileContents");
   std::unique_ptr<FILE, void (*)(FILE*)> file = {std::fopen(path.c_str(), "r"),
                                                  +[](FILE* file) {
                                                    if (file) fclose(file);
@@ -70,6 +73,7 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
 }
 
 Status SetFileContents(const std::string& path, const std::string& content) {
+  IREE_TRACE_SCOPE0("file_io::SetFileContents");
   std::unique_ptr<FILE, void (*)(FILE*)> file = {std::fopen(path.c_str(), "wb"),
                                                  +[](FILE* file) {
                                                    if (file) fclose(file);
@@ -87,6 +91,7 @@ Status SetFileContents(const std::string& path, const std::string& content) {
 }
 
 Status DeleteFile(const std::string& path) {
+  IREE_TRACE_SCOPE0("file_io::DeleteFile");
   if (::remove(path.c_str()) == -1) {
     return ErrnoToCanonicalStatusBuilder(
         errno, absl::StrCat("Failed to delete file '", path, "'"), IREE_LOC);
@@ -96,6 +101,7 @@ Status DeleteFile(const std::string& path) {
 
 Status MoveFile(const std::string& source_path,
                 const std::string& destination_path) {
+  IREE_TRACE_SCOPE0("file_io::MoveFile");
   if (::rename(source_path.c_str(), destination_path.c_str()) == -1) {
     return ErrnoToCanonicalStatusBuilder(
         errno,

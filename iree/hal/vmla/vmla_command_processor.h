@@ -16,6 +16,7 @@
 #define IREE_HAL_VMLA_VMLA_COMMAND_PROCESSOR_H_
 
 #include "iree/hal/host/host_local_command_processor.h"
+#include "iree/vm/stack.h"
 
 namespace iree {
 namespace hal {
@@ -23,7 +24,7 @@ namespace vmla {
 
 class VMLACommandProcessor final : public HostLocalCommandProcessor {
  public:
-  VMLACommandProcessor(Allocator* allocator, CommandBufferModeBitfield mode,
+  VMLACommandProcessor(Allocator* allocator,
                        CommandCategoryBitfield command_categories);
   ~VMLACommandProcessor() override;
 
@@ -33,6 +34,9 @@ class VMLACommandProcessor final : public HostLocalCommandProcessor {
       const PushConstantBlock& push_constants,
       absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings)
       override;
+
+ private:
+  iree_vm_stack_t* stack_ = nullptr;
 };
 
 }  // namespace vmla

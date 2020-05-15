@@ -168,12 +168,6 @@ maybe(local_repository,
     path = "third_party/flatbuffers",
 )
 
-maybe(new_local_repository,
-    name = "com_google_tracing_framework_cpp",
-    path = "third_party/google_tracing_framework/bindings/cpp",
-    build_file = "build_tools/third_party/google_tracing_framework_cpp/BUILD.overlay",
-)
-
 # TODO(scotttodd): TensorFlow is squatting on the vulkan_headers repo name, so
 # we use a temporary one until resolved. Theirs is set to an outdated version.
 maybe(new_local_repository,

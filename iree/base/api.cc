@@ -133,6 +133,8 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
     return IREE_STATUS_RESOURCE_EXHAUSTED;
   }
 
+  IREE_TRACE_ALLOC(ptr, byte_length);
+
   *out_ptr = ptr;
   return IREE_STATUS_OK;
 }
@@ -140,6 +142,7 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_allocator_system_free(void* self, void* ptr) {
   IREE_TRACE_SCOPE0("iree_allocator_system_free");
+  IREE_TRACE_FREE(ptr);
   if (ptr) {
     std::free(ptr);
   }

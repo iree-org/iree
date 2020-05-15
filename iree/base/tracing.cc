@@ -12,212 +12,143 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Force the header to detect WTF_ENABLE so that this library builds
-// (for when building recursively).
-#if !defined(WTF_ENABLE)
-#define WTF_ENABLE
-#endif
-
 #include "iree/base/tracing.h"
 
-#include <thread>  // NOLINT
+// Textually include the Tracy implementation.
+// We do this here instead of relying on an external build target so that we can
+// ensure our configuration specified in tracing.h is picked up.
+#if IREE_TRACING_FEATURES != 0
+#include "third_party/tracy/TracyClient.cpp"
+#endif  // IREE_TRACING_FEATURES
 
-#include "absl/base/attributes.h"
-#include "absl/base/const_init.h"
-#include "absl/base/thread_annotations.h"
-#include "absl/flags/flag.h"
-#include "absl/strings/str_cat.h"
-#include "absl/synchronization/mutex.h"
-#include "absl/time/clock.h"
-#include "iree/base/file_io.h"
-#include "iree/base/file_path.h"
-#include "iree/base/initializer.h"
-#include "iree/base/logging.h"
-#include "iree/base/status.h"
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-ABSL_FLAG(int32_t, iree_trace_file_period, 5,
-          "Seconds between automatic flushing of WTF trace files. 0 to "
-          "disable auto-flush.");
-ABSL_FLAG(std::string, iree_trace_file, "",
-          "wtf-trace file to save if --define=GLOBAL_WTF_ENABLE=1 was used "
-          "when building.");
+#if IREE_TRACING_FEATURES != 0
 
-namespace iree {
-namespace {
-
-// Guards global WTF state (like the flush fiber and IO).
-ABSL_CONST_INIT absl::Mutex global_tracing_mutex(absl::kConstInit);
-
-// True when tracing has been enabled and initialized.
-bool global_tracing_initialized ABSL_GUARDED_BY(global_tracing_mutex) = false;
-
-// If there is an existing file at the given path back it up by moving it aside.
-// Only kMaxBackups will be kept to avoid unbounded growth.
-void RollTraceFiles(const std::string& path) {
-  std::string path_stem = file_path::JoinPaths(file_path::DirectoryName(path),
-                                               file_path::Stem(path));
-  const int kMaxBackups = 5;
-  for (int i = kMaxBackups; i >= 0; i--) {
-    std::string source_name;
-    if (i > 0) {
-      source_name = absl::StrCat(path_stem, ".", i, ".wtf-trace");
-    } else {
-      source_name = path;
-    }
-    if (!file_io::FileExists(source_name).ok()) {
-      continue;
-    }
-
-    Status status;
-    if (i == kMaxBackups) {
-      status = file_io::DeleteFile(source_name);
-    } else {
-      std::string backup_name =
-          absl::StrCat(path_stem, ".", (i + 1), ".wtf-trace");
-      status = file_io::MoveFile(source_name, backup_name);
-    }
-    if (!status.ok()) {
-      LOG(WARNING) << "Could not remove backup trace file " << source_name
-                   << ": " << status;
-    }
-  }
+void iree_tracing_set_thread_name_impl(const char* name) {
+  tracy::SetThreadName(name);
 }
 
-// Flushes all recorded trace data since the last flush.
-void FlushTraceFile(absl::optional<absl::string_view> explicit_trace_path)
-    ABSL_EXCLUSIVE_LOCKS_REQUIRED(global_tracing_mutex) {
-  if (!global_tracing_initialized) return;
+iree_zone_id_t iree_tracing_zone_begin_impl(
+    const struct ___tracy_source_location_data* src_loc, const char* name,
+    size_t name_length) {
+  const iree_zone_id_t zone_id = tracy::GetProfiler().GetNextZoneId();
 
-  static std::string* current_trace_path = nullptr;
-  static ::wtf::Runtime::SaveCheckpoint checkpoint;
-  static bool is_first_flush = false;
+#ifndef TRACY_NO_VERIFY
+  {
+    TracyLfqPrepareC(tracy::QueueType::ZoneValidation);
+    tracy::MemWrite(&item->zoneValidation.id, zone_id);
+    TracyLfqCommitC;
+  }
+#endif  // TRACY_NO_VERIFY
 
-  // Detect whether explicitly overriding the trace file.
-  if (explicit_trace_path) {
-    if (!current_trace_path || *current_trace_path != *explicit_trace_path) {
-      // Reset.
-      delete current_trace_path;
-      current_trace_path = new std::string(*explicit_trace_path);
+  {
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+    TracyLfqPrepareC(tracy::QueueType::ZoneBeginCallstack);
+#else
+    TracyLfqPrepareC(tracy::QueueType::ZoneBegin);
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+    tracy::MemWrite(&item->zoneBegin.time, tracy::Profiler::GetTime());
+    tracy::MemWrite(&item->zoneBegin.srcloc,
+                    reinterpret_cast<uint64_t>(src_loc));
+    TracyLfqCommitC;
+  }
 
-      // Trigger first flush semantics.
-      is_first_flush = true;
-      checkpoint = ::wtf::Runtime::SaveCheckpoint();
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+  tracy::GetProfiler().SendCallstack(IREE_TRACING_MAX_CALLSTACK_DEPTH);
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+
+  if (name_length) {
+#ifndef TRACY_NO_VERIFY
+    {
+      TracyLfqPrepareC(tracy::QueueType::ZoneValidation);
+      tracy::MemWrite(&item->zoneValidation.id, zone_id);
+      TracyLfqCommitC;
     }
-  } else if (!current_trace_path) {
-    // Resolve implicitly from flags.
-    const auto& implicit_trace_path = absl::GetFlag(FLAGS_iree_trace_file);
-    if (!implicit_trace_path.empty()) {
-      current_trace_path = new std::string(implicit_trace_path);
-      // Trigger first flush semantics.
-      is_first_flush = true;
-      checkpoint = ::wtf::Runtime::SaveCheckpoint();
-    }
+#endif  // TRACY_NO_VERIFY
+    auto name_ptr =
+        reinterpret_cast<char*>(tracy::tracy_malloc(name_length + 1));
+    memcpy(name_ptr, name, name_length);
+    name_ptr[name_length] = '\0';
+    TracyLfqPrepareC(tracy::QueueType::ZoneName);
+    tracy::MemWrite(&item->zoneText.text, reinterpret_cast<uint64_t>(name_ptr));
+    TracyLfqCommitC;
   }
 
-  if (!current_trace_path) {
-    return;
-  }
-
-  if (is_first_flush) {
-    // Backup existing any existing trace files at the specified path.
-    RollTraceFiles(*current_trace_path);
-  }
-
-  auto save_options =
-      ::wtf::Runtime::SaveOptions::ForStreamingFile(&checkpoint);
-  if (is_first_flush) {
-    // On the first time, truncate the file. All subsequent flushes append.
-    save_options.open_mode = std::ios_base::trunc;
-  }
-
-  is_first_flush = false;
-
-  auto* runtime = ::wtf::Runtime::GetInstance();
-  if (!runtime->SaveToFile(*current_trace_path, save_options)) {
-    LOG(ERROR) << "Error saving WTF file: " << *current_trace_path;
-    return;
-  }
-
-  VLOG(1) << "Flushed WTF trace to: " << *current_trace_path;
+  return zone_id;
 }
 
-}  // namespace
+iree_zone_id_t iree_tracing_zone_begin_external_impl(
+    const char* file_name, size_t file_name_length, uint32_t line,
+    const char* function_name, size_t function_name_length, const char* name,
+    size_t name_length) {
+  // NOTE: cloned from tracy::Profiler::AllocSourceLocation so that we can use
+  // the string lengths we already have.
+  const uint32_t src_loc_length =
+      static_cast<uint32_t>(4 + 4 + 4 + function_name_length + 1 +
+                            file_name_length + 1 + name_length);
+  auto ptr = reinterpret_cast<char*>(tracy::tracy_malloc(src_loc_length));
+  memcpy(ptr, &src_loc_length, 4);
+  memset(ptr + 4, 0, 4);
+  memcpy(ptr + 8, &line, 4);
+  memcpy(ptr + 12, function_name, function_name_length + 1);
+  memcpy(ptr + 12 + function_name_length + 1, file_name, file_name_length + 1);
+  if (name_length) {
+    memcpy(ptr + 12 + function_name_length + 1 + file_name_length + 1, name,
+           name_length);
+  }
+  uint64_t src_loc = reinterpret_cast<uint64_t>(ptr);
 
-void InitializeTracing() {
-  if (!::wtf::kMasterEnable) {
-    if (!absl::GetFlag(FLAGS_iree_trace_file).empty()) {
-      LOG(WARNING) << "WTF trace save requested but WTF is not compiled in. "
-                   << "Enable by building with --define=GLOBAL_WTF_ENABLE=1.";
-    }
-    return;
+  const iree_zone_id_t zone_id = tracy::GetProfiler().GetNextZoneId();
+
+#ifndef TRACY_NO_VERIFY
+  {
+    TracyLfqPrepareC(tracy::QueueType::ZoneValidation);
+    tracy::MemWrite(&item->zoneValidation.id, zone_id);
+    TracyLfqCommitC;
+  }
+#endif  // TRACY_NO_VERIFY
+
+  {
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+    TracyLfqPrepareC(tracy::QueueType::ZoneBeginAllocSrcLocCallstack);
+#else
+    TracyLfqPrepareC(tracy::QueueType::ZoneBeginAllocSrcLoc);
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+    tracy::MemWrite(&item->zoneBegin.time, tracy::Profiler::GetTime());
+    tracy::MemWrite(&item->zoneBegin.srcloc, src_loc);
+    TracyLfqCommitC;
   }
 
-  absl::MutexLock lock(&global_tracing_mutex);
-  if (global_tracing_initialized) return;
-  global_tracing_initialized = true;
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
+  tracy::GetProfiler().SendCallstack(IREE_TRACING_MAX_CALLSTACK_DEPTH);
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
 
-  // Enable tracing on this thread, which we know is main.
-  IREE_TRACE_THREAD_ENABLE("main");
-
-  // Register atexit callback to stop tracking.
-  atexit(StopTracing);
-
-  LOG(INFO) << "Tracing enabled and streaming to: "
-            << absl::GetFlag(FLAGS_iree_trace_file);
-
-  // Launch a thread to periodically flush the trace.
-  if (absl::GetFlag(FLAGS_iree_trace_file_period) > 0 &&
-      !absl::GetFlag(FLAGS_iree_trace_file).empty()) {
-    absl::Duration period =
-        absl::Seconds(absl::GetFlag(FLAGS_iree_trace_file_period));
-    StartTracingAutoFlush(period);
-  }
+  return zone_id;
 }
 
-bool IsTracingAvailable() { return ::wtf::kMasterEnable; }
-
-void StartTracingAutoFlush(absl::Duration period) {
-  static std::thread flush_thread = ([period]() -> std::thread {
-    flush_thread = std::thread([period]() {
-      while (true) {
-        absl::SleepFor(period);
-        absl::MutexLock lock(&global_tracing_mutex);
-        if (!global_tracing_initialized) {
-          return;
-        }
-        FlushTraceFile(absl::optional<absl::string_view>());
-      }
-    });
-    flush_thread.detach();
-    return std::move(flush_thread);
-  })();
+void iree_tracing_set_plot_type_impl(const char* name_literal,
+                                     uint8_t plot_type) {
+  tracy::Profiler::ConfigurePlot(name_literal,
+                                 static_cast<tracy::PlotFormatType>(plot_type));
 }
 
-// Stops tracing if currently initialized.
-void StopTracing() {
-  if (!::wtf::kMasterEnable) return;
-  absl::MutexLock lock(&global_tracing_mutex);
-  if (!global_tracing_initialized) return;
-
-  // Flush any pending trace data.
-  FlushTraceFile(absl::optional<absl::string_view>());
-
-  // Mark WTF as uninitialized to kill the flush thread.
-  global_tracing_initialized = false;
-
-  LOG(INFO) << "Tracing stopped and flushed to file: "
-            << absl::GetFlag(FLAGS_iree_trace_file);
+void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value) {
+  tracy::Profiler::PlotData(name_literal, value);
 }
 
-void FlushTrace(absl::optional<absl::string_view> explicit_trace_path) {
-  if (!::wtf::kMasterEnable) return;
-  absl::MutexLock lock(&global_tracing_mutex);
-  if (!global_tracing_initialized) return;
-  FlushTraceFile(explicit_trace_path);
+void iree_tracing_plot_value_f32_impl(const char* name_literal, float value) {
+  tracy::Profiler::PlotData(name_literal, value);
 }
 
-}  // namespace iree
+void iree_tracing_plot_value_f64_impl(const char* name_literal, double value) {
+  tracy::Profiler::PlotData(name_literal, value);
+}
 
-IREE_DECLARE_MODULE_INITIALIZER(iree_tracing);
+#endif  // IREE_TRACING_FEATURES
 
-IREE_REGISTER_MODULE_INITIALIZER(iree_tracing, ::iree::InitializeTracing());
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus

@@ -48,6 +48,7 @@
 #include "iree/base/init.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
@@ -147,6 +148,7 @@ std::string BackendToDriverName(std::string backend) {
 
 // Returns a list of target compiler backends to use for file evaluation.
 StatusOr<std::vector<std::string>> GetTargetBackends() {
+  IREE_TRACE_SCOPE0("GetTargetBackends");
   auto target_backends =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags().targets;
   if (target_backends.empty()) {
@@ -170,6 +172,8 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
 StatusOr<std::string> PrepareModule(
     std::string target_backend,
     std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+  IREE_TRACE_SCOPE0("PrepareModule");
+
   mlir::MLIRContext context;
 
   // Parse input MLIR module.
@@ -258,6 +262,8 @@ Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
                         iree_vm_function_t function,
                         absl::string_view export_name) {
+  IREE_TRACE_SCOPE0("EvaluateFunction");
+
   std::cout << "EXEC @" << export_name << std::endl;
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   auto input_values_list = absl::MakeConstSpan(
@@ -293,6 +299,8 @@ Status EvaluateFunction(iree_vm_context_t* context,
 Status EvaluateFunctions(iree_vm_instance_t* instance,
                          absl::string_view driver_name,
                          const std::string& flatbuffer_data) {
+  IREE_TRACE_SCOPE0("EvaluateFunctions");
+
   LOG(INFO) << "Evaluating all functions in module for driver '" << driver_name
             << "'...";
 
@@ -369,6 +377,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 
 // Translates and runs a single LLVM file buffer.
 Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+  IREE_TRACE_SCOPE0("EvaluateFile");
+
   // TODO(benvanik): move to instance-based registration.
   RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
       << "Registering HAL types";
@@ -381,12 +391,14 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
   ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
   for (const auto& target_backend : target_backends) {
     // Prepare the module for execution and evaluate it.
+    IREE_TRACE_FRAME_MARK();
     auto cloned_file_buffer = llvm::MemoryBuffer::getMemBufferCopy(
         file_buffer->getBuffer(), file_buffer->getBufferIdentifier());
     ASSIGN_OR_RETURN(
         auto flatbuffer_data,
         PrepareModule(target_backend + '*', std::move(cloned_file_buffer)),
         _ << "Translating module");
+    IREE_TRACE_FRAME_MARK();
     RETURN_IF_ERROR(EvaluateFunctions(
         instance, BackendToDriverName(target_backend), flatbuffer_data))
         << "Evaluating functions";
@@ -398,6 +410,8 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
 
 // Runs the given .mlir file based on the current flags.
 Status RunFile(const std::string& mlir_filename) {
+  IREE_TRACE_SCOPE0("RunFile");
+
   // Load input file/from stdin.
   std::string error_message;
   auto file = mlir::openInputFile(mlir_filename, &error_message);
@@ -448,6 +462,8 @@ Status RunFile(const std::string& mlir_filename) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
+  IREE_TRACE_SCOPE0("iree-run-mlir");
+
   int argc_llvm = argc;
   char** argv_llvm = argv;
   int argc_absl = 1;
@@ -486,7 +502,7 @@ extern "C" int main(int argc, char** argv) {
   }
   argc_absl += run_args_flag.size();
   char** argv_absl_ptr = argv_absl.data();
-  InitializeEnvironment(&argc_absl, &argv_absl_ptr);
+  iree::InitializeEnvironment(&argc_absl, &argv_absl_ptr);
 
   auto status = RunFile(input_file_flag);
   if (!status.ok()) {

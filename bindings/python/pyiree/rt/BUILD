@@ -62,8 +62,6 @@ iree_py_extension(
         ":rt_library",
         "//bindings/python/pyiree/common",
         "//iree/base:initializer",
-        "//iree/base:tracing",
-        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
 )
 

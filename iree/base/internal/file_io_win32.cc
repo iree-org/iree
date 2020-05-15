@@ -18,6 +18,7 @@
 #include "iree/base/internal/file_handle_win32.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
+#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
@@ -25,6 +26,7 @@ namespace iree {
 namespace file_io {
 
 Status FileExists(const std::string& path) {
+  IREE_TRACE_SCOPE0("file_io::FileExists");
   DWORD attrs = ::GetFileAttributesA(path.c_str());
   if (attrs == INVALID_FILE_ATTRIBUTES) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
@@ -34,6 +36,7 @@ Status FileExists(const std::string& path) {
 }
 
 StatusOr<std::string> GetFileContents(const std::string& path) {
+  IREE_TRACE_SCOPE0("file_io::GetFileContents");
   ASSIGN_OR_RETURN(auto file, FileHandle::OpenRead(std::move(path),
                                                    FILE_FLAG_SEQUENTIAL_SCAN));
   std::string result;
@@ -53,6 +56,7 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
 }
 
 Status SetFileContents(const std::string& path, const std::string& content) {
+  IREE_TRACE_SCOPE0("file_io::SetFileContents");
   ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
   if (::WriteFile(file->handle(), content.data(), content.size(), NULL, NULL) ==
       FALSE) {
@@ -64,6 +68,7 @@ Status SetFileContents(const std::string& path, const std::string& content) {
 }
 
 Status DeleteFile(const std::string& path) {
+  IREE_TRACE_SCOPE0("file_io::DeleteFile");
   if (::DeleteFileA(path.c_str()) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
            << "Unable to delete/access file: " << path;
@@ -73,6 +78,7 @@ Status DeleteFile(const std::string& path) {
 
 Status MoveFile(const std::string& source_path,
                 const std::string& destination_path) {
+  IREE_TRACE_SCOPE0("file_io::MoveFile");
   if (::MoveFileA(source_path.c_str(), destination_path.c_str()) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
            << "Unable to move file " << source_path << " to "

@@ -85,6 +85,7 @@ iree_cc_library(
     iree::hal::host::host_buffer
     iree::hal::host::host_local_command_processor
     iree::vm::invocation
+    iree::vm::stack
     iree::vm::variant_list
   PUBLIC
 )

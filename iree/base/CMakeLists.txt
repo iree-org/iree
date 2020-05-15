@@ -589,20 +589,20 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_ENABLE_TRACING})
+if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
       tracing
     HDRS
       "tracing.h"
+      "${IREE_ROOT_DIR}/third_party/tracy/Tracy.hpp"
+      "${IREE_ROOT_DIR}/third_party/tracy/TracyC.h"
+    SRCS
+      "tracing.cc"
     DEPS
-      absl::strings
-      absl::optional
-      absl::time
-      iree::base::tracing_enabled
-      # TODO(marbre): Add dependencies
-      # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
-      # "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"]
+      absl::core_headers
+    DEFINES
+      "IREE_TRACING_MODE=2"
     PUBLIC
   )
 else()
@@ -612,54 +612,8 @@ else()
     HDRS
       "tracing.h"
     DEPS
-      absl::strings
-      absl::time
-      absl::optional
-      iree::base::tracing_disabled
-    PUBLIC
-  )
-endif()
-
-iree_cc_library(
-  NAME
-    tracing_disabled
-  HDRS
-    "tracing.h"
-  SRCS
-    "tracing_disabled.cc"
-  DEPS
-    absl::flags
-    absl::strings
-    absl::time
-    absl::optional
-    # TODO(marbre): Add dependency
-    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
-  ALWAYSLINK
-)
-
-if(${IREE_ENABLE_TRACING})
-  iree_cc_library(
-    NAME
-      tracing_enabled
-    HDRS
-      "tracing.h"
-    SRCS
-      "tracing_enabled.cc"
-    DEPS
       absl::core_headers
-      absl::flags
-      absl::strings
-      absl::synchronization
-      absl::time
-      absl::optional
-      iree::base::file_io
-      iree::base::file_path
-      iree::base::initializer
-      iree::base::logging
-      iree::base::status
-      # TODO(marbre): Add dependency
-      # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
-    ALWAYSLINK
+    PUBLIC
   )
 endif()
 
