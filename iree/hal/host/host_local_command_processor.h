@@ -40,7 +40,6 @@ struct PushConstantBlock {
 class HostLocalCommandProcessor : public CommandBuffer {
  public:
   HostLocalCommandProcessor(Allocator* allocator,
-                            CommandBufferModeBitfield mode,
                             CommandCategoryBitfield command_categories);
   ~HostLocalCommandProcessor() override;
 

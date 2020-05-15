@@ -52,7 +52,8 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
   UnsynchronizedCommandQueue(Allocator* allocator, std::string name,
                              CommandCategoryBitfield supported_categories)
       : CommandQueue(std::move(name), supported_categories),
-        allocator_(allocator) {}
+        allocator_(allocator),
+        command_processor_(allocator_, supported_categories_) {}
   ~UnsynchronizedCommandQueue() override = default;
 
   Status Submit(absl::Span<const SubmissionBatch> batches) override {
@@ -84,14 +85,13 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
     for (auto* command_buffer : command_buffers) {
       auto* inproc_command_buffer =
           static_cast<InProcCommandBuffer*>(command_buffer->impl());
-      VMLACommandProcessor command_processor(allocator_, command_buffer->mode(),
-                                             supported_categories());
-      RETURN_IF_ERROR(inproc_command_buffer->Process(&command_processor));
+      RETURN_IF_ERROR(inproc_command_buffer->Process(&command_processor_));
     }
     return OkStatus();
   }
 
   Allocator* const allocator_;
+  VMLACommandProcessor command_processor_;
 };
 
 }  // namespace

@@ -84,8 +84,8 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
     for (auto* command_buffer : command_buffers) {
       auto* inproc_command_buffer =
           static_cast<InProcCommandBuffer*>(command_buffer->impl());
-      LLVMJITCommandProcessor command_processor(
-          allocator_, command_buffer->mode(), supported_categories());
+      LLVMJITCommandProcessor command_processor(allocator_,
+                                                supported_categories());
       RETURN_IF_ERROR(inproc_command_buffer->Process(&command_processor));
     }
     return OkStatus();
