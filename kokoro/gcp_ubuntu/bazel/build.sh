@@ -40,7 +40,7 @@ cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 # to much the same effect.
 docker build \
   --tag gcr.io/iree-oss/bazel-kokoro \
-  --file build_tools/docker/bazel_kokoro \
+  --file build_tools/docker/bazel_kokoro/Dockerfile \
   .
 
 # Run the tests.
