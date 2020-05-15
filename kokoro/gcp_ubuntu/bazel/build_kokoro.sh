@@ -23,22 +23,14 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Check these exist and print the versions for later debugging
-bazel --version
-python3 -V
-
-export CXX=clang++-6.0
-export CC=clang-6.0
-export PYTHON_BIN="$(which python3)"
-
 # Kokoro checks out the repository here.
-cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
+WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
-# Mount the checked out repository to /usr/src/git/iree/, make that the working
-# directory and run the tests in the bazel-tensorflow image.
+# Mount the checked out repository, make that the working directory and run the
+# tests in the bazel-tensorflow image.
 docker run \
-  --volume ${KOKORO_ARTIFACTS_DIR?}/github/iree/:/usr/src/git/iree/ \
-  --workdir="/usr/src/git/iree/" \
+  --volume "${WORKDIR?}:${WORKDIR?}" \
+  --workdir="${WORKDIR?}" \
   --rm \
   gcr.io/iree-oss/bazel-tensorflow \
   kokoro/gcp_ubuntu/bazel/build.sh
