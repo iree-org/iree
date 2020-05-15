@@ -33,15 +33,9 @@ export PYTHON_BIN="$(which python3)"
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 
-# Build the bazel-kokoro image, which copys the current repo over to the image
-# and runs via an entrypoint.
-# Caching can't be done at this level (without replicating checking out a
-# specific PR ourselves), but we can cache gcr.io/iree-oss/bazel-tensorflow
-# to much the same effect.
-docker build \
-  --tag gcr.io/iree-oss/bazel-kokoro \
-  --file build_tools/docker/bazel_kokoro/Dockerfile \
-  .
-
-# Run the tests.
-docker run gcr.io/iree-oss/bazel-kokoro
+docker run \
+  --volume ${KOKORO_ARTIFACTS_DIR?}/github/iree/:/usr/src/git/iree/ \
+  --workdir="/usr/src/git/iree/" \
+  --rm \
+  gcr.io/iree-oss/bazel-tensorflow \
+  kokoro/gcp_ubuntu/bazel/build.sh
