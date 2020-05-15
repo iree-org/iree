@@ -245,7 +245,7 @@ class HALModuleState final {
         IREE_LOC));
     if (allocation_size < value->data.data_length) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Constant data is too larger for the minimum allocation size";
+             << "Constant data is too large for the minimum allocation size";
     }
 
     vm::ref<iree_hal_buffer_t> buffer;

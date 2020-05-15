@@ -244,6 +244,7 @@ Status InProcCommandBuffer::Process(CommandBuffer* command_processor) const {
       LOG(ERROR) << "DeviceQueue failure while executing command; permanently "
                     "failing all future commands: "
                  << command_status;
+      return command_status;
     }
   }
 
