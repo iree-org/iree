@@ -52,8 +52,10 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
 /// Populates the patterns that convert from XLA to Linalg on buffers. Currently
 /// only implements conversions when the XLA op is the only op XLA op in the
 /// dispatch region.
+using TensorToBufferMap = DenseMap<Value, Value>;
 void populateHLOToLinalgOnBuffersConversionPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+    MLIRContext *context, OwningRewritePatternList &patterns,
+    TensorToBufferMap const &outputTensorToBuffer);
 
 /// Populates passes to convert from XLA-HLO to Linalg on buffers as well as
 /// handling some IREE specific conversions (like iree.interface.* and

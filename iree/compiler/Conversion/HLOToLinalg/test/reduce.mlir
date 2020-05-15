@@ -5,9 +5,9 @@
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
 module {
   //      CHECK: func @reduction_entry
-  //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
-  //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<5xf32>
+  //  CHECK-DAG: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<5xf32>
+  //  CHECK-DAG: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
+  //  CHECK-DAG: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
   //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
@@ -116,9 +116,9 @@ module {
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
 module {
   //      CHECK: func @reduction_entry
+  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
   //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
@@ -183,9 +183,9 @@ module {
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0)>
 module {
   //      CHECK: func @reduction_multi_dimensions
+  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4x3xf32>
   //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-  //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
