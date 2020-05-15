@@ -30,6 +30,29 @@ IREE VM type representing a TensorList.
 
 ## Operation definition
 
+### `tensorlist.Concat` (IREE::TensorList::Concat)
+
+Creates a tensor by concatenate the tensors in the tensorlist
+
+Creates a new tensor `tensor` by concatenating the tensors in `list` along
+the leading dimension.
+
+Requires the list to be non-empty.
+Requires all tensors contained in `list` to have the same dimensions along
+the non-leading axes.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | tensorlist.list
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`tensor` | buffer_view
+
 ### `tensorlist.FromTensor` (IREE::TensorList::FromTensor)
 
 Creates a tensorlist by slicing along the first dimension
