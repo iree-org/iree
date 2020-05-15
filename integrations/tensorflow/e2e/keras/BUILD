@@ -33,7 +33,7 @@ package(
 )
 
 iree_py_test(
-    # TODO(GH-1620): Include after fixing the failure on the OSS CI.
+    # TODO(#1620): Include after fixing the failure on the OSS CI.
     name = "keras_lstm_static_test",
     srcs = ["keras_lstm_static_test.py"],
     main = "keras_lstm_static_test.py",

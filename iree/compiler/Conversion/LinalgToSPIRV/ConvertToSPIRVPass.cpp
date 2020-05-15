@@ -300,7 +300,7 @@ struct ConvertToSPIRVPass
 LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
     IREE::HAL::InterfaceLoadConstantOp loadOp, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
-  // TODO(GH-1519): hal.interface.load.constant should point to the
+  // TODO(#1519): hal.interface.load.constant should point to the
   // hal.interface op.
   auto moduleOp = loadOp.getParentOfType<ModuleOp>();
   auto halInterfaceOps =

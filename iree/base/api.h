@@ -211,7 +211,7 @@ typedef enum {
   IREE_STATUS_CODE_MASK = 0x1F,
 } iree_status_code_t;
 
-// TODO(GH-265): add ABSL_MUST_USE_RESULT to iree_status_t.
+// TODO(#265): add ABSL_MUST_USE_RESULT to iree_status_t.
 
 // Opaque status structure containing an iree_status_code_t and optional status
 // object with more detailed information and payloads.
@@ -229,8 +229,8 @@ typedef uintptr_t iree_status_t;
 #define iree_make_status(code) \
   (iree_status_t)(((iree_status_code_t)(code)) & IREE_STATUS_CODE_MASK)
 
-// TODO(GH-265): string formatting constructors.
-// TODO(GH-265): payload support (custom stack traces, etc).
+// TODO(#265): string formatting constructors.
+// TODO(#265): payload support (custom stack traces, etc).
 
 // Returns the iree_status_code_t from an iree_status_t.
 #define iree_status_code(value) \
@@ -271,7 +271,7 @@ typedef uintptr_t iree_status_t;
 #define iree_status_is_unauthenticated(value) \
   (iree_status_code(value) == IREE_STATUS_UNAUTHENTICATED)
 
-// TODO(GH-265): better logging of status checks.
+// TODO(#265): better logging of status checks.
 #define IREE_CHECK_OK(expr) CHECK_EQ(IREE_STATUS_OK, iree_status_code(expr))
 #define IREE_ASSERT_OK(expr) ASSERT_EQ(IREE_STATUS_OK, iree_status_code(expr))
 #define IREE_EXPECT_OK(expr) EXPECT_EQ(IREE_STATUS_OK, iree_status_code(expr))
@@ -283,7 +283,7 @@ typedef uintptr_t iree_status_t;
   iree_status_t var = (expr);                                       \
   if (var) return var;
 
-// TODO(GH-265): variadic arguments to support appending strings.
+// TODO(#265): variadic arguments to support appending strings.
 // Propagates the error returned by (expr) by returning from the current
 // function on non-OK status.
 //

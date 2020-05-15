@@ -43,7 +43,7 @@ class TranslateExecutablesPass
     auto targetOps = llvm::to_vector<4>(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>());
     for (auto targetOp : targetOps) {
-      // TODO(GH-1036): this will be what we want the dynamic pass manager to
+      // TODO(#1036): this will be what we want the dynamic pass manager to
       // do for us: we want to nest all of the backend passes on a source op
       // that matches their target_backend pattern.
       for (auto &targetBackend :
