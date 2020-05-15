@@ -97,7 +97,7 @@ typedef struct iree_vm_module {
   iree_atomic_intptr_t ref_count;
 
   // Destroys |self| when all references to the module have been released.
-  iree_status_t(IREE_API_PTR* destroy)(void* self);
+  void(IREE_API_PTR* destroy)(void* self);
 
   // Returns the name of the module (used during resolution).
   iree_string_view_t(IREE_API_PTR* name)(void* self);
@@ -126,8 +126,8 @@ typedef struct iree_vm_module {
       iree_vm_module_state_t** out_module_state);
 
   // Frees module state data.
-  iree_status_t(IREE_API_PTR* free_state)(void* self,
-                                          iree_vm_module_state_t* module_state);
+  void(IREE_API_PTR* free_state)(void* self,
+                                 iree_vm_module_state_t* module_state);
 
   // Resolves the import with the given ordinal to |function|.
   // The function is guaranteed to remain valid for the lifetime of the module
@@ -167,11 +167,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_init(iree_vm_module_t* module, void* self);
 
 // Retains the given |module| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_module_retain(iree_vm_module_t* module);
 
 // Releases the given |module| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_module_release(iree_vm_module_t* module);
 
 // Returns the name of the module (used during resolution).

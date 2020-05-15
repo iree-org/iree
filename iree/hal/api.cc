@@ -44,20 +44,16 @@ namespace iree {
 namespace hal {
 
 // Defines the iree_hal_<type_name>_retain/_release methods.
-#define IREE_HAL_API_RETAIN_RELEASE(type_name, cc_type)         \
-  IREE_API_EXPORT iree_status_t iree_hal_##type_name##_retain(  \
-      iree_hal_##type_name##_t* type_name) {                    \
-    auto* handle = reinterpret_cast<cc_type*>(type_name);       \
-    if (!handle) return IREE_STATUS_INVALID_ARGUMENT;           \
-    handle->AddReference();                                     \
-    return IREE_STATUS_OK;                                      \
-  }                                                             \
-  IREE_API_EXPORT iree_status_t iree_hal_##type_name##_release( \
-      iree_hal_##type_name##_t* type_name) {                    \
-    auto* handle = reinterpret_cast<cc_type*>(type_name);       \
-    if (!handle) return IREE_STATUS_INVALID_ARGUMENT;           \
-    handle->ReleaseReference();                                 \
-    return IREE_STATUS_OK;                                      \
+#define IREE_HAL_API_RETAIN_RELEASE(type_name, cc_type)   \
+  IREE_API_EXPORT void iree_hal_##type_name##_retain(     \
+      iree_hal_##type_name##_t* type_name) {              \
+    auto* handle = reinterpret_cast<cc_type*>(type_name); \
+    if (handle) handle->AddReference();                   \
+  }                                                       \
+  IREE_API_EXPORT void iree_hal_##type_name##_release(    \
+      iree_hal_##type_name##_t* type_name) {              \
+    auto* handle = reinterpret_cast<cc_type*>(type_name); \
+    if (handle) handle->ReleaseReference();               \
   }
 
 //===----------------------------------------------------------------------===//

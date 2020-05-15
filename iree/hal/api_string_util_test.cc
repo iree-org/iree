@@ -300,7 +300,7 @@ StatusOr<std::string> FormatBufferElements(
 
 // C API iree_*_retain/iree_*_release function pointer.
 template <typename T>
-using HandleRefFn = iree_status_t(IREE_API_PTR*)(T*);
+using HandleRefFn = void(IREE_API_PTR*)(T*);
 
 // C++ RAII wrapper for an IREE C reference object.
 // Behaves the same as a thread-safe intrusive pointer.

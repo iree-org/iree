@@ -109,10 +109,7 @@ class NativeModule {
     return reinterpret_cast<State*>(self);
   }
 
-  static iree_status_t ModuleDestroy(void* self) {
-    delete FromModulePointer(self);
-    return IREE_STATUS_OK;
-  }
+  static void ModuleDestroy(void* self) { delete FromModulePointer(self); }
 
   static iree_string_view_t ModuleName(void* self) {
     auto* module = FromModulePointer(self);
@@ -198,11 +195,9 @@ class NativeModule {
     return IREE_STATUS_OK;
   }
 
-  static iree_status_t ModuleFreeState(void* self,
-                                       iree_vm_module_state_t* module_state) {
-    if (!module_state) return IREE_STATUS_INVALID_ARGUMENT;
-    delete FromStatePointer(module_state);
-    return IREE_STATUS_OK;
+  static void ModuleFreeState(void* self,
+                              iree_vm_module_state_t* module_state) {
+    if (module_state) delete FromStatePointer(module_state);
   }
 
   static iree_status_t ModuleResolveImport(void* self,

@@ -607,11 +607,11 @@ iree_hal_allocator_create_host_local(iree_allocator_t allocator,
                                      iree_hal_allocator** out_allocator);
 
 // Retains the given |allocator| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
 
 // Releases the given |allocator| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_allocator_release(iree_hal_allocator_t* allocator);
 
 // Calculates the allocation size of a buffer.
@@ -690,11 +690,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_subspan(
     iree_hal_buffer_t** out_buffer);
 
 // Retains the given |buffer| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
 
 // Releases the given |buffer| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_buffer_release(iree_hal_buffer_t* buffer);
 
 // Returns the allocator this buffer was allocated from.
@@ -810,11 +810,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view);
 
 // Releases the given |buffer_view| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view);
 
 // Returns the buffer underlying the buffer view.
@@ -910,11 +910,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Retains the given |command_buffer| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_command_buffer_retain(iree_hal_command_buffer_t* command_buffer);
 
 // Releases the given |command_buffer| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_command_buffer_release(iree_hal_command_buffer_t* command_buffer);
 
 // Resets and begins recording into the command buffer, clearing all
@@ -1070,11 +1070,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
     iree_allocator_t allocator, iree_hal_descriptor_set_t** out_descriptor_set);
 
 // Retains the given |set| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_descriptor_set_retain(iree_hal_descriptor_set_t* descriptor_set);
 
 // Releases the given |set| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
 
 #endif  // IREE_API_NO_PROTOTYPES
@@ -1096,13 +1096,11 @@ iree_hal_descriptor_set_layout_create(
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
 // Retains the given |descriptor_set_layout| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_descriptor_set_layout_retain(
+IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_retain(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 // Releases the given |descriptor_set_layout| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_descriptor_set_layout_release(
+IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_release(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 #endif  // IREE_API_NO_PROTOTYPES
@@ -1114,11 +1112,11 @@ iree_hal_descriptor_set_layout_release(
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Retains the given |device| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_device_retain(iree_hal_device_t* device);
 
 // Releases the given |device| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_device_release(iree_hal_device_t* device);
 
 // Returns a reference to the allocator of the device that can be used for
@@ -1190,11 +1188,11 @@ iree_hal_device_wait_semaphores_with_timeout(
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Retains the given |driver| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_driver_retain(iree_hal_driver_t* driver);
 
 // Releases the given |driver| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_driver_release(iree_hal_driver_t* driver);
 
 // Queries available devices and returns them as a list.
@@ -1257,11 +1255,11 @@ iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Retains the given |executable| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_executable_retain(iree_hal_executable_t* executable);
 
 // Releases the given |executable| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_executable_release(iree_hal_executable_t* executable);
 
 #endif  // IREE_API_NO_PROTOTYPES
@@ -1281,11 +1279,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
     iree_hal_executable_cache_t** out_executable_cache);
 
 // Retains the given |executable_cache| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_executable_cache_retain(iree_hal_executable_cache_t* executable_cache);
 
 // Releases the given |executable_cache| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_release(
+IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_cache_release(
     iree_hal_executable_cache_t* executable_cache);
 
 // Returns true if the executable cache can prepare the given executable input
@@ -1329,11 +1327,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_executable_layout_t** out_executable_layout);
 
 // Retains the given |executable_layout| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_retain(
+IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_retain(
     iree_hal_executable_layout_t* executable_layout);
 
 // Releases the given |executable_layout| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_release(
+IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_release(
     iree_hal_executable_layout_t* executable_layout);
 
 #endif  // IREE_API_NO_PROTOTYPES
@@ -1352,11 +1350,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_create(
     iree_allocator_t allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Retains the given |semaphore| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
 
 // Releases the given |semaphore| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
 
 // Queries the current payload of the semaphore and stores the result in

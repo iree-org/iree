@@ -26,21 +26,18 @@ iree_vm_module_init(iree_vm_module_t* module, void* self) {
   return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_module_retain(iree_vm_module_t* module) {
-  if (!module) return IREE_STATUS_INVALID_ARGUMENT;
-  iree_atomic_fetch_add(&module->ref_count, 1);
-  return IREE_STATUS_OK;
+  if (module) {
+    iree_atomic_fetch_add(&module->ref_count, 1);
+  }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_module_release(iree_vm_module_t* module) {
-  if (module) {
-    if (iree_atomic_fetch_sub(&module->ref_count, 1) == 1) {
-      return module->destroy(module->self);
-    }
+  if (module && iree_atomic_fetch_sub(&module->ref_count, 1) == 1) {
+    module->destroy(module->self);
   }
-  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL

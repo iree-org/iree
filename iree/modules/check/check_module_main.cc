@@ -64,9 +64,7 @@ class CheckModuleTest : public ::testing::Test {
         instance_, modules_.data(), modules_.size(), IREE_ALLOCATOR_SYSTEM,
         &context_));
   }
-  void TearDown() override {
-    IREE_ASSERT_OK(iree_vm_context_release(context_));
-  }
+  void TearDown() override { iree_vm_context_release(context_); }
 
   void TestBody() override {
     IREE_EXPECT_OK(iree_vm_invoke(context_, function_, /*policy=*/nullptr,
@@ -165,19 +163,11 @@ StatusOr<int> Run(std::string input_file_path) {
   }
   int ret = RUN_ALL_TESTS();
 
-  // TODO(b/146898896): Investigate mechanism for sharing state between tests
-  // that happens before test registration (we need the input module) and has
-  // nice setup/teardown split.
-  // TODO(gcmn): Some nice wrappers to make this pattern shorter with generated
-  // error messages.
-  // Deallocate:
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_module_release(hal_module), IREE_LOC));
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_module_release(check_module), IREE_LOC));
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_module_release(input_module), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_device_release(device), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_instance_release(instance), IREE_LOC));
+  iree_vm_module_release(hal_module);
+  iree_vm_module_release(check_module);
+  iree_vm_module_release(input_module);
+  iree_hal_device_release(device);
+  iree_vm_instance_release(instance);
 
   return ret;
 }

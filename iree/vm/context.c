@@ -35,7 +35,7 @@ struct iree_vm_context {
   } list;
 };
 
-static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context);
+static void iree_vm_context_destroy(iree_vm_context_t* context);
 
 static iree_status_t iree_vm_context_query_module_state(
     void* state_resolver, iree_vm_module_t* module,
@@ -205,10 +205,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
   return IREE_STATUS_OK;
 }
 
-static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context) {
-  if (!context) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+static void iree_vm_context_destroy(iree_vm_context_t* context) {
+  if (!context) return;
 
   if (context->list.count > 0) {
     // Allocate a scratch stack used for initialization.
@@ -243,24 +241,20 @@ static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context) {
   context->instance = NULL;
 
   iree_allocator_free(context->allocator, context);
-  return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_retain(iree_vm_context_t* context) {
-  if (!context) return IREE_STATUS_INVALID_ARGUMENT;
-  iree_atomic_fetch_add(&context->ref_count, 1);
-  return IREE_STATUS_OK;
+  if (context) {
+    iree_atomic_fetch_add(&context->ref_count, 1);
+  }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context) {
-  if (context) {
-    if (iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
-      return iree_vm_context_destroy(context);
-    }
+  if (context && iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
+    iree_vm_context_destroy(context);
   }
-  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT intptr_t IREE_API_CALL
