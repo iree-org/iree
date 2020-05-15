@@ -150,6 +150,7 @@ cc_library(
     srcs = ["module.c"],
     hdrs = ["module.h"],
     deps = [
+        "//iree/base:alignment",
         "//iree/base:api",
         "//iree/base:atomics",
     ],
@@ -215,6 +216,7 @@ cc_library(
     deps = [
         ":module",
         ":ref",
+        ":variant_list",
         "//iree/base:alignment",
         "//iree/base:api",
     ],

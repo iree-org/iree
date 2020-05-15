@@ -49,13 +49,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
     const iree_vm_invocation_policy_t* policy, iree_vm_variant_list_t* inputs,
     iree_vm_variant_list_t* outputs, iree_allocator_t allocator);
 
-// Equivalent to iree_vm_invoke but uses an existing |stack|.
-// If the invocation fails the stack may be left in an indeterminate state.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke_within(
-    iree_vm_context_t* context, iree_vm_stack_t* stack,
-    iree_vm_function_t function, const iree_vm_invocation_policy_t* policy,
-    iree_vm_variant_list_t* inputs, iree_vm_variant_list_t* outputs);
-
 // TODO(benvanik): document and implement.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invocation_create(
     iree_vm_context_t* context, iree_vm_function_t function,

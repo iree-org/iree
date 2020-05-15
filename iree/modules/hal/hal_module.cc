@@ -559,7 +559,7 @@ class HALModuleState final {
       absl::Span<const int32_t> binding_offsets,
       absl::Span<const int32_t> binding_lengths) {
     IREE_TRACE_SCOPE0("HALModuleState::CommandBufferPushDescriptorSet");
-    absl::InlinedVector<iree_hal_descriptor_set_binding_t, 4> binding_structs(
+    absl::InlinedVector<iree_hal_descriptor_set_binding_t, 16> binding_structs(
         binding_ordinals.size());
     for (int i = 0; i < binding_ordinals.size(); ++i) {
       binding_structs[i] = {

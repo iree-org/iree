@@ -242,7 +242,7 @@ void SetupVmBindings(pybind11::module m) {
   m.def("create_strings_module", &CreateStringsModule);
   m.def("create_tensorlist_module", &CreateTensorListModule);
 
-  py::enum_<iree_vm_function_linkage_t>(m, "Linkage")
+  py::enum_<enum iree_vm_function_linkage_e>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)
       .value("IMPORT", IREE_VM_FUNCTION_LINKAGE_IMPORT)
       .value("EXPORT", IREE_VM_FUNCTION_LINKAGE_EXPORT)

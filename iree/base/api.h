@@ -114,15 +114,15 @@
 #include <stdint.h>
 
 #if defined(_WIN32)
-// Safe alloca that may fall back to heap in the case of stack overflows:
+// The safe malloca that may fall back to heap in the case of stack overflows:
 // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/malloca?view=vs-2019
+// Because that gets really annoying to deal with during error handling we just
+// go for _alloca which may generate SEH exceptions if we blow the stack.
 #include <malloc.h>
-#define iree_alloca(sz) _malloca(sz)
-#define iree_freea(ptr) _freea(ptr)
+#define iree_alloca(sz) _alloca(sz)
 #else
 #include <alloca.h>
 #define iree_alloca(sz) alloca(sz)
-#define iree_freea(ptr)
 #endif  // _WIN32
 
 #ifdef __cplusplus
@@ -188,11 +188,17 @@ typedef struct {
   iree_host_size_t data_length;
 } iree_byte_span_t;
 
+#define iree_make_byte_span(data, data_length) \
+  { (uint8_t*)(data), (data_length) }
+
 // A span of constant bytes (ala std::span of const uint8_t).
 typedef struct {
   const uint8_t* data;
   iree_host_size_t data_length;
 } iree_const_byte_span_t;
+
+#define iree_make_const_byte_span(data, data_length) \
+  { (const uint8_t*)(data), (data_length) }
 
 //===----------------------------------------------------------------------===//
 // iree_status_t and error reporting
@@ -407,13 +413,15 @@ typedef struct {
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
-#define IREE_ALLOCATOR_SYSTEM \
-  { 0, iree_allocator_system_allocate, iree_allocator_system_free }
+#define IREE_ALLOCATOR_SYSTEM                                     \
+  iree_allocator_t {                                              \
+    0, iree_allocator_system_allocate, iree_allocator_system_free \
+  }
 
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
 #define IREE_ALLOCATOR_NULL \
-  { 0, 0, 0 }
+  iree_allocator_t { 0, 0, 0 }
 
 #ifndef IREE_API_NO_PROTOTYPES
 

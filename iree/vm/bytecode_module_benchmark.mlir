@@ -21,7 +21,18 @@ vm.module @bytecode_module_benchmark {
     %7 = vm.call @internal_func(%6) : (i32) -> i32
     %8 = vm.call @internal_func(%7) : (i32) -> i32
     %9 = vm.call @internal_func(%8) : (i32) -> i32
-    vm.return %9 : i32
+    %10 = vm.call @internal_func(%9) : (i32) -> i32
+    %11 = vm.call @internal_func(%10) : (i32) -> i32
+    %12 = vm.call @internal_func(%11) : (i32) -> i32
+    %13 = vm.call @internal_func(%12) : (i32) -> i32
+    %14 = vm.call @internal_func(%13) : (i32) -> i32
+    %15 = vm.call @internal_func(%14) : (i32) -> i32
+    %16 = vm.call @internal_func(%15) : (i32) -> i32
+    %17 = vm.call @internal_func(%16) : (i32) -> i32
+    %18 = vm.call @internal_func(%17) : (i32) -> i32
+    %19 = vm.call @internal_func(%18) : (i32) -> i32
+    %20 = vm.call @internal_func(%19) : (i32) -> i32
+    vm.return %20 : i32
   }
 
   // Measures the cost of a call to an imported function.
@@ -38,7 +49,18 @@ vm.module @bytecode_module_benchmark {
     %7 = vm.call @benchmark.imported_func(%6) : (i32) -> i32
     %8 = vm.call @benchmark.imported_func(%7) : (i32) -> i32
     %9 = vm.call @benchmark.imported_func(%8) : (i32) -> i32
-    vm.return %9 : i32
+    %10 = vm.call @benchmark.imported_func(%9) : (i32) -> i32
+    %11 = vm.call @benchmark.imported_func(%10) : (i32) -> i32
+    %12 = vm.call @benchmark.imported_func(%11) : (i32) -> i32
+    %13 = vm.call @benchmark.imported_func(%12) : (i32) -> i32
+    %14 = vm.call @benchmark.imported_func(%13) : (i32) -> i32
+    %15 = vm.call @benchmark.imported_func(%14) : (i32) -> i32
+    %16 = vm.call @benchmark.imported_func(%15) : (i32) -> i32
+    %17 = vm.call @benchmark.imported_func(%16) : (i32) -> i32
+    %18 = vm.call @benchmark.imported_func(%17) : (i32) -> i32
+    %19 = vm.call @benchmark.imported_func(%18) : (i32) -> i32
+    %20 = vm.call @benchmark.imported_func(%19) : (i32) -> i32
+    vm.return %20 : i32
   }
 
   // Measures the cost of a simple for-loop.

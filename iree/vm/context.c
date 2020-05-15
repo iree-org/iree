@@ -19,6 +19,7 @@
 #include <stdio.h>
 
 #include "iree/base/atomics.h"
+#include "iree/base/tracing.h"
 
 struct iree_vm_context {
   iree_atomic_intptr_t ref_count;
@@ -36,6 +37,32 @@ struct iree_vm_context {
 };
 
 static void iree_vm_context_destroy(iree_vm_context_t* context);
+
+// Runs a single `() -> ()` function from the module if it exists.
+static iree_status_t iree_vm_context_run_function(
+    iree_vm_stack_t* stack, iree_vm_module_t* module,
+    iree_string_view_t function_name) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  if (!iree_status_is_ok(iree_vm_module_lookup_function_by_name(
+          module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name,
+          &call.function))) {
+    // Function doesn't exist (or otherwise).
+    IREE_TRACE_ZONE_END(z0);
+    return IREE_STATUS_OK;
+  }
+
+  iree_vm_execution_result_t result;
+  iree_status_t status =
+      module->begin_call(module->self, stack, &call, &result);
+
+  // TODO(benvanik): ensure completed synchronously.
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
 
 static iree_status_t iree_vm_context_query_module_state(
     void* state_resolver, iree_vm_module_t* module,
@@ -86,28 +113,14 @@ static iree_status_t iree_vm_context_resolve_module_imports(
   return IREE_STATUS_OK;
 }
 
-static iree_status_t iree_vm_invoke_empty_function(
-    iree_vm_stack_t* stack, iree_vm_function_t function) {
-  iree_vm_stack_frame_t* callee_frame = NULL;
-  iree_status_t status =
-      iree_vm_stack_function_enter(stack, function, &callee_frame);
-  if (!iree_status_is_ok(status)) {
-    return status;
-  }
-
-  iree_vm_execution_result_t result;
-  status = function.module->execute(function.module->self, stack, callee_frame,
-                                    &result);
-
-  iree_vm_stack_function_leave(stack);
-  return status;
-}
-
 static void iree_vm_context_release_modules(iree_vm_context_t* context,
-                                            iree_vm_stack_t* stack,
                                             iree_host_size_t start,
                                             iree_host_size_t end) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Run module __deinit functions, if present (in reverse init order).
+  IREE_VM_INLINE_STACK_INITIALIZE(
+      stack, iree_vm_context_state_resolver(context), context->allocator);
   for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     iree_vm_module_state_t* module_state = context->list.module_states[i];
@@ -115,13 +128,10 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
       // Partially initialized; skip.
       continue;
     }
-    iree_vm_function_t deinit_function;
-    if (iree_status_is_ok(iree_vm_module_lookup_function_by_name(
-            module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-            iree_make_cstring_view("__deinit"), &deinit_function))) {
-      iree_vm_invoke_empty_function(stack, deinit_function);
-    }
+    IREE_IGNORE_ERROR(iree_vm_context_run_function(
+        stack, module, iree_make_cstring_view("__deinit")));
   }
+  iree_vm_stack_deinitialize(stack);
 
   // Release all module state (in reverse init order).
   for (int i = (int)end; i >= (int)start; --i) {
@@ -140,6 +150,8 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
     }
     context->list.modules[i] = NULL;
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -207,19 +219,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
 static void iree_vm_context_destroy(iree_vm_context_t* context) {
   if (!context) return;
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   if (context->list.count > 0) {
-    // Allocate a scratch stack used for initialization.
-    // If we shrunk the stack (or made it so that it could dynamically grow)
-    // then we could stack-allocate it here and not need the allocator at all.
-    iree_vm_stack_t* stack = NULL;
-    iree_allocator_malloc(context->allocator, sizeof(iree_vm_stack_t),
-                          (void**)&stack);
-    iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-
-    iree_vm_context_release_modules(context, stack, 0, context->list.count - 1);
-
-    iree_vm_stack_deinit(stack);
-    iree_allocator_free(context->allocator, stack);
+    iree_vm_context_release_modules(context, 0, context->list.count - 1);
   }
 
   // Note: For non-static module lists, it is only dynamically allocated if
@@ -235,6 +238,8 @@ static void iree_vm_context_destroy(iree_vm_context_t* context) {
   context->instance = NULL;
 
   iree_allocator_free(context->allocator, context);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT void IREE_API_CALL
@@ -312,7 +317,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
            sizeof(iree_vm_module_t*) * context->list.count);
     memcpy(new_module_state_list, context->list.module_states,
            sizeof(iree_vm_module_state_t*) * context->list.count);
-    // The existing memory is only dynamically allocated if it has been grown.
+    // The existing memory is only dynamically allocated if it has been
+    // grown.
     if (context->list.capacity > 0) {
       iree_allocator_free(context->allocator, context->list.modules);
       iree_allocator_free(context->allocator, context->list.module_states);
@@ -322,79 +328,64 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
     context->list.capacity = new_capacity;
   }
 
-  // Allocate a scratch stack used for initialization.
-  // If we shrunk the stack (or made it so that it could dynamically grow)
-  // then we could stack-allocate it here and not need the allocator at all.
-  iree_vm_stack_t* stack = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      context->allocator, sizeof(iree_vm_stack_t), (void**)&stack));
-  iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
+  // VM stack used to call into module __init methods.
+  IREE_VM_INLINE_STACK_INITIALIZE(
+      stack, iree_vm_context_state_resolver(context), context->allocator);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
-  iree_host_size_t orig_count = context->list.count;
-  for (iree_host_size_t i = 0; i < module_count; ++i) {
+  iree_host_size_t original_count = context->list.count;
+  iree_status_t status = IREE_STATUS_OK;
+  iree_host_size_t i = 0;
+  for (i = 0; i < module_count; ++i) {
     iree_vm_module_t* module = modules[i];
-    context->list.modules[orig_count + i] = module;
-    context->list.module_states[orig_count + i] = NULL;
+    context->list.modules[original_count + i] = module;
+    context->list.module_states[original_count + i] = NULL;
 
     iree_vm_module_retain(module);
 
     // Allocate module state.
     iree_vm_module_state_t* module_state = NULL;
-    iree_status_t alloc_status =
+    status =
         module->alloc_state(module->self, context->allocator, &module_state);
-    if (!iree_status_is_ok(alloc_status)) {
-      // NOTE: we need to clean up initialized modules.
-      iree_vm_context_release_modules(context, stack, orig_count,
-                                      orig_count + i);
-      context->list.count = orig_count;
-      iree_vm_stack_deinit(stack);
-      iree_allocator_free(context->allocator, stack);
-      return alloc_status;
+    if (!iree_status_is_ok(status)) {
+      // Cleanup handled below.
+      break;
     }
-    context->list.module_states[orig_count + i] = module_state;
+    context->list.module_states[original_count + i] = module_state;
 
     // Resolve imports for the modules.
-    // TODO(benvanik): re-resolve imports for previous modules?
-    iree_status_t resolve_status =
+    status =
         iree_vm_context_resolve_module_imports(context, module, module_state);
-    if (!iree_status_is_ok(resolve_status)) {
-      // NOTE: we need to clean up initialized modules.
-      iree_vm_context_release_modules(context, stack, orig_count,
-                                      orig_count + i);
-      context->list.count = orig_count;
-      iree_vm_stack_deinit(stack);
-      iree_allocator_free(context->allocator, stack);
-      return resolve_status;
+    if (!iree_status_is_ok(status)) {
+      // Cleanup handled below.
+      break;
     }
 
     ++context->list.count;
 
     // Run module __init functions, if present.
-    // As initialization functions may reference imports we need to perform all
-    // of these after we have resolved the imports above.
-    iree_vm_function_t init_function;
-    if (iree_status_is_ok(iree_vm_module_lookup_function_by_name(
-            module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-            iree_make_cstring_view("__init"), &init_function))) {
-      iree_status_t init_status =
-          iree_vm_invoke_empty_function(stack, init_function);
-      if (!iree_status_is_ok(init_status)) {
-        // NOTE: we need to clean up initialized modules.
-        iree_vm_context_release_modules(context, stack, orig_count,
-                                        orig_count + i);
-        context->list.count = orig_count;
-        iree_vm_stack_deinit(stack);
-        iree_allocator_free(context->allocator, stack);
-        return init_status;
-      }
+    // As initialization functions may reference imports we need to perform
+    // all of these after we have resolved the imports above.
+    status = iree_vm_context_run_function(stack, module,
+                                          iree_make_cstring_view("__init"));
+    if (!iree_status_is_ok(status)) {
+      // Cleanup handled below.
+      break;
     }
   }
 
-  iree_vm_stack_deinit(stack);
-  iree_allocator_free(context->allocator, stack);
-  return IREE_STATUS_OK;
+  iree_vm_stack_deinitialize(stack);
+
+  // Cleanup for failure cases during module initialization; we need to
+  // ensure we release any modules we'd already initialized.
+  if (!iree_status_is_ok(status)) {
+    iree_vm_context_release_modules(context, original_count,
+                                    original_count + i);
+    context->list.count = original_count;
+  }
+
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(

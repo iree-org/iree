@@ -21,6 +21,7 @@
 #include "iree/hal/vmla/vmla_executable.h"
 #include "iree/hal/vmla/vmla_module.h"
 #include "iree/vm/invocation.h"
+#include "iree/vm/stack.h"
 #include "iree/vm/variant_list.h"
 
 namespace iree {
@@ -29,15 +30,9 @@ namespace vmla {
 
 VMLACommandProcessor::VMLACommandProcessor(
     Allocator* allocator, CommandCategoryBitfield command_categories)
-    : HostLocalCommandProcessor(allocator, command_categories) {
-  // TODO(#1172): embed the stack allocation within the command processor.
-  iree_allocator_malloc(IREE_ALLOCATOR_SYSTEM, sizeof(iree_vm_stack_t),
-                        (void**)&stack_);
-}
+    : HostLocalCommandProcessor(allocator, command_categories) {}
 
-VMLACommandProcessor::~VMLACommandProcessor() {
-  iree_allocator_free(IREE_ALLOCATOR_SYSTEM, stack_);
-}
+VMLACommandProcessor::~VMLACommandProcessor() = default;
 
 Status VMLACommandProcessor::DispatchInline(
     Executable* executable, int32_t entry_point,
@@ -69,17 +64,16 @@ Status VMLACommandProcessor::DispatchInline(
     }
   }
 
-  iree_vm_stack_init(iree_vm_context_state_resolver(vmla_executable->context()),
-                     stack_);
-  auto status =
-      FromApiStatus(iree_vm_invoke_within(
-                        vmla_executable->context(), stack_,
-                        vmla_executable->entry_functions()[entry_point],
-                        /*policy=*/nullptr, vmla_executable->interface_inputs(),
-                        /*outputs=*/nullptr),
-                    IREE_LOC);
-  iree_vm_stack_deinit(stack_);
-  return status;
+  auto status = FromApiStatus(
+      iree_vm_invoke(vmla_executable->context(),
+                     vmla_executable->entry_functions()[entry_point],
+                     /*policy=*/nullptr, vmla_executable->interface_inputs(),
+                     /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
+      IREE_LOC);
+
+  interface->Reset();
+
+  return std::move(status);
 }
 
 }  // namespace vmla
