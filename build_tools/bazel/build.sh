@@ -70,7 +70,6 @@ bazel query //iree/... + //bindings/... | \
   xargs bazel test ${test_env_args[@]} \
     --build_tag_filters="${BUILD_TAG_FILTERS?}" \
     --test_tag_filters="${TEST_TAG_FILTERS?}" \
-    --define=iree_tensorflow=true \
     --keep_going \
     --test_output=errors \
     --config=rs \
