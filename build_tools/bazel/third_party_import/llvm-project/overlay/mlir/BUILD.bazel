@@ -2235,7 +2235,7 @@ cc_library(
         "lib/Interfaces/SideEffects.cpp",
     ],
     hdrs = [
-        "include/mlir/Interfaces/SideEffects.h",
+        "include/mlir/Interfaces/SideEffectInterfaces.h",
     ],
     includes = ["include"],
     deps = [
