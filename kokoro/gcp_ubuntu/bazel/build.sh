@@ -18,7 +18,7 @@
 # Log some information about the environment, initialize the submodules and then
 # run the bazel tests.
 
-# Unnecessary change for testing presubmits.
+# Unnecessary change for testing presubmits...
 
 set -e
 set -x
