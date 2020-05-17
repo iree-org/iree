@@ -38,7 +38,7 @@ iree_cc_library(
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRParser
-    MLIRSideEffects
+    MLIRSideEffectInterfaces
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
