@@ -30,7 +30,7 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRPass
-    MLIRSideEffects
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR

@@ -50,6 +50,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
     "@llvm-project//mlir:SCFTransforms": ["MLIRSCFTransforms"],
+    "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
     "@llvm-project//mlir:SPIRVTranslateRegistration": [
