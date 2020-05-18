@@ -145,6 +145,9 @@ class ModelBuilder : public OpBuilder {
                       ArrayRef<Type> results, ArrayRef<Type> args,
                       MLIRFuncOpConfig config = MLIRFuncOpConfig());
 
+  // Add GPU attribute to the module.
+  void addGPUAttr();
+
   // Build a MLIR GPU module. GPUFuncOp can later be added to the module.
   gpu::GPUModuleOp makeGPUModule(StringRef name);
 

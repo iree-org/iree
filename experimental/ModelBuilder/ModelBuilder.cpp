@@ -78,13 +78,18 @@ static spirv::TargetEnvAttr getTargetEnv(MLIRContext *context) {
 
 gpu::GPUModuleOp mlir::ModelBuilder::makeGPUModule(StringRef name) {
   // Add module attributes required first.
+  addGPUAttr();
+  OpBuilder b(&module->getBodyRegion());
+  auto kernelModule = b.create<gpu::GPUModuleOp>(loc, name);
+  return kernelModule;
+}
+
+void mlir::ModelBuilder::addGPUAttr() {
+  // Add module attributes required first.
   module->setAttr(gpu::GPUDialect::getContainerModuleAttrName(),
                   UnitAttr::get(module->getContext()));
   spirv::TargetEnvAttr targetEnv = getTargetEnv(module->getContext());
   module->setAttr(spirv::getTargetEnvAttrName(), targetEnv);
-  OpBuilder b(&module->getBodyRegion());
-  auto kernelModule = b.create<gpu::GPUModuleOp>(loc, name);
-  return kernelModule;
 }
 
 gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(

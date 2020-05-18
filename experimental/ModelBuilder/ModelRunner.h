@@ -68,6 +68,7 @@ struct CompilationOptions {
   unsigned llcOptLevel = 3;
   vector::VectorTransformsOptions vectorTransformsOptions =
       vector::VectorTransformsOptions();
+  std::function<void(mlir::PassManager &)> loweringPasses = nullptr;
 };
 
 class ModelRunner {

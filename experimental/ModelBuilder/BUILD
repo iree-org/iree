@@ -40,6 +40,26 @@ cc_library(
 )
 
 cc_library(
+    name = "VulkanLaunchWrapper",
+    srcs = ["VulkanWrapperPass.cpp"],
+    hdrs = ["VulkanWrapperPass.h"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:ConversionPassIncGen",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVSerialization",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
     name = "ModelRunner",
     srcs = ["ModelRunner.cpp"],
     hdrs = [

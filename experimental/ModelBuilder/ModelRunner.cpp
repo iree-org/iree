@@ -63,7 +63,9 @@ void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
         compilationOptions.vectorTransformsOptions);
     mlir::applyPatternsAndFoldGreedily(*module, patterns);
   }
-  runLoweringPass(getDefaultMLIRPassBuilder());
+  runLoweringPass(compilationOptions.loweringPasses
+                      ? compilationOptions.loweringPasses
+                      : getDefaultMLIRPassBuilder());
 
   // Make sure the execution engine runs LLVM passes for the specified
   // optimization level.
