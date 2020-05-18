@@ -84,9 +84,9 @@ tools for the packages needed. (And please feel free to update this doc
 regarding them.)
 
 You can also download and install the [Vulkan SDK][VulkanSDK] from LunarG. It
-packages the loader with many useful layers. The source code of the SDK
-component projects are included, allowing you to recompile the artifacts if
-needed.
+packages the loader with many useful layers and other shader tools. The source
+code of the SDK component projects are included, allowing you to recompile the
+artifacts if needed.
 
 You can also build the Vulkan SDK component projects like
 [Vulkan-Loader][VulkanLoaderSource] and
@@ -103,6 +103,9 @@ For example:
 $ LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/
 $ LD_PRELOAD=libvulkan.so.1
 ```
+
+This can also be done by sourcing the proper `setup-env.sh` from one of the
+downloaded Vulkan SDKs.
 
 ## Vulkan debugging and profiling
 
