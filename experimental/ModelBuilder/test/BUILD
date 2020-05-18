@@ -133,6 +133,7 @@ cc_binary(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:mlir_runner_utils",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 

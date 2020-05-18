@@ -150,6 +150,7 @@ class ModelBuilder : public OpBuilder {
 
   // Build a MLIR GPU kernel within a GPU module.
   gpu::GPUFuncOp makeGPUKernel(StringRef name, gpu::GPUModuleOp GPUModule,
+                               ArrayRef<int32_t> workgroupSize,
                                ArrayRef<Type> args = {},
                                ArrayRef<Type> results = {});
 

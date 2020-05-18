@@ -87,17 +87,16 @@ gpu::GPUModuleOp mlir::ModelBuilder::makeGPUModule(StringRef name) {
   return kernelModule;
 }
 
-gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(StringRef name,
-                                                 gpu::GPUModuleOp GPUModule,
-                                                 ArrayRef<Type> args,
-                                                 ArrayRef<Type> results) {
+gpu::GPUFuncOp mlir::ModelBuilder::makeGPUKernel(
+    StringRef name, gpu::GPUModuleOp GPUModule, ArrayRef<int32_t> workgroupSize,
+    ArrayRef<Type> args, ArrayRef<Type> results) {
   auto fnType = FunctionType::get(args, results, module->getContext());
   OpBuilder b(&GPUModule.body());
   auto kernelFunc = b.create<gpu::GPUFuncOp>(loc, name, fnType);
   kernelFunc.setAttr(gpu::GPUDialect::getKernelFuncAttrName(), b.getUnitAttr());
   kernelFunc.setAttr(
       spirv::getEntryPointABIAttrName(),
-      spirv::getEntryPointABIAttr({1, 1, 1}, module->getContext()));
+      spirv::getEntryPointABIAttr(workgroupSize, module->getContext()));
   return kernelFunc;
 }
 
