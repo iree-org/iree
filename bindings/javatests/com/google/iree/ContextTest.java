@@ -18,14 +18,14 @@ package com.google.iree;
 
 import static org.junit.Assert.assertNotEquals;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
+@RunWith(AndroidJUnit4.class)
 public final class ContextTest {
   @Test
-  public void create_printsContextId() {
+  public void create_createsContextWithId() {
     Context context = new Context();
     assertNotEquals(context.getId(), -1);
     context.free();

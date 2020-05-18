@@ -18,6 +18,10 @@ package com.google.iree;
 
 /** An isolated execution context. */
 final class Context {
+  static {
+    System.loadLibrary("iree");
+  }
+
   public Context() {
     nativeAddress = nativeNew();
     nativeCreate();
