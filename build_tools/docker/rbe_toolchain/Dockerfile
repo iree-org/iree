@@ -25,3 +25,19 @@ RUN apt-get update
 RUN apt-get install -y python3 python3-pip
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install numpy
+
+# Install dependencies for python3.6-dev
+RUN apt-get install -y software-properties-common
+# apt-add-repository requires a version of python with the softwareproperties
+# module. To use this command, we:
+#   1. remove the symlink to python3 from python3.6 and symlink it to python3.5
+#   2. run apt-add-repository with python3 = python3.5
+#   3. resymlink python3 to /opt/python3.6/bin/python3.6
+# See https://github.com/google/iree/issues/1966 for more information.
+RUN rm /usr/bin/python3 && ln -s /usr/bin/python3.5 /usr/bin/python3
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN rm /usr/bin/python3 && ln -s /opt/python3.6/bin/python3.6 /usr/bin/python3
+
+# Install python3.6-dev
+RUN apt-get update
+RUN apt-get install -y python3.6 python3.6-dev
