@@ -47,27 +47,6 @@ bool isLegallyShapedSignatureType(Type thisType, Type nextType) {
   return true;  // Legal: dynamic tensor followed by matching shape.
 }
 
-// Determines whether a function is "legally shaped", which means that its
-// shaped inputs/results are either a) statically shaped or b) followed by
-// an appropriate (ranked_shape) argument/result with corresponding
-// dims.
-bool isLegallyShapedFunction(FuncOp fnOp) {
-  auto fnType = fnOp.getType();
-  // Validate arguments.
-  for (unsigned i = 0, e = fnType.getNumInputs(); i < e; ++i) {
-    Type type = fnType.getInput(i);
-    Type nextType = (i + 1 < e) ? fnType.getInput(i + 1) : nullptr;
-    if (!isLegallyShapedSignatureType(type, nextType)) return false;
-  }
-  // Validate results.
-  for (unsigned i = 0, e = fnType.getNumResults(); i < e; ++i) {
-    Type type = fnType.getResult(i);
-    Type nextType = (i + 1 < e) ? fnType.getResult(i + 1) : nullptr;
-    if (!isLegallyShapedSignatureType(type, nextType)) return false;
-  }
-  return true;
-}
-
 class ExpandFunctionDynamicDimsPass
     : public PassWrapper<ExpandFunctionDynamicDimsPass, FunctionPass> {
   void runOnFunction() override {

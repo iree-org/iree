@@ -175,8 +175,9 @@ class VMLATypedImportOpConversion : public VMLAImportOpConversion<T> {
 class VMLAConstantOpConversion
     : public OpConversionPattern<IREE::VMLA::ConstantOp> {
  public:
-  VMLAConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  VMLAConstantOpConversion(MLIRContext *context,
+                           TypeConverter & /*typeConverter*/)
+      : OpConversionPattern(context) {}
 
   LogicalResult matchAndRewrite(
       IREE::VMLA::ConstantOp op, llvm::ArrayRef<Value> operands,
@@ -203,8 +204,6 @@ class VMLAConstantOpConversion
   }
 
  private:
-  TypeConverter &typeConverter;
-
   // TODO(b/145839814): find a name that's unique or make the rewriter support
   // assigning unique names.
   int allocateUniqueId(Operation *context) const {
