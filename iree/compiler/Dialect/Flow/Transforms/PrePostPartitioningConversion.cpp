@@ -55,7 +55,7 @@ class PrePartitioningConversionPass
 
     // Control flow must be converted to standard form via
     // xla_hlo::createLegalizeControlFlowPass() prior to conversion.
-    conversionTarget.addIllegalOp<xla_hlo::ConditionalOp, xla_hlo::WhileOp>();
+    conversionTarget.addIllegalOp<xla_hlo::IfOp, xla_hlo::WhileOp>();
 
     // We don't support broadcast_dimensions as part of ops, so materialize
     // any such attributes to dedicated xla_hlo.broadcast_in_dim ops.
