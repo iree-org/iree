@@ -67,7 +67,7 @@ class VmVariantList {
   VmVariantList() : list_(nullptr) {}
   ~VmVariantList() {
     if (list_) {
-      CheckApiStatus(iree_vm_variant_list_free(list_), "Error freeing list");
+      iree_vm_variant_list_free(list_);
     }
   }
 

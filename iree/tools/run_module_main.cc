@@ -127,17 +127,13 @@ Status Run() {
   RETURN_IF_ERROR(PrintVariantList(output_descs, outputs))
       << "printing results";
 
-  // TODO(gcmn): Some nice wrappers to make this pattern shorter with generated
-  // error messages.
-  // Deallocate:
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_variant_list_free(inputs), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_variant_list_free(outputs), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_module_release(hal_module), IREE_LOC));
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_module_release(input_module), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_device_release(device), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_context_release(context), IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_instance_release(instance), IREE_LOC));
+  iree_vm_variant_list_free(inputs);
+  iree_vm_variant_list_free(outputs);
+  iree_vm_module_release(hal_module);
+  iree_vm_module_release(input_module);
+  iree_hal_device_release(device);
+  iree_vm_context_release(context);
+  iree_vm_instance_release(instance);
   return OkStatus();
 }
 

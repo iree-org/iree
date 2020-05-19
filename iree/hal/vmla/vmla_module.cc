@@ -230,9 +230,8 @@ class VMLAModuleState final {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferConst");
     iree_allocator_t external_allocator = {0};
     external_allocator.self = vm::retain_ref(value).release();
-    external_allocator.free = +[](void* self, void* ptr) -> iree_status_t {
+    external_allocator.free = +[](void* self, void* ptr) {
       vm::assign_ref(reinterpret_cast<iree_vm_ro_byte_buffer_t*>(self)).reset();
-      return IREE_STATUS_OK;
     };
     return Buffer::Wrap(value->data.data, value->data.data_length,
                         external_allocator);
@@ -287,9 +286,8 @@ class VMLAModuleState final {
 
     iree_allocator_t external_allocator = {0};
     external_allocator.self = vm::retain_ref(src).release();
-    external_allocator.free = +[](void* self, void* ptr) -> iree_status_t {
+    external_allocator.free = +[](void* self, void* ptr) {
       vm::assign_ref(reinterpret_cast<Buffer*>(self)).reset();
-      return IREE_STATUS_OK;
     };
     return Buffer::Wrap(data, data_length, external_allocator);
   }

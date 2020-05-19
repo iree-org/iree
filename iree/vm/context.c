@@ -35,7 +35,7 @@ struct iree_vm_context {
   } list;
 };
 
-static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context);
+static void iree_vm_context_destroy(iree_vm_context_t* context);
 
 static iree_status_t iree_vm_context_query_module_state(
     void* state_resolver, iree_vm_module_t* module,
@@ -175,8 +175,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
       sizeof(iree_vm_module_state_t*) * module_count;
 
   iree_vm_context_t* context = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, context_size, (void**)&context));
+  iree_allocator_malloc(allocator, context_size, (void**)&context);
   iree_atomic_store(&context->ref_count, 1);
   context->instance = instance;
   iree_vm_instance_retain(context->instance);
@@ -205,24 +204,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
   return IREE_STATUS_OK;
 }
 
-static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context) {
-  if (!context) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+static void iree_vm_context_destroy(iree_vm_context_t* context) {
+  if (!context) return;
 
   if (context->list.count > 0) {
     // Allocate a scratch stack used for initialization.
     // If we shrunk the stack (or made it so that it could dynamically grow)
     // then we could stack-allocate it here and not need the allocator at all.
     iree_vm_stack_t* stack = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        context->allocator, sizeof(iree_vm_stack_t), (void**)&stack));
-    iree_status_t status =
-        iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-    if (!iree_status_is_ok(status)) {
-      iree_allocator_free(context->allocator, stack);
-      return status;
-    }
+    iree_allocator_malloc(context->allocator, sizeof(iree_vm_stack_t),
+                          (void**)&stack);
+    iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
 
     iree_vm_context_release_modules(context, stack, 0, context->list.count - 1);
 
@@ -243,24 +235,20 @@ static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context) {
   context->instance = NULL;
 
   iree_allocator_free(context->allocator, context);
-  return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_retain(iree_vm_context_t* context) {
-  if (!context) return IREE_STATUS_INVALID_ARGUMENT;
-  iree_atomic_fetch_add(&context->ref_count, 1);
-  return IREE_STATUS_OK;
+  if (context) {
+    iree_atomic_fetch_add(&context->ref_count, 1);
+  }
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context) {
-  if (context) {
-    if (iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
-      return iree_vm_context_destroy(context);
-    }
+  if (context && iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
+    iree_vm_context_destroy(context);
   }
-  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT intptr_t IREE_API_CALL
@@ -340,12 +328,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
   iree_vm_stack_t* stack = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       context->allocator, sizeof(iree_vm_stack_t), (void**)&stack));
-  iree_status_t status =
-      iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-  if (!iree_status_is_ok(status)) {
-    iree_allocator_free(context->allocator, stack);
-    return status;
-  }
+  iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);

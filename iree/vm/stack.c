@@ -18,19 +18,17 @@
 
 #include "iree/vm/module.h"
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_init(
+IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_init(
     iree_vm_state_resolver_t state_resolver, iree_vm_stack_t* out_stack) {
   memset(out_stack, 0, sizeof(iree_vm_stack_t));
   out_stack->state_resolver = state_resolver;
-  return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_stack_deinit(iree_vm_stack_t* stack) {
   while (stack->depth) {
-    IREE_RETURN_IF_ERROR(iree_vm_stack_function_leave(stack));
+    iree_vm_stack_function_leave(stack);
   }
-  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_vm_stack_frame_t* IREE_API_CALL

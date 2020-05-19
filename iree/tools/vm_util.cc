@@ -314,8 +314,7 @@ Status CreateDevice(absl::string_view driver_name,
                                     driver, IREE_ALLOCATOR_SYSTEM, out_device),
                                 IREE_LOC))
       << "Creating default device for driver '" << driver_name << "'";
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_driver_release(driver), IREE_LOC))
-      << "Releasing driver '" << driver_name << "'";
+  iree_hal_driver_release(driver);
   return OkStatus();
 }
 

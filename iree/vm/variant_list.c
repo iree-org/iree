@@ -33,7 +33,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_variant_list_alloc(
   iree_vm_variant_list_t* list = NULL;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, alloc_size, (void**)&list));
-  IREE_RETURN_IF_ERROR(iree_vm_variant_list_init(list, capacity));
+  iree_vm_variant_list_init(list, capacity);
   list->allocator = allocator;
   *out_list = list;
   return IREE_STATUS_OK;
@@ -44,23 +44,22 @@ iree_vm_variant_list_alloc_size(iree_host_size_t capacity) {
   return sizeof(iree_vm_variant_list_t) + sizeof(iree_vm_variant_t) * capacity;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_variant_list_init(
+IREE_API_EXPORT void IREE_API_CALL iree_vm_variant_list_init(
     iree_vm_variant_list_t* list, iree_host_size_t capacity) {
   memset(&list->allocator, 0, sizeof(list->allocator));
   list->capacity = capacity;
   list->count = 0;
   memset(list->values, 0, sizeof(list->values[0]) * capacity);
-  return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_variant_list_free(iree_vm_variant_list_t* list) {
   for (iree_host_size_t i = 0; i < list->count; ++i) {
     if (IREE_VM_VARIANT_IS_REF(&list->values[i])) {
       iree_vm_ref_release(&list->values[i].ref);
     }
   }
-  return iree_allocator_free(list->allocator, list);
+  iree_allocator_free(list->allocator, list);
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL

@@ -65,10 +65,9 @@ class OpaqueBlob {
       std::shared_ptr<OpaqueBlob> blob;
     };
     Holder* holder = new Holder{std::move(blob)};
-    auto free_fn = +([](void* self, void*) -> iree_status_t {
+    auto free_fn = +([](void* self, void*) {
       Holder* self_holder = static_cast<Holder*>(self);
       delete self_holder;
-      return IREE_STATUS_OK;
     });
     return {holder /* self */, nullptr /* alloc */, free_fn /* free */};
   }

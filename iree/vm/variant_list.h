@@ -65,11 +65,11 @@ iree_vm_variant_list_alloc_size(iree_host_size_t capacity);
 // iree_vm_variant_list_alloc_size for the same |capacity|.
 // The list must be freed with iree_vm_variant_list_free unless ownership is
 // transferred to code that will perform the free as documented in its API.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_variant_list_init(
+IREE_API_EXPORT void IREE_API_CALL iree_vm_variant_list_init(
     iree_vm_variant_list_t* list, iree_host_size_t capacity);
 
 // Frees the list using the allocator it was originally allocated from.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
+IREE_API_EXPORT void IREE_API_CALL
 iree_vm_variant_list_free(iree_vm_variant_list_t* list);
 
 // Returns the total number of elements added to the list.

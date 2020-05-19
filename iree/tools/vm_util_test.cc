@@ -35,7 +35,7 @@ class VmUtilTest : public ::testing::Test {
     allocator_ = iree_hal_device_allocator(device_);
   }
 
-  virtual void TearDown() { IREE_ASSERT_OK(iree_hal_device_release(device_)); }
+  virtual void TearDown() { iree_hal_device_release(device_); }
 
   iree_hal_device_t* device_ = nullptr;
   iree_hal_allocator_t* allocator_ = nullptr;
@@ -54,7 +54,7 @@ TEST_F(VmUtilTest, ParsePrintBuffer) {
   ASSERT_OK(PrintVariantList({desc}, variant_list, &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
 
-  IREE_ASSERT_OK(iree_vm_variant_list_free(variant_list));
+  iree_vm_variant_list_free(variant_list);
 }
 
 TEST_F(VmUtilTest, ParsePrintScalar) {
@@ -69,7 +69,7 @@ TEST_F(VmUtilTest, ParsePrintScalar) {
   ASSERT_OK(PrintVariantList({desc}, variant_list, &os));
   EXPECT_EQ(os.str(), absl::StrCat(input_string, "\n"));
 
-  IREE_ASSERT_OK(iree_vm_variant_list_free(variant_list));
+  iree_vm_variant_list_free(variant_list);
 }
 
 TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
@@ -84,7 +84,7 @@ TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
   ASSERT_OK(PrintVariantList({desc}, variant_list, &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
 
-  IREE_ASSERT_OK(iree_vm_variant_list_free(variant_list));
+  iree_vm_variant_list_free(variant_list);
 }
 
 TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
@@ -107,7 +107,7 @@ TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
   ASSERT_OK(PrintVariantList({desc1, desc2}, variant_list, &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string1, "\n", buf_string2, "\n"));
 
-  IREE_ASSERT_OK(iree_vm_variant_list_free(variant_list));
+  iree_vm_variant_list_free(variant_list);
 }
 
 }  // namespace
