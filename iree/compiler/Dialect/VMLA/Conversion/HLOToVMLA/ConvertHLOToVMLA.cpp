@@ -448,6 +448,67 @@ struct DynamicSliceOpConversion
   TypeConverter &typeConverter;
 };
 
+struct CompareOpConversion : public OpConversionPattern<xla_hlo::CompareOp> {
+  CompareOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      xla_hlo::CompareOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto linputType = srcOp.lhs().getType().dyn_cast<ShapedType>();
+    auto rinputType = srcOp.rhs().getType().dyn_cast<ShapedType>();
+    if (!linputType || !rinputType) return failure();
+
+    IREE::VMLA::CmpPredicate predicate = IREE::VMLA::CmpPredicate::EQ;
+    auto comparisonDirection = srcOp.comparison_direction();
+    auto comparePredicate =
+        llvm::StringSwitch<Optional<CmpIPredicate>>(comparisonDirection)
+            .Case("EQ", CmpIPredicate::eq)
+            .Case("NE", CmpIPredicate::ne)
+            .Case("LT", CmpIPredicate::slt)
+            .Case("LE", CmpIPredicate::sle)
+            .Case("GT", CmpIPredicate::sgt)
+            .Case("GE", CmpIPredicate::sge)
+            .Default(llvm::None);
+    if (!comparePredicate.hasValue()) return failure();
+
+    auto predicateValue = comparePredicate.getValue();
+    switch (predicateValue) {
+      case CmpIPredicate::eq:
+        predicate = IREE::VMLA::CmpPredicate::EQ;
+        break;
+      case CmpIPredicate::ne:
+        predicate = IREE::VMLA::CmpPredicate::NE;
+        break;
+      case CmpIPredicate::slt:
+        predicate = IREE::VMLA::CmpPredicate::LT;
+        break;
+      case CmpIPredicate::sle:
+        predicate = IREE::VMLA::CmpPredicate::LE;
+        break;
+      case CmpIPredicate::sgt:
+        predicate = IREE::VMLA::CmpPredicate::GT;
+        break;
+      case CmpIPredicate::sge:
+        predicate = IREE::VMLA::CmpPredicate::GE;
+        break;
+      default:
+        llvm_unreachable("unhandled comparison predicate");
+        return failure();
+    }
+
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    auto newOp = rewriter.create<IREE::VMLA::CmpOp>(
+        srcOp.getLoc(), predicate, rawOperands[0], rawOperands[1], dst,
+        TypeAttr::get(linputType.getElementType()));
+    rewriter.replaceOp(srcOp, newOp.dst());
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 }  // namespace
 
 void populateHLOToVMLAPatterns(MLIRContext *context,
@@ -540,6 +601,8 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::ClampOp, IREE::VMLA::ClampOp>>(
       context, typeConverter);
+
+  patterns.insert<CompareOpConversion>(context, typeConverter);
 
   // Ops that are only used for type information that we erase. We can elide
   // these entirely by just passing on their input values.

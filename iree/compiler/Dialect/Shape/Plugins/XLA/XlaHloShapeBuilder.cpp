@@ -276,6 +276,38 @@ Value rewriteDynamicReshape(RankedShapeType resultShape, DynamicReshapeOp op,
                                             op.output_shape());
 }
 
+Value rewriteSelectOp(RankedShapeType resultShape, SelectOp selectOp,
+                      OpBuilder &builder) {
+  // TODO: broadcast case
+  if (!selectOp) return nullptr;
+  auto loc = selectOp.getLoc();
+
+  auto trueType = selectOp.on_true().getType().dyn_cast<RankedTensorType>();
+  auto falseType = selectOp.on_false().getType().dyn_cast<RankedTensorType>();
+  auto predType = selectOp.pred().getType().dyn_cast<RankedTensorType>();
+  if (!trueType || !falseType || !predType) return nullptr;
+
+  assert(trueType.getRank() == resultShape.getRank() &&
+         trueType.getRank() == falseType.getRank() &&
+         trueType.getRank() == predType.getRank());
+
+  auto operandShapeValue = builder.create<GetRankedShapeOp>(
+      loc, RankedShapeType::get(trueType.getShape(), builder.getContext()),
+      selectOp.on_true());
+
+  // Map the dynamic dims.
+  SmallVector<Value, 4> dynamicDims;
+  for (int64_t i = 0, e = resultShape.getRank(); i < e; ++i) {
+    if (!resultShape.isDimDynamic(i)) continue;
+    auto dimValue = builder.create<RankedDimOp>(loc, builder.getIndexType(),
+                                                operandShapeValue,
+                                                builder.getI64IntegerAttr(i));
+    dynamicDims.push_back(dimValue);
+  }
+
+  return builder.create<MakeRankedShapeOp>(loc, resultShape, dynamicDims);
+}
+
 }  // namespace
 
 // Creates a custom op shape builder for XLA-HLO ops that are not otherwise
@@ -298,7 +330,9 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   INSERT_EW_OP(ShiftRightArithmeticOp);
   INSERT_EW_OP(ShiftRightLogicalOp);
   INSERT_EW_OP(SubOp);
+  INSERT_EW_OP(CompareOp);
 
+  b.insertOpRankedShapeBuilder<SelectOp>(rewriteSelectOp);
   b.insertOpRankedShapeBuilder<DotOp>(rewriteXlaDotOpShape);
   b.insertOpRankedShapeBuilder<RankedBroadcastInDimOp>(
       rewriteShapexRankedBroadcastInDim);
