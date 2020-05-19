@@ -49,7 +49,7 @@ reduce | ✓ | ✓ | ✓
 reduce_window | ✓ | ✗ | ✓
 remainder | ✓ | ✓ | ✓
 reshape | ✓ | ✓ | ✓
-reverse | ✓ | ✗ | ✗
+reverse | ✓ | ✓ | ✓
 rsqrt | ✓ | ✓ | ✓
 select | ✓ | ✓ | ✓
 sine | ✓ | ✓ | ✓
