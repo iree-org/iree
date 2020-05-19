@@ -113,7 +113,7 @@ typedef struct iree_vm_stack {
 } iree_vm_stack_t;
 
 // Constructs a stack in-place in |out_stack|.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_init(
+IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_init(
     iree_vm_state_resolver_t state_resolver, iree_vm_stack_t* out_stack);
 
 // Destructs |stack|.

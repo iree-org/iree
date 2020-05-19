@@ -175,8 +175,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
       sizeof(iree_vm_module_state_t*) * module_count;
 
   iree_vm_context_t* context = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, context_size, (void**)&context));
+  iree_allocator_malloc(allocator, context_size, (void**)&context);
   iree_atomic_store(&context->ref_count, 1);
   context->instance = instance;
   iree_vm_instance_retain(context->instance);
@@ -213,14 +212,9 @@ static void iree_vm_context_destroy(iree_vm_context_t* context) {
     // If we shrunk the stack (or made it so that it could dynamically grow)
     // then we could stack-allocate it here and not need the allocator at all.
     iree_vm_stack_t* stack = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        context->allocator, sizeof(iree_vm_stack_t), (void**)&stack));
-    iree_status_t status =
-        iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-    if (!iree_status_is_ok(status)) {
-      iree_allocator_free(context->allocator, stack);
-      return status;
-    }
+    iree_allocator_malloc(context->allocator, sizeof(iree_vm_stack_t),
+                          (void**)&stack);
+    iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
 
     iree_vm_context_release_modules(context, stack, 0, context->list.count - 1);
 
@@ -334,12 +328,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
   iree_vm_stack_t* stack = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       context->allocator, sizeof(iree_vm_stack_t), (void**)&stack));
-  iree_status_t status =
-      iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-  if (!iree_status_is_ok(status)) {
-    iree_allocator_free(context->allocator, stack);
-    return status;
-  }
+  iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
