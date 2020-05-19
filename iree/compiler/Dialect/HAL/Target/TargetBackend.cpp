@@ -98,6 +98,12 @@ std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
     OpBuilder &builder) {
   auto workgroupSize = calculateDispatchWorkgroupSize(
       loc, executableOp, entryPointOp, workload, builder);
+  return calculateDispatchWorkgroupCount(loc, workload, workgroupSize, builder);
+}
+
+std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
+    Location loc, Value workload, const std::array<Value, 3> &workgroupSize,
+    OpBuilder &builder) {
   std::array<Value, 3> result;
   auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
   for (int i = 0; i < 3; ++i) {

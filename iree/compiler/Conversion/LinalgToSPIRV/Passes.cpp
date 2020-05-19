@@ -77,10 +77,24 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - All Linalg ops have buffer semantics.
   //
   // Post-conditions:
-  //   - loop.parallel ops are generated for mapping to workgroups.
-  //   - Linalg ops are nested inside loop.parallel ops and ready for mapping
-  //     to workitems.
+  //   - If the input Linalg ops are tilable:
+  //     - loop.parallel ops are generated for mapping to workgroups.
+  //     - Linalg ops are nested inside loop.parallel ops and ready for mapping
+  //       to workitems.
+  //   - Otherwise:
+  //     - The Linalg op is kept untouched.
+  //   - Dispatch functions might be split into multiple ones.
+  //
+  // Note:
+  //   We first try to tile and fuse the dispatch function as a whole. If there
+  //   are multiple Linalg ops inside, they may not share any number of common
+  //   outer parallel iterators. Then the first tile and fuse pass will do
+  //   nothing. We split all the Linalg ops into their own dispatch functions
+  //   afterwards. This gives each Linalg op a second chance to be tiled,
+  //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
+  pm.addPass(createLinalgTileAndFusePass(workGroupSize));
+  pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(workGroupSize));
 
   //===--------------------------------------------------------------------===//

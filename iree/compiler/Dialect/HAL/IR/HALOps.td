@@ -1156,6 +1156,11 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
       Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
       Value workgroupX, Value workgroupY, Value workgroupZ
     }]>,
+    OpBuilder<[{
+      Builder &builder, OperationState &state, Value commandBuffer,
+      Value executable, unsigned entryPointOrdinal,
+      Value workgroupX, Value workgroupY, Value workgroupZ
+    }]>,
   ];
 }
 

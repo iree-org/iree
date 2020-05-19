@@ -33,6 +33,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Utility functions
+//===----------------------------------------------------------------------===//
+
 static constexpr unsigned kMaxWorkgroupRank = 3;
 
 ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
@@ -48,8 +52,7 @@ ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
 }
 
 /// Updates the workgroup size used for the dispatch region.
-LogicalResult updateWorkGroupSize(Operation *op,
-                                  ArrayRef<int64_t> workGroupSize) {
+void updateWorkGroupSize(Operation *op, ArrayRef<int64_t> workGroupSize) {
   // Need to update both the surrounding FuncOp that has the spv.entry_point_abi
   // attribute, and the hal.executable.
   FuncOp funcOp =
@@ -61,7 +64,6 @@ LogicalResult updateWorkGroupSize(Operation *op,
   workGroupSizeVec.resize(3, 1);
   funcOp.setAttr(spirv::getEntryPointABIAttrName(),
                  spirv::getEntryPointABIAttr(workGroupSizeVec, context));
-  return success();
 }
 
 /// Returns the tile sizes to use by default based on number of dimension of
@@ -122,6 +124,10 @@ static void getTileSizes(unsigned numParallelLoops,
   for (auto &tileSize : tileSizes)
     if (tileSize == 1) tileSize = 0;
 }
+
+//===----------------------------------------------------------------------===//
+// Pass and patterns
+//===----------------------------------------------------------------------===//
 
 /// Check that all uses of elements of `values` are within the `operation`.
 static bool allUsesInOperation(ArrayRef<Value> values, Operation *operation) {
@@ -188,8 +194,7 @@ void LinalgTileAndFusePass::runOnFunction() {
   FuncOp funcOp = getFunction();
 
   Region &body = funcOp.getBody();
-  // Only handle single block functions.
-  if (body.getBlocks().size() != 1) {
+  if (!llvm::hasSingleElement(body.getBlocks())) {
     funcOp.emitError("unhandled dispatch function with multiple blocks");
     return signalPassFailure();
   }
@@ -198,7 +203,7 @@ void LinalgTileAndFusePass::runOnFunction() {
   if (linalgOps.empty()) return;
 
   // Compute the minimum number of outer parallel loops across linalg
-  // operations. This gives the dimensionality of tiling to be used.
+  // operations. This gives the dimensionality for tiling.
   unsigned numParallelLoops = kMaxWorkgroupRank;
   for (linalg::LinalgOp op : linalgOps)
     numParallelLoops = std::min(numParallelLoops, getNumOuterParallelLoops(op));
@@ -209,7 +214,7 @@ void LinalgTileAndFusePass::runOnFunction() {
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";
-    llvm::dbgs() << "# parallel loops: " << numParallelLoops;
+    llvm::dbgs() << "# common parallel loops: " << numParallelLoops;
     llvm::dbgs() << "\nworkgroup sizes: [";
     interleaveComma(workGroupSize, llvm::dbgs());
     llvm::dbgs() << "]\ntile sizes: [";
@@ -239,9 +244,12 @@ void LinalgTileAndFusePass::runOnFunction() {
   // get the workgroup size.
   SmallVector<int64_t, 3> updatedWorkGroupSize(reverse(tileSizes));
   updatedWorkGroupSize.resize(3, 1);
-  if (failed(updateWorkGroupSize(funcOp, updatedWorkGroupSize)))
-    return signalPassFailure();
+  updateWorkGroupSize(funcOp, updatedWorkGroupSize);
 }
+
+//===----------------------------------------------------------------------===//
+// Pass entry point and registration
+//===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
     ArrayRef<int64_t> workGroupSize) {
@@ -252,5 +260,6 @@ static PassRegistration<LinalgTileAndFusePass> pass(
     "iree-codegen-linalg-tile-and-fuse",
     "Tile and fuse Linalg operations on buffers",
     [] { return std::make_unique<LinalgTileAndFusePass>(); });
+
 }  // namespace iree_compiler
 }  // namespace mlir

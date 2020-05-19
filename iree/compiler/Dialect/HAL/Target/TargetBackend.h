@@ -283,7 +283,8 @@ class TargetBackend {
   }
 
  protected:
-  // Calculates the workgroup size (x, y, z).
+  // Calculates the workgroup size (x, y, z). This are the dimension numbers for
+  // a single workgroup.
   virtual std::array<Value, 3> calculateDispatchWorkgroupSize(
       Location loc, IREE::HAL::ExecutableOp executableOp,
       IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
@@ -296,6 +297,11 @@ class TargetBackend {
   virtual std::array<Value, 3> calculateDispatchWorkgroupCount(
       Location loc, IREE::HAL::ExecutableOp executableOp,
       IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+      OpBuilder &builder);
+  // Calculates the workgroup count (x, y, z) given the total |workload| and
+  // specific |workgroupSize|.
+  std::array<Value, 3> calculateDispatchWorkgroupCount(
+      Location loc, Value workload, const std::array<Value, 3> &workgroupSize,
       OpBuilder &builder);
 };
 

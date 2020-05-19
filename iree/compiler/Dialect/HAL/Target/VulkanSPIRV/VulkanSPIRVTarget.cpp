@@ -18,6 +18,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -95,6 +96,18 @@ static std::vector<std::string> populateEntryPointNames(
   return entryPointNames;
 }
 
+// Records a full execution barrier that forces visibility of all buffers.
+static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
+                                       OpBuilder &builder) {
+  Value memoryBarrier = builder.create<IREE::HAL::MakeMemoryBarrierOp>(
+      loc, IREE::HAL::AccessScopeBitfield::DispatchWrite,
+      IREE::HAL::AccessScopeBitfield::DispatchRead);
+  builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
+      loc, commandBuffer, IREE::HAL::ExecutionStageBitfield::Dispatch,
+      IREE::HAL::ExecutionStageBitfield::Dispatch,
+      ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
+}
+
 class VulkanSPIRVTargetBackend : public TargetBackend {
  public:
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
@@ -125,6 +138,69 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     buildSPIRVTransformPassPipeline(passManager, options_.workgroupSize);
   }
 
+  LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
+                               DeviceSwitchBuilder &switchBuilder) override {
+    // Multiple entry points might be generated for a single dispatch function.
+    // Under such circumstances, we will have a special attribute indicating the
+    // schedule of the split entry points. Try to see if we can find such
+    // schedule attribute first.
+    ArrayAttr entryPointScheduleAttr;
+    spirv::ModuleOp spvModuleOp;
+    IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
+    for (auto executableTargetOp :
+         executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
+      if (matchPattern(executableTargetOp.target_backend(), name())) {
+        ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
+        if ((entryPointScheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+                 iree_compiler::getEntryPointScheduleAttrName()))) {
+          auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
+          assert(llvm::hasSingleElement(spvModuleOps));
+          spvModuleOp = *spvModuleOps.begin();
+        }
+        break;
+      }
+    }
+
+    // If not found, then just fall back to the default dispatch recording.
+    if (!entryPointScheduleAttr) {
+      return TargetBackend::recordDispatch(loc, dispatchState, switchBuilder);
+    }
+
+    auto *region = switchBuilder.addConditionRegion(
+        IREE::HAL::DeviceMatchIDAttr::get(name(), loc.getContext()),
+        {
+            dispatchState.workload,
+            dispatchState.commandBuffer,
+            dispatchState.executable,
+        });
+
+    auto &entryBlock = region->front();
+    auto builder = OpBuilder::atBlockBegin(&entryBlock);
+    auto workload = entryBlock.getArgument(0);
+    auto commandBuffer = entryBlock.getArgument(1);
+    auto executable = entryBlock.getArgument(2);
+
+    // We have multiple entry points to dispatch. Record in the order specified
+    // by entry point schedule and insert barrier between sequential ones.
+    for (int i = 0, e = entryPointScheduleAttr.size(); i < e; ++i) {
+      StringRef entryName =
+          entryPointScheduleAttr[i].cast<StringAttr>().getValue();
+      auto workgroupSize = calculateDispatchWorkgroupSize(
+          loc, spvModuleOp, entryName, workload, builder);
+      auto workgroupCount = calculateDispatchWorkgroupCount(
+          loc, workload, workgroupSize, builder);
+      builder.create<IREE::HAL::CommandBufferDispatchOp>(
+          loc, commandBuffer, executable, /*entryPointOrdinal=*/i,
+          workgroupCount[0], workgroupCount[1], workgroupCount[2]);
+      if (i + 1 != e) {
+        recordFullExecutionBarrier(commandBuffer, loc, builder);
+      }
+    }
+
+    builder.create<IREE::HAL::ReturnOp>(loc);
+    return success();
+  }
+
   // Finds the spv.ExecutionMode operation to get the workgroup size from.
   // TODO(ravishankarm): This might not be the only way this is specified. You
   // could also have a spec constant, but that is not generated in the
@@ -140,19 +216,27 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     spirv::ModuleOp spvModuleOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend(), "vulkan*")) {
-        auto spvModuleOps =
-            executableTargetOp.getInnerModule().getOps<spirv::ModuleOp>();
-        assert(!spvModuleOps.empty());
+      if (matchPattern(executableTargetOp.target_backend(), name())) {
+        ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
+        assert(!innerModuleOp.getAttr(
+            iree_compiler::getEntryPointScheduleAttrName()));
+        auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
+        assert(llvm::hasSingleElement(spvModuleOps));
         spvModuleOp = *spvModuleOps.begin();
         break;
       }
     }
+    return calculateDispatchWorkgroupSize(
+        loc, spvModuleOp, entryPointOp.sym_name(), workload, builder);
+  }
 
+  std::array<Value, 3> calculateDispatchWorkgroupSize(
+      Location loc, spirv::ModuleOp spvModuleOp, StringRef entryPointName,
+      Value workload, OpBuilder &builder) {
     std::array<Value, 3> workgroupSize;
     for (auto executionModeOp :
          spvModuleOp.getBlock().getOps<spirv::ExecutionModeOp>()) {
-      if (executionModeOp.fn() == entryPointOp.sym_name() &&
+      if (executionModeOp.fn() == entryPointName &&
           executionModeOp.execution_mode() == spirv::ExecutionMode::LocalSize) {
         for (int i = 0; i < executionModeOp.values().size(); ++i) {
           workgroupSize[i] =
@@ -179,13 +263,23 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                                     OpBuilder &executableBuilder) override {
     iree::SpirVExecutableDefT spirvExecutableDef;
 
-    auto spvModuleOp =
-        *targetOp.getInnerModule().getOps<spirv::ModuleOp>().begin();
+    ModuleOp innerModuleOp = targetOp.getInnerModule();
+    auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
 
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.
-    spirvExecutableDef.entry_points = populateEntryPointNames(spvModuleOp);
+    if (auto scheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+            iree_compiler::getEntryPointScheduleAttrName())) {
+      // We have multiple entry points in this module. Make sure the order
+      // specified in the schedule attribute is respected.
+      for (Attribute entryPoint : scheduleAttr) {
+        spirvExecutableDef.entry_points.emplace_back(
+            entryPoint.cast<StringAttr>().getValue().str());
+      }
+    } else {
+      spirvExecutableDef.entry_points = populateEntryPointNames(spvModuleOp);
+    }
 
     // Serialize the spirv::ModuleOp into the binary that we will embed in the
     // final flatbuffer.
