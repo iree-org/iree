@@ -74,14 +74,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
   iree_vm_stack_t* stack = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, sizeof(iree_vm_stack_t),
                                              (void**)&stack));
-  iree_status_t status =
-      iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-  if (!iree_status_is_ok(status)) {
-    iree_allocator_free(allocator, stack);
-    return status;
-  }
+  iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
 
-  status =
+  iree_status_t status =
       iree_vm_invoke_within(context, stack, function, policy, inputs, outputs);
 
   iree_vm_stack_deinit(stack);

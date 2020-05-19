@@ -153,10 +153,9 @@ VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
 
   // Bridge to the C-based deallocator API.
   auto* raw_ptr = flatbuffer_blob.ptr();
-  auto free_fn = +([](void* self, void*) -> iree_status_t {
+  auto free_fn = +([](void* self, void*) {
     PyObject* self_ptr = static_cast<PyObject*>(self);
     Py_XDECREF(self_ptr);
-    return IREE_STATUS_OK;
   });
   flatbuffer_blob.inc_ref();
   iree_allocator_t deallocator{raw_ptr /* self */, nullptr /* alloc */,

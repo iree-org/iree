@@ -69,10 +69,8 @@ Status VMLACommandProcessor::DispatchInline(
     }
   }
 
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_stack_init(
-          iree_vm_context_state_resolver(vmla_executable->context()), stack_),
-      IREE_LOC));
+  iree_vm_stack_init(iree_vm_context_state_resolver(vmla_executable->context()),
+                     stack_);
   auto status =
       FromApiStatus(iree_vm_invoke_within(
                         vmla_executable->context(), stack_,
