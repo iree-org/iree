@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/Utils/TypeConversion.h"
 #include "iree/compiler/Utils/GraphUtils.h"
@@ -48,6 +49,15 @@ static bool isStreamableOp(Operation *op) {
     return true;
   }
   return false;
+}
+
+static inline bool usefulStreamOp(Operation *op) {
+  return op->getDialect()->getNamespace() !=
+         ShapeDialect::getDialectNamespace();
+}
+
+static inline bool usefulStreamWork(ArrayRef<Operation *> currentStreamOps) {
+  return llvm::any_of(currentStreamOps, usefulStreamOp);
 }
 
 // Expand any compound types to primitive types in the stream fragment.
@@ -89,15 +99,17 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     for (Operation &op : block) {
       if (isStreamableOp(&op)) {
         currentStreamOps.push_back(&op);
-      } else if (!currentStreamOps.empty()) {
-        streams.push_back(currentStreamOps);
-        currentStreamOps = {};
+        continue;
       }
-    }
-    if (!currentStreamOps.empty()) {
-      streams.push_back(currentStreamOps);
+      if (usefulStreamWork(currentStreamOps)) {
+        streams.push_back(currentStreamOps);
+      }
       currentStreamOps = {};
     }
+    if (usefulStreamWork(currentStreamOps)) {
+      streams.push_back(currentStreamOps);
+    }
+    currentStreamOps = {};
 
     return streams;
   }
