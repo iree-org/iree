@@ -34,9 +34,7 @@ using Shape::buildOrFindRankedShapeForValue;
 
 VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
                                            TypeConverter &typeConverter)
-    : ConversionTarget(*context),
-      context(*context),
-      typeConverter(typeConverter) {
+    : ConversionTarget(*context), typeConverter(typeConverter) {
   // The VMLA dialect expects both standard ops and the VMLA ops (in case some
   // conversion has already happened).
   addLegalOp<ModuleOp, ModuleTerminatorOp>();
