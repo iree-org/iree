@@ -39,13 +39,11 @@ class DecomposeClampOp : public OpRewritePattern<xla_hlo::ClampOp> {
     // clamp(a, x, b) = min(max(a, x), b)
     Location loc = op.getLoc();
     Value cmpMin = rewriter.create<xla_hlo::CompareOp>(
-        loc, op.min(), op.operand(),
-        /*broadcast_dimensions=*/nullptr, rewriter.getStringAttr("LT"));
+        loc, op.min(), op.operand(), rewriter.getStringAttr("LT"));
     Value selectMin = rewriter.create<xla_hlo::SelectOp>(
         loc, operandType, cmpMin, op.operand(), op.min());
     Value cmpMax = rewriter.create<xla_hlo::CompareOp>(
-        loc, selectMin, op.max(),
-        /*broadcast_dimensions=*/nullptr, rewriter.getStringAttr("LT"));
+        loc, selectMin, op.max(), rewriter.getStringAttr("LT"));
     Value selectMax = rewriter.create<xla_hlo::SelectOp>(
         loc, operandType, cmpMax, selectMin, op.max());
     rewriter.replaceOp(op, selectMax);

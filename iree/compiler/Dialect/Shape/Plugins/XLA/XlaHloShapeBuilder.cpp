@@ -37,13 +37,6 @@ template <typename HloOp>
 Value rewriteXlaBinaryElementwiseOpShape(RankedShapeType resultShape, HloOp op,
                                          OpBuilder &builder) {
   if (!op) return nullptr;
-
-  if (op.broadcast_dimensions()) {
-    // Has implicit broadcast - ignore for now.
-    return nullptr;
-  }
-
-  // No implicit broadcast. Tread as same element type.
   SmallVector<Value, 4> inputOperands(op.getOperands());
   return buildCastInputsToResultShape(op.getLoc(), resultShape, inputOperands,
                                       builder);
