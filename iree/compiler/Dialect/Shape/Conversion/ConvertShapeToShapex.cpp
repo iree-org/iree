@@ -74,6 +74,21 @@ namespace {
 // targets could make these assertions not fire in practice, but it would
 // be a maintenance burden.
 
+class ConvertConstShapeOp : public OpConversionPattern<shape::ConstShapeOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      shape::ConstShapeOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<int64_t, 4> extents;
+    for (APInt extent : op.shape()) {
+      extents.push_back(extent.getZExtValue());
+    }
+    auto rsType = RankedShapeType::get(extents, rewriter.getContext());
+    rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, rsType);
+    return success();
+  }
+};
+
 class ConvertShapeOfOp : public OpConversionPattern<shape::ShapeOfOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -186,6 +201,7 @@ class ConvertShapeToShapex
 
     // Patterns.
     OwningRewritePatternList patterns;
+    patterns.insert<ConvertConstShapeOp>(context);
     patterns.insert<ConvertShapeOfOp>(context);
     patterns.insert<ConvertSplitAtOp>(context);
     patterns.insert<ConvertBroadcastOp>(context);

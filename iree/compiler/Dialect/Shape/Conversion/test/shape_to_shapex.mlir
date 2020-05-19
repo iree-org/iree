@@ -1,6 +1,16 @@
 // RUN: iree-opt -convert-shape-to-shapex -split-input-file -verify-diagnostics -allow-unregistered-dialect <%s | IreeFileCheck %s
 
 // -----
+// shape.const_shape
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<?xf32>) {
+  // CHECK: shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3]>
+  %0 = shape.const_shape [1, 2, 3]
+  "foo.use"(%0) : (!shape.shape) -> ()
+  return
+}
+
+// -----
 // shape.shape_of
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<?xf32>) {
