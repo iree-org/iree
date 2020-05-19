@@ -81,10 +81,7 @@ iree_check_single_backend_test_suite(
         "reduce.mlir",
         "remainder.mlir",
         "reshape.mlir",
-
-        # TODO(GH-1699): Enable after xla_hlo.reverse can be lowered to linalg.
-        # "reverse.mlir",
-        #
+        "reverse.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
@@ -136,6 +133,7 @@ iree_check_single_backend_test_suite(
         "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
+        "reverse.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
