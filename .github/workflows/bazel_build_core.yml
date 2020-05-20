@@ -27,7 +27,7 @@ on:
 jobs:
   linux:
     runs-on: ubuntu-18.04
-    container: gcr.io/iree-oss/bazel@sha256:3fd72776fc3a97d99e43ac9972a4b9a57ca055f372a4000f26a24c0e914e7d6f
+    container: gcr.io/iree-oss/bazel@sha256:14e4e26b5acb14aac5d0b3017fe79a282985d3d365e0b0b4e7e9ab8ffa0f60bb
     steps:
       - name: Printing environment
         run: |
