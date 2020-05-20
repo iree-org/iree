@@ -28,7 +28,8 @@ export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
-# over from Bazel tags), every test should be labeled with the directory it is in.
+# over from Bazel tags), every test should be labeled with the directory it is
+# in.
 declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
@@ -47,7 +48,6 @@ declare -a label_exclude_args=(
   # Use a trailing slash to avoid prefix collisions.
   # For example:
   #   ^bindings/
-
 )
 
 # Join on "|"
