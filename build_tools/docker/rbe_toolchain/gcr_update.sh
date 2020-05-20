@@ -29,4 +29,4 @@ echo '
 Remember to update the rbe_defualt digest in the WORKSPACE file to reflect the
 new ID for the container.
 
-Use `docker images --no-trunk` to view the ID.'
+See `latest: digest: sha256:<ID>` from earlier in this script.'
