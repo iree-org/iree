@@ -32,5 +32,5 @@ docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/bazel-tensorflow \
+  gcr.io/iree-oss/bazel-tensorflow@sha256:279ffff87cb8e1325628f3e5d8f9babef280d3f3c9b34ac9f24a99239941f0e1 \
   kokoro/gcp_ubuntu/bazel/build.sh

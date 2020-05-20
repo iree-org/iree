@@ -18,11 +18,10 @@
 # docker build --tag gcr.io/iree-oss/bazel build_tools/docker/bazel/
 
 # Set up the image and working directory.
-FROM l.gcr.io/google/bazel:2.1.0
+FROM ubuntu:18.04
 WORKDIR /usr/src/git
 
-# Undo inherited bazel command line entrypoint.
-ENTRYPOINT []
+RUN apt-get update
 
 # Set environment variables.
 ENV CXX clang++
@@ -32,9 +31,20 @@ ENV PYTHON_BIN /usr/bin/python3
 # Install the newest version of git. This is necessary because the checkout
 # action (https://github.com/actions/checkout) requires `git >= 2.18` for this
 # action to work with git submodules.
+RUN apt-get install -y software-properties-common
 RUN add-apt-repository ppa:git-core/ppa
 RUN apt-get update
 RUN apt-get install -y git
+
+# Install Bazel.
+# https://docs.bazel.build/versions/master/install-ubuntu.html
+ENV BAZEL_VERSION 2.1.0
+RUN apt-get install unzip zip wget
+RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+RUN chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+RUN ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user
+RUN rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+ENV PATH "/root/bin:$PATH"
 
 # Install core IREE dependencies.
 RUN apt-get install -y clang libsdl2-dev
