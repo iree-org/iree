@@ -22,10 +22,14 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
+export CMAKE_BIN="$(which cmake)"
+export CC="$(which clang)"
+export CXX="$(which clang++)"
+
 # Check these exist and print the versions for later debugging
-cmake --version
-clang --version
-clang++ --version
+"$CMAKE_BIN" --version
+"$CC" --version
+"$CXX" --version
 python3 --version
 
 echo "Initializing submodules"
