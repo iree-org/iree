@@ -100,12 +100,18 @@ func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x1
   // CHECK: %[[CAST_BS:.+]] = index_cast %[[BS]] : index to i32
   // CHECK: hal.command_buffer.push_constants %[[UNUSED0:.+]], %[[UNUSED1:.+]], offset = 0, values = [%[[CAST_BS]]] : i32
   // CHECK: %[[ALLOCATOR0:.+]] = hal.buffer.allocator %[[T]] : !hal.allocator
+  // Note that multiple dispatches in the stream verifies that transient
+  // allocation is covering all ops.
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<?x128xf32>, %arg3 = %bs : index) -> tensor<?x128xf32> {
     %1 = shapex.make_ranked_shape %arg3 : (index) -> !shapex.ranked_shape<[?,128]>
     %2 = shapex.tie_shape %arg2, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
     %3 = flow.dispatch @ex0::@entry0[%arg1 : index](%2, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
     %4 = shapex.tie_shape %3, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
-    flow.return %4 : tensor<?x128xf32>
+    %5 = flow.dispatch @ex0::@entry0[%arg1 : index](%4, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+    %6 = shapex.tie_shape %5, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
+    %7 = flow.dispatch @ex0::@entry0[%arg1 : index](%6, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+    %8 = shapex.tie_shape %7, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
+    flow.return %8 : tensor<?x128xf32>
   }
   return %0 : tensor<?x128xf32>
 }

@@ -171,41 +171,75 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
 static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
                                      BufferSet &bufferSet,
                                      ConversionPatternRewriter &rewriter) {
-  // Pull outputs that terminate on identities to operands.
-  for (auto &op : llvm::reverse(streamOp.body().front())) {
-    if (isIdentityOp(&op)) {
-      auto result = op.getResult(0);
-      auto operand = op.getOperand(0);
-      if (bufferSet.rangeMap[result].buffer &&
-          !bufferSet.rangeMap[operand].buffer) {
-        bufferSet.rangeMap[operand].buffer = bufferSet.rangeMap[result].buffer;
+  LLVM_DEBUG(llvm::dbgs() << ": HAL allocateTransientBuffers: "
+                          << *streamOp.getOperation() << "\n");
+
+  auto propagateIdentityBuffers = [&]() {
+    bool madeChange = false;
+    // Pull outputs that terminate on identities to operands.
+    for (auto &op : llvm::reverse(streamOp.body().front())) {
+      if (isIdentityOp(&op)) {
+        auto result = op.getResult(0);
+        auto operand = op.getOperand(0);
+        if (bufferSet.rangeMap[result].buffer &&
+            !bufferSet.rangeMap[operand].buffer) {
+          LLVM_DEBUG(llvm::dbgs() << "  + PROPAGATE IDENTITY RESULT->OPERAND: "
+                                  << op << "\n");
+          madeChange = true;
+          bufferSet.rangeMap[operand].buffer =
+              bufferSet.rangeMap[result].buffer;
+        }
       }
     }
-  }
 
-  // Push inputs that originate on identities to results.
-  for (auto &op : streamOp.body().front()) {
-    if (isIdentityOp(&op)) {
-      auto operand = op.getOperand(0);
-      auto result = op.getResult(0);
-      if (bufferSet.rangeMap[operand].buffer &&
-          !bufferSet.rangeMap[result].buffer) {
-        bufferSet.rangeMap[result].buffer = bufferSet.rangeMap[operand].buffer;
+    // Push inputs that originate on identities to results.
+    for (auto &op : streamOp.body().front()) {
+      if (isIdentityOp(&op)) {
+        auto operand = op.getOperand(0);
+        auto result = op.getResult(0);
+        if (bufferSet.rangeMap[operand].buffer &&
+            !bufferSet.rangeMap[result].buffer) {
+          LLVM_DEBUG(llvm::dbgs() << "  + PROPAGATE IDENTITY OPERAND->RESULT: "
+                                  << op << "\n");
+          madeChange = true;
+          bufferSet.rangeMap[result].buffer =
+              bufferSet.rangeMap[operand].buffer;
+        }
       }
     }
-  }
+    return madeChange;
+  };
 
-  // Allocate any remaining transients on "active" ops.
+  // Allocate any needed transient buffers.
+  // The idea here is that every non-identity-op result needs to be assigned a
+  // buffer; however, input and output buffers are already assigned to outer
+  // operands and results (which may be on identity ops). To handle this,
+  // we first propagate all buffers across identity ops, then allocate any
+  // transient buffers on non-identity ops that are still needed. Finally,
+  // propagate across identity ops again (to account for identity ops on
+  // the interior).
+  // Because there may be runs of identity ops, propagation loops until no
+  // changes are made.
+  while (propagateIdentityBuffers()) {
+  }
   for (auto &op : streamOp.body().front()) {
     if (isNoOp(&op) || isIdentityOp(&op)) continue;
-    for (auto result : op.getResults()) {
+    for (auto it : llvm::enumerate(op.getResults())) {
+      auto result = it.value();
       // If the result is an output buffer we can just use that directly.
-      if (bufferSet.rangeMap[result].buffer) continue;
-
+      if (bufferSet.rangeMap[result].buffer) {
+        LLVM_DEBUG(llvm::dbgs() << "    -- SKIP ALREADY SET BUFFER RESULT("
+                                << it.index() << "): " << op << "\n");
+        continue;
+      }
+      LLVM_DEBUG(llvm::dbgs() << "    -- ALLOCATE BUFFER FOR RESULT("
+                              << it.index() << "): " << op << "\n");
       auto buffer =
           allocateTransientBuffer(result, bufferSet.allocator, rewriter);
       bufferSet.rangeMap[result] = BufferRange{buffer};
     }
+  }
+  while (propagateIdentityBuffers()) {
   }
 }
 
@@ -269,6 +303,8 @@ static LogicalResult recordPushBindings(
     IREE::HAL::ExecutableOp &executableOp,
     IREE::HAL::ExecutableEntryPointOp &entryPointOp, Value executableLayout,
     BufferSet &bufferSet, ConversionPatternRewriter &rewriter) {
+  LLVM_DEBUG(llvm::dbgs() << "HAL recordPushBindings: "
+                          << *dispatchOp.getOperation() << "\n");
   uint32_t setOrdinal = 0;
   uint32_t bindingOrdinal = 0;
   SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
@@ -289,15 +325,19 @@ static LogicalResult recordPushBindings(
                                        zeroOffset, byteLength));
     return success();
   };
-  for (auto inputValue : dispatchOp.operands()) {
-    if (inputValue.getType().isa<TensorType>()) {
-      if (failed(pushBinding(inputValue))) {
+  for (auto it : llvm::enumerate(dispatchOp.operands())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + OPERAND(" << it.index() << "): " << it.value() << "\n");
+    if (it.value().getType().isa<TensorType>()) {
+      if (failed(pushBinding(it.value()))) {
         return failure();
       }
     }
   }
-  for (auto tensorValue : dispatchOp.results()) {
-    if (failed(pushBinding(tensorValue))) {
+  for (auto it : llvm::enumerate(dispatchOp.results())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + RESULT(" << it.index() << "): " << it.value() << "\n");
+    if (failed(pushBinding(it.value()))) {
       return failure();
     }
   }
