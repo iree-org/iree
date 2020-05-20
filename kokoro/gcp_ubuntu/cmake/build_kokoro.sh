@@ -14,22 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the project with cmake using Kokoro.
+# Build and test the project within the gcr.io/iree-oss/cmake using Kokoro.
 
 set -e
 set -x
 
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
-
-export CMAKE_BIN="$(which cmake)"
-export CC="$(which clang-6.0)"
-export CXX="$(which clang++-6.0)"
-
-# Check these exist and print the versions for later debugging
-"$CMAKE_BIN" --version
-"$CC" --version
-"$CXX" --version
 
 # Kokoro checks out the repository here.
 WORKDIR=${KOKORO_ARTIFACTS_DIR?}/github/iree
