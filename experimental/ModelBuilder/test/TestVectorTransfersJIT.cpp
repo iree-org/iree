@@ -79,13 +79,15 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
       A,
       SmallVector<Value, 4>(szA.size(), std_constant_index(0)),
       AffineMap::getMinorIdentityMap(szA.size(), szA.size(), ctx),
-      flt_42);
+      flt_42,
+      ArrayAttr());
   Value vA = vector_transfer_read(
       mb.getVectorType(szVec, mb.f32),
       A,
       indicesA,
       AffineMap::getMinorIdentityMap(szA.size(), szVec.size(), ctx),
-      flt_42);
+      flt_42,
+      ArrayAttr());
 
   auto mapB = AffineMap::getMinorIdentityMap(szB.size(), szVec.size(), ctx);
   vector_transfer_write(vA, B, indicesBWr, mapB);
@@ -96,13 +98,15 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
       B,
       SmallVector<Value, 4>(szB.size(), std_constant_index(0)),
       AffineMap::getMinorIdentityMap(szB.size(), szB.size(), ctx),
-      flt_13);
+      flt_13,
+      ArrayAttr());
   Value vB = vector_transfer_read(
       mb.getVectorType(szVec, mb.f32),
       B,
       indicesBRd,
       AffineMap::getMinorIdentityMap(szB.size(), szVec.size(), ctx),
-      flt_13);
+      flt_13,
+      ArrayAttr());
 
   (vector_print(vFullA));
   (vector_print(vA));
