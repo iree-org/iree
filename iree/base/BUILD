@@ -157,6 +157,27 @@ cc_library(
     ],
 )
 
+# Note: this name needs some variation of .so/.dll/.dylib. The selection is
+# arbitrary and a platform-specific shared object will be created regardless.
+cc_binary(
+    name = "libdynamic_library_test_library.so",
+    testonly = 1,
+    srcs = ["dynamic_library_test_library.cc"],
+    linkshared = 1,
+)
+
+cc_test(
+    name = "dynamic_library_test",
+    srcs = ["dynamic_library_test.cc"],
+    data = ["libdynamic_library_test_library.so"],
+    deps = [
+        ":dynamic_library",
+        ":status",
+        ":status_matchers",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 cc_library(
     name = "file_io",
     hdrs = ["file_io.h"],

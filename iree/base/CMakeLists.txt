@@ -168,7 +168,7 @@ iree_cc_library(
     "dynamic_library_win32.cc"
   LINKOPTS
     ${_DYNAMIC_LIBRARY_LINKOPTS}
-DEPS
+  DEPS
     ::logging
     ::platform_headers
     ::status
@@ -177,6 +177,31 @@ DEPS
     absl::memory
     absl::span
   PUBLIC
+)
+
+# TODO(scotttodd): clean up bazel_to_cmake handling here
+#   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
+iree_cc_library(
+  NAME
+    libdynamic_library_test_library.so
+  TESTONLY
+  SRCS
+    "dynamic_library_test_library.cc"
+  SHARED
+)
+
+iree_cc_test(
+  NAME
+    dynamic_library_test
+  SRCS
+    "dynamic_library_test.cc"
+  DATA
+    ::libdynamic_library_test_library.so
+  DEPS
+    ::dynamic_library
+    ::status
+    ::status_matchers
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

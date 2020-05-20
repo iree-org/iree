@@ -67,7 +67,7 @@ include(CMakeParseArguments)
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;ALWAYSLINK;TESTONLY"
+    "PUBLIC;ALWAYSLINK;TESTONLY;SHARED"
     "NAME"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -76,6 +76,7 @@ function(iree_cc_library)
   iree_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
 
   if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
     # Prefix the library with the package name, so we get: iree_package_name.
@@ -99,7 +100,12 @@ function(iree_cc_library)
     endif()
 
     if(NOT _RULE_IS_INTERFACE)
-      add_library(${_NAME} STATIC "")
+      if (_RULE_SHARED)
+        add_library(${_NAME} SHARED "")
+      else()
+        add_library(${_NAME} STATIC "")
+      endif()
+
       target_sources(${_NAME}
         PRIVATE
           ${_RULE_SRCS}

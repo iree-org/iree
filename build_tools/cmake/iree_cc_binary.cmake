@@ -110,6 +110,7 @@ function(iree_cc_binary)
     iree_package_ns(_PACKAGE_NS)
     # Replace dependencies passed by ::name with ::iree::package::name
     list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+    list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
 
     # Add all IREE targets to a folder in the IDE for organization.
     set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/binaries)
