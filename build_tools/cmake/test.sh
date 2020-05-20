@@ -37,8 +37,6 @@ declare -a label_exclude_args=(
   ^driver=vulkan$
   ^nokokoro$
 
-  # TODO(b/151445957) Enable the python tests when the Kokoro VMs support them.
-
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.
   # For example:
