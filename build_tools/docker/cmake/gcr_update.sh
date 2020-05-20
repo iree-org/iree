@@ -24,3 +24,10 @@ gcloud auth configure-docker
 # Build and push the cmake image.
 docker build --tag gcr.io/iree-oss/cmake build_tools/docker/cmake/
 docker push gcr.io/iree-oss/cmake
+
+echo '
+Remember to update all of the files using the `cmake` image (e.g.
+/kokoro/gcp_ubuntu/cmake/build_kokoro.sh) to use the digest of the updated
+image.
+
+Use `docker images --digests` to view the digest.'

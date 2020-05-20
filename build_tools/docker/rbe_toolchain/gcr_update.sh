@@ -27,6 +27,6 @@ docker push gcr.io/iree-oss/rbe-toolchain
 
 echo '
 Remember to update the rbe_default digest in the WORKSPACE file to reflect the
-new ID for the container.
+new digest for the container.
 
-Use `docker images --digests` to view the ID.'
+Use `docker images --digests` to view the digest.'
