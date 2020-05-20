@@ -22,9 +22,13 @@
 #   --volume /home/phoenix/iree/fork:/usr/src/iree/ \
 #   gcr.io/iree-oss/cmake
 
-# Build IREE.
-# cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
+# Build and test IREE.
+# cmake -G Ninja -B build/ \
+#   -DCMAKE_C_COMPILER=clang \
+#   -DCMAKE_CXX_COMPILER=clang++ \
+#   -DIREE_BUILD_PYTHON_BINDINGS=ON .
 # cmake --build build/
+# ./build_tools/cmake/test.sh
 
 
 # Set up the image and working directory.

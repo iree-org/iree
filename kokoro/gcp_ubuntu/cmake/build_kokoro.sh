@@ -27,19 +27,18 @@ export CC="$(which clang-6.0)"
 export CXX="$(which clang++-6.0)"
 
 # Check these exist and print the versions for later debugging
-cmake --version
-clang --version
-clang++ --version
-python3 --version
+"$CMAKE_BIN" --version
+"$CC" --version
+"$CXX" --version
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
+# Kokoro checks out the repository here.
+WORKDIR=${KOKORO_ARTIFACTS_DIR?}/github/iree
 
-# TODO(gcmn): It would be nice to be able to build and test as much as possible,
-# so a build failure only prevents building/testing things that depend on it and
-# we can still run the other tests.
-echo "Building with cmake"
-./build_tools/cmake/clean_build.sh
-
-echo "Testing with ctest"
-./build_tools/cmake/test.sh
+# Mount the checked out repository, make that the working directory and run the
+# tests in the cmake image.
+docker run \
+  --volume "${WORKDIR?}:${WORKDIR?}" \
+  --workdir="${WORKDIR?}" \
+  --rm \
+  gcr.io/iree-oss/cmake \
+  kokoro/gcp_ubuntu/cmake/build.sh

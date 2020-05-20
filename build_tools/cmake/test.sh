@@ -38,18 +38,18 @@ declare -a label_exclude_args=(
   ^nokokoro$
 
   # TODO(b/151445957) Enable the python tests when the Kokoro VMs support them.
-  # See also, https://github.com/google/iree/issues/1346.
+
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.
   # For example:
   #   ^bindings/python/pyiree/rt$
-  ^bindings$
+
   # Exclude all tests in some subdirectories.
   # Put the whole parent directory with only a starting anchor.
   # Use a trailing slash to avoid prefix collisions.
   # For example:
   #   ^bindings/
-  ^bindings/
+
 )
 
 # Join on "|"

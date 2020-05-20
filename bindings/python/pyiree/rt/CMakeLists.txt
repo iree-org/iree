@@ -90,6 +90,8 @@ iree_py_test(
     function_abi_test
   SRCS
     "function_abi_test.py"
+  LABELS
+    "nokokoro"
 )
 
 iree_py_test(
