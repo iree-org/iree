@@ -24,3 +24,9 @@ gcloud auth configure-docker
 # Build and push the rbe-toolchain image.
 docker build --tag gcr.io/iree-oss/rbe-toolchain build_tools/docker/rbe_toolchain/
 docker push gcr.io/iree-oss/rbe-toolchain
+
+echo '
+Remember to update the rbe_default digest in the WORKSPACE file to reflect the
+new ID for the container.
+
+Use `docker images --digests` to view the ID.'
