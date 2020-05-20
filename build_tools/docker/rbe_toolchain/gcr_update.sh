@@ -26,7 +26,7 @@ docker build --tag gcr.io/iree-oss/rbe-toolchain build_tools/docker/rbe_toolchai
 docker push gcr.io/iree-oss/rbe-toolchain
 
 echo '
-Remember to update the rbe_defualt digest in the WORKSPACE file to reflect the
+Remember to update the rbe_default digest in the WORKSPACE file to reflect the
 new ID for the container.
 
 Use `docker images --digests` to view the ID.'
