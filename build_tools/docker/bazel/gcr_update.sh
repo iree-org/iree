@@ -35,4 +35,4 @@ Remember to update all of the files using `bazel` and `bazel-tensorflow` images
 (e.g. .github/workflows/bazel_* and /kokoro/gcp_ubuntu/bazel/build_kokoro.sh)
 to use the IDs of the updated images.
 
-Use `docker images --no-trunk` to view the IDs.'
+Use `docker images --digests` to view the IDs.'
