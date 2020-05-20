@@ -36,6 +36,8 @@ else
 fi
 cd build
 "$CMAKE_BIN" -G Ninja -DCMAKE_BUILD_TYPE=FastBuild \
+                      -DCMAKE_C_COMPILER=clang \
+                      -DCMAKE_CXX_COMPILER=clang++ \
                       -DIREE_BUILD_COMPILER=ON \
                       -DIREE_BUILD_TESTS=ON \
                       -DIREE_BUILD_SAMPLES=OFF \
