@@ -31,20 +31,15 @@ class DynamicLibraryWin : public DynamicLibrary {
     ::FreeLibrary(library_);
   }
 
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names) {
-    IREE_TRACE_SCOPE0("DynamicLibraryWin::Load");
-
-    for (int i = 0; i < search_file_names.size(); ++i) {
-      HMODULE library = ::LoadLibraryA(search_file_names[i]);
-      if (library) {
-        return absl::WrapUnique(
-            new DynamicLibraryWin(search_file_names[i], library));
-      }
+  static StatusOr<std::unique_ptr<DynamicLibrary>> TryLoad(
+      const char* file_name) {
+    HMODULE library = ::LoadLibraryA(file_name);
+    if (library) {
+      return absl::WrapUnique(new DynamicLibraryWin(file_name, library));
     }
 
     return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open dynamic library, not found on search paths";
+           << "Unable to open dynamic library, not found on search path";
   }
 
   void* GetSymbol(const char* symbol_name) const override {
@@ -59,9 +54,9 @@ class DynamicLibraryWin : public DynamicLibrary {
 };
 
 // static
-StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::Load(
-    absl::Span<const char* const> search_file_names) {
-  return DynamicLibraryWin::Load(search_file_names);
+StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::TryLoad(
+    const char* file_name) {
+  return DynamicLibraryWin::TryLoad(file_name);
 }
 
 }  // namespace iree

@@ -34,20 +34,15 @@ class DynamicLibraryPosix : public DynamicLibrary {
     ::dlclose(library_);
   }
 
-  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names) {
-    IREE_TRACE_SCOPE0("DynamicLibraryPosix::Load");
-
-    for (int i = 0; i < search_file_names.size(); ++i) {
-      void* library = ::dlopen(search_file_names[i], RTLD_LAZY | RTLD_LOCAL);
-      if (library) {
-        return absl::WrapUnique(
-            new DynamicLibraryPosix(search_file_names[i], library));
-      }
+  static StatusOr<std::unique_ptr<DynamicLibrary>> TryLoad(
+      const char* file_name) {
+    void* library = ::dlopen(file_name, RTLD_LAZY | RTLD_LOCAL);
+    if (library) {
+      return absl::WrapUnique(new DynamicLibraryPosix(file_name, library));
     }
 
     return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open dynamic library, not found on search paths";
+           << "Unable to dlopen dynamic library, not found at search path";
   }
 
   void* GetSymbol(const char* symbol_name) const override {
@@ -62,9 +57,9 @@ class DynamicLibraryPosix : public DynamicLibrary {
 };
 
 // static
-StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::Load(
-    absl::Span<const char* const> search_file_names) {
-  return DynamicLibraryPosix::Load(search_file_names);
+StatusOr<std::unique_ptr<DynamicLibrary>> DynamicLibrary::TryLoad(
+    const char* file_name) {
+  return DynamicLibraryPosix::TryLoad(file_name);
 }
 
 }  // namespace iree

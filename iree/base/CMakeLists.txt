@@ -164,6 +164,7 @@ iree_cc_library(
   HDRS
     "dynamic_library.h"
   SRCS
+    "dynamic_library.cc"
     "dynamic_library_posix.cc"
     "dynamic_library_win32.cc"
   LINKOPTS
@@ -201,6 +202,7 @@ iree_cc_test(
     ::dynamic_library
     ::status
     ::status_matchers
+    ::target_platform
     iree::testing::gtest_main
 )
 

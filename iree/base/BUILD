@@ -141,6 +141,7 @@ cc_test(
 cc_library(
     name = "dynamic_library",
     srcs = [
+        "dynamic_library.cc",
         "dynamic_library_posix.cc",
         "dynamic_library_win32.cc",
     ],
@@ -169,11 +170,13 @@ cc_binary(
 cc_test(
     name = "dynamic_library_test",
     srcs = ["dynamic_library_test.cc"],
-    data = ["libdynamic_library_test_library.so"],
+    data = [":libdynamic_library_test_library.so"],
     deps = [
         ":dynamic_library",
         ":status",
         ":status_matchers",
+        ":target_platform",
+        "@com_google_absl//absl/strings",
         "//iree/testing:gtest_main",
     ],
 )

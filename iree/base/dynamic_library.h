@@ -17,6 +17,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/types/span.h"
 #include "iree/base/status.h"
@@ -44,14 +45,17 @@ class DynamicLibrary {
  public:
   virtual ~DynamicLibrary() = default;
 
-  // Loads the library at the null-terminated string |search_file_name|.
+  // Loads the library at the null-terminated string |file_name|.
+  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(const char* file_name);
+  // Loads the library at |file_name|.
   static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      const char* search_file_name) {
-    return Load(absl::Span<const char* const>({search_file_name}));
-  }
-  // Loads the library at the first name within |search_file_names| found.
+      const std::string& file_name);
+  // Loads the library at the first name within |file_names| found.
   static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
-      absl::Span<const char* const> search_file_names);
+      absl::Span<const char* const> file_names);
+  // Loads the library at the first name within |file_names| found.
+  static StatusOr<std::unique_ptr<DynamicLibrary>> Load(
+      const std::vector<std::string>& file_names);
 
   // Gets the name of the library file that is loaded.
   const std::string& file_name() const { return file_name_; }
@@ -67,6 +71,11 @@ class DynamicLibrary {
  protected:
   // Private constructor, use |Load| factory method instead.
   DynamicLibrary(std::string file_name) : file_name_(file_name) {}
+
+  // Note: platform-specific files must define this, and should forward to their
+  // own implementations.
+  static StatusOr<std::unique_ptr<DynamicLibrary>> TryLoad(
+      const char* file_name);
 
   std::string file_name_;
 };
