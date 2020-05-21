@@ -31,5 +31,5 @@ docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/cmake@sha256:959e6c23ac90fa2d47200263287cc49fb37683608996335cede68370b451cdc8 \
+  gcr.io/iree-oss/cmake@sha256:256d8aa56d5b50659581ff85a381848b14bcddc0dd9c9962baa4efa70b358aab \
   kokoro/gcp_ubuntu/cmake/build.sh

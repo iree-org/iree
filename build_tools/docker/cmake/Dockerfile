@@ -25,9 +25,9 @@ RUN apt-get update
 
 # Update cmake to v3.13+, which is ahead of apt-get's version (3.10.2).
 # Install dependencies, including an old version of cmake to bootstrap.
-RUN apt-get install -y clang cmake libssl-dev wget
 ENV CMAKE_VERSION 3.13.5
-RUN mkdir ./cmake_install \
+RUN apt-get install -y clang cmake libssl-dev wget \
+  && mkdir ./cmake_install \
   && cd cmake_install \
   && wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz \
   && tar -xzvf cmake-${CMAKE_VERSION}.tar.gz \
@@ -37,13 +37,15 @@ RUN mkdir ./cmake_install \
   && make install
 
 # Install dependencies.
-RUN apt-get install -y git
-RUN apt-get install -y ninja-build
-RUN apt-get install -y python3 python3-pip python3-setuptools
-
-# Install dependencies for the python bindings tests.
-RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install numpy absl-py
+RUN apt-get install -y \
+  git \
+  ninja-build \
+  python3 \
+  python3-pip \
+  python3-setuptools \
+  # Install dependencies for the python bindings tests.
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install numpy absl-py
 
 # Environment variables for IREE.
 ENV CC /usr/bin/clang
