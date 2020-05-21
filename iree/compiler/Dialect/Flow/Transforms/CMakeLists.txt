@@ -50,6 +50,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::Shape::Conversion
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
