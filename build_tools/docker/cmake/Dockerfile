@@ -44,3 +44,7 @@ RUN apt-get install -y python3 python3-pip python3-setuptools
 # Install dependencies for the python bindings tests.
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install numpy absl-py
+
+# Environment variables for IREE.
+ENV CC /usr/bin/clang
+ENV CXX /usr/bin/clang++
