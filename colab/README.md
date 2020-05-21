@@ -27,6 +27,14 @@ using IREE
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/master/colab/mnist_tensorflow.ipynb)
 
+### [resnet\.ipynb](resnet.ipynb)
+
+Loads a pretrained
+[ResNet50](https://www.tensorflow.org/api_docs/python/tf/keras/applications/ResNet50)
+model and runs it using IREE
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/master/colab/resnet.ipynb)
+
 ### [simple_tensorflow_module_import\.ipynb](simple_tensorflow_module_import.ipynb)
 
 Defines a simple TF module, saves it and loads it in IREE
