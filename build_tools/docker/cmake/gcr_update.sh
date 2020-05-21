@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds and pushes the rbe-toolchain image to gcr.io/iree-oss/
+# Builds and pushes the cmake image to gcr.io/iree-oss/
 
 set -x
 set -e
@@ -21,12 +21,13 @@ set -e
 # Ensure correct authorization.
 gcloud auth configure-docker
 
-# Build and push the rbe-toolchain image.
-docker build --tag gcr.io/iree-oss/rbe-toolchain build_tools/docker/rbe_toolchain/
-docker push gcr.io/iree-oss/rbe-toolchain
+# Build and push the cmake image.
+docker build --tag gcr.io/iree-oss/cmake build_tools/docker/cmake/
+docker push gcr.io/iree-oss/cmake
 
 echo '
-Remember to update the rbe_default digest in the WORKSPACE file to reflect the
-new digest for the container.
+Remember to update all of the files using the `cmake` image (e.g.
+/kokoro/gcp_ubuntu/cmake/build_kokoro.sh) to use the digest of the updated
+image.
 
 Use `docker images --digests` to view the digest.'

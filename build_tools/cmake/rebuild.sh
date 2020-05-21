@@ -27,9 +27,9 @@ CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 ninja --version
 
 cd ${ROOT_DIR?}
-if [ -d "build" ] 
+if [ -d "build" ]
 then
-  echo "Build directory already exists. Will use cached results there." 
+  echo "Build directory already exists. Will use cached results there."
 else
   echo "Build directory does not already exist. Creating a new one."
   mkdir build
@@ -43,4 +43,3 @@ cd build
                       -DIREE_BUILD_DEBUGGER=OFF \
                       -DIREE_BUILD_PYTHON_BINDINGS=ON ..
 "$CMAKE_BIN" --build .
-

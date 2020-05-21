@@ -28,7 +28,8 @@ export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
-# over from Bazel tags), every test should be labeled with the directory it is in.
+# over from Bazel tags), every test should be labeled with the directory it is
+# in.
 declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
@@ -37,19 +38,16 @@ declare -a label_exclude_args=(
   ^driver=vulkan$
   ^nokokoro$
 
-  # TODO(b/151445957) Enable the python tests when the Kokoro VMs support them.
-  # See also, https://github.com/google/iree/issues/1346.
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.
   # For example:
   #   ^bindings/python/pyiree/rt$
-  ^bindings$
+
   # Exclude all tests in some subdirectories.
   # Put the whole parent directory with only a starting anchor.
   # Use a trailing slash to avoid prefix collisions.
   # For example:
   #   ^bindings/
-  ^bindings/
 )
 
 # Join on "|"

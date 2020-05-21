@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the project with cmake using Kokoro.
+# Build and test the project within the gcr.io/iree-oss/cmake using Kokoro.
 
 set -e
 set -x
@@ -22,21 +22,14 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Check these exist and print the versions for later debugging
-export CMAKE_BIN="$(which cmake)"
-"$CMAKE_BIN" --version
-"$CC" --version
-"$CXX" --version
-python3 --version
+# Kokoro checks out the repository here.
+WORKDIR=${KOKORO_ARTIFACTS_DIR?}/github/iree
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
-# TODO(gcmn): It would be nice to be able to build and test as much as possible,
-# so a build failure only prevents building/testing things that depend on it and
-# we can still run the other tests.
-echo "Building with cmake"
-./build_tools/cmake/clean_build.sh
-
-echo "Testing with ctest"
-./build_tools/cmake/test.sh
+# Mount the checked out repository, make that the working directory and run the
+# tests in the cmake image.
+docker run \
+  --volume "${WORKDIR?}:${WORKDIR?}" \
+  --workdir="${WORKDIR?}" \
+  --rm \
+  gcr.io/iree-oss/cmake@sha256:256d8aa56d5b50659581ff85a381848b14bcddc0dd9c9962baa4efa70b358aab \
+  kokoro/gcp_ubuntu/cmake/build.sh
