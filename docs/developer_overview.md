@@ -193,6 +193,17 @@ For example, to inspect the module translated above:
 $ bazel run iree/tools:iree-dump-module -- /tmp/simple.module
 ```
 
+### Useful generic flags
+
+There are a few useful generic flags when working with IREE tools:
+
+#### `--iree_minloglevel` and `--iree_v`
+
+These flags can control IREE tool output verbosity. `--iree_minloglevel` and
+`--iree_v` set the minimal and maximal verbosity levels respectively. They both
+accept a number where 0, 1, 2, 3 stands for info, warning, error, and fatal
+error respectively.
+
 ### Useful Vulkan driver flags
 
 For IREE's Vulkan runtime driver, there are a few useful
