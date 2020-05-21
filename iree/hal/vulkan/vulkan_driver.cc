@@ -292,6 +292,8 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
                                     device_extensibility_spec_, syms(),
                                     renderdoc_capture_manager_.get()));
 
+  LOG(INFO) << "Created Vulkan Device: " << device->info().name();
+
   return device;
 }
 
