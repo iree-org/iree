@@ -22,11 +22,8 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-export CMAKE_BIN="$(which cmake)"
-export CC="$(which clang)"
-export CXX="$(which clang++)"
-
 # Check these exist and print the versions for later debugging
+export CMAKE_BIN="$(which cmake)"
 "$CMAKE_BIN" --version
 "$CC" --version
 "$CXX" --version
