@@ -34,7 +34,18 @@ namespace IREE {
 namespace HAL {
 
 int32_t getRoundedElementByteWidth(Type type) {
-  return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+  auto bitWidth = 0;
+  if (type.isIntOrFloat()) {
+    bitWidth = type.getIntOrFloatBitWidth();
+  } else if (type.isIndex()) {
+    bitWidth = IndexType::kInternalStorageBitWidth;
+  } else {
+    llvm_unreachable(
+        "getRoundedElementByteWidth only support int, float"
+        "and index type now.");
+  }
+
+  return (bitWidth + 8 - 1) / 8;
 }
 
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,

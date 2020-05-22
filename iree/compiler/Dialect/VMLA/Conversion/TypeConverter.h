@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -27,7 +28,18 @@ class VMLATypeConverter : public TypeConverter {
   // Returns the number of bytes an element of the given type occupies
   // post-conversion. For example, the size of i1 would be '1 byte'.
   static int32_t getRoundedElementByteWidth(Type type) {
-    return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+    auto bitWidth = 0;
+    if (type.isIntOrFloat()) {
+      bitWidth = type.getIntOrFloatBitWidth();
+    } else if (type.isIndex()) {
+      bitWidth = IndexType::kInternalStorageBitWidth;
+    } else {
+      llvm_unreachable(
+          "getRoundedElementByteWidth only support int, float"
+          "and index type now.");
+    }
+
+    return (bitWidth + 8 - 1) / 8;
   }
 
   // TODO(benvanik): signature conversion for output buffers.
