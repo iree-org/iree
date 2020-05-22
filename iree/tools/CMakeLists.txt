@@ -94,7 +94,6 @@ if(${IREE_ENABLE_LLVM})
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
     DEPS
-      LLVMMLIRTableGen
       MLIRSupport
       MLIRTableGen
       iree::compiler::Dialect::IREE::Tools

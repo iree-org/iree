@@ -21,10 +21,10 @@ iree_cc_library(
     "VMOpEncoderGen.cpp"
     "VMOpTableGen.cpp"
   DEPS
-    LLVMMLIRTableGen
     LLVMSupport
     LLVMTableGen
     MLIRSupport
+    MLIRTableGen
   ALWAYSLINK
   PUBLIC
 )
