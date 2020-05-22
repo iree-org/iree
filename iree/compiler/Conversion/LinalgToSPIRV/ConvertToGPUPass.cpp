@@ -405,25 +405,27 @@ void ConvertToGPUPass::runOnFunction() {
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
   OwningRewritePatternList patterns;
+
   patterns.insert<
+  // clang-format off
+#define ADD_ALL_LINALG_PATTERNS(OP_NAME)                                       \
+  MapLinalgOpToGlobalInvocationId<OP_NAME>,                                    \
+  MapLinalgOpToLocalInvocationId<OP_NAME>
 
-#define ADD_ALL_LINALG_PATTERNS(OP_NAME)    \
-  MapLinalgOpToGlobalInvocationId<OP_NAME>, \
-      MapLinalgOpToLocalInvocationId<OP_NAME>
-
-      ADD_ALL_LINALG_PATTERNS(linalg::ConvOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::CopyOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::FillOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::GenericOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::IndexedGenericOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::MatmulOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::PoolingMaxOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::PoolingMinOp),
-      ADD_ALL_LINALG_PATTERNS(linalg::PoolingSumOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::ConvOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::CopyOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::FillOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::GenericOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::IndexedGenericOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::MatmulOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::PoolingMaxOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::PoolingMinOp),
+    ADD_ALL_LINALG_PATTERNS(linalg::PoolingSumOp),
 
 #undef ADD_ALL_LINALG_PATTERNS
 
-      PartitionPLoopToWorkgroups, RemoveLinalgRange>(context);
+    PartitionPLoopToWorkgroups, RemoveLinalgRange>(context);
+  // clang-format on
 
   if (failed(applyFullConversion(funcOp, target, patterns)))
     return signalPassFailure();

@@ -39,7 +39,7 @@ namespace iree_compiler {
 
 static constexpr unsigned kMaxWorkgroupRank = 3;
 
-ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
+static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
   if (vector.empty()) return vector;
   auto numTrailingOnes = 0;
   for (unsigned i = vector.size() - 1; i > 0; --i) {
@@ -51,19 +51,60 @@ ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
   return vector.drop_back(numTrailingOnes);
 }
 
+/// Returns the number of "outer" parallel loops specified in the `linalgOp`.
+static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
+  if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
+    Optional<DenseIntElementsAttr> padding = convOp.padding();
+    if (padding) return convOp.getNumBatchDimensions();
+  }
+  return linalgOp.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) {
+        return attr.cast<StringAttr>().getValue() ==
+               getParallelIteratorTypeName();
+      })
+      .size();
+}
+
 /// Updates the workgroup size used for the dispatch region.
-void updateWorkGroupSize(Operation *op, ArrayRef<int64_t> workGroupSize) {
+static LogicalResult updateWorkGroupSize(FuncOp funcOp,
+                                         ArrayRef<int64_t> workGroupSize) {
   // Need to update both the surrounding FuncOp that has the spv.entry_point_abi
   // attribute, and the hal.executable.
-  FuncOp funcOp =
-      (isa<FuncOp>(op) ? cast<FuncOp>(op) : op->getParentOfType<FuncOp>());
-  MLIRContext *context = op->getContext();
-  SmallVector<int32_t, 3> workGroupSizeVec(llvm::map_range(
-      workGroupSize,
-      [](int64_t value) { return static_cast<int32_t>(value); }));
+  Region &body = funcOp.getBody();
+  if (!llvm::hasSingleElement(body))
+    return funcOp.emitError("unhandled dispatch function with multiple blocks");
+
+  SmallVector<int32_t, 3> workGroupSizeVec = llvm::to_vector<3>(llvm::map_range(
+      workGroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
+
+  // TODO(ravishankarm, antiagainst): We should have at most one scf.parallel
+  // op, but that is not the case till the splitting of kernels lands.
+  unsigned numParallelLoops = 0;
+  auto updateNumParallelLoops = [&numParallelLoops](unsigned nPar) {
+    numParallelLoops =
+        (!numParallelLoops ? nPar : std::min(numParallelLoops, nPar));
+  };
+  for (auto parallelLoop : body.front().getOps<scf::ParallelOp>()) {
+    updateNumParallelLoops(parallelLoop.getNumLoops());
+  }
+  // If there are no parallel loops, there might be linalg ops that arent
+  // tiled. Use that to get the number of parallel loops.
+  for (auto linalgOp : body.front().getOps<linalg::LinalgOp>()) {
+    updateNumParallelLoops(getNumOuterParallelLoops(linalgOp));
+  }
+  workGroupSizeVec.resize(numParallelLoops);
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";
+    llvm::dbgs() << "# workgroup sizes at end: [";
+    interleaveComma(workGroupSizeVec, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+  MLIRContext *context = funcOp.getContext();
   workGroupSizeVec.resize(3, 1);
   funcOp.setAttr(spirv::getEntryPointABIAttrName(),
                  spirv::getEntryPointABIAttr(workGroupSizeVec, context));
+  return success();
 }
 
 /// Returns the tile sizes to use by default based on number of dimension of
@@ -89,40 +130,41 @@ static void getDefaultTileSizes(unsigned numDims,
   tileSizes.push_back(32);
 }
 
-/// Returns the number of "outer" parallel loops specified in the `linalgOp`.
-static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
-  if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
-    Optional<DenseIntElementsAttr> padding = convOp.padding();
-    if (padding) return convOp.getNumBatchDimensions();
+/// Returns the tile sizes to use for given list of linalg operations.
+static LogicalResult getTileSizesImpl(ArrayRef<linalg::LinalgOp> linalgOps,
+                                      SmallVectorImpl<int64_t> &tileSizes) {
+  // For now hard-coding some special cases. The working assumption is that the
+  // tile sizes will be driven by ops like matmul, convolution, etc.
+  unsigned numParallelLoops = kMaxWorkgroupRank;
+  for (linalg::LinalgOp op : linalgOps) {
+    // If there is no marker on this op (i.e. a marker to prevent tile), add an
+    // explicit marker to indicate that the op is to be tiled. Makes subsequent
+    // lowering simpler.
+    if (!hasMarker(op)) setWorkGroupMarker(op);
+    numParallelLoops = std::min(numParallelLoops, getNumOuterParallelLoops(op));
   }
-  return linalgOp.iterator_types()
-      .getValue()
-      .take_while([](Attribute attr) {
-        return attr.cast<StringAttr>().getValue() ==
-               getParallelIteratorTypeName();
-      })
-      .size();
+  getDefaultTileSizes(numParallelLoops, tileSizes);
+  return success();
 }
 
 /// Returns the tile size to use for a linalg operation by following
 /// `workGroupSize`, if provided, or the default otherwise.
-static void getTileSizes(unsigned numParallelLoops,
-                         ArrayRef<int64_t> workGroupSize,
-                         SmallVectorImpl<int64_t> &tileSizes) {
+static LogicalResult getTileSizes(ArrayRef<linalg::LinalgOp> linalgOps,
+                                  ArrayRef<int64_t> workGroupSize,
+                                  SmallVectorImpl<int64_t> &tileSizes) {
   tileSizes.clear();
-  numParallelLoops = std::min(numParallelLoops, kMaxWorkgroupRank);
   if (!workGroupSize.empty()) {
     workGroupSize = dropTrailingOnes(workGroupSize);
-    auto rev = reverse(workGroupSize.take_front(numParallelLoops));
+    auto rev = reverse(workGroupSize);
     tileSizes.assign(rev.begin(), rev.end());
-    tileSizes.resize(numParallelLoops, 0);
-  } else {
-    getDefaultTileSizes(numParallelLoops, tileSizes);
+  } else if (failed(getTileSizesImpl(linalgOps, tileSizes))) {
+    return failure();
   }
   // Linalg convention is to use 0 for no tiling. If the workgroup size is
   // 1, then dont tile along that dimension. So overriding 1 to 0.
   for (auto &tileSize : tileSizes)
     if (tileSize == 1) tileSize = 0;
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -150,41 +192,22 @@ struct LinalgTileAndFusePass
   SmallVector<int64_t, 3> workGroupSize;
 };
 
-/// Tiling pattern which special cases pooling behavior to account for the fake
-/// memref case.
-template <typename LinalgPoolingOp>
-struct TileLinalgPoolingOpPattern
-    : public linalg::LinalgTilingPattern<LinalgPoolingOp> {
-  TileLinalgPoolingOpPattern(MLIRContext *context,
-                             linalg::LinalgTilingOptions options,
-                             linalg::LinalgMarker marker,
-                             PatternBenefit benefit = 1)
-      : linalg::LinalgTilingPattern<LinalgPoolingOp>(context, options, marker,
-                                                     benefit) {}
+/// Pattern to tile linalg operations if they have the workgroup marker.
+template <typename LinalgOp>
+struct TileLinalgOpPattern : public linalg::LinalgTilingPattern<LinalgOp> {
+  using linalg::LinalgTilingPattern<LinalgOp>::LinalgTilingPattern;
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(op);
-    // Linalg pooling ops has a fake window_dimension memref that has at least
-    // two uses. However, it doesn't affect because it is just a fake memref.
-    assert(isa<linalg::PoolingMaxOp>(op) || isa<linalg::PoolingMinOp>(op) ||
-           isa<linalg::PoolingSumOp>(op));
-
-    auto linalgOp = cast<linalg::LinalgOp>(op);
-    auto buffers = linalgOp.getInputsAndOutputBuffers();
-    // The second buffer is a fake memref.
-    if (!(*buffers.begin()).hasOneUse()) return failure();
-    buffers = llvm::drop_begin(buffers, 2);
-
-    // Check that all buffers have uses only in this op. In that case, just
-    // tile the operation.
-    // TODO(ravishankarm) : Use Linalg dependence graph information to make
-    // this decision.
-    for (Value buffer : buffers)
-      if (!allUsesInOperation(buffer, op)) return failure();
-    return linalg::LinalgTilingPattern<LinalgPoolingOp>::matchAndRewrite(
-        linalgOp, rewriter);
+    if (!hasWorkGroupMarker(op)) return failure();
+    if (succeeded(linalg::LinalgTilingPattern<LinalgOp>::matchAndRewrite(
+            op, rewriter)))
+      return success();
+    // Update the marker to map to global invocation ID.
+    rewriter.startRootUpdate(op);
+    setNoTileMarker(op);
+    rewriter.finalizeRootUpdate(op);
+    return success();
   }
 };
 }  // namespace
@@ -202,40 +225,36 @@ void LinalgTileAndFusePass::runOnFunction() {
   auto linalgOps = block.getOps<linalg::LinalgOp>();
   if (linalgOps.empty()) return;
 
-  // Compute the minimum number of outer parallel loops across linalg
-  // operations. This gives the dimensionality for tiling.
-  unsigned numParallelLoops = kMaxWorkgroupRank;
-  for (linalg::LinalgOp op : linalgOps)
-    numParallelLoops = std::min(numParallelLoops, getNumOuterParallelLoops(op));
-
   // Get the tile sizes to use for the lowering.
   SmallVector<int64_t, 3> tileSizes;
-  getTileSizes(numParallelLoops, workGroupSize, tileSizes);
+  SmallVector<linalg::LinalgOp, 1> opsVec(linalgOps.begin(), linalgOps.end());
+  if (failed(getTileSizes(opsVec, workGroupSize, tileSizes)))
+    return signalPassFailure();
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";
-    llvm::dbgs() << "# common parallel loops: " << numParallelLoops;
-    llvm::dbgs() << "\nworkgroup sizes: [";
+    llvm::dbgs() << "# workgroup sizes at start: [";
     interleaveComma(workGroupSize, llvm::dbgs());
     llvm::dbgs() << "]\ntile sizes: [";
     interleaveComma(tileSizes, llvm::dbgs());
     llvm::dbgs() << "]\n";
   });
 
-  OwningRewritePatternList patterns;
-  patterns.insert<linalg::LinalgTilingPattern<linalg::ConvOp>,
-                  linalg::LinalgTilingPattern<linalg::CopyOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>,
-                  linalg::LinalgTilingPattern<linalg::IndexedGenericOp>,
-                  linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  TileLinalgPoolingOpPattern<linalg::PoolingMaxOp>,
-                  TileLinalgPoolingOpPattern<linalg::PoolingMinOp>,
-                  TileLinalgPoolingOpPattern<linalg::PoolingSumOp>>(
+  OwningRewritePatternList tilingPatterns;
+  tilingPatterns.insert<TileLinalgOpPattern<linalg::ConvOp>,
+                        TileLinalgOpPattern<linalg::CopyOp>,
+                        TileLinalgOpPattern<linalg::FillOp>,
+                        TileLinalgOpPattern<linalg::GenericOp>,
+                        TileLinalgOpPattern<linalg::IndexedGenericOp>,
+                        TileLinalgOpPattern<linalg::MatmulOp>,
+                        TileLinalgOpPattern<linalg::PoolingMaxOp>,
+                        TileLinalgOpPattern<linalg::PoolingMinOp>,
+                        TileLinalgOpPattern<linalg::PoolingSumOp>>(
       context,
       linalg::LinalgTilingOptions().setTileSizes(tileSizes).setLoopType(
           linalg::LinalgTilingLoopType::ParallelLoops),
-      linalg::LinalgMarker(getWorkItemMarker()));
-  applyPatternsAndFoldGreedily(getOperation(), patterns);
+      linalg::LinalgMarker(getWorkGroupMarker(), getWorkItemMarker()));
+  applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
   // Update the workgroup size to be consistent with the tile sizes used. Note
   // the tile sizes are ordered from outer most to inner most loops. The
@@ -244,7 +263,8 @@ void LinalgTileAndFusePass::runOnFunction() {
   // get the workgroup size.
   SmallVector<int64_t, 3> updatedWorkGroupSize(reverse(tileSizes));
   updatedWorkGroupSize.resize(3, 1);
-  updateWorkGroupSize(funcOp, updatedWorkGroupSize);
+  if (failed(updateWorkGroupSize(funcOp, updatedWorkGroupSize)))
+    return signalPassFailure();
 }
 
 //===----------------------------------------------------------------------===//
