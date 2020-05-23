@@ -200,7 +200,7 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
   LogicalResult matchAndRewrite(
       CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CmpIOp::OperandAdaptor srcAdapter(operands);
+    CmpIOp::Adaptor srcAdapter(operands);
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
       case CmpIPredicate::eq:
@@ -256,7 +256,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::OperandAdaptor srcAdapter(operands);
+    typename SrcOpTy::Adaptor srcAdapter(operands);
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
                                          srcAdapter.lhs(), srcAdapter.rhs());
@@ -271,7 +271,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::OperandAdaptor srcAdaptor(operands);
+    typename SrcOpTy::Adaptor srcAdaptor(operands);
     auto type = srcOp.getType();
     if (!type.isSignlessInteger() || type.getIntOrFloatBitWidth() != kBits) {
       return failure();
@@ -306,7 +306,7 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   LogicalResult matchAndRewrite(
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SelectOp::OperandAdaptor srcAdaptor(operands);
+    SelectOp::Adaptor srcAdaptor(operands);
     IntegerType requiredType = IntegerType::get(32, srcOp.getContext());
     // Note: This check can correctly just be a verification that
     // actualType == requiredType, but since the VM type conversion also
@@ -358,7 +358,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
   LogicalResult matchAndRewrite(
       CallOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CallOp::OperandAdaptor srcAdaptor(operands);
+    CallOp::Adaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.
     VMTypeConverter typeConverter;
