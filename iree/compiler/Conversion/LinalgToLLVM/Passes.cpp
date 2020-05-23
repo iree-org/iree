@@ -40,6 +40,7 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createLowerToCFGPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+  passManager.addPass(createResolveShapeOpsPass());
 
   // Convert ExecuableOp entry function to use memref arguments.
   passManager.addPass(createHALInterfaceToMemrefArgumentsPass());
