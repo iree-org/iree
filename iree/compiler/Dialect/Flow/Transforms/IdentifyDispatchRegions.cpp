@@ -42,7 +42,7 @@
 #include "mlir/Transforms/Utils.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
-#define DEBUG_TYPE "iree-dispatch"
+#define DEBUG_TYPE "iree-dispatch-detail"
 
 namespace mlir {
 namespace iree_compiler {

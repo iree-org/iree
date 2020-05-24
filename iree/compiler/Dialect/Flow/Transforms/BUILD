@@ -20,12 +20,14 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "DispatchConfig.cpp",
         "DispatchabilityAnalysis.cpp",
         "FlattenTuplesInCFG.cpp",
         "FoldCompatibleDispatchRegions.cpp",
         "FormStreams.cpp",
         "HLOToHLOPreprocessing.cpp",
         "HoistUnstreamableOps.cpp",
+        "IdentifyDispatchRegions2.cpp",
         "IdentifyDispatchRegions.cpp",
         "LegalizeInputTypes.cpp",
         "MaterializeExportedReflection.cpp",

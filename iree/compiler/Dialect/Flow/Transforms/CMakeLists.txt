@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "DispatchConfig.cpp"
     "DispatchabilityAnalysis.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
@@ -27,6 +28,7 @@ iree_cc_library(
     "HLOToHLOPreprocessing.cpp"
     "HoistUnstreamableOps.cpp"
     "IdentifyDispatchRegions.cpp"
+    "IdentifyDispatchRegions2.cpp"
     "LegalizeInputTypes.cpp"
     "MaterializeExportedReflection.cpp"
     "MergeExportedReflection.cpp"
