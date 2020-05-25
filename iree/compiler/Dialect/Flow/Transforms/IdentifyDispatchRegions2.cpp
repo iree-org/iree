@@ -15,6 +15,7 @@
 #include <algorithm>
 
 #include "iree/compiler/Dialect/Flow/Analysis/Dispatchability.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchConfig.h"
 #include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
@@ -33,24 +34,6 @@ namespace Flow {
 
 namespace {
 
-// Clones an operation with new result types.
-Operation *cloneWithNewResultTypes(
-    Operation *op, llvm::SmallVectorImpl<Type> &newResultTypes) {
-  OperationState state(op->getLoc(), op->getName());
-  state.addOperands(op->getOperands());
-  state.addTypes(newResultTypes);
-  state.addSuccessors(op->getSuccessors());
-  state.addAttributes(op->getAttrs());
-  for (unsigned i = 0, e = op->getNumRegions(); i < e; ++i) {
-    state.addRegion();
-  }
-  Operation *newOp = Operation::create(state);
-  for (unsigned i = 0, e = op->getNumRegions(); i < e; ++i) {
-    newOp->getRegion(i).takeBody(op->getRegion(i));
-  }
-  return newOp;
-}
-
 struct DispatchableOp {
   OpDispatchPolicy::AnchorBenefit anchorBenefit;
   size_t index;
@@ -65,180 +48,47 @@ struct DispatchableOp {
 };
 
 struct DispatchRegion {
-  IREE::Flow::DispatchRegionOp op;
+  DispatchRegionOp op;
   Operation *anchorOp;
 
   Block &getEntryBlock() { return op.body().front(); }
 
-  // Appends results to the dispatch region. This will re-allocate the
-  // DispatchRegionOp itself but preserve the contained body block.
-  // Returns a ResultRange for the new dispatch region op's results
-  // corresponding to addlResults.
-  ResultRange appendResults(llvm::SmallVectorImpl<Value> &addlResults) {
-    Location loc = op.getLoc();
-    Block &block = getEntryBlock();
+  static llvm::Optional<DispatchRegion> form(Operation *anchorOp) {
+    auto loc = anchorOp->getLoc();
+    if (anchorOp->getNumResults() < 1) {
+      emitError(loc) << "dispatch anchor op must have at least one result: "
+                     << *anchorOp;
+      return llvm::None;
+    }
+    Value result = anchorOp->getResult(0);
+    Value workload = calculateWorkload(anchorOp, result);
+    if (!workload) return llvm::None;
 
-    unsigned origNumResults = op.getNumResults();
-    llvm::SmallVector<Type, 4> newTypes(op.getResultTypes().begin(),
-                                        op.getResultTypes().end());
-    for (auto r : addlResults) newTypes.push_back(r.getType());
+    OpBuilder builder(anchorOp->getContext());
+    auto created =
+        DispatchRegionOp::formFromAnchorOp(workload, anchorOp, builder);
+    if (!created) return llvm::None;
+    return DispatchRegion{created->first, created->second};
+  }
 
-    // Changing the arity of the results requires replacing the dispatch region.
-    OpBuilder builder(op);
-    auto newDrOp = llvm::cast<IREE::Flow::DispatchRegionOp>(
-        builder.insert(cloneWithNewResultTypes(op, newTypes)));
-    op.replaceAllUsesWith(ResultRange(newDrOp, 0, origNumResults));
-    op.erase();
-    op = newDrOp;
-
-    // Add results to the terminator.
-    auto terminator = getEntryBlock().getTerminator();
-    llvm::SmallVector<Value, 4> returns(terminator->getOperands());
-    returns.append(addlResults.begin(), addlResults.end());
-    terminator->setOperands(returns);
-
-    return ResultRange(op, origNumResults, addlResults.size());
+  // After a call to inlineDispatchOp, adds the results of the inlined op to
+  // the dispatch region's results and redirects any uses outside of the
+  // dispatch region.
+  void returnAndReplaceUses(Operation *origOp, Operation *inlinedOp) {
+    // Extend the arity of the dispatch region.
+    OpBuilder builder(op.getContext());
+    llvm::SmallVector<Value, 4> addlResults(inlinedOp->getResults());
+    origOp->replaceAllUsesWith(
+        DispatchRegionOp::appendResults(op, addlResults, builder));
   }
 };
-
-// Utility class to optimize a "closure" op, which maintains a variadic
-// list of operands corresponding to entry block arguments.
-class ClosureOpOptimizer {
- public:
-  ClosureOpOptimizer(Operation *closureOp, Block &entryBlock,
-                     unsigned variadicOffset)
-      : closureOp(closureOp),
-        entryBlock(entryBlock),
-        variadicOffset(variadicOffset),
-        blockArgReplacements(entryBlock.getNumArguments()) {
-    assert(closureOp->getNumOperands() ==
-           entryBlock.getNumArguments() + variadicOffset);
-
-    // Build data structure for unused operand elision.
-    for (auto it : llvm::enumerate(entryBlock.getArguments())) {
-      BlockArgument blockArg = it.value();
-      Value opArg = closureOp->getOperand(it.index() + variadicOffset);
-      if (blockArg.getUses().empty()) {
-        // Not used - Drop.
-        needsOperandElision = true;
-        blockArgReplacements[it.index()] = BlockArgument();
-        continue;
-      }
-      auto existingIt = argToBlockMap.find(opArg);
-      if (existingIt == argToBlockMap.end()) {
-        // Not found - Record for deduping.
-        argToBlockMap.insert(std::make_pair(opArg, blockArg));
-      } else {
-        // Found - Replace.
-        needsOperandElision = true;
-        blockArgReplacements[it.index()] = existingIt->second;
-      }
-    }
-
-    // Check for unused results.
-    for (auto result : closureOp->getResults()) {
-      if (result.getUses().empty()) {
-        needsResultElision = true;
-        break;
-      }
-    }
-  }
-
-  bool getNeedsOptimization() {
-    return needsOperandElision || needsResultElision;
-  }
-
-  Operation *optimize() {
-    if (needsResultElision) elideUnusedResults();
-    if (needsOperandElision) elideUnusedOperands();
-    return closureOp;
-  }
-
- private:
-  void elideUnusedOperands() {
-    llvm::SmallVector<Value, 8> newOperands(
-        closureOp->operand_begin(),
-        closureOp->operand_begin() + variadicOffset);
-    unsigned blockArgIndex = 0;
-    for (auto it : llvm::enumerate(blockArgReplacements)) {
-      llvm::Optional<BlockArgument> replacement = it.value();
-      Value currentOpArg = closureOp->getOperand(it.index() + variadicOffset);
-      if (!replacement) {
-        // No change.
-        newOperands.push_back(currentOpArg);
-        blockArgIndex++;
-        continue;
-      } else if (!replacement.getValue()) {
-        // Drop.
-        entryBlock.eraseArgument(blockArgIndex);
-        continue;
-      } else {
-        // Replace.
-        BlockArgument currentBlockArg = entryBlock.getArgument(blockArgIndex);
-        currentBlockArg.replaceAllUsesWith(*replacement);
-        entryBlock.eraseArgument(blockArgIndex);
-      }
-    }
-
-    closureOp->setOperands(newOperands);
-  }
-
-  void elideUnusedResults() {
-    // Determine the result signature transform needed.
-    llvm::SmallVector<unsigned, 4> resultIndexMap;
-    llvm::SmallVector<Type, 4> newResultTypes;
-    for (auto it : llvm::enumerate(closureOp->getResults())) {
-      if (!it.value().getUses().empty()) {
-        newResultTypes.push_back(it.value().getType());
-        resultIndexMap.push_back(it.index());
-      }
-    }
-
-    // Re-allocate the op.
-    OpBuilder builder(closureOp);
-    Operation *newOp =
-        builder.insert(cloneWithNewResultTypes(closureOp, newResultTypes));
-
-    // Remap all returns.
-    llvm::SmallVector<Value, 4> newReturns(resultIndexMap.size());
-    newOp->walk([&](IREE::Flow::ReturnOp terminator) {
-      for (unsigned i = 0, e = resultIndexMap.size(); i < e; ++i) {
-        newReturns[i] = terminator.getOperand(resultIndexMap[i]);
-      }
-      terminator.getOperation()->setOperands(newReturns);
-    });
-
-    // Replace original uses.
-    for (unsigned i = 0, e = resultIndexMap.size(); i < e; ++i) {
-      closureOp->getResult(resultIndexMap[i])
-          .replaceAllUsesWith(newOp->getResult(i));
-    }
-    closureOp->erase();
-    closureOp = newOp;
-  }
-
-  Operation *closureOp;
-  Block &entryBlock;
-  unsigned variadicOffset;
-  llvm::SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements;
-  llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
-  bool needsOperandElision = false;
-  bool needsResultElision = false;
-};
-
-// TODO: Make a method on DispatchRegionOP.
-IREE::Flow::DispatchRegionOp optimizeDispatchRegion(
-    IREE::Flow::DispatchRegionOp drOp) {
-  ClosureOpOptimizer opt(drOp, drOp.body().front(), 1);
-  Operation *newOp = opt.optimize();
-  return llvm::cast<IREE::Flow::DispatchRegionOp>(newOp);
-}
 
 // Clones and hoists any identity metadata ops from the operands and results
 // of the dispatch region back out into the surrounding block.
 // This function is not general purpose: it only knows how to undo sinking
 // done by dispatch region formation.
-void hoistDispatchRegionMetadataOps(DispatchRegion &dr, OpDispatchPolicy &policy) {
+void hoistDispatchRegionMetadataOps(DispatchRegion &dr,
+                                    OpDispatchPolicy &policy) {
   BlockAndValueMapping mapping;
   Block &block = dr.getEntryBlock();
   for (unsigned i = 0, e = block.getNumArguments(); i < e; ++i) {
@@ -250,8 +100,8 @@ void hoistDispatchRegionMetadataOps(DispatchRegion &dr, OpDispatchPolicy &policy
     auto &blockArg = it.value();
     for (auto &blockUse : blockArg.getUses()) {
       Operation *useOp = blockUse.getOwner();
-      if (!policy.isIdentityMetadata(useOp) ||
-          useOp->getOperand(0) != blockArg) continue;
+      if (!policy.isIdentityMetadata(useOp) || useOp->getOperand(0) != blockArg)
+        continue;
       OpBuilder builder(dr.op);
       Operation *newOp = builder.clone(*useOp, mapping);
       dr.op.argsMutable().slice(it.index(), 1).assign(newOp->getResult(0));
@@ -260,7 +110,7 @@ void hoistDispatchRegionMetadataOps(DispatchRegion &dr, OpDispatchPolicy &policy
 
   // Hoist metadata ops from the result edge.
   // Since initial formation can only have a single block, this is safe.
-  auto *terminator = block.getTerminator();  
+  auto *terminator = block.getTerminator();
   for (auto it : llvm::enumerate(terminator->getOperands())) {
     Operation *defOp = it.value().getDefiningOp();
     if (!defOp || !policy.isIdentityMetadata(defOp)) continue;
@@ -278,108 +128,12 @@ void findDispatchableAnchorOps(Block &block, OpDispatchPolicy &policy,
   for (auto it : llvm::enumerate(block.getOperations())) {
     Operation *op = &it.value();
     // Skip any already formed dispatch regions and non dispatchable ops.
-    if (isa<IREE::Flow::DispatchRegionOp>(op)) continue;
+    if (isa<DispatchRegionOp>(op)) continue;
     if (!policy.isDispatchable(op)) continue;
     OpDispatchPolicy::AnchorBenefit anchorBenefit = policy.getAnchorBenefit(op);
     if (anchorBenefit > maxAnchorBenefit || anchorBenefit <= 0) continue;
     ops.push_back({anchorBenefit, it.index(), op});
   }
-}
-
-llvm::Optional<DispatchRegion> formDispatchRegion(Block &block,
-                                                  Operation *anchorOp) {
-  OpBuilder b(anchorOp);
-  auto loc = anchorOp->getLoc();
-  if (anchorOp->getNumResults() < 1) {
-    emitError(loc) << "dispatch anchor op must have at least one result: "
-                   << *anchorOp;
-    return llvm::None;
-  }
-  Value result = anchorOp->getResult(0);
-  Value workload = calculateWorkload(anchorOp, result);
-  if (!workload) return llvm::None;
-
-  // Map anchor into new dispatch region.
-  llvm::SmallVector<Value, 4> capturedInputs(anchorOp->getOperands());
-  llvm::SmallVector<Type, 1> types(anchorOp->getResultTypes().begin(),
-                                   anchorOp->getResultTypes().end());
-  auto drOp = b.create<IREE::Flow::DispatchRegionOp>(loc, types, workload,
-                                                     capturedInputs);
-  auto *drBlock = new Block();
-  drOp.body().push_back(drBlock);
-  BlockAndValueMapping mapping;
-  for (Value capturedInput : capturedInputs) {
-    auto blockArg = drBlock->addArgument(capturedInput.getType());
-    mapping.map(capturedInput, blockArg);
-  }
-
-  // Create new body.
-  OpBuilder drBuilder = OpBuilder::atBlockEnd(drBlock);
-  auto *newAnchorOp = drBuilder.clone(*anchorOp, mapping);
-  drBuilder.create<IREE::Flow::ReturnOp>(loc, newAnchorOp->getResults());
-
-  // Replace anchor uses with region result.
-  for (auto it : llvm::enumerate(anchorOp->getResults())) {
-    it.value().replaceAllUsesWith(drOp.getResult(it.index()));
-  }
-  anchorOp->erase();
-  return DispatchRegion{drOp, newAnchorOp};
-}
-
-Operation *inlineDispatchOp(DispatchRegion &dispatchRegion, Operation *origOp,
-                            OpBuilder &builder) {
-  auto drOp = dispatchRegion.op;
-  Location loc = origOp->getLoc();
-
-  // Map existing dr args.
-  BlockAndValueMapping mapping;
-  Block &block = dispatchRegion.getEntryBlock();
-  for (unsigned i = 0, e = block.getNumArguments(); i < e; ++i) {
-    mapping.map(drOp.args()[i], block.getArgument(i));
-  }
-
-  // Also map any terminator operands to support inlining at the end.
-  for (auto it : llvm::enumerate(block.getTerminator()->getOperands())) {
-    mapping.map(drOp.getResult(it.index()), it.value());
-  }
-
-  // Remember the values corresponding to original op results.
-  llvm::SmallVector<Value, 4> origOpResultValues;
-  for (Value result : origOp->getResults()) {
-    origOpResultValues.push_back(mapping.lookupOrNull(result));
-  }
-
-  // Add arguments for any op arguments that need to be captured.
-  for (Value newArgument : origOp->getOperands()) {
-    if (mapping.contains(newArgument)) continue;
-    drOp.getOperation()->insertOperands(drOp.getNumOperands(), {newArgument});
-    Value newBlockArgument = block.addArgument(newArgument.getType());
-    mapping.map(newArgument, newBlockArgument);
-  }
-
-  // Clone the op.
-  Operation *inlinedOp = builder.clone(*origOp, mapping);
-
-  // Replace any results from the orig with results from the clone.
-  for (unsigned i = 0, e = origOp->getNumResults(); i < e; ++i) {
-    Value resultFrom = origOp->getResult(i);
-    Value resultTo = origOpResultValues[i];
-    if (resultTo) {
-      resultTo.replaceAllUsesWith(inlinedOp->getResult(i));
-    }
-  }
-
-  return inlinedOp;
-}
-
-// After a call to inlineDispatchOp, adds the results of the inlined op to
-// the dispatch region's results and redirects any uses outside of the dispatch
-// region.
-void returnAndReplaceUses(DispatchRegion &dr, Operation *origOp,
-                          Operation *inlinedOp) {
-  // Extend the arity of the dispatch region.
-  llvm::SmallVector<Value, 4> addlResults(inlinedOp->getResults());
-  origOp->replaceAllUsesWith(dr.appendResults(addlResults));
 }
 
 // Returns whether the op has no uses on all of its results.
@@ -478,9 +232,8 @@ LogicalResult fuseInputs(DispatchRegion &dispatchRegion,
     // ordering.
     LLVM_DEBUG(llvm::dbgs() << "- FUSABLE INPUT(" << static_cast<int>(action)
                             << "): " << *nextOp << "\n");
-    Block &entryBlock = dispatchRegion.getEntryBlock();
-    auto builder = OpBuilder::atBlockBegin(&entryBlock);
-    auto *inlinedOp = inlineDispatchOp(dispatchRegion, nextOp, builder);
+    OpBuilder builder(nextOp->getContext());
+    auto *inlinedOp = dispatchRegion.op.inlineOp(nextOp, builder);
     if (!inlinedOp) {
       return failure();
     }
@@ -492,7 +245,7 @@ LogicalResult fuseInputs(DispatchRegion &dispatchRegion,
     // makes this simple check safe.
     // The dispatch region must be optimized to remove unused arguments
     // resulting from this fusion.
-    dispatchRegion.op = optimizeDispatchRegion(dispatchRegion.op);
+    DispatchRegionOp::dceOperandsAndResults(dispatchRegion.op);
     if (opHasNoUses(nextOp)) {
       nextOp->erase();
     }
@@ -527,13 +280,13 @@ LogicalResult fuseOutputs(DispatchRegion &dispatchRegion,
     // Since results will be redirected to the region results, need to scan
     // for worklist items before changing use-def chain.
     worklist.addResultUses(nextOp->getResults());
-    Block &entryBlock = dispatchRegion.getEntryBlock();
-    auto builder = OpBuilder::atBlockTerminator(&entryBlock);
-    auto *inlinedOp = inlineDispatchOp(dispatchRegion, nextOp, builder);
+    OpBuilder builder(nextOp->getContext());
+    auto *inlinedOp =
+        dispatchRegion.op.inlineOp(nextOp, builder, /*positionAtEnd=*/true);
     if (!inlinedOp) {
       return failure();
     }
-    returnAndReplaceUses(dispatchRegion, nextOp, inlinedOp);
+    dispatchRegion.returnAndReplaceUses(nextOp, inlinedOp);
     if (opHasNoUses(nextOp)) {
       nextOp->erase();
     }
@@ -564,7 +317,7 @@ LogicalResult processBlock(Block &block, OpDispatchPolicy &policy) {
     if (d.anchorBenefit <= 0) break;
     LLVM_DEBUG(llvm::dbgs() << "FORM DISPATCH REGION(" << d.index << ":"
                             << d.anchorBenefit << "): " << *d.op << "\n");
-    auto dispatchRegion = formDispatchRegion(block, d.op);
+    auto dispatchRegion = DispatchRegion::form(d.op);
     if (!dispatchRegion) return failure();
     dispatchRegions.insert(
         std::make_pair(dispatchRegion->op, dispatchRegion->anchorOp));
@@ -575,7 +328,7 @@ LogicalResult processBlock(Block &block, OpDispatchPolicy &policy) {
     if (failed(fuseInputs(*dispatchRegion, policy))) return failure();
 
     // Ensure all unused operands and results are dce'd.
-    dispatchRegion->op = optimizeDispatchRegion(dispatchRegion->op);
+    DispatchRegionOp::dceOperandsAndResults(dispatchRegion->op);
     hoistDispatchRegionMetadataOps(*dispatchRegion, policy);
   }
   return success();
