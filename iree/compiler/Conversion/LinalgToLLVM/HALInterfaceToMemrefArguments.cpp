@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -50,6 +51,7 @@ bool operator<(IREE::HAL::InterfaceBindingOp aOp,
   return aOp.set().getZExtValue() < bOp.set().getZExtValue();
 }
 
+
 /// A pattern to process function interface. It replaces interface related ops
 /// with function arguments to match LLVM's CodeGen's ABI contract.
 ///
@@ -78,12 +80,16 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
           funcOp, "entry function should not have inputs");
 
     // Get interface buffers from all the blocks.
-    // TODO: Also handle hal.interface.load.constant for dynamic shape.
     SmallVector<IREE::PlaceholderOp, 8> bufferOps;
+    SmallVector<IREE::HAL::InterfaceLoadConstantOp, 8> loadOps;
     for (Block& block : funcOp.getBlocks()) {
-      for (Operation& op : block)
+      for (Operation& op : block) {
         if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
           bufferOps.push_back(phOp);
+        if (auto phOp = dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
+          loadOps.push_back(phOp);
+        }
+      }
     }
 
     if (bufferOps.empty()) return failure();
@@ -122,6 +128,10 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
         ++argIndex;
       }
     }
+    SmallVector<int64_t, 4> shapes;
+    shapes.push_back(ShapedType::kDynamicSize);
+    Type push_constants_type = MemRefType::get(shapes, rewriter.getIntegerType(32));
+    signatureConverter.addInputs(push_constants_type);
 
     // Create the new function's signature.
     Location loc = funcOp.getLoc();
@@ -143,10 +153,27 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     for (auto bufferOp : bufferOps) {
       bufferOp.replaceAllUsesWith(
           newFuncOp.getArgument(bufferArgMap[bufferOp]));
+    
       rewriter.eraseOp(bufferOp);
     }
 
     rewriter.eraseOp(funcOp);
+    Type indexType = rewriter.getIndexType();
+    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
+    for (auto loadOp: loadOps) {
+      auto loc = newFuncOp.front().front().getLoc();
+      // Value dim = builder.create<ConstantOp>(newFuncOp.front().front().getLoc(), indexType, rewriter.getIntegerAttr(indexType, 3));
+      // auto dim = builder.create<mlir::DimOp>(newFuncOp.front().front().getLoc(), newFuncOp.getArgument(0), loadOp.offset().getZExtValue());
+      // auto dim = builder.create<mlir::DimOp>(newFuncOp.front().front().getLoc(), newFuncOp.getArgument(0), 0);
+      SmallVector<Value, 4> indices;
+      Value constant_offset = builder.create<ConstantOp>(loc, indexType, rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
+      indices.push_back(constant_offset);
+      Value load_constant = builder.create<LoadOp>(loc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
+      Value load_contant_index = builder.create<IndexCastOp>(loc, load_constant, indexType);
+      loadOp.replaceAllUsesWith(load_contant_index);
+      //rewriter.replaceOp(loadOp, ValueRange({dim}));
+      rewriter.eraseOp(loadOp);
+    }
     return success();
   }
 };
