@@ -101,6 +101,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass();
 // flow.dispatch_regions.
 std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegionsPass();
 
+// Identifies dispatchable regions of functions and wraps them in
+// flow.dispatch_regions (version 2).
+std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegions2Pass();
+
 // Folds multiple dispatch regions together that have compatible workloads.
 std::unique_ptr<OperationPass<FuncOp>>
 createFoldCompatibleDispatchRegionsPass();
@@ -150,6 +154,7 @@ inline void registerFlowPasses() {
   createMergeExportedReflection();
   createDispatchabilityAnalysisPass();
   createIdentifyDispatchRegionsPass();
+  createIdentifyDispatchRegions2Pass();
   createFoldCompatibleDispatchRegionsPass();
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();

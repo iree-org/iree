@@ -16,6 +16,7 @@
 #include <numeric>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -38,6 +39,41 @@ namespace IREE {
 namespace Flow {
 
 //===----------------------------------------------------------------------===//
+// Dispatch regions
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DceDispatchRegion : public OpRewritePattern<DispatchRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchRegionOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.body().empty()) return failure();
+    ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/1);
+    if (!dce.needsOptimization()) return failure();
+
+    bool newOperation = dce.needsNewOperation();
+    if (!newOperation) {
+      rewriter.startRootUpdate(op);
+      dce.optimize(rewriter);
+      rewriter.finalizeRootUpdate(op);
+    } else {
+      dce.optimize(rewriter, /*eraseOriginal=*/false);
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
+}  // namespace
+
+void DispatchRegionOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<DceDispatchRegion>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // Streams
 //===----------------------------------------------------------------------===//
 
@@ -46,69 +82,24 @@ namespace {
 // Optimizes stream fragment arguments by:
 //   - Removing any that are not used in the body
 //   - Deduping arguments that refer to the same Value
-struct OptimizeStreamFragmentArgs
-    : public OpRewritePattern<ExStreamFragmentOp> {
+struct DceStreamFragment : public OpRewritePattern<ExStreamFragmentOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(ExStreamFragmentOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.body().empty()) return failure();
+    ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/0);
+    if (!dce.needsOptimization()) return failure();
 
-    bool needsMod = false;
-    Block *entryBlock = &op.body().front();
-    llvm::SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements(
-        entryBlock->getNumArguments());
-    assert(op.args().size() == blockArgReplacements.size());
-    llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
-    for (auto it :
-         llvm::enumerate(llvm::zip(op.args(), entryBlock->getArguments()))) {
-      Value opArg = std::get<0>(it.value());
-      BlockArgument blockArg = std::get<1>(it.value());
-      if (blockArg.getUses().empty()) {
-        // Not used - Drop.
-        needsMod = true;
-        blockArgReplacements[it.index()] = BlockArgument();
-        continue;
-      }
-      auto existingIt = argToBlockMap.find(opArg);
-      if (existingIt == argToBlockMap.end()) {
-        // Not found - Record for deduping.
-        argToBlockMap.insert(std::make_pair(opArg, blockArg));
-      } else {
-        // Found - Replace.
-        needsMod = true;
-        blockArgReplacements[it.index()] = existingIt->second;
-      }
+    bool newOperation = dce.needsNewOperation();
+    if (!newOperation) {
+      rewriter.startRootUpdate(op);
+      dce.optimize(rewriter);
+      rewriter.finalizeRootUpdate(op);
+    } else {
+      dce.optimize(rewriter, /*eraseOriginal=*/false);
+      rewriter.eraseOp(op);
     }
-
-    if (!needsMod) return failure();
-
-    rewriter.startRootUpdate(op);
-    llvm::SmallVector<Value, 8> newArgs;
-    unsigned blockArgIndex = 0;
-    for (auto it : llvm::zip(op.args(), blockArgReplacements)) {
-      Value currentOpArg = std::get<0>(it);
-      llvm::Optional<BlockArgument> replacement = std::get<1>(it);
-      if (!replacement) {
-        // No change.
-        newArgs.push_back(currentOpArg);
-        blockArgIndex++;
-        continue;
-      } else if (!replacement.getValue()) {
-        // Drop.
-        entryBlock->eraseArgument(blockArgIndex);
-        continue;
-      } else {
-        // Replace.
-        BlockArgument currentBlockArg = entryBlock->getArgument(blockArgIndex);
-        currentBlockArg.replaceAllUsesWith(*replacement);
-        entryBlock->eraseArgument(blockArgIndex);
-      }
-    }
-
-    op.getOperation()->setOperands(newArgs);
-    rewriter.finalizeRootUpdate(op);
-
     return success();
   }
 };
@@ -117,7 +108,7 @@ struct OptimizeStreamFragmentArgs
 
 void ExStreamFragmentOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<OptimizeStreamFragmentArgs>(context);
+  results.insert<DceStreamFragment>(context);
 }
 
 //===----------------------------------------------------------------------===//

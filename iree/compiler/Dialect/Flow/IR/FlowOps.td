@@ -196,8 +196,39 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
   let regions = (region AnyRegion:$body);
 
   let extraClassDeclaration = [{
+    /// Forms a dispatch region around a given anchor operation, returning
+    /// the new DispatchRegionOp and anchor operation within the region.
+    /// Returns llvm::None on failure.
+    /// The insertion point of the OpBuilder will be modified.
+    static llvm::Optional<std::pair<DispatchRegionOp, Operation *>> 
+        formFromAnchorOp(Value workload, Operation *anchorOp, 
+                         OpBuilder &builder);
+
+    /// Performs an in-place DCE optimization on unused operands and results.
+    /// Note that this may or may not re-allocate the op. If so, the reference
+    /// will be updated.
+    static void dceOperandsAndResults(DispatchRegionOp &op);
+
+    // Appends results to the dispatch region. This will re-allocate the
+    // DispatchRegionOp itself but preserve the contained body block.
+    // Returns a ResultRange for the new dispatch region op's results
+    // corresponding to addlResults.
+    static ResultRange appendResults(
+        DispatchRegionOp &self, ValueRange addlResults, OpBuilder &builder);
+
     /// Returns the index of the args() operand in the Operation operands list.
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + 1; }
+
+    /// Inlines an op into the dispatch region.
+    /// By default, this will inline the op at the beginning of the region.
+    /// Set positionAtEnd=true to inline at the end. This is not a general
+    /// IR splicing helper: it can only inline ops with inputs that map to
+    /// either captured operands or results and is used to coelesce an op
+    /// into an adjacent dispatch region.
+    /// Note that the original op is cloned but not erased. It is up to the
+    /// caller to cleanup the original op as needed.
+    Operation *inlineOp(Operation *origOp, OpBuilder &builder, 
+        bool positionAtEnd=false);
   }];
 
   let skipDefaultBuilders = 1;
@@ -208,6 +239,8 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
       ArrayRef<NamedAttribute> attributes = {}
     }]>,
   ];
+
+  let hasCanonicalizer = 1;  
 }
 
 def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {

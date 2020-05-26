@@ -14,9 +14,11 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -262,6 +264,117 @@ static LogicalResult verifyVariableStoreIndirectOp(
 //===----------------------------------------------------------------------===//
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
+
+llvm::Optional<std::pair<DispatchRegionOp, Operation *>>
+DispatchRegionOp::formFromAnchorOp(Value workload, Operation *anchorOp,
+                                   OpBuilder &builder) {
+  builder.setInsertionPoint(anchorOp);
+  auto loc = anchorOp->getLoc();
+  // Map anchor into new dispatch region.
+  llvm::SmallVector<Value, 4> capturedInputs(anchorOp->getOperands());
+  auto drOp = builder.create<DispatchRegionOp>(
+      loc, llvm::to_vector<1>(anchorOp->getResultTypes()), workload,
+      capturedInputs);
+  auto *drBlock = new Block();
+  drOp.body().push_back(drBlock);
+  BlockAndValueMapping mapping;
+  for (Value capturedInput : capturedInputs) {
+    auto blockArg = drBlock->addArgument(capturedInput.getType());
+    mapping.map(capturedInput, blockArg);
+  }
+
+  // Create new body.
+  builder.setInsertionPointToEnd(drBlock);
+  auto *newAnchorOp = builder.clone(*anchorOp, mapping);
+  builder.create<IREE::Flow::ReturnOp>(loc, newAnchorOp->getResults());
+
+  // Replace anchor uses with region result.
+  for (auto it : llvm::enumerate(anchorOp->getResults())) {
+    it.value().replaceAllUsesWith(drOp.getResult(it.index()));
+  }
+  anchorOp->erase();
+  return std::make_pair(drOp, newAnchorOp);
+}
+
+void DispatchRegionOp::dceOperandsAndResults(DispatchRegionOp &op) {
+  OpBuilder builder(op.getContext());
+  ClosureOpDce dce(op, op.body().front(), /*variadicOffset=*/1);
+  op = llvm::cast<DispatchRegionOp>(dce.optimize(builder));
+}
+
+ResultRange DispatchRegionOp::appendResults(DispatchRegionOp &self,
+                                            ValueRange addlResults,
+                                            OpBuilder &builder) {
+  Block &block = self.body().front();
+
+  unsigned origNumResults = self.getNumResults();
+  llvm::SmallVector<Type, 4> newTypes(self.getResultTypes().begin(),
+                                      self.getResultTypes().end());
+  for (auto r : addlResults) newTypes.push_back(r.getType());
+
+  // Changing the arity of the results requires replacing the dispatch region.
+  builder.setInsertionPoint(self);
+  auto newDrOp = llvm::cast<DispatchRegionOp>(
+      builder.insert(cloneWithNewResultTypes(self, newTypes)));
+  self.replaceAllUsesWith(ResultRange(newDrOp, 0, origNumResults));
+  self.erase();
+  self = newDrOp;
+
+  // Add results to the terminator.
+  auto terminator = block.getTerminator();
+  llvm::SmallVector<Value, 4> returns(terminator->getOperands());
+  returns.append(addlResults.begin(), addlResults.end());
+  terminator->setOperands(returns);
+
+  return ResultRange(self, origNumResults, addlResults.size());
+}
+
+Operation *DispatchRegionOp::inlineOp(Operation *origOp, OpBuilder &builder,
+                                      bool positionAtEnd) {
+  Block &block = body().front();
+  if (positionAtEnd) {
+    builder.setInsertionPoint(block.getTerminator());
+  } else {
+    builder.setInsertionPointToStart(&block);
+  }
+  // Map existing dr args.
+  BlockAndValueMapping mapping;
+  for (unsigned i = 0, e = block.getNumArguments(); i < e; ++i) {
+    mapping.map(args()[i], block.getArgument(i));
+  }
+
+  // Also map any terminator operands to support inlining at the end.
+  for (auto it : llvm::enumerate(block.getTerminator()->getOperands())) {
+    mapping.map(getResult(it.index()), it.value());
+  }
+
+  // Remember the values corresponding to original op results.
+  llvm::SmallVector<Value, 4> origOpResultValues;
+  for (Value result : origOp->getResults()) {
+    origOpResultValues.push_back(mapping.lookupOrNull(result));
+  }
+
+  // Add arguments for any op arguments that need to be captured.
+  for (Value newArgument : origOp->getOperands()) {
+    if (mapping.contains(newArgument)) continue;
+    getOperation()->insertOperands(getNumOperands(), {newArgument});
+    Value newBlockArgument = block.addArgument(newArgument.getType());
+    mapping.map(newArgument, newBlockArgument);
+  }
+
+  // Clone the op.
+  Operation *inlinedOp = builder.clone(*origOp, mapping);
+
+  // Replace any results from the orig with results from the clone.
+  for (unsigned i = 0, e = origOp->getNumResults(); i < e; ++i) {
+    Value resultTo = origOpResultValues[i];
+    if (resultTo) {
+      resultTo.replaceAllUsesWith(inlinedOp->getResult(i));
+    }
+  }
+
+  return inlinedOp;
+}
 
 void DispatchRegionOp::build(OpBuilder &builder, OperationState &state,
                              ArrayRef<Type> resultTypes, Value workload,

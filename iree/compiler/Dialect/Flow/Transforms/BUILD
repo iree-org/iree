@@ -20,6 +20,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "DispatchConfig.cpp",
         "DispatchabilityAnalysis.cpp",
         "FlattenTuplesInCFG.cpp",
         "FoldCompatibleDispatchRegions.cpp",
@@ -27,6 +28,7 @@ cc_library(
         "HLOToHLOPreprocessing.cpp",
         "HoistUnstreamableOps.cpp",
         "IdentifyDispatchRegions.cpp",
+        "IdentifyDispatchRegions2.cpp",
         "LegalizeInputTypes.cpp",
         "MaterializeExportedReflection.cpp",
         "MergeExportedReflection.cpp",
@@ -36,6 +38,7 @@ cc_library(
         "RematerializeDispatchConstants.cpp",
     ],
     hdrs = [
+        "DispatchConfig.h",
         "Passes.h",
     ],
     deps = [

@@ -54,3 +54,18 @@ func @removeUnusedDupCapture() -> (index) {
   }
   return %0 : index
 }
+
+// -----
+// CHECK-LABEL: func @removeUnusedResult
+func @removeUnusedResult() -> (index) {
+  // CHECK: %[[CST:.+]] = constant 4
+  %cst = constant 4 : index
+  // Note that the unused result should also cascade to elide the newly
+  // unused operand.
+  // CHECK: flow.ex.stream.fragment(%arg0 = %[[CST]] : index)
+  // CHECK-SAME: -> index
+  %0:2 = flow.ex.stream.fragment(%arg0 = %cst : index, %arg1 = %cst : index) -> (index, index) {
+    flow.return %arg1, %arg0 : index, index
+  }
+  return %0 : index
+}
