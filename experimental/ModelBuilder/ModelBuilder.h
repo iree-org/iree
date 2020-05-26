@@ -69,8 +69,11 @@ using edsc::ops::linalg_generic_matmul;
 // From the Vector Dialect.
 using edsc::intrinsics::vector_broadcast;
 using edsc::intrinsics::vector_contract;
+using edsc::intrinsics::vector_extract;
 using edsc::intrinsics::vector_matmul;
+using edsc::intrinsics::vector_outerproduct;
 using edsc::intrinsics::vector_print;
+using edsc::intrinsics::vector_transpose;
 using edsc::ops::vector_contraction;
 using edsc::ops::vector_contraction_matmul;
 // From the Std Dialect.
