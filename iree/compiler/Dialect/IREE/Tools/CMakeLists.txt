@@ -20,10 +20,10 @@ iree_cc_library(
   SRCS
     "StructAttrGen.cpp"
   DEPS
-    LLVMMLIRTableGen
     LLVMSupport
     LLVMTableGen
     MLIRSupport
+    MLIRTableGen
   ALWAYSLINK
   PUBLIC
 )

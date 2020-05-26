@@ -47,6 +47,7 @@ package(
         "keras_lstm_test",
         "mandelbrot_test",
         "matrix_ops_test",
+        "resource_ops_test",
         "ring_buffer_test",
         "sliding_window_test",
         "simple_arithmetic_test",

@@ -74,6 +74,7 @@ TF_IMPORT_PASS_PIPELINE = (
     "canonicalize",
 
     # Legalize to XLA
+    "tf-device-decompose-resource-ops",
     "xla-legalize-tf{allow-partial-conversion=true}",
     "canonicalize",
 

@@ -31,6 +31,8 @@ static bool checkMarkerValue(Operation *op, StringRef marker = "") {
 
 StringRef getNoTileMarker() { return "no-tile"; }
 
+StringRef getWorkGroupMarker() { return "workgroup"; }
+
 StringRef getWorkItemMarker() { return "workitem"; }
 
 bool hasMarker(Operation *op) { return checkMarkerValue(op); }
@@ -39,19 +41,23 @@ bool hasNoTileMarker(Operation *op) {
   return checkMarkerValue(op, getNoTileMarker());
 }
 
+bool hasWorkGroupMarker(Operation *op) {
+  return checkMarkerValue(op, getWorkGroupMarker());
+}
+
 bool hasWorkItemMarker(Operation *op) {
   return checkMarkerValue(op, getWorkItemMarker());
 }
 
-void setMarkerValue(Operation *op, StringRef marker) {
+void setMarker(Operation *op, StringRef marker) {
   op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
               StringAttr::get(marker, op->getContext()));
 }
 
-void setNoTileMarker(Operation *op) { setMarkerValue(op, getNoTileMarker()); }
+void setNoTileMarker(Operation *op) { setMarker(op, getNoTileMarker()); }
 
-void setWorkItemMarker(Operation *op) {
-  setMarkerValue(op, getWorkItemMarker());
-}
+void setWorkGroupMarker(Operation *op) { setMarker(op, getWorkGroupMarker()); }
+
+void setWorkItemMarker(Operation *op) { setMarker(op, getWorkItemMarker()); }
 }  // namespace iree_compiler
 }  // namespace mlir

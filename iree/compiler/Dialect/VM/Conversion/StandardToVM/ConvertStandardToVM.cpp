@@ -45,7 +45,14 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     StringRef name = srcOp.getName() ? *srcOp.getName() : "module";
     auto newModuleOp =
         rewriter.create<IREE::VM::ModuleOp>(srcOp.getLoc(), name);
-    newModuleOp.getBodyRegion().takeBody(srcOp.getBodyRegion());
+    assert(!newModuleOp.getBodyRegion().empty());
+    Block *firstCreatedBlock = &newModuleOp.getBodyRegion().front();
+    rewriter.inlineRegionBefore(srcOp.getBodyRegion(), firstCreatedBlock);
+    auto blockRange = llvm::make_range(Region::iterator(firstCreatedBlock),
+                                       newModuleOp.getBodyRegion().end());
+    for (Block &block : llvm::make_early_inc_range(blockRange)) {
+      rewriter.eraseBlock(&block);
+    }
     rewriter.replaceOp(srcOp, {});
     return success();
   }

@@ -81,7 +81,7 @@ iree_check_single_backend_test_suite(
         "reduce.mlir",
         "remainder.mlir",
         "reshape.mlir",
-        "reverse.mlir",
+        # "reverse.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
