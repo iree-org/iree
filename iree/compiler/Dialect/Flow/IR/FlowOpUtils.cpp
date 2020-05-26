@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
+
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
 namespace mlir {
