@@ -25,12 +25,14 @@ namespace Flow {
 // to be based on both queries of new op interfaces and a cost model.
 class OpDispatchPolicy {
  public:
+  // The benefit that selecting an anchor is expected to provide. Anchors
+  // with higher benefit should be formed first.
   using AnchorBenefit = int;
   enum class FusionType {
     // Fusion is disallowed.
     DISABLED = 0,
     // The operation should be duped into the dispatch region.
-    DUP_INTO = 1,
+    CLONE_INTO = 1,
     // The operation should be cloned into the dispatch region and have
     // uses be redirected to the dispatch region.
     MOVE_INTO = 3,

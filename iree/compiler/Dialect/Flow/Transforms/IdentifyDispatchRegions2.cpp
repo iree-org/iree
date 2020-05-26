@@ -136,14 +136,6 @@ void findDispatchableAnchorOps(Block &block, OpDispatchPolicy &policy,
   }
 }
 
-// Returns whether the op has no uses on all of its results.
-bool opHasNoUses(Operation *op) {
-  for (auto result : op->getResults()) {
-    if (!result.use_empty()) return false;
-  }
-  return true;
-}
-
 // Maintains a worklist of operations that are potential fusion candidates.
 // By default, items are popped in inverse topological order. An operation
 // can only be added to a worklist once and later additions will be ignored.
@@ -245,7 +237,7 @@ LogicalResult fuseInputs(DispatchRegion &dispatchRegion,
     // The dispatch region must be optimized to remove unused arguments
     // resulting from this fusion.
     DispatchRegionOp::dceOperandsAndResults(dispatchRegion.op);
-    if (opHasNoUses(nextOp)) {
+    if (nextOp->use_empty()) {
       nextOp->erase();
     }
   }
@@ -286,7 +278,7 @@ LogicalResult fuseOutputs(DispatchRegion &dispatchRegion,
       return failure();
     }
     dispatchRegion.returnAndReplaceUses(nextOp, inlinedOp);
-    if (opHasNoUses(nextOp)) {
+    if (nextOp->use_empty()) {
       nextOp->erase();
     }
   }
@@ -351,8 +343,7 @@ class IdentifyDispatchRegions2Pass
     OpDispatchPolicy policy(*dispatchability);
     for (auto &block : getFunction()) {
       if (failed(processBlock(block, policy))) {
-        signalPassFailure();
-        return;
+        return signalPassFailure();
       }
     }
   }

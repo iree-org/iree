@@ -113,7 +113,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
   } else if (isIdentityMetadata(inputOp)) {
     // Shape ties must always be duplicated into the region and remain in their
     // original position. This should apply to any such "metadata" ops.
-    return FusionType::DUP_INTO;
+    return FusionType::CLONE_INTO;
   }
 
   // By default for operands, they are duplicated into the dispatch region.
@@ -121,7 +121,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
   // model to determine whether it is more beneficial to fuse or materialize,
   // so the bias is towards fusion and leaving inter-region analysis to a later
   // phase.
-  return FusionType::DUP_INTO;
+  return FusionType::CLONE_INTO;
 }
 
 OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,

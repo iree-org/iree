@@ -21,8 +21,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-Operation *cloneWithNewResultTypes(
-    Operation *op, TypeRange newResultTypes) {
+Operation *cloneWithNewResultTypes(Operation *op, TypeRange newResultTypes) {
   OperationState state(op->getLoc(), op->getName());
   state.addOperands(op->getOperands());
   state.addTypes(newResultTypes);
