@@ -173,7 +173,6 @@ class FusionWorklist {
         if (def->getBlock() != block) continue;
         if (!visited.insert(def).second) continue;
         worklist.push_back(def);
-        llvm::dbgs() << "  ** DISCOVER RESULT USE: " << *def << "\n";
         dirty = true;
       }
     }

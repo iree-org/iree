@@ -37,17 +37,21 @@ class ClosureOpDce {
 
   bool needsOptimization() { return needsOperandElision || needsResultElision; }
 
+  // Whether the operation needs to be replaced.
   bool needsNewOperation() { return needsResultElision; }
 
-  Operation *optimize(OpBuilder &builder) {
-    if (needsResultElision) elideUnusedResults(builder);
+  // Performs the optimization. If the optional eraseOriginal=false and
+  // needsNewOperation(), then the original will not be erased, leaving that
+  // to the caller (which is needed in some pattern rewriting scenarios).
+  Operation *optimize(OpBuilder &builder, bool eraseOriginal = true) {
+    if (needsResultElision) elideUnusedResults(builder, eraseOriginal);
     if (needsOperandElision) elideUnusedOperands(builder);
     return closureOp;
   }
 
  private:
   void elideUnusedOperands(OpBuilder &builder);
-  void elideUnusedResults(OpBuilder &builder);
+  void elideUnusedResults(OpBuilder &builder, bool eraseOriginal);
 
   Operation *closureOp;
   Block &entryBlock;

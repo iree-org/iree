@@ -59,8 +59,8 @@ struct DceDispatchRegion : public OpRewritePattern<DispatchRegionOp> {
       dce.optimize(rewriter);
       rewriter.finalizeRootUpdate(op);
     } else {
-      Operation *newOp = dce.optimize(rewriter);
-      rewriter.replaceOp(op, newOp->getResults());
+      dce.optimize(rewriter, /*eraseOriginal=*/false);
+      rewriter.eraseOp(op);
     }
     return success();
   }
@@ -97,8 +97,8 @@ struct DceStreamFragment : public OpRewritePattern<ExStreamFragmentOp> {
       dce.optimize(rewriter);
       rewriter.finalizeRootUpdate(op);
     } else {
-      Operation *newOp = dce.optimize(rewriter);
-      rewriter.replaceOp(op, newOp->getResults());
+      dce.optimize(rewriter, /*eraseOriginal=*/false);
+      rewriter.eraseOp(op);
     }
     return success();
   }

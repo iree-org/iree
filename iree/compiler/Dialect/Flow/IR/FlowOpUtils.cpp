@@ -107,7 +107,7 @@ void ClosureOpDce::elideUnusedOperands(OpBuilder &builder) {
   closureOp->setOperands(newOperands);
 }
 
-void ClosureOpDce::elideUnusedResults(OpBuilder &builder) {
+void ClosureOpDce::elideUnusedResults(OpBuilder &builder, bool eraseOriginal) {
   // Determine the result signature transform needed.
   llvm::SmallVector<unsigned, 4> resultIndexMap;
   llvm::SmallVector<Type, 4> newResultTypes;
@@ -137,7 +137,7 @@ void ClosureOpDce::elideUnusedResults(OpBuilder &builder) {
     closureOp->getResult(resultIndexMap[i])
         .replaceAllUsesWith(newOp->getResult(i));
   }
-  closureOp->erase();
+  if (eraseOriginal) closureOp->erase();
   closureOp = newOp;
 }
 
