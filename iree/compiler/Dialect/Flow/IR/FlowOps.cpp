@@ -272,10 +272,9 @@ DispatchRegionOp::formFromAnchorOp(Value workload, Operation *anchorOp,
   auto loc = anchorOp->getLoc();
   // Map anchor into new dispatch region.
   llvm::SmallVector<Value, 4> capturedInputs(anchorOp->getOperands());
-  llvm::SmallVector<Type, 1> types(anchorOp->getResultTypes().begin(),
-                                   anchorOp->getResultTypes().end());
-  auto drOp =
-      builder.create<DispatchRegionOp>(loc, types, workload, capturedInputs);
+  auto drOp = builder.create<DispatchRegionOp>(
+      loc, llvm::to_vector<1>(anchorOp->getResultTypes()), workload,
+      capturedInputs);
   auto *drBlock = new Block();
   drOp.body().push_back(drBlock);
   BlockAndValueMapping mapping;
@@ -303,9 +302,9 @@ void DispatchRegionOp::dceOperandsAndResults(DispatchRegionOp &op) {
   op = llvm::cast<DispatchRegionOp>(dce.optimize(builder));
 }
 
-ResultRange DispatchRegionOp::appendResults(
-    DispatchRegionOp &self, llvm::SmallVectorImpl<Value> &addlResults,
-    OpBuilder &builder) {
+ResultRange DispatchRegionOp::appendResults(DispatchRegionOp &self,
+                                            ValueRange addlResults,
+                                            OpBuilder &builder) {
   Block &block = self.body().front();
 
   unsigned origNumResults = self.getNumResults();

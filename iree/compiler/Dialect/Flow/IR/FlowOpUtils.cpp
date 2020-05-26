@@ -22,7 +22,7 @@ namespace IREE {
 namespace Flow {
 
 Operation *cloneWithNewResultTypes(
-    Operation *op, llvm::SmallVectorImpl<Type> &newResultTypes) {
+    Operation *op, TypeRange newResultTypes) {
   OperationState state(op->getLoc(), op->getName());
   state.addOperands(op->getOperands());
   state.addTypes(newResultTypes);

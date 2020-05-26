@@ -26,7 +26,7 @@ namespace Flow {
 // The original operation will be erased and a new operation constructed
 // in its place.
 Operation *cloneWithNewResultTypes(Operation *op,
-                                   llvm::SmallVectorImpl<Type> &newResultTypes);
+                                   TypeRange newResultTypes);
 
 // Utility class to optimize a "closure" op, which maintains a variadic
 // list of operands corresponding to entry block arguments.
@@ -43,6 +43,9 @@ class ClosureOpDce {
   // Performs the optimization. If the optional eraseOriginal=false and
   // needsNewOperation(), then the original will not be erased, leaving that
   // to the caller (which is needed in some pattern rewriting scenarios).
+  // TODO(laurenzo): Fix OpBuilder upstream so that this eraseOriginal 
+  // workaround is not required to write a safe rewriter pattern that uses this
+  // utility.
   Operation *optimize(OpBuilder &builder, bool eraseOriginal = true) {
     if (needsResultElision) elideUnusedResults(builder, eraseOriginal);
     if (needsOperandElision) elideUnusedOperands(builder);

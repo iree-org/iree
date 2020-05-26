@@ -214,8 +214,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     // Returns a ResultRange for the new dispatch region op's results
     // corresponding to addlResults.
     static ResultRange appendResults(
-        DispatchRegionOp &self, llvm::SmallVectorImpl<Value> &addlResults,
-        OpBuilder &builder);
+        DispatchRegionOp &self, ValueRange addlResults, OpBuilder &builder);
 
     /// Returns the index of the args() operand in the Operation operands list.
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + 1; }
@@ -226,6 +225,8 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     /// IR splicing helper: it can only inline ops with inputs that map to
     /// either captured operands or results and is used to coelesce an op
     /// into an adjacent dispatch region.
+    /// Note that the original op is cloned but not erased. It is up to the
+    /// caller to cleanup the original op as needed.
     Operation *inlineOp(Operation *origOp, OpBuilder &builder, 
         bool positionAtEnd=false);
   }];
