@@ -306,7 +306,6 @@ void DispatchRegionOp::dceOperandsAndResults(DispatchRegionOp &op) {
 ResultRange DispatchRegionOp::appendResults(
     DispatchRegionOp &self, llvm::SmallVectorImpl<Value> &addlResults,
     OpBuilder &builder) {
-  Location loc = self.getLoc();
   Block &block = self.body().front();
 
   unsigned origNumResults = self.getNumResults();
@@ -333,7 +332,6 @@ ResultRange DispatchRegionOp::appendResults(
 
 Operation *DispatchRegionOp::inlineOp(Operation *origOp, OpBuilder &builder,
                                       bool positionAtEnd) {
-  Location loc = origOp->getLoc();
   Block &block = body().front();
   if (positionAtEnd) {
     builder.setInsertionPoint(block.getTerminator());
@@ -370,7 +368,6 @@ Operation *DispatchRegionOp::inlineOp(Operation *origOp, OpBuilder &builder,
 
   // Replace any results from the orig with results from the clone.
   for (unsigned i = 0, e = origOp->getNumResults(); i < e; ++i) {
-    Value resultFrom = origOp->getResult(i);
     Value resultTo = origOpResultValues[i];
     if (resultTo) {
       resultTo.replaceAllUsesWith(inlinedOp->getResult(i));

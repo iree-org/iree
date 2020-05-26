@@ -38,6 +38,7 @@ cc_library(
         "RematerializeDispatchConstants.cpp",
     ],
     hdrs = [
+        "DispatchConfig.h",
         "Passes.h",
     ],
     deps = [

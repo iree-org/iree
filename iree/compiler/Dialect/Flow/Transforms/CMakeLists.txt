@@ -18,6 +18,7 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "DispatchConfig.h"
     "Passes.h"
   SRCS
     "DispatchConfig.cpp"
