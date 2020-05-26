@@ -21,7 +21,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
-#define DEBUG_TYPE "XXX"
+#define DEBUG_TYPE "iree-dispatch-config"
 
 namespace mlir {
 namespace iree_compiler {
