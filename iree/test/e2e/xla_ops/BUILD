@@ -42,10 +42,9 @@ iree_check_single_backend_test_suite(
         "broadcast_add.mlir",
         "broadcast.mlir",
         "broadcast_in_dim.mlir",
-        # TODO(GH-1851): Enalbe the test.
-        # "clamp.mlir",
-        #
+        "clamp.mlir",
         "compare.mlir",
+        "convert.mlir",
 
         # TODO(GH-1695): Enable when xla.concat can be lowered to linalg
         # effectively.
