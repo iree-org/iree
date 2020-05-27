@@ -201,7 +201,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
 
 // static
 StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
-    ref_ptr<Driver> driver, const DeviceInfo& device_info,
+    ref_ptr<Driver> driver, VkInstance instance, const DeviceInfo& device_info,
     VkPhysicalDevice physical_device,
     const ExtensibilitySpec& extensibility_spec,
     const ref_ptr<DynamicSymbols>& syms,
@@ -314,6 +314,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   VK_RETURN_IF_ERROR(syms->vkCreateDevice(physical_device, &device_create_info,
                                           logical_device->allocator(),
                                           logical_device->mutable_value()));
+  RETURN_IF_ERROR(logical_device->syms()->LoadFromDevice(
+      instance, logical_device->value()));
   IREE_ENABLE_LEAK_CHECKS();
 
   // Create the device memory allocator.

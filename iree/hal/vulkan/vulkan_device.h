@@ -51,8 +51,8 @@ class VulkanDevice final : public Device {
  public:
   // Creates a device that manages its own VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Create(
-      ref_ptr<Driver> driver, const DeviceInfo& device_info,
-      VkPhysicalDevice physical_device,
+      ref_ptr<Driver> driver, VkInstance instance,
+      const DeviceInfo& device_info, VkPhysicalDevice physical_device,
       const ExtensibilitySpec& extensibility_spec,
       const ref_ptr<DynamicSymbols>& syms,
       DebugCaptureManager* debug_capture_manager);

@@ -72,7 +72,7 @@ namespace vulkan {
   DEV_PFN(EXCLUDED, vkCmdDebugMarkerEndEXT)                             \
   DEV_PFN(EXCLUDED, vkCmdDebugMarkerInsertEXT)                          \
   DEV_PFN(REQUIRED, vkCmdDispatch)                                      \
-  DEV_PFN(REQUIRED, vkCmdDispatchBase)                                  \
+  DEV_PFN(EXCLUDED, vkCmdDispatchBase)                                  \
   DEV_PFN(EXCLUDED, vkCmdDispatchBaseKHR)                               \
   DEV_PFN(REQUIRED, vkCmdDispatchIndirect)                              \
   DEV_PFN(EXCLUDED, vkCmdDraw)                                          \
@@ -222,7 +222,7 @@ namespace vulkan {
   DEV_PFN(EXCLUDED, vkGetBufferMemoryRequirements2)                     \
   DEV_PFN(EXCLUDED, vkGetBufferMemoryRequirements2KHR)                  \
   DEV_PFN(EXCLUDED, vkGetCalibratedTimestampsEXT)                       \
-  DEV_PFN(REQUIRED, vkGetDescriptorSetLayoutSupport)                    \
+  DEV_PFN(EXCLUDED, vkGetDescriptorSetLayoutSupport)                    \
   DEV_PFN(EXCLUDED, vkGetDescriptorSetLayoutSupportKHR)                 \
   DEV_PFN(EXCLUDED, vkGetDeviceGroupPeerMemoryFeatures)                 \
   DEV_PFN(EXCLUDED, vkGetDeviceGroupPeerMemoryFeaturesKHR)              \
@@ -277,7 +277,7 @@ namespace vulkan {
   DEV_PFN(REQUIRED, vkSetEvent)                                         \
   DEV_PFN(EXCLUDED, vkSetHdrMetadataEXT)                                \
   DEV_PFN(EXCLUDED, vkSetLocalDimmingAMD)                               \
-  DEV_PFN(REQUIRED, vkTrimCommandPool)                                  \
+  DEV_PFN(EXCLUDED, vkTrimCommandPool)                                  \
   DEV_PFN(EXCLUDED, vkTrimCommandPoolKHR)                               \
   DEV_PFN(REQUIRED, vkUnmapMemory)                                      \
   DEV_PFN(EXCLUDED, vkUnregisterObjectsNVX)                             \
