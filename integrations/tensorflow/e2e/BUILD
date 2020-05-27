@@ -31,6 +31,7 @@ package(
         python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+            "//third_party/py/sklearn",
         ],
     )
     for name in [
@@ -45,6 +46,7 @@ package(
         "gather_test",
         "tensorlist_test",
         "keras_lstm_test",
+        "keras_model_train_test",
         "mandelbrot_test",
         "matrix_ops_test",
         "resource_ops_test",
