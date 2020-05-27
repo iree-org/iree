@@ -1,0 +1,5 @@
+{% for js_file in page.js_files %}
+  <script type="text/javascript">
+  {% include {{ js_file }} %}
+  </script>
+{% endfor %}
