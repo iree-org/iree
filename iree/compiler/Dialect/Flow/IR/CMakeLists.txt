@@ -22,18 +22,18 @@ iree_cc_library(
     "FlowDialect.h"
     "FlowEnums.h.inc"
     "FlowOpInterface.h.inc"
+    "FlowOpUtils.h"
     "FlowOps.h"
     "FlowOps.h.inc"
-    "FlowOpUtils.h"
     "FlowTypes.h"
   SRCS
     "FlowDialect.cpp"
     "FlowEnums.cpp.inc"
     "FlowOpFolders.cpp"
     "FlowOpInterface.cpp.inc"
+    "FlowOpUtils.cpp"
     "FlowOps.cpp"
     "FlowOps.cpp.inc"
-    "FlowOpUtils.cpp"
     "FlowTypes.cpp"
   DEPS
     LLVMSupport
