@@ -30,6 +30,28 @@ trap {
   exit 1
 }
 
+# Search the system path for a suitable bash.exe.
+# Note that C:\Windows\system32\bash.exe is actually WSL -- which will not
+# work. Why???
+$pathFolders = $env:Path.Split(";") 
+foreach ($_ in $pathFolders) {
+  if (-not ($_ -like "*:\Windows\*")) {
+    Write-Debug "Checking for bash.exe in: $_"
+    $possibleBashExe = "$_\bash.exe"
+    if (Test-Path $possibleBashExe -PathType leaf) {
+      $bashExe = $possibleBashExe
+      break
+    }
+  }
+}
+
+if (-not $bashExe) {
+  Write-Host -ForegroundColor Red "Could not find bash.exe on path (excluding \Windows\system32)"
+  $pathFolders -join "`r`n" |  Write-Host -ForegroundColor Red
+  exit 1
+}
+Write-Debug "Using bash.exe: $bashExe"
+
 # Get all of the directories we'll want to put on our path for the test.
 $test_dirs = [System.Collections.ArrayList]@()
 foreach ($test_path in $test_data) {
@@ -51,7 +73,7 @@ foreach ($test_line in $test_lines) {
   $test_line = $test_line -replace "%s", $test_file
   Write-Host -ForegroundColor Blue "Running test command:"
   Write-Host -ForegroundColor Yellow "$test_line"
-  & "bash.exe" -c $test_line | Out-Default
+  & $bashExe -c $test_line | Out-Default
   if ($LASTEXITCODE -gt 0) {
     Write-Host -ForegroundColor Red "Test failed with $LASTEXITCODE, command:"
     Write-Host -ForegroundColor Yellow "$test_line"
