@@ -16,6 +16,10 @@ set(VMA_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
 )
 
+if(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE)
+  add_definitions(-DIREE_EMULATE_TIMELINE_SEMAPHORE)
+endif()
+
 iree_cc_library(
   NAME
     api
@@ -198,6 +202,24 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    emulated_timeline_semaphore
+  HDRS
+    "emulated_timeline_semaphore.h"
+  SRCS
+    "emulated_timeline_semaphore.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
+  DEPS
+    ::handle_util
+    ::status_util
+    iree::base::tracing
+    iree::hal::semaphore
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     extensibility_util
   HDRS
     "extensibility_util.h"
@@ -224,9 +246,11 @@ iree_cc_library(
   COPTS
     "-DVK_NO_PROTOTYPES"
   DEPS
+    absl::inlined_vector
     absl::synchronization
     absl::utility
     iree::base::ref_ptr
+    iree::hal::command_queue
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::extensibility_util
     Vulkan::Headers
@@ -375,6 +399,32 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    serializing_command_queue
+  HDRS
+    "serializing_command_queue.h"
+  SRCS
+    "serializing_command_queue.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
+  DEPS
+    absl::core_headers
+    absl::synchronization
+    absl::time
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_queue
+    iree::hal::vulkan::direct_command_buffer
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::emulated_timeline_semaphore
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::status_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     status_util
   HDRS
     "status_util.h"
@@ -436,12 +486,14 @@ iree_cc_library(
     ::direct_command_buffer
     ::direct_command_queue
     ::dynamic_symbols
+    ::emulated_timeline_semaphore
     ::extensibility_util
     ::handle_util
     ::native_descriptor_set
     ::native_timeline_semaphore
     ::pipeline_cache
     ::pipeline_executable_layout
+    ::serializing_command_queue
     ::status_util
     ::vma_allocator
     absl::inlined_vector
