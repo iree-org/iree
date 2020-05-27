@@ -42,12 +42,6 @@ namespace Shape {
 // shapex.tie_shape
 //===----------------------------------------------------------------------===//
 
-void TieShapeOp::build(OpBuilder &builder, OperationState &result,
-                       Value operand, Value shape) {
-  result.types.push_back(operand.getType());
-  result.addOperands({operand, shape});
-}
-
 static LogicalResult verifyTieShapeOp(TieShapeOp op) {
   // Validate shapedType and ranked_shape_type conservatively in this
   // case (tie_shape supports arbitrary operand() but we constrain it if

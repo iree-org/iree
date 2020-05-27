@@ -59,13 +59,6 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
 
   let verifier = [{ return verify$cppClass(*this); }];
 
-  let builders = [
-    // Short-hand for building with a shape equivalent to the tensor operand
-    // and 'index' dim type.
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, Value operand, Value shape
-    }]>,
-  ];
   let hasCanonicalizer = 1;
 }
 
