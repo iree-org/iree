@@ -235,7 +235,8 @@ void extendInboundMetadataOps(llvm::SetVector<Operation *> *subgraph) {
         LLVM_DEBUG(llvm::dbgs() << "    : Duplicating tie_shape op\n");
         b.setInsertionPointAfter(tieShapeOp);
         auto duped = b.create<Shape::TieShapeOp>(
-            tieShapeOp.getLoc(), tieShapeOp, tieShapeOp.shape());
+            tieShapeOp.getLoc(), tieShapeOp.getType(), tieShapeOp,
+            tieShapeOp.shape());
         metadataCloneMap.insert({metadataOp, duped.getOperation()});
       }
     }
@@ -271,7 +272,8 @@ void extendOutboundMetadataOps(llvm::SetVector<Operation *> *subgraph) {
           LLVM_DEBUG(llvm::dbgs() << "    : Duplicating tie_shape op\n");
           b.setInsertionPointAfter(tieShapeOp);
           auto duped = b.create<Shape::TieShapeOp>(
-              tieShapeOp.getLoc(), tieShapeOp, tieShapeOp.shape());
+              tieShapeOp.getLoc(), tieShapeOp.getType(), tieShapeOp,
+              tieShapeOp.shape());
           metadataOp->replaceAllUsesWith(duped);
           duped.getOperation()->replaceUsesOfWith(duped.result(),
                                                   tieShapeOp.result());

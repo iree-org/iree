@@ -53,7 +53,8 @@ class TieDynamicShapesPass
     OpBuilder builder(&getContext());
     builder.setInsertionPointAfter(op);
     auto getShapeOp = builder.create<GetRankedShapeOp>(op->getLoc(), result);
-    auto tieOp = builder.create<TieShapeOp>(op->getLoc(), result, getShapeOp);
+    auto tieOp = builder.create<TieShapeOp>(op->getLoc(), result.getType(),
+                                            result, getShapeOp);
 
     // Replace: {result} -> {tieOp, getShapeOp, ...origUses}
     // With: {result} -> {tieOp -> ...origUses, getShapeOp}
