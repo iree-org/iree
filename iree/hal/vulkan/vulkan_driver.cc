@@ -288,9 +288,9 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   // This may fail if the device was enumerated but is in exclusive use,
   // disabled by the system, or permission is denied.
   ASSIGN_OR_RETURN(auto device, VulkanDevice::Create(
-                                    add_ref(this), device_info, physical_device,
-                                    device_extensibility_spec_, syms(),
-                                    renderdoc_capture_manager_.get()));
+                                    add_ref(this), instance(), device_info,
+                                    physical_device, device_extensibility_spec_,
+                                    syms(), renderdoc_capture_manager_.get()));
 
   LOG(INFO) << "Created Vulkan Device: " << device->info().name();
 

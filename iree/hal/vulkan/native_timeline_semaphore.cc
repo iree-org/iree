@@ -122,6 +122,9 @@ Status NativeTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
   // device loss event may return either VK_SUCCESS *or* VK_ERROR_DEVICE_LOST.
   // We may want to explicitly query for device loss after a successful wait
   // to ensure we consistently return errors.
+  if (!logical_device_->syms()->vkWaitSemaphores) {
+    return UnknownErrorBuilder(IREE_LOC) << "vkWaitSemaphores not defined";
+  }
   VkResult result = logical_device_->syms()->vkWaitSemaphores(
       *logical_device_, &wait_info, timeout_nanos);
   if (result == VK_ERROR_DEVICE_LOST) {
