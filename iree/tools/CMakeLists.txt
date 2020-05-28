@@ -106,10 +106,38 @@ endif()
 if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
-      init_passes_and_dialects
+      init_iree_passes_and_dialects
     HDRS
-      "init_dialects.h"
-      "init_passes.h"
+      "init_iree_dialects.h"
+      "init_iree_passes.h"
+    DEPS
+      MLIRIR
+      iree::compiler::Dialect::Flow::Analysis
+      iree::compiler::Dialect::Flow::IR
+      iree::compiler::Dialect::Flow::Transforms
+      iree::compiler::Dialect::HAL::IR::HALDialect
+      iree::compiler::Dialect::HAL::Transforms
+      iree::compiler::Dialect::IREE::IR
+      iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::Shape::Conversion
+      iree::compiler::Dialect::Shape::IR
+      iree::compiler::Dialect::Shape::Transforms
+      iree::compiler::Dialect::VM::Analysis
+      iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Transforms
+      iree::compiler::Dialect::VMLA::IR::VMLADialect
+      iree::compiler::Dialect::VMLA::Transforms
+      iree::compiler::Dialect::Vulkan::IR
+      iree::compiler::Translation::IREEVM
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
+      init_mlir_passes_and_dialects
+    HDRS
+      "init_mlir_dialects.h"
+      "init_mlir_passes.h"
     DEPS
       MLIRAffineOps
       MLIRAffineTransforms
@@ -128,27 +156,11 @@ if(${IREE_BUILD_COMPILER})
       MLIRSDBM
       MLIRSPIRV
       MLIRSPIRVTransforms
+      MLIRShape
       MLIRStandardOps
       MLIRStandardToSPIRVTransforms
       MLIRTransforms
       MLIRVector
-      iree::compiler::Dialect::Flow::Analysis
-      iree::compiler::Dialect::Flow::IR
-      iree::compiler::Dialect::Flow::Transforms
-      iree::compiler::Dialect::HAL::IR::HALDialect
-      iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::IREE::IR
-      iree::compiler::Dialect::IREE::Transforms
-      iree::compiler::Dialect::Shape::Conversion
-      iree::compiler::Dialect::Shape::IR
-      iree::compiler::Dialect::Shape::Transforms
-      iree::compiler::Dialect::VM::Analysis
-      iree::compiler::Dialect::VM::IR
-      iree::compiler::Dialect::VM::Transforms
-      iree::compiler::Dialect::VMLA::IR::VMLADialect
-      iree::compiler::Dialect::VMLA::Transforms
-      iree::compiler::Dialect::Vulkan::IR
-      iree::compiler::Translation::IREEVM
     PUBLIC
   )
 
@@ -202,13 +214,16 @@ if(${IREE_BUILD_COMPILER})
       "opt_main.cc"
     DEPS
       ::init_compiler_modules
-      ::init_passes_and_dialects
+      ::init_iree_passes_and_dialects
+      ::init_mlir_passes_and_dialects
       ::init_targets
       ::init_xla_dialects
       LLVMSupport
       MLIRIR
       MLIROptLib
+      MLIRParser
       MLIRPass
+      MLIRTransformUtils
       MLIRSupport
       iree::compiler::Conversion::init_conversions
       iree::compiler::Conversion::HLOToLinalg
@@ -254,7 +269,8 @@ if(${IREE_BUILD_COMPILER})
       "run_mlir_main.cc"
     DEPS
       ::init_compiler_modules
-      ::init_passes_and_dialects
+      ::init_iree_passes_and_dialects
+      ::init_mlir_passes_and_dialects
       ::init_targets
       ::vm_util
       LLVMSupport
@@ -294,7 +310,8 @@ if(${IREE_BUILD_COMPILER})
       "translate_main.cc"
     DEPS
       ::init_compiler_modules
-      ::init_passes_and_dialects
+      ::init_iree_passes_and_dialects
+      ::init_mlir_passes_and_dialects
       ::init_targets
       ::init_translations
       ::init_xla_dialects

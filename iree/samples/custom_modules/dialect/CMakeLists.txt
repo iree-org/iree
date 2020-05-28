@@ -89,8 +89,10 @@ iree_cc_binary(
     LLVMSupport
     MLIRIR
     MLIROptLib
+    MLIRParser
     MLIRPass
     MLIRSupport
+    MLIRTransformUtils
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::init_conversions
     iree::compiler::Dialect::Flow::Analysis
@@ -115,7 +117,8 @@ iree_cc_binary(
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Translation::IREEVM
     iree::tools::init_compiler_modules
-    iree::tools::init_passes_and_dialects
+    iree::tools::init_iree_passes_and_dialects
+    iree::tools::init_mlir_passes_and_dialects
     iree::tools::init_targets
     iree::tools::init_xla_dialects
     tensorflow::mlir_xla
@@ -141,7 +144,8 @@ iree_cc_binary(
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Translation::IREEVM
     iree::tools::init_compiler_modules
-    iree::tools::init_passes_and_dialects
+    iree::tools::init_iree_passes_and_dialects
+    iree::tools::init_mlir_passes_and_dialects
     iree::tools::init_targets
     iree::tools::init_translations
     iree::tools::init_xla_dialects

@@ -17,21 +17,11 @@
 //
 // Based on MLIR's InitAllPasses but without passes we don't care about.
 
-#ifndef IREE_TOOLS_INIT_PASSES_H_
-#define IREE_TOOLS_INIT_PASSES_H_
+#ifndef IREE_TOOLS_INIT_MLIR_PASSES_H_
+#define IREE_TOOLS_INIT_MLIR_PASSES_H_
 
 #include <cstdlib>
 
-#include "iree/compiler/Dialect/Flow/Analysis/TestPasses.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
-#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
-#include "iree/compiler/Translation/IREEVM.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
@@ -167,25 +157,4 @@ inline void registerMlirPasses() {
 
 }  // namespace mlir
 
-namespace mlir {
-namespace iree_compiler {
-
-// This function may be called to register the IREE passes with the
-// global registry.
-inline void registerAllIreePasses() {
-  IREE::Flow::registerFlowPasses();
-  IREE::Flow::registerFlowAnalysisTestPasses();
-  IREE::HAL::registerHALPasses();
-  IREE::registerIreePasses();
-  Shape::registerShapeConversionPasses();
-  Shape::registerShapePasses();
-  IREE::VM::registerVMPasses();
-  IREE::VM::registerVMAnalysisTestPasses();
-  IREE::VM::registerVMTestPasses();
-  IREE::VMLA::registerVMLAPasses();
-  registerIREEVMTransformPassPipeline();
-}
-}  // namespace iree_compiler
-}  // namespace mlir
-
-#endif  // IREE_TOOLS_INIT_PASSES_H_
+#endif  // IREE_TOOLS_INIT_MLIR_PASSES_H_
