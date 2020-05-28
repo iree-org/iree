@@ -140,7 +140,7 @@ def iree_vision_test_suite(
         size = "large",
         python_version = "PY3",
         **kwargs):
-    """Creates one iree_py_test per source file and a test suite that bundles them.
+    """Creates one iree_py_test per configuration tuple and bundles them.
 
     Args:
       name: name of the generated test suite.
@@ -170,7 +170,6 @@ def iree_vision_test_suite(
             "--model={}".format(model),
             "--override_backends={}".format(backends),
         ]
-
         if external_data:
             args.append("--url=https://storage.googleapis.com/iree_models/")
 
