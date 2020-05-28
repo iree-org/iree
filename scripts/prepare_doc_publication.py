@@ -59,6 +59,7 @@ DOC_TITLE_DICT = {
     'op_coverage.md': 'XLA HLO Operation Coverage',
     'roadmap.md': 'Short-term Focus Areas',
     'roadmap_design.md': 'Long-term Design Roadmap',
+    'iree_community.md': 'Community',
 }
 
 # A dictionary containing source file to permanent link mappings.
@@ -82,6 +83,7 @@ PERMALINK_DICT = {
     'op_coverage.md': 'HLOOpCoverage',
     'roadmap.md': 'FocusAreas',
     'roadmap_design.md': 'DesignRoadmap',
+    'iree_community.md': 'Community',
 }
 
 # A dictionary containing source file to navigation order mappings.
@@ -97,6 +99,7 @@ NAVI_ORDER_DICT = {
     'roadmap.md': 5,
     'op_coverage.md': 6,
     'testing_guide.md': 7,
+    'iree_community.md': 8,
 
     # Within 'Getting Started' use explicit ordering.
     # Alphabetical would put 'bazel' before 'cmake' and 'python' between 'linux'

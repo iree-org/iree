@@ -62,6 +62,7 @@ cp docs/roadmap.md ${BUILD_DIR}/doc/
 cp docs/roadmap_design.md ${BUILD_DIR}/doc/
 cp docs/developer_overview.md ${BUILD_DIR}/doc/
 cp docs/testing_guide.md ${BUILD_DIR}/doc/
+cp docs/iree_community.md ${BUILD_DIR}/doc/
 
 mkdir -p ${BUILD_DIR}/doc/GetStarted/
 cp docs/GetStarted/getting_started_windows_bazel.md ${BUILD_DIR}/doc/GetStarted/
