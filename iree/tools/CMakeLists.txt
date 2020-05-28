@@ -110,8 +110,6 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_iree_dialects.h"
       "init_iree_passes.h"
-      "init_mlir_dialects.h"
-      "init_mlir_passes.h"
     DEPS
       MLIRIR
       iree::compiler::Dialect::Flow::Analysis
