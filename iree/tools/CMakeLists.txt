@@ -156,6 +156,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSDBM
       MLIRSPIRV
       MLIRSPIRVTransforms
+      MLIRShape
       MLIRStandardOps
       MLIRStandardToSPIRVTransforms
       MLIRTransforms
