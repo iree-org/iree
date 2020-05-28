@@ -108,8 +108,9 @@ if(${IREE_BUILD_COMPILER})
     NAME
       init_passes_and_dialects
     HDRS
-      "init_dialects.h"
+      "init_iree_dialects.h"
       "init_iree_passes.h"
+      "init_mlir_dialects.h"
       "init_mlir_passes.h"
     DEPS
       MLIRAffineOps

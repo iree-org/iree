@@ -69,8 +69,9 @@ iree_cc_binary(
 cc_library(
     name = "init_passes_and_dialects",
     hdrs = [
-        "init_dialects.h",
+        "init_iree_dialects.h",
         "init_iree_passes.h",
+        "init_mlir_dialects.h",
         "init_mlir_passes.h",
     ],
     deps = [
