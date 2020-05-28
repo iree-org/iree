@@ -97,8 +97,6 @@ cc_library(
 cc_library(
     name = "init_mlir_passes_and_dialects",
     hdrs = [
-        "init_iree_dialects.h",
-        "init_iree_passes.h",
         "init_mlir_dialects.h",
         "init_mlir_passes.h",
     ],
