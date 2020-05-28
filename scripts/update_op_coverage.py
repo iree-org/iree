@@ -24,8 +24,8 @@ import os
 import subprocess
 
 # The symbols to show in the table if the operation is supported or not.
-SUCCESS_SYMBOL = '✓'
-FAILURE_SYMBOL = '✗'
+SUCCESS_ELEMENT = '<span class="success-table-element">✓</span>'
+FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
 
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
@@ -108,7 +108,7 @@ def generate_table(build_dir):
     row = [op]
     for backend in backends:
       row.append(
-          SUCCESS_SYMBOL if (op in backend_ops[backend]) else FAILURE_SYMBOL)
+          SUCCESS_ELEMENT if (op in backend_ops[backend]) else FAILURE_ELEMENT)
     rows.append(row)
   return create_markdown_table(rows)
 

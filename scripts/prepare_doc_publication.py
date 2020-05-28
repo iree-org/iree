@@ -123,6 +123,9 @@ DIRECTORY_TITLE_DICT = {
     'GetStarted': 'Getting Started',
 }
 
+# A dictionary containing the supporting JavaScript files for each doc.
+JS_FILES_DICT = {'op_coverage.md': ['js/add_classes.js']}
+
 
 def process_file(basedir, relpath, filename):
   """Patches the given file in-place with metadata for publication."""
@@ -179,6 +182,12 @@ def process_file(basedir, relpath, filename):
     front_matter['nav_order'] = NAVI_ORDER_DICT[filename]
   if relpath in DIRECTORY_TITLE_DICT:
     front_matter['parent'] = DIRECTORY_TITLE_DICT[relpath]
+  if filename in JS_FILES_DICT:
+    # js_files is a list, so we split each file onto a different line. We put
+    # an extra \n on the front so the code below can treat it like the rest of
+    # the values in front_matter.
+    front_matter['js_files'] = '\n' + '\n'.join(
+        [f'- {file}' for file in JS_FILES_DICT[filename]])
 
   # Compose the content prefix for front matter.
   prefix = '\n'.join([f'{k}: {v}' for (k, v) in front_matter.items()])
