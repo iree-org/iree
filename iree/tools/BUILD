@@ -67,12 +67,10 @@ iree_cc_binary(
 )
 
 cc_library(
-    name = "init_passes_and_dialects",
+    name = "init_iree_passes_and_dialects",
     hdrs = [
         "init_iree_dialects.h",
         "init_iree_passes.h",
-        "init_mlir_dialects.h",
-        "init_mlir_passes.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/Analysis",
@@ -92,6 +90,19 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/Transforms",
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Translation:IREEVM",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_library(
+    name = "init_mlir_passes_and_dialects",
+    hdrs = [
+        "init_iree_dialects.h",
+        "init_iree_passes.h",
+        "init_mlir_dialects.h",
+        "init_mlir_passes.h",
+    ],
+    deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:GPUDialect",
@@ -166,7 +177,8 @@ cc_library(
     srcs = ["opt_main.cc"],
     deps = [
         ":init_compiler_modules",
-        ":init_passes_and_dialects",
+        ":init_iree_passes_and_dialects",
+        ":init_mlir_passes_and_dialects",
         ":init_targets",
         ":init_xla_dialects",
         "//iree/compiler/Conversion:init_conversions",
@@ -218,7 +230,8 @@ iree_cc_binary(
     tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
-        ":init_passes_and_dialects",
+        ":init_iree_passes_and_dialects",
+        ":init_mlir_passes_and_dialects",
         ":init_targets",
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
@@ -287,7 +300,8 @@ cc_library(
     srcs = ["translate_main.cc"],
     deps = [
         ":init_compiler_modules",
-        ":init_passes_and_dialects",
+        ":init_iree_passes_and_dialects",
+        ":init_mlir_passes_and_dialects",
         ":init_targets",
         ":init_translations",
         ":init_xla_dialects",
