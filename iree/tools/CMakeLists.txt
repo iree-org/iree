@@ -208,7 +208,9 @@ if(${IREE_BUILD_COMPILER})
       LLVMSupport
       MLIRIR
       MLIROptLib
+      MLIRParser
       MLIRPass
+      MLIRTransformUtils
       MLIRSupport
       iree::compiler::Conversion::init_conversions
       iree::compiler::Conversion::HLOToLinalg

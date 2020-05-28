@@ -89,8 +89,10 @@ iree_cc_binary(
     LLVMSupport
     MLIRIR
     MLIROptLib
+    MLIRParser
     MLIRPass
     MLIRSupport
+    MLIRTransformUtils
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::init_conversions
     iree::compiler::Dialect::Flow::Analysis
