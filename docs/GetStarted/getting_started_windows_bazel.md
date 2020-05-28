@@ -55,7 +55,7 @@ would look like this:
 ### Clone
 
 Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
-clone the repository and initialize its submodules:
+clone the repository, initialize its submodules, and configure:
 
 ```powershell
 > git clone https://github.com/google/iree.git
