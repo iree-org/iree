@@ -231,6 +231,10 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
   auto moduleOp = phOp.getParentOfType<ModuleOp>();
 
   Type convertedType = typeConverter.convertType(phOp.getType());
+  if (!convertedType) {
+    return phOp.emitError()
+           << "SPIRV type conversion failed: " << phOp.getType();
+  }
   auto bindingOp = dyn_cast_or_null<IREE::HAL::InterfaceBindingOp>(
       SymbolTable::lookupNearestSymbolFrom(
           phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
