@@ -17,6 +17,7 @@ load(
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
     "iree_py_test",
+    "iree_py_test_suite",
 )
 
 package(
@@ -24,6 +25,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+<<<<<<< HEAD
 [
     iree_py_test(
         name = name,
@@ -215,8 +217,13 @@ py_binary(
     srcs = [
         "train_vision_models_on_cifar.py",
     ],
+=======
+iree_py_test_suite(
+    name = "e2e",
+    srcs = glob(["*.py"]),
+    excludes = ["linspace_test.py"],
+>>>>>>> 871ef43a... Refactor e2e integrations BUILD into test suites
     python_version = "PY3",
-    srcs_version = "PY2AND3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
