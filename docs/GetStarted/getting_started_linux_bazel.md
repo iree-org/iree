@@ -48,6 +48,7 @@ Clone the repository and initialize its submodules:
 $ git clone https://github.com/google/iree.git
 $ cd iree
 $ git submodule update --init
+$ python3 configure_bazel.py
 ```
 
 > Tip:<br>
