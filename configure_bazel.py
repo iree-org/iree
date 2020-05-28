@@ -55,7 +55,7 @@ def write_python_path(bazelrc):
     normalize_path(user_site)), file=bazelrc)
 
 
-local_bazelrc = os.path.join(os.path.dirname(__file__), "local.bazelrc")
+local_bazelrc = os.path.join(os.path.dirname(__file__), "configured.bazelrc")
 with open(local_bazelrc, "wt") as bazelrc:
   write_platform(bazelrc)
   write_python_bin(bazelrc)
