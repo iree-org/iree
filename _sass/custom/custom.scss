@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-.success-table-cell
+.success-table-cell {
   background-color: rgba($purple-000, 0.5)
+}
 
-.failure-table-cell
+.failure-table-cell {
   background-color: $grey-lt-000
+}

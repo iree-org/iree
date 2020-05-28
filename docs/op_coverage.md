@@ -3,7 +3,7 @@ layout: default
 permalink: HLOOpCoverage
 title: XLA HLO Operation Coverage
 nav_order: 6
-js_files: 
+js_files:
 - js/add_classes.js
 ---
 
