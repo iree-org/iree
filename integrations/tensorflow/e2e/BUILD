@@ -45,7 +45,6 @@ package(
         "gather_test",
         "tensorlist_test",
         "keras_lstm_test",
-        "keras_model_train_test",
         "mandelbrot_test",
         "matrix_ops_test",
         "resource_ops_test",
@@ -54,6 +53,39 @@ package(
         "simple_arithmetic_test",
         "simple_stateful_test",
         "strings_test",
+    ]
+]
+
+[
+    iree_py_test(
+        name = "_".join([
+            "keras_model_train",
+            optimizer_name,
+            backends,
+            "test",
+        ]),
+        srcs = [
+            "keras_model_train_test.py",
+        ],
+        args = [
+            "--optimizer_name=%s" % optimizer_name,
+            "--override_backends=%s" % backends,
+        ],
+        main = "keras_model_train_test.py",
+        python_version = "PY3",
+        tags = [
+            "manual",
+            "noga",
+            "notap",
+        ],
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    for optimizer_name, backends in [
+        ("sgd", "tf"),
+        ("sgd", "tf,iree_vmla"),
+        ("adam", "tf,iree_vmla"),  # TODO(b/157581521)
     ]
 ]
 

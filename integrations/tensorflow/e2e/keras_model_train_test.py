@@ -18,10 +18,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from sklearn.preprocessing import PolynomialFeatures
 import tensorflow as tf
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "optimizer_name", "sgd",
+    "optimizer name: sgd, rmsprop, nadam, adamax, adam, adagrad, adadelta")
 
 _DEGREE = 3  # polynomial degree of input feature for regression test
 _FEATURE_SIZE = _DEGREE + 1  # input feature size
@@ -56,7 +62,7 @@ class ModelTrain(tf.Module):
   def __init__(self, model):
     self.model = model
     self.loss = tf.keras.losses.MeanSquaredError()
-    self.optimizer = tf.keras.optimizers.Adam(0.01)
+    self.optimizer = tf.keras.optimizers.get(FLAGS.optimizer_name)
 
   @tf.function(input_signature=[
       tf.TensorSpec(_INPUT_DATA_SHAPE, tf.float32),
