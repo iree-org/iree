@@ -16,28 +16,44 @@
 
 package com.google.iree;
 
-/** An isolated execution context. */
-final class Context {
-  public Context(Instance instance) {
-    nativeAddress = nativeNew();
-    nativeCreate(instance.getNativeAddress());
+/**
+ * Shared runtime instance responsible for routing Context events, enumerating and creating hardware
+ * device interfaces, and managing device resource pools.
+ */
+final class Instance {
+  /**
+   * Loads the native IREE shared library. This must be called first before doing anything with the
+   * IREE Java API.
+   */
+  public static void loadNativeLibrary() {
+    System.loadLibrary("iree");
+    loaded = true;
   }
 
-  public int getId() {
-    return nativeGetId();
+  public Instance() {
+    if (!loaded) {
+      throw new IllegalStateException("Native library is not loaded");
+    }
+
+    nativeAddress = nativeNew();
+    nativeCreate();
+  }
+
+  public long getNativeAddress() {
+    return nativeAddress;
   }
 
   public void free() {
     nativeFree();
   }
 
+  private static boolean loaded = false;
+
   private final long nativeAddress;
 
   private native long nativeNew();
 
-  private native void nativeCreate(long instanceAddress);
+  private native void nativeCreate();
 
   private native void nativeFree();
-
-  private native int nativeGetId();
 }

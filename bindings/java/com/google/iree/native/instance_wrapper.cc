@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/java/com/google/iree/native/context_wrapper.h"
+#include "bindings/java/com/google/iree/native/instance_wrapper.h"
 
 #include "iree/base/api_util.h"
-#include "iree/base/logging.h"
 
 namespace iree {
 namespace java {
 
-Status ContextWrapper::Create(InstanceWrapper instance_wrapper) {
-  return FromApiStatus(iree_vm_context_create(instance_wrapper.instance(),
-                                              IREE_ALLOCATOR_SYSTEM, &context_),
-                       IREE_LOC);
+Status InstanceWrapper::Create() {
+  return FromApiStatus(
+      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_), IREE_LOC);
 }
 
-int ContextWrapper::id() const { return iree_vm_context_id(context_); }
+iree_vm_instance_t* InstanceWrapper::instance() const { return instance_; }
 
 }  // namespace java
 }  // namespace iree
