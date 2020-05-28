@@ -70,7 +70,8 @@ cc_library(
     name = "init_passes_and_dialects",
     hdrs = [
         "init_dialects.h",
-        "init_passes.h",
+        "init_iree_passes.h",
+        "init_mlir_passes.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/Analysis",
