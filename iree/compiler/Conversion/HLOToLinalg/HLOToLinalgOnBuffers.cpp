@@ -1192,7 +1192,7 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
       if (!tieShapeOp.result().hasOneUse()) break;
       builder.setInsertionPointAfter(tieShapeOp.shape().getDefiningOp());
       auto newTieShapeOp = builder.create<Shape::TieShapeOp>(
-          op.getLoc(), buffer, tieShapeOp.shape());
+          op.getLoc(), buffer.getType(), buffer, tieShapeOp.shape());
       tensor = tieShapeOp.operand();
       buffer = newTieShapeOp.result();
       resultTensorToBufferMap[tensor] = buffer;
