@@ -31,7 +31,6 @@ package(
         python_version = "PY3",
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-            "//third_party/py/sklearn",
         ],
     )
     for name in [
