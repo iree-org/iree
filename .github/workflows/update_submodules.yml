@@ -16,10 +16,12 @@
 
 name: Update Submodules
 
-on:
-  schedule:
-     # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
-     - cron: '0 */6 * * *'
+# Turn this off for now, as we transition to automatically updating the LLVM SHA
+# from Google's source repository
+on: []
+#   schedule:
+#      # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
+#      - cron: '0 */6 * * *'
 
 jobs:
   update:
