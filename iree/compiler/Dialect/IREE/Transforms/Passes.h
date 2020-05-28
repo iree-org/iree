@@ -25,7 +25,7 @@ namespace IREE {
 std::unique_ptr<OperationPass<ModuleOp>> createDropCompilerHintsPass();
 
 // Register all Passes
-inline void registerIreePasses() { createDropCompilerHintsPass(); }
+inline void registerTransformPasses() { createDropCompilerHintsPass(); }
 
 }  // namespace IREE
 }  // namespace iree_compiler

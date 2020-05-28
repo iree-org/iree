@@ -42,7 +42,7 @@ inline void registerAllIreePasses() {
   IREE::Flow::registerFlowPasses();
   IREE::Flow::registerFlowAnalysisTestPasses();
   IREE::HAL::registerHALPasses();
-  IREE::registerIreePasses();
+  IREE::registerTransformPasses();
   Shape::registerShapeConversionPasses();
   Shape::registerShapePasses();
   IREE::VM::registerVMPasses();
