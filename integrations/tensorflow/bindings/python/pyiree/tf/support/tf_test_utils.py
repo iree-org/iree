@@ -120,9 +120,15 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
         sm_path)
     return compile_from_path(sm_path)
   else:
-    # Round-trip through a temporary director.
-    with tempfile.TemporaryDirectory() as sm_path:
-      options = tf.saved_model.SaveOptions(save_debug_info=True)
+    options = tf.saved_model.SaveOptions(save_debug_info=True)
+    if FLAGS.debug_dir is None:
+      # Round-trip through a temporary directory.
+      with tempfile.TemporaryDirectory() as sm_path:
+        tf.saved_model.save(tf_module, sm_path, options=options)
+        return compile_from_path(sm_path)
+    else:
+      # Use the supplied directory.
+      sm_path = os.path.join(FLAGS.debug_dir, "SavedModel")
       tf.saved_model.save(tf_module, sm_path, options=options)
       return compile_from_path(sm_path)
 
