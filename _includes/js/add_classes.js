@@ -15,12 +15,12 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  let successes =
+  const successes =
     document.body.getElementsByClassName('success-table-element');
   Array.prototype.forEach.call(successes, element => {
     element.parentElement.classList.add('success-table-cell');
   });
-  let failures =
+  const failures =
     document.body.getElementsByClassName('failure-table-element');
   Array.prototype.forEach.call(failures, element => {
     element.parentElement.classList.add('failure-table-cell');
