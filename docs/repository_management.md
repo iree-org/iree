@@ -12,7 +12,7 @@ your workflow, please reach out to us so we can prioritize a fix.
 As a project which brings together compiler, runtime and graphics systems,
 dependency management is somewhat complex. We use git submodules for C++
 dependencies and, where possible, language specific external package management
-for other types of dependencies (i.e. Python).
+for other types of dependencies (e.g. Python).
 
 In addition, dependencies are managed entirely different in the Google internal
 source code repository. This imposes constraints on repository management tasks
