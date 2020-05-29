@@ -18,6 +18,15 @@ In addition, dependencies are managed entirely different in the Google internal
 source code repository. This imposes constraints on repository management tasks
 that may not be obvious.
 
+The git submodule state is not accessible to the tooling that moves the IREE
+source between GitHub and Google's source repository. We therefore mirror this
+state in a special `SUBMODULE_VERSIONS` file. This file is considered the source
+of truth for the correct submodule state and is what is used by the CI. When
+updating the submodule state from Google's source repository, only this file is
+updated and another
+[GitHub Actions workflow](https://github.com/google/iree/blob/master/.github/workflows/synchronize_submodules.yml)
+immediately commits a submodule update on top of that.
+
 Shortcut commands (read below for full documentation):
 
 ```shell
@@ -26,10 +35,6 @@ Shortcut commands (read below for full documentation):
 
 # Update current git submodule pointers based on SUBMODULE_VERSIONS
 ./scripts/git/submodule_versions.py import
-
-# Bump TensorFlow and LLVM to (TensorFlow) head.
-# (Also updates SUBMODULE_VERSIONS).
-./scripts/git/update_tf_llvm_submodules.py
 ```
 
 ### The special relationship with LLVM and TensorFlow
@@ -53,6 +58,17 @@ possible (especially with the CMake build) to use a newer llvm-project commit,
 and private development forks should feel free to do this. However, to submit
 upstream, we will need to integrate this newer commit in the internal Google
 source of truth prior to accepting code that depends on it.
+
+LLVM is integrated into Google's source repository at a cadence up to several
+times a day. When this necessitates updating IREE to changing LLVM and MLIR
+APIs, these updates are performed atomically as part of the integration.
+Previously this did not trigger a change to the LLVM submodule version in open
+source, which would result in breakages due to version skew. We are
+transitioning to make each integration of LLVM update IREE's submodule in OSS.
+This means that API updates will have some chance of not breaking the build.
+However, it can introduce breakages as well, especially in the Bazel build where
+we still have to wait to update the BUILD files where necessary. We are
+continuing to work on improving this situation.
 
 ### Tasks:
 
@@ -129,6 +145,10 @@ TODO(laurenzo): Add a GitHub hook to auto-commit submodule updates on
 `SUBMODULE_VERSIONS` file changes.
 
 #### Updating TensorFlow and LLVM versions
+
+WARNING: These scripts have not been updated to reflect the new tooling to
+automatically update the LLVM hash directly from Google's source repository
+rather than through TensorFlow.
 
 ```shell
 # By default, updates third_party/tensorflow to the remote head and
