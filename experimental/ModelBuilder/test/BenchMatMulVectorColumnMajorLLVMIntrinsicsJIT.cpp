@@ -64,13 +64,14 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
 
   // Loop ITERS times over the kernel to reduce the JIT's overhead.
   StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)), C(f.getArgument(2));
-  Value i;
-  LoopNestBuilder(&i, std_constant_index(0), std_constant_index(ITERS),
-                  std_constant_index(1))([&] {
-    // Compute C += A x B, in column-major form, with LLVM matrix intrinsics.
-    C() = (vector_contract(A(), B(), C(), mb.getAffineMapArrayAttr(accesses),
-                           mb.getArrayAttr(iterator_types)));
-  });
+  loopNestBuilder(std_constant_index(0), std_constant_index(ITERS),
+                  std_constant_index(1), [&](Value) {
+                    // Compute C += A x B, in column-major form, with LLVM
+                    // matrix intrinsics.
+                    C() = (vector_contract(A(), B(), C(),
+                                           mb.getAffineMapArrayAttr(accesses),
+                                           mb.getArrayAttr(iterator_types)));
+                  });
   std_ret();
 }
 
@@ -103,7 +104,8 @@ void BM_MxMColMajorVectors(benchmark::State &state) {
   StringLiteral funcName = "matmult_column_major";
 
   vector::VectorTransformsOptions vectorTransformsOptions{
-      LowerToLLVMMatrixIntrinsics};
+      LowerToLLVMMatrixIntrinsics ? vector::VectorContractLowering::Matmul
+                                  : vector::VectorContractLowering::FMA};
   CompilationOptions compilationOptions{/*llvmOptLevel=*/3, /*llcOptLevel=*/3,
                                         vectorTransformsOptions};
   if (MeasureBuild) {

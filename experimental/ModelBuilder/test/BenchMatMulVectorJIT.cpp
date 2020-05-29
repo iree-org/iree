@@ -61,13 +61,13 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
 
   // Loop ITERS times over the kernel to reduce the JIT's overhead.
   StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)), C(f.getArgument(2));
-  Value i;
-  LoopNestBuilder(&i, std_constant_index(0), std_constant_index(ITERS),
-                  std_constant_index(1))([&] {
-    // Compute C += A x B^T with row-wise dot-products.
-    C() = (vector_contract(A(), B(), C(), mb.getAffineMapArrayAttr(accesses),
-                           mb.getArrayAttr(iterator_types)));
-  });
+  loopNestBuilder(std_constant_index(0), std_constant_index(ITERS),
+                  std_constant_index(1), [&](Value) {
+                    // Compute C += A x B^T with row-wise dot-products.
+                    C() = (vector_contract(A(), B(), C(),
+                                           mb.getAffineMapArrayAttr(accesses),
+                                           mb.getArrayAttr(iterator_types)));
+                  });
   std_ret();
 }
 

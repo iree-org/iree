@@ -95,7 +95,7 @@ using edsc::intrinsics::affine_min;
 using edsc::intrinsics::AffineIndexedValue;
 // From the Loop Dialect.
 using edsc::AffineLoopNestBuilder;
-using edsc::LoopNestBuilder;
+using edsc::loopNestBuilder;
 using edsc::ParallelLoopNestBuilder;
 // -----------------------------------------------------------------------------
 
