@@ -52,7 +52,7 @@ jobs:
           # excluded with "noga".
           bazel query '//integrations/...' \
             | xargs bazel test \
-              --config=generic_clang \            
+              --config=generic_clang \
               --build_tag_filters="-noga" \
               --test_tag_filters="-noga,-driver=vulkan" \
               --test_env=IREE_VULKAN_DISABLE=1 \
