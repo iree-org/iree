@@ -52,7 +52,7 @@ you'd like to see!
 We also have some public talks that explain IREE's concepts and architecture:
 
 *   2020-03-18: Interactive HAL IR Walkthrough (Ben Vanik and core team)
-    ([recording](https://drive.google.com/open?id=1FDrW9wvmiCQsVNSNzTD_V0bYmBl0XTyQ))
+    ([recording](https://drive.google.com/file/d/1_sWDgAPDfrGQZdxAapSA90AD1jVfhp-f/view?usp=sharing))
 *   2020-01-31: End-to-end MLIR Workflow in IREE
     ([recording](https://drive.google.com/open?id=1os9FaPodPI59uj7JJI3aXnTzkuttuVkR)
     and
