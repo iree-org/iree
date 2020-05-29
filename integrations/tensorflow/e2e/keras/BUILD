@@ -16,25 +16,26 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
-    "iree_py_test",
     "iree_py_test_suite",
-    "iree_vision_test_suite",
 )
-
-E2E_INTEGRATIONS_DEPS = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-    "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-]
+load(
+    "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.oss.bzl",
+    "iree_vision_test_suite"
+)
 
 iree_py_test_suite(
     name = "non_vision",
-    srcs = glob(["*_test.py"]),
-    excludes = [
-        "keras_vision_model_test.py",
-        # TODO(GH-1620): Re-enable after fixing the failure on GitHub Actions.
-        "keras_lstm_static_test.py"
+    srcs = glob(
+        ["*_test.py"],
+        exclude = [
+            "keras_vision_model_test.py",
+            # TODO(GH-1620): Include after fixing the failure on GitHub Actions.
+            "keras_lstm_static_test.py"
+        ]
+    ),
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
-    python_version = "PY3",
-    deps = E2E_INTEGRATIONS_DEPS,
 )
 
 iree_vision_test_suite(
@@ -46,7 +47,9 @@ iree_vision_test_suite(
         ("cifar10", 1, "ResNet50", "tf,iree_llvmjit"),
         ("cifar10", 1, "ResNet50", "tf,iree_vulkan"),
     ],
-    deps = E2E_INTEGRATIONS_DEPS,
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
     tags = ["manual"],
 )
 
@@ -72,11 +75,12 @@ iree_vision_test_suite(
         ("imagenet", 1, "MobileNetV2", "tf,iree_vulkan"),  # TODO(b/150244105)
         ("imagenet", 1, "MobileNetV2", "tf,iree_llvmjit"),  # TODO(b/150244105)
     ],
-    external_data = True,
-    deps = E2E_INTEGRATIONS_DEPS,
+    external_weights = "https://storage.googleapis.com/iree_models/",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
     tags = [
         "external",
-        "large",
         "manual",
         "noga",
         "notap",
@@ -89,10 +93,10 @@ iree_vision_test_suite(
 # models trained on imagenet data sets
 py_binary(
     name = "train_vision_models_on_cifar",
-    srcs = [
-        "train_vision_models_on_cifar.py",
-    ],
+    srcs = ["train_vision_models_on_cifar.py"],
     python_version = "PY3",
     srcs_version = "PY2AND3",
-    deps = E2E_INTEGRATIONS_DEPS,
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
 )
