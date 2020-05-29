@@ -27,7 +27,7 @@ E2E_INTEGRATIONS_DEPS = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
 
 iree_py_test_suite(
     name = "non_vision",
-    srcs = glob(["*.py"]),
+    srcs = glob(["*_test.py"]),
     excludes = [
         "keras_vision_model_test.py",
         # TODO(GH-1620): Re-enable after fixing the failure on GitHub Actions.
@@ -81,4 +81,18 @@ iree_vision_test_suite(
         "noga",
         "notap",
     ],
+)
+
+# It is used to produce weights for keras vision models with input image size
+# 32x32. These models are not optimized for accuracy or latency (they are for
+# debugging only). They have the same neural net topology with keras vision
+# models trained on imagenet data sets
+py_binary(
+    name = "train_vision_models_on_cifar",
+    srcs = [
+        "train_vision_models_on_cifar.py",
+    ],
+    python_version = "PY3",
+    srcs_version = "PY2AND3",
+    deps = E2E_INTEGRATIONS_DEPS,
 )
