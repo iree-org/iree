@@ -71,6 +71,32 @@ class RuntimeTest(tf.test.TestCase):
       print("XLA ASM:", xla_asm)
       self.assertRegex(xla_asm, "xla_hlo.tanh")
 
+  def testLoadSignatureDefSavedModel(self):
+    """Tests loading a SignatureDef saved model with a single variable."""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+      sm_dir = os.path.join(temp_dir, "simple.sm")
+      print("Saving to:", sm_dir)
+
+      with tf.Graph().as_default() as graph:
+        v = tf.Variable(10)
+        result = v.read_value()
+        tensor_info = tf.compat.v1.saved_model.utils.build_tensor_info(result)
+        sig = tf.compat.v1.saved_model.signature_def_utils.build_signature_def(
+            inputs={}, outputs={"result": tensor_info}, method_name="foo")
+        builder = tf.compat.v1.saved_model.Builder(sm_dir)
+        with tf.compat.v1.Session(graph=graph) as sess:
+          sess.run(v.initializer)
+          builder.add_meta_graph_and_variables(
+              sess, ["bar"], {"baz": sig}, strip_default_attrs=True)
+          builder.save()
+
+      module = compiler.tf_load_signature_def_saved_model(
+          sm_dir, tags=set(["bar"]), exported_names=["baz"])
+
+      module_asm = module.to_asm(large_element_limit=100)
+      self.assertRegexpMatches(module_asm, "flow.variable @[^ ]* dense<10>")
+
 
 if __name__ == "__main__":
   tf.test.main()
