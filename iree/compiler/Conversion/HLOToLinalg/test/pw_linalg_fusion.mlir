@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -iree-codegen-linalg-fusion %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors -linalg-fusion-for-tensor-ops %s | IreeFileCheck %s
 
 // CHECK-LABEL: @pw_fusion_two
 func @pw_fusion_two(%arg0: tensor<4x8xi32>, %arg1: tensor<4x8xi32>, %arg2 : tensor<4x8xi32>) -> tensor<4x8xi32> {

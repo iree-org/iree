@@ -30,7 +30,6 @@ inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
-  createLinalgOnTensorsFusionPass();
 }
 
 inline void registerLinalgToSPIRVPasses() {

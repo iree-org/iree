@@ -36,10 +36,6 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
 
-/// Fuses linalg operations on tensors in dispatch function. For now does only
-/// producer consumer fusion.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass();
-
 /// Resolves shape related ops (std.dim, shapex.tie_shape, etc.) by tracing
 /// them back to the original HAL interface bindings.
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass();

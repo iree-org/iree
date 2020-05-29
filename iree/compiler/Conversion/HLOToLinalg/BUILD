@@ -23,7 +23,6 @@ cc_library(
         "DecomposeHLOClamp.cpp",
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
-        "LinalgFusion.cpp",
         "Passes.cpp",
         "ResolveShapeOps.cpp",
     ],

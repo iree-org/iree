@@ -42,65 +42,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-// These are duplicated from xla/transforms/xla_legalize_to_linalg.cc.
-ArrayAttr getNParallelLoopsAttrs(unsigned nParallelLoops, Builder& b) {
-  auto parallelLoopTypeAttr = b.getStringAttr("parallel");
-  SmallVector<Attribute, 3> iteratorTypes(nParallelLoops, parallelLoopTypeAttr);
-  return b.getArrayAttr(iteratorTypes);
-}
-
-ShapedType getXLAOpResultType(Operation* op) {
-  return op->getResult(0).getType().cast<ShapedType>();
-}
-
-template <bool isLHLO = true>
-bool verifyXLAOpTensorSemantics(Operation* op) {
-  auto verifyType = [&](Value val) -> bool {
-    return (val.getType().isa<RankedTensorType>());
-  };
-  return llvm::all_of(op->getOperands(), verifyType) &&
-         llvm::all_of(op->getResults(), verifyType);
-}
-
-/// Conversion pattern for splat constants that are not zero-dim tensors, i.e
-/// constant dense<...> : tensor<?xelem-type> -> linalg.generic op.
-class SplatConstConverter : public OpConversionPattern<ConstantOp> {
- public:
-  using OpConversionPattern<ConstantOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      ConstantOp op, ArrayRef<Value> args,
-      ConversionPatternRewriter& rewriter) const final {
-    if (!verifyXLAOpTensorSemantics(op)) {
-      return failure();
-    }
-    auto resultType = getXLAOpResultType(op);
-    if (resultType.getRank() == 0) return failure();
-    auto valueAttr = op.value().template cast<DenseElementsAttr>();
-    if (!valueAttr.isSplat()) return failure();
-
-    OpBuilder::InsertionGuard linalgOpGuard(rewriter);
-    auto nloops = std::max<unsigned>(resultType.getRank(), 1);
-    auto loc = op.getLoc();
-
-    auto linalgOp = rewriter.create<linalg::GenericOp>(
-        loc, resultType, args, rewriter.getI64IntegerAttr(0),
-        rewriter.getI64IntegerAttr(1),
-        rewriter.getAffineMapArrayAttr(rewriter.getMultiDimIdentityMap(nloops)),
-        getNParallelLoopsAttrs(nloops, rewriter),
-        /*doc=*/nullptr,
-        /*library_call=*/nullptr);
-    auto* region = &linalgOp.region();
-    auto* block = rewriter.createBlock(region, region->end());
-    rewriter.setInsertionPointToEnd(block);
-    auto stdConstOp =
-        rewriter.create<mlir::ConstantOp>(loc, valueAttr.getSplatValue());
-    rewriter.create<linalg::YieldOp>(loc, stdConstOp.getResult());
-    rewriter.replaceOp(op, linalgOp.getResults());
-    return success();
-  }
-};
-
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void runOnFunction() override {
@@ -134,7 +75,6 @@ struct ConvertHLOToLinalgOnTensorsPass
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext* context, OwningRewritePatternList& patterns) {
   xla_hlo::populateHLOToLinalgConversionPattern(context, &patterns);
-  patterns.insert<SplatConstConverter>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

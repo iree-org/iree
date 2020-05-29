@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
@@ -21,7 +22,8 @@ namespace iree_compiler {
 
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
   pm.addPass(createHLOToLinalgOnTensorsPass());
-  pm.addPass(createLinalgOnTensorsFusionPass());
+  // pm.addPass(createLinalgOnTensorsFusionPass());
+  pm.addPass(createLinalgFusionOfTensorOpsPass());
   pm.addPass(createHLOToLinalgOnBuffersPass());
 }
 

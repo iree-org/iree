@@ -131,6 +131,11 @@ inline void registerMlirPasses() {
 
   // Linalg
   createLinalgFusionPass();
+  ::mlir::registerPass("linalg-fusion-for-tensor-ops",
+                       "Fuse Linalg ops on tensors",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createLinalgFusionOfTensorOpsPass();
+                       });
   createLinalgTilingPass();
   createLinalgTilingToParallelLoopsPass();
   createLinalgPromotionPass(0);
