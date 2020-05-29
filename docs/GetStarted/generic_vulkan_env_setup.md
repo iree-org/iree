@@ -48,11 +48,11 @@ with one another.
 You need to install the [Vulkan SDK][VulkanSDK] from LunarG to get the Vulkan
 loader.
 
-Typically the Vulkan SDK will be installed at ``C:\VulkanSDK\<version>\\` and
-there will be an environment variable``VULKAN_SDK`pointing to it. You can run
-the`vulkancube`executable under the`Bin\` subdirectory of the Vulkan SDK to make
-sure everything works properly. If not, you probably need to check whether the
-graphics card is Vulkan capable or update the driver.
+Typically the Vulkan SDK will be installed at `C:\VulkanSDK\<version>\ ` and
+there will be an environment variable `VULKAN_SDK` pointing to it. You can run
+the `vulkancube` executable under the `Bin\` subdirectory of the Vulkan SDK to
+make sure everything works properly. If not, you probably need to check whether
+the graphics card is Vulkan capable or update the driver.
 
 ### Debian/Ubuntu
 
@@ -112,8 +112,8 @@ downloaded Vulkan SDKs.
 ### RenderDoc
 
 RenderDoc is an awesome tool that one can use to capture and introspect Vulkan
-applications. It can be downloaded from https://renderdoc.org/ or compiled from
-[source][RenderDocSource].
+applications. It can be downloaded from RenderDoc's
+[website](https://renderdoc.org/) or compiled from [source][RenderDocSource].
 
 ## Vulkan development environment troubleshooting
 
