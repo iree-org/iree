@@ -41,6 +41,7 @@ iree_cc_library(
     absl::memory
     absl::strings
     iree::base::file_io_hdrs
+    iree::base::file_path
     iree::base::platform_headers
     iree::base::status
     iree::base::target_platform

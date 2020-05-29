@@ -15,12 +15,15 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
+#include "iree/base/file_path.h"
 #include "iree/base/internal/file_handle_win32.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
+
+#include <io.h>
 
 namespace iree {
 namespace file_io {
@@ -55,7 +58,7 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
   return result;
 }
 
-Status SetFileContents(const std::string& path, const std::string& content) {
+Status SetFileContents(const std::string& path, absl::string_view content) {
   IREE_TRACE_SCOPE0("file_io::SetFileContents");
   ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
   if (::WriteFile(file->handle(), content.data(), content.size(), NULL, NULL) ==
@@ -85,6 +88,44 @@ Status MoveFile(const std::string& source_path,
            << destination_path;
   }
   return OkStatus();
+}
+
+std::string GetTempPath() {
+  IREE_TRACE_SCOPE0("file_io::GetTempPath");
+
+  // TEST_TMPDIR will point to a writeable temp path when running bazel tests.
+  char* test_tmpdir = getenv("TEST_TMPDIR");
+  if (test_tmpdir) {
+    return test_tmpdir;
+  }
+
+  DWORD chars_required = ::GetTempPathA(0, nullptr);
+  if (chars_required == 0) {
+    DCHECK(false) << "Unable to query temp path size";
+    return "";
+  }
+  std::string temp_path;
+  temp_path.resize(chars_required - 1);
+  if (::GetTempPathA(chars_required, &temp_path[0]) != temp_path.size()) {
+    DCHECK(false) << "Unable to read temp path";
+    return "";
+  }
+  return temp_path;
+}
+
+StatusOr<std::string> GetTempFile(const std::string& base_name) {
+  IREE_TRACE_SCOPE0("file_io::GetTempFile");
+
+  std::string temp_path = GetTempPath();
+  std::string template_path =
+      file_path::JoinPaths(temp_path, base_name) + "XXXXXX";
+
+  if (::_mktemp(&template_path[0]) != nullptr) {
+    return template_path;  // Should have been modified by _mktemp.
+  } else {
+    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
+           << "Unable to create temp file with template " << template_path;
+  }
 }
 
 }  // namespace file_io
