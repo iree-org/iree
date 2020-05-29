@@ -19,7 +19,7 @@ load(
     "iree_py_test_suite",
 )
 load(
-    "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.oss.bzl",
+    "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.bzl",
     "iree_vision_test_suite"
 )
 
@@ -41,7 +41,7 @@ iree_py_test_suite(
 iree_vision_test_suite(
     name = "keras_vision_models",
     configurations = [
-        # tuples of (data, include_top, model_name, backends)
+        # tuples of (dataset, include_top, model_name, backends)
         # "cifar10" has toy models with input 32x32, is good for debugging
         ("cifar10", 1, "ResNet50", "tf,iree_vmla"),
         ("cifar10", 1, "ResNet50", "tf,iree_llvmjit"),
@@ -56,7 +56,7 @@ iree_vision_test_suite(
 iree_vision_test_suite(
     name = "keras_vision_models_external",
     configurations = [
-        # tuples of (data, include_top, model_name, backends)
+        # tuples of (dataset, include_top, model_name, backends)
         # "cifar10" has toy models with input 32x32, is good for debugging
         # "imagenet" has real model weights for input 224x224
         ("cifar10", 1, "MobileNet", "tf,iree_vmla"),

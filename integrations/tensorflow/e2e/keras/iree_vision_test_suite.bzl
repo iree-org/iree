@@ -29,9 +29,8 @@ def iree_vision_test_suite(
 
     Args:
       name: name of the generated test suite.
-      configurations: a list of tuples of (data, include_top, model, backends)
-                      that specifies which data, model and backends to use for
-                      a given test.
+      configurations: a list of tuples of (dataset, include_top, model,
+                      backends) that specifies which data, model and backends to use for a given test.
       external_weights: a base url to fetch trained model weights from.
       tags: tags to apply to the test. Note that as in standard test suites,
             manual is treated specially and will also apply to the test suite
@@ -43,13 +42,13 @@ def iree_vision_test_suite(
                 tests and test_suite.
     """
     tests = []
-    for data, include_top, model, backends in configurations:
+    for dataset, include_top, model, backends in configurations:
         test_name = "{}_{}_top_{}_{}_{}_test".format(
-            name, data, include_top, model, backends)
+            name, dataset, include_top, model, backends)
         tests.append(test_name)
 
         args = [
-            "--data={}".format(data),
+            "--data={}".format(dataset),
             "--include_top={}".format(include_top),
             "--model={}".format(model),
             "--override_backends={}".format(backends),
