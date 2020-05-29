@@ -45,10 +45,6 @@ Also install [MSYS2](https://www.msys2.org/) by following Bazel's documentation.
 Instructions for installation can be found
 [here](https://www.python.org/downloads/windows/).
 
-### Install Clang
-
-Install Clang for `clang-cl.exe` from https://releases.llvm.org/download.html.
-
 ### Install Build Tools For Visual Studio
 
 Install the full Visual Studio or "Build Tools For Visual Studio" from the
@@ -62,7 +58,6 @@ would look like this:
 
 ```powershell
 > $env:BAZEL_VS = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
-> $env:USE_CLANG_CL = 1
 ```
 
 ## Clone and Build
@@ -70,12 +65,13 @@ would look like this:
 ### Clone
 
 Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
-clone the repository and initialize its submodules:
+clone the repository, initialize its submodules, and configure:
 
 ```powershell
 > git clone https://github.com/google/iree.git
 > cd iree
 > git submodule update --init
+> python configure_bazel.py
 ```
 
 > Tip
@@ -88,7 +84,7 @@ clone the repository and initialize its submodules:
 Run all core tests:
 
 ```powershell
-> bazel test -k --config=windows iree/...
+> bazel test -k iree/...
 ```
 
 In general, build artifacts will be under the `bazel-bin` directory at the top
@@ -100,7 +96,6 @@ You can put a user.bazelrc at the root of the repository and it will be ignored
 by git. The recommended contents for Windows are:
 
 ```
-build --config=windows
 build --disk_cache=c:/bazelcache
 build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=never
 ```

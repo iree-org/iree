@@ -50,12 +50,13 @@ export CXX=clang++
 
 ### Clone
 
-Clone the repository and initialize its submodules:
+Clone the repository, initialize its submodules and configure:
 
 ```shell
 $ git clone https://github.com/google/iree.git
 $ cd iree
-$ git submodule update --init
+$ git submodule update --initss
+$ python3 configure_bazel.py
 ```
 
 > Tip
