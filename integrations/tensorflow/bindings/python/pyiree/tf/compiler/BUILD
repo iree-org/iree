@@ -54,6 +54,7 @@ SAVED_MODEL_TF_RUNTIME_DEPS = [
     ":disable_kernels": [],
     "//conditions:default": [
         "@org_tensorflow//tensorflow/core/kernels:array",
+        "@org_tensorflow//tensorflow/core/kernels:math",
     ],
 })
 

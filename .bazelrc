@@ -12,38 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Disable warnings we don't care about.
-build --copt=-Wno-unused-local-typedef
-build --copt=-Wno-unused-private-field
-build --copt=-Wno-unused-const-variable
-# Matches upstream. Cannot impact due to extern C inclusion method.
-build --copt=-Wno-extern-c-compat
-# Technically UB but needed for intrusive ptrs
-build --copt=-Wno-invalid-offsetof
-build --copt=-Wno-unused-function
-
-# C++14 standard version is required.
-build --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
-
-# Default to an optimized build with asserts.
-# This is a good compromise between runtime and debugability.
-# Override via: "-c dbg" or --compilation_mode=dbg
-build --compilation_mode=opt
-build --copt=-UNDEBUG
-
+###############################################################################
+# Common flags that apply to all configurations.
+# Use sparingly for things common to all compilers and platforms.
+###############################################################################
+# Prevent invalid caching if input files are modified during a build.
+build --experimental_guard_against_concurrent_changes
 # Disable visibility checks (works around some private deps in TensorFlow that
 # are being unbundled soon anyway).
 build --nocheck_visibility
+# Override via: "-c dbg" or --compilation_mode=dbg
+build --compilation_mode=opt
+# Used in TensorFlow, so we have to enable it here as well.
+common --experimental_repo_remote_exec
+# Actually printing output on errors is... a useful default
+test --test_output=errors
+
+###############################################################################
+# Options for "generic_clang" builds: these options should generally apply to 
+# either clang or gcc and are curated based on need.
+###############################################################################
+
+# Disable warnings we don't care about.
+build:generic_clang --copt=-Wno-unused-local-typedef
+build:generic_clang --copt=-Wno-unused-private-field
+build:generic_clang --copt=-Wno-unused-const-variable
+# Matches upstream. Cannot impact due to extern C inclusion method.
+build:generic_clang --copt=-Wno-extern-c-compat
+# Technically UB but needed for intrusive ptrs
+build:generic_clang --copt=-Wno-invalid-offsetof
+build:generic_clang --copt=-Wno-unused-function
+
+# C++14 standard version is required.
+build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
+
+# Default to an optimized build with asserts.
+# This is a good compromise between runtime and debugability.
+build:generic_clang --copt=-UNDEBUG
+
+###############################################################################
+# Architecture specific options
+###############################################################################
 
 # Enable some default cpu flags for x86 optimization.
 build:x86opt --copt=-mavx2
 
-###############################################################################
-
-# Not strictly required, but generally good flags.
-
-# Prevent invalid caching if input files are modified during a build.
-build --experimental_guard_against_concurrent_changes
 
 ###############################################################################
 
@@ -118,37 +131,26 @@ build:rs --bes_results_url="https://source.cloud.google.com/results/invocations/
 build:rs --project_id=iree-oss
 
 ###############################################################################
+# Windows specific flags for building with VC.
+###############################################################################
 
-# Experimental config for building on Windows via clang-cl.
-# As an aspiration, it may eventually not be required to manually
-# activate this config, but for now, it is a place to store the
-# set of flags and tweaks needed to get the Windows build working.
-# Note that this is intended to work with clang-cl, not the Visual
-# Studio compiler. The following must be performed prior to invoking
-# Bazel:
-#   * Install Visual Studio Build Tools
-#   * export USE_CLANG_CL=1
-#   * export BAZEL_LLVM=C:/Users/$USER/scoop/apps/llvm/current
-#     (or actual LLVM install location)
-# Then one can build with:
-#   bazel build --config=windows {targets...}
+build:windows --define=iree_is_msvc=true
+build:windows --copt=/wd4624 # destructor was implicitly defined as deleted
+build:windows --copt=/wd4244 # possible loss of data
+build:windows --copt=/wd4005 # macro redefinition
+build:windows --copt=/wd4267 # initializing: possible loss of data
+build:windows --copt=/wd4141 # inline used more than once
+build:windows --per_file_copt=mkl_dnn@/wd4551 # missing argument list
+build:windows --per_file_copt=mkl_dnn@/wd4068 # unknown pragma
+build:windows --per_file_copt=farmhash@/wd4319 # zero extending to T of greater size
 
-# Works around __TIME__ __DATE__, etc redefinitions and -std=c++14
-# warnings.
-build:windows --copt=-Wno-builtin-macro-redefined --host_copt=-Wno-builtin-macro-redefined
-build:windows --copt=-Wno-unknown-argument --host_copt=-Wno-unknown-argument
-
-# Avoid warnings for WIN32_LEAN_AND_MEAN being defined multiple times.
-build:windows --copt=-Wno-macro-redefined
+build:windows --linkopt=/IGNORE:4217 # mismatch import/export declspec
 
 # Enables unix-style runfiles link trees (requires symlink permission).
 # See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
 # Generally: Enable Developer Mode in the Developer Settings page of the
 # system settings.
 build:windows --experimental_enable_runfiles
-
-###############################################################################
-
 # Flags to make tensorflow build.
 # Some of these are also of general use and fine to enable globally for windows.
 build:windows --copt=/arch:AVX
@@ -159,24 +161,14 @@ build:windows --copt=/DWIN32_LEAN_AND_MEAN --host_copt=/DWIN32_LEAN_AND_MEAN
 # That is one way to have less warnings :(
 build:windows --per_file_copt=tensorflow@-w
 build:windows --per_file_copt=protobuf@-w
-# This is used a lot and shouldn't be an error.
-build:windows --per_file_copt=tensorflow@-Wno-microsoft-unqualified-friend
-build:windows --per_file_copt=protobuf@-Wno-microsoft-unqualified-friend
 # Why are min/max macros? No one knows.
 build:windows --copt=/DNOMINMAX --host_copt=/DNOMINMAX
 # Yay for security warnings. Boo for non-standard.
 build:windows --copt=/D_CRT_SECURE_NO_WARNINGS --host_copt=/D_CRT_SECURE_NO_WARNINGS
 # TensorFlow requires the "monolithic" build mode for now on Windows.
 build:windows --define framework_shared_object=false
-# TODO(laurenzo): Clang uses runtime functions for 128bit math that require the
-# rt library and there is not a convenient way to link it. Figure out how to
-# do the following:
-# See: http://clang-developers.42468.n3.nabble.com/Issue-with-Clang-on-Windows-and-compiler-rt-builtins-td4059230.html
-build:windows --linkopt=/DEFAULTLIB:clang_rt.builtins-x86_64.lib
-build:windows --linkopt=/DEFAULTLIB:ws2_32.lib
 # Necessary for M_* math constants.
-build:windows --copt=/D_USE_MATH_DEFINES
-build:windows --host_copt=/D_USE_MATH_DEFINES
+build:windows --copt=/D_USE_MATH_DEFINES --host_copt=/D_USE_MATH_DEFINES
 
 # Workaround WinGDI.h defining `ERROR`, which conflicts with logging macros.
 # Note that IREE and TensorFlow both `#undef ERROR` and define their own
@@ -184,10 +176,16 @@ build:windows --host_copt=/D_USE_MATH_DEFINES
 # "graphics device interface" (GDI) for certain GUI sample projects.
 build:windows --per_file_copt=tensorflow@-DNOGDI
 
-# Used in TensorFlow, so we have to enable it here as well.
-common --experimental_repo_remote_exec
+# Disables TensorFlow eigen bloat and reduces compile times.
+build:windows --define=override_eigen_strong_inline=true
+
+# Another TensorFlow flag from their config script.
+build:windows --define with_default_optimizations=true
 
 ###############################################################################
+
+# Run the configure_bazel.py script to generate.
+try-import %workspace%/configured.bazelrc
 
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.

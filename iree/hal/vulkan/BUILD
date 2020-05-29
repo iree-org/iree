@@ -351,8 +351,12 @@ cc_library(
     copts = [
         # Only needed in the implementation cc and not by external users.
         "-DVMA_STATIC_VULKAN_FUNCTIONS=0",
-        "-Wno-thread-safety-attributes",  # External code.
-    ],
+    ] + select({
+        "//iree:iree_is_msvc": [],
+        "//conditions:default": [
+            "-Wno-thread-safety-attributes",  # External code.
+        ],
+    }),
     deps = [
         ":dynamic_symbols",
         ":handle_util",
