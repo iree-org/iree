@@ -22,7 +22,7 @@ set -e
 gcloud auth configure-docker
 
 # Determine which image tag to update. Updates :latest by default.
-if [[ $* == *--update-prod ]]; then
+if [[ $* == --update-prod ]]; then
   TAG="prod"
 else
   TAG="latest"
