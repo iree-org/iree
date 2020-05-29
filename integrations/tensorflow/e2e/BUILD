@@ -119,8 +119,6 @@ package(
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
     )
-    # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
-    # and add other supported vision models
     # ResNet50 test is hermetic - does not access any extrnal urls
     # all other tests need real weights loaded from url
     for data, include_top, model_name, backends in [
@@ -140,6 +138,7 @@ package(
             "top",
             str(include_top),
             model_name,
+            backends,
             "test",
         ]),
         srcs = [
@@ -165,23 +164,24 @@ package(
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
     )
-    # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
-    # and add other supported vision models
+    # "cifar10" has toy models with input 32x32, is good for debugging
+    # "imagenet" has real model weights for input 224x224
     for data, include_top, model_name, backends in [
-        # "cifar10" has toy models with input 32x32, is good for debugging
-        # "imagenet" has real model weights for input 224x224
-        # TODO(rybakov) remove tests with include_top=0 as soon as include_top=1 works
-        ("cifar10", 1, "ResNet50", "tf"),
-        ("cifar10", 0, "MobileNet", "tf,iree_vmla"),
         ("cifar10", 1, "MobileNet", "tf,iree_vmla"),
-        ("cifar10", 0, "MobileNetV2", "tf"),
-        ("cifar10", 1, "MobileNetV2", "tf"),
-        ("imagenet", 0, "ResNet50", "tf"),
-        ("imagenet", 1, "ResNet50", "tf"),
-        ("imagenet", 0, "MobileNet", "tf"),
-        ("imagenet", 1, "MobileNet", "tf"),
-        ("imagenet", 0, "MobileNetV2", "tf"),
-        ("imagenet", 1, "MobileNetV2", "tf"),
+        ("cifar10", 1, "MobileNet", "tf,iree_vulkan"),  # TODO(b/150244105)
+        ("cifar10", 1, "MobileNet", "tf,iree_llvmjit"),  # TODO(b/150244105)
+        ("cifar10", 1, "MobileNetV2", "tf,iree_vmla"),
+        ("cifar10", 1, "MobileNetV2", "tf,iree_vulkan"),  # TODO(b/150244105)
+        ("cifar10", 1, "MobileNetV2", "tf,iree_llvmjit"),  # TODO(b/150244105)
+        ("imagenet", 1, "ResNet50", "tf,iree_vmla"),
+        ("imagenet", 1, "ResNet50", "tf,iree_vulkan"),
+        ("imagenet", 1, "ResNet50", "tf,iree_llvmjit"),
+        ("imagenet", 1, "MobileNet", "tf,iree_vmla"),
+        ("imagenet", 1, "MobileNet", "tf,iree_vulkan"),  # TODO(b/150244105)
+        ("imagenet", 1, "MobileNet", "tf,iree_llvmjit"),  # TODO(b/150244105)
+        ("imagenet", 1, "MobileNetV2", "tf,iree_vmla"),
+        ("imagenet", 1, "MobileNetV2", "tf,iree_vulkan"),  # TODO(b/150244105)
+        ("imagenet", 1, "MobileNetV2", "tf,iree_llvmjit"),  # TODO(b/150244105)
     ]
 ]
 
