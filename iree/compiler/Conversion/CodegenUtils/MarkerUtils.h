@@ -39,8 +39,9 @@ StringRef getWorkGroupMarker();
 /// Marker to denote that a linalg operation is to be partitioned to workitems.
 StringRef getWorkItemMarker();
 
-/// Returns true if an operation has any marker.
-bool hasMarker(Operation *);
+/// Returns true if an operation has the specified `marker`. When `marker` is
+/// empty, returns true if the operation has any marker.
+bool hasMarker(Operation *, StringRef marker = "");
 
 /// Returns true if an operation has marker to denote that it is not to be
 /// tiled.

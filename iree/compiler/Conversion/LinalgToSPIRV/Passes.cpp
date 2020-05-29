@@ -96,6 +96,7 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createLinalgTileAndFusePass(workGroupSize));
   pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(workGroupSize));
+  pm.addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
   // Map to GPU processor IDs.

@@ -19,6 +19,7 @@ iree_cc_library(
     LinalgToSPIRV
   HDRS
     "Attributes.h"
+    "MemorySpace.h"
     "Passes.h"
   SRCS
     "ConvertToGPUPass.cpp"

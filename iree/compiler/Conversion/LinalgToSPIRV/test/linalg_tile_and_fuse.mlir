@@ -1,6 +1,11 @@
 // RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse %s | IreeFileCheck %s
 
-module {
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: func @tile_only
   //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
@@ -33,7 +38,12 @@ module {
 
 // -----
 
-module {
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: func @conv_padding
   //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
@@ -60,7 +70,12 @@ module {
 
 // -----
 
-module {
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: func @conv_no_padding
   //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
   //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
@@ -86,7 +101,12 @@ module {
 // -----
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-module {
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK-LABEL: func @parallel_4D
   //       CHECK: scf.parallel (%{{.+}}, %{{.+}}, %{{.+}})
   func @parallel_4D(%arg0: memref<?x?x?x?xf32>,
@@ -108,15 +128,22 @@ module {
 
 // -----
 
-func @no_tile(%arg0: memref<?x?xf32>,
-              %arg1: memref<?x?xf32>,
-              %ret0: memref<?x?xf32>) {
-  linalg.matmul(%arg0, %arg1, %ret0) {__internal_linalg_transform__ = "no-tile"} :
-    memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
-  return
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @no_tile(%arg0: memref<?x?xf32>,
+                %arg1: memref<?x?xf32>,
+                %ret0: memref<?x?xf32>) {
+    linalg.matmul(%arg0, %arg1, %ret0) {__internal_linalg_transform__ = "no-tile"} :
+      memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
+    return
+  }
 }
 // CHECK-LABEL: func @no_tile
-//  CHECK-SAME:   local_size = dense<[32, 4, 1]>
+//  CHECK-SAME:   local_size = dense<[8, 8, 1]>
 //   CHECK-NOT:   scf
 //       CHECK:   linalg.matmul
 //   CHECK-NOT:   scf
@@ -133,15 +160,22 @@ func @no_tile(%arg0: memref<?x?xf32>,
   iterator_types = []
 }
 
-func @scalar_add(%arg0 : memref<f32>, %arg1 : memref<f32>,
-                 %arg2 : memref<f32>)
-{
-   linalg.generic #trait %arg0, %arg1, %arg2 {
-   ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @scalar_add(%arg0 : memref<f32>, %arg1 : memref<f32>,
+                   %arg2 : memref<f32>)
+  {
+    linalg.generic #trait %arg0, %arg1, %arg2 {
+    ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
       %0 = addf %arg3, %arg4 : f32
       linalg.yield %0 : f32
-   } : memref<f32>, memref<f32>, memref<f32>
-   return
+     } : memref<f32>, memref<f32>, memref<f32>
+     return
+  }
 }
 // CHECK-LABEL: func @scalar_add
 //   CHECK-NOT:   scf.parallel

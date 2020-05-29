@@ -28,6 +28,7 @@ cc_library(
     ],
     hdrs = [
         "Attributes.h",
+        "MemorySpace.h",
         "Passes.h",
     ],
     deps = [

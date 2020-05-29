@@ -35,7 +35,9 @@ StringRef getWorkGroupMarker() { return "workgroup"; }
 
 StringRef getWorkItemMarker() { return "workitem"; }
 
-bool hasMarker(Operation *op) { return checkMarkerValue(op); }
+bool hasMarker(Operation *op, StringRef marker) {
+  return checkMarkerValue(op, marker);
+}
 
 bool hasNoTileMarker(Operation *op) {
   return checkMarkerValue(op, getNoTileMarker());
