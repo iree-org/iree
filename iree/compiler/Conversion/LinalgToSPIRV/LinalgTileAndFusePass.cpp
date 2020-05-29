@@ -122,10 +122,11 @@ class TileSizeCalculator {
 
   /// Compute the tile sizes based on workgroup size specified.
   LogicalResult setTileSizesBasedOnWorkgroupSize(
-      ArrayRef<int64_t> workGroupSize) {
-    if (!workGroupSize.empty()) {
-      workGroupSize = dropTrailingOnes(workGroupSize);
-      auto rev = reverse(workGroupSize);
+      ArrayRef<int64_t> vWorkGroupSize) {
+    if (!vWorkGroupSize.empty()) {
+      vWorkGroupSize = dropTrailingOnes(vWorkGroupSize);
+      workgroupSize.assign(vWorkGroupSize.begin(), vWorkGroupSize.end());
+      auto rev = reverse(workgroupSize);
       tileSizes.assign(rev.begin(), rev.end());
     }
     return success();
@@ -274,8 +275,11 @@ namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 struct LinalgTileAndFusePass
     : public PassWrapper<LinalgTileAndFusePass, FunctionPass> {
-  LinalgTileAndFusePass(ArrayRef<int64_t> workGroupSize = {})
-      : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {}
+  LinalgTileAndFusePass(ArrayRef<int64_t> workGroupSize = {},
+                        bool useWorkgroupMem = true)
+      : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {
+    this->useWorkgroupMemory = useWorkgroupMem;
+  }
   LinalgTileAndFusePass(const LinalgTileAndFusePass &pass) {}
 
   void runOnFunction() override;
@@ -283,7 +287,7 @@ struct LinalgTileAndFusePass
   Option<bool> useWorkgroupMemory{
       *this, "use-workgroup-memory",
       llvm::cl::desc("Promote subviews to use workgroup memory"),
-      llvm::cl::init(false)};
+      llvm::cl::init(true)};
 
  private:
   SmallVector<int64_t, 3> workGroupSize;
@@ -432,8 +436,9 @@ void LinalgTileAndFusePass::runOnFunction() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
-    ArrayRef<int64_t> workGroupSize) {
-  return std::make_unique<LinalgTileAndFusePass>(workGroupSize);
+    ArrayRef<int64_t> workGroupSize, bool useWorkgroupMemory) {
+  return std::make_unique<LinalgTileAndFusePass>(workGroupSize,
+                                                 useWorkgroupMemory);
 }
 
 static PassRegistration<LinalgTileAndFusePass> pass(
