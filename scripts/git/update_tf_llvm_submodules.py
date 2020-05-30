@@ -63,7 +63,8 @@ def parse_arguments():
       default="TENSORFLOW")
   parser.add_argument(
       "--update_build_files",
-      help="Updates the IREE LLVM build files from TensorFlow",
+      help=("Updates the IREE LLVM build files from TensorFlow."
+            "Defaults to True iff llvm_commit==TENSORFLOW"),
       type=utils.str2bool,
       nargs="?",
       default=None)
