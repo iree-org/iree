@@ -75,7 +75,7 @@ class T0002a_SimpleVarRead(tf.Module):
 
 # CHECK-LABEL: RUN_TEST: T0002b_SimpleVarWrite
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
-# CHECK: func @f(%arg0: tensor<f32>)
+# CHECK: func @f(%arg0: tensor<f32> {tf._user_specified_name = "a"})
 # CHECK: attributes
 # CHECK-SAME: iree.module.export
 # CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R1!"}
