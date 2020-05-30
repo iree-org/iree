@@ -17,6 +17,9 @@
 // NOLINTNEXTLINE
 // RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so 2>&1 | IreeFileCheck %s
 
+// NOLINTNEXTLINE
+// RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so -use-workgroup-memory -workgroup-size=2,2 2>&1 | IreeFileCheck %s
+
 // clang-format on
 #include <string>
 #include "mlir/ExecutionEngine/RunnerUtils.h"
@@ -48,6 +51,14 @@
 static llvm::cl::opt<std::string> vulkanWrapper(
     "vulkan-wrapper", llvm::cl::desc("Vulkan wrapper library"),
     llvm::cl::value_desc("filename"), llvm::cl::init("-"));
+
+static llvm::cl::opt<bool> useWorkgroupMemory(
+    "use-workgroup-memory", llvm::cl::desc("Enable use of workgroup memory"),
+    llvm::cl::value_desc("boolean"), llvm::cl::init(false));
+
+static llvm::cl::list<int> workgroupSize(
+    "workgroup-size", llvm::cl::desc("Workgroup size to use"),
+    llvm::cl::CommaSeparated);
 
 using namespace mlir;                    // NOLINT
 using namespace mlir::edsc;              // NOLINT
@@ -84,8 +95,11 @@ void testMatMul() {
   CompilationOptions options;
   const int64_t workload = width * height;
   SmallVector<Type, 3> args = {typeA, typeB, typeC};
-  auto lowering = [args](mlir::PassManager &pm) {
-    pm.addPass(mlir::iree_compiler::createLinalgTileAndFusePass());
+  SmallVector<int64_t, 4> vWorkgroupSizes(workgroupSize.begin(),
+                                          workgroupSize.end());
+  auto lowering = [&](mlir::PassManager &pm) {
+    pm.addPass(mlir::iree_compiler::createLinalgTileAndFusePass(
+        vWorkgroupSizes, useWorkgroupMemory));
     pm.addPass(mlir::iree_compiler::createConvertToGPUPass());
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
