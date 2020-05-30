@@ -150,6 +150,7 @@ class FusionWorklist {
       Operation *def = operand.getDefiningOp();
       if (!def) continue;
       if (def->getBlock() != block) continue;
+      if (!isValidItem(def)) continue;
       if (!visited.insert(def).second) continue;
       worklist.push_back(def);
       dirty = true;
@@ -163,6 +164,7 @@ class FusionWorklist {
         Operation *def = use.getOwner();
         if (def->isKnownTerminator()) continue;
         if (def->getBlock() != block) continue;
+        if (!isValidItem(def)) continue;
         if (!visited.insert(def).second) continue;
         worklist.push_back(def);
         dirty = true;
@@ -178,6 +180,13 @@ class FusionWorklist {
   }
 
  private:
+  bool isValidItem(Operation *op) {
+    // Dispatch regions cannot be added to the worklist because they are
+    // modified/deleted in place and can not be guaranteed valid for the
+    // duration of the worklist.
+    return !llvm::isa<DispatchRegionOp>(op);
+  }
+
   // Sorts worklist items such that popNext() values pop in inverse
   // topological order.
   void sort() {

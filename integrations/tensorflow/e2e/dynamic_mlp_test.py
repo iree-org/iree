@@ -57,14 +57,11 @@ class Mlp(tf.Module):
         tf.add(tf.matmul(layer_2, self.out_weights), self.out_bias))
 
   def predict(self, x):
-    # return tf.nn.softmax(self.mlp(x))
-    # For simplicity at this point, don't do the softmax, as it lets us
-    # skip reductions.
-    return self.mlp(x)
+    return tf.nn.softmax(self.mlp(x))
 
 
-# TODO(silvasean): Get this test working on IREE.
-@tf_test_utils.compile_modules(backends=["tf"], mlp=(Mlp, ["predict"]))
+@tf_test_utils.compile_modules(
+    backends=["tf", "iree_vmla"], mlp=(Mlp, ["predict"]))
 class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
 
   def test_dynamic_batch(self):

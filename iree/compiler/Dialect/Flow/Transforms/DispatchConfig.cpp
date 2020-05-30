@@ -21,12 +21,36 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
-#define DEBUG_TYPE "iree-dispatch-config"
+#define DEBUG_TYPE "iree-detail"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+namespace {
+// TODO(laurenzo): Every one of these should have better support and removed
+// from this exclusion list eventually.
+bool isUnsupportedFusionOp(Operation *op) {
+  return isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
+         isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
+         isa<xla_hlo::ReduceWindowOp>(op);
+}
+
+// Whitelist of ops that materialize to a an index-permuted copy of some kind
+// if they exist standalone. Generally we try to avoid anchoring on these,
+// letting them fuse into more meaningful ops as possible.
+bool isIndexOp(Operation *op) {
+  // TODO(laurenzo): Curate this list more specifically (or have a better
+  // mechanism for determining).
+  return isa<Shape::RankedBroadcastInDimOp>(op) ||
+         isa<xla_hlo::BroadcastInDimOp>(op) ||
+         isa<xla_hlo::DynamicBroadcastInDimOp>(op) ||
+         isa<xla_hlo::DynamicReshapeOp>(op) ||
+         isa<xla_hlo::DynamicSliceOp>(op) || isa<xla_hlo::ReshapeOp>(op) ||
+         isa<xla_hlo::SliceOp>(op) || isa<xla_hlo::TransposeOp>(op);
+}
+}  // namespace
 
 //------------------------------------------------------------------------------
 // OpDispatchPolicy
@@ -86,18 +110,25 @@ bool OpDispatchPolicy::isIdentityMetadata(Operation *op) {
 }
 
 int OpDispatchPolicy::getAnchorBenefit(Operation *op) {
+  if (isUnsupportedFusionOp(op)) {
+    return 100;
+  }
+
   if (isa<Shape::TieShapeOp>(op) || isa<Shape::MakeRankedShapeOp>(op)) {
     // Cannot anchor.
     return 0;
-  } else if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-             isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
-             isa<xla_hlo::ReduceWindowOp>(op)) {
-    // High benefit anchor.
-    // TODO(GH-1605): Remove xla_hlo::PadOp from the check.
-    return 10;
+  } else if (isIndexOp(op)) {
+    // We generally do not want to form anchors around ops that just do a copy
+    // (perhaps with an affine map) except as a last resort.
+    return 1;
+  } else if (isa<xla_hlo::SelectOp>(op)) {
+    // TODO(GH-2050): In a number of cases, this makes it less likely to split
+    // a DR across a compare/select boundary. Remove this once i1 is legalized
+    // properly.
+    return 15;
   } else {
     // Most dispatchable ops can anchor but are a fairly low benefit.
-    return 1;
+    return 10;
   }
 }
 
@@ -105,15 +136,13 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
                                                          Operation *inputOp) {
   if (inputOp->isKnownTerminator()) return FusionType::DISABLED;
 
-  if (isa<xla_hlo::DotOp>(inputOp) || isa<xla_hlo::ConvOp>(inputOp) ||
-      isa<xla_hlo::ReduceOp>(inputOp) || isa<xla_hlo::PadOp>(inputOp) ||
-      isa<xla_hlo::ReduceWindowOp>(inputOp)) {
-    // TODO(GH-1605): Remove xla_hlo::PadOp from the check.
-    return FusionType::DISABLED;
-  } else if (isIdentityMetadata(inputOp)) {
+  if (isIdentityMetadata(inputOp)) {
     // Shape ties must always be duplicated into the region and remain in their
     // original position. This should apply to any such "metadata" ops.
     return FusionType::CLONE_INTO;
+  }
+  if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(inputOp)) {
+    return FusionType::DISABLED;
   }
 
   // By default for operands, they are duplicated into the dispatch region.
@@ -129,28 +158,18 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
   if (outputOp->isKnownTerminator() || outputOp->getNumResults() == 0) {
     return FusionType::DISABLED;
   }
-
-  if (isa<xla_hlo::DotOp>(outputOp) || isa<xla_hlo::ConvOp>(outputOp) ||
-      isa<xla_hlo::ReduceOp>(outputOp) || isa<xla_hlo::PadOp>(outputOp) ||
-      isa<xla_hlo::ReduceWindowOp>(outputOp)) {
-    // TODO(GH-1605): Remove xla_hlo::PadOp from the check.
+  if (isIdentityMetadata(outputOp)) {
+    return FusionType::MOVE_INTO;
+  }
+  if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(outputOp)) {
     return FusionType::DISABLED;
-  } else if (isIdentityMetadata(outputOp)) {
-    return FusionType::MOVE_INTO;
   }
 
-  // Generally allow fusions of any output op that has the same shape.
-  // This is very simplified and needs to be extended to infer shape
-  // equivalence wrt dynamic shapes and other conditions that are legal to
-  // fuse.
-  assert(anchorOp->getNumResults() > 0);
-  Type anchorType = anchorOp->getResult(0).getType();
-  Type outputType = outputOp->getResult(0).getType();
-  auto shapedType = anchorType.dyn_cast<ShapedType>();
-  if (shapedType.hasStaticShape() && anchorType == outputType) {
-    return FusionType::MOVE_INTO;
-  }
-
+  // Generally, it is hard to reason locally about the legality of fusing an
+  // output, since additional analysis may need to be done to determine
+  // workload compatibility (especially with dynamic shapes involved). As
+  // such, we do as little as possible here and instead rely on optimization
+  // passes to merge compatible regions.
   return FusionType::DISABLED;
 }
 

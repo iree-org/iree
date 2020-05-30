@@ -144,7 +144,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createDispatchabilityAnalysisPass());
 
   // Create all of the dispatch regions, CSE their workloads, and fold.
-  passManager.addPass(IREE::Flow::createIdentifyDispatchRegionsPass());
+  passManager.addPass(IREE::Flow::createIdentifyDispatchRegions2Pass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addPass(IREE::Flow::createFoldCompatibleDispatchRegionsPass());
 

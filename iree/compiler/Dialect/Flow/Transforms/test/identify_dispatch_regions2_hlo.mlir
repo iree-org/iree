@@ -16,65 +16,40 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // -----
 
-// CHECK-LABEL: @hloElementwiseOps
-func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT: %[[WORKLOAD:.+]] = constant 4
-  // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%[[WORKLOAD]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %2 = xla_hlo.subtract %1, %arg1 : tensor<4xf32>
-  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %3 = xla_hlo.multiply %2, %arg1 : tensor<4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   flow.return %3 : tensor<4xf32>
-  // CHECK-NEXT: }
-  // CHECK-NEXT: return %0 : tensor<4xf32>
-  return %2 : tensor<4xf32>
-}
-
-// -----
-
-// CHECK-LABEL: @interleavedDot
-func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+// CHECK-LABEL: @isolatedDot
+func @isolatedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // NOTE: Fragile ordering. Workload constants are emitted in order a the
   // top of the block.
-  // CHECK: %[[WORKLOAD0:.+]] = constant 16 : index
-  // CHECK: %[[R0:.+]] = flow.dispatch.region
-  // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // CHECK-NEXT:   %[[DADD:.*]] = xla_hlo.add %arg1, %arg1 : tensor<4x4xf32>
-  // CHECK-NEXT:   %[[DDOT:.*]] = "xla_hlo.dot"(%[[DADD]], %arg1)
-  // CHECK-NEXT:   %[[DMUL:.*]] = xla_hlo.multiply %[[DDOT]], %arg1
-  // CHECK-NEXT: flow.return %[[DMUL]] : tensor<4x4xf32>
-  // CHECK-NEXT: }
+  // CHECK: flow.dispatch.region
+  // CHECK:   xla_hlo.add
+  // CHECK: flow.dispatch.region
+  // CHECK:   "xla_hlo.dot"
+  // CHECK: flow.dispatch.region
+  // CHECK:   xla_hlo.multiply
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
-  // CHECK-NEXT: return %[[R0]] : tensor<4x4xf32>
   return %2 : tensor<4x4xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func @caller
-func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT: %[[WORKLOAD0:.+]] = constant 4 : index
-  // CHECK-NEXT: %[[R0:.+]] = flow.dispatch.region
-  // CHECK-SAME: [%[[WORKLOAD0]] : index]
-  // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
+// CHECK-LABEL: func @sameBenefit
+func @sameBenefit(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
+  // Because these are all the same benefit, initial formation puts them each
+  // in their own region.
+  // CHECK: flow.dispatch.region
+  // CHECK:   xla_hlo.add
+  // CHECK: flow.dispatch.region
+  // CHECK:   call @callee
+  // CHECK: flow.dispatch.region
+  // CHECK:   xla_hlo.multiply
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %2 = call @callee(%1) : (tensor<4xf32>) -> tensor<4xf32>
   %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   %3 = xla_hlo.multiply %2, %arg1 : tensor<4xf32>
   %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   flow.return %3 : tensor<4xf32>
-  // CHECK-NEXT: }
-  // CHECK-NEXT: return %[[R0]] : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
+
 // CHECK-LABEL: func @callee
 func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[WORKLOAD0:.+]] = constant 4 : index
@@ -87,6 +62,20 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: }
   // CHECK: return %[[R0]] : tensor<4xf32>
   return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @copyAdd
+func @copyAdd(%arg0 : tensor<4xf32>) -> tensor<4x16xf32> {
+  // Because these are all the same benefit, initial formation puts them each
+  // in their own region.
+  // CHECK: flow.dispatch.region
+  // CHECK:      "xla_hlo.broadcast_in_dim"
+  // CHECK-NEXT: xla_hlo.add
+  %0 = "xla_hlo.broadcast_in_dim"(%arg0) { broadcast_dimensions = dense<0> : tensor<1xi64> } : (tensor<4xf32>) -> tensor<4x16xf32>
+  %1 = xla_hlo.add %0, %0 : tensor<4x16xf32>
+  return %1 : tensor<4x16xf32>
 }
 
 // -----
