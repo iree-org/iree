@@ -30,5 +30,5 @@ fi
 echo "Updating $TAG"
 
 # Build and push the cmake image.
-docker build --tag gcr.io/iree-oss/cmake:$TAG build_tools/docker/cmake/
-docker push gcr.io/iree-oss/cmake:$TAG
+docker build --tag "gcr.io/iree-oss/cmake:${TAG}" build_tools/docker/cmake/
+docker push "gcr.io/iree-oss/cmake:${TAG}"

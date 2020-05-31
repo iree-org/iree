@@ -30,5 +30,5 @@ fi
 echo "Updating $TAG"
 
 # Build and push the bazel-tensorflow image.
-docker build --tag gcr.io/iree-oss/bazel-tensorflow:$TAG build_tools/docker/bazel_tensorflow/
-docker push gcr.io/iree-oss/bazel-tensorflow:$TAG
+docker build --tag "gcr.io/iree-oss/bazel-tensorflow:${TAG}" build_tools/docker/bazel_tensorflow/
+docker push "gcr.io/iree-oss/bazel-tensorflow:${TAG}"
