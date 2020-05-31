@@ -73,31 +73,31 @@ static iree_status_t iree_vm_invoke_within(
     iree_vm_variant_list_t* inputs, iree_vm_variant_list_t* outputs) {
   iree_vm_function_signature_t signature =
       iree_vm_function_signature(&function);
-  if ((inputs &&
-       iree_vm_variant_list_size(inputs) != signature.argument_count) ||
-      (!inputs && signature.argument_count > 0)) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (!outputs && signature.result_count > 0) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  // TODO(#2075): disabled because check_test is invoking native methods.
+  // These checks should be nice and simple as we don't support variadic
+  // args/results in bytecode.
+  int32_t input_count = inputs ? iree_vm_variant_list_size(inputs) : 0;
+  int32_t min_output_count = VMMAX(signature.result_count, outputs ? 1 : 0);
+  // if (input_count != signature.argument_count) {
+  //   return IREE_STATUS_INVALID_ARGUMENT;
+  // } else if (!outputs && signature.result_count > 0) {
+  //   return IREE_STATUS_INVALID_ARGUMENT;
+  // }
 
   // Allocate storage for marshaling arguments into the callee stack frame.
   iree_vm_register_list_t* argument_registers =
       (iree_vm_register_list_t*)iree_alloca(sizeof(iree_vm_register_list_t) +
-                                            signature.argument_count *
-                                                sizeof(uint16_t));
-  argument_registers->size = signature.argument_count;
+                                            input_count * sizeof(uint16_t));
+  argument_registers->size = input_count;
   iree_vm_register_list_t* result_registers =
       (iree_vm_register_list_t*)iree_alloca(sizeof(iree_vm_register_list_t) +
-                                            signature.result_count *
+                                            min_output_count *
                                                 sizeof(uint16_t));
-  result_registers->size = signature.result_count;
+  result_registers->size = min_output_count;
 
   // Enter the [external] frame, which will have storage space for the
   // argument and result registers.
-  int32_t register_count =
-      max(signature.argument_count, signature.result_count);
+  int32_t register_count = VMMAX(input_count, min_output_count);
   iree_vm_stack_frame_t* external_frame = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_stack_external_enter(stack, iree_make_cstring_view("invoke"),

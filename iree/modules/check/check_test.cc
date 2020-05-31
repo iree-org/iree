@@ -170,6 +170,7 @@ class CheckTest : public ::testing::Test {
             &function),
         IREE_LOC))
         << "Exported function '" << function_name << "' not found";
+    // TODO(#2075): don't directly invoke native functions like this.
     return FromApiStatus(
         iree_vm_invoke(context_, function,
                        /*policy=*/nullptr, inputs_,
