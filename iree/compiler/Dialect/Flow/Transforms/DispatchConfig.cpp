@@ -29,12 +29,25 @@ namespace IREE {
 namespace Flow {
 
 namespace {
-// TODO(laurenzo): Every one of these should have better support and removed
-// from this exclusion list eventually.
 bool isUnsupportedFusionOp(Operation *op) {
-  return isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-         isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
-         isa<xla_hlo::ReduceWindowOp>(op);
+  // TODO(laurenzo): Every one of these should have better support and removed
+  // from this exclusion list eventually.
+  if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
+      isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
+      isa<xla_hlo::ReduceWindowOp>(op))
+    return true;
+
+  return false;
+}
+
+bool isDynamicallyShaped(Operation *op) {
+  // TODO(laurenzo): Backends support very limited fusion of dynamic shapes.
+  // Open this up.
+  return (llvm::any_of(op->getResults(), [](Value v) {
+    Type t = v.getType();
+    auto tensorType = t.dyn_cast<TensorType>();
+    return tensorType && !tensorType.hasStaticShape();
+  }));
 }
 
 // Whitelist of ops that materialize to a an index-permuted copy of some kind
@@ -141,6 +154,7 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
     // original position. This should apply to any such "metadata" ops.
     return FusionType::CLONE_INTO;
   }
+  if (isDynamicallyShaped(inputOp)) return FusionType::DISABLED;
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(inputOp)) {
     return FusionType::DISABLED;
   }

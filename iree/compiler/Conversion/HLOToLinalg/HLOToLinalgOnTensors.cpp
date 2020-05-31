@@ -22,6 +22,7 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -41,6 +42,21 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+struct RankedBroadcastInDimOpConversion
+    : public OpConversionPattern<Shape::RankedBroadcastInDimOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      Shape::RankedBroadcastInDimOp op, ArrayRef<Value> rawInputs,
+      ConversionPatternRewriter& rewriter) const override {
+    Shape::RankedBroadcastInDimOpOperandAdaptor inputs(rawInputs);
+    rewriter.replaceOpWithNewOp<xla_hlo::BroadcastInDimOp>(
+        op, op.getResult().getType(), inputs.operand(),
+        op.broadcast_dimensionsAttr());
+    return success();
+  }
+};
 
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
@@ -64,6 +80,9 @@ struct ConvertHLOToLinalgOnTensorsPass
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
 
+    // Must convert dynamic HLO ops to non-dynamic.
+    target.addIllegalOp<Shape::RankedBroadcastInDimOp>();
+
     if (failed(applyPartialConversion(getFunction(), target, patterns))) {
       signalPassFailure();
     }
@@ -75,6 +94,7 @@ struct ConvertHLOToLinalgOnTensorsPass
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext* context, OwningRewritePatternList& patterns) {
   xla_hlo::populateHLOToLinalgConversionPattern(context, &patterns);
+  patterns.insert<RankedBroadcastInDimOpConversion>(context);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

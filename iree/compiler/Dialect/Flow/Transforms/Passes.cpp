@@ -145,8 +145,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Create all of the dispatch regions, CSE their workloads, and fold.
   passManager.addPass(IREE::Flow::createIdentifyDispatchRegions2Pass());
+  // TODO(laurenzo): BAD BAD BAD. For some reason, tie_shapes are being
+  // duplicated, requiring multiple hits with the hammer to filter down.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addPass(IREE::Flow::createFoldCompatibleDispatchRegionsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  // TODO(laurenzo): Make compatible with dynamic shapes.
+  // passManager.addPass(IREE::Flow::createFoldCompatibleDispatchRegionsPass());
 
   // Note that as we are rematerializing things here it's critical we do not run
   // the canonicalizer/CSE between now and when we outline - otherwise it'll

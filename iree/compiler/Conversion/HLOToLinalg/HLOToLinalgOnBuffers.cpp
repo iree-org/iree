@@ -111,6 +111,8 @@ static unsigned mapDescriptorTypeToMemorySpace(IREE::HAL::DescriptorType type) {
     case IREE::HAL::DescriptorType::UniformBuffer:
     case IREE::HAL::DescriptorType::UniformBufferDynamic:
       return 4;
+    default:
+      llvm_unreachable("unsupported DescriptorType");
   }
 }
 
@@ -1190,6 +1192,13 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
   while (true) {
     if (auto tieShapeOp = tensor.getDefiningOp<Shape::TieShapeOp>()) {
       if (!tieShapeOp.result().hasOneUse()) break;
+      // auto shapeDef = tieShapeOp.shape().getDefiningOp();
+      // auto operandDef = tieShapeOp.operand().getDefiningOp();
+      // if (!operandDef || shapeDef->isBeforeInBlock(operandDef)) {
+      //   builder.setInsertionPointAfter(shapeDef);
+      // } else {
+      //   builder.setInsertionPointAfter(operandDef);
+      // }
       builder.setInsertionPointAfter(tieShapeOp.shape().getDefiningOp());
       auto newTieShapeOp = builder.create<Shape::TieShapeOp>(
           op.getLoc(), buffer.getType(), buffer, tieShapeOp.shape());
@@ -1214,17 +1223,72 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
   return success();
 }
 
+static LogicalResult createDynamicTemporaryBuffers(
+    Shape::TieShapeOp tieShapeOp, TensorToBufferMap &resultTensorToBufferMap,
+    OpBuilder &builder) {
+  if (resultTensorToBufferMap.count(tieShapeOp.result()) > 0) {
+    // Already has an allocation.
+    return success();
+  }
+
+  auto loc = tieShapeOp.getLoc();
+  RankedTensorType tensorType =
+      tieShapeOp.result().getType().dyn_cast<RankedTensorType>();
+  if (!tensorType) return success();
+  auto shapeType =
+      tieShapeOp.shape().getType().dyn_cast<Shape::RankedShapeType>();
+  if (!shapeType) return success();
+  // TODO(laurenzo): Have a real memory space for temporary buffers?
+  MemRefType memrefType =
+      getMemrefTypeForTensor(tensorType, /*affineMapComposition=*/{},
+                             /*memorySpace=*/0);
+  assert(memrefType.hasRank());
+
+  // Create an allocation at the highest point possible.
+  auto shapeDefOp = tieShapeOp.shape().getDefiningOp();
+  if (shapeDefOp) {
+    builder.setInsertionPointAfter(shapeDefOp);
+  } else {
+    builder.setInsertionPointToStart(builder.getBlock());
+  }
+
+  SmallVector<Value, 4> dynamicDims;
+  for (int i = 0, e = memrefType.getRank(); i < e; ++i) {
+    if (memrefType.isDynamicDim(i)) {
+      auto dim = builder.create<Shape::RankedDimOp>(loc, tieShapeOp.shape(), i);
+      dynamicDims.push_back(dim);
+    }
+  }
+  auto alloc = builder.create<AllocOp>(loc, memrefType, dynamicDims);
+  // Associate the buffer with the input and output of the tie shape.
+  resultTensorToBufferMap[tieShapeOp.result()] = alloc;
+  resultTensorToBufferMap[tieShapeOp.operand()] = alloc;
+  return success();
+}
+
 /// Processes the hal.interface.store.tensor instructions to get buffer views
 /// for the inputs/outputs to the dispatch function.
 static LogicalResult createAndPropagateBufferUsedForResultTensors(
     FuncOp funcOp, TensorToBufferMap &resultTensorToBufferMap) {
   OpBuilder builder(funcOp.getBody());
+  // First associate buffers for anything that derives from a pre-allocated
+  // placeholder.
   auto walkResult = funcOp.walk(
       [&](IREE::HAL::InterfaceStoreTensorOp storeTensorOp) -> WalkResult {
         return createAndPropagateBufferUsedForResultTensor(
             storeTensorOp, resultTensorToBufferMap, builder);
       });
-  return failure(walkResult.wasInterrupted());
+  if (walkResult.wasInterrupted()) return failure();
+
+  // Then allocate any dynamic intermediate buffers. These allocations may
+  // not actually be used once buffer fusion takes place.
+  // walkResult = funcOp.walk(
+  //   [&](Shape::TieShapeOp tieShapeOp) -> WalkResult {
+  //     return createDynamicTemporaryBuffers(
+  //       tieShapeOp, resultTensorToBufferMap, builder);
+  //   });
+  // if (walkResult.wasInterrupted()) return failure();
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

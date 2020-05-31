@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/Support/Debug.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -71,12 +72,34 @@ ClosureOpDce::ClosureOpDce(Operation *closureOp, Block &entryBlock,
     }
   }
 
-  // Check for unused results.
-  for (auto result : closureOp->getResults()) {
+  // Build data structure for unused result elision.
+  auto *terminator = entryBlock.getTerminator();
+  assert(terminator->getNumOperands() == closureOp->getNumResults());
+  for (auto it : llvm::enumerate(terminator->getOperands())) {
+    auto result = closureOp->getResult(it.index());
     if (result.getUses().empty()) {
+      // Not used - Drop.
       needsResultElision = true;
-      break;
+      continue;
     }
+
+    // Is it duplicated prior?
+    bool isDup = false;
+    for (int i = 0; i < returnIndexMap.size(); ++i) {
+      Value newReturn = terminator->getOperand(returnIndexMap[i]);
+      if (it.value() == newReturn) {
+        // Duplicated.
+        isDup = true;
+        needsResultElision = true;
+        resultIndexMap.push_back(std::make_pair(it.index(), i));
+        break;
+      }
+    }
+    if (isDup) continue;
+
+    // Map as-is.
+    resultIndexMap.push_back(std::make_pair(it.index(), returnIndexMap.size()));
+    returnIndexMap.push_back(it.index());
   }
 }
 
@@ -109,13 +132,9 @@ void ClosureOpDce::elideUnusedOperands(OpBuilder &builder) {
 
 void ClosureOpDce::elideUnusedResults(OpBuilder &builder, bool eraseOriginal) {
   // Determine the result signature transform needed.
-  llvm::SmallVector<unsigned, 4> resultIndexMap;
   llvm::SmallVector<Type, 4> newResultTypes;
-  for (auto it : llvm::enumerate(closureOp->getResults())) {
-    if (!it.value().getUses().empty()) {
-      newResultTypes.push_back(it.value().getType());
-      resultIndexMap.push_back(it.index());
-    }
+  for (auto index : returnIndexMap) {
+    newResultTypes.push_back(closureOp->getResult(index).getType());
   }
 
   // Re-allocate the op.
@@ -124,18 +143,21 @@ void ClosureOpDce::elideUnusedResults(OpBuilder &builder, bool eraseOriginal) {
       builder.insert(cloneWithNewResultTypes(closureOp, newResultTypes));
 
   // Remap all returns.
-  llvm::SmallVector<Value, 4> newReturns(resultIndexMap.size());
-  newOp->walk([&](IREE::Flow::ReturnOp terminator) {
-    for (unsigned i = 0, e = resultIndexMap.size(); i < e; ++i) {
-      newReturns[i] = terminator.getOperand(resultIndexMap[i]);
-    }
-    terminator.getOperation()->setOperands(newReturns);
-  });
+  auto *newTerminator = newOp->getRegion(0).front().getTerminator();
+  llvm::SmallVector<Value, 4> newReturns(returnIndexMap.size());
+  for (unsigned i = 0, e = returnIndexMap.size(); i < e; ++i) {
+    int oldIndex = returnIndexMap[i];
+    newReturns[i] = newTerminator->getOperand(oldIndex);
+  }
+  newTerminator->setOperands(newReturns);
 
   // Replace original uses.
-  for (unsigned i = 0, e = resultIndexMap.size(); i < e; ++i) {
-    closureOp->getResult(resultIndexMap[i])
-        .replaceAllUsesWith(newOp->getResult(i));
+  for (auto indexMap : resultIndexMap) {
+    unsigned oldIndex = indexMap.first;
+    unsigned newIndex = indexMap.second;
+    Value oldResult = closureOp->getResult(oldIndex);
+    Value newResult = newOp->getResult(newIndex);
+    oldResult.replaceAllUsesWith(newResult);
   }
   if (eraseOriginal) closureOp->erase();
   closureOp = newOp;

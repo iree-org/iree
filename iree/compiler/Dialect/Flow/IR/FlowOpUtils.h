@@ -60,6 +60,8 @@ class ClosureOpDce {
   unsigned variadicOffset;
   llvm::SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements;
   llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
+  llvm::SmallVector<int, 4> returnIndexMap;
+  llvm::SmallVector<std::pair<int, int>, 4> resultIndexMap;
   bool needsOperandElision = false;
   bool needsResultElision = false;
 };
