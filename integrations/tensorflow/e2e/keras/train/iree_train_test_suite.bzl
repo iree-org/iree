@@ -24,7 +24,7 @@ def iree_train_test_suite(
         size = None,
         python_version = "PY3",
         **kwargs):
-    """Creates one iree_py_test per configuration tuple and bundles them.
+    """Creates one iree_py_test per configuration tuple and a test suite that bundles them.
 
     Args:
       name: name of the generated test suite.
