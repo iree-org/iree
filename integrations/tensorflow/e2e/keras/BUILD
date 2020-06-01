@@ -79,6 +79,8 @@ iree_vision_test_suite(
         # tuples of (dataset, include_top, model_name, backends)
         # "cifar10" has toy models with 32x32 input which are good for debugging
         # "imagenet" has real model weights for input 224x224
+        # TODO(b/150244105): Compiling fails with commands targeting IREE
+        # interpreter and vulkan backends for tests marked with this to do.
         ("cifar10", 1, "MobileNet", "tf,iree_vmla"),
         ("cifar10", 1, "MobileNet", "tf,iree_vulkan"),  # TODO(b/150244105)
         ("cifar10", 1, "MobileNet", "tf,iree_llvmjit"),  # TODO(b/150244105)
