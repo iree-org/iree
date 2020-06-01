@@ -172,7 +172,10 @@ cc_library(
 cc_library(
     name = "file_io_hdrs",
     hdrs = ["file_io.h"],
-    deps = [":status"],
+    deps = [
+        ":status",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 cc_test(

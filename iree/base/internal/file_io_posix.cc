@@ -12,13 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cstdio>
-
-#include "absl/strings/str_cat.h"
-#include "iree/base/file_io.h"
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX)
@@ -26,6 +20,15 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include <cstdio>
+#include <cstdlib>
+
+#include "absl/strings/str_cat.h"
+#include "iree/base/file_io.h"
+#include "iree/base/file_path.h"
+#include "iree/base/status.h"
+#include "iree/base/tracing.h"
 
 namespace iree {
 namespace file_io {
@@ -72,7 +75,7 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
   return contents;
 }
 
-Status SetFileContents(const std::string& path, const std::string& content) {
+Status SetFileContents(const std::string& path, absl::string_view content) {
   IREE_TRACE_SCOPE0("file_io::SetFileContents");
   std::unique_ptr<FILE, void (*)(FILE*)> file = {std::fopen(path.c_str(), "wb"),
                                                  +[](FILE* file) {
@@ -110,6 +113,41 @@ Status MoveFile(const std::string& source_path,
         IREE_LOC);
   }
   return OkStatus();
+}
+
+std::string GetTempPath() {
+  IREE_TRACE_SCOPE0("file_io::GetTempPath");
+
+  // TEST_TMPDIR will point to a writeable temp path when running bazel tests.
+  char* test_tmpdir = getenv("TEST_TMPDIR");
+  if (test_tmpdir) {
+    return test_tmpdir;
+  }
+
+  char* tmpdir = getenv("TMPDIR");
+  if (tmpdir) {
+    return tmpdir;
+  }
+
+  return "/tmp";
+}
+
+StatusOr<std::string> GetTempFile(absl::string_view base_name) {
+  IREE_TRACE_SCOPE0("file_io::GetTempFile");
+
+  std::string temp_path = GetTempPath();
+  std::string template_path =
+      file_path::JoinPaths(temp_path, base_name) + "XXXXXX";
+
+  if (::mkstemp(&template_path[0]) != -1) {
+    return template_path;  // Should have been modified by mkstemp.
+  } else {
+    return ErrnoToCanonicalStatusBuilder(
+        errno,
+        absl::StrCat("Failed to create temp file with template '",
+                     template_path, "'"),
+        IREE_LOC);
+  }
 }
 
 }  // namespace file_io

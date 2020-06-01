@@ -120,6 +120,6 @@ function(iree_cc_test)
       "${CMAKE_BINARY_DIR}"
     )
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
+  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()

@@ -43,6 +43,7 @@ cc_library(
     deps = [
         ":file_handle_win32",
         "//iree/base:file_io_hdrs",
+        "//iree/base:file_path",
         "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:target_platform",

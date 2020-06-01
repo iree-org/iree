@@ -78,6 +78,28 @@ TEST(FileIo, MoveFile) {
   EXPECT_EQ(to_write, read);
 }
 
+TEST(FileIo, GetTempPath) {
+  auto temp_path = GetTempPath();
+  EXPECT_NE("", temp_path);
+}
+
+TEST(FileIo, GetTempFile) {
+  ASSERT_OK_AND_ASSIGN(std::string path1, GetTempFile("foo"));
+  EXPECT_TRUE(path1.find("foo") != std::string::npos);
+
+  // Should be able to set file contents at the given path.
+  // Note that the file may or may not exist, depending on the platform, and
+  // a file must be created at the path before calling GetTempFile again, or
+  // else the same path may be returned.
+  auto to_write = GetUniqueContents("GetTempFile");
+  ASSERT_OK(SetFileContents(path1, to_write));
+
+  // Create another temp file with the same base name, check for a unique path.
+  ASSERT_OK_AND_ASSIGN(std::string path2, GetTempFile("foo"));
+  EXPECT_TRUE(path2.find("foo") != std::string::npos);
+  EXPECT_NE(path1, path2);
+}
+
 }  // namespace
 }  // namespace file_io
 }  // namespace iree

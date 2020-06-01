@@ -17,6 +17,7 @@
 
 #include <string>
 
+#include "absl/strings/string_view.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -32,7 +33,7 @@ Status FileExists(const std::string& path);
 StatusOr<std::string> GetFileContents(const std::string& path);
 
 // Synchronously writes a string into a file, overwriting its contents.
-Status SetFileContents(const std::string& path, const std::string& content);
+Status SetFileContents(const std::string& path, absl::string_view content);
 
 // Deletes the file at the provided path.
 Status DeleteFile(const std::string& path);
@@ -44,6 +45,14 @@ Status DeleteFile(const std::string& path);
 // physical storage locations).
 Status MoveFile(const std::string& source_path,
                 const std::string& destination_path);
+
+// Gets a platform and environment-dependent path for temporary files.
+std::string GetTempPath();
+
+// Gets a temporary file name and returns its absolute path.
+// The particular path chosen is platform and environment-dependent.
+// Unique characters will be automatically inserted after |base_name|.
+StatusOr<std::string> GetTempFile(absl::string_view base_name);
 
 }  // namespace file_io
 }  // namespace iree
