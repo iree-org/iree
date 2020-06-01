@@ -22,12 +22,17 @@ set -e
 gcloud auth configure-docker
 
 # Determine which image tag to update. Updates :latest by default.
-if [[ $* == --update-prod ]]; then
-  TAG="prod"
-else
-  TAG="latest"
+TAG="latest"
+if [[ "$#" -ne 0  ]]; then
+  if [[ "$@" == "--update-prod" ]]; then
+    TAG="prod"
+  else
+    echo "Invalid commandline arguments. Accepts --update-prod or no arguments."
+    exit 1
+  fi
 fi
-echo "Updating $TAG"
+echo "Updating ${TAG}"
+
 
 # Build and push the bazel image.
 docker build --tag "gcr.io/iree-oss/bazel:${TAG}" build_tools/docker/bazel/
