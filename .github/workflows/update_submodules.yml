@@ -39,7 +39,7 @@ jobs:
         with:
           # Personal token is required to trigger additional automation (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          commit-message: "Automatically update TF submodule and LLVM BUILD files"
+          commit-message: "Update TF submodule and LLVM BUILD files"
           title: "Update TF submodule and LLVM BUILD files"
           body: "Automated submodule bump from .github/workflows/update_submodules.yml"
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
