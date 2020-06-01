@@ -21,13 +21,19 @@ set -e
 # Ensure correct authorization.
 gcloud auth configure-docker
 
+# Determine which image tag to update. Updates :latest by default.
+TAG="latest"
+if [[ "$#" -ne 0  ]]; then
+  if [[ "$@" == "--update-prod" ]]; then
+    TAG="prod"
+  else
+    echo "Invalid commandline arguments. Accepts --update-prod or no arguments."
+    exit 1
+  fi
+fi
+echo "Updating ${TAG}"
+
+
 # Build and push the cmake image.
-docker build --tag gcr.io/iree-oss/cmake build_tools/docker/cmake/
-docker push gcr.io/iree-oss/cmake
-
-echo '
-Remember to update all of the files using the `cmake` image (e.g.
-/kokoro/gcp_ubuntu/cmake/build_kokoro.sh) to use the digest of the updated
-image.
-
-Use `docker images --digests` to view the digest.'
+docker build --tag "gcr.io/iree-oss/cmake:${TAG}" build_tools/docker/cmake/
+docker push "gcr.io/iree-oss/cmake:${TAG}"

@@ -21,13 +21,19 @@ set -e
 # Ensure correct authorization.
 gcloud auth configure-docker
 
+# Determine which image tag to update. Updates :latest by default.
+TAG="latest"
+if [[ "$#" -ne 0  ]]; then
+  if [[ "$@" == "--update-prod" ]]; then
+    TAG="prod"
+  else
+    echo "Invalid commandline arguments. Accepts --update-prod or no arguments."
+    exit 1
+  fi
+fi
+echo "Updating ${TAG}"
+
+
 # Build and push the bazel-tensorflow image.
-docker build --tag gcr.io/iree-oss/bazel-tensorflow build_tools/docker/bazel_tensorflow/
-docker push gcr.io/iree-oss/bazel-tensorflow
-
-echo '
-Remember to update all of the files using the `bazel-tensorflow` image
-(e.g. .github/workflows/bazel_* and /kokoro/gcp_ubuntu/bazel/build_kokoro.sh)
-to use the digest of the updated image.
-
-Use `docker images --digests` to view the digest.'
+docker build --tag "gcr.io/iree-oss/bazel-tensorflow:${TAG}" build_tools/docker/bazel_tensorflow/
+docker push "gcr.io/iree-oss/bazel-tensorflow:${TAG}"
