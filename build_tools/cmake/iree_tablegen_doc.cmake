@@ -30,6 +30,10 @@ include(CMakeParseArguments)
 #         `-gen-<something> <output-file-name>`. Note that the generator
 #         commands should only be for documentation.
 function(iree_tablegen_doc)
+  if(NOT IREE_BUILD_DOCS)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -38,47 +42,45 @@ function(iree_tablegen_doc)
     ${ARGN}
   )
 
-  if(IREE_BUILD_DOCS)
-    # Prefix the library with the package name, so we get: iree_package_name
-    iree_package_name(_PACKAGE_NAME)
-    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  # Prefix the library with the package name, so we get: iree_package_name
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-    if(${_RULE_TBLGEN} MATCHES "IREE")
-      set(_TBLGEN "IREE")
-    else()
-      set(_TBLGEN "MLIR")
-    endif()
-
-
-    set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
-    list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
-    list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
-
-    set(_INPUTS ${_RULE_TD_FILE})
-    set(LLVM_TARGET_DEFINITIONS ${_INPUTS})
-
-    set(_OUTPUTS)
-    while(_RULE_OUTS)
-      list(GET _RULE_OUTS 0 _COMMAND)
-      list(REMOVE_AT _RULE_OUTS 0)
-      list(GET _RULE_OUTS 0 _OUTPUT)
-      list(REMOVE_AT _RULE_OUTS 0)
-
-      # TableGen this output with the given command.
-      tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_INCLUDE_DIRS})
-      list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT})
-    endwhile()
-
-    # Put all dialect docs at one place.
-    set(_DOC_DIR ${PROJECT_BINARY_DIR}/doc/Dialects/)
-    # Set a target to drive copy.
-    add_custom_target(${_NAME}_target
-              ${CMAKE_COMMAND} -E make_directory ${_DOC_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy ${_OUTPUTS} ${_DOC_DIR}
-      DEPENDS ${_OUTPUTS})
-    set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
-
-    # Register this dialect doc to iree-doc.
-    add_dependencies(iree-doc ${_NAME}_target)
+  if(${_RULE_TBLGEN} MATCHES "IREE")
+    set(_TBLGEN "IREE")
+  else()
+    set(_TBLGEN "MLIR")
   endif()
+
+
+  set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
+  list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
+  list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
+
+  set(_INPUTS ${_RULE_TD_FILE})
+  set(LLVM_TARGET_DEFINITIONS ${_INPUTS})
+
+  set(_OUTPUTS)
+  while(_RULE_OUTS)
+    list(GET _RULE_OUTS 0 _COMMAND)
+    list(REMOVE_AT _RULE_OUTS 0)
+    list(GET _RULE_OUTS 0 _OUTPUT)
+    list(REMOVE_AT _RULE_OUTS 0)
+
+    # TableGen this output with the given command.
+    tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_INCLUDE_DIRS})
+    list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT})
+  endwhile()
+
+  # Put all dialect docs at one place.
+  set(_DOC_DIR ${PROJECT_BINARY_DIR}/doc/Dialects/)
+  # Set a target to drive copy.
+  add_custom_target(${_NAME}_target
+            ${CMAKE_COMMAND} -E make_directory ${_DOC_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${_OUTPUTS} ${_DOC_DIR}
+    DEPENDS ${_OUTPUTS})
+  set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
+
+  # Register this dialect doc to iree-doc.
+  add_dependencies(iree-doc ${_NAME}_target)
 endfunction()
