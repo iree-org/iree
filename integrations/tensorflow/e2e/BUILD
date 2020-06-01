@@ -42,7 +42,7 @@ iree_py_test(
 
 iree_py_test_suite(
     name = "e2e",
-    srcs = glob(["*.py"], exclude = ["linspace_test.py"]),
+    srcs = glob(["*_test.py"], exclude = ["linspace_test.py"]),
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
