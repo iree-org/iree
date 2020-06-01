@@ -28,6 +28,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #-------------------------------------------------------------------------------
 
 project(iree CXX C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 

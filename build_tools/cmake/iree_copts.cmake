@@ -18,7 +18,7 @@ include(AbseilConfigureCopts)
 # C++ used within IREE
 #-------------------------------------------------------------------------------
 
-set(IREE_CXX_STANDARD 14)
+set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
 set(IREE_ROOT_DIR ${PROJECT_SOURCE_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
