@@ -651,11 +651,12 @@ static void iree_vm_stack_populate_external_result_list(
   }
 }
 
-IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_function_leave(
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
     iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers,
     iree_vm_stack_frame_t** out_caller_frame) {
-  VMCHECK(stack->top != NULL);
-  if (!stack->top) return;
+  if (!stack->top) {
+    return IREE_STATUS_FAILED_PRECONDITION;
+  }
 
   iree_vm_stack_frame_header_t* frame_header = stack->top;
   iree_vm_stack_frame_t* callee_frame = &frame_header->frame;
@@ -691,6 +692,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_function_leave(
   stack->frame_storage_size -= frame_header->frame_size;
 
   if (out_caller_frame) *out_caller_frame = caller_frame;
+  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
@@ -708,11 +710,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
   return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT void IREE_API_CALL
+IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_stack_external_leave(iree_vm_stack_t* stack) {
-  VMCHECK(stack->top != NULL);
-  if (!stack->top) return;
-  VMCHECK(stack->top->type == IREE_VM_STACK_FRAME_EXTERNAL);
-  if (stack->top->type != IREE_VM_STACK_FRAME_EXTERNAL) return;
-  iree_vm_stack_function_leave(stack, NULL, NULL);
+  if (!stack->top) {
+    return IREE_STATUS_FAILED_PRECONDITION;
+  } else if (stack->top->type != IREE_VM_STACK_FRAME_EXTERNAL) {
+    return IREE_STATUS_FAILED_PRECONDITION;
+  }
+  return iree_vm_stack_function_leave(stack, NULL, NULL);
 }

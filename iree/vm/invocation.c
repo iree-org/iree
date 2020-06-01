@@ -127,9 +127,7 @@ static iree_status_t iree_vm_invoke_within(
         external_frame->registers, result_registers, outputs));
   }
 
-  iree_vm_stack_external_leave(stack);
-
-  return IREE_STATUS_OK;
+  return iree_vm_stack_external_leave(stack);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(

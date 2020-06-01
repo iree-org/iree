@@ -71,10 +71,10 @@ TEST(VMStackTest, Usage) {
   EXPECT_EQ(frame_b, iree_vm_stack_current_frame(stack));
   EXPECT_EQ(frame_a, iree_vm_stack_parent_frame(stack));
 
-  iree_vm_stack_function_leave(stack, NULL, NULL);
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack, NULL, NULL));
   EXPECT_EQ(frame_a, iree_vm_stack_current_frame(stack));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack));
-  iree_vm_stack_function_leave(stack, NULL, NULL);
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack, NULL, NULL));
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack));
 
@@ -120,7 +120,7 @@ TEST(VMStackTest, StackOverflow) {
       did_overflow = true;
       break;
     }
-    EXPECT_TRUE(iree_status_is_ok(status));
+    IREE_EXPECT_OK(status);
   }
   ASSERT_TRUE(did_overflow);
 
@@ -132,7 +132,8 @@ TEST(VMStackTest, UnbalancedPop) {
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
   IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver, IREE_ALLOCATOR_SYSTEM);
 
-  iree_vm_stack_function_leave(stack, NULL, NULL);
+  EXPECT_TRUE(iree_status_is_failed_precondition(
+      iree_vm_stack_function_leave(stack, NULL, NULL)));
 
   iree_vm_stack_deinitialize(stack);
 }
@@ -172,9 +173,9 @@ TEST(VMStackTest, ModuleStateQueries) {
   EXPECT_EQ(MODULE_B_STATE_SENTINEL, frame_b->module_state);
   EXPECT_EQ(1, module_b_state_resolve_count);
 
-  iree_vm_stack_function_leave(stack, NULL, NULL);
-  iree_vm_stack_function_leave(stack, NULL, NULL);
-  iree_vm_stack_function_leave(stack, NULL, NULL);
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack, NULL, NULL));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack, NULL, NULL));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack, NULL, NULL));
 
   iree_vm_stack_deinitialize(stack);
 }

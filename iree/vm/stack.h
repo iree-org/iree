@@ -213,7 +213,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
 // Leaves the current stack frame.
 // The provided |result_registers| in the callee frame will be stored back into
 // the caller frame result registers.
-IREE_API_EXPORT void IREE_API_CALL iree_vm_stack_function_leave(
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
     iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers,
     iree_vm_stack_frame_t** out_caller_frame);
 
@@ -231,7 +231,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
     iree_host_size_t register_count, iree_vm_stack_frame_t** out_callee_frame);
 
 // Leaves the current external stack frame.
-IREE_API_EXPORT void IREE_API_CALL
+IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_stack_external_leave(iree_vm_stack_t* stack);
 
 #ifdef __cplusplus
