@@ -158,14 +158,16 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # Third-party dependencies
 #-------------------------------------------------------------------------------
 
+# Use the (deprecated) FindPythonInterp/FindPythonLibs functions before
+# any of our dependencies do. See
+# https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
+# If one dependency finds Python 2 (the default),
+# any others that try to find Python 3 will fail.
+# (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
 if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
-  # Use the (deprecated) FindPythonInterp/FindPythonLibs functions before
-  # any of our dependencies do. See
-  # https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
-  # If one dependency finds Python 2 (the default),
-  # any others that try to find Python 3 will fail.
-  # (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
   find_package(PythonInterp 3 REQUIRED)
+endif()
+if(${IREE_BUILD_PYTHON_BINDINGS})
   find_package(PythonLibs 3 REQUIRED)
 endif()
 
