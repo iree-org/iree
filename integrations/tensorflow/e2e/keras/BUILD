@@ -16,6 +16,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+    "iree_py_test",
 )
 load(
     "//build_tools/bazel:iree_py_test_suite.bzl",
@@ -31,14 +32,25 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_py_test(
+    # TODO(GH-1620): Include after fixing the failure on GitHub Actions.
+    name = "keras_lstm_static_test",
+    main = "keras_lstm_static_test.py",
+    srcs = ["keras_lstm_static_test.py"],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+    tags = ["noga"],
+    python_version="PY3"
+)
+
 iree_py_test_suite(
     name = "non_vision",
     srcs = glob(
         ["*_test.py"],
         exclude = [
             "keras_vision_model_test.py",
-            # TODO(GH-1620): Include after fixing the failure on GitHub Actions.
-            "keras_lstm_static_test.py"
+            "keras_lstm_static_test.py",
         ]
     ),
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
