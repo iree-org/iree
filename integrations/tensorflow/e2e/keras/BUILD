@@ -77,7 +77,7 @@ iree_vision_test_suite(
     name = "keras_vision_models_external",
     configurations = [
         # tuples of (dataset, include_top, model_name, backends)
-        # "cifar10" has toy models with input 32x32, is good for debugging
+        # "cifar10" has toy models with 32x32 input which are good for debugging
         # "imagenet" has real model weights for input 224x224
         ("cifar10", 1, "MobileNet", "tf,iree_vmla"),
         ("cifar10", 1, "MobileNet", "tf,iree_vulkan"),  # TODO(b/150244105)
