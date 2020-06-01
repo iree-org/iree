@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Creates a PR to update TF & LLVM submodules when TF moves to a new LLVM commit.
+# Creates a PR to update the TF submodule to HEAD & copy the latest
+# version of the LLVM Bazel BUILD files from TF.
 
 name: Update Submodules
 
-# Turn this off for now, as we transition to automatically updating the LLVM SHA
-# from Google's source repository
-on: []
-#   schedule:
-#      # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
-#      - cron: '0 */6 * * *'
+on:
+  schedule:
+    # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
+    - cron: '0 */6 * * *'
 
 jobs:
   update:
@@ -34,14 +33,14 @@ jobs:
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules
-        run: ./scripts/git/update_tf_llvm_submodules.py --update_build_files=true
+        run: ./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
           # Personal token is required to trigger additional automation (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          commit-message: "Automatically update LLVM & TF submodules"
-          title: "Update LLVM & TF submodules"
+          commit-message: "Update TF submodule and LLVM BUILD files"
+          title: "Update TF submodule and LLVM BUILD files"
           body: "Automated submodule bump from .github/workflows/update_submodules.yml"
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
           # TODO(gcmn): Figure out a way to assign this to someone dynamically.
