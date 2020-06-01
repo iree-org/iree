@@ -41,7 +41,7 @@ def iree_py_test_suite(
     """
     tests = []
     for src in srcs:
-        test_name = "{}_{}".format(name, src)
+        test_name = "{}_{}".format(name, src[:-3])
         iree_py_test(
             name = test_name,
             main = src,
