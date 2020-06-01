@@ -16,7 +16,10 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
-    "iree_py_test_suite",
+)
+load(
+    "//integrations/tensorflow/e2e/keras/train:iree_train_test_suite.bzl",
+    "iree_train_test_suite"
 )
 
 package(
@@ -24,10 +27,20 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_py_test_suite(
-    name = "e2e",
-    srcs = glob(["*.py"], exclude = ["linspace_test.py"]),
+iree_train_test_suite(
+    name = "keras_model_train",
+    configurations = [
+        # tuples of (optimizer, backends)
+        ("sgd", "tf"),
+        ("sgd", "tf,iree_vmla"),
+        ("adam", "tf,iree_vmla"),  # TODO(b/157581521)
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+    tags = [
+        "manual",
+        "noga",
+        "notap",
     ],
 )

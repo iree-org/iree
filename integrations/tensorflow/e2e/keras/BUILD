@@ -23,6 +23,11 @@ load(
     "iree_vision_test_suite"
 )
 
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
 iree_py_test_suite(
     name = "non_vision",
     srcs = glob(

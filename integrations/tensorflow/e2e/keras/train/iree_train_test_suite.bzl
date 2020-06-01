@@ -16,23 +16,19 @@
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 
-def iree_vision_test_suite(
+def iree_train_test_suite(
         name,
         configurations,
-        external_weights = None,
         deps = None,
         tags = None,
-        size = "large",
+        size = None,
         python_version = "PY3",
         **kwargs):
     """Creates one iree_py_test per configuration tuple and bundles them.
 
     Args:
       name: name of the generated test suite.
-      configurations: a list of tuples of (dataset, include_top, model,
-                      backends) that specifies which data, model and backends to
-                      use for a given test.
-      external_weights: a base url to fetch trained model weights from.
+      configurations: a list of tuples of (optimizer, backends).
       tags: tags to apply to the test. Note that as in standard test suites,
             manual is treated specially and will also apply to the test suite
             itself.
@@ -43,24 +39,19 @@ def iree_vision_test_suite(
                 tests and test_suite.
     """
     tests = []
-    for dataset, include_top, model, backends in configurations:
-        test_name = "{}_{}_top_{}_{}_{}_test".format(
-            name, dataset, include_top, model, backends)
+    for optimizer, backends in configurations:
+        test_name = "{}_{}_{}_test".format(name, optimizer, backends)
         tests.append(test_name)
 
         args = [
-            "--data={}".format(dataset),
-            "--include_top={}".format(include_top),
-            "--model={}".format(model),
+            "--optimizer_name={}".format(optimizer),
             "--override_backends={}".format(backends),
         ]
-        if external_weights:
-            args.append("--url={}".format(external_weights))
 
         iree_py_test(
             name = test_name,
-            main = "keras_vision_model_test.py",
-            srcs = ["keras_vision_model_test.py"],
+            main = "keras_model_train_test.py",
+            srcs = ["keras_model_train_test.py"],
             args = args,
             tags = tags,
             deps = deps,
