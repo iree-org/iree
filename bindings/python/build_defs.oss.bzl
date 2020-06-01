@@ -76,56 +76,6 @@ def iree_py_test(**kwargs):
     #   imports
     py_test(legacy_create_init = False, **kwargs)
 
-def iree_py_test_suite(
-        name,
-        srcs,
-        deps = None,
-        tags = None,
-        size = None,
-        python_version = "PY3",
-        **kwargs):
-    """Creates one iree_py_test per source file and a test suite that bundles them.
-
-    Args:
-      name: name of the generated test suite.
-      srcs: test file sources.
-      deps: test dependencies.
-      tags: tags to apply to the test. Note that as in standard test suites,
-            manual is treated specially and will also apply to the test suite
-            itself.
-      size: size of the tests.
-      python_version: the python version to run the tests with. Uses python3
-                      by default.
-      **kwargs: Any additional arguments that will be passed to the underlying
-                tests and test_suite.
-    """
-    tests = []
-    for src in srcs:
-        test_name = "{}_{}".format(name, src)
-        iree_py_test(
-            name = test_name,
-            main = src,
-            srcs = [src],
-            deps = deps,
-            tags = tags,
-            size = size,
-            python_version = python_version,
-            **kwargs
-        )
-        tests.append(test_name)
-
-    native.test_suite(
-        name = name,
-        tests = tests,
-        # Note that only the manual tag really has any effect here. Others are
-        # used for test suite filtering, but all tests are passed the same tags.
-        tags = tags,
-        # If there are kwargs that need to be passed here which only apply to
-        # the generated tests and not to test_suite, they should be extracted
-        # into separate named arguments.
-        **kwargs
-    )
-
 def iree_py_extension(**kwargs):
     """Delegates to the real py_extension."""
     py_extension(**kwargs)

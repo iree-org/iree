@@ -16,6 +16,9 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+)
+load(
+    "//build_tools/bazel:iree_py_test_suite.bzl",
     "iree_py_test_suite",
 )
 
