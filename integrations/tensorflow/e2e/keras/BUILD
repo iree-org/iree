@@ -79,23 +79,42 @@ iree_vision_test_suite(
         # tuples of (dataset, include_top, model_name, backends)
         # "cifar10" has toy models with 32x32 input which are good for debugging
         # "imagenet" has real model weights for input 224x224
-        # TODO(b/150244105): Compiling fails with commands targeting IREE
-        # interpreter and vulkan backends for tests marked with this to do.
         ("cifar10", 1, "MobileNet", "tf,iree_vmla"),
-        ("cifar10", 1, "MobileNet", "tf,iree_vulkan"),  # TODO(b/150244105)
-        ("cifar10", 1, "MobileNet", "tf,iree_llvmjit"),  # TODO(b/150244105)
         ("cifar10", 1, "MobileNetV2", "tf,iree_vmla"),
-        ("cifar10", 1, "MobileNetV2", "tf,iree_vulkan"),  # TODO(b/150244105)
-        ("cifar10", 1, "MobileNetV2", "tf,iree_llvmjit"),  # TODO(b/150244105)
         ("imagenet", 1, "ResNet50", "tf,iree_vmla"),
         ("imagenet", 1, "ResNet50", "tf,iree_vulkan"),
         ("imagenet", 1, "ResNet50", "tf,iree_llvmjit"),
         ("imagenet", 1, "MobileNet", "tf,iree_vmla"),
-        ("imagenet", 1, "MobileNet", "tf,iree_vulkan"),  # TODO(b/150244105)
-        ("imagenet", 1, "MobileNet", "tf,iree_llvmjit"),  # TODO(b/150244105)
         ("imagenet", 1, "MobileNetV2", "tf,iree_vmla"),
-        ("imagenet", 1, "MobileNetV2", "tf,iree_vulkan"),  # TODO(b/150244105)
-        ("imagenet", 1, "MobileNetV2", "tf,iree_llvmjit"),  # TODO(b/150244105)
+    ],
+    external_weights = "https://storage.googleapis.com/iree_models/",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+    tags = [
+        "external",
+        "manual",
+        "noga",
+        "notap",
+    ],
+)
+
+iree_vision_test_suite(
+    name = "keras_vision_models_external_failing",
+    configurations = [
+        # tuples of (dataset, include_top, model_name, backends)
+        # "cifar10" has toy models with 32x32 input which are good for debugging
+        # "imagenet" has real model weights for input 224x224
+        # TODO(b/150244105): Compiling fails with commands targeting IREE
+        # interpreter and vulkan backends for tests marked with this to do.
+        ("cifar10", 1, "MobileNet", "tf,iree_vulkan"),
+        ("cifar10", 1, "MobileNet", "tf,iree_llvmjit"),
+        ("cifar10", 1, "MobileNetV2", "tf,iree_vulkan"),
+        ("cifar10", 1, "MobileNetV2", "tf,iree_llvmjit"),
+        ("imagenet", 1, "MobileNet", "tf,iree_vulkan"),
+        ("imagenet", 1, "MobileNet", "tf,iree_llvmjit"),
+        ("imagenet", 1, "MobileNetV2", "tf,iree_vulkan"),
+        ("imagenet", 1, "MobileNetV2", "tf,iree_llvmjit"),
     ],
     external_weights = "https://storage.googleapis.com/iree_models/",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
