@@ -101,7 +101,7 @@ std::string GetTempPath() {
   }
 
   std::string temp_path(64, '\0');
-  for (bool retry_query = false; retry_query && !temp_path.empty();) {
+  for (bool retry_query = true; retry_query;) {
     DWORD required_length = ::GetTempPathA(temp_path.size(), &temp_path[0]);
     retry_query = required_length > temp_path.size();
     temp_path.resize(required_length);
