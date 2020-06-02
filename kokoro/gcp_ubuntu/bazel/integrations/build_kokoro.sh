@@ -33,8 +33,8 @@ docker run \
   --workdir="${WORKDIR?}" \
   --rm \
   gcr.io/iree-oss/bazel-tensorflow:prod \
-  kokoro/gcp_ubuntu/bazel/build.sh
+  kokoro/gcp_ubuntu/bazel/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
-# build which takes forever and is totally useless. 
+# build which takes forever and is totally useless.
 rm -rf "${KOKORO_ARTIFACTS_DIR?}/*"
