@@ -18,9 +18,13 @@ package com.google.iree;
 
 /** An isolated execution context. */
 final class Context {
-  public Context(Instance instance) {
+  public Context(Instance instance) throws Exception {
     nativeAddress = nativeNew();
-    nativeCreate(instance.getNativeAddress());
+    Status status = Status.fromCode(nativeCreate(instance.getNativeAddress()));
+
+    if (!status.isOk()) {
+      throw status.toException("Could not create Context");
+    }
   }
 
   public int getId() {
@@ -35,7 +39,7 @@ final class Context {
 
   private native long nativeNew();
 
-  private native void nativeCreate(long instanceAddress);
+  private native int nativeCreate(long instanceAddress);
 
   private native void nativeFree();
 

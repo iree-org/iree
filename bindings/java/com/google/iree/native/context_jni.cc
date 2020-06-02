@@ -50,18 +50,14 @@ JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz, jlong handle) {
   delete context;
 }
 
-JNI_FUNC void JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz,
+JNI_FUNC jint JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz,
                                        jlong instanceAddress) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
   CHECK_NE(context, nullptr);
 
   auto instance = (InstanceWrapper*)instanceAddress;
   auto status = context->Create(*instance);
-
-  // TODO(jennik): Propogate this status through to java side.
-  if (!status.ok()) {
-    LOG(FATAL) << status.message();
-  }
+  return (jint)status.code();
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeGetId)(JNIEnv* env, jobject thiz) {

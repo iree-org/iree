@@ -30,13 +30,17 @@ final class Instance {
     loaded = true;
   }
 
-  public Instance() {
+  public Instance() throws Exception {
     if (!loaded) {
       throw new IllegalStateException("Native library is not loaded");
     }
 
     nativeAddress = nativeNew();
-    nativeCreate();
+    Status status = Status.fromCode(nativeCreate());
+
+    if (!status.isOk()) {
+      throw status.toException("Could not create Instance");
+    }
   }
 
   public long getNativeAddress() {
@@ -53,7 +57,7 @@ final class Instance {
 
   private native long nativeNew();
 
-  private native void nativeCreate();
+  private native int nativeCreate();
 
   private native void nativeFree();
 }
