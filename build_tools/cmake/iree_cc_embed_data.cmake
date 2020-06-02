@@ -48,53 +48,55 @@ function(iree_cc_embed_data)
     ${ARGN}
   )
 
-  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    if(DEFINED _RULE_IDENTIFIER)
-      set(_IDENTIFIER ${_RULE_IDENTIFIER})
-    else()
-      set(_IDENTIFIER ${_RULE_NAME})
-    endif()
-
-    set(_ARGS)
-    list(APPEND _ARGS "--output_header=${_RULE_H_FILE_OUTPUT}")
-    list(APPEND _ARGS "--output_impl=${_RULE_CC_FILE_OUTPUT}")
-    list(APPEND _ARGS "--identifier=${_IDENTIFIER}")
-    if(DEFINED _RULE_CPP_NAMESPACE)
-      list(APPEND _ARGS "--cpp_namespace=${_RULE_CPP_NAMESPACE}")
-    endif()
-    if(DEFINED _RULE_STRIP_PREFIX})
-      list(APPEND _ARGS "--strip_prefix=${_RULE_STRIP_PREFIX}")
-    endif()
-    if(DEFINED _RULE_FLATTEN})
-      list(APPEND _ARGS "--flatten")
-    endif()
-
-    foreach(SRC ${_RULE_SRCS})
-      list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
-    endforeach(SRC)
-    foreach(SRC ${_RULE_GENERATED_SRCS})
-      list(APPEND _ARGS "${SRC}")
-    endforeach(SRC)
-
-    add_custom_command(
-      OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_CC_FILE_OUTPUT}"
-      COMMAND generate_cc_embed_data ${_ARGS}
-      DEPENDS generate_cc_embed_data ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
-    )
-
-    if(_RULE_TESTONLY)
-      set(_TESTONLY_ARG "TESTONLY")
-    endif()
-    if(_RULE_PUBLIC)
-      set(_PUBLIC_ARG "PUBLIC")
-    endif()
-
-    iree_cc_library(
-      NAME ${_RULE_NAME}
-      HDRS "${_RULE_H_FILE_OUTPUT}"
-      SRCS "${_RULE_CC_FILE_OUTPUT}"
-      "${_PUBLIC_ARG}"
-      "${_TESTONLY_ARG}"
-    )
+  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
   endif()
+
+  if(DEFINED _RULE_IDENTIFIER)
+    set(_IDENTIFIER ${_RULE_IDENTIFIER})
+  else()
+    set(_IDENTIFIER ${_RULE_NAME})
+  endif()
+
+  set(_ARGS)
+  list(APPEND _ARGS "--output_header=${_RULE_H_FILE_OUTPUT}")
+  list(APPEND _ARGS "--output_impl=${_RULE_CC_FILE_OUTPUT}")
+  list(APPEND _ARGS "--identifier=${_IDENTIFIER}")
+  if(DEFINED _RULE_CPP_NAMESPACE)
+    list(APPEND _ARGS "--cpp_namespace=${_RULE_CPP_NAMESPACE}")
+  endif()
+  if(DEFINED _RULE_STRIP_PREFIX})
+    list(APPEND _ARGS "--strip_prefix=${_RULE_STRIP_PREFIX}")
+  endif()
+  if(DEFINED _RULE_FLATTEN})
+    list(APPEND _ARGS "--flatten")
+  endif()
+
+  foreach(SRC ${_RULE_SRCS})
+    list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
+  endforeach(SRC)
+  foreach(SRC ${_RULE_GENERATED_SRCS})
+    list(APPEND _ARGS "${SRC}")
+  endforeach(SRC)
+
+  add_custom_command(
+    OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_CC_FILE_OUTPUT}"
+    COMMAND generate_cc_embed_data ${_ARGS}
+    DEPENDS generate_cc_embed_data ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
+  )
+
+  if(_RULE_TESTONLY)
+    set(_TESTONLY_ARG "TESTONLY")
+  endif()
+  if(_RULE_PUBLIC)
+    set(_PUBLIC_ARG "PUBLIC")
+  endif()
+
+  iree_cc_library(
+    NAME ${_RULE_NAME}
+    HDRS "${_RULE_H_FILE_OUTPUT}"
+    SRCS "${_RULE_CC_FILE_OUTPUT}"
+    "${_PUBLIC_ARG}"
+    "${_TESTONLY_ARG}"
+  )
 endfunction()

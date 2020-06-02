@@ -26,33 +26,35 @@ function(external_tablegen_library)
     ${ARGN}
   )
 
-  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Prefix the library with the package name.
-    string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
-    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-
-    # Prefix source paths with the root.
-    list(TRANSFORM _RULE_SRCS PREPEND ${_RULE_ROOT})
-
-    set(LLVM_TARGET_DEFINITIONS ${_RULE_SRCS})
-    set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
-    list(APPEND _INCLUDE_DIRS ${_RULE_ROOT})
-    list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
-    set(_OUTPUTS)
-    while(_RULE_OUTS)
-      list(GET _RULE_OUTS 0 _COMMAND)
-      list(REMOVE_AT _RULE_OUTS 0)
-      list(GET _RULE_OUTS 0 _FILE)
-      list(REMOVE_AT _RULE_OUTS 0)
-      tablegen(${_RULE_TBLGEN} ${_FILE} ${_COMMAND} ${_INCLUDE_DIRS})
-      list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_FILE})
-    endwhile()
-    add_custom_target(${_NAME}_target DEPENDS ${_OUTPUTS})
-    set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
-
-    add_library(${_NAME} INTERFACE)
-    add_dependencies(${_NAME} ${_NAME}_target)
-
-    add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
+  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
   endif()
+
+  # Prefix the library with the package name.
+  string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
+  # Prefix source paths with the root.
+  list(TRANSFORM _RULE_SRCS PREPEND ${_RULE_ROOT})
+
+  set(LLVM_TARGET_DEFINITIONS ${_RULE_SRCS})
+  set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
+  list(APPEND _INCLUDE_DIRS ${_RULE_ROOT})
+  list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
+  set(_OUTPUTS)
+  while(_RULE_OUTS)
+    list(GET _RULE_OUTS 0 _COMMAND)
+    list(REMOVE_AT _RULE_OUTS 0)
+    list(GET _RULE_OUTS 0 _FILE)
+    list(REMOVE_AT _RULE_OUTS 0)
+    tablegen(${_RULE_TBLGEN} ${_FILE} ${_COMMAND} ${_INCLUDE_DIRS})
+    list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_FILE})
+  endwhile()
+  add_custom_target(${_NAME}_target DEPENDS ${_OUTPUTS})
+  set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
+
+  add_library(${_NAME} INTERFACE)
+  add_dependencies(${_NAME} ${_NAME}_target)
+
+  add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
 endfunction()

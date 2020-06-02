@@ -71,59 +71,61 @@ function(flatbuffer_cc_library)
     ${ARGN}
   )
 
-  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Prefix the library with the package name, so we get: iree_package_name
-    iree_package_name(_PACKAGE_NAME)
-    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-
-    if(NOT DEFINED _RULE_FLATC_ARGS)
-      set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS
-        # Preserve root-relative include paths in generated code.
-        "--keep-prefix"
-        # Use C++11 'enum class' for enums.
-        "--scoped-enums"
-        # Include reflection tables used for dumping debug representations.
-        "--reflect-names"
-        # Generate FooT types for unpack/pack support. Note that this should only
-        # be used in tooling as the code size/runtime overhead is non-trivial.
-        "--gen-object-api"
-      )
-    else()
-      set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS ${_RULE_FLATC_ARGS})
-    endif()
-
-    build_flatbuffers(
-      "${_RULE_SRCS}"
-      "${IREE_ROOT_DIR}"
-      "${_NAME}_gen"  # custom_target_name
-      "${_RULE_DEPS}" # additional_dependencies
-      "${CMAKE_CURRENT_BINARY_DIR}" # generated_include_dir
-      "${CMAKE_CURRENT_BINARY_DIR}" # binary_schemas_dir
-      "" # copy_text_schemas_dir
-    )
-
-    add_library(${_NAME} INTERFACE)
-    add_dependencies(${_NAME} ${_NAME}_gen)
-    target_include_directories(${_NAME}
-      INTERFACE
-        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
-        ${CMAKE_CURRENT_BINARY_DIR}
-      )
-    target_link_libraries(${_NAME}
-      INTERFACE
-        flatbuffers
-        ${_RULE_LINKOPTS}
-        ${IREE_DEFAULT_LINKOPTS}
-    )
-    target_compile_definitions(${_NAME}
-      INTERFACE
-        ${_RULE_DEFINES}
-    )
-
-    # Alias the iree_package_name library to iree::package::name.
-    # This lets us more clearly map to Bazel and makes it possible to
-    # disambiguate the underscores in paths vs. the separators.
-    iree_package_ns(_PACKAGE_NS)
-    add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
   endif()
+
+  # Prefix the library with the package name, so we get: iree_package_name
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
+  if(NOT DEFINED _RULE_FLATC_ARGS)
+    set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS
+      # Preserve root-relative include paths in generated code.
+      "--keep-prefix"
+      # Use C++11 'enum class' for enums.
+      "--scoped-enums"
+      # Include reflection tables used for dumping debug representations.
+      "--reflect-names"
+      # Generate FooT types for unpack/pack support. Note that this should only
+      # be used in tooling as the code size/runtime overhead is non-trivial.
+      "--gen-object-api"
+    )
+  else()
+    set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS ${_RULE_FLATC_ARGS})
+  endif()
+
+  build_flatbuffers(
+    "${_RULE_SRCS}"
+    "${IREE_ROOT_DIR}"
+    "${_NAME}_gen"  # custom_target_name
+    "${_RULE_DEPS}" # additional_dependencies
+    "${CMAKE_CURRENT_BINARY_DIR}" # generated_include_dir
+    "${CMAKE_CURRENT_BINARY_DIR}" # binary_schemas_dir
+    "" # copy_text_schemas_dir
+  )
+
+  add_library(${_NAME} INTERFACE)
+  add_dependencies(${_NAME} ${_NAME}_gen)
+  target_include_directories(${_NAME}
+    INTERFACE
+      "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+      ${CMAKE_CURRENT_BINARY_DIR}
+    )
+  target_link_libraries(${_NAME}
+    INTERFACE
+      flatbuffers
+      ${_RULE_LINKOPTS}
+      ${IREE_DEFAULT_LINKOPTS}
+  )
+  target_compile_definitions(${_NAME}
+    INTERFACE
+      ${_RULE_DEFINES}
+  )
+
+  # Alias the iree_package_name library to iree::package::name.
+  # This lets us more clearly map to Bazel and makes it possible to
+  # disambiguate the underscores in paths vs. the separators.
+  iree_package_ns(_PACKAGE_NS)
+  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 endfunction()

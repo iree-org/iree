@@ -43,58 +43,60 @@ function(iree_bytecode_module)
     ${ARGN}
   )
 
-  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Set defaults for FLAGS and TRANSLATE_TOOL
-    if(DEFINED _RULE_FLAGS)
-      set(_FLAGS ${_RULE_FLAGS})
-    else()
-      set(_FLAGS "-iree-mlir-to-vm-bytecode-module")
-    endif()
-    if(DEFINED _RULE_TRANSLATE_TOOL)
-      set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
-    else()
-      set(_TRANSLATE_TOOL "iree_tools_iree-translate")
-    endif()
+  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
+  endif()
 
-    # Resolve the executable binary path from the target name.
-    set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
+  # Set defaults for FLAGS and TRANSLATE_TOOL
+  if(DEFINED _RULE_FLAGS)
+    set(_FLAGS ${_RULE_FLAGS})
+  else()
+    set(_FLAGS "-iree-mlir-to-vm-bytecode-module")
+  endif()
+  if(DEFINED _RULE_TRANSLATE_TOOL)
+    set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
+  else()
+    set(_TRANSLATE_TOOL "iree_tools_iree-translate")
+  endif()
 
-    set(_ARGS "${_FLAGS}")
-    list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
-    list(APPEND _ARGS "-o")
-    list(APPEND _ARGS "${_RULE_NAME}.module")
+  # Resolve the executable binary path from the target name.
+  set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
 
-    add_custom_command(
-      OUTPUT "${_RULE_NAME}.module"
-      COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
-      DEPENDS ${_TRANSLATE_TOOL}
+  set(_ARGS "${_FLAGS}")
+  list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
+  list(APPEND _ARGS "-o")
+  list(APPEND _ARGS "${_RULE_NAME}.module")
+
+  add_custom_command(
+    OUTPUT "${_RULE_NAME}.module"
+    COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+    DEPENDS ${_TRANSLATE_TOOL}
+  )
+
+  if(_RULE_TESTONLY)
+    set(_TESTONLY_ARG "TESTONLY")
+  endif()
+  if(_RULE_PUBLIC)
+    set(_PUBLIC_ARG "PUBLIC")
+  endif()
+
+  if(DEFINED _RULE_CC_NAMESPACE)
+    iree_cc_embed_data(
+      NAME
+        "${_RULE_NAME}_cc"
+      IDENTIFIER
+        "${_RULE_NAME}"
+      GENERATED_SRCS
+        "${_RULE_NAME}.module"
+      CC_FILE_OUTPUT
+        "${_RULE_NAME}.cc"
+      H_FILE_OUTPUT
+        "${_RULE_NAME}.h"
+      CPP_NAMESPACE
+        "${_RULE_CC_NAMESPACE}"
+      FLATTEN
+      "${_PUBLIC_ARG}"
+      "${_TESTONLY_ARG}"
     )
-
-    if(_RULE_TESTONLY)
-      set(_TESTONLY_ARG "TESTONLY")
-    endif()
-    if(_RULE_PUBLIC)
-      set(_PUBLIC_ARG "PUBLIC")
-    endif()
-
-    if(DEFINED _RULE_CC_NAMESPACE)
-      iree_cc_embed_data(
-        NAME
-          "${_RULE_NAME}_cc"
-        IDENTIFIER
-          "${_RULE_NAME}"
-        GENERATED_SRCS
-          "${_RULE_NAME}.module"
-        CC_FILE_OUTPUT
-          "${_RULE_NAME}.cc"
-        H_FILE_OUTPUT
-          "${_RULE_NAME}.h"
-        CPP_NAMESPACE
-          "${_RULE_CC_NAMESPACE}"
-        FLATTEN
-        "${_PUBLIC_ARG}"
-        "${_TESTONLY_ARG}"
-      )
-    endif()
   endif()
 endfunction()

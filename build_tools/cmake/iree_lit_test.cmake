@@ -31,6 +31,10 @@ include(CMakeParseArguments)
 # TODO(gcmn): allow using alternative driver
 # A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -38,9 +42,6 @@ function(iree_lit_test)
     "DATA;LABELS"
     ${ARGN}
   )
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
 
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -101,6 +102,10 @@ endfunction()
 # TODO(gcmn): allow using alternative driver
 # A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test_suite)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -108,9 +113,6 @@ function(iree_lit_test_suite)
     "SRCS;DATA;LABELS"
     ${ARGN}
   )
-  IF(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
 
   foreach(_TEST_FILE ${_RULE_SRCS})
     get_filename_component(_TEST_BASENAME ${_TEST_FILE} NAME)
