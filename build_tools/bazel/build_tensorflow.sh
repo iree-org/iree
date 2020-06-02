@@ -46,10 +46,6 @@ declare -a test_env_args=(
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro")
 
-# TODO: Match noga tags with nokokoro tags.
-default_build_tag_filters+=("-noga")
-default_test_tag_filters+=("-noga")
-
 # We can still build things that use vulkan. Only add to test tag filters.
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
@@ -79,4 +75,4 @@ bazel query '//integrations/...' | \
     --test_tag_filters="${TEST_TAG_FILTERS?}" \
     --test_output=errors \
     --keep_going \
-    --config=rs
+    # --config=rs
