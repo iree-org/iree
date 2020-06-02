@@ -22,6 +22,7 @@ def normalize_path(p):
   if platform.system() == "Windows":
     # Sure. Good idea, bazel.
     return p.replace("\\", "/")
+  return p
 
 
 def write_platform(bazelrc):
