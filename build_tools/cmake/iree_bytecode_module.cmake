@@ -43,7 +43,6 @@ function(iree_bytecode_module)
     ${ARGN}
   )
 
-  # Return early if this is test only but we are not building tests.
   if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
     return()
   endif()
