@@ -24,13 +24,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addPass(createInlinerPass());
-
-  // HLO -> Linalg on buffers.
-  passManager.addPass(createDecomposeHLOClampPass());
-  addHLOToLinalgOnBuffersPasses(passManager);
-
+void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Linalg -> SCF
   passManager.addPass(createConvertLinalgToLoopsPass());
   passManager.addPass(createCanonicalizerPass());
@@ -50,6 +44,31 @@ void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 }
+
+void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createInlinerPass());
+
+  // HLO -> Linalg on buffers.
+  passManager.addPass(createDecomposeHLOClampPass());
+  addHLOToLinalgOnBuffersPasses(passManager);
+
+  // Linalg -> LLVM passes.
+  addLinalgToLLVMPasses(passManager);
+}
+
+static PassPipelineRegistration<> linalgLLVMVPipeline(
+    "iree-codegen-linalg-to-llvm-pipeline",
+    "Runs the progressive lowering pipeline from Linalg to LLVM",
+    [](OpPassManager &passManager) {
+      buildLLVMTransformPassPipeline(passManager);
+    });
+
+static PassPipelineRegistration<> hloToLinalgLLVMVPipeline(
+    "iree-codegen-hlo-to-llvm-pipeline",
+    "Runs the progressive lowering pipeline from XLA HLO to Linalg to LLVM",
+    [](OpPassManager &passManager) {
+      buildLLVMTransformPassPipeline(passManager);
+    });
 
 }  // namespace iree_compiler
 }  // namespace mlir
