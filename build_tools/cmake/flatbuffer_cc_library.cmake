@@ -105,6 +105,11 @@ function(flatbuffer_cc_library)
     "" # copy_text_schemas_dir
   )
 
+  if(CMAKE_CROSSCOMPILING)
+    iree_get_host_exectuable_path(flatc _FLATC_PATH)
+    add_dependencies("${_NAME}_gen" iree_host_flatc)
+  endif()
+
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_NAME}_gen)
   target_include_directories(${_NAME}

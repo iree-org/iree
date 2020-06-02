@@ -56,22 +56,38 @@ function(iree_bytecode_module)
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
   else()
-    set(_TRANSLATE_TOOL "iree_tools_iree-translate")
+    set(_TRANSLATE_TOOL "iree-translate")
   endif()
 
-  # Resolve the executable binary path from the target name.
-  set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
+  if (CMAKE_CROSSCOMPILING)
+    iree_get_host_exectuable_path(${_TRANSLATE_TOOL} _TRANSLATE_TOOL_EXECUTABLE)
+  else()
+    # Resolve the executable binary path from the target name.
+    set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
+  endif()
 
   set(_ARGS "${_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_NAME}.module")
 
-  add_custom_command(
-    OUTPUT "${_RULE_NAME}.module"
-    COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
-    DEPENDS ${_TRANSLATE_TOOL}
-  )
+  if (CMAKE_CROSSCOMPILING)
+    # For cross compilation, we don't have a target for the translation tool
+    # to depend on: it is in another build root from a different CMake
+    # invocation. But we have a custom command for generating the translation
+    # tool for host. Depend on the file instead.
+    add_custom_command(
+      OUTPUT "${_RULE_NAME}.module"
+      COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+      DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE}
+    )
+  else()
+    add_custom_command(
+      OUTPUT "${_RULE_NAME}.module"
+      COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+      DEPENDS ${_TRANSLATE_TOOL}
+    )
+  endif()
 
   if(_RULE_TESTONLY)
     set(_TESTONLY_ARG "TESTONLY")

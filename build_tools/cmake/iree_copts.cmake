@@ -85,13 +85,20 @@ set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 #-------------------------------------------------------------------------------
 
 set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INCLUDE_DIRS
   "${PROJECT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
+
+if(CMAKE_CROSSCOMPILING)
+  set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "" FORCE)
+  set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+else()
+  set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
+  set(FLATBUFFERS_INSTALL ON CACHE BOOL "" FORCE)
+endif()
+
 iree_select_compiler_opts(FLATBUFFERS_COPTS
   CLANG
     # Flatbuffers has a bunch of incorrect documentation annotations.
@@ -136,8 +143,12 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
-set(MLIR_TABLEGEN_EXE mlir-tblgen)
-set(IREE_TABLEGEN_EXE iree-tblgen)
+if(CMAKE_CROSSCOMPILING)
+  iree_get_host_exectuable_path(iree-tblgen IREE_TABLEGEN_EXE)
+else()
+  set(MLIR_TABLEGEN_EXE mlir-tblgen)
+  set(IREE_TABLEGEN_EXE iree-tblgen)
+endif()
 
 #-------------------------------------------------------------------------------
 # Third party: tensorflow

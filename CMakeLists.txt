@@ -33,6 +33,8 @@ set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# NOTE: new options added here should also be added to iree_cross_compile.cmake.
+
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
 
@@ -59,7 +61,7 @@ if(${IREE_BUILD_COMPILER})
 endif()
 
 #-------------------------------------------------------------------------------
-# IREE-specific CMake configuration
+# Targets and Backends Configuration
 #-------------------------------------------------------------------------------
 
 # List of all HAL drivers to be built by default:
@@ -111,12 +113,45 @@ foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
   set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
-
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
+
+#-------------------------------------------------------------------------------
+# Cross compiling configuration
+#-------------------------------------------------------------------------------
+
+if(CMAKE_CROSSCOMPILING)
+  message(STATUS "Detected cross compilation mode, configuring IREE on host...")
+
+  # C/C++ compilers for host compilation.
+  # Note: we need to explicitly set this because IREE does not work well with
+  # GCC at the moment: https://github.com/google/iree/issues/1269
+  set(IREE_HOST_C_COMPILER "$ENV{IREE_HOST_C_COMPILER}" CACHE FILEPATH "C compiler for host compilation")
+  set(IREE_HOST_CXX_COMPILER "$ENV{IREE_HOST_CXX_COMPILER}" CACHE FILEPATH "C++ compiler for host compilation")
+
+  # Master configuration for the binary directory containing all artifacts
+  # compiled for host.
+  set(IREE_HOST_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/host")
+
+  set(IREE_HOST_BUILD_COMPILER ON) # For iree-translate
+  set(IREE_HOST_ENABLE_LLVM ON)    # For iree-tblgen
+
+  # Set the host build directory for LLVM to our directory. Otherwise it will
+  # follow its own convention.
+  set(LLVM_NATIVE_BUILD "${IREE_HOST_BINARY_ROOT}/third_party/llvm-project/llvm")
+
+  include(iree_cross_compile)
+
+  # Use another CMake invocation to configure a build for host.
+  iree_create_configuration(HOST)
+endif()
+
+#-------------------------------------------------------------------------------
+# IREE-specific CMake configuration
+#-------------------------------------------------------------------------------
 
 include(iree_macros)
 include(iree_copts)
@@ -189,6 +224,19 @@ add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
+
+if(CMAKE_CROSSCOMPILING)
+  iree_build_host_executable(flatc BUILDONLY)
+  # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
+  # binary in BuildFlatBuffers().
+  iree_get_host_exectuable_path(flatc FLATBUFFERS_FLATC_EXECUTABLE)
+  # Add a custom target to copy the flatc to the binary directory.
+  add_custom_target(iree_host_flatc
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc" "${IREE_HOST_BINARY_ROOT}/bin"
+    DEPENDS iree_host_build_flatc
+  )
+endif()
 
 if(${IREE_ENABLE_LLVM})
   # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm

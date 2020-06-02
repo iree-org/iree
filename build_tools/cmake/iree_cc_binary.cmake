@@ -30,6 +30,8 @@ endif()
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
+# TESTONLY: for testing; won't compile when tests are disabled
+# HOSTONLY: host only; compile using host toolchain when cross-compiling
 #
 # Note:
 # By default, iree_cc_binary will always create a binary named iree_${NAME}.
@@ -58,13 +60,17 @@ endif()
 function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
-    "TESTONLY"
+    "HOSTONLY;TESTONLY"
     "NAME;OUT"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
 
   if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
+  if(_RULE_HOSTONLY AND CMAKE_CROSSCOMPILING)
     return()
   endif()
 
@@ -126,6 +132,11 @@ function(iree_cc_binary)
   # Track target and deps, use in iree_complete_binary_link_options() later.
   set_property(GLOBAL APPEND PROPERTY _IREE_CC_BINARY_NAMES "${_NAME}")
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
+
+  install(TARGETS ${_NAME}
+          RENAME ${_RULE_NAME}
+          COMPONENT ${_RULE_NAME}
+          RUNTIME DESTINATION bin)
 endfunction()
 
 # Lists all transitive dependencies of DIRECT_DEPS in TRANSITIVE_DEPS.

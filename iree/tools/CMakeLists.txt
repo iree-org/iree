@@ -100,7 +100,12 @@ if(${IREE_ENABLE_LLVM})
       iree::compiler::Dialect::VM::Tools
     LINKOPTS
       "-lpthread"
+    HOSTONLY
   )
+endif()
+
+if(CMAKE_CROSSCOMPILING)
+  iree_build_host_executable(iree-tblgen)
 endif()
 
 if(${IREE_BUILD_COMPILER})
@@ -258,6 +263,7 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       ::iree_opt_main
+    HOSTONLY
   )
 
   iree_cc_binary(
@@ -301,6 +307,7 @@ if(${IREE_BUILD_COMPILER})
       iree::vm::bytecode_module
       iree::vm::value
       ${IREE_HAL_DRIVER_MODULES}
+    HOSTONLY
   )
 
   iree_cc_library(
@@ -335,6 +342,7 @@ if(${IREE_BUILD_COMPILER})
       iree-translate
     DEPS
       ::iree_translate_main
+    HOSTONLY
   )
 endif()
 
@@ -379,6 +387,12 @@ iree_cc_test(
     iree::vm::value
     iree::vm::variant_list
 )
+
+if(CMAKE_CROSSCOMPILING)
+  iree_build_host_executable(iree-opt)
+  iree_build_host_executable(iree-run-mlir)
+  iree_build_host_executable(iree-translate)
+endif()
 
 if(${IREE_ENABLE_LLVM})
   add_custom_target(IreeFileCheck ALL
