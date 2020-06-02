@@ -16,11 +16,10 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
-    "iree_py_test",
 )
 load(
-    "//build_tools/bazel:iree_py_test_suite.bzl",
-    "iree_py_test_suite",
+    "//integrations/tensorflow/e2e/keras/train:iree_train_test_suite.bzl",
+    "iree_train_test_suite",
 )
 
 package(
@@ -28,24 +27,35 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_py_test(
-    # TODO(GH-2082): `linspace_test.py` fails due to an unknown location error.
-    name = "linspace_test",
-    srcs = ["linspace_test.py"],
-    main = "linspace_test.py",
-    python_version = "PY3",
-    tags = ["noga"],
+iree_train_test_suite(
+    name = "keras_model_train",
+    configurations = [
+        # tuples of (optimizer, backends)
+        ("sgd", "tf"),
+    ],
+    tags = [
+        "manual",
+        "noga",
+        "notap",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
 
-iree_py_test_suite(
-    name = "e2e",
-    srcs = glob(
-        ["*_test.py"],
-        exclude = ["linspace_test.py"],
-    ),
+iree_train_test_suite(
+    name = "keras_model_train_failing",
+    configurations = [
+        # tuples of (optimizer, backends)
+        # TODO: Combine this suite with keras_model_train once these tests pass.
+        ("sgd", "tf,iree_vmla"),
+        ("adam", "tf,iree_vmla"),  # TODO(b/157581521)
+    ],
+    tags = [
+        "manual",
+        "noga",
+        "notap",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
