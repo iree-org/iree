@@ -32,6 +32,22 @@ iree_train_test_suite(
     configurations = [
         # tuples of (optimizer, backends)
         ("sgd", "tf"),
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+    tags = [
+        "manual",
+        "noga",
+        "notap",
+    ],
+)
+
+iree_train_test_suite(
+    name = "keras_model_train_failing",
+    configurations = [
+        # tuples of (optimizer, backends)
+        # TODO: Combine this suite with keras_model_train once these tests pass.
         ("sgd", "tf,iree_vmla"),
         ("adam", "tf,iree_vmla"),  # TODO(b/157581521)
     ],
