@@ -33,9 +33,9 @@ endfunction()
 #   set to a directory named as `config_name` under the current CMake binary
 #   directory.
 # - IREE_<config_name>_C_COMPILER: C compiler for the given `config_name`.
-#   This must be definedd by the caller.
+#   This must be defined by the caller.
 # - IREE_<config_name>_CXX_COMPILER: C++ compiler for the given `config_name`.
-#   This must be definedd by the caller.
+#   This must be defined by the caller.
 # - IREE_<config_name>_<option>: switch for the given `option` specifically for
 #   `config_name`. If missing, default to OFF for bool options; default to
 #   IREE_<option> for non-bool variables.
@@ -112,7 +112,7 @@ endfunction()
 # Gets the CMake build command for the given `target`.
 #
 # Parameters:
-# - target: the target to build on host.
+# - target: the target to build.
 # - bin_dir: root binary directory containing CMakeCache.txt.
 # - cmd_var: variable name for receiving the build command.
 function(iree_get_build_command target bin_dir cmd_var)
@@ -140,6 +140,15 @@ function(iree_get_host_exectuable_path target output_path_var)
   set(${output_path_var} "${output_path}" PARENT_SCOPE)
 endfunction()
 
+# iree_host_install
+#
+# Defines custom commands and targets for installing the given `target`. The
+# custom target for install will be named as `iree_host_install_${target}`.
+#
+# Parameters:
+# - COMPONENT: installation component; used for filtering installation targets.
+# - PREFIX: the root installation path prefix.
+# - DEPENDS: addtional dependencies for the installation.
 function(iree_host_install target)
   cmake_parse_arguments(_RULE "" "COMPONENT;PREFIX" "DEPENDS" ${ARGN})
   if(_RULE_COMPONENT)
@@ -165,11 +174,12 @@ endfunction()
 
 # iree_build_host_executable
 #
-# Builds and installs a tool on host for cross-compilation.
+# Generates custom commands and targets for building and installing a tool on
+# host for cross-compilation.
 #
 # Parameters:
 # - target: the target to build on host.
-# - BUILDONLY: only build the target.
+# - BUILDONLY: only generates commands for building the target.
 # - DEPENDS: any additional dependencies for the target.
 function(iree_build_host_executable target)
   cmake_parse_arguments(_RULE "BUILDONLY" "" "DEPENDS" ${ARGN})
