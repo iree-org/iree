@@ -92,6 +92,19 @@ flatbuffer_cc_library(
   PUBLIC
 )
 
+flatbuffer_cc_library(
+  NAME
+    dylib_executable_def_cc_fbs
+  SRCS
+    "dylib_executable_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
+  PUBLIC
+)
+
 iree_cc_embed_data(
   NAME
     reflection_data

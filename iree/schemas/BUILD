@@ -69,6 +69,12 @@ iree_flatbuffer_cc_library(
     flatc_args = FLATC_ARGS,
 )
 
+iree_flatbuffer_cc_library(
+    name = "dylib_executable_def_cc_fbs",
+    srcs = ["dylib_executable_def.fbs"],
+    flatc_args = FLATC_ARGS,
+)
+
 iree_build_test(
     name = "schema_build_test",
     targets = [
@@ -77,6 +83,8 @@ iree_build_test(
         ":interpreter_module_def_cc_fbs",
         ":spirv_executable_def_cc_fbs",
         ":vmla_executable_def_cc_fbs",
+        ":llvmir_executable_def_cc_fbs",
+        ":dylib_executable_def_cc_fbs",
     ],
 )
 
@@ -86,6 +94,8 @@ REFLECTION_SRCS = [] if not FLATBUFFER_SUPPORTS_REFLECTIONS else [
     "interpreter_module_def.bfbs",
     "spirv_executable_def.bfbs",
     "vmla_executable_def.bfbs",
+    "llvmir_executable_def.bfbs",
+    "dylib_executable_def.bfbs",
 ]
 
 cc_embed_data(
