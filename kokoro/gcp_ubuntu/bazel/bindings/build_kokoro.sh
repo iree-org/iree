@@ -28,6 +28,7 @@ WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
 # Mount the checked out repository, make that the working directory and run the
 # tests in the bazel-tensorflow image.
+# TODO: Change image to gcr.io/iree-oss/bazel-bindings:prod once we create it.
 docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
