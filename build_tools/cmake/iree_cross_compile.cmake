@@ -68,6 +68,7 @@ function(iree_create_configuration config_name)
   # when useful.
   add_custom_target(iree_prepare_${config_name}_dir DEPENDS ${config_binary_root})
 
+  # LINT.IfChange(iree_cross_compile_options)
   iree_to_bool(config_enable_runtime_tracing "${IREE_${config_name}_ENABLE_RUNTIME_TRACING}")
   iree_to_bool(config_enable_llvm "${IREE_${config_name}_ENABLE_LLVM}")
   iree_to_bool(config_build_compiler "${IREE_${config_name}_BUILD_COMPILER}")
@@ -82,6 +83,7 @@ function(iree_create_configuration config_name)
   # spaces.
   string(REPLACE ";" "$<SEMICOLON>" config_hal_drivers_to_build "${IREE_HAL_DRIVERS_TO_BUILD}")
   string(REPLACE ";" "$<SEMICOLON>" config_compiler_targets_to_build "${IREE_TARGET_BACKENDS_TO_BUILD}")
+  # LINT.ThenChange(https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options)
 
   add_custom_command(OUTPUT ${IREE_${config_name}_BINARY_ROOT}/CMakeCache.txt
     COMMAND "${CMAKE_COMMAND}" "${PROJECT_SOURCE_DIR}" -G "${CMAKE_GENERATOR}"

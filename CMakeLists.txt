@@ -33,8 +33,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-# NOTE: new options added here should also be added to iree_cross_compile.cmake.
-
+# LINT.IfChange(iree_options)
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
 
@@ -51,6 +50,7 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\"." FORCE)
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\"." FORCE)
+# LINT.ThenChange(https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options)
 
 if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
