@@ -36,6 +36,7 @@ iree_train_test_suite(
     tags = [
         "manual",
         "noga",
+        "nokokoro",
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
@@ -54,6 +55,7 @@ iree_train_test_suite(
     tags = [
         "manual",
         "noga",
+        "nokokoro",
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [

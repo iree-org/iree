@@ -75,4 +75,4 @@ bazel query '//integrations/...' | \
     --test_tag_filters="${TEST_TAG_FILTERS?}" \
     --test_output=errors \
     --keep_going \
-    # --config=rs
+    --config=rs

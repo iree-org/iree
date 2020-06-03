@@ -38,7 +38,7 @@ iree_py_test(
     srcs = ["keras_lstm_static_test.py"],
     main = "keras_lstm_static_test.py",
     python_version = "PY3",
-    tags = ["noga"],
+    tags = ["noga", "nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
@@ -92,6 +92,7 @@ iree_vision_test_suite(
         "external",
         "manual",
         "noga",
+        "nokokoro",
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
@@ -123,6 +124,7 @@ iree_vision_test_suite(
         "external",
         "manual",
         "noga",
+        "nokokoro",
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
