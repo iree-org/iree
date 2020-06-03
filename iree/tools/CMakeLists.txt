@@ -182,7 +182,8 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_targets.h"
     DEPS
-      iree::compiler::Dialect::HAL::Target::LLVM
+      iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
+      iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
       iree::compiler::Dialect::HAL::Target::VMLA
       iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     PUBLIC

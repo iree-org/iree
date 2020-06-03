@@ -95,6 +95,7 @@ endforeach()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
+  # TODO(scotttodd): LLVMAOT
   LLVMIR
   Vulkan_SPIRV
   VMLA
