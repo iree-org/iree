@@ -47,6 +47,51 @@ iree_py_test(
     ],
 )
 
+# @unused
+DOC = """
+keras_vision_models_test is for manual testing of all keras vision models.
+Test will run only manually with all parameters specified manually, for example:
+bazel run -c opt integrations/tensorflow/e2e/keras/keras_vision_models_test -- \
+--override_backends=tf,iree_vmla,iree_llvmjit \
+--data=imagenet \
+--include_top=1 \
+--url=https://storage.googleapis.com/iree_models/ \
+--model=ResNet50
+
+Command arguments description:
+--override_backends: can be combination of these: tf,iree_vmla,iree_llvmjit
+--data: can be 'imagenet' or 'cifar10'.
+    imagenet - input image size (1, 224, 224, 3)
+    cifar10 - input image size (1, 32, 32, 3) - it is used for quick tests
+            and needs pretrained weights, we pretrained models: ResNet50, MobileNet, MobileNetV2
+--include_top: can be 1 or 0. Include top layer 1, not include top layer 0
+--url: we need it only for cifar10 models to load weights from https://storage.googleapis.com/iree_models/
+       imagenet pretrained weights url is specified by keras
+--model: supports ResNet50, MobileNet, MobileNetV2, ResNet101, ResNet152,
+    ResNet50V2, ResNet101V2, ResNet152V2, VGG16, VGG19, Xception,
+    InceptionV3, InceptionResNetV2, DenseNet121, DenseNet169,
+    DenseNet201, NASNetMobile, NASNetLarge
+    All above models works with 'imagenet' data sets.
+    ResNet50, MobileNet, MobileNetV2 work with both 'imagenet' and 'cifar10' data sets.
+"""
+
+iree_py_test(
+    name = "keras_vision_models_test",
+    srcs = ["keras_vision_model_test.py"],
+    main = "keras_vision_model_test.py",
+    python_version = "PY3",
+    tags = [
+        "external",
+        "manual",
+        "noga",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
 iree_py_test_suite(
     name = "non_vision",
     srcs = glob(
