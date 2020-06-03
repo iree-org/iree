@@ -15,13 +15,13 @@
 #ifndef IREE_HAL_VMLA_VMLA_COMMAND_PROCESSOR_H_
 #define IREE_HAL_VMLA_VMLA_COMMAND_PROCESSOR_H_
 
-#include "iree/hal/host/host_local_command_processor.h"
+#include "iree/hal/host/serial_command_processor.h"
 
 namespace iree {
 namespace hal {
 namespace vmla {
 
-class VMLACommandProcessor final : public HostLocalCommandProcessor {
+class VMLACommandProcessor final : public SerialCommandProcessor {
  public:
   VMLACommandProcessor(Allocator* allocator,
                        CommandCategoryBitfield command_categories);

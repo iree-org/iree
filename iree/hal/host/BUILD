@@ -112,21 +112,6 @@ cc_library(
 )
 
 cc_library(
-    name = "host_local_command_processor",
-    srcs = ["host_local_command_processor.cc"],
-    hdrs = ["host_local_command_processor.h"],
-    deps = [
-        ":host_descriptor_set",
-        ":host_executable_layout",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:command_buffer",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
     name = "host_semaphore",
     srcs = ["host_semaphore.cc"],
     hdrs = ["host_semaphore.h"],
@@ -163,6 +148,21 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
+    ],
+)
+
+cc_library(
+    name = "serial_command_processor",
+    srcs = ["serial_command_processor.cc"],
+    hdrs = ["serial_command_processor.h"],
+    deps = [
+        ":host_descriptor_set",
+        ":host_executable_layout",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:command_buffer",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

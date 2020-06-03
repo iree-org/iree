@@ -126,24 +126,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    host_local_command_processor
-  HDRS
-    "host_local_command_processor.h"
-  SRCS
-    "host_local_command_processor.cc"
-  DEPS
-    ::host_descriptor_set
-    ::host_executable_layout
-    absl::inlined_vector
-    iree::base::source_location
-    iree::base::status
-    iree::base::tracing
-    iree::hal::command_buffer
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     host_semaphore
   HDRS
     "host_semaphore.h"
@@ -183,6 +165,24 @@ iree_cc_library(
   DEPS
     iree::base::arena
     iree::base::intrusive_list
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    serial_command_processor
+  HDRS
+    "serial_command_processor.h"
+  SRCS
+    "serial_command_processor.cc"
+  DEPS
+    ::host_descriptor_set
+    ::host_executable_layout
+    absl::inlined_vector
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer

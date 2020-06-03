@@ -82,7 +82,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_buffer",
-        "//iree/hal/host:host_local_command_processor",
+        "//iree/hal/host:serial_command_processor",
         "//iree/vm:invocation",
         "//iree/vm:stack",
         "//iree/vm:variant_list",

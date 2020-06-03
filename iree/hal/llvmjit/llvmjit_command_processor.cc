@@ -28,7 +28,7 @@ namespace llvmjit {
 
 LLVMJITCommandProcessor::LLVMJITCommandProcessor(
     Allocator* allocator, CommandCategoryBitfield command_categories)
-    : HostLocalCommandProcessor(allocator, command_categories) {}
+    : SerialCommandProcessor(allocator, command_categories) {}
 
 LLVMJITCommandProcessor::~LLVMJITCommandProcessor() = default;
 

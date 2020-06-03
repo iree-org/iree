@@ -14,13 +14,13 @@
 //
 #ifndef IREE_HAL_LLVMJIT_LLVMJIT_COMMAND_PROCESSOR_H_
 #define IREE_HAL_LLVMJIT_LLVMJIT_COMMAND_PROCESSOR_H_
-#include "iree/hal/host/host_local_command_processor.h"
+#include "iree/hal/host/serial_command_processor.h"
 
 namespace iree {
 namespace hal {
 namespace llvmjit {
 
-class LLVMJITCommandProcessor final : public HostLocalCommandProcessor {
+class LLVMJITCommandProcessor final : public SerialCommandProcessor {
  public:
   LLVMJITCommandProcessor(Allocator* allocator,
                           CommandCategoryBitfield command_categories);

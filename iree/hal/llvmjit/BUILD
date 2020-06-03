@@ -47,7 +47,7 @@ cc_library(
         ":memref_runtime",
         "//iree/base:tracing",
         "//iree/hal:buffer",
-        "//iree/hal/host:host_local_command_processor",
+        "//iree/hal/host:serial_command_processor",
     ],
 )
 

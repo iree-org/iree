@@ -21,7 +21,6 @@
 #include "iree/hal/vmla/vmla_executable.h"
 #include "iree/hal/vmla/vmla_module.h"
 #include "iree/vm/invocation.h"
-#include "iree/vm/stack.h"
 #include "iree/vm/variant_list.h"
 
 namespace iree {
@@ -30,7 +29,8 @@ namespace vmla {
 
 VMLACommandProcessor::VMLACommandProcessor(
     Allocator* allocator, CommandCategoryBitfield command_categories)
-    : HostLocalCommandProcessor(allocator, command_categories) {}
+    : HostLocalCommandProcessor(allocator, command_categories){}
+    : SerialCommandProcessor(allocator, command_categories) {}
 
 VMLACommandProcessor::~VMLACommandProcessor() = default;
 

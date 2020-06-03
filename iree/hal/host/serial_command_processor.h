@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
-#define IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
+#ifndef IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
+#define IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/command_buffer.h"
@@ -37,11 +37,11 @@ struct PushConstantBlock {
 // returns failure.
 //
 // Thread-compatible (as with CommandBuffer itself).
-class HostLocalCommandProcessor : public CommandBuffer {
+class SerialCommandProcessor : public CommandBuffer {
  public:
-  HostLocalCommandProcessor(Allocator* allocator,
-                            CommandCategoryBitfield command_categories);
-  ~HostLocalCommandProcessor() override;
+  SerialCommandProcessor(Allocator* allocator,
+                         CommandCategoryBitfield command_categories);
+  ~SerialCommandProcessor() override;
 
   bool is_recording() const override { return is_recording_; }
 
@@ -120,4 +120,4 @@ class HostLocalCommandProcessor : public CommandBuffer {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
+#endif  // IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
