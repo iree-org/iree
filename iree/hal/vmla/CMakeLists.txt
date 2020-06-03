@@ -116,8 +116,8 @@ iree_cc_library(
     iree::hal::host::host_executable_layout
     iree::hal::host::host_local_allocator
     iree::hal::host::host_semaphore
-    iree::hal::host::host_submission_queue
     iree::hal::host::inproc_command_buffer
+    iree::hal::host::serial_submission_queue
     iree::vm::instance
     iree::vm::module
   PUBLIC

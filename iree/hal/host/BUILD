@@ -25,7 +25,7 @@ cc_library(
     srcs = ["async_command_queue.cc"],
     hdrs = ["async_command_queue.h"],
     deps = [
-        ":host_submission_queue",
+        ":serial_submission_queue",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_queue",
@@ -40,7 +40,7 @@ cc_test(
     srcs = ["async_command_queue_test.cc"],
     deps = [
         ":async_command_queue",
-        ":host_submission_queue",
+        ":serial_submission_queue",
         "//iree/base:status",
         "//iree/base:status_matchers",
         "//iree/base:time",
@@ -154,31 +154,6 @@ cc_test(
 )
 
 cc_library(
-    name = "host_submission_queue",
-    srcs = ["host_submission_queue.cc"],
-    hdrs = ["host_submission_queue.h"],
-    deps = [
-        ":host_semaphore",
-        "//iree/base:intrusive_list",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:command_queue",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-cc_test(
-    name = "host_submission_queue_test",
-    srcs = ["host_submission_queue_test.cc"],
-    deps = [
-        ":host_submission_queue",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "inproc_command_buffer",
     srcs = ["inproc_command_buffer.cc"],
     hdrs = ["inproc_command_buffer.h"],
@@ -188,5 +163,21 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
+    ],
+)
+
+cc_library(
+    name = "serial_submission_queue",
+    srcs = ["serial_submission_queue.cc"],
+    hdrs = ["serial_submission_queue.h"],
+    deps = [
+        ":host_semaphore",
+        "//iree/base:intrusive_list",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:command_queue",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
     ],
 )

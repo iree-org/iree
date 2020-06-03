@@ -25,7 +25,7 @@
 #include "iree/base/status_matchers.h"
 #include "iree/base/time.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/host_submission_queue.h"
+#include "iree/hal/host/serial_submission_queue.h"
 #include "iree/hal/testing/mock_command_buffer.h"
 #include "iree/hal/testing/mock_command_queue.h"
 #include "iree/testing/gtest.h"

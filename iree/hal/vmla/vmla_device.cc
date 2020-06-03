@@ -27,8 +27,8 @@
 #include "iree/hal/host/host_event.h"
 #include "iree/hal/host/host_executable_layout.h"
 #include "iree/hal/host/host_semaphore.h"
-#include "iree/hal/host/host_submission_queue.h"
 #include "iree/hal/host/inproc_command_buffer.h"
+#include "iree/hal/host/serial_submission_queue.h"
 #include "iree/hal/vmla/vmla_cache.h"
 #include "iree/hal/vmla/vmla_command_processor.h"
 
