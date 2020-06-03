@@ -45,14 +45,7 @@ StatusOr<ref_ptr<Executable>> DyLibExecutableCache::PrepareExecutable(
   //    hash data into a filename and read from / write to GetTempPath() or
   //    GetCachePath() rather than use GetTempFile().
 
-  // Wrap the data (or copy it).
-  bool allow_aliasing_data =
-      AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
-  ASSIGN_OR_RETURN(
-      auto executable,
-      DyLibExecutable::Load(allocator_, spec, !allow_aliasing_data));
-
-  return executable;
+  return DyLibExecutable::Load(allocator_, spec);
 }
 
 }  // namespace dylib

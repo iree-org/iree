@@ -24,8 +24,8 @@ namespace dylib {
 
 // static
 StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(
-    hal::Allocator* allocator, ExecutableSpec spec, bool allow_aliasing_data) {
-  auto executable = make_ref<DyLibExecutable>(spec, allow_aliasing_data);
+    hal::Allocator* allocator, ExecutableSpec spec) {
+  auto executable = make_ref<DyLibExecutable>(spec);
   RETURN_IF_ERROR(executable->Initialize());
   return executable;
 }
@@ -47,23 +47,25 @@ Status DyLibExecutable::Initialize() {
   // library APIs work with files. We could instead use in-memory files on
   // platforms where that is convenient.
   std::string base_name = "dylib_executable";
-  ASSIGN_OR_RETURN(std::string temp_file, file_io::GetTempFile(base_name));
+  ASSIGN_OR_RETURN(executable_library_temp_path_,
+                   file_io::GetTempFile(base_name));
   // Add platform-specific file extensions so opinionated dynamic library
   // loaders are more likely to find the file:
 #if defined(IREE_PLATFORM_WINDOWS)
-  temp_file += ".dll";
+  executable_library_temp_path_ += ".dll";
 #else
-  temp_file += ".so";
+  executable_library_temp_path_ += ".so";
 #endif
 
   absl::string_view embedded_library_data(
       reinterpret_cast<const char*>(
           dylib_executable_def->library_embedded()->data()),
       dylib_executable_def->library_embedded()->size());
-  RETURN_IF_ERROR(file_io::SetFileContents(temp_file, embedded_library_data));
+  RETURN_IF_ERROR(file_io::SetFileContents(executable_library_temp_path_,
+                                           embedded_library_data));
 
   ASSIGN_OR_RETURN(executable_library_,
-                   DynamicLibrary::Load(temp_file.c_str()));
+                   DynamicLibrary::Load(executable_library_temp_path_.c_str()));
 
   const auto& entry_points = *dylib_executable_def->entry_points();
   entry_functions_.resize(entry_points.size());
@@ -79,18 +81,14 @@ Status DyLibExecutable::Initialize() {
   return OkStatus();
 }
 
-DyLibExecutable::DyLibExecutable(ExecutableSpec spec, bool allow_aliasing_data)
-    : spec_(spec) {
-  if (!allow_aliasing_data) {
-    // Clone data.
-    cloned_executable_data_ = {spec.executable_data.begin(),
-                               spec.executable_data.end()};
-    spec_.executable_data = absl::MakeConstSpan(cloned_executable_data_);
+DyLibExecutable::DyLibExecutable(ExecutableSpec spec) : spec_(spec) {}
+
+DyLibExecutable::~DyLibExecutable() {
+  executable_library_.reset();
+  if (!executable_library_temp_path_.empty()) {
+    file_io::DeleteFile(executable_library_temp_path_);
   }
 }
-
-// TODO(scotttodd): delete temp file after unloading library?
-DyLibExecutable::~DyLibExecutable() = default;
 
 Status DyLibExecutable::Invoke(int func_id, absl::Span<void*> args) const {
   return UnimplementedErrorBuilder(IREE_LOC) << "DyLibExecutable::Invoke NYI";

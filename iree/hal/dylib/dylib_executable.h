@@ -16,7 +16,7 @@
 #define IREE_HAL_DYLIB_DYLIB_EXECUTABLE_H_
 
 #include <memory>
-#include <vector>
+#include <string>
 
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
@@ -35,9 +35,8 @@ struct MemrefType;
 class DyLibExecutable final : public Executable {
  public:
   static StatusOr<ref_ptr<DyLibExecutable>> Load(hal::Allocator* allocator,
-                                                 ExecutableSpec spec,
-                                                 bool allow_aliasing_data);
-  DyLibExecutable(ExecutableSpec spec, bool allow_aliasing_data);
+                                                 ExecutableSpec spec);
+  DyLibExecutable(ExecutableSpec spec);
   ~DyLibExecutable() override;
 
   bool supports_debugging() const override { return false; }
@@ -48,8 +47,7 @@ class DyLibExecutable final : public Executable {
   Status Initialize();
 
   ExecutableSpec spec_;
-  std::vector<uint8_t> cloned_executable_data_;
-
+  std::string executable_library_temp_path_;
   std::unique_ptr<DynamicLibrary> executable_library_;
   absl::InlinedVector<void*, 4> entry_functions_;
 };
