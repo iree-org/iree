@@ -32,6 +32,7 @@ cc_library(
         "//iree/hal:executable_spec",
         "//iree/schemas:dylib_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
     ],
 )

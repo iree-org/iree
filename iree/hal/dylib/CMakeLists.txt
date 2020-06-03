@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "dylib_executable.cc"
   DEPS
+    absl::inlined_vector
     absl::span
     flatbuffers
     iree::base::dynamic_library

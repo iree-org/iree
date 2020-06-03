@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_DYLIB_DYLIB_EXECUTABLE_H_
 #define IREE_HAL_DYLIB_DYLIB_EXECUTABLE_H_
 
+#include <memory>
 #include <vector>
 
 #include "absl/container/inlined_vector.h"

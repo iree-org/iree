@@ -14,13 +14,8 @@
 
 #include "iree/hal/dylib/dylib_executable.h"
 
-#include <iostream>
-#include <memory>
-
-#include "absl/types/span.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
-#include "iree/hal/executable.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
 
 namespace iree {
