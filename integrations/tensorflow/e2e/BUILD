@@ -34,7 +34,10 @@ iree_py_test(
     srcs = ["linspace_test.py"],
     main = "linspace_test.py",
     python_version = "PY3",
-    tags = ["noga"],
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

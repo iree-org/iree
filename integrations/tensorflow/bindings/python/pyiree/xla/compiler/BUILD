@@ -36,7 +36,10 @@ iree_py_library(
         "__init__.py",
     ],
     srcs_version = "PY3",
-    tags = ["noga"],
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -52,7 +55,10 @@ iree_py_extension(
     copts = PYBIND_COPTS + PYBIND_EXTENSION_COPTS,
     features = PYBIND_FEATURES,
     linkstatic = 1,
-    tags = ["noga"],
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     win_def_file = "export.def",
     deps = [
         ":compiler_library",
@@ -69,7 +75,10 @@ pybind_cc_library(
     hdrs = [
         "register_xla.h",
     ],
-    tags = ["noga"],
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = [
         "//bindings/python/pyiree/common",
         "//bindings/python/pyiree/compiler:compiler_library",
@@ -84,7 +93,10 @@ iree_py_test(
     name = "xla_module_proto_test",
     srcs = ["xla_module_proto_test.py"],
     python_version = "PY3",
-    tags = ["noga"],
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "@absl_py//absl/testing:absltest",
         "//integrations/tensorflow/bindings/python/pyiree/xla/compiler",
