@@ -74,5 +74,7 @@ bazel query '//integrations/...' | \
     --build_tag_filters="${BUILD_TAG_FILTERS?}" \
     --test_tag_filters="${TEST_TAG_FILTERS?}" \
     --test_output=errors \
-    --keep_going \
-    --config=rs
+    --keep_going
+    # TODO: Enable result store once the Kokoro VMs used for this test have the
+    # appropriate auth.
+    # --config=rs
