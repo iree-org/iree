@@ -18,7 +18,8 @@ function(iree_append value)
   endforeach(variable)
 endfunction()
 
-if(NOT ("${IREE_USE_LINKER}" STREQUAL ""))
+if(IREE_ENABLE_LLD)
+  set(IREE_USE_LINKER "lld")
   set(IREE_LINKER_FLAG "-fuse-ld=${IREE_USE_LINKER}")
 
   include(CheckCXXSourceCompiles)

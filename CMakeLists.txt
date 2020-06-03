@@ -126,7 +126,7 @@ list(APPEND CMAKE_MODULE_PATH
 # IREE compilation toolchain configuration
 #-------------------------------------------------------------------------------
 
-set(IREE_USE_LINKER "" CACHE STRING "The linker to use for C/C++ compilers")
+option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
