@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build IREE's integrations (//integrations/...) with bazel. Designed for CI,
-# but can be run manually.
+# Build IREE's bindings (//bindings/...) with bazel. Designed for CI, but can be
+# run manually.
 
 # Looks at environment variables and uses CI-friendly defaults if they are not
 # set.
@@ -42,7 +42,6 @@ fi
 declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
-  --test_env=IREE_AVAILABLE_BACKENDS="tf,iree_vmla"
 )
 
 declare -a default_build_tag_filters=("-nokokoro")
@@ -70,13 +69,12 @@ fi
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "nokokoro".
-bazel query '//integrations/...' | \
+bazel query //bindings/... | \
   xargs bazel test ${test_env_args[@]} \
     --config=generic_clang \
     --build_tag_filters="${BUILD_TAG_FILTERS?}" \
     --test_tag_filters="${TEST_TAG_FILTERS?}" \
+    --keep_going \
     --test_output=errors \
-    --keep_going
-    # TODO: Enable result store once the Kokoro VMs used for this test have the
-    # appropriate auth.
-    # --config=rs
+    --config=rs \
+    --config=rbe
