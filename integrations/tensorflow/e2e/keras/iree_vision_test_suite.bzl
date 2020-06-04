@@ -49,7 +49,7 @@ def iree_vision_test_suite(
             dataset,
             include_top,
             model,
-            backends,
+            backends.replace(",", "_"),
         )
         tests.append(test_name)
 
