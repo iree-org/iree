@@ -15,7 +15,6 @@
 #ifndef IREE_HAL_LLVMJIT_EXECUTABLE_CACHE_H_
 #define IREE_HAL_LLVMJIT_EXECUTABLE_CACHE_H_
 
-#include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
 

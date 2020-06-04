@@ -18,7 +18,10 @@
 #include <memory>
 
 #include "flatbuffers/flatbuffers.h"
+#include "iree/base/tracing.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/executable.h"
+#include "iree/hal/llvmjit/memref_runtime.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -86,22 +89,10 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
              << "Can't JIT compile function : " << func_name;
     }
     // Map function to its invoke_ symbol.
-    executable->InsertSymbol(func_symbol.get());
+    executable->symbols_.push_back(func_symbol.get());
   }
 
   return executable;
-}
-
-void LLVMJITExecutable::InsertSymbol(llvm::JITEvaluatedSymbol symbol) {
-  symbols_.push_back(symbol);
-}
-
-Status LLVMJITExecutable::Invoke(int func_id,
-                                 llvm::MutableArrayRef<void*> args) {
-  const auto func_symbol = symbols_[func_id];
-  auto exe_func = (void (*)(void**))func_symbol.getAddress();
-  exe_func(args.data());
-  return OkStatus();
 }
 
 LLVMJITExecutable::LLVMJITExecutable(ExecutableSpec spec,
@@ -117,6 +108,65 @@ LLVMJITExecutable::LLVMJITExecutable(ExecutableSpec spec,
 }
 
 LLVMJITExecutable::~LLVMJITExecutable() = default;
+
+struct LLVMJITDispatchState : public HostExecutable::DispatchState {
+  LLVMJITDispatchState() = default;
+  ~LLVMJITDispatchState() override {
+    for (int i = 0; i < descriptors.size(); ++i) {
+      freeUnrankedDescriptor(descriptors[i]);
+    }
+  }
+
+  llvm::JITEvaluatedSymbol symbol;
+  llvm::SmallVector<UnrankedMemRefType<uint32_t>*, 4> descriptors;
+  llvm::SmallVector<void*, 4> args;
+};
+
+StatusOr<ref_ptr<HostExecutable::DispatchState>>
+LLVMJITExecutable::PrepareDispatch(const DispatchParams& params) {
+  IREE_TRACE_SCOPE0("LLVMJITExecutable::PrepareDispatch");
+
+  if (params.entry_point >= symbols_.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid entry point ordinal " << params.entry_point;
+  }
+
+  auto dispatch_state = make_ref<LLVMJITDispatchState>();
+  dispatch_state->symbol = symbols_[params.entry_point];
+
+  for (size_t set = 0; set < params.set_bindings.size(); ++set) {
+    for (size_t binding = 0; binding < params.set_bindings[set].size();
+         ++binding) {
+      const auto& io_binding = params.set_bindings[set][binding];
+      ASSIGN_OR_RETURN(auto memory, io_binding.buffer->MapMemory<uint8_t>(
+                                        MemoryAccessBitfield::kWrite,
+                                        io_binding.offset, io_binding.length));
+      auto data = memory.mutable_data();
+      auto descriptor = allocUnrankedDescriptor<uint32_t>(data);
+      dispatch_state->descriptors.push_back(descriptor);
+      dispatch_state->args.push_back(&descriptor->descriptor);
+    }
+  }
+
+  auto push_constants_descriptor = allocUnrankedDescriptor<uint32_t>(
+      const_cast<uint32_t*>(params.push_constants->values.data()),
+      {static_cast<int64_t>(params.push_constants->values.size())});
+  dispatch_state->descriptors.push_back(push_constants_descriptor);
+  dispatch_state->args.push_back(&push_constants_descriptor->descriptor);
+
+  return std::move(dispatch_state);
+}
+
+Status LLVMJITExecutable::DispatchTile(DispatchState* state,
+                                       std::array<uint32_t, 3> workgroup_xyz) {
+  IREE_TRACE_SCOPE0("LLVMJITExecutable::DispatchTile");
+  auto* dispatch_state = static_cast<LLVMJITDispatchState*>(state);
+
+  auto func_ptr = (void (*)(void**))dispatch_state->symbol.getAddress();
+  func_ptr(dispatch_state->args.data());
+
+  return OkStatus();
+}
 
 }  // namespace llvmjit
 }  // namespace hal

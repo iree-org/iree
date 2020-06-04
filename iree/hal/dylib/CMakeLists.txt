@@ -16,49 +16,15 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    dylib_command_processor
-  HDRS
-    "dylib_command_processor.h"
-  SRCS
-    "dylib_command_processor.cc"
-  DEPS
-    ::dylib_executable
-    ::memref_runtime
-    absl::inlined_vector
-    iree::base::tracing
-    iree::hal::buffer
-    iree::hal::host::host_local_command_processor
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     dylib_device
   HDRS
     "dylib_device.h"
   SRCS
     "dylib_device.cc"
   DEPS
-    ::dylib_command_processor
     ::dylib_executable_cache
-    absl::inlined_vector
-    absl::memory
-    absl::span
-    absl::strings
-    iree::base::memory
-    iree::base::status
     iree::base::tracing
-    iree::hal::command_buffer_validation
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::host::async_command_queue
-    iree::hal::host::host_descriptor_set
-    iree::hal::host::host_event
-    iree::hal::host::host_executable_layout
-    iree::hal::host::host_local_allocator
-    iree::hal::host::host_submission_queue
-    iree::hal::host::inproc_command_buffer
-    iree::hal::semaphore
+    iree::hal::host::host_local_device
   PUBLIC
 )
 
@@ -73,6 +39,7 @@ iree_cc_library(
     ::dylib_device
     iree::hal::device_info
     iree::hal::driver
+    iree::hal::host::serial_scheduling_model
   PUBLIC
 )
 
@@ -98,14 +65,17 @@ iree_cc_library(
   SRCS
     "dylib_executable.cc"
   DEPS
+    ::memref_runtime
     absl::inlined_vector
     absl::span
     flatbuffers
     iree::base::dynamic_library
     iree::base::file_io
     iree::base::status
+    iree::base::tracing
     iree::hal::executable
     iree::hal::executable_spec
+    iree::hal::host::host_executable
     iree::schemas::dylib_executable_def_cc_fbs
   PUBLIC
 )

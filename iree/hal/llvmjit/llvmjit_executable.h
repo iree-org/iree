@@ -17,11 +17,9 @@
 
 #include <vector>
 
-#include "absl/types/span.h"
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
+#include "iree/hal/host/host_executable.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
@@ -32,7 +30,7 @@ namespace llvmjit {
 
 struct MemrefType;
 
-class LLVMJITExecutable final : public Executable {
+class LLVMJITExecutable final : public HostExecutable {
  public:
   static StatusOr<ref_ptr<LLVMJITExecutable>> Load(ExecutableSpec spec,
                                                    bool allow_aliasing_data);
@@ -44,16 +42,16 @@ class LLVMJITExecutable final : public Executable {
 
   bool supports_debugging() const override { return false; }
 
-  // Invokes jitted function with args.
-  Status Invoke(int func_id, llvm::MutableArrayRef<void*> args);
-
-  void InsertSymbol(llvm::JITEvaluatedSymbol symbol);
+  StatusOr<ref_ptr<DispatchState>> PrepareDispatch(
+      const DispatchParams& params) override;
+  Status DispatchTile(DispatchState* state,
+                      std::array<uint32_t, 3> workgroup_xyz) override;
 
  private:
-  llvm::SmallVector<llvm::JITEvaluatedSymbol, 4> symbols_;
   ExecutableSpec spec_;
   std::vector<uint8_t> cloned_executable_data_;
   std::unique_ptr<llvm::orc::LLJIT> ll_jit_;
+  llvm::SmallVector<llvm::JITEvaluatedSymbol, 4> symbols_;
 };
 
 }  // namespace llvmjit

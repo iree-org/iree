@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/hal/host/serial_command_processor.h"
+
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/host/host_descriptor_set.h"
 #include "iree/hal/host/host_executable_layout.h"
-#include "iree/hal/host/serial_command_processor.h"
 
 namespace iree {
 namespace hal {
 
 SerialCommandProcessor::SerialCommandProcessor(
-    Allocator* allocator, CommandCategoryBitfield command_categories)
-    : CommandBuffer(allocator, CommandBufferMode::kOneShot,
-                    command_categories) {}
+    CommandCategoryBitfield command_categories)
+    : CommandBuffer(CommandBufferMode::kOneShot, command_categories) {}
 
 SerialCommandProcessor::~SerialCommandProcessor() = default;
 
@@ -193,13 +193,7 @@ Status SerialCommandProcessor::Dispatch(Executable* executable,
                                         int32_t entry_point,
                                         std::array<uint32_t, 3> workgroups) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::Dispatch");
-  absl::InlinedVector<absl::Span<const DescriptorSet::Binding>, 2>
-      descriptor_sets(descriptor_sets_.size());
-  for (int i = 0; i < descriptor_sets_.size(); ++i) {
-    descriptor_sets[i] = absl::MakeConstSpan(descriptor_sets_[i]);
-  }
-  return DispatchInline(executable, entry_point, workgroups, push_constants_,
-                        descriptor_sets);
+  return DispatchGrid(executable, entry_point, workgroups);
 }
 
 Status SerialCommandProcessor::DispatchIndirect(
@@ -207,17 +201,40 @@ Status SerialCommandProcessor::DispatchIndirect(
     device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("SerialCommandProcessor::DispatchIndirect");
 
-  std::array<uint32_t, 3> workgroups;
+  std::array<uint32_t, 3> workgroup_count;
   RETURN_IF_ERROR(workgroups_buffer->ReadData(
-      workgroups_offset, workgroups.data(), sizeof(uint32_t) * 3));
+      workgroups_offset, workgroup_count.data(), sizeof(uint32_t) * 3));
+
+  return DispatchGrid(executable, entry_point, workgroup_count);
+}
+
+Status SerialCommandProcessor::DispatchGrid(
+    Executable* executable, int32_t entry_point,
+    std::array<uint32_t, 3> workgroup_count) {
+  HostExecutable::DispatchParams params;
+  params.entry_point = entry_point;
+  params.workgroup_count = workgroup_count;
+  params.push_constants = &push_constants_;
 
   absl::InlinedVector<absl::Span<const DescriptorSet::Binding>, 2>
       descriptor_sets(descriptor_sets_.size());
   for (int i = 0; i < descriptor_sets_.size(); ++i) {
     descriptor_sets[i] = absl::MakeConstSpan(descriptor_sets_[i]);
   }
-  return DispatchInline(executable, entry_point, workgroups, push_constants_,
-                        descriptor_sets);
+  params.set_bindings = descriptor_sets;
+
+  auto* host_executable = reinterpret_cast<HostExecutable*>(executable);
+  ASSIGN_OR_RETURN(auto dispatch_state,
+                   host_executable->PrepareDispatch(params));
+  for (uint32_t z = 0; z < params.workgroup_count[2]; ++z) {
+    for (uint32_t y = 0; y < params.workgroup_count[1]; ++y) {
+      for (uint32_t x = 0; x < params.workgroup_count[0]; ++x) {
+        RETURN_IF_ERROR(
+            host_executable->DispatchTile(dispatch_state.get(), {x, y, z}));
+      }
+    }
+  }
+  return OkStatus();
 }
 
 }  // namespace hal

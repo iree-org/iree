@@ -86,6 +86,16 @@ cc_library(
 )
 
 cc_library(
+    name = "host_executable",
+    hdrs = ["host_executable.h"],
+    deps = [
+        "//iree/base:status",
+        "//iree/hal:descriptor_set",
+        "//iree/hal:executable",
+    ],
+)
+
+cc_library(
     name = "host_executable_layout",
     srcs = ["host_executable_layout.cc"],
     hdrs = ["host_executable_layout.h"],
@@ -108,6 +118,26 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:allocator",
         "//iree/hal:buffer",
+    ],
+)
+
+cc_library(
+    name = "host_local_device",
+    srcs = ["host_local_device.cc"],
+    hdrs = ["host_local_device.h"],
+    deps = [
+        ":host_descriptor_set",
+        ":host_executable_layout",
+        ":host_local_allocator",
+        ":scheduling_model",
+        "//iree/base:memory",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:allocator",
+        "//iree/hal:command_buffer_validation",
+        "//iree/hal:device",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -165,11 +195,32 @@ cc_library(
     hdrs = ["serial_command_processor.h"],
     deps = [
         ":host_descriptor_set",
+        ":host_executable",
         ":host_executable_layout",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
+        "@com_google_absl//absl/container:inlined_vector",
+    ],
+)
+
+cc_library(
+    name = "serial_scheduling_model",
+    srcs = ["serial_scheduling_model.cc"],
+    hdrs = ["serial_scheduling_model.h"],
+    deps = [
+        ":async_command_queue",
+        ":host_event",
+        ":host_semaphore",
+        ":inproc_command_buffer",
+        ":scheduling_model",
+        ":serial_command_processor",
+        ":serial_submission_queue",
+        "//iree/base:memory",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/base:tracing",
         "@com_google_absl//absl/container:inlined_vector",
     ],
 )

@@ -71,27 +71,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    vmla_command_processor
-  HDRS
-    "vmla_command_processor.h"
-  SRCS
-    "vmla_command_processor.cc"
-  DEPS
-    ::vmla_executable
-    ::vmla_module
-    iree::base::api_util
-    iree::base::status
-    iree::base::tracing
-    iree::hal::host::host_buffer
-    iree::hal::host::serial_command_processor
-    iree::vm::invocation
-    iree::vm::stack
-    iree::vm::variant_list
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     vmla_device
   HDRS
     "vmla_device.h"
@@ -99,7 +78,6 @@ iree_cc_library(
     "vmla_device.cc"
   DEPS
     ::vmla_cache
-    ::vmla_command_processor
     absl::inlined_vector
     absl::memory
     absl::span
@@ -107,17 +85,9 @@ iree_cc_library(
     iree::base::memory
     iree::base::status
     iree::base::tracing
-    iree::hal::command_buffer_validation
     iree::hal::command_queue
     iree::hal::device
-    iree::hal::host::async_command_queue
-    iree::hal::host::host_descriptor_set
-    iree::hal::host::host_event
-    iree::hal::host::host_executable_layout
-    iree::hal::host::host_local_allocator
-    iree::hal::host::host_semaphore
-    iree::hal::host::inproc_command_buffer
-    iree::hal::host::serial_submission_queue
+    iree::hal::host::host_local_device
     iree::vm::instance
     iree::vm::module
   PUBLIC
@@ -137,6 +107,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::device_info
     iree::hal::driver
+    iree::hal::host::serial_scheduling_model
     iree::vm::instance
     iree::vm::module
   PUBLIC
@@ -170,9 +141,10 @@ iree_cc_library(
     iree::base::api_util
     iree::base::status
     iree::base::tracing
-    iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_spec
+    iree::hal::host::host_buffer
+    iree::hal::host::host_executable
     iree::schemas::vmla_executable_def_cc_fbs
     iree::vm::bytecode_module
     iree::vm::context

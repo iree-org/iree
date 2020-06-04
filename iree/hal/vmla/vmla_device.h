@@ -15,11 +15,8 @@
 #ifndef IREE_HAL_VMLA_VMLA_DEVICE_H_
 #define IREE_HAL_VMLA_VMLA_DEVICE_H_
 
-#include "absl/container/inlined_vector.h"
-#include "absl/types/span.h"
 #include "iree/base/memory.h"
-#include "iree/hal/device.h"
-#include "iree/hal/host/host_local_allocator.h"
+#include "iree/hal/host/host_local_device.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
 
@@ -27,56 +24,17 @@ namespace iree {
 namespace hal {
 namespace vmla {
 
-class VMLADevice final : public Device {
+class VMLADevice final : public HostLocalDevice {
  public:
-  explicit VMLADevice(DeviceInfo device_info, iree_vm_instance_t* instance,
+  explicit VMLADevice(DeviceInfo device_info,
+                      std::unique_ptr<SchedulingModel> scheduling_model,
+                      iree_vm_instance_t* instance,
                       iree_vm_module_t* vmla_module);
   ~VMLADevice() override;
 
-  std::string DebugString() const override;
-
-  Allocator* allocator() const override { return &allocator_; }
-
-  absl::Span<CommandQueue*> dispatch_queues() const override {
-    return RawPtrSpan(absl::MakeSpan(command_queues_));
-  }
-
-  absl::Span<CommandQueue*> transfer_queues() const override {
-    return RawPtrSpan(absl::MakeSpan(command_queues_));
-  }
-
   ref_ptr<ExecutableCache> CreateExecutableCache() override;
 
-  StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
-      DescriptorSetLayout::UsageType usage_type,
-      absl::Span<const DescriptorSetLayout::Binding> bindings) override;
-
-  StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
-      absl::Span<DescriptorSetLayout* const> set_layouts,
-      size_t push_constants) override;
-
-  StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
-      DescriptorSetLayout* set_layout,
-      absl::Span<const DescriptorSet::Binding> bindings) override;
-
-  StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
-      CommandBufferModeBitfield mode,
-      CommandCategoryBitfield command_categories) override;
-
-  StatusOr<ref_ptr<Event>> CreateEvent() override;
-
-  StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
-  Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                           absl::Time deadline) override;
-  StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
-                                 absl::Time deadline) override;
-
-  Status WaitIdle(absl::Time deadline) override;
-
  private:
-  mutable HostLocalAllocator allocator_;
-  mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
-
   iree_vm_instance_t* instance_ = nullptr;
   iree_vm_module_t* vmla_module_ = nullptr;
 };

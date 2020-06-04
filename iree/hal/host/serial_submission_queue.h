@@ -36,7 +36,7 @@ namespace hal {
 // some kind of warning in the host implementation that TSAN can catch.
 //
 // Thread-compatible. Const methods may be called from any thread.
-class SerialSubmissionQueue {
+class SerialSubmissionQueue final {
  public:
   using ExecuteFn =
       std::function<Status(absl::Span<CommandBuffer* const> command_buffers)>;

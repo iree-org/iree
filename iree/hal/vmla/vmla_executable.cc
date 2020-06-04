@@ -15,10 +15,13 @@
 #include "iree/hal/vmla/vmla_executable.h"
 
 #include "iree/base/api_util.h"
+#include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/host/host_buffer.h"
 #include "iree/hal/vmla/vmla_module.h"
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/invocation.h"
 #include "iree/vm/module.h"
 #include "iree/vm/variant_list.h"
 
@@ -30,6 +33,7 @@ namespace vmla {
 StatusOr<ref_ptr<VMLAExecutable>> VMLAExecutable::Load(
     iree_vm_instance_t* instance, iree_vm_module_t* vmla_module,
     ExecutableSpec spec, bool allow_aliasing_data) {
+  IREE_TRACE_SCOPE0("VMLAExecutable::Load");
   // Allocate the executable now.
   // We do this here so that if we need to clone the data we are passing that
   // to the VM loader instead of the data we may not have access to later.
@@ -126,6 +130,79 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
       IREE_LOC));
 
   return OkStatus();
+}
+
+struct VMLADispatchState : public HostExecutable::DispatchState {
+  VMLADispatchState() { interface_ref = Interface_retain_ref(&interface); }
+  ~VMLADispatchState() override { iree_vm_ref_release(&interface_ref); }
+
+  iree_vm_function_t function;
+  Interface interface;
+  iree_vm_ref_t interface_ref;
+  iree_host_size_t input_list_size = 0;
+};
+
+StatusOr<ref_ptr<HostExecutable::DispatchState>>
+VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
+  IREE_TRACE_SCOPE0("VMLAExecutable::PrepareDispatch");
+
+  if (params.entry_point >= entry_functions_.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid entry point ordinal " << params.entry_point;
+  }
+
+  auto dispatch_state = make_ref<VMLADispatchState>();
+  dispatch_state->function = entry_functions_[params.entry_point];
+  dispatch_state->input_list_size = iree_vm_variant_list_alloc_size(1 + 3);
+
+  auto* interface = &dispatch_state->interface;
+  RETURN_IF_ERROR(interface->SetConstants(params.push_constants->values));
+
+  for (int set_ordinal = 0; set_ordinal < params.set_bindings.size();
+       ++set_ordinal) {
+    for (const auto& binding : params.set_bindings[set_ordinal]) {
+      // TODO(benvanik): plumb binding directly into VMLA to avoid this.
+      void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())
+                       ->mutable_data();
+      data = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(data) +
+                                     binding.buffer->byte_offset());
+      ASSIGN_OR_RETURN(auto buffer,
+                       Buffer::WrapMutable(data, binding.buffer->byte_length(),
+                                           IREE_ALLOCATOR_NULL));
+      RETURN_IF_ERROR(interface->SetBinding(set_ordinal, binding.binding,
+                                            {std::move(buffer)}));
+    }
+  }
+
+  return std::move(dispatch_state);
+}
+
+Status VMLAExecutable::DispatchTile(DispatchState* state,
+                                    std::array<uint32_t, 3> workgroup_xyz) {
+  IREE_TRACE_SCOPE0("VMLAExecutable::DispatchTile");
+  auto* dispatch_state = static_cast<VMLADispatchState*>(state);
+
+  auto* input_list = reinterpret_cast<iree_vm_variant_list_t*>(
+      alloca(dispatch_state->input_list_size));
+  iree_vm_variant_list_init(input_list, 1 + 3);
+  iree_vm_variant_list_append_ref_retain(input_list,
+                                         &dispatch_state->interface_ref);
+  iree_vm_variant_list_append_value(input_list,
+                                    IREE_VM_VALUE_MAKE_I32(workgroup_xyz[0]));
+  iree_vm_variant_list_append_value(input_list,
+                                    IREE_VM_VALUE_MAKE_I32(workgroup_xyz[1]));
+  iree_vm_variant_list_append_value(input_list,
+                                    IREE_VM_VALUE_MAKE_I32(workgroup_xyz[2]));
+
+  auto status =
+      FromApiStatus(iree_vm_invoke(context(), dispatch_state->function,
+                                   /*policy=*/nullptr, input_list,
+                                   /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
+                    IREE_LOC);
+
+  iree_vm_variant_list_free(input_list);
+
+  return std::move(status);
 }
 
 }  // namespace vmla

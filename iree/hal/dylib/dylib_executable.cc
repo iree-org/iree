@@ -16,6 +16,8 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
+#include "iree/base/tracing.h"
+#include "iree/hal/dylib/memref_runtime.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
 
 namespace iree {
@@ -24,23 +26,26 @@ namespace dylib {
 
 // static
 StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(ExecutableSpec spec) {
-  auto executable = make_ref<DyLibExecutable>(spec);
-  RETURN_IF_ERROR(executable->Initialize());
+  auto executable = make_ref<DyLibExecutable>();
+  RETURN_IF_ERROR(executable->Initialize(spec));
   return executable;
 }
 
-DyLibExecutable::DyLibExecutable(ExecutableSpec spec) : spec_(spec) {}
+DyLibExecutable::DyLibExecutable() = default;
 
 DyLibExecutable::~DyLibExecutable() {
+  IREE_TRACE_SCOPE0("DyLibExecutable::dtor");
   executable_library_.reset();
   if (!executable_library_temp_path_.empty()) {
     file_io::DeleteFile(executable_library_temp_path_).IgnoreError();
   }
 }
 
-Status DyLibExecutable::Initialize() {
+Status DyLibExecutable::Initialize(ExecutableSpec spec) {
+  IREE_TRACE_SCOPE0("DyLibExecutable::Initialize");
+
   auto dylib_executable_def =
-      ::flatbuffers::GetRoot<DyLibExecutableDef>(spec_.executable_data.data());
+      ::flatbuffers::GetRoot<DyLibExecutableDef>(spec.executable_data.data());
 
   if (!dylib_executable_def->entry_points() ||
       dylib_executable_def->entry_points()->size() == 0) {
@@ -89,8 +94,57 @@ Status DyLibExecutable::Initialize() {
   return OkStatus();
 }
 
-Status DyLibExecutable::Invoke(int func_id, absl::Span<void*> args) const {
-  return UnimplementedErrorBuilder(IREE_LOC) << "DyLibExecutable::Invoke NYI";
+struct DyLibDispatchState : public HostExecutable::DispatchState {
+  DyLibDispatchState() = default;
+  ~DyLibDispatchState() override {
+    for (int i = 0; i < descriptors.size(); ++i) {
+      freeUnrankedDescriptor(descriptors[i]);
+    }
+  }
+
+  void* entry_function = nullptr;
+  absl::InlinedVector<UnrankedMemRefType<uint32_t>*, 4> descriptors;
+  absl::InlinedVector<void*, 4> args;
+};
+
+StatusOr<ref_ptr<HostExecutable::DispatchState>>
+DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
+  IREE_TRACE_SCOPE0("DyLibExecutable::PrepareDispatch");
+
+  if (params.entry_point >= entry_functions_.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid entry point ordinal " << params.entry_point;
+  }
+
+  auto dispatch_state = make_ref<DyLibDispatchState>();
+  dispatch_state->entry_function = entry_functions_[params.entry_point];
+
+  for (size_t set = 0; set < params.set_bindings.size(); ++set) {
+    for (size_t binding = 0; binding < params.set_bindings[set].size();
+         ++binding) {
+      const auto& io_binding = params.set_bindings[set][binding];
+      ASSIGN_OR_RETURN(auto memory, io_binding.buffer->MapMemory<uint8_t>(
+                                        MemoryAccessBitfield::kWrite,
+                                        io_binding.offset, io_binding.length));
+      auto data = memory.mutable_data();
+      auto descriptor = allocUnrankedDescriptor<uint32_t>(data);
+      dispatch_state->descriptors.push_back(descriptor);
+      dispatch_state->args.push_back(&descriptor->descriptor);
+    }
+  }
+
+  return std::move(dispatch_state);
+}
+
+Status DyLibExecutable::DispatchTile(DispatchState* state,
+                                     std::array<uint32_t, 3> workgroup_xyz) {
+  IREE_TRACE_SCOPE0("DyLibExecutable::DispatchTile");
+  auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
+
+  auto entry_function = (void (*)(void**))dispatch_state->entry_function;
+  entry_function(dispatch_state->args.data());
+
+  return OkStatus();
 }
 
 }  // namespace dylib

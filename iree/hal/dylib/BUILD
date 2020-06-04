@@ -20,44 +20,13 @@ package(
 )
 
 cc_library(
-    name = "dylib_command_processor",
-    srcs = ["dylib_command_processor.cc"],
-    hdrs = ["dylib_command_processor.h"],
-    deps = [
-        ":dylib_executable",
-        ":memref_runtime",
-        "//iree/base:tracing",
-        "//iree/hal:buffer",
-        "//iree/hal/host:host_local_command_processor",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
     name = "dylib_device",
     srcs = ["dylib_device.cc"],
     hdrs = ["dylib_device.h"],
     deps = [
-        ":dylib_command_processor",
         ":dylib_executable_cache",
-        "//iree/base:memory",
-        "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:command_buffer_validation",
-        "//iree/hal:command_queue",
-        "//iree/hal:device",
-        "//iree/hal:semaphore",
-        "//iree/hal/host:async_command_queue",
-        "//iree/hal/host:host_descriptor_set",
-        "//iree/hal/host:host_event",
-        "//iree/hal/host:host_executable_layout",
-        "//iree/hal/host:host_local_allocator",
-        "//iree/hal/host:host_submission_queue",
-        "//iree/hal/host:inproc_command_buffer",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "//iree/hal/host:host_local_device",
     ],
 )
 
@@ -69,6 +38,7 @@ cc_library(
         ":dylib_device",
         "//iree/hal:device_info",
         "//iree/hal:driver",
+        "//iree/hal/host:serial_scheduling_model",
     ],
 )
 
@@ -89,11 +59,14 @@ cc_library(
     srcs = ["dylib_executable.cc"],
     hdrs = ["dylib_executable.h"],
     deps = [
+        ":memref_runtime",
         "//iree/base:dynamic_library",
         "//iree/base:file_io",
         "//iree/base:status",
+        "//iree/base:tracing",
         "//iree/hal:executable",
         "//iree/hal:executable_spec",
+        "//iree/hal/host:host_executable",
         "//iree/schemas:dylib_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/container:inlined_vector",
