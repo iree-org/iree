@@ -28,8 +28,8 @@ namespace hal {
 namespace dylib {
 
 DyLibCommandProcessor::DyLibCommandProcessor(
-    Allocator* allocator, CommandCategoryBitfield command_categories)
-    : HostLocalCommandProcessor(allocator, command_categories) {}
+    CommandCategoryBitfield command_categories)
+    : HostLocalCommandProcessor(command_categories) {}
 
 DyLibCommandProcessor::~DyLibCommandProcessor() = default;
 

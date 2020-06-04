@@ -37,7 +37,7 @@ namespace vulkan {
 // indirection.
 class DirectCommandBuffer final : public CommandBuffer {
  public:
-  DirectCommandBuffer(Allocator* allocator, CommandBufferModeBitfield mode,
+  DirectCommandBuffer(CommandBufferModeBitfield mode,
                       CommandCategoryBitfield command_categories,
                       ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
                       ref_ptr<VkCommandPoolHandle> command_pool,

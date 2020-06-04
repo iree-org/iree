@@ -23,11 +23,19 @@ namespace hal {
 namespace dylib {
 
 // static
-StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(
-    hal::Allocator* allocator, ExecutableSpec spec) {
+StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(ExecutableSpec spec) {
   auto executable = make_ref<DyLibExecutable>(spec);
   RETURN_IF_ERROR(executable->Initialize());
   return executable;
+}
+
+DyLibExecutable::DyLibExecutable(ExecutableSpec spec) : spec_(spec) {}
+
+DyLibExecutable::~DyLibExecutable() {
+  executable_library_.reset();
+  if (!executable_library_temp_path_.empty()) {
+    file_io::DeleteFile(executable_library_temp_path_).IgnoreError();
+  }
 }
 
 Status DyLibExecutable::Initialize() {
@@ -79,15 +87,6 @@ Status DyLibExecutable::Initialize() {
   }
 
   return OkStatus();
-}
-
-DyLibExecutable::DyLibExecutable(ExecutableSpec spec) : spec_(spec) {}
-
-DyLibExecutable::~DyLibExecutable() {
-  executable_library_.reset();
-  if (!executable_library_temp_path_.empty()) {
-    file_io::DeleteFile(executable_library_temp_path_).IgnoreError();
-  }
 }
 
 Status DyLibExecutable::Invoke(int func_id, absl::Span<void*> args) const {

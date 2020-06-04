@@ -29,7 +29,6 @@ TEST_P(CommandBufferTest, CreateCommandBuffer) {
                                                 CommandBufferMode::kOneShot,
                                                 CommandCategory::kDispatch));
 
-  EXPECT_EQ(device_->allocator(), command_buffer->allocator());
   EXPECT_TRUE((command_buffer->mode() & CommandBufferMode::kOneShot) ==
               CommandBufferMode::kOneShot);
   EXPECT_TRUE((command_buffer->command_categories() &

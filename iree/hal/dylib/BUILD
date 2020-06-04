@@ -20,24 +20,6 @@ package(
 )
 
 cc_library(
-    name = "dylib_executable",
-    srcs = ["dylib_executable.cc"],
-    hdrs = ["dylib_executable.h"],
-    deps = [
-        "//iree/base:dynamic_library",
-        "//iree/base:file_io",
-        "//iree/base:status",
-        "//iree/hal:allocator",
-        "//iree/hal:executable",
-        "//iree/hal:executable_spec",
-        "//iree/schemas:dylib_executable_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
     name = "dylib_command_processor",
     srcs = ["dylib_command_processor.cc"],
     hdrs = ["dylib_command_processor.h"],
@@ -48,22 +30,6 @@ cc_library(
         "//iree/hal:buffer",
         "//iree/hal/host:host_local_command_processor",
         "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
-    name = "dylib_executable_cache",
-    srcs = ["dylib_executable_cache.cc"],
-    hdrs = ["dylib_executable_cache.h"],
-    deps = [
-        ":dylib_executable",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:allocator",
-        "//iree/hal:executable",
-        "//iree/hal:executable_cache",
-        "//iree/hal:executable_format",
     ],
 )
 
@@ -116,6 +82,38 @@ cc_library(
         "//iree/hal:driver_registry",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "dylib_executable",
+    srcs = ["dylib_executable.cc"],
+    hdrs = ["dylib_executable.h"],
+    deps = [
+        "//iree/base:dynamic_library",
+        "//iree/base:file_io",
+        "//iree/base:status",
+        "//iree/hal:executable",
+        "//iree/hal:executable_spec",
+        "//iree/schemas:dylib_executable_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "dylib_executable_cache",
+    srcs = ["dylib_executable_cache.cc"],
+    hdrs = ["dylib_executable_cache.h"],
+    deps = [
+        ":dylib_executable",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:executable",
+        "//iree/hal:executable_cache",
+        "//iree/hal:executable_format",
+    ],
 )
 
 cc_library(

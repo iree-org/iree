@@ -29,6 +29,7 @@ class DyLibDevice final : public Device {
  public:
   static StatusOr<ref_ptr<DyLibDevice>> CreateDyLibDevice(
       DeviceInfo device_info);
+
   explicit DyLibDevice(DeviceInfo device_info);
   ~DyLibDevice() override;
 

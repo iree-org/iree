@@ -32,7 +32,7 @@ namespace hal {
 // Thread-compatible (as with CommandBuffer itself).
 class InProcCommandBuffer final : public CommandBuffer {
  public:
-  InProcCommandBuffer(Allocator* allocator, CommandBufferModeBitfield mode,
+  InProcCommandBuffer(CommandBufferModeBitfield mode,
                       CommandCategoryBitfield command_categories);
   ~InProcCommandBuffer() override;
 

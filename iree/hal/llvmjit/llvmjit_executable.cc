@@ -35,7 +35,9 @@ namespace llvmjit {
 
 // static
 StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
-    hal::Allocator* allocator, ExecutableSpec spec, bool allow_aliasing_data) {
+    ExecutableSpec spec, bool allow_aliasing_data) {
+  IREE_TRACE_SCOPE0("LLVMJITExecutable::Load");
+
   auto module_def =
       ::flatbuffers::GetRoot<LLVMIRExecutableDef>(spec.executable_data.data());
   auto data =
@@ -46,8 +48,9 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   auto llvm_context = std::make_unique<llvm::LLVMContext>();
   llvm::SMDiagnostic sm_diagnostic;
   auto module = llvm::parseAssembly(*mem_buffer, sm_diagnostic, *llvm_context);
-  if (!module)
+  if (!module) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "Can't parse LLVMIR Module";
+  }
   auto dataLayout = module->getDataLayout();
   const auto entry_points = module_def->entry_points();
   llvm::orc::ThreadSafeModule thread_safe_module(std::move(module),
@@ -55,23 +58,25 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   auto ll_jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
 
   llvm::Error err = ll_jit->addIRModule(std::move(thread_safe_module));
-  if (err)
+  if (err) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Can't add executable module to executable LLJIT"
            << llvm::toString(std::move(err));
+  }
 
   auto dylib_serarch_generator =
       llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
           dataLayout.getGlobalPrefix());
-  if (!dylib_serarch_generator)
+  if (!dylib_serarch_generator) {
     return UnavailableErrorBuilder(IREE_LOC)
            << "Can't resolve symbols in current process";
+  }
 
   auto& main_jitdylib = ll_jit->getMainJITDylib();
   main_jitdylib.addGenerator(std::move(dylib_serarch_generator.get()));
 
-  auto executable = make_ref<LLVMJITExecutable>(
-      allocator, spec, std::move(ll_jit), allow_aliasing_data);
+  auto executable =
+      make_ref<LLVMJITExecutable>(spec, std::move(ll_jit), allow_aliasing_data);
 
   for (const auto func_name : *entry_points) {
     auto func_symbol =
@@ -99,8 +104,7 @@ Status LLVMJITExecutable::Invoke(int func_id,
   return OkStatus();
 }
 
-LLVMJITExecutable::LLVMJITExecutable(hal::Allocator* allocator,
-                                     ExecutableSpec spec,
+LLVMJITExecutable::LLVMJITExecutable(ExecutableSpec spec,
                                      std::unique_ptr<llvm::orc::LLJIT> ll_jit,
                                      bool allow_aliasing_data)
     : spec_(spec), ll_jit_(std::move(ll_jit)) {

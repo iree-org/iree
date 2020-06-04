@@ -127,7 +127,6 @@ iree_cc_library(
   SRCS
     "command_buffer.cc"
   DEPS
-    ::allocator
     ::buffer
     ::descriptor_set
     ::event
@@ -147,6 +146,7 @@ iree_cc_library(
   SRCS
     "command_buffer_validation.cc"
   DEPS
+    ::allocator
     ::command_buffer
     absl::strings
     iree::base::logging

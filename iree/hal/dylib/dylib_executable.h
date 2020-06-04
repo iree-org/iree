@@ -22,7 +22,6 @@
 #include "absl/types/span.h"
 #include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
 
@@ -34,8 +33,8 @@ struct MemrefType;
 
 class DyLibExecutable final : public Executable {
  public:
-  static StatusOr<ref_ptr<DyLibExecutable>> Load(hal::Allocator* allocator,
-                                                 ExecutableSpec spec);
+  static StatusOr<ref_ptr<DyLibExecutable>> Load(ExecutableSpec spec);
+
   DyLibExecutable(ExecutableSpec spec);
   ~DyLibExecutable() override;
 

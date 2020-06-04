@@ -23,8 +23,7 @@ namespace dylib {
 
 class DyLibCommandProcessor final : public HostLocalCommandProcessor {
  public:
-  DyLibCommandProcessor(Allocator* allocator,
-                        CommandCategoryBitfield command_categories);
+  explicit DyLibCommandProcessor(CommandCategoryBitfield command_categories);
   ~DyLibCommandProcessor() override;
 
   Status DispatchInline(

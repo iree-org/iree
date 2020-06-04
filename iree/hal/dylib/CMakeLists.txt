@@ -16,27 +16,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    dylib_executable
-  HDRS
-    "dylib_executable.h"
-  SRCS
-    "dylib_executable.cc"
-  DEPS
-    absl::inlined_vector
-    absl::span
-    flatbuffers
-    iree::base::dynamic_library
-    iree::base::file_io
-    iree::base::status
-    iree::hal::allocator
-    iree::hal::executable
-    iree::hal::executable_spec
-    iree::schemas::dylib_executable_def_cc_fbs
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     dylib_command_processor
   HDRS
     "dylib_command_processor.h"
@@ -49,25 +28,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::buffer
     iree::hal::host::host_local_command_processor
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    dylib_executable_cache
-  HDRS
-    "dylib_executable_cache.h"
-  SRCS
-    "dylib_executable_cache.cc"
-  DEPS
-    ::dylib_executable
-    iree::base::source_location
-    iree::base::status
-    iree::base::tracing
-    iree::hal::allocator
-    iree::hal::executable
-    iree::hal::executable_cache
-    iree::hal::executable_format
   PUBLIC
 )
 
@@ -127,6 +87,44 @@ iree_cc_library(
     iree::base::status
     iree::hal::driver_registry
   ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dylib_executable
+  HDRS
+    "dylib_executable.h"
+  SRCS
+    "dylib_executable.cc"
+  DEPS
+    absl::inlined_vector
+    absl::span
+    flatbuffers
+    iree::base::dynamic_library
+    iree::base::file_io
+    iree::base::status
+    iree::hal::executable
+    iree::hal::executable_spec
+    iree::schemas::dylib_executable_def_cc_fbs
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dylib_executable_cache
+  HDRS
+    "dylib_executable_cache.h"
+  SRCS
+    "dylib_executable_cache.cc"
+  DEPS
+    ::dylib_executable
+    iree::base::source_location
+    iree::base::status
+    iree::base::tracing
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
   PUBLIC
 )
 

@@ -20,9 +20,8 @@ namespace iree {
 namespace hal {
 
 InProcCommandBuffer::InProcCommandBuffer(
-    Allocator* allocator, CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories)
-    : CommandBuffer(allocator, mode, command_categories) {}
+    CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories)
+    : CommandBuffer(mode, command_categories) {}
 
 InProcCommandBuffer::~InProcCommandBuffer() { Reset(); }
 

@@ -34,10 +34,10 @@ struct MemrefType;
 
 class LLVMJITExecutable final : public Executable {
  public:
-  static StatusOr<ref_ptr<LLVMJITExecutable>> Load(hal::Allocator* allocator,
-                                                   ExecutableSpec spec,
+  static StatusOr<ref_ptr<LLVMJITExecutable>> Load(ExecutableSpec spec,
                                                    bool allow_aliasing_data);
-  LLVMJITExecutable(hal::Allocator* allocator, ExecutableSpec spec,
+
+  LLVMJITExecutable(ExecutableSpec spec,
                     std::unique_ptr<llvm::orc::LLJIT> ll_jit,
                     bool allow_aliasing_data);
   ~LLVMJITExecutable() override;

@@ -61,8 +61,8 @@ struct AsyncCommandQueueTest : public ::testing::Test {
 TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
   ::testing::InSequence sequence;
 
-  auto cmd_buffer = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                CommandCategory::kTransfer);
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([&](absl::Span<const SubmissionBatch> batches) {
@@ -81,8 +81,8 @@ TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
 TEST_F(AsyncCommandQueueTest, PropagateSubmitFailure) {
   ::testing::InSequence sequence;
 
-  auto cmd_buffer = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                CommandCategory::kTransfer);
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
@@ -103,8 +103,8 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWhileIdle) {
 TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
   ::testing::InSequence sequence;
 
-  auto cmd_buffer = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                CommandCategory::kTransfer);
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
@@ -134,10 +134,10 @@ TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
         return OkStatus();
       });
 
-  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
-  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                  CommandCategory::kTransfer);
+  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                  CommandCategory::kTransfer);
 
   HostSemaphore semaphore_0(0u);
   ASSERT_OK(command_queue->Submit(
@@ -166,8 +166,8 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
         Sleep(absl::Milliseconds(100));
         return DataLossErrorBuilder(IREE_LOC);
       });
-  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                  CommandCategory::kTransfer);
   HostSemaphore semaphore_0(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1u}}}));
@@ -177,8 +177,8 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
 
   // Future submits should fail asynchronously.
-  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                  CommandCategory::kTransfer);
   HostSemaphore semaphore_1(0ull);
   EXPECT_TRUE(IsDataLoss(command_queue->Submit(
       {{}, {cmd_buffer_1.get()}, {{&semaphore_1, 1ull}}})));
@@ -196,10 +196,10 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
         return DataLossErrorBuilder(IREE_LOC);
       });
 
-  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
-  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(
-      nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
+  auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                  CommandCategory::kTransfer);
+  auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
+                                                  CommandCategory::kTransfer);
 
   HostSemaphore semaphore_0(0ull);
   ASSERT_OK(command_queue->Submit(
