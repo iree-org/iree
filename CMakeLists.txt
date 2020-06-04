@@ -69,6 +69,7 @@ endif()
 
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
+  DyLib
   LLVM
   Vulkan
   VMLA

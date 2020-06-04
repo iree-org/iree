@@ -42,9 +42,35 @@ flatbuffer_cc_library(
 
 flatbuffer_cc_library(
   NAME
+    dylib_executable_def_cc_fbs
+  SRCS
+    "dylib_executable_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
+  PUBLIC
+)
+
+flatbuffer_cc_library(
+  NAME
     interpreter_module_def_cc_fbs
   SRCS
     "interpreter_module_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
+  PUBLIC
+)
+
+flatbuffer_cc_library(
+  NAME
+    llvmir_executable_def_cc_fbs
+  SRCS
+    "llvmir_executable_def.fbs"
   FLATC_ARGS
     "--keep-prefix"
     "--scoped-enums"
@@ -71,19 +97,6 @@ flatbuffer_cc_library(
     vmla_executable_def_cc_fbs
   SRCS
     "vmla_executable_def.fbs"
-  FLATC_ARGS
-    "--keep-prefix"
-    "--scoped-enums"
-    "--reflect-names"
-    "--gen-object-api"
-  PUBLIC
-)
-
-flatbuffer_cc_library(
-  NAME
-    llvmir_executable_def_cc_fbs
-  SRCS
-    "llvmir_executable_def.fbs"
   FLATC_ARGS
     "--keep-prefix"
     "--scoped-enums"

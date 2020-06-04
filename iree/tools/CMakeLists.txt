@@ -18,6 +18,7 @@ add_subdirectory(test)
 # TODO: skip targets disabled by options.
 iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
   ALL
+    "iree::hal::dylib::dylib_driver_module"
     "iree::hal::llvmjit::llvmjit_driver_module"
     "iree::hal::vmla::vmla_driver_module"
     "iree::hal::vulkan::vulkan_driver_module"
