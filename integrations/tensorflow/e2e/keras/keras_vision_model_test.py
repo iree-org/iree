@@ -71,9 +71,15 @@ APP_MODELS = {
 }
 
 
-def get_input_shape(data):
+def get_input_shape(data, model):
   if data == 'imagenet':
-    return (1, 224, 224, 3)
+    if (model == 'InceptionV3' or model == 'Xception' or
+        model == 'InceptionResNetV2'):
+      return (1, 299, 299, 3)
+    elif model == 'NASNetLarge':
+      return (1, 331, 331, 3)
+    else:
+      return (1, 224, 224, 3)
   elif data == 'cifar10':
     return (1, 32, 32, 3)
   else:
@@ -84,7 +90,7 @@ def models():
   tf.keras.backend.set_learning_phase(False)
   tf_test_utils.set_random_seed()
 
-  input_shape = get_input_shape(FLAGS.data)
+  input_shape = get_input_shape(FLAGS.data, FLAGS.model)
   # keras model receives images size as input,
   # where batch size is not specified - by default it is dynamic
   if FLAGS.model in APP_MODELS:
@@ -125,7 +131,7 @@ def models():
 class AppTest(tf_test_utils.SavedModelTestCase):
 
   def test_application(self):
-    input_shape = get_input_shape(FLAGS.data)
+    input_shape = get_input_shape(FLAGS.data, FLAGS.model)
     input_data = np.random.rand(np.prod(np.array(input_shape))).astype(
         np.float32)
     input_data = input_data.reshape(input_shape)

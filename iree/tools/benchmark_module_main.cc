@@ -149,11 +149,20 @@ void BM_RunModule(benchmark::State& state) {
   CHECK_OK(Run(state));
 }
 
-// By default only the main thread is included in CPU time. Include all the
-// threads instead. To make single and multi-threaded benchmarks more
-// comparable, use the wall time to determine how many iterations to run.
-// See https://github.com/google/benchmark#cpu-timers,
-BENCHMARK(BM_RunModule)->MeasureProcessCPUTime()->UseRealTime();
+BENCHMARK(BM_RunModule)
+    // By default only the main thread is included in CPU time. Include all the
+    // threads instead.
+    ->MeasureProcessCPUTime()
+    // To make single and multi-threaded benchmarks more comparable, use the
+    // wall time to determine how many iterations to run.
+    // See https://github.com/google/benchmark#cpu-timers,
+    ->UseRealTime()
+    // Report timing in milliseconds, which is the general order of magnitude of
+    // model runs. The benchmark framework will print with precision between 0
+    // and 3 places after the decimal while aiming for three significant digits.
+    // If we end up wanting precision beyond microseconds, we can make this
+    // setting configurable with a custom command line flag.
+    ->Unit(benchmark::kMillisecond);
 
 }  // namespace
 

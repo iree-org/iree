@@ -47,8 +47,7 @@ def pybind_cc_library(
         name,
         copts = [],
         features = [],
-        deps = [
-        ],
+        deps = [],
         **kwargs):
     """Wrapper cc_library for deps that are part of the python bindings."""
     cc_library(

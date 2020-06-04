@@ -78,20 +78,16 @@ VMTypeConverter::VMTypeConverter() {
         }
         return success();
       });
-}
 
-Operation *VMTypeConverter::materializeConversion(PatternRewriter &rewriter,
-                                                  Type resultType,
-                                                  ArrayRef<Value> inputs,
-                                                  Location loc) {
-  LLVM_DEBUG(llvm::dbgs() << "MATERIALIZE CONVERSION: " << resultType << "\n");
-  if (auto rsType = resultType.dyn_cast<Shape::RankedShapeType>()) {
-    return rewriter.create<Shape::MakeRankedShapeOp>(loc, rsType, inputs);
-  }
-
-  // TODO(b/145876978): materialize conversion when this is called.
-  llvm_unreachable("unhandled materialization");
-  return nullptr;
+  // TODO(b/145876978): materialize conversion for other types
+  addMaterialization([](PatternRewriter &rewriter,
+                        Shape::RankedShapeType resultType, ValueRange inputs,
+                        Location loc) -> Optional<Value> {
+    LLVM_DEBUG(llvm::dbgs()
+               << "MATERIALIZE CONVERSION: " << resultType << "\n");
+    return rewriter.create<Shape::MakeRankedShapeOp>(loc, resultType, inputs)
+        .getResult();
+  });
 }
 
 }  // namespace iree_compiler
