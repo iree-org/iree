@@ -105,10 +105,9 @@ function(flatbuffer_cc_library)
     "" # copy_text_schemas_dir
   )
 
-  if(CMAKE_CROSSCOMPILING)
-    # Additionally depend on the flatc binary to drive compiling it.
-    add_dependencies("${_NAME}_gen" iree_host_flatc)
-  endif()
+  # Add dependency on flatc explicitly. This is needed for cross-compiling
+  # where flatc comes from another CMake invocation for host.
+  iree_add_executable_dependencies("${_NAME}_gen" flatc)
 
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_NAME}_gen)

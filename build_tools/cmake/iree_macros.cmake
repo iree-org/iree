@@ -191,3 +191,20 @@ function(iree_add_data_dependencies)
     endif()
   endforeach()
 endfunction()
+
+# iree_add_executable_dependencies
+#
+# Adds dependency to a target in a cross-compilation-aware way. This is meant
+# to be used for dependencies that are used to generate source files and can
+# only be built on host.
+#
+# Parameters:
+# - target: the target to take on dependencies
+# - dependency: additional dependencies to append to target
+function(iree_add_executable_dependencies target dependency)
+  if(CMAKE_CROSSCOMPILING)
+    add_dependencies(${target} iree_host_${dependency})
+  else()
+    add_dependencies(${target} ${dependency})
+  endif()
+endfunction()
