@@ -130,18 +130,6 @@ function(iree_get_build_command target bin_dir cmd_var)
   endif()
 endfunction()
 
-# iree_get_host_executable_path
-#
-# Gets the path to a host executable.
-#
-# Paramters:
-# - target: the target to build on host.
-# - output_path_var: variable name for receiving the path to the built target.
-function(iree_get_host_exectuable_path target output_path_var)
-  set(output_path "${IREE_HOST_BINARY_ROOT}/bin/${target}")
-  set(${output_path_var} "${output_path}" PARENT_SCOPE)
-endfunction()
-
 # iree_host_install
 #
 # Defines custom commands and targets for installing the given `target`. The
@@ -160,7 +148,7 @@ function(iree_host_install target)
     set(prefix_option -DCMAKE_INSTALL_PREFIX="${_RULE_PREFIX}")
   endif()
 
-  iree_get_host_exectuable_path(${target} output_path)
+  iree_get_executable_path(${target} output_path)
 
   add_custom_command(
     OUTPUT ${output_path}
@@ -174,7 +162,7 @@ function(iree_host_install target)
   add_custom_target(iree_host_install_${target} DEPENDS ${output_path})
 endfunction()
 
-# iree_build_host_executable
+# iree_declare_host_excutable
 #
 # Generates custom commands and targets for building and installing a tool on
 # host for cross-compilation.
@@ -183,10 +171,10 @@ endfunction()
 # - target: the target to build on host.
 # - BUILDONLY: only generates commands for building the target.
 # - DEPENDS: any additional dependencies for the target.
-function(iree_build_host_executable target)
+function(iree_declare_host_excutable target)
   cmake_parse_arguments(_RULE "BUILDONLY" "" "DEPENDS" ${ARGN})
 
-  iree_get_host_exectuable_path(${target} output_path)
+  iree_get_executable_path(${target} output_path)
 
   iree_get_build_command(${target} ${IREE_HOST_BINARY_ROOT} build_cmd)
 

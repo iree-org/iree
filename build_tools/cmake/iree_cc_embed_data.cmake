@@ -79,12 +79,7 @@ function(iree_cc_embed_data)
     list(APPEND _ARGS "${SRC}")
   endforeach(SRC)
 
-  if (CMAKE_CROSSCOMPILING)
-    iree_get_host_exectuable_path(generate_cc_embed_data _EXE_PATH)
-  else()
-    # Resolve the executable binary path from the target name.
-    set(_EXE_PATH $<TARGET_FILE:generate_cc_embed_data>)
-  endif()
+  iree_get_executable_path(generate_cc_embed_data _EXE_PATH)
 
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_CC_FILE_OUTPUT}"

@@ -59,12 +59,7 @@ function(iree_bytecode_module)
     set(_TRANSLATE_TOOL "iree-translate")
   endif()
 
-  if (CMAKE_CROSSCOMPILING)
-    iree_get_host_exectuable_path(${_TRANSLATE_TOOL} _TRANSLATE_TOOL_EXECUTABLE)
-  else()
-    # Resolve the executable binary path from the target name.
-    set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
-  endif()
+  iree_get_executable_path(${_TRANSLATE_TOOL} _TRANSLATE_TOOL_EXECUTABLE)
 
   set(_ARGS "${_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")

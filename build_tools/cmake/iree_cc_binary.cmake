@@ -71,6 +71,10 @@ function(iree_cc_binary)
   endif()
 
   if(_RULE_HOSTONLY AND CMAKE_CROSSCOMPILING)
+    # The binary is marked as host only. We need to declare the rules for
+    # generating them under host configuration so cross-compiling towards
+    # target we can still have this binary.
+    iree_declare_host_excutable(_RULE_NAME)
     return()
   endif()
 

@@ -104,10 +104,6 @@ if(${IREE_ENABLE_LLVM})
   )
 endif()
 
-if(CMAKE_CROSSCOMPILING)
-  iree_build_host_executable(iree-tblgen)
-endif()
-
 if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
@@ -387,12 +383,6 @@ iree_cc_test(
     iree::vm::value
     iree::vm::variant_list
 )
-
-if(CMAKE_CROSSCOMPILING)
-  iree_build_host_executable(iree-opt)
-  iree_build_host_executable(iree-run-mlir)
-  iree_build_host_executable(iree-translate)
-endif()
 
 if(${IREE_ENABLE_LLVM})
   add_custom_target(IreeFileCheck ALL

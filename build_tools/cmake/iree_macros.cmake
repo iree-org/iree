@@ -72,6 +72,28 @@ function(iree_package_dir PACKAGE_DIR)
   set(${PACKAGE_DIR} ${_PACKAGE_DIR} PARENT_SCOPE)
 endfunction()
 
+# iree_get_executable_path
+#
+# Gets the path to an executable in a cross-compilation-aware way. This is
+# meant to be used for binaries that are used to generate source files and
+# can only be built on host.
+#
+# Paramters:
+# - target: the target to build on host.
+# - output_path_var: variable name for receiving the path to the built target.
+function(iree_get_executable_path target output_path_var)
+  if(CMAKE_CROSSCOMPILING)
+    # The target is defined in the CMake invocation for host. We don't have
+    # access to the target; relying on the path here.
+    set(output_path "${IREE_HOST_BINARY_ROOT}/bin/${target}")
+    set(${output_path_var} "${output_path}" PARENT_SCOPE)
+  else()
+    # The target is defined in this CMake invocation. We can query the location
+    # directly from CMake.
+    set(${output_path_var} "$<TARGET_FILE:${target}>" PARENT_SCOPE)
+  endif()
+endfunction()
+
 #-------------------------------------------------------------------------------
 # select()-like Evaluation
 #-------------------------------------------------------------------------------

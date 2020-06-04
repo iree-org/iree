@@ -143,12 +143,10 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
-if(CMAKE_CROSSCOMPILING)
-  iree_get_host_exectuable_path(iree-tblgen IREE_TABLEGEN_EXE)
-else()
-  set(MLIR_TABLEGEN_EXE mlir-tblgen)
-  set(IREE_TABLEGEN_EXE iree-tblgen)
-endif()
+set(MLIR_TABLEGEN_EXE mlir-tblgen)
+# iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
+# tools in LLVM.
+iree_get_executable_path(iree-tblgen IREE_TABLEGEN_EXE)
 
 #-------------------------------------------------------------------------------
 # Third party: tensorflow

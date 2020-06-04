@@ -106,7 +106,7 @@ function(flatbuffer_cc_library)
   )
 
   if(CMAKE_CROSSCOMPILING)
-    iree_get_host_exectuable_path(flatc _FLATC_PATH)
+    # Additionally depend on the flatc binary to drive compiling it.
     add_dependencies("${_NAME}_gen" iree_host_flatc)
   endif()
 

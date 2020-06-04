@@ -226,15 +226,16 @@ add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 
 if(CMAKE_CROSSCOMPILING)
-  iree_build_host_executable(flatc BUILDONLY)
+  iree_declare_host_excutable(flatc BUILDONLY)
   # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
   # binary in BuildFlatBuffers().
-  iree_get_host_exectuable_path(flatc FLATBUFFERS_FLATC_EXECUTABLE)
+  iree_get_executable_path(flatc FLATBUFFERS_FLATC_EXECUTABLE)
   # Add a custom target to copy the flatc to the binary directory.
   add_custom_target(iree_host_flatc
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
       "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc" "${IREE_HOST_BINARY_ROOT}/bin"
     DEPENDS iree_host_build_flatc
+    COMMENT "Installing host flatc..."
   )
 endif()
 
