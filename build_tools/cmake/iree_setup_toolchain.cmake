@@ -19,7 +19,13 @@ function(iree_append value)
 endfunction()
 
 if(IREE_ENABLE_LLD)
+  if (IREE_USE_LINKER)
+    message(FATAL_ERROR "IREE_ENABLE_LLD and IREE_USE_LINKER can't be set at the same time")
+  endif()
   set(IREE_USE_LINKER "lld")
+endif()
+
+if(IREE_USE_LINKER)
   set(IREE_LINKER_FLAG "-fuse-ld=${IREE_USE_LINKER}")
 
   include(CheckCXXSourceCompiles)
