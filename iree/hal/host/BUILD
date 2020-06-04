@@ -152,6 +152,14 @@ cc_library(
 )
 
 cc_library(
+    name = "scheduling_model",
+    hdrs = ["scheduling_model.h"],
+    deps = [
+        "//iree/hal:command_queue",
+    ],
+)
+
+cc_library(
     name = "serial_command_processor",
     srcs = ["serial_command_processor.cc"],
     hdrs = ["serial_command_processor.h"],

@@ -173,6 +173,16 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    scheduling_model
+  HDRS
+    "scheduling_model.h"
+  DEPS
+    iree::hal::command_queue
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     serial_command_processor
   HDRS
     "serial_command_processor.h"
