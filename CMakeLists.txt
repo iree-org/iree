@@ -129,6 +129,10 @@ list(APPEND CMAKE_MODULE_PATH
 #-------------------------------------------------------------------------------
 
 if(CMAKE_CROSSCOMPILING)
+  if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+    message(FATAL_ERROR "Cross compilation with Windows host unspported yet")
+  endif()
+
   message(STATUS "Detected cross compilation mode, configuring IREE on host...")
 
   # C/C++ compilers for host compilation.
@@ -152,6 +156,8 @@ if(CMAKE_CROSSCOMPILING)
 
   # Use another CMake invocation to configure a build for host.
   iree_create_configuration(HOST)
+
+  message(STATUS "Done configuring IREE on host")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -231,10 +237,14 @@ add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 
 if(CMAKE_CROSSCOMPILING)
+  # We need flatc to generate some source code. When cross-compiling, we need
+  # to make sure the flatc binary is configured under host environment.
   iree_declare_host_excutable(flatc BUILDONLY)
+
   # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
   # binary in BuildFlatBuffers().
   iree_get_executable_path(flatc FLATBUFFERS_FLATC_EXECUTABLE)
+
   # Add a custom target to copy the flatc to the binary directory.
   add_custom_target(iree_host_flatc
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different

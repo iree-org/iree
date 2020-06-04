@@ -87,6 +87,9 @@ function(iree_create_configuration config_name)
   string(REPLACE ";" "$<SEMICOLON>" config_compiler_targets_to_build "${IREE_TARGET_BACKENDS_TO_BUILD}")
   # LINT.ThenChange(https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options)
 
+  message(STATUS "C compiler for ${config_name} build: ${config_c_compiler}")
+  message(STATUS "C++ compiler for ${config_name} build: ${config_cxx_compiler}")
+
   add_custom_command(OUTPUT ${IREE_${config_name}_BINARY_ROOT}/CMakeCache.txt
     COMMAND "${CMAKE_COMMAND}" "${PROJECT_SOURCE_DIR}" -G "${CMAKE_GENERATOR}"
         -DCMAKE_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
