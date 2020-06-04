@@ -34,9 +34,6 @@ set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
-if(${IREE_ENABLE_RUNTIME_TRACING})
-  set (CMAKE_EXE_LINKER_FLAGS -ldl )
-endif()
 option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
