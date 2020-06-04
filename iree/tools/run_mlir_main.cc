@@ -356,8 +356,6 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                                      function, export_name))
         << "Evaluating export function " << ordinal;
 
-    // TODO: temporarily comment out as it will cause a memory corruption 
-    // in dynamic shape in llvm-ir backend 
     iree_vm_context_release(context);
     return OkStatus();
   };

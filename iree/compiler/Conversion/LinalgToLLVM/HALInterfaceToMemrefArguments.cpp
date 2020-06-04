@@ -162,16 +162,12 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
     for (auto loadOp: loadOps) {
       auto loc = newFuncOp.front().front().getLoc();
-      // Value dim = builder.create<ConstantOp>(newFuncOp.front().front().getLoc(), indexType, rewriter.getIntegerAttr(indexType, 3));
-      // auto dim = builder.create<mlir::DimOp>(newFuncOp.front().front().getLoc(), newFuncOp.getArgument(0), loadOp.offset().getZExtValue());
-      // auto dim = builder.create<mlir::DimOp>(newFuncOp.front().front().getLoc(), newFuncOp.getArgument(0), 0);
       SmallVector<Value, 4> indices;
       Value constant_offset = builder.create<ConstantOp>(loc, indexType, rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
       indices.push_back(constant_offset);
       Value load_constant = builder.create<LoadOp>(loc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
       Value load_contant_index = builder.create<IndexCastOp>(loc, load_constant, indexType);
       loadOp.replaceAllUsesWith(load_contant_index);
-      //rewriter.replaceOp(loadOp, ValueRange({dim}));
       rewriter.eraseOp(loadOp);
     }
     return success();
