@@ -121,3 +121,17 @@ iree_py_test(
         "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",
     ],
 )
+
+iree_py_test(
+    name = "signature_def_saved_model_test",
+    srcs = ["signature_def_saved_model_test.py"],
+    python_version = "PY3",
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "@absl_py//absl/testing:absltest",
+        "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",
+    ],
+)

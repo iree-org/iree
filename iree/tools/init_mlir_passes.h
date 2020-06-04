@@ -124,11 +124,6 @@ inline void registerMlirPasses() {
   createSymbolDCEPass();
   createLocationSnapshotPass({});
 
-  // GPU
-  createGpuKernelOutliningPass();
-  createSimpleSCFToGPUPass(0, 0);
-  createLoopToGPUPass({}, {});
-
   // Linalg
   createLinalgFusionPass();
   ::mlir::registerPass("linalg-fusion-for-tensor-ops",

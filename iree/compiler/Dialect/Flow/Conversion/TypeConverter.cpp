@@ -56,15 +56,7 @@ FlowTypeConverter::FlowTypeConverter() {
     // here for certain cases (such as * on the LHS).
     return Type();
   });
-}
-
-Operation *FlowTypeConverter::materializeConversion(PatternRewriter &rewriter,
-                                                    Type resultType,
-                                                    ArrayRef<Value> inputs,
-                                                    Location loc) {
-  // TODO(b/145876978): materialize conversion when this is called.
-  llvm_unreachable("unhandled materialization");
-  return nullptr;
+  // TODO(b/145876978): add conversion materializer
 }
 
 }  // namespace iree_compiler

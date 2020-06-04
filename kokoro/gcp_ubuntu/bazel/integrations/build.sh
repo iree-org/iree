@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For use within a IREE bazel docker image on a Kokoro VM.
+# For use within a IREE bazel-tensorflow docker image on a Kokoro VM.
 # Log some information about the environment, initialize the submodules and then
-# run the bazel tests.
+# run the bazel integrations tests.
 
 set -e
 set -x
@@ -36,4 +36,4 @@ echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
 echo "Building and testing with bazel"
-./build_tools/bazel/build_core.sh
+./build_tools/bazel/build_tensorflow.sh

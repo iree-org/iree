@@ -14,8 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the IREE project with bazel. Designed for CI, but can be run manually.
-# Looks at environment variables and uses CI-friendly defaults if they are not set.
+# Build IREE's core (//iree/...) with bazel. Designed for CI, but can be run
+# manually.
+
+# Looks at environment variables and uses CI-friendly defaults if they are not
+# set.
 # IREE_LLVMJIT_DISABLE: Do not run tests that require LLVM-JIT. Default: 1
 # IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 1
 # BUILD_TAG_FILTERS: Passed to bazel to filter targets to build.
@@ -66,7 +69,7 @@ fi
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "nokokoro".
-bazel query //iree/... + //bindings/... | \
+bazel query //iree/... | \
   xargs bazel test ${test_env_args[@]} \
     --config=generic_clang \
     --build_tag_filters="${BUILD_TAG_FILTERS?}" \
