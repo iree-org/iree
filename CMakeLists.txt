@@ -61,7 +61,7 @@ if(${IREE_BUILD_COMPILER})
 endif()
 
 #-------------------------------------------------------------------------------
-# Targets and Backends Configuration
+# Target and backend configuration
 #-------------------------------------------------------------------------------
 
 # List of all HAL drivers to be built by default:

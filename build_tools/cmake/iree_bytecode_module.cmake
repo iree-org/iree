@@ -66,23 +66,13 @@ function(iree_bytecode_module)
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_NAME}.module")
 
-  if (CMAKE_CROSSCOMPILING)
-    # For cross compilation, we don't have a target for the translation tool
-    # to depend on: it is in another build root from a different CMake
-    # invocation. But we have a custom command for generating the translation
-    # tool for host. Depend on the file instead.
-    add_custom_command(
-      OUTPUT "${_RULE_NAME}.module"
-      COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
-      DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE}
-    )
-  else()
-    add_custom_command(
-      OUTPUT "${_RULE_NAME}.module"
-      COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
-      DEPENDS ${_TRANSLATE_TOOL}
-    )
-  endif()
+  # Depending on the binary instead of the target here given we might not have
+  # a target in this CMake invocation when cross-compiling.
+  add_custom_command(
+    OUTPUT "${_RULE_NAME}.module"
+    COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+    DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE}
+  )
 
   if(_RULE_TESTONLY)
     set(_TESTONLY_ARG "TESTONLY")
