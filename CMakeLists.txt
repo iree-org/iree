@@ -126,6 +126,8 @@ list(APPEND CMAKE_MODULE_PATH
 # IREE compilation toolchain configuration
 #-------------------------------------------------------------------------------
 
+# Enable using lld as the linker for C/C++ targets. This affects IREE and all
+# dependency projects.
 option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
