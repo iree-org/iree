@@ -53,7 +53,9 @@ Status LLVMJITCommandProcessor::DispatchInline(
       args.push_back(&descriptor->descriptor);
     }
   }
-  auto push_constants_descriptor = allocUnrankedDescriptor<uint32_t>((void*)push_constants.values.data(), {static_cast<long>(push_constants.values.size())});
+  auto push_constants_descriptor = allocUnrankedDescriptor<uint32_t>(
+      (void*)push_constants.values.data(),
+      {static_cast<long>(push_constants.values.size())});
   descriptors.push_back(push_constants_descriptor);
   args.push_back(&push_constants_descriptor->descriptor);
 

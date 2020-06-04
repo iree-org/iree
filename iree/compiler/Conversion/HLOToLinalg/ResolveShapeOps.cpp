@@ -112,8 +112,7 @@ std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass() {
   return std::make_unique<ResolveShapeOpsPass>();
 }
 
-static PassRegistration<ResolveShapeOpsPass> pass(
-   "iree-codege-resolve-shape",
-    "resolve shape");
+static PassRegistration<ResolveShapeOpsPass> pass("iree-codege-resolve-shape",
+                                                  "resolve shape");
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -51,7 +51,6 @@ bool operator<(IREE::HAL::InterfaceBindingOp aOp,
   return aOp.set().getZExtValue() < bOp.set().getZExtValue();
 }
 
-
 /// A pattern to process function interface. It replaces interface related ops
 /// with function arguments to match LLVM's CodeGen's ABI contract.
 ///
@@ -130,7 +129,8 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     }
     SmallVector<int64_t, 4> shapes;
     shapes.push_back(ShapedType::kDynamicSize);
-    Type push_constants_type = MemRefType::get(shapes, rewriter.getIntegerType(32));
+    Type push_constants_type =
+        MemRefType::get(shapes, rewriter.getIntegerType(32));
     signatureConverter.addInputs(push_constants_type);
 
     // Create the new function's signature.
@@ -153,20 +153,24 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     for (auto bufferOp : bufferOps) {
       bufferOp.replaceAllUsesWith(
           newFuncOp.getArgument(bufferArgMap[bufferOp]));
-    
+
       rewriter.eraseOp(bufferOp);
     }
 
     rewriter.eraseOp(funcOp);
     Type indexType = rewriter.getIndexType();
     auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
-    for (auto loadOp: loadOps) {
+    for (auto loadOp : loadOps) {
       auto loc = newFuncOp.front().front().getLoc();
       SmallVector<Value, 4> indices;
-      Value constant_offset = builder.create<ConstantOp>(loc, indexType, rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
+      Value constant_offset = builder.create<ConstantOp>(
+          loc, indexType,
+          rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
       indices.push_back(constant_offset);
-      Value load_constant = builder.create<LoadOp>(loc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
-      Value load_contant_index = builder.create<IndexCastOp>(loc, load_constant, indexType);
+      Value load_constant = builder.create<LoadOp>(
+          loc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
+      Value load_contant_index =
+          builder.create<IndexCastOp>(loc, load_constant, indexType);
       loadOp.replaceAllUsesWith(load_contant_index);
       rewriter.eraseOp(loadOp);
     }
