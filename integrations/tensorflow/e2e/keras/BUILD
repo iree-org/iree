@@ -138,6 +138,7 @@ iree_vision_test_suite(
     external_weights = "https://storage.googleapis.com/iree_models/",
     tags = [
         "external",
+        "guitar",
         "manual",
         "noga",
         "nokokoro",
