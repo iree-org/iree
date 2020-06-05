@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the project within the gcr.io/iree-oss/bazel-tensorflow
+# Build and test IREE's core within the gcr.io/iree-oss/bazel-tensorflow
 # image using Kokoro.
 
 set -e
@@ -32,9 +32,9 @@ docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/bazel-tensorflow:prod \
-  kokoro/gcp_ubuntu/bazel/build.sh
+  gcr.io/iree-oss/bazel:prod \
+  kokoro/gcp_ubuntu/bazel/core/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
-# build which takes forever and is totally useless. 
+# build which takes forever and is totally useless.
 rm -rf "${KOKORO_ARTIFACTS_DIR?}/*"
