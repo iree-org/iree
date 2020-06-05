@@ -30,23 +30,6 @@ namespace iree_compiler {
 namespace Shape {
 namespace {
 
-bool isLegallyShapedSignatureType(Type thisType, Type nextType) {
-  if (!thisType.isa<TensorType>()) return true;  // Legal: Don't care.
-  auto rankedType = thisType.dyn_cast<RankedTensorType>();
-  if (!rankedType) return false;  // Illegal: Non-ranked tensor
-  if (rankedType.getNumDynamicDims() == 0) return true;  // Legal: Static shape
-
-  // At this point, the type is ranked and has dynamic dims. Validate.
-  auto rankedShapeType = nextType.dyn_cast_or_null<Shape::RankedShapeType>();
-  if (!rankedShapeType) return false;  // Illegal: No following shape.
-
-  // Are dims equal.
-  auto thisDims = rankedType.getShape();
-  auto shapeDims = rankedShapeType.getAllDims();
-  if (!thisDims.equals(shapeDims)) return false;  // Illegal: Mismatched shape.
-  return true;  // Legal: dynamic tensor followed by matching shape.
-}
-
 class ExpandFunctionDynamicDimsPass
     : public PassWrapper<ExpandFunctionDynamicDimsPass, FunctionPass> {
   void runOnFunction() override {
