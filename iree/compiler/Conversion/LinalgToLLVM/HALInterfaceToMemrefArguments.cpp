@@ -167,12 +167,12 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
           newLoc, indexType,
           rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
       indices.push_back(constantOffset);
-      Value loadConstant = builder.create<LoadOp>(
+      Value loadDim = builder.create<LoadOp>(
           newLoc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1),
           indices);
-      Value load_contant_index =
-          builder.create<IndexCastOp>(newLoc, loadConstant, indexType);
-      loadOp.replaceAllUsesWith(load_contant_index);
+      Value loadDimIndex =
+          builder.create<IndexCastOp>(newLoc, loadDim, indexType);
+      loadOp.replaceAllUsesWith(loadDimIndex);
       rewriter.eraseOp(loadOp);
     }
     rewriter.eraseOp(funcOp);
