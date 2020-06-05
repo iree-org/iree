@@ -32,6 +32,7 @@
 # dependencies.
 
 import os
+import platform
 import setuptools
 import sys
 
@@ -40,36 +41,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 import common_setup
 
 
-def find_bazel_runfiles_dir():
-  bazel_bin = os.path.abspath(
-      os.path.join(os.path.dirname(__file__), "..", "..", "..", "bazel-bin"))
-  if not os.path.isdir(bazel_bin):
-    print("ERROR: Could not find bazel-bin:", bazel_bin)
-    sys.exit(1)
-  # Find the path to the runfiles of the built target:
-  #   //integrations/tensorflow/bindings/python/packaging:all_tf_packages
-  runfiles_dir = os.path.join(bazel_bin, "integrations", "tensorflow",
-                              "bindings", "python", "packaging",
-                              "all_tf_packages.runfiles")
-  if not os.path.isdir(runfiles_dir):
-    print("ERROR: Could not find build target 'all_tf_packages':", runfiles_dir)
-    print(
-        "Make sure to build target",
-        "//integrations/tensorflow/bindings/python/packaging:all_tf_packages")
-    sys.exit(1)
-  # And finally seek into the corresponding path in the runfiles dir.
-  # Aren't bazel paths fun???
-  # Note that the "iree_core" path segment corresponds to the workspace name.
-  package_path = os.path.join(runfiles_dir, "iree_core", "integrations",
-                              "tensorflow", "bindings", "python")
-  if not os.path.isdir(package_path):
-    print("ERROR: Could not find built python package:", package_path)
-    sys.exit(1)
-  return package_path
-
-
 def run():
-  package_dir = find_bazel_runfiles_dir()
+  package_dir = common_setup.get_package_dir(
+      prefix=("integrations", "tensorflow", "bindings", "python"))
   packages = setuptools.find_namespace_packages(
       package_dir,
       include=[
