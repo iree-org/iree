@@ -28,11 +28,13 @@ WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
 # Mount the checked out repository, make that the working directory and run the
 # tests in the bazel-tensorflow image.
+# TODO: Make this use the gcr.io/iree-oss/bazel:prod image once we separate out
+# the bindings from `build_core.sh`.
 docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/bazel:prod \
+  gcr.io/iree-oss/bazel-tensorflow:prod \
   kokoro/gcp_ubuntu/bazel/core/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
