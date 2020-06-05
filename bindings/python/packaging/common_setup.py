@@ -19,14 +19,48 @@ import sys
 from datetime import date
 
 
-def get_package_dir():
-  if "CMAKE_BUILD_ROOT" in os.environ:
-    cmake_build_root = os.environ["CMAKE_BUILD_ROOT"]
+def get_exe_suffix():
+  if platform.system() == "Windows":
+    return ".exe"
+  else:
+    return ""
+
+
+def get_package_dir(prefix=("bindings", "python")):
+  cmake_build_root = os.environ.get("PYIREE_CMAKE_BUILD_ROOT")
+  bazel_build_root = os.environ.get("PYIREE_BAZEL_BUILD_ROOT")
+
+  if cmake_build_root and bazel_build_root:
+    print("ERROR: Both PYIREE_CMAKE_BUILD_ROOT and PYIREE_BAZEL_BUILD_ROOT"
+          "cannot be set at the same time")
+    sys.exit(1)
+
+  if cmake_build_root:
     print("Using CMake build root:", cmake_build_root)
-    pkg_dir = os.path.join(cmake_build_root, "bindings", "python")
+    pkg_dir = os.path.join(cmake_build_root, *prefix)
+  elif bazel_build_root:
+    print("Using Bazel build root:", bazel_build_root)
+    if not os.path.isdir(bazel_build_root):
+      print("ERROR: Could not find bazel-bin:", bazel_build_root)
+      sys.exit(1)
+    # Find the path to the runfiles of the built target:
+    #   //bindings/python/packaging:all_pyiree_packages
+    runfiles_dir = os.path.join(
+        bazel_build_root, "bindings", "python", "packaging",
+        "all_pyiree_packages%s.runfiles" % (get_exe_suffix(),))
+    if not os.path.isdir(runfiles_dir):
+      print("ERROR: Could not find build target 'all_pyiree_packages':",
+            runfiles_dir)
+      print("Make sure to build target",
+            "//bindings/python/packaging:all_pyiree_packages")
+      sys.exit(1)
+    # And finally seek into the corresponding path in the runfiles dir.
+    # Aren't bazel paths fun???
+    # Note that the "iree_core" path segment corresponds to the workspace name.
+    pkg_dir = os.path.join(runfiles_dir, "iree_core", *prefix)
   else:
     print("ERROR: No build directory specified. Set one of these variables:")
-    print("  CMAKE_BUILD_ROOT=/path/to/cmake/build")
+    print("  PYIREE_CMAKE_BUILD_ROOT=/path/to/cmake/build")
     sys.exit(1)
 
   if not os.path.exists(pkg_dir):
