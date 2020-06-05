@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -78,12 +79,16 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
           funcOp, "entry function should not have inputs");
 
     // Get interface buffers from all the blocks.
-    // TODO: Also handle hal.interface.load.constant for dynamic shape.
     SmallVector<IREE::PlaceholderOp, 8> bufferOps;
+    SmallVector<IREE::HAL::InterfaceLoadConstantOp, 8> loadOps;
     for (Block& block : funcOp.getBlocks()) {
-      for (Operation& op : block)
+      for (Operation& op : block) {
         if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
           bufferOps.push_back(phOp);
+        if (auto phOp = dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
+          loadOps.push_back(phOp);
+        }
+      }
     }
 
     if (bufferOps.empty()) return failure();
@@ -122,6 +127,9 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
         ++argIndex;
       }
     }
+    Type dynamicDimsBufferType =
+        MemRefType::get(ShapedType::kDynamicSize, rewriter.getIntegerType(32));
+    signatureConverter.addInputs(dynamicDimsBufferType);
 
     // Create the new function's signature.
     Location loc = funcOp.getLoc();
@@ -143,9 +151,30 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     for (auto bufferOp : bufferOps) {
       bufferOp.replaceAllUsesWith(
           newFuncOp.getArgument(bufferArgMap[bufferOp]));
+
       rewriter.eraseOp(bufferOp);
     }
 
+    // Lower all hal.interface.load.constant ops into std.load
+    // from the last buffer holding all dynamic dimensions with the proper
+    // offset.
+    Type indexType = rewriter.getIndexType();
+    auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
+    auto newLoc = newFuncOp.front().front().getLoc();
+    for (auto loadOp : loadOps) {
+      SmallVector<Value, 1> indices;
+      Value constantOffset = builder.create<ConstantOp>(
+          newLoc, indexType,
+          rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
+      indices.push_back(constantOffset);
+      Value loadDim = builder.create<LoadOp>(
+          newLoc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1),
+          indices);
+      Value loadDimIndex =
+          builder.create<IndexCastOp>(newLoc, loadDim, indexType);
+      loadOp.replaceAllUsesWith(loadDimIndex);
+      rewriter.eraseOp(loadOp);
+    }
     rewriter.eraseOp(funcOp);
     return success();
   }
