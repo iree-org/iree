@@ -155,8 +155,9 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
       rewriter.eraseOp(bufferOp);
     }
 
-    // Lower all hal.interface.load.constant ops into std.load 
-    // from the last buffer holding all dynamic dimensions with the proper offset.
+    // Lower all hal.interface.load.constant ops into std.load
+    // from the last buffer holding all dynamic dimensions with the proper
+    // offset.
     Type indexType = rewriter.getIndexType();
     auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
     auto newLoc = newFuncOp.front().front().getLoc();
@@ -167,7 +168,8 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
           rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
       indices.push_back(constant_offset);
       Value load_constant = builder.create<LoadOp>(
-          newLoc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
+          newLoc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1),
+          indices);
       Value load_contant_index =
           builder.create<IndexCastOp>(newLoc, load_constant, indexType);
       loadOp.replaceAllUsesWith(load_contant_index);
