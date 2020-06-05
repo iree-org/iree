@@ -54,7 +54,6 @@ VMLAExecutable::VMLAExecutable(ExecutableSpec spec, bool allow_aliasing_data)
 
 VMLAExecutable::~VMLAExecutable() {
   IREE_TRACE_SCOPE0("VMLAExecutable::dtor");
-  iree_vm_variant_list_free(interface_inputs_);
   iree_vm_context_release(context_);
   context_ = nullptr;
 }
@@ -109,27 +108,8 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
                               IREE_LOC)
                 << "Failed resolving imports for executable module";
   iree_vm_module_release(bytecode_module);
-  RETURN_IF_ERROR(result);
 
-  // Query the Interface block we'll use to set bindings during invocation.
-  iree_vm_module_state_t* module_state = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_context_resolve_module_state(
-                                    context(), vmla_module, &module_state),
-                                IREE_LOC));
-  interface_ = ModuleStateInterface(module_state);
-
-  // Preallocate the variant list we'll use to pass the interface into
-  // executables. This makes dispatches zero-allocation (well, on the outside
-  // anyway!).
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &interface_inputs_),
-      IREE_LOC));
-  auto interface_ref = Interface_retain_ref(interface_);
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_append_ref_move(interface_inputs_, &interface_ref),
-      IREE_LOC));
-
-  return OkStatus();
+  return std::move(result);
 }
 
 struct VMLADispatchState : public HostExecutable::DispatchState {
@@ -153,7 +133,8 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
 
   auto dispatch_state = make_ref<VMLADispatchState>();
   dispatch_state->function = entry_functions_[params.entry_point];
-  dispatch_state->input_list_size = iree_vm_variant_list_alloc_size(1 + 3);
+  dispatch_state->input_list_size =
+      iree_vm_variant_list_alloc_size(/*interface*/ 1 + /*workgroup_xyz[3]*/ 3);
 
   auto* interface = &dispatch_state->interface;
   RETURN_IF_ERROR(interface->SetConstants(params.push_constants->values));
@@ -184,7 +165,8 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
 
   auto* input_list = reinterpret_cast<iree_vm_variant_list_t*>(
       alloca(dispatch_state->input_list_size));
-  iree_vm_variant_list_init(input_list, 1 + 3);
+  iree_vm_variant_list_init(input_list,
+                            /*interface*/ 1 + /*workgroup_xyz[3]*/ 3);
   iree_vm_variant_list_append_ref_retain(input_list,
                                          &dispatch_state->interface_ref);
   iree_vm_variant_list_append_value(input_list,

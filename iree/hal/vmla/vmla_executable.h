@@ -58,12 +58,6 @@ class VMLAExecutable final : public HostExecutable {
     return absl::MakeConstSpan(entry_functions_);
   }
 
-  // ABI vmla.interface binding block.
-  Interface* interface() const { return interface_; }
-
-  // Entry point inputs list of a single vmla.interface.
-  iree_vm_variant_list_t* interface_inputs() const { return interface_inputs_; }
-
   StatusOr<ref_ptr<DispatchState>> PrepareDispatch(
       const DispatchParams& params) override;
   Status DispatchTile(DispatchState* state,
@@ -78,8 +72,6 @@ class VMLAExecutable final : public HostExecutable {
 
   iree_vm_context_t* context_ = nullptr;
   absl::InlinedVector<iree_vm_function_t, 4> entry_functions_;
-  Interface* interface_ = nullptr;
-  iree_vm_variant_list_t* interface_inputs_ = nullptr;
 };
 
 }  // namespace vmla

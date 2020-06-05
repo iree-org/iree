@@ -283,7 +283,7 @@ class TargetBackend {
   }
 
  protected:
-  // Calculates the workgroup size (x, y, z). This are the dimension numbers for
+  // Calculates the workgroup size (x, y, z). Tese are the dimension numbers for
   // a single workgroup.
   virtual std::array<Value, 3> calculateDispatchWorkgroupSize(
       Location loc, IREE::HAL::ExecutableOp executableOp,

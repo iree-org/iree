@@ -130,8 +130,6 @@ Status ModuleRegisterTypes();
 
 Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module);
 
-Interface* ModuleStateInterface(iree_vm_module_state_t* module_state);
-
 }  // namespace vmla
 }  // namespace hal
 }  // namespace iree
