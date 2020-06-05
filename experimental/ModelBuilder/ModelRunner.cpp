@@ -22,6 +22,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
@@ -124,6 +125,7 @@ static void addVulkanLoweringPass(mlir::PassManager& manager) {
 
 static void addCPULoweringPass(mlir::PassManager& manager) {
   // Set up compiler passes.
+  manager.addPass(mlir::createConvertVectorToSCFPass());
   manager.addPass(mlir::createConvertLinalgToLoopsPass());
   manager.addPass(mlir::createConvertLinalgToLLVMPass());
   manager.addPass(mlir::createConvertVectorToLLVMPass());
