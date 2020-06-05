@@ -127,10 +127,10 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
         ++argIndex;
       }
     }
-    SmallVector<int64_t, 4> shapes;
-    shapes.push_back(ShapedType::kDynamicSize);
+   // SmallVector<int64_t, 4> shapes;
+    //shapes.push_back(ShapedType::kDynamicSize);
     Type push_constants_type =
-        MemRefType::get(shapes, rewriter.getIntegerType(32));
+        MemRefType::get(ShapedType::kDynamicSize, rewriter.getIntegerType(32));
     signatureConverter.addInputs(push_constants_type);
 
     // Create the new function's signature.
@@ -157,23 +157,25 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
       rewriter.eraseOp(bufferOp);
     }
 
-    rewriter.eraseOp(funcOp);
+    // Lower all hal.interface.load.constant ops into std.load 
+    // from the last buffer holding all dynamic dimensions with the proper offset.
     Type indexType = rewriter.getIndexType();
     auto builder = OpBuilder::atBlockBegin(&(newFuncOp.getBlocks().front()));
+    auto newLoc = newFuncOp.front().front().getLoc();
     for (auto loadOp : loadOps) {
-      auto loc = newFuncOp.front().front().getLoc();
-      SmallVector<Value, 4> indices;
+      SmallVector<Value, 1> indices;
       Value constant_offset = builder.create<ConstantOp>(
-          loc, indexType,
+          newLoc, indexType,
           rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
       indices.push_back(constant_offset);
       Value load_constant = builder.create<LoadOp>(
-          loc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
+          newLoc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1), indices);
       Value load_contant_index =
-          builder.create<IndexCastOp>(loc, load_constant, indexType);
+          builder.create<IndexCastOp>(newLoc, load_constant, indexType);
       loadOp.replaceAllUsesWith(load_contant_index);
       rewriter.eraseOp(loadOp);
     }
+    rewriter.eraseOp(funcOp);
     return success();
   }
 };
