@@ -31,6 +31,9 @@ namespace HAL {
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
     const LLVMTargetOptions& options);
 
+// Creates an invocation function in a module for the given function name.
+void createLLVMInvocationFunc(const std::string& name, llvm::Module* module);
+
 // Creates and runs LLVMIR optimization passes defined in LLVMTargetOptions.
 LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
                               std::unique_ptr<llvm::TargetMachine> machine,

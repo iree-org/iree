@@ -29,6 +29,7 @@ FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
 
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
+# TODO(scotttodd): LLVM AOT (dylib-llvm-aot) HAL target(s)
 OP_COVERAGE_DESCRIPTION = """# HLO Op Coverage
 There are three backend [targets](https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/Target) in IREE:
 

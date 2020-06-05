@@ -16,11 +16,11 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    LLVM
+    LLVMIR
   HDRS
-    "LLVMTarget.h"
+    "LLVMIRTarget.h"
   SRCS
-    "LLVMTarget.cpp"
+    "LLVMIRTarget.cpp"
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions
@@ -31,6 +31,25 @@ iree_cc_library(
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
     iree::schemas::llvmir_executable_def_cc_fbs
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LLVMAOT
+  HDRS
+    "LLVMAOTTarget.h"
+  SRCS
+    "LLVMAOTTarget.cpp"
+  DEPS
+    ::LLVMIRPasses
+    ::LLVMTargetOptions
+    LLVMCore
+    LLVMSupport
+    MLIRTargetLLVMIR
+    iree::compiler::Conversion::LinalgToLLVM
+    iree::compiler::Dialect::HAL::Target
+    iree::schemas::dylib_executable_def_cc_fbs
   PUBLIC
 )
 

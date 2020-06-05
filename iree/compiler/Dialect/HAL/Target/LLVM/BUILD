@@ -18,12 +18,12 @@ package(
 )
 
 cc_library(
-    name = "LLVM",
+    name = "LLVMIR",
     srcs = [
-        "LLVMTarget.cpp",
+        "LLVMIRTarget.cpp",
     ],
     hdrs = [
-        "LLVMTarget.h",
+        "LLVMIRTarget.h",
     ],
     deps = [
         ":LLVMIRPasses",
@@ -33,9 +33,29 @@ cc_library(
         "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:TargetLLVMIR",
         # TODO(ataei): Link with native target dep.
         "@llvm-project//llvm:x86_code_gen",
+        "@llvm-project//mlir:TargetLLVMIR",
+    ],
+)
+
+cc_library(
+    name = "LLVMAOT",
+    srcs = [
+        "LLVMAOTTarget.cpp",
+    ],
+    hdrs = [
+        "LLVMAOTTarget.h",
+    ],
+    deps = [
+        ":LLVMIRPasses",
+        ":LLVMTargetOptions",
+        "//iree/compiler/Conversion/LinalgToLLVM",
+        "//iree/compiler/Dialect/HAL/Target",
+        "//iree/schemas:dylib_executable_def_cc_fbs",
+        "@llvm-project//llvm:core",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
 

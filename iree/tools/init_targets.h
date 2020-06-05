@@ -15,7 +15,8 @@
 #ifndef IREE_TOOLS_INIT_TARGETS_H_
 #define IREE_TOOLS_INIT_TARGETS_H_
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
@@ -28,7 +29,9 @@ namespace iree_compiler {
 // need.
 inline void registerHALTargetBackends() {
   static bool init_once = []() {
-    IREE::HAL::registerLLVMTargetBackends(
+    IREE::HAL::registerLLVMAOTTargetBackends(
+        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
+    IREE::HAL::registerLLVMIRTargetBackends(
         []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
     IREE::HAL::registerVMLATargetBackends(
         []() { return IREE::HAL::getVMLATargetOptionsFromFlags(); });
