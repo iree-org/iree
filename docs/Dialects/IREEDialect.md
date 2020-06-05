@@ -151,7 +151,7 @@ stripped during translation.
 
 ```mlir
 ^bb0:
-  %true = constant 1 : i1
+  %true = constant true
   cond_br %true, ^bb2, ^bb1
 ^bb1:
   // Indicates that this branch should never be taken.
