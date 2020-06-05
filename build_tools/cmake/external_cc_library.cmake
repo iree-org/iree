@@ -85,106 +85,108 @@ function(external_cc_library)
     ${ARGN}
   )
 
-  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Prefix the library with the package name.
-    string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
-    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
+  endif()
 
-    # Prefix paths with the root.
-    list(TRANSFORM _RULE_HDRS PREPEND ${_RULE_ROOT})
-    list(TRANSFORM _RULE_SRCS PREPEND ${_RULE_ROOT})
+  # Prefix the library with the package name.
+  string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-    # Check if this is a header-only library.
-    # Note that as of February 2019, many popular OS's (for example, Ubuntu
-    # 16.04 LTS) only come with cmake 3.5 by default.  For this reason, we can't
-    # use list(FILTER...)
-    set(_CC_SRCS "${_RULE_SRCS}")
-    foreach(src_file IN LISTS _CC_SRCS)
-      if(${src_file} MATCHES ".*\\.(h|inc)")
-        list(REMOVE_ITEM _CC_SRCS "${src_file}")
-      endif()
-    endforeach()
-    if("${_CC_SRCS}" STREQUAL "")
-      set(_RULE_IS_INTERFACE 1)
+  # Prefix paths with the root.
+  list(TRANSFORM _RULE_HDRS PREPEND ${_RULE_ROOT})
+  list(TRANSFORM _RULE_SRCS PREPEND ${_RULE_ROOT})
+
+  # Check if this is a header-only library.
+  # Note that as of February 2019, many popular OS's (for example, Ubuntu
+  # 16.04 LTS) only come with cmake 3.5 by default.  For this reason, we can't
+  # use list(FILTER...)
+  set(_CC_SRCS "${_RULE_SRCS}")
+  foreach(src_file IN LISTS _CC_SRCS)
+    if(${src_file} MATCHES ".*\\.(h|inc)")
+      list(REMOVE_ITEM _CC_SRCS "${src_file}")
+    endif()
+  endforeach()
+  if("${_CC_SRCS}" STREQUAL "")
+    set(_RULE_IS_INTERFACE 1)
+  else()
+    set(_RULE_IS_INTERFACE 0)
+  endif()
+
+  if(NOT _RULE_IS_INTERFACE)
+    add_library(${_NAME} STATIC "")
+    target_sources(${_NAME}
+      PRIVATE
+        ${_RULE_SRCS}
+        ${_RULE_HDRS}
+    )
+    target_include_directories(${_NAME}
+      PUBLIC
+        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+        "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+    )
+    target_compile_options(${_NAME}
+      PRIVATE
+        ${_RULE_COPTS}
+        ${IREE_DEFAULT_COPTS}
+    )
+    target_link_libraries(${_NAME}
+      PUBLIC
+        ${_RULE_DEPS}
+      PRIVATE
+        ${_RULE_LINKOPTS}
+        ${IREE_DEFAULT_LINKOPTS}
+    )
+    target_compile_definitions(${_NAME}
+      PUBLIC
+        ${_RULE_DEFINES}
+    )
+    iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
+
+    if(DEFINED _RULE_ALWAYSLINK)
+      set_property(TARGET ${_NAME} PROPERTY ALWAYSLINK 1)
+    endif()
+
+    # Add all external targets to a a folder in the IDE for organization.
+    if(_RULE_PUBLIC)
+      set_property(TARGET ${_NAME} PROPERTY FOLDER third_party)
+    elseif(_RULE_TESTONLY)
+      set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/test)
     else()
-      set(_RULE_IS_INTERFACE 0)
+      set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/internal)
     endif()
 
-    if(NOT _RULE_IS_INTERFACE)
-      add_library(${_NAME} STATIC "")
-      target_sources(${_NAME}
-        PRIVATE
-          ${_RULE_SRCS}
-          ${_RULE_HDRS}
-      )
-      target_include_directories(${_NAME}
-        PUBLIC
-          "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
-          "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
-      )
-      target_compile_options(${_NAME}
-        PRIVATE
-          ${_RULE_COPTS}
-          ${IREE_DEFAULT_COPTS}
-      )
-      target_link_libraries(${_NAME}
-        PUBLIC
-          ${_RULE_DEPS}
-        PRIVATE
-          ${_RULE_LINKOPTS}
-          ${IREE_DEFAULT_LINKOPTS}
-      )
-      target_compile_definitions(${_NAME}
-        PUBLIC
-          ${_RULE_DEFINES}
-      )
-      iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
+    # INTERFACE libraries can't have the CXX_STANDARD property set
+    set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
+    set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+  else()
+    # Generating header-only library
+    add_library(${_NAME} INTERFACE)
+    target_include_directories(${_NAME}
+      INTERFACE
+        "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+        "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+    )
+    target_compile_options(${_NAME}
+      INTERFACE
+        ${_RULE_COPTS}
+        ${IREE_DEFAULT_COPTS}
+    )
+    target_link_libraries(${_NAME}
+      INTERFACE
+        ${_RULE_DEPS}
+        ${_RULE_LINKOPTS}
+        ${IREE_DEFAULT_LINKOPTS}
+    )
+    iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
+    target_compile_definitions(${_NAME}
+      INTERFACE
+        ${_RULE_DEFINES}
+    )
+  endif()
 
-      if(DEFINED _RULE_ALWAYSLINK)
-        set_property(TARGET ${_NAME} PROPERTY ALWAYSLINK 1)
-      endif()
-
-      # Add all external targets to a a folder in the IDE for organization.
-      if(_RULE_PUBLIC)
-        set_property(TARGET ${_NAME} PROPERTY FOLDER third_party)
-      elseif(_RULE_TESTONLY)
-        set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/test)
-      else()
-        set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/internal)
-      endif()
-
-      # INTERFACE libraries can't have the CXX_STANDARD property set
-      set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
-      set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
-    else()
-      # Generating header-only library
-      add_library(${_NAME} INTERFACE)
-      target_include_directories(${_NAME}
-        INTERFACE
-          "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
-          "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
-      )
-      target_compile_options(${_NAME}
-        INTERFACE
-          ${_RULE_COPTS}
-          ${IREE_DEFAULT_COPTS}
-      )
-      target_link_libraries(${_NAME}
-        INTERFACE
-          ${_RULE_DEPS}
-          ${_RULE_LINKOPTS}
-          ${IREE_DEFAULT_LINKOPTS}
-      )
-      iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
-      target_compile_definitions(${_NAME}
-        INTERFACE
-          ${_RULE_DEFINES}
-      )
-    endif()
-
-    add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
-    if(${_RULE_PACKAGE} STREQUAL ${_RULE_NAME})
-      add_library(${_RULE_PACKAGE} ALIAS ${_NAME})
-    endif()
+  add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
+  if(${_RULE_PACKAGE} STREQUAL ${_RULE_NAME})
+    add_library(${_RULE_PACKAGE} ALIAS ${_NAME})
   endif()
 endfunction()

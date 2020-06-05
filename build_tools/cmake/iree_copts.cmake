@@ -18,13 +18,17 @@ include(AbseilConfigureCopts)
 # C++ used within IREE
 #-------------------------------------------------------------------------------
 
-set(IREE_CXX_STANDARD 14)
+set(IREE_CXX_STANDARD ${CMAKE_CXX_STANDARD})
 
 set(IREE_ROOT_DIR ${PROJECT_SOURCE_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}
   ${PROJECT_BINARY_DIR}
 )
+
+if(${IREE_ENABLE_RUNTIME_TRACING})
+  set (CMAKE_EXE_LINKER_FLAGS -ldl)
+endif()
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG

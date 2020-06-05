@@ -32,6 +32,10 @@ include(CMakeParseArguments)
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
+  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -39,9 +43,6 @@ function(iree_check_test)
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
-    return()
-  endif()
 
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -126,6 +127,10 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 function(iree_check_single_backend_test_suite)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -133,9 +138,6 @@ function(iree_check_single_backend_test_suite)
     "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
 
   foreach(_SRC IN LISTS _RULE_SRCS)
     set(_TEST_NAME "${_RULE_NAME}_${_SRC}")
@@ -183,6 +185,10 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
 function(iree_check_test_suite)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -190,9 +196,6 @@ function(iree_check_test_suite)
     "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
     set(_RULE_TARGET_BACKENDS "vmla" "vulkan-spirv" "llvm-ir")

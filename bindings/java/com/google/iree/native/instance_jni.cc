@@ -48,14 +48,10 @@ JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz, jlong handle) {
   delete instance;
 }
 
-JNI_FUNC void JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz) {
+JNI_FUNC jint JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz) {
   InstanceWrapper* instance = GetInstanceWrapper(env, thiz);
   CHECK_NE(instance, nullptr);
 
   auto status = instance->Create();
-
-  // TODO(jennik): Propogate this status through to java side.
-  if (!status.ok()) {
-    LOG(FATAL) << status.message();
-  }
+  return (jint)status.code();
 }

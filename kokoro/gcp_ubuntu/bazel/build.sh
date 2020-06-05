@@ -36,4 +36,4 @@ echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
 echo "Building and testing with bazel"
-./build_tools/bazel/build.sh
+./build_tools/bazel/build_core.sh

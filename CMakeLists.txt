@@ -28,11 +28,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #-------------------------------------------------------------------------------
 
 project(iree CXX C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
+option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -56,12 +59,17 @@ if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_LLVM ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
+if(${IREE_ENABLE_EMITC} AND NOT ${IREE_ENABLE_LLVM})
+  message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_LLVM to ON.")
+endif()
+
 #-------------------------------------------------------------------------------
 # IREE-specific CMake configuration
 #-------------------------------------------------------------------------------
 
 # List of all HAL drivers to be built by default:
 set(IREE_ALL_HAL_DRIVERS
+  DyLib
   LLVM
   Vulkan
   VMLA
@@ -158,14 +166,16 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # Third-party dependencies
 #-------------------------------------------------------------------------------
 
+# Use the (deprecated) FindPythonInterp/FindPythonLibs functions before
+# any of our dependencies do. See
+# https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
+# If one dependency finds Python 2 (the default),
+# any others that try to find Python 3 will fail.
+# (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
 if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
-  # Use the (deprecated) FindPythonInterp/FindPythonLibs functions before
-  # any of our dependencies do. See
-  # https://pybind11.readthedocs.io/en/stable/faq.html#inconsistent-detection-of-python-version-in-cmake-and-pybind11
-  # If one dependency finds Python 2 (the default),
-  # any others that try to find Python 3 will fail.
-  # (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
   find_package(PythonInterp 3 REQUIRED)
+endif()
+if(${IREE_BUILD_PYTHON_BINDINGS})
   find_package(PythonLibs 3 REQUIRED)
 endif()
 
@@ -195,6 +205,9 @@ if(${IREE_ENABLE_LLVM})
   endif()
 
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+  if(${IREE_ENABLE_EMITC})
+    add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
+  endif()
 
   # Reset CMAKE_BUILD_TYPE to its previous setting
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)

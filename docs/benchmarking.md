@@ -98,7 +98,7 @@ Benchmark                                    Time             CPU   Iterations
 BM_RunModule/process_time/real_time      11416 ns        14202 ns        61654
 ```
 
-Remember to [restore cpu scaling](#cpu-configuration) when you're done.
+Remember to [restore CPU scaling](#cpu-configuration) when you're done.
 
 ## Microbenchmarks
 
@@ -129,11 +129,13 @@ run all CPUs at maximum frequency.
 Google benchmark provides some
 [instructions](https://github.com/google/benchmark#disabling-cpu-frequency-scaling):
 
-Before benchmarking:
+Turn off CPU scaling before benchmarking:
 
 ```shell
 $ sudo cpupower frequency-set --governor performance
 ```
+
+Restore CPU scaling after benchmarking:
 
 ```shell
 $ sudo cpupower frequency-set --governor powersave

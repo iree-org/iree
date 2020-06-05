@@ -23,10 +23,6 @@ namespace iree_compiler {
 class VMTypeConverter : public TypeConverter {
  public:
   VMTypeConverter();
-
-  Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
-                                   ArrayRef<Value> inputs,
-                                   Location loc) override;
 };
 
 }  // namespace iree_compiler

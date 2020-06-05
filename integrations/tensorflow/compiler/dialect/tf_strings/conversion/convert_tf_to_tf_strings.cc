@@ -65,13 +65,6 @@ class StringTypeConverter : public TypeConverter {
       return tf_strings::StringType::get(type.getContext());
     });
   }
-
-  Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
-                                   ArrayRef<Value> inputs,
-                                   Location loc) override {
-    llvm_unreachable("unhandled materialization");
-    return nullptr;
-  }
 };
 
 struct StringFormatOpLowering : public OpRewritePattern<TF::StringFormatOp> {

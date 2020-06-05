@@ -27,17 +27,16 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public final class ContextTest {
   @Test
-  public void create_throwsExceptionWithoutNativeLib() {
+  public void create_throwsExceptionWithoutNativeLib() throws Exception {
     try {
       new Instance();
       fail();
-    } catch (IllegalStateException e) {
-      // Expected exception.
+    } catch (IllegalStateException expected) {
     }
   }
 
   @Test
-  public void create_createsContextWithId() {
+  public void create_createsContextWithId() throws Exception {
     Instance.loadNativeLibrary();
     Instance instance = new Instance();
     Context context = new Context(instance);
