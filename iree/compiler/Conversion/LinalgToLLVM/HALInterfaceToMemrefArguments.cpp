@@ -127,11 +127,9 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
         ++argIndex;
       }
     }
-   // SmallVector<int64_t, 4> shapes;
-    //shapes.push_back(ShapedType::kDynamicSize);
-    Type push_constants_type =
+    Type dynamicDimsBufferType =
         MemRefType::get(ShapedType::kDynamicSize, rewriter.getIntegerType(32));
-    signatureConverter.addInputs(push_constants_type);
+    signatureConverter.addInputs(dynamicDimsBufferType);
 
     // Create the new function's signature.
     Location loc = funcOp.getLoc();
