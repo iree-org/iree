@@ -163,15 +163,15 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     auto newLoc = newFuncOp.front().front().getLoc();
     for (auto loadOp : loadOps) {
       SmallVector<Value, 1> indices;
-      Value constant_offset = builder.create<ConstantOp>(
+      Value constantOffset = builder.create<ConstantOp>(
           newLoc, indexType,
           rewriter.getIntegerAttr(indexType, loadOp.offset().getZExtValue()));
-      indices.push_back(constant_offset);
-      Value load_constant = builder.create<LoadOp>(
+      indices.push_back(constantOffset);
+      Value loadConstant = builder.create<LoadOp>(
           newLoc, newFuncOp.getArgument(newFuncOp.getNumArguments() - 1),
           indices);
       Value load_contant_index =
-          builder.create<IndexCastOp>(newLoc, load_constant, indexType);
+          builder.create<IndexCastOp>(newLoc, loadConstant, indexType);
       loadOp.replaceAllUsesWith(load_contant_index);
       rewriter.eraseOp(loadOp);
     }
