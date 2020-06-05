@@ -634,7 +634,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
 static void iree_vm_stack_populate_external_result_list(
     const iree_vm_register_list_t* callee_registers,
     const iree_vm_register_list_t* external_registers) {
-  VMCHECK(external_registers->size == callee_registers->size);
+  VMCHECK(external_registers->size >= callee_registers->size);
   uint16_t i32_reg_ordinal = 0;
   uint16_t ref_reg_ordinal = 0;
   uint16_t* dst_reg_list = (uint16_t*)external_registers->registers;

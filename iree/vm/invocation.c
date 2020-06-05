@@ -71,33 +71,40 @@ static iree_status_t iree_vm_invoke_within(
     iree_vm_context_t* context, iree_vm_stack_t* stack,
     iree_vm_function_t function, const iree_vm_invocation_policy_t* policy,
     iree_vm_variant_list_t* inputs, iree_vm_variant_list_t* outputs) {
-  iree_vm_function_signature_t signature =
-      iree_vm_function_signature(&function);
   // TODO(#2075): disabled because check_test is invoking native methods.
   // These checks should be nice and simple as we don't support variadic
   // args/results in bytecode.
-  int32_t input_count = inputs ? iree_vm_variant_list_size(inputs) : 0;
-  int32_t min_output_count = VMMAX(signature.result_count, outputs ? 1 : 0);
+  iree_host_size_t input_count = inputs ? iree_vm_variant_list_size(inputs) : 0;
+  iree_host_size_t output_count =
+      outputs ? iree_vm_variant_list_capacity(outputs) : 0;
+  // iree_vm_function_signature_t signature =
+  //     iree_vm_function_signature(&function);
   // if (input_count != signature.argument_count) {
   //   return IREE_STATUS_INVALID_ARGUMENT;
   // } else if (!outputs && signature.result_count > 0) {
   //   return IREE_STATUS_INVALID_ARGUMENT;
   // }
 
+  // Keep the I/O count reasonable to limit stack usage. If we end up passing
+  // this many things (such as for nested variadic lists/etc) we should instead
+  // use list objects as they'll be significantly more efficient.
+  if (input_count > 1024 || output_count > 1024) {
+    return IREE_STATUS_RESOURCE_EXHAUSTED;
+  }
+
   // Allocate storage for marshaling arguments into the callee stack frame.
   iree_vm_register_list_t* argument_registers =
       (iree_vm_register_list_t*)iree_alloca(sizeof(iree_vm_register_list_t) +
                                             input_count * sizeof(uint16_t));
-  argument_registers->size = input_count;
+  argument_registers->size = (uint16_t)input_count;
   iree_vm_register_list_t* result_registers =
       (iree_vm_register_list_t*)iree_alloca(sizeof(iree_vm_register_list_t) +
-                                            min_output_count *
-                                                sizeof(uint16_t));
-  result_registers->size = min_output_count;
+                                            output_count * sizeof(uint16_t));
+  result_registers->size = (uint16_t)output_count;
 
   // Enter the [external] frame, which will have storage space for the
   // argument and result registers.
-  int32_t register_count = VMMAX(input_count, min_output_count);
+  iree_host_size_t register_count = VMMAX(input_count, output_count);
   iree_vm_stack_frame_t* external_frame = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_stack_external_enter(stack, iree_make_cstring_view("invoke"),

@@ -63,6 +63,11 @@ iree_vm_variant_list_free(iree_vm_variant_list_t* list) {
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+iree_vm_variant_list_capacity(const iree_vm_variant_list_t* list) {
+  return list->capacity;
+}
+
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL
 iree_vm_variant_list_size(const iree_vm_variant_list_t* list) {
   return list->count;
 }

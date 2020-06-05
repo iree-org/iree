@@ -218,8 +218,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
     iree_vm_stack_frame_t** out_caller_frame);
 
 // Enters into an `[external]` frame and returns the external stack frame.
-// May invalidate any pointers to stack frames and the only pointer that can be
-// assumed valid after return is the one in |out_callee_frame|.
+// May invalidate any existing pointers to stack frames and the only pointer
+// that can be assumed valid after return is the one in |out_callee_frame|.
 //
 // The frame will have |register_count| registers of each type reserved and
 // ready for the caller to populate.
