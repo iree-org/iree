@@ -55,6 +55,10 @@ bool hasWorkGroupMarker(Operation *);
 /// partitioned to workitems.
 bool hasWorkItemMarker(Operation *);
 
+/// Returns true if an operation has marker to denote that it can be natively
+/// lowered to SPIRV.
+bool hasSPIRVMarker(Operation *);
+
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
 
