@@ -27,7 +27,7 @@ def iree_vision_test_suite(
         size = "large",
         python_version = "PY3",
         **kwargs):
-    """Creates the iree_py_tests as specified and bundles them in a test suite.
+    """Expands a set of iree_py_tests from these arguments into a test suite.
 
     Args:
       name:
