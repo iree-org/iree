@@ -31,7 +31,7 @@ Install CMake version >= 3.13 from the
 [Ninja](https://ninja-build.org/) is a fast build system that you can use as a
 CMake generator. Download it from the
 [releases page](https://github.com/ninja-build/ninja/releases), extract
-somewhere, and it to your PATH.
+somewhere, and add it to your PATH.
 
 ### Install a Compiler
 
