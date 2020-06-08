@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test IREE's bindings within the gcr.io/iree-oss/bazel-tensorflow
+# Build and test the project within the gcr.io/iree-oss/bazel-tensorflow
 # image using Kokoro.
 
 set -e

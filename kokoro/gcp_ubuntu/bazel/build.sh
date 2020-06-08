@@ -16,7 +16,7 @@
 
 # For use within a IREE bazel docker image on a Kokoro VM.
 # Log some information about the environment, initialize the submodules and then
-# run the bazel core tests.
+# run the bazel tests.
 
 set -e
 set -x
