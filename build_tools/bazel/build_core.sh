@@ -44,8 +44,8 @@ declare -a test_env_args=(
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
 )
 
-declare -a default_build_tag_filters=("-nokokoro")
-declare -a default_test_tag_filters=("-nokokoro")
+declare -a default_build_tag_filters=("-nokokoro,-no-rbe")
+declare -a default_test_tag_filters=("-nokokoro,-no-rbe")
 
 # We can still build things that use vulkan. Only add to test tag filters.
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then

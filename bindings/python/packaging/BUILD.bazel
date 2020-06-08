@@ -23,6 +23,7 @@ py_binary(
     tags = [
         # Do not build with ... expansion
         "manual",
+        "no-rbe",
     ],
     deps = [
         "//bindings/python:pathsetup",  # build_cleaner: keep
