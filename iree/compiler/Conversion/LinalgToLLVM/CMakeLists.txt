@@ -22,14 +22,17 @@ iree_cc_library(
   SRCS
     "HALInterfaceToMemrefArguments.cpp"
     "Passes.cpp"
+    #"LowerShapexToLLVM.cpp"
+    "ConvertToLLVM.cpp"
   DEPS
     MLIRIR
-    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
     MLIRStandardOps
     MLIRTransforms
+    MLIRVectorToSCF
+    MLIRVectorToLLVM
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
