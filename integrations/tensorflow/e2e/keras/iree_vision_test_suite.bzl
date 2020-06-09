@@ -27,7 +27,9 @@ def iree_vision_test_suite(
         size = "large",
         python_version = "PY3",
         **kwargs):
-    """Expands a set of iree_py_tests from these arguments into a test suite.
+    """Expands a set of iree_py_tests for the specified vision models and bundles them into a test suite.
+    
+    Creates one test per dataset, backend, and model.
 
     Args:
       name:
