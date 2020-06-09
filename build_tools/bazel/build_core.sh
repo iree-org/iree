@@ -33,9 +33,6 @@ set -e
 set -x
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
-if ! [[ -v IREE_LLVMJIT_DISABLE ]]; then
-  IREE_LLVMJIT_DISABLE=1
-fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
   IREE_VULKAN_DISABLE=1
 fi
