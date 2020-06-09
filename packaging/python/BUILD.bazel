@@ -23,9 +23,6 @@ py_binary(
     tags = [
         # Do not build with ... expansion
         "manual",
-        # This target does not run on RBE because it depends on a part of
-        # TensorFlow that is incompatible with it.
-        "nokokoro",
     ],
     deps = [
         "//bindings/python:pathsetup",  # build_cleaner: keep

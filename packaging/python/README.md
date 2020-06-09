@@ -1,6 +1,6 @@
 # Python packaging scripts.
 
-Note that packages will be placed in `bindings/python/packaging/dist` with the
+Note that packages will be placed in `packaging/python/dist` with the
 canonical instructions. However, the setup scripts can be run from anywhere and
 will create `build` and `dist` directories where run. Wheels can be installed
 with `pip3 install --user dist/*.whl`.
@@ -15,20 +15,20 @@ Canonical instructions follow:
 ### Linux
 
 ```shell
-export LDFLAGS=-fuse-ld=/usr/bin/ld.lld-10
-export PYIREE_CMAKE_BUILD_ROOT=$HOME/build-iree-release
-export IREE_SRC=$HOME/src/iree
-rm -Rf $CMAKE_BUILD_ROOT; mkdir -p $CMAKE_BUILD_ROOT
-cmake -GNinja -B$CMAKE_BUILD_ROOT -H$IREE_SRC \
+export LDFLAGS=-fuse-ld=/usr/bin/ld.lld
+export PYIREE_CMAKE_BUILD_ROOT="${HOME?}/build-iree-release"
+export IREE_SRC="${HOME?}/src/iree"
+rm -Rf "${PYIREE_CMAKE_BUILD_ROOT?}"; mkdir -p "${PYIREE_CMAKE_BUILD_ROOT?}"
+cmake -GNinja -B"${PYIREE_CMAKE_BUILD_ROOT?}" -H"${IREE_SRC}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
   -DIREE_BUILD_PYTHON_BINDINGS=ON -DIREE_BUILD_SAMPLES=OFF
-(cd $CMAKE_BUILD_ROOT && ninja)
-(cd $IREE_SRC/bindings/python/packaging && (
-rm -Rf build;
-python3 setup_compiler.py bdist_wheel;
-rm -Rf build;
-python3 setup_rt.py bdist_wheel))
+(cd "${PYIREE_CMAKE_BUILD_ROOT?}" && ninja)
+(cd "${IREE_SRC?}/packaging/python" && (
+  rm -Rf build;
+  python3 setup_compiler.py bdist_wheel;
+  rm -Rf build;
+  python3 setup_rt.py bdist_wheel))
 ```
 
 ## Building IREE/TensorFlow wheels
@@ -51,28 +51,32 @@ fi
 
 ### Building:
 
+Optionally add: `--define=PYIREE_TF_DISABLE_KERNELS=1` to build a 'thin' (less 
+functional) version without TensorFlow kernels. This should not be done for
+released binaries but can help while developing.
+
 ```shell
 cd $IREE_SRC
 bazel build -c opt \
-  //bindings/python/packaging:all_pyiree_packages
+  //packaging/python:all_pyiree_packages
 ```
 
 # Packaging
 
 ```shell
-(cd $IREE_SRC/bindings/python/packaging && (
-rm -Rf build;
-python3 setup_tf.py bdist_wheel))
+(cd $IREE_SRC/packaging/python && (
+  rm -Rf build;
+  python3 setup_tf.py bdist_wheel))
 ```
 
 ```shell
-(cd $IREE_SRC/bindings/python/packaging && (
-rm -Rf build;
-python3 setup_compiler.py bdist_wheel))
+(cd $IREE_SRC/packaging/python && (
+  rm -Rf build;
+  python3 setup_compiler.py bdist_wheel))
 ```
 
 ```shell
-(cd $IREE_SRC/bindings/python/packaging && (
-rm -Rf build;
-python3 setup_rt.py bdist_wheel))
+(cd $IREE_SRC/packaging/python && (
+  rm -Rf build;
+  python3 setup_rt.py bdist_wheel))
 ```
