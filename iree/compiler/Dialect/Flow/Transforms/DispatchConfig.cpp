@@ -37,7 +37,7 @@ bool isUnsupportedFusionOp(Operation *op) {
          isa<xla_hlo::ReduceWindowOp>(op);
 }
 
-// Whitelist of ops that materialize to a an index-permuted copy of some kind
+// Allowlist of ops that materialize to a an index-permuted copy of some kind
 // if they exist standalone. Generally we try to avoid anchoring on these,
 // letting them fuse into more meaningful ops as possible.
 bool isIndexOp(Operation *op) {
