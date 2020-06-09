@@ -39,18 +39,12 @@ TEST_P(SemaphoreTest, NormalSignaling) {
   EXPECT_EQ(40u, semaphore->Query().value());
 }
 
-// Tests that a semaphore will fail to set non-increasing values.
-TEST_P(SemaphoreTest, RequireIncreasingValues) {
-  ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(2u));
-  EXPECT_EQ(2u, semaphore->Query().value());
-  // Same value.
-  EXPECT_TRUE(IsInvalidArgument(semaphore->Signal(2u)));
-  // Decreasing.
-  EXPECT_TRUE(IsInvalidArgument(semaphore->Signal(1u)));
-}
+// Note: Behavior is undefined when signaling with decreasing values, so we
+// can't reliably test it across backends. Some backends may return errors,
+// while others may accept the new, decreasing, values.
 
 // Tests that a semaphore that has failed will remain in a failed state.
-TEST_P(SemaphoreTest, StickyFailure) {
+TEST_P(SemaphoreTest, Failure) {
   ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(2u));
   // Signal to 3.
   EXPECT_OK(semaphore->Signal(3u));
@@ -60,9 +54,8 @@ TEST_P(SemaphoreTest, StickyFailure) {
   semaphore->Fail(UnknownErrorBuilder(IREE_LOC));
   EXPECT_TRUE(IsUnknown(semaphore->Query().status()));
 
-  // Unable to signal again (it'll return the sticky failure).
-  EXPECT_TRUE(IsUnknown(semaphore->Signal(4u)));
-  EXPECT_TRUE(IsUnknown(semaphore->Query().status()));
+  // Signaling again is undefined behavior. Some backends may return a
+  // sticky failure status while others may silently process new signal values.
 }
 
 // Tests waiting on no semaphores.
@@ -84,18 +77,14 @@ TEST_P(SemaphoreTest, WaitAlreadySignaled) {
 TEST_P(SemaphoreTest, WaitUnsignaled) {
   ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(2u));
   // NOTE: we don't actually block here because otherwise we'd lock up.
-  EXPECT_TRUE(IsDeadlineExceeded(device_->WaitAllSemaphores(
-      {{semaphore.get(), 3u}}, absl::InfinitePast())));
+  // Result status is undefined - some backends may return DeadlineExceededError
+  // while others may return success.
+  device_->WaitAllSemaphores({{semaphore.get(), 3u}}, absl::InfinitePast())
+      .IgnoreError();
 }
 
-// Tests waiting on a failed semaphore (it should return the error on the
-// semaphore).
-TEST_P(SemaphoreTest, WaitAlreadyFailed) {
-  ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(2u));
-  semaphore->Fail(UnknownErrorBuilder(IREE_LOC));
-  EXPECT_TRUE(IsUnknown(device_->WaitAllSemaphores({{semaphore.get(), 2u}},
-                                                   absl::InfinitePast())));
-}
+// Waiting on a failed semaphore is undefined behavior. Some backends may
+// return UnknownError while others may succeed.
 
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
@@ -115,23 +104,6 @@ TEST_P(SemaphoreTest, PingPong) {
       device_->WaitAllSemaphores({{b2a.get(), 1u}}, absl::InfiniteFuture()));
   ASSERT_OK(a2b->Signal(4u));
   thread.join();
-}
-
-// Tests that failure still wakes waiters and propagates the error.
-TEST_P(SemaphoreTest, FailNotifies) {
-  ASSERT_OK_AND_ASSIGN(auto a2b, device_->CreateSemaphore(0u));
-  ASSERT_OK_AND_ASSIGN(auto b2a, device_->CreateSemaphore(0u));
-  bool got_failure = false;
-  std::thread thread([&]() {
-    ASSERT_OK(b2a->Signal(1u));
-    got_failure = IsUnknown(
-        device_->WaitAllSemaphores({{a2b.get(), 1u}}, absl::InfiniteFuture()));
-  });
-  ASSERT_OK(
-      device_->WaitAllSemaphores({{b2a.get(), 1u}}, absl::InfiniteFuture()));
-  a2b->Fail(UnknownErrorBuilder(IREE_LOC));
-  thread.join();
-  ASSERT_TRUE(got_failure);
 }
 
 INSTANTIATE_TEST_SUITE_P(AllDrivers, SemaphoreTest,
