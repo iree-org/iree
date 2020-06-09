@@ -31,6 +31,33 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+namespace {
+/// ExtractElementOp will be lowered to IREE::Flow::TensorLoadOp. If the type is
+/// i1, it's not valid to load. In this case, we need to cast it to i8 before
+/// the load, and truncate the value after the load.
+struct ExtractElementOpPromotion
+    : public OpConversionPattern<ExtractElementOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      ExtractElementOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const override {
+    auto aggregateType = op.getAggregate().getType().dyn_cast<TensorType>();
+    if (!aggregateType) {
+      // We currently are only looking for tensor types.
+      return failure();
+    }
+    if (aggregateType.getElementTypeBitWidth() != 1) return failure();
+    Location loc = op.getLoc();
+    auto i8Type = rewriter.getIntegerType(8);
+    auto i8Operand = rewriter.create<xla_hlo::ConvertOp>(loc, args[0], i8Type);
+    auto loadOp = rewriter.create<ExtractElementOp>(
+        loc, i8Type, i8Operand, llvm::to_vector<4>(op.indices()));
+    auto i1Type = rewriter.getI1Type();
+    rewriter.replaceOpWithNewOp<TruncateIOp>(op, i1Type, loadOp.getResult());
+    return success();
+  }
+};
+}  // namespace
 
 class PrePartitioningConversionPass
     : public PassWrapper<PrePartitioningConversionPass, FunctionPass> {
@@ -69,6 +96,7 @@ class PrePartitioningConversionPass
     setupDirectHLOToFlowLegality(context, conversionTarget);
     populateHLOToFlowPatterns(context, conversionPatterns);
     setupDirectStandardToFlowLegality(context, conversionTarget);
+    conversionPatterns.insert<ExtractElementOpPromotion>(context);
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,

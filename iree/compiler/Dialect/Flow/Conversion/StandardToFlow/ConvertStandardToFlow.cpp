@@ -36,6 +36,9 @@ struct ExtractElementOpLowering : public OpRewritePattern<ExtractElementOp> {
       // We currently are only looking for tensor types.
       return failure();
     }
+    // tensor<i1> is not valid to load, it needs to be converted to i8 or
+    // something else instead.
+    if (aggregateType.getElementTypeBitWidth() == 1) return failure();
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
         op, aggregateType.getElementType(), op.aggregate(),
         llvm::to_vector<4>(op.indices()));

@@ -509,6 +509,33 @@ struct CompareOpConversion : public OpConversionPattern<xla_hlo::CompareOp> {
   TypeConverter &typeConverter;
 };
 
+struct ConvertOpConversion : public OpConversionPattern<xla_hlo::ConvertOp> {
+  ConvertOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      xla_hlo::ConvertOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    int srcBit =
+        srcOp.operand().getType().cast<ShapedType>().getElementTypeBitWidth();
+    int dstBit =
+        srcOp.getResult().getType().cast<ShapedType>().getElementTypeBitWidth();
+    // VMLA does not support tensors of i1. tensor<*xi1> will be converted to
+    // tensor<*xi8>.
+    if (srcBit == 1 && dstBit == 8) {
+      rewriter.replaceOp(srcOp, rawOperands);
+    } else {
+      return VMLAConversionTarget::applyDefaultBufferRewrite(
+          srcOp, rawOperands, VMLAOpSemantics::kDefault,
+          IREE::VMLA::ConvertOp::getOperationName(), typeConverter, rewriter);
+    }
+
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 }  // namespace
 
 void populateHLOToVMLAPatterns(MLIRContext *context,
@@ -579,8 +606,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::SelectOp, IREE::VMLA::SelectOp>>(
       context, typeConverter);
-  patterns.insert<VMLAOpConversion<xla_hlo::ConvertOp, IREE::VMLA::ConvertOp>>(
-      context, typeConverter);
+  patterns.insert<ConvertOpConversion>(context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::ReverseOp, IREE::VMLA::ReverseOp>>(
       context, typeConverter);
   patterns
