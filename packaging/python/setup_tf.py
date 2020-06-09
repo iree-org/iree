@@ -14,15 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build platform specific wheel files for the pyiree.rt package.
+# Build platform specific wheel files for the pyiree.tf packages.
 # Built artifacts are per-platform and build out of the build tree.
-# Usage:
-# ------
-# Windows with CMake:
-#   export CMAKE_BUILD_ROOT='D:\src\build-iree'  # Must be native path
-#   python ./setup_rt.py bdist_wheel
 
 import os
+import platform
 import setuptools
 import sys
 
@@ -32,14 +28,23 @@ import common_setup
 
 
 def run():
+  package_dir = common_setup.get_package_dir(
+      prefix=("integrations", "tensorflow", "bindings", "python"))
   packages = setuptools.find_namespace_packages(
-      common_setup.get_package_dir(),
-      include=["pyiree.rt", "pyiree.rt.*"],
+      package_dir,
+      include=[
+          "pyiree.tf.compiler", "pyiree.tf.compiler.*", "pyiree.tf.support",
+          "pyiree.tf.support.*"
+      ],
       exclude=["*.CMakeFiles"])
   print("Found packages:", packages)
+  if not packages:
+    print("ERROR: Did not find packages under", package_dir)
+    sys.exit(1)
   setup_kwargs = common_setup.get_setup_defaults(
-      sub_project="rt",
-      description="IREE Runtime Components (for executing compiled programs)")
+      sub_project="tf",
+      description="IREE TensorFlow Compiler",
+      package_dir=package_dir)
   common_setup.setup(packages=packages, **setup_kwargs)
 
 
