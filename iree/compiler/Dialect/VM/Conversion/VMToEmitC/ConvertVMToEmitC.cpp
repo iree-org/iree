@@ -13,8 +13,9 @@
 // limitations under the License.
 
 
-#include "iree/compiler/Dialect/VM/Conversion/ConvertVMToEmitC.h"
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
+#include "emitc/Dialect/EmitC/EmitCDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
 namespace mlir {

@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
