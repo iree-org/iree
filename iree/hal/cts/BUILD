@@ -35,6 +35,8 @@ cc_library(
         "//iree/hal:driver_registry",
 
         # HAL driver modules.
+        "//iree/hal/dylib:dylib_driver_module",  # build-cleaner: keep
+        "//iree/hal/llvmjit:llvmjit_driver_module",  # build-cleaner: keep
         "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
         # "//iree/hal/dawn:dawn_driver_module",  # build-cleaner: keep
