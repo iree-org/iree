@@ -38,7 +38,9 @@ def iree_vision_test_suite(
         a list specifying which model weights to load for external tests. Also
         specifies the shape of the random images to use for testing.
       models_to_backends:
-        a dictionary of lists of models to lists of backends to run them on.
+        a dictionary of models to lists of backends to run them on. Keys can
+        either be tuples of strings (mapping multiple models to the same set of
+        backends) or strings (mapping a single model to a set of backends).
       external_weights:
         a base url to fetch trained model weights from.
       tags:
