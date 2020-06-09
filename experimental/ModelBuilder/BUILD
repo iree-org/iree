@@ -47,7 +47,7 @@ cc_library(
         "noga",
     ],
     deps = [
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ConversionPassIncGen",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
@@ -74,7 +74,7 @@ cc_library(
     ],
     deps = [
         ":ModelBuilder",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:GPUToSPIRVTransforms",

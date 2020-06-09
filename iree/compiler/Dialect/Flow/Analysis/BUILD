@@ -31,7 +31,7 @@ cc_library(
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",

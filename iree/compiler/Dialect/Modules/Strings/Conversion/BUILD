@@ -29,7 +29,7 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Modules/Strings/IR",
         "//iree/compiler/Dialect/VM/Conversion",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",

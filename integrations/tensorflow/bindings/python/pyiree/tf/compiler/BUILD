@@ -104,7 +104,7 @@ pybind_cc_library(
     deps = SAVED_MODEL_TF_RUNTIME_DEPS + TF_XLA_PASS_DEPS + [
         "//bindings/python/pyiree/common",
         "//bindings/python/pyiree/compiler:compiler_library",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",

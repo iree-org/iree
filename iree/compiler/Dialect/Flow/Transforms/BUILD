@@ -54,7 +54,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
         "//iree/compiler/Utils",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
