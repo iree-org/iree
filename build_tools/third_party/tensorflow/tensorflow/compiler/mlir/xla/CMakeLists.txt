@@ -39,20 +39,25 @@ external_cc_library(
     "ir/dialect_registration.cc"
     "ir/hlo_ops.cc"
     "ir/hlo_utils.cc"
+    "ir/infer_fusibility_op_interface.cc"
     "ir/lhlo_ops.cc"
     "transforms/chlo_legalize_to_hlo.cc"
+    "transforms/cycle_detector.cc"
     "transforms/legalize_control_flow.cc"
     "transforms/legalize_to_standard.cc"
     "transforms/lower_general_dot.cc"
     "transforms/materialize_broadcasts.cc"
     "transforms/unfuse_batch_norm.cc"
+    "transforms/xla_hlo_fusion.cc"
     "transforms/xla_legalize_to_linalg.cc"
   HDRS
     "convert_op_folder.h"
     "ir/chlo_ops.h"
     "ir/hlo_ops.h"
     "ir/hlo_utils.h"
+    "ir/infer_fusibility_op_interface.h"
     "ir/lhlo_ops.h"
+    "transforms/cycle_detector.h"
     "transforms/map_xla_to_scalar_op.h"
     "transforms/passes.h"
     "transforms/rewriters.h"
@@ -68,6 +73,7 @@ external_cc_library(
     tensorflow_mlir_xla_chlo_ops_gen
     tensorflow_mlir_xla_hlo_ops_gen
     tensorflow_mlir_xla_hlo_ops_base_gen
+    tensorflow_mlir_xla_infer_fusibility_op_interface_gen
     tensorflow_mlir_xla_legalize_to_standard_patterns_gen
     tensorflow_mlir_xla_lhlo_ops_gen
     LLVMSupport
@@ -143,6 +149,22 @@ external_tablegen_library(
   OUTS
     -gen-op-decls ir/hlo_ops_base.h.inc
     -gen-op-defs ir/hlo_ops_base.cc.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_xla_infer_fusibility_op_interface_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_XLA_SRC_ROOT}
+  SRCS
+    "ir/infer_fusibility_op_interface.td"
+  OUTS
+    -gen-op-interface-decls ir/infer_fusibility_op_interface.h.inc
+    -gen-op-interface-defs ir/infer_fusibility_op_interface.cc.inc
 )
 
 external_tablegen_library(
