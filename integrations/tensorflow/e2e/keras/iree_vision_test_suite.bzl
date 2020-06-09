@@ -47,7 +47,7 @@ def iree_vision_test_suite(
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
       size:
-        size of the tests.
+        size of the tests. Default: "large".
       python_version:
         the python version to run the tests with. Uses python3 by default.
       **kwargs:
