@@ -35,8 +35,9 @@ def iree_vision_test_suite(
       reference_backend:
         the backend to use as a source of truth for the expected output results.
       datasets:
-        a list specifying which model weights to load for external tests. Also
-        specifies the shape of the random images to use for testing.
+        a list specifying the dataset on which the model is based. This controls
+        the shape of the input images. Also indicates which weight file to use
+        when loading weights from an external source.
       models_to_backends:
         a dictionary of models to lists of backends to run them on. Keys can
         either be tuples of strings (mapping multiple models to the same set of
