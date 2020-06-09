@@ -163,8 +163,8 @@ external_tablegen_library(
   SRCS
     "ir/infer_fusibility_op_interface.td"
   OUTS
-    -gen-op-decls ir/infer_fusibility_op_interface.h.inc
-    -gen-op-defs ir/infer_fusibility_op_interface.cc.inc
+    -gen-op-interface-decls ir/infer_fusibility_op_interface.h.inc
+    -gen-op-interface-defs ir/infer_fusibility_op_interface.cc.inc
 )
 
 external_tablegen_library(
