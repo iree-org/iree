@@ -260,7 +260,7 @@ class _IreeModuleInstance(object):
 
 
 class _IreeFunctionWrapper(object):
-  """Wraps an IRRE function, making it callable."""
+  """Wraps an IREE function, making it callable."""
 
   def __init__(self, context, f):
     self._context = context
