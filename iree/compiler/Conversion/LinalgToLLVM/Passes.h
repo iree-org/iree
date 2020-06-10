@@ -25,7 +25,7 @@ namespace iree_compiler {
 std::unique_ptr<OperationPass<ModuleOp>>
 createHALInterfaceToMemrefArgumentsPass();
 
-/// Convert module to LLVM dialect.
+/// Pass to perform final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the

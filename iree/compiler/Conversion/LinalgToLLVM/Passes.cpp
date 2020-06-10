@@ -48,7 +48,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createInlinerPass());
 
-  // Propagates dynamic shapes computation on tensor.
+  // Propagates dynamic shapes computation on tensors.
   passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
   passManager.addNestedPass<FuncOp>(
       Shape::createMaterializeShapeCalculationsPass());

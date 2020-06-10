@@ -45,7 +45,6 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
       ConversionPatternRewriter &rewriter) const override {
     auto tieShapeOp = cast<Shape::TieShapeOp>(op);
     auto loc = tieShapeOp.getLoc();
-    // Update memory descriptor information.
     MemRefDescriptor sourceMemRef(operands.front());
     auto makeRankedShapeOp =
         cast<Shape::MakeRankedShapeOp>(tieShapeOp.shape().getDefiningOp());
@@ -65,7 +64,7 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
         sourceMemRef.setConstantSize(rewriter, loc, i, shape[i]);
       }
     }
-    // Compute and update memref strides,
+    // Compute and update memref descriptor strides,
     sourceMemRef.setConstantStride(rewriter, loc, shape.size() - 1, 1);
     for (int i = shape.size() - 2; i >= 0; --i) {
       auto stride_i = sourceMemRef.stride(rewriter, loc, i + 1);
@@ -126,7 +125,6 @@ struct ConvertToLLVMPass
 
 void ConvertToLLVMPass::runOnOperation() {
   auto module = getOperation();
-  // Convert to the LLVM IR dialect using the converter defined above.
   OwningRewritePatternList patterns;
   LLVMTypeConverter converter(&getContext());
   populateAffineToStdConversionPatterns(patterns, &getContext());
@@ -152,7 +150,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {
 }
 
 static PassRegistration<ConvertToLLVMPass> pass(
-    "iree-codegen-convert-to-llvm", "Convert Linalg to LLVM",
+    "iree-codegen-convert-to-llvm",
+    "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to LLVMIR "
+    "dialect",
     [] { return std::make_unique<ConvertToLLVMPass>(); });
 
 }  // namespace iree_compiler
