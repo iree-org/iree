@@ -25,6 +25,7 @@ cc_library(
         "LinalgTileAndFusePass.cpp",
         "Passes.cpp",
         "SplitDispatchFunctionPass.cpp",
+        "VectorToGPUPass.cpp",
     ],
     hdrs = [
         "Attributes.h",
@@ -41,7 +42,6 @@ cc_library(
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
-        "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
@@ -57,6 +57,7 @@ cc_library(
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_linalg",
     ],
