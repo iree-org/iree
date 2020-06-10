@@ -67,6 +67,12 @@ constexpr ExecutableFormat kExecutableFormatSpirV =
 constexpr ExecutableFormat kExecutableFormatLLVM =
     MakeExecutableFormatID("LLVM");
 
+// Dynamic Library (dylib) executable in FlatBuffer format using the
+// https://github.com/google/iree/tree/master/iree/schemas/dylib_executable_def.fbs
+// schema
+constexpr ExecutableFormat kExecutableFormatDyLib =
+    MakeExecutableFormatID("DLIB");
+
 // LINT.ThenChange(https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
 
 }  // namespace hal

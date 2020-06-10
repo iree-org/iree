@@ -141,7 +141,8 @@ cc_library(
     name = "init_targets",
     hdrs = ["init_targets.h"],
     deps = [
-        "//iree/compiler/Dialect/HAL/Target/LLVM",
+        "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMAOT",
+        "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMIR",
         "//iree/compiler/Dialect/HAL/Target/VMLA",
         "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     ],

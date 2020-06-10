@@ -33,6 +33,8 @@ StringRef getNoTileMarker() { return "no-tile"; }
 
 StringRef getWorkGroupMarker() { return "workgroup"; }
 
+StringRef getSPIRVMarker() { return "SPIRV"; }
+
 StringRef getWorkItemMarker() { return "workitem"; }
 
 bool hasMarker(Operation *op, StringRef marker) {
@@ -49,6 +51,10 @@ bool hasWorkGroupMarker(Operation *op) {
 
 bool hasWorkItemMarker(Operation *op) {
   return checkMarkerValue(op, getWorkItemMarker());
+}
+
+bool hasSPIRVMarker(Operation *op) {
+  return checkMarkerValue(op, getSPIRVMarker());
 }
 
 void setMarker(Operation *op, StringRef marker) {

@@ -26,14 +26,14 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     # LLVM
     "@llvm-project//llvm:asm_parser": ["LLVMAsmParser"],
-    "@llvm-project//llvm:core": ["LLVMCore"],
+    "@llvm-project//llvm:ir": ["LLVMCore"],
     "@llvm-project//llvm:execution_engine": ["LLVMExecutionEngine"],
     "@llvm-project//llvm:passes": ["LLVMPasses"],
-    "@llvm-project//llvm:target": ["LLVMTarget"],
+    "@llvm-project//llvm:target_base": ["LLVMTarget"],
     "@llvm-project//llvm:support": ["LLVMSupport"],
-    "@llvm-project//llvm:orc_jit": ["LLVMOrcJIT"],
+    "@llvm-project//llvm:orcjit": ["LLVMOrcJIT"],
     "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
-    "@llvm-project//llvm:x86_code_gen": ["LLVMX86CodeGen"],
+    "@llvm-project//llvm:x86_target": ["LLVMX86CodeGen"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [

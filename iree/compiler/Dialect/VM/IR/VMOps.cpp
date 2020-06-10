@@ -591,8 +591,7 @@ bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
     return false;
   }
   // Finally, check that the attribute kind is handled.
-  return value.isa<UnitAttr>() || value.isa<BoolAttr>() ||
-         value.isa<IntegerAttr>() ||
+  return value.isa<UnitAttr>() || value.isa<IntegerAttr>() ||
          (value.isa<ElementsAttr>() && value.cast<ElementsAttr>()
                                            .getType()
                                            .getElementType()

@@ -30,7 +30,7 @@ DeviceInfo GetDefaultDeviceInfo() {
   // supported_features |= DeviceFeature::kDebugging;
   // supported_features |= DeviceFeature::kCoverage;
   // supported_features |= DeviceFeature::kProfiling;
-  DeviceInfo device_info("llvmjit", "llvm", supported_features);
+  DeviceInfo device_info("llvm-ir-jit", "llvm", supported_features);
   // TODO(benvanik): device info.
   return device_info;
 }

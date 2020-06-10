@@ -33,8 +33,8 @@ module attributes {tf_saved_model.semantics} {
 // CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR0:%.+]] = flow.variable.address [[V]] : !iree.ptr<tensor<?xf32>>
 // CHECK-NEXT:   [[PTR1:%.+]] = flow.variable.address [[V1]] : !iree.ptr<tensor<?xf32>>
-// CHECK-NEXT:   %cst = constant false
-// CHECK-NEXT:   cond_br %cst, ^bb1([[PTR0]] : !iree.ptr<tensor<?xf32>>), ^bb1([[PTR1]] : !iree.ptr<tensor<?xf32>>)
+// CHECK-NEXT:   %[[FALSE:.+]] = constant false
+// CHECK-NEXT:   cond_br %[[FALSE]], ^bb1([[PTR0]] : !iree.ptr<tensor<?xf32>>), ^bb1([[PTR1]] : !iree.ptr<tensor<?xf32>>)
 // CHECK-NEXT: ^bb1([[PTR:%.+]]: !iree.ptr<tensor<?xf32>>):   // 2 preds: ^bb0, ^bb0
 // CHECK-NEXT:   [[T:%.+]] = flow.variable.load.indirect [[PTR]] : !iree.ptr<tensor<?xf32>> -> tensor<?xf32>
 // CHECK-NEXT:   return [[T]] : tensor<?xf32>

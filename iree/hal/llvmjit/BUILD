@@ -32,8 +32,8 @@ cc_library(
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:asm_parser",
-        "@llvm-project//llvm:core",
-        "@llvm-project//llvm:orc_jit",
+        "@llvm-project//llvm:ir",
+        "@llvm-project//llvm:orcjit",
         "@llvm-project//llvm:support",
     ],
 )
@@ -64,7 +64,7 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
-        "@llvm-project//llvm:orc_jit",
+        "@llvm-project//llvm:orcjit",
     ],
 )
 
@@ -118,7 +118,7 @@ cc_library(
         "//iree/hal:driver_registry",
         "@llvm-project//llvm:support",
         #TODO(ataei): Link with native target dep.
-        "@llvm-project//llvm:x86_code_gen",
+        "@llvm-project//llvm:x86_target",
     ],
     alwayslink = 1,
 )

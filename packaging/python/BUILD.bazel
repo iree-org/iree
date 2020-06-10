@@ -15,13 +15,19 @@
 # This is a dummy binary that has the side-effect of building all of the TF
 # python bindings. It is used to build wheel files.
 py_binary(
-    name = "all_tf_packages",
+    name = "all_pyiree_packages",
     srcs = ["dummy_exclude_from_package.py"],
     legacy_create_init = False,
     main = "dummy_exclude_from_package.py",
     python_version = "PY3",
+    tags = [
+        # Do not build with ... expansion
+        "manual",
+    ],
     deps = [
         "//bindings/python:pathsetup",  # build_cleaner: keep
+        "//bindings/python/pyiree/compiler",  # build_cleaner: keep
+        "//bindings/python/pyiree/rt",  # build_cleaner: keep
         "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",  # build_cleaner: keep
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",  # build_cleaner: keep
     ],
