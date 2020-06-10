@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
@@ -40,6 +41,44 @@ std::unique_ptr<llvm::TargetMachine> createTargetMachine(
       options.targetTriple, "generic" /* cpu e.g k8*/,
       "" /* cpu features e.g avx512fma*/, {}, {}));
   return machine;
+}
+
+void createLLVMInvocationFunc(const std::string& name, llvm::Module* module) {
+  // TODO(ataei): This is written as a stub in LLVM IR. It would be easier to
+  // have this using MLIR and lower it to LLVM like the dispatch function
+  // implementation is.
+
+  auto& ctx = module->getContext();
+  llvm::IRBuilder<> builder(ctx);
+  auto var_func = module->getFunction(name);
+
+  auto new_type = llvm::FunctionType::get(
+      builder.getVoidTy(), builder.getInt8PtrTy()->getPointerTo(),
+      /*isVarArg=*/false);
+
+  auto new_name = "invoke_" + name;
+  auto func_cst = module->getOrInsertFunction(new_name, new_type);
+  llvm::Function* interface_func =
+      llvm::cast<llvm::Function>(func_cst.getCallee());
+
+  auto bb = llvm::BasicBlock::Create(ctx);
+  bb->insertInto(interface_func);
+  builder.SetInsertPoint(bb);
+  llvm::Value* argList = interface_func->arg_begin();
+  llvm::SmallVector<llvm::Value*, 8> args;
+  args.reserve(llvm::size(var_func->args()));
+  for (auto& indexedArg : llvm::enumerate(var_func->args())) {
+    llvm::Value* arg_index = llvm::Constant::getIntegerValue(
+        builder.getInt64Ty(), llvm::APInt(64, indexedArg.index()));
+    llvm::Value* arg_ptr_ptr = builder.CreateGEP(argList, arg_index);
+    llvm::Value* arg_ptr = builder.CreateLoad(arg_ptr_ptr);
+    arg_ptr = builder.CreateBitCast(
+        arg_ptr, indexedArg.value().getType()->getPointerTo());
+    llvm::Value* arg = builder.CreateLoad(arg_ptr);
+    args.push_back(arg);
+  }
+  builder.CreateCall(var_func, args);
+  builder.CreateRetVoid();
 }
 
 LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,

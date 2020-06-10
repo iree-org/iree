@@ -34,6 +34,7 @@ iree_train_test_suite(
         ("sgd", "tf"),
     ],
     tags = [
+        "guitar",
         "manual",
         "noga",
         "nokokoro",

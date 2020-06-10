@@ -18,6 +18,7 @@ add_subdirectory(test)
 # TODO: skip targets disabled by options.
 iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
   ALL
+    "iree::hal::dylib::dylib_driver_module"
     "iree::hal::llvmjit::llvmjit_driver_module"
     "iree::hal::vmla::vmla_driver_module"
     "iree::hal::vulkan::vulkan_driver_module"
@@ -182,7 +183,8 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_targets.h"
     DEPS
-      iree::compiler::Dialect::HAL::Target::LLVM
+      iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
+      iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
       iree::compiler::Dialect::HAL::Target::VMLA
       iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     PUBLIC

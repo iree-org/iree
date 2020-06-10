@@ -82,8 +82,8 @@ func @tensorStore(%arg0 : tensor<2x3xi32>) {
 
 // CHECK-LABEL: @tensorStore1
 func @tensorStore1(%arg0 : tensor<i1>) {
-  // CHECK-DAG: %[[C1:.+]] = constant 1 : i1
-  %c1 = constant 1 : i1
+  // CHECK-DAG: %[[C1:.+]] = constant true
+  %c1 = constant true
   // CHECK: %[[OFF:.+]] = hal.allocator.compute_offset %allocator, shape = [], element_type = 16777217, indices = []
   // CHECK-NEXT: hal.buffer.store %[[C1]], %arg0[
   // CHECK-SAME:   %[[OFF]]

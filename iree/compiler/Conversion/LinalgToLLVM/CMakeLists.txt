@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
+    MLIRStandardOps
     MLIRTransforms
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Dialect::HAL::IR

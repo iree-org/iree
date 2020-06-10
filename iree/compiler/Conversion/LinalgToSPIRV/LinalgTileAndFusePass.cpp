@@ -26,6 +26,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Identifier.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/FoldUtils.h"
@@ -388,7 +389,8 @@ void LinalgTileAndFusePass::runOnFunction() {
       linalg::LinalgTilingOptions()
           .setTileSizes(tileSizeCalculator.getTileSizesForLinalg())
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      linalg::LinalgMarker(getWorkGroupMarker(), getWorkItemMarker()));
+      linalg::LinalgMarker(Identifier::get(getWorkGroupMarker(), context),
+                           Identifier::get(getWorkItemMarker(), context)));
   applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
   if (useWorkgroupMemory) {
@@ -408,7 +410,8 @@ void LinalgTileAndFusePass::runOnFunction() {
                 [&](OpBuilder &b, Value src, Value dst) -> LogicalResult {
                   return copyToFromWorkgroupMemory(b, src, dst);
                 }),
-        linalg::LinalgMarker(getWorkItemMarker(), PromotionMarker));
+        linalg::LinalgMarker(Identifier::get(getWorkItemMarker(), context),
+                             Identifier::get(PromotionMarker, context)));
     applyPatternsAndFoldGreedily(getOperation(), promotionPatterns);
   }
 

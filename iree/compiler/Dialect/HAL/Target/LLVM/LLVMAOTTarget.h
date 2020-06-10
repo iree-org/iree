@@ -13,19 +13,18 @@
 // limitations under the License.
 //
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_TARGET_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_TARGET_H_
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Registers the LLVM backends.
-void registerLLVMTargetBackends(
+// Registers the LLVM Ahead-Of-Time (AOT) target backends.
+void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions);
 
 }  // namespace HAL
@@ -33,4 +32,4 @@ void registerLLVMTargetBackends(
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_TARGET_H_

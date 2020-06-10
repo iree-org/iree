@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRTarget.h"
 
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/TargetSelect.h"
@@ -30,55 +28,15 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// TODO(ataei): This is written as a stub in LLVM IR. It would be easier to have
-// this using MLIR and lower it to LLVM like the dispatch function
-// implementation is.
-static void createInvocationFunc(const std::string& name,
-                                 llvm::Module* module) {
-  auto& ctx = module->getContext();
-  llvm::IRBuilder<> builder(ctx);
-  auto var_func = module->getFunction(name);
-
-  auto new_type = llvm::FunctionType::get(
-      builder.getVoidTy(), builder.getInt8PtrTy()->getPointerTo(),
-      /*isVarArg=*/false);
-
-  auto new_name = "invoke_" + name;
-  auto func_cst = module->getOrInsertFunction(new_name, new_type);
-  llvm::Function* interface_func =
-      llvm::cast<llvm::Function>(func_cst.getCallee());
-
-  auto bb = llvm::BasicBlock::Create(ctx);
-  bb->insertInto(interface_func);
-  builder.SetInsertPoint(bb);
-  llvm::Value* argList = interface_func->arg_begin();
-  llvm::SmallVector<llvm::Value*, 8> args;
-  args.reserve(llvm::size(var_func->args()));
-  for (auto& indexedArg : llvm::enumerate(var_func->args())) {
-    llvm::Value* arg_index = llvm::Constant::getIntegerValue(
-        builder.getInt64Ty(), llvm::APInt(64, indexedArg.index()));
-    llvm::Value* arg_ptr_ptr = builder.CreateGEP(argList, arg_index);
-    llvm::Value* arg_ptr = builder.CreateLoad(arg_ptr_ptr);
-    arg_ptr = builder.CreateBitCast(
-        arg_ptr, indexedArg.value().getType()->getPointerTo());
-    llvm::Value* arg = builder.CreateLoad(arg_ptr);
-    args.push_back(arg);
-  }
-  builder.CreateCall(var_func, args);
-  builder.CreateRetVoid();
-}
-
 class LLVMIRTargetBackend final : public TargetBackend {
  public:
   LLVMIRTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {}
 
   // NOTE: we could vary this based on the options, such as by arch/etc.
-  std::string name() const override { return "llvm*"; }
+  std::string name() const override { return "llvm-ir*"; }
 
-  // Adds a sequence of passess to a given pass manager that progressively lower
-  // from HLO to LLVM throught linalg dialect.
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
+  void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
                                     OpPassManager& passManager) override {
     buildLLVMTransformPassPipeline(passManager);
   }
@@ -106,7 +64,7 @@ class LLVMIRTargetBackend final : public TargetBackend {
           addCInterface ? "_mlir_ciface_" + std::string(entryPointOp.sym_name())
                         : std::string(entryPointOp.sym_name());
       llvmIrExecutableDef.entry_points.push_back(funcName);
-      createInvocationFunc(funcName, llvmModule.get());
+      createLLVMInvocationFunc(funcName, llvmModule.get());
     }
 
     // LLVMIR opt passes.
@@ -153,7 +111,7 @@ class LLVMIRTargetBackend final : public TargetBackend {
   LLVMTargetOptions options_;
 };
 
-void registerLLVMTargetBackends(
+void registerLLVMIRTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
   static TargetBackendRegistration registration("llvm-ir", [=]() {

@@ -108,13 +108,15 @@ iree_py_test_suite(
 
 iree_vision_test_suite(
     name = "keras_vision_models",
-    configurations = [
-        # tuples of (dataset, include_top, model_name, backends)
-        # "cifar10" has toy models with input 32x32, is good for debugging
-        ("cifar10", 1, "ResNet50", "tf,iree_vmla"),
-        ("cifar10", 1, "ResNet50", "tf,iree_llvmjit"),
-        ("cifar10", 1, "ResNet50", "tf,iree_vulkan"),
-    ],
+    datasets = ["cifar10"],
+    models_to_backends = {
+        "ResNet50": [
+            "iree_llvmjit",
+            "iree_vmla",
+            "iree_vulkan",
+        ],
+    },
+    reference_backend = "tf",
     tags = ["manual"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
@@ -123,21 +125,23 @@ iree_vision_test_suite(
 
 iree_vision_test_suite(
     name = "keras_vision_models_external",
-    configurations = [
-        # tuples of (dataset, include_top, model_name, backends)
-        # "cifar10" has toy models with 32x32 input which are good for debugging
-        # "imagenet" has real model weights for input 224x224
-        ("cifar10", 1, "MobileNet", "tf,iree_vmla"),
-        ("cifar10", 1, "MobileNetV2", "tf,iree_vmla"),
-        ("imagenet", 1, "ResNet50", "tf,iree_vmla"),
-        ("imagenet", 1, "ResNet50", "tf,iree_vulkan"),
-        ("imagenet", 1, "ResNet50", "tf,iree_llvmjit"),
-        ("imagenet", 1, "MobileNet", "tf,iree_vmla"),
-        ("imagenet", 1, "MobileNetV2", "tf,iree_vmla"),
+    datasets = [
+        "cifar10",
+        "imagenet",
     ],
     external_weights = "https://storage.googleapis.com/iree_models/",
+    models_to_backends = {
+        ("MobileNet", "MobileNetV2"): ["iree_vmla"],
+        "ResNet50": [
+            "iree_llvmjit",
+            "iree_vmla",
+            "iree_vulkan",
+        ],
+    },
+    reference_backend = "tf",
     tags = [
         "external",
+        "guitar",
         "manual",
         "noga",
         "nokokoro",
@@ -149,25 +153,23 @@ iree_vision_test_suite(
 )
 
 iree_vision_test_suite(
+    # TODO: Combine this suite with keras_vision_models_external once these
+    # tests pass.
     name = "keras_vision_models_external_failing",
-    configurations = [
-        # tuples of (dataset, include_top, model_name, backends)
-        # "cifar10" has toy models with 32x32 input which are good for debugging
-        # "imagenet" has real model weights for input 224x224
-        # TODO(b/150244105): Compiling fails with commands targeting IREE
-        # interpreter and vulkan backends for these tests.
-        # TODO: Combine this suite with keras_vision_models_external once these
-        # tests pass.
-        ("cifar10", 1, "MobileNet", "tf,iree_vulkan"),
-        ("cifar10", 1, "MobileNet", "tf,iree_llvmjit"),
-        ("cifar10", 1, "MobileNetV2", "tf,iree_vulkan"),
-        ("cifar10", 1, "MobileNetV2", "tf,iree_llvmjit"),
-        ("imagenet", 1, "MobileNet", "tf,iree_vulkan"),
-        ("imagenet", 1, "MobileNet", "tf,iree_llvmjit"),
-        ("imagenet", 1, "MobileNetV2", "tf,iree_vulkan"),
-        ("imagenet", 1, "MobileNetV2", "tf,iree_llvmjit"),
+    datasets = [
+        "cifar10",
+        "imagenet",
     ],
     external_weights = "https://storage.googleapis.com/iree_models/",
+    # TODO(b/150244105): Compiling fails with commands targeting IREE
+    # interpreter and vulkan backends for these tests.
+    models_to_backends = {
+        ("MobileNet", "MobileNetV2"): [
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    reference_backend = "tf",
     tags = [
         "external",
         "manual",
