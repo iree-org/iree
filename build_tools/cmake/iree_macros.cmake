@@ -25,6 +25,22 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# General utilities
+#-------------------------------------------------------------------------------
+
+# iree_to_bool
+#
+# Sets `variable` to `ON` if `value` is true and `OFF` otherwise.
+function(iree_to_bool variable value)
+  if(value)
+    set(${variable} "ON" PARENT_SCOPE)
+  else()
+    set(${variable} "OFF" PARENT_SCOPE)
+  endif()
+endfunction()
+
+
+#-------------------------------------------------------------------------------
 # Packages and Paths
 #-------------------------------------------------------------------------------
 
