@@ -62,8 +62,11 @@ struct StdDimResolver final : public OpRewritePattern<DimOp> {
         dyn_cast<Shape::TieShapeOp>(dimOp.memrefOrTensor().getDefiningOp());
     if (!tieShapeOp) return failure();
 
+    auto index = dimOp.getConstantIndex();
+    assert(index.hasValue() && "expect constant index in `std.dim` operation");
+
     rewriter.replaceOpWithNewOp<Shape::RankedDimOp>(dimOp, tieShapeOp.shape(),
-                                                    dimOp.getIndex());
+                                                    index.getValue());
     return success();
   }
 };
