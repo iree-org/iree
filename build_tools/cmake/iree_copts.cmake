@@ -12,7 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#-------------------------------------------------------------------------------
+# Abseil configuration
+#-------------------------------------------------------------------------------
+
 include(AbseilConfigureCopts)
+
+# By default Abseil strips string literals on mobile platforms, which means
+# we cannot run IREE binaries via command-line with proper options. Turn off
+# the stripping.
+# TODO: we might still want to strip when compiling IREE into Android Java apps.
+if(CMAKE_CROSSCOMPILING AND "${CMAKE_SYSTEM_NAME}" MATCHES "Android")
+  add_definitions(-DABSL_FLAGS_STRIP_NAMES=0)
+endif()
 
 #-------------------------------------------------------------------------------
 # C++ used within IREE
