@@ -45,7 +45,7 @@ iree_lit_test_suite(
         "//iree/tools:IreeFileCheck",
     ],
     tags = [
-        "noga",
+        "nokokoro",
     ],
 )
 
@@ -53,7 +53,7 @@ cc_binary(
     name = "test-dot-prod",
     srcs = ["TestDotProdJIT.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -70,7 +70,7 @@ cc_binary(
     name = "test-vector-transfers-jit",
     srcs = ["TestVectorTransfersJIT.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         ":runtime-support.so",
@@ -88,7 +88,7 @@ cc_binary(
     name = "test-mnist-jit",
     srcs = ["TestMNISTJIT.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -106,7 +106,7 @@ cc_binary(
     name = "test-simple-jit",
     srcs = ["TestSimpleJIT.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -123,7 +123,7 @@ cc_binary(
     name = "test-simple-jit-vulkan",
     srcs = ["TestSimpleJITVulkan.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -142,7 +142,7 @@ cc_binary(
     name = "test-matmul-vulkan",
     srcs = ["TestMatMulVulkan.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -179,7 +179,7 @@ cc_binary(
     name = "test-simple-mlir",
     srcs = ["TestSimpleMLIR.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -195,7 +195,7 @@ cc_binary(
     name = "bench-matvec-vector-jit",
     srcs = ["BenchMatVecVectorJIT.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -212,7 +212,7 @@ cc_binary(
     name = "bench-matmul-vector-jit",
     srcs = ["BenchMatMulVectorJIT.cpp"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",
@@ -230,7 +230,7 @@ cc_binary(
     srcs = ["BenchMatMulVectorColumnMajorLLVMIntrinsicsJIT.cpp"],
     copts = ["-O3"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "//experimental/ModelBuilder",

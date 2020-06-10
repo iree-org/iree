@@ -22,7 +22,7 @@ cc_library(
     srcs = ["ModelBuilder.cpp"],
     hdrs = ["ModelBuilder.h"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "@llvm-project//mlir:Affine",
@@ -44,7 +44,7 @@ cc_library(
     srcs = ["VulkanWrapperPass.cpp"],
     hdrs = ["VulkanWrapperPass.h"],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         "@llvm-project//llvm:support",
@@ -70,7 +70,7 @@ cc_library(
         "-ldl",
     ],
     tags = [
-        "noga",
+        "nokokoro",
     ],
     deps = [
         ":ModelBuilder",

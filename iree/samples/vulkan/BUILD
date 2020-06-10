@@ -42,7 +42,6 @@ cc_binary(
     }),
     tags = [
         "manual",
-        "noga",
         "nokokoro",
     ],
     deps = [

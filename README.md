@@ -112,8 +112,6 @@ features and quarterly plans. Please check out for updated information.
 
 CI System      | Build System | Platform | Component       | Status
 :------------: | :----------: | :------: | :-------------: | :----:
-GitHub Actions | Bazel        | Linux    | Integrations    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Integrations%22)
-GitHub Actions | Bazel        | Linux    | Other           | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Fallthrough%22)
 Kokoro         | Bazel        | Linux    | Core            | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
 Kokoro         | Bazel        | Linux    | Bindings        | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/bindings/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/bindings/build_result_linux.html)
 Kokoro         | Bazel        | Linux    | Integrations    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/integrations/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/integrations/build_result_linux.html)
