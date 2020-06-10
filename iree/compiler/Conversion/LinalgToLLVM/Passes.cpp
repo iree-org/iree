@@ -35,7 +35,6 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // passManager.addPass(createResolveShapeOpsPass());
   // Convert ExecuableOp entry function to use memref arguments.
   passManager.addPass(createHALInterfaceToMemrefArgumentsPass());
 
@@ -49,7 +48,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createInlinerPass());
 
-  // Propagates dynamic shapes computation on tensors.
+  // Propagates dynamic shapes computation on tensor.
   passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
   passManager.addNestedPass<FuncOp>(
       Shape::createMaterializeShapeCalculationsPass());

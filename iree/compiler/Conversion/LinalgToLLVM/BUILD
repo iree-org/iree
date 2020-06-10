@@ -22,7 +22,7 @@ cc_library(
     srcs = [
         "HALInterfaceToMemrefArguments.cpp",
         "Passes.cpp",
-        ""ConvertToLLVM.cpp"
+        "ConvertToLLVM.cpp"
     ],
     hdrs = [
         "Passes.h",
