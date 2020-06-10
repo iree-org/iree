@@ -254,6 +254,33 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
+  iree_cc_library(
+    NAME
+      iree_translate_main
+    SRCS
+      "translate_main.cc"
+    DEPS
+      ::init_compiler_modules
+      ::init_iree_passes_and_dialects
+      ::init_mlir_passes_and_dialects
+      ::init_targets
+      ::init_translations
+      ::init_xla_dialects
+      LLVMSupport
+      MLIRIR
+      MLIRSCFTransforms
+      MLIRPass
+      MLIRSupport
+      MLIRTranslation
+      iree::compiler::Conversion::init_conversions
+      iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Dialect::VM::Target::init_targets
+      iree::compiler::Translation::IREEVM
+    PUBLIC
+  )
+endif(${IREE_BUILD_COMPILER})
+
+if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
   iree_cc_binary(
     NAME
       iree-opt
@@ -308,31 +335,6 @@ if(${IREE_BUILD_COMPILER})
     HOSTONLY
   )
 
-  iree_cc_library(
-    NAME
-      iree_translate_main
-    SRCS
-      "translate_main.cc"
-    DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
-      ::init_targets
-      ::init_translations
-      ::init_xla_dialects
-      LLVMSupport
-      MLIRIR
-      MLIRSCFTransforms
-      MLIRPass
-      MLIRSupport
-      MLIRTranslation
-      iree::compiler::Conversion::init_conversions
-      iree::compiler::Dialect::VM::Target::Bytecode
-      iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Translation::IREEVM
-    PUBLIC
-  )
-
   iree_cc_binary(
     NAME
       iree-translate
@@ -342,7 +344,7 @@ if(${IREE_BUILD_COMPILER})
       ::iree_translate_main
     HOSTONLY
   )
-endif()
+endif(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
 
 iree_cc_library(
   NAME
