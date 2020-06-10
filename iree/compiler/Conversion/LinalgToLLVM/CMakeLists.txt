@@ -22,7 +22,6 @@ iree_cc_library(
   SRCS
     "HALInterfaceToMemrefArguments.cpp"
     "Passes.cpp"
-    #"LowerShapexToLLVM.cpp"
     "ConvertToLLVM.cpp"
   DEPS
     MLIRIR

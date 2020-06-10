@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "HALInterfaceToMemrefArguments.cpp",
         "Passes.cpp",
+        ""ConvertToLLVM.cpp"
     ],
     hdrs = [
         "Passes.h",
@@ -31,12 +32,12 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorToSCF",
+        "@llvm-project//mlir:VectorToLLVM",
     ],
 )

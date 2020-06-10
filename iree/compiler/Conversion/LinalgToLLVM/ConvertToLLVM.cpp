@@ -31,6 +31,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Converts tie_shape op to an insert shape and stride information into Memref
+// descritor.
 class ConvertTieShapePattern : public ConvertToLLVMPattern {
  public:
   explicit ConvertTieShapePattern(MLIRContext *context,
@@ -43,34 +45,40 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
       ConversionPatternRewriter &rewriter) const override {
     auto tieShapeOp = cast<Shape::TieShapeOp>(op);
     auto loc = tieShapeOp.getLoc();
-    auto tieShapeMemrefType =
-        tieShapeOp.operand().getType().dyn_cast_or_null<MemRefType>();
-    if (!tieShapeMemrefType) return failure();
-    auto targetDescTy = typeConverter.convertType(tieShapeMemrefType)
-                            .dyn_cast_or_null<LLVM::LLVMType>();
-    auto targetElementTy =
-        typeConverter.convertType(tieShapeMemrefType.getElementType())
-            .dyn_cast<LLVM::LLVMType>();
-    if (!targetDescTy) return failure();
-
     // Update memory descriptor information.
     MemRefDescriptor sourceMemRef(operands.front());
-
     auto makeRankedShapeOp =
         cast<Shape::MakeRankedShapeOp>(tieShapeOp.shape().getDefiningOp());
+    auto rankedShapeType = makeRankedShapeOp.shape()
+                               .getType()
+                               .dyn_cast_or_null<Shape::RankedShapeType>();
+    if (!rankedShapeType) return failure();
 
-    // Update descriptor shape information.
-    for (int i = 0; i < makeRankedShapeOp.dynamic_dimensions().size(); ++i) {
-      auto dynamicDims = makeRankedShapeOp.dynamic_dimensions()[i];
-      sourceMemRef.setSize(rewriter, loc, i, dynamicDims);
+    auto shape = rankedShapeType.getAllDims();
+
+    // Update memref descriptor shape and strides.
+    for (int i = 0; i < shape.size(); ++i) {
+      if (shape[i] == -1) {
+        sourceMemRef.setSize(rewriter, loc, i,
+                             makeRankedShapeOp.dynamic_dimensions()[i]);
+      } else {
+        sourceMemRef.setConstantSize(rewriter, loc, i, shape[i]);
+      }
     }
-
+    // Compute and update memref strides,
+    sourceMemRef.setConstantStride(rewriter, loc, shape.size() - 1, 1);
+    for (int i = shape.size() - 2; i >= 0; --i) {
+      auto stride_i = sourceMemRef.stride(rewriter, loc, i + 1);
+      auto dim_i = sourceMemRef.size(rewriter, loc, i + 1);
+      Value strideVal = rewriter.create<LLVM::MulOp>(loc, stride_i, dim_i);
+      sourceMemRef.setStride(rewriter, loc, i, strideVal);
+    }
     rewriter.replaceOp(tieShapeOp, {sourceMemRef});
-    rewriter.eraseOp(makeRankedShapeOp);
     return success();
   }
 };  // namespace iree_compiler
 
+// Replace RankedDimOp with resolved index.
 class ConvertRankedDimPattern : public ConvertToLLVMPattern {
  public:
   explicit ConvertRankedDimPattern(MLIRContext *context,
@@ -84,10 +92,26 @@ class ConvertRankedDimPattern : public ConvertToLLVMPattern {
     auto rankedDimOp = cast<Shape::RankedDimOp>(op);
     auto makeRankedShapeOp =
         cast<Shape::MakeRankedShapeOp>(rankedDimOp.shape().getDefiningOp());
+    if (!makeRankedShapeOp) return failure();
     auto dimIndex = rankedDimOp.index();
     auto dynamicDims =
         makeRankedShapeOp.dynamic_dimensions()[*dimIndex.getRawData()];
     rewriter.replaceOp(op, dynamicDims);
+    return success();
+  }
+};
+
+class RemoveMakeRankedShape : public ConvertToLLVMPattern {
+ public:
+  explicit RemoveMakeRankedShape(MLIRContext *context,
+                                 LLVMTypeConverter &lowering_)
+      : ConvertToLLVMPattern(Shape::MakeRankedShapeOp::getOperationName(),
+                             context, lowering_) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -111,8 +135,8 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToSCFConversionPatterns(patterns, &getContext());
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
-  patterns.insert<ConvertRankedDimPattern, ConvertTieShapePattern>(
-      &getContext(), converter);
+  patterns.insert<ConvertRankedDimPattern, ConvertTieShapePattern,
+                  RemoveMakeRankedShape>(&getContext(), converter);
   populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
 
   LLVMConversionTarget target(getContext());
