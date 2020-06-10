@@ -35,7 +35,6 @@ iree_py_test(
     main = "linspace_test.py",
     python_version = "PY3",
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [

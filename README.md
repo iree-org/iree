@@ -10,9 +10,9 @@ solutions for the compiled ML models.
 
 IREE is still in its early phase. We have settled down on the overarching
 infrastructure and are actively improving various software components as well as
-project logisitics. It is still quite far from ready for everyday use and is
-made available without any support at the moment. With that said, we welcome any
-kind of feedback on any [communication channels](#communication-channels)!
+project logistics. It is still quite far from ready for everyday use and is made
+available without any support at the moment. With that said, we welcome any kind
+of feedback on any [communication channels](#communication-channels)!
 
 ## Communication Channels
 
@@ -71,7 +71,7 @@ The architecture of IREE is best illustrated by the following picture:
 ![IREE Architecture](./docs/IREE-Architecture.svg)
 
 Being compilation-based means IREE does not have a traditional runtime that
-dispatches "ops" to their fat kernel implemenations. What IREE provides is a
+dispatches "ops" to their fat kernel implementations. What IREE provides is a
 toolbox for different deployment scenarios. It scales from running generated
 code on a particular API (such as emitting C code calling external DSP kernels),
 to a HAL (**H**ardware **A**bstraction **L**ayer) that allows the same generated
@@ -90,7 +90,7 @@ IREE aims to
     and runtimes. MLIR enables IREE's holistic approach of focusing on the math
     being performed and how that math is scheduled rather than graphs of "ops".
 *   Embrace standard-based ML via Vulkan. The graphics world is shifting towards
-    favoring mordern explicit APIs for performance and predictability and Vulkan
+    favoring modern explicit APIs for performance and predictability and Vulkan
     is emerging as the "compatibility" layer. We would love to allow hardware
     vendors to be able to make ML efficient on their hardware without the need
     for bespoke runtimes and special access. We also would love to let
@@ -110,12 +110,12 @@ features and quarterly plans. Please check out for updated information.
 
 ## Build Status
 
-CI System      | Build System | Platform | Component       | Status
-:------------: | :----------: | :------: | :-------------: | :----:
-GitHub Actions | Bazel        | Linux    | Integrations    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Integrations%22)
-GitHub Actions | Bazel        | Linux    | Other           | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Fallthrough%22)
-Kokoro         | Bazel        | Linux    | Core + Bindings | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
-Kokoro         | CMake        | Linux    | Core + Bindings | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_result_linux.html)
+CI System | Build System | Platform | Component       | Status
+:-------: | :----------: | :------: | :-------------: | :----:
+Kokoro    | Bazel        | Linux    | Core            | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
+Kokoro    | Bazel        | Linux    | Bindings        | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/bindings/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/bindings/build_result_linux.html)
+Kokoro    | Bazel        | Linux    | Integrations    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/integrations/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/integrations/build_result_linux.html)
+Kokoro    | CMake        | Linux    | Core + Bindings | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_result_linux.html)
 
 ## License
 

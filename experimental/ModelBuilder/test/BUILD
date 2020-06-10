@@ -44,17 +44,11 @@ iree_lit_test_suite(
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
-    tags = [
-        "noga",
-    ],
 )
 
 cc_binary(
     name = "test-dot-prod",
     srcs = ["TestDotProdJIT.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -69,9 +63,6 @@ cc_binary(
 cc_binary(
     name = "test-vector-transfers-jit",
     srcs = ["TestVectorTransfersJIT.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         ":runtime-support.so",
         "//experimental/ModelBuilder",
@@ -87,9 +78,6 @@ cc_binary(
 cc_binary(
     name = "test-mnist-jit",
     srcs = ["TestMNISTJIT.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -105,9 +93,6 @@ cc_binary(
 cc_binary(
     name = "test-simple-jit",
     srcs = ["TestSimpleJIT.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -122,9 +107,6 @@ cc_binary(
 cc_binary(
     name = "test-simple-jit-vulkan",
     srcs = ["TestSimpleJITVulkan.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -141,9 +123,6 @@ cc_binary(
 cc_binary(
     name = "test-matmul-vulkan",
     srcs = ["TestMatMulVulkan.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -178,9 +157,6 @@ cc_binary(
 cc_binary(
     name = "test-simple-mlir",
     srcs = ["TestSimpleMLIR.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -194,9 +170,6 @@ cc_binary(
 cc_binary(
     name = "bench-matvec-vector-jit",
     srcs = ["BenchMatVecVectorJIT.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -211,9 +184,6 @@ cc_binary(
 cc_binary(
     name = "bench-matmul-vector-jit",
     srcs = ["BenchMatMulVectorJIT.cpp"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
@@ -229,9 +199,6 @@ cc_binary(
     name = "bench-matmul-vector-column-major-llvm-intrinsics-jit",
     srcs = ["BenchMatMulVectorColumnMajorLLVMIntrinsicsJIT.cpp"],
     copts = ["-O3"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",

@@ -37,7 +37,6 @@ iree_py_library(
     ],
     srcs_version = "PY3",
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = [
@@ -56,7 +55,6 @@ iree_py_extension(
     features = PYBIND_FEATURES,
     linkstatic = 1,
     tags = [
-        "noga",
         "nokokoro",
     ],
     win_def_file = "export.def",
@@ -76,7 +74,6 @@ pybind_cc_library(
         "register_xla.h",
     ],
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = [
@@ -94,7 +91,6 @@ iree_py_test(
     srcs = ["xla_module_proto_test.py"],
     python_version = "PY3",
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [

@@ -71,7 +71,9 @@ function(iree_bytecode_module)
   add_custom_command(
     OUTPUT "${_RULE_NAME}.module"
     COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
-    DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE}
+    # Changes to either the translation tool or the input source should
+    # trigger rebuilding.
+    DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} ${_RULE_SRC}
   )
 
   if(_RULE_TESTONLY)

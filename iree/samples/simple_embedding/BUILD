@@ -40,7 +40,6 @@ cc_test(
     ],
     # TODO(b/145815906) Get this running in OSS CI.
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = [
