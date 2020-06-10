@@ -24,7 +24,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
+# Respect the user setting, but default to turning off the vulkan tests.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
