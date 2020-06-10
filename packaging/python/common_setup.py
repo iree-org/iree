@@ -32,7 +32,7 @@ def get_package_dir(prefix=("bindings", "python")):
 
   if cmake_build_root and bazel_build_root:
     print("ERROR: Both PYIREE_CMAKE_BUILD_ROOT and PYIREE_BAZEL_BUILD_ROOT"
-          "cannot be set at the same time")
+          " cannot be set at the same time")
     sys.exit(1)
 
   if cmake_build_root:
@@ -46,13 +46,13 @@ def get_package_dir(prefix=("bindings", "python")):
     # Find the path to the runfiles of the built target:
     #   //bindings/python/packaging:all_pyiree_packages
     runfiles_dir = os.path.join(
-        bazel_build_root, "bindings", "python", "packaging",
+        bazel_build_root, "packaging", "python",
         "all_pyiree_packages%s.runfiles" % (get_exe_suffix(),))
     if not os.path.isdir(runfiles_dir):
       print("ERROR: Could not find build target 'all_pyiree_packages':",
             runfiles_dir)
       print("Make sure to build target",
-            "//bindings/python/packaging:all_pyiree_packages")
+            "//packaging/python:all_pyiree_packages")
       sys.exit(1)
     # And finally seek into the corresponding path in the runfiles dir.
     # Aren't bazel paths fun???

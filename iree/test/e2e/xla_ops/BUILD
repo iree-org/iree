@@ -44,6 +44,7 @@ iree_check_single_backend_test_suite(
         "broadcast_in_dim.mlir",
         "clamp.mlir",
         "compare.mlir",
+        "convolution.mlir",
         "convert.mlir",
 
         # TODO(GH-1695): Enable when xla.concat can be lowered to linalg
@@ -78,6 +79,7 @@ iree_check_single_backend_test_suite(
         "negate.mlir",
         "pad.mlir",
         "reduce.mlir",
+        "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
         # "reverse.mlir",

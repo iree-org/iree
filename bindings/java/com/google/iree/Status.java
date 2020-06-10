@@ -45,7 +45,7 @@ public enum Status {
 
   public Exception toException(String message) {
     String messageWithStatus = this + ": " + message;
-    switch(this) {
+    switch (this) {
       case CANCELLED:
         return new CancellationException(messageWithStatus);
       case UNKNOWN:
