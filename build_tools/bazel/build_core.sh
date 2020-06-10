@@ -47,10 +47,13 @@ declare -a test_env_args=(
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro")
 
-# We can still build things that use vulkan. Only add to test tag filters.
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
 fi
+if [[ "${IREE_LLVMJIT_DISABLE?}" == 1 ]]; then
+  default_test_tag_filters+=("-driver=llvm")
+fi
+
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
 if ! [[ -v BUILD_TAG_FILTERS ]]; then
   # String join on comma
