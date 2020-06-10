@@ -110,12 +110,74 @@ metrics to direct development work.
 
 TODO(benvanik): Talk about VM Benchmarks
 
-## Tracing
+### Building Tracy
 
-IREE is instrumented with the C++ bindings from the
-[Google Web Tracing Framework](https://github.com/google/tracing-framework).
+To use tracing in IREE, you need to build IREE with following requirements:
 
-TODO(benvanik): Talk about WTF
+*   Turn `IREE_ENABLE_RUNTIME_TRACING` on.
+*   Add `-DNDEBUG` to `IREE_DEFAULT_COPTS`.
+*   Use Release/RelWithDebInfo build.
+
+For example:
+
+```shell
+export IREE_DEFAULT_COPTS='-DNDEBUG'
+cmake -B build/ \
+      -DIREE_ENABLE_RUNTIME_TRACING=ON \
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo
+```
+
+The above compiles IREE with Tracy APIs so that IREE will stream profiling data
+back to Tracy when running. To be able to collect and analyze these data, you
+can either use GUI or CLI tools. Tracy profiler is the GUI tool. You can find
+the
+[Tracy manual](https://github.com/wolfpld/tracy/releases/download/v0.6.3/tracy.pdf)
+for more details on Tracy itself.
+
+To build the profiler on Linux, you will need to install some external
+libraries. Some Linux distributions will require you to add a `lib` prefix and a
+`-dev`, or `-devel` postfix to library names. For example, you might see the
+error:
+
+```
+Package glfw3 was not found in the pkg-config search path.
+
+```
+
+and then you could try to install `libglfw3-dev`.
+
+Instructions to build Tracy profiler:
+
+```shell
+cd third_party/tracy/profiler/build/unix
+make release
+```
+
+### Using Tracy
+
+Launch the profiler UI, and click connect. Then the server will wait for the
+connection. Now you can launch the IREE binary you want to trace, it should
+connect automatically and stream data. For example:
+
+Prepare the module to profile:
+
+```shell
+build/iree/tools/iree-benchmark-module \
+  --input_file=/tmp/module.fb \
+  --driver=vmla \
+  --entry_function=abs \
+  --inputs="i32=-2"
+```
+
+Run the module:
+
+```shell
+build/iree/tools/iree-run-module \
+  --input_file=/tmp/module.fb \
+  --driver=vmla \
+  --entry_function=abs \
+  --inputs="i32=-2"
+```
 
 ## CPU Configuration
 
