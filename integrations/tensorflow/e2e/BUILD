@@ -28,8 +28,23 @@ package(
 )
 
 iree_e2e_test_suite(
+    # TODO(GH-2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
+    name = "linspace_test",
+    srcs = ["linspace_test.py"],
+    reference_backend = "tf",
+    backends = ["iree_vmla", "iree_llvmjit", "iree_vulkan"],
+    tags = [
+        "nokokoro",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+
+iree_e2e_test_suite(
     name = "e2e",
-    srcs = glob(["*_test.py"]),
+    srcs = glob(["*_test.py"], exclude = ["linspace_test.py"]),
     reference_backend = "tf",
     backends = ["iree_vmla", "iree_llvmjit", "iree_vulkan"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
