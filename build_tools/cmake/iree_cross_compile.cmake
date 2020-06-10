@@ -144,8 +144,12 @@ endfunction()
 
 # iree_host_install
 #
-# Defines custom commands and targets for installing the given `target`. The
-# custom target for install will be named as `iree_host_install_${target}`.
+# Defines custom commands and targets for installing the given `target` under
+# host configuration. The custom target for install will be named as
+# `iree_host_install_${target}`.
+#
+# Precondition:
+# - iree_create_configuration(HOST) is invoked previously.
 #
 # Parameters:
 # - COMPONENT: installation component; used for filtering installation targets.
@@ -178,6 +182,9 @@ endfunction()
 #
 # Generates custom commands and targets for building and installing a tool on
 # host for cross-compilation.
+#
+# Precondition:
+# - iree_create_configuration(HOST) is invoked previously.
 #
 # Parameters:
 # - target: the target to build on host.
