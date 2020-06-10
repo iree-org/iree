@@ -60,7 +60,7 @@ def iree_e2e_test_suite(
             # TODO(GH-2175): Simplify this after backend names are standardized.
             driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
             if driver == "llvmjit":
-                driver == "llvm"
+                driver = "llvm"
             py_test_tags = ["driver={}".format(driver)]
             if tags != None:  # `is` is not supported.
                 py_test_tags += tags
