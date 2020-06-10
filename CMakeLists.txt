@@ -23,15 +23,15 @@ if(POLICY CMP0079)
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-#-------------------------------------------------------------------------------
-# Project configuration
-#-------------------------------------------------------------------------------
-
 project(iree CXX C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+#-------------------------------------------------------------------------------
+# Project component configuration
+#-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
@@ -64,7 +64,7 @@ if(${IREE_ENABLE_EMITC} AND NOT ${IREE_ENABLE_LLVM})
 endif()
 
 #-------------------------------------------------------------------------------
-# IREE-specific CMake configuration
+# Target and backend configuration
 #-------------------------------------------------------------------------------
 
 # List of all HAL drivers to be built by default:
@@ -118,12 +118,38 @@ foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
   set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
-
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
+
+#-------------------------------------------------------------------------------
+# IREE compilation toolchain configuration
+#-------------------------------------------------------------------------------
+
+# Enable using lld as the linker for C/C++ targets. This affects IREE and all
+# dependency projects.
+option(IREE_ENABLE_LLD "Use lld when linking" OFF)
+
+string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
+
+set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
+set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used for linking binaries during fast builds." FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used by the shared libraries linker binaries during fast builds." FORCE)
+mark_as_advanced(
+  CMAKE_CXX_FLAGS_FASTBUILD
+  CMAKE_C_FLAGS_FASTBUILD
+  CMAKE_EXE_LINKER_FLAGS_FASTBUILD
+  CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
+)
+
+include(iree_setup_toolchain)
+
+#-------------------------------------------------------------------------------
+# IREE utility definitions
+#-------------------------------------------------------------------------------
 
 include(iree_macros)
 include(iree_copts)
@@ -141,19 +167,6 @@ include(iree_py_test)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
-
-string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
-
-set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
-set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used for linking binaries during fast builds." FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used by the shared libraries linker binaries during fast builds." FORCE)
-mark_as_advanced(
-  CMAKE_CXX_FLAGS_FASTBUILD
-  CMAKE_C_FLAGS_FASTBUILD
-  CMAKE_EXE_LINKER_FLAGS_FASTBUILD
-  CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
-)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

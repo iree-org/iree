@@ -42,7 +42,7 @@ flags.DEFINE_string(
     "--test_tmpdir")
 FLAGS = flags.FLAGS
 
-ORIGNAL_SAVED_MODEL_PATH_ATTR = "_ORIGINAL_SAVED_MODEL_PATH"
+ORIGINAL_SAVED_MODEL_PATH_ATTR = "_ORIGINAL_SAVED_MODEL_PATH"
 
 # Per test directory where debug artifacts are dumped.
 global_debug_dir = None
@@ -112,9 +112,9 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
 
     return compiled_module
 
-  if hasattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR):
+  if hasattr(tf_module, ORIGINAL_SAVED_MODEL_PATH_ATTR):
     # Compile directly from the original path.
-    sm_path = getattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR)
+    sm_path = getattr(tf_module, ORIGINAL_SAVED_MODEL_PATH_ATTR)
     logging.info(
         "Compiling from original saved_model path (not round-tripping): %s",
         sm_path)
@@ -146,10 +146,10 @@ def load_tf_module(path):
     which TensorFlow tends to lose on round-trip.
   """
   tf_module = tf.saved_model.load(path)
-  assert not hasattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR), (
+  assert not hasattr(tf_module, ORIGINAL_SAVED_MODEL_PATH_ATTR), (
       "Saved model (%s) already has attribute %s" %
-      (path, ORIGNAL_SAVED_MODEL_PATH_ATTR))
-  setattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR, path)
+      (path, ORIGINAL_SAVED_MODEL_PATH_ATTR))
+  setattr(tf_module, ORIGINAL_SAVED_MODEL_PATH_ATTR, path)
   return tf_module
 
 
@@ -260,7 +260,7 @@ class _IreeModuleInstance(object):
 
 
 class _IreeFunctionWrapper(object):
-  """Wraps an IRRE function, making it callable."""
+  """Wraps an IREE function, making it callable."""
 
   def __init__(self, context, f):
     self._context = context
