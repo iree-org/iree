@@ -120,7 +120,7 @@ class ConversionPass
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
-                                      conversionPatterns, &typeConverter))) {
+                                      conversionPatterns))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }

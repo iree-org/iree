@@ -149,10 +149,8 @@ void ConvertToLLVMPass::runOnOperation() {
   patterns.insert<ConvertRankedDimPattern, ConvertTieShapePattern,
                   RemoveMakeRankedShape>(&getContext(), converter);
   LLVMConversionTarget target(getContext());
-  target.addDynamicallyLegalOp<FuncOp>(
-      [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
   target.addLegalOp<ModuleOp, ModuleTerminatorOp>();
-  if (failed(applyPartialConversion(module, target, patterns, &converter)))
+  if (failed(applyPartialConversion(module, target, patterns)))
     signalPassFailure();
 }
 

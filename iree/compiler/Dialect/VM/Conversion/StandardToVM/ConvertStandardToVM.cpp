@@ -88,7 +88,6 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
       FuncOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
-    VMTypeConverter typeConverter;
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
 
@@ -130,8 +129,10 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     }
 
     // Tell the rewriter to convert the region signature.
-    rewriter.applySignatureConversion(&newFuncOp.getBody(),
-                                      signatureConversion);
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
+                                           &signatureConversion))) {
+      return failure();
+    }
 
     // Also add an export for the "raw" form of this function, which operates
     // on low level VM types and does no verification. A later pass will
@@ -151,6 +152,8 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.replaceOp(srcOp, llvm::None);
     return success();
   }
+
+  mutable VMTypeConverter typeConverter;
 };
 
 class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
