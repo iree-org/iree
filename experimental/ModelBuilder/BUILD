@@ -21,9 +21,6 @@ cc_library(
     name = "ModelBuilder",
     srcs = ["ModelBuilder.cpp"],
     hdrs = ["ModelBuilder.h"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:EDSC",
@@ -43,9 +40,6 @@ cc_library(
     name = "VulkanLaunchWrapper",
     srcs = ["VulkanWrapperPass.cpp"],
     hdrs = ["VulkanWrapperPass.h"],
-    tags = [
-        "noga",
-    ],
     deps = [
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:ConversionPassIncGen",
@@ -68,9 +62,6 @@ cc_library(
     ],
     linkopts = [
         "-ldl",
-    ],
-    tags = [
-        "noga",
     ],
     deps = [
         ":ModelBuilder",

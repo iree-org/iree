@@ -33,13 +33,12 @@ package(
 )
 
 iree_py_test(
-    # TODO(GH-1620): Include after fixing the failure on GitHub Actions.
+    # TODO(GH-1620): Include after fixing the failure on the OSS CI.
     name = "keras_lstm_static_test",
     srcs = ["keras_lstm_static_test.py"],
     main = "keras_lstm_static_test.py",
     python_version = "PY3",
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
@@ -83,7 +82,6 @@ iree_py_test(
     tags = [
         "external",
         "manual",
-        "noga",
         "nokokoro",
         "notap",
     ],
@@ -143,7 +141,6 @@ iree_vision_test_suite(
         "external",
         "guitar",
         "manual",
-        "noga",
         "nokokoro",
         "notap",
     ],
@@ -173,7 +170,6 @@ iree_vision_test_suite(
     tags = [
         "external",
         "manual",
-        "noga",
         "nokokoro",
         "notap",
     ],

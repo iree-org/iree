@@ -50,10 +50,10 @@ To run tests for the TensorFlow integration, which include end-to-end backend
 comparison tests:
 
 ```shell
-# Exclude tests that are skipped in the GitHub Actions ("ga") CI
+# Exclude tests that are skipped in the Kokoro CI
 $ bazel test \
-  --build_tag_filters="-noga" \
-  --test_tag_filters="-noga" \
+  --build_tag_filters="-nokokoro" \
+  --test_tag_filters="-nokokoro" \
   --define=iree_tensorflow=true \
   integrations/tensorflow/...
 ```
