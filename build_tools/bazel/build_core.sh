@@ -19,7 +19,7 @@
 
 # Looks at environment variables and uses CI-friendly defaults if they are not
 # set.
-# IREE_LLVMJIT_DISABLE: Do not run tests that require LLVM-JIT. Default: 1
+# IREE_LLVMJIT_DISABLE: Do not run tests that require LLVM-JIT. Default: 0
 # IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 1
 # BUILD_TAG_FILTERS: Passed to bazel to filter targets to build.
 #   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--build_tag_filters)
@@ -33,6 +33,9 @@ set -e
 set -x
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
+if ! [[ -v IREE_LLVMJIT_DISABLE ]]; then
+  IREE_LLVMJIT_DISABLE=0
+fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
   IREE_VULKAN_DISABLE=1
 fi
