@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build IREE's integrations (//integrations/...) with bazel. Designed for CI,
-# but can be run manually.
+# Build IREE's integrations for tensorflow and colab, and IREE's packaging with
+# bazel. Designed for CI, but can be run manually.
 
 # Looks at environment variables and uses CI-friendly defaults if they are not
 # set.
@@ -70,7 +70,7 @@ fi
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "nokokoro".
-bazel query '//integrations/...' | \
+bazel query //integrations/... + //colab/... + //packaging/... | \
   xargs bazel test ${test_env_args[@]} \
     --config=generic_clang \
     --build_tag_filters="${BUILD_TAG_FILTERS?}" \
