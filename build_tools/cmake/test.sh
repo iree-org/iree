@@ -24,8 +24,10 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
+# Respect the user setting, but default to turning off the vulkan tests
+# and turning on the llvmjit ones.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
+export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-0}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with the directory it is
@@ -34,8 +36,7 @@ declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
   # For example:
-  #   ^driver=vulkan$
-  ^driver=vulkan$
+  #   ^nokokoro$
   ^nokokoro$
 
   # Exclude all tests in a directory.
@@ -49,6 +50,13 @@ declare -a label_exclude_args=(
   # For example:
   #   ^bindings/
 )
+
+if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
+  label_exclude_args+=("^driver=vulkan$")
+fi
+if [[ "${IREE_LLVMJIT_DISABLE?}" == 1 ]]; then
+  label_exclude_args+=("^driver=llvm$")
+fi
 
 # Join on "|"
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
