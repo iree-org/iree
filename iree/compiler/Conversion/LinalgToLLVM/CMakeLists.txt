@@ -25,9 +25,9 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
   DEPS
     MLIRIR
+    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRPass
-    MLIRSCFToStandard
     MLIRStandardOps
     MLIRTransforms
     MLIRVectorToLLVM
@@ -36,5 +36,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
   PUBLIC
 )
