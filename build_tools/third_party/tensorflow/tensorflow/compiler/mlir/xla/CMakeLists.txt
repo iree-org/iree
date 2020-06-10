@@ -196,4 +196,6 @@ external_tablegen_library(
   OUTS
     -gen-op-decls ir/lhlo_ops.h.inc
     -gen-op-defs ir/lhlo_ops.cc.inc
+    -gen-struct-attr-decls ir/lhlo_structs.h.inc
+    -gen-struct-attr-defs ir/lhlo_structs.cc.inc
 )
