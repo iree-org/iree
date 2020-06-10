@@ -72,7 +72,7 @@ function(iree_bytecode_module)
     COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
     # Changes to either the translation tool or the input source should
     # trigger rebuilding.
-    DEPENDS ${_TRANSLATE_TOOL} "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
+    DEPENDS ${_TRANSLATE_TOOL} ${_RULE_SRC}
   )
 
   if(_RULE_TESTONLY)
