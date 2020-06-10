@@ -30,8 +30,8 @@ iree_cc_library(
     MLIRSCFToStandard
     MLIRStandardOps
     MLIRTransforms
-    MLIRVectorToSCF
     MLIRVectorToLLVM
+    MLIRVectorToSCF
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
