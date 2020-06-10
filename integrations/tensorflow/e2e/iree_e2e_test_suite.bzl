@@ -57,6 +57,7 @@ def iree_e2e_test_suite(
                 "--override_backends={},{}".format(reference_backend, backend)
             ]
 
+            # TODO(GH-2175): Simplify this after backend names are standardized.
             driver = backend.split("_")[-1]  # "iree_<driver>" --> "<driver>"
             if driver == "llvmjit":
                 driver == "llvm"
