@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test IREE's bindings within the gcr.io/iree-oss/bazel-tensorflow
+# Build and test IREE's bindings within the gcr.io/iree-oss/bazel-bindings
 # image using Kokoro.
 
 set -e
@@ -27,13 +27,12 @@ export PS4='[$(date -u "+%T %Z")] '
 WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
 # Mount the checked out repository, make that the working directory and run the
-# tests in the bazel-tensorflow image.
-# TODO: Change image to gcr.io/iree-oss/bazel-bindings:prod once we create it.
+# tests in the bazel-bindings image.
 docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/bazel-tensorflow:prod \
+  gcr.io/iree-oss/bazel-bindings:prod \
   kokoro/gcp_ubuntu/bazel/bindings/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds and pushes bazel, bazel-bindings and bazel-tensorflow images to
-# gcr.io/iree-oss/
+# Builds and pushes the bazel-bindings image to gcr.io/iree-oss/
 
 set -x
 set -e
@@ -35,16 +34,6 @@ fi
 echo "Updating ${TAG}"
 
 
-# Build and push the bazel image.
-docker build --tag "gcr.io/iree-oss/bazel:${TAG}" build_tools/docker/bazel/
-docker push "gcr.io/iree-oss/bazel:${TAG}"
-
-# Build and push the bazel-bindings image, which depends on
-# gcr.io/iree-oss/bazel
+# Build and push the bazel-bindings image.
 docker build --tag "gcr.io/iree-oss/bazel-bindings:${TAG}" build_tools/docker/bazel_bindings/
 docker push "gcr.io/iree-oss/bazel-bindings:${TAG}"
-
-# Build and push the bazel-tensorflow image, which depends on
-# gcr.io/iree-oss/bazel
-docker build --tag "gcr.io/iree-oss/bazel-tensorflow:${TAG}" build_tools/docker/bazel_tensorflow/
-docker push "gcr.io/iree-oss/bazel-tensorflow:${TAG}"

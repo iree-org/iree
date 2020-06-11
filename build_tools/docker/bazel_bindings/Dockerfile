@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE with tensorflow integrations using bazel.
+# An image for building IREE with python bindings using bazel.
 
 # Build using:
-# docker build --tag gcr.io/iree-oss/bazel-tensorflow \
-#   build_tools/docker/bazel_tensorflow/
+# docker build --tag gcr.io/iree-oss/bazel-bindings \
+#   build_tools/docker/bazel_bindings/
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
 # docker run -it -rm --entrypoint bash --volume ${IREE_WORKDIR}:/usr/src/iree/ \
-#   gcr.io/iree-oss/bazel-tensorflow
+#   gcr.io/iree-oss/bazel-bindings
 
 # Set up the image and working directory.
 FROM gcr.io/iree-oss/bazel
 
-# Install python3, tensorflow and numpy.
+# Install python3 and numpy.
 RUN apt-get install -y python3 python3-dev python3-pip python3-setuptools \
   && python3 -m pip install --upgrade pip \
-  && python3 -m pip install numpy tf-nightly
+  && python3 -m pip install numpy
