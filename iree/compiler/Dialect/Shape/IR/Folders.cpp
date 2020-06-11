@@ -29,7 +29,7 @@ namespace Shape {
 //===----------------------------------------------------------------------===//
 
 LogicalResult safeCastCompatibleShapePattern(
-    CastCompatibleShapeOp op, CastCompatibleShapeOpOperandAdaptor operands,
+    CastCompatibleShapeOp op, CastCompatibleShapeOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   // TODO(laurenzo): This is just eliding if everything is the same. Make
   // it generic.
@@ -51,7 +51,7 @@ LogicalResult safeCastCompatibleShapePattern(
 }
 
 LogicalResult elideTiedGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOpOperandAdaptor operands,
+    GetRankedShapeOp op, GetRankedShapeOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   // If the immediate predecessor is a TieShapeOp, then this op can be
   // erased in favor of the input to the tie op.
@@ -65,7 +65,7 @@ LogicalResult elideTiedGetRankedShapePattern(
 }
 
 LogicalResult elideDuplicateGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOpOperandAdaptor operands,
+    GetRankedShapeOp op, GetRankedShapeOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   // If the immediate predecessor is a GetRankedShapeOp, then this op can be
   // erased in favor of the input to the tie op.
@@ -78,7 +78,7 @@ LogicalResult elideDuplicateGetRankedShapePattern(
 }
 
 LogicalResult elideStaticGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOpOperandAdaptor operands,
+    GetRankedShapeOp op, GetRankedShapeOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   auto operandType = operands.operand().getType().dyn_cast<RankedTensorType>();
   auto resultShapeType = op.shape().getType().dyn_cast<RankedShapeType>();
@@ -91,7 +91,7 @@ LogicalResult elideStaticGetRankedShapePattern(
 }
 
 LogicalResult identityMakeRankedShapePattern(
-    MakeRankedShapeOp op, MakeRankedShapeOpOperandAdaptor operands,
+    MakeRankedShapeOp op, MakeRankedShapeOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   if (operands.dynamic_dimensions().empty()) {
     // Do not match static shapes.
@@ -149,7 +149,7 @@ LogicalResult identityMakeRankedShapePattern(
 // shapex.make_ranked_shape ops which we need to delete for legality reasons.
 // This pattern allows conversions to erase those ops.
 LogicalResult eraseUnusedMakeRankedShapeOp(
-    MakeRankedShapeOp op, MakeRankedShapeOpOperandAdaptor operands,
+    MakeRankedShapeOp op, MakeRankedShapeOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   if (!op.getResult().use_empty())
     return rewriter.notifyMatchFailure(op, "op has uses");
@@ -158,7 +158,7 @@ LogicalResult eraseUnusedMakeRankedShapeOp(
 }
 
 LogicalResult dynamicMakeRankedShapeDimPattern(
-    RankedDimOp op, RankedDimOpOperandAdaptor operands,
+    RankedDimOp op, RankedDimOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   // If the immediate predecessor is a MakeRankedShapeOp, then this op can be
   // erased in favor of the corresponding input to that op.
@@ -187,9 +187,9 @@ LogicalResult dynamicMakeRankedShapeDimPattern(
   return success();
 }
 
-LogicalResult expandRankedShapeDimsPattern(RankedDimsOp op,
-                                           RankedDimsOpOperandAdaptor operands,
-                                           PatternRewriter &rewriter) {
+LogicalResult expandRankedShapeDimsPattern(
+    RankedDimsOp op, RankedDimsOp::OperandAdaptor operands,
+    PatternRewriter &rewriter) {
   auto shapeInput = operands.shape();
   auto rsType = shapeInput.getType().cast<RankedShapeType>();
   SmallVector<Value, 4> dims(rsType.getRank());
@@ -202,7 +202,7 @@ LogicalResult expandRankedShapeDimsPattern(RankedDimsOp op,
 }
 
 LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
-                                            TieShapeOpOperandAdaptor operands,
+                                            TieShapeOp::OperandAdaptor operands,
                                             PatternRewriter &rewriter) {
   // If the immediate predecessor is a TieShapeOp, then it can be possible
   // to merge these. This can often happen when function/block tie_shape
@@ -294,7 +294,7 @@ void RankedDimsOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 LogicalResult fromExtentTensorOfToExtentTensorIsIdentity(
-    FromExtentTensorOp op, FromExtentTensorOpOperandAdaptor operands,
+    FromExtentTensorOp op, FromExtentTensorOp::OperandAdaptor operands,
     PatternRewriter &rewriter) {
   auto toOp =
       dyn_cast_or_null<ToExtentTensorOp>(op.extent_tensor().getDefiningOp());
@@ -323,7 +323,7 @@ struct TieShapeTypeConversionPattern : public OpConversionPattern<TieShapeOp> {
   LogicalResult matchAndRewrite(
       TieShapeOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    TieShapeOpOperandAdaptor adaptor(operands);
+    TieShapeOp::OperandAdaptor adaptor(operands);
     Type operandType = adaptor.operand().getType();
     if (operandType == srcOp.getType()) {
       return failure();

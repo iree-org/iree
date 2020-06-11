@@ -425,7 +425,7 @@ LogicalResult PadOpConversion::apply(
     return op.emitError(
         "pad op with non-zero interiror_padding is not supported");
 
-  xla_hlo::PadOpOperandAdaptor adaptor(inputBuffers);
+  xla_hlo::PadOp::OperandAdaptor adaptor(inputBuffers);
   auto loc = op.getLoc();
 
   Attribute paddingConstVal = getInitValueAsConst(adaptor.padding_value());
@@ -543,7 +543,7 @@ struct TorchIndexSelectOpConversion
 LogicalResult TorchIndexSelectOpConversion::apply(
     xla_hlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  xla_hlo::TorchIndexSelectOpOperandAdaptor adaptor(inputBuffers);
+  xla_hlo::TorchIndexSelectOp::OperandAdaptor adaptor(inputBuffers);
   int axis = op.dim().getSExtValue();
   int batch = op.batch_dims().getSExtValue();
   auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
@@ -997,7 +997,7 @@ struct TensorReshapeOpConversion
   LogicalResult matchAndRewrite(
       linalg::TensorReshapeOp reshapeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    linalg::TensorReshapeOpOperandAdaptor adaptor(operands);
+    linalg::TensorReshapeOp::OperandAdaptor adaptor(operands);
     if (!reshapeOp.src().hasOneUse())
       return reshapeOp.emitError(
           "unhandled conversion of tensor_reshape op when operand has more "
@@ -1036,7 +1036,7 @@ struct ShapeOpPattern final : public OpConversionPattern<Shape::TieShapeOp> {
   LogicalResult matchAndRewrite(
       Shape::TieShapeOp shapeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    Shape::TieShapeOpOperandAdaptor adaptor(operands);
+    Shape::TieShapeOp::OperandAdaptor adaptor(operands);
     if (Value buffer = resolveResult(shapeOp.operand(), adaptor.operand(),
                                      shapeOp.result(), resultTensorToBufferMap))
       rewriter.replaceOp(shapeOp, buffer);
@@ -1110,7 +1110,7 @@ struct HALInterfaceStoreTensorOpEraser final
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceStoreTensorOp storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::InterfaceStoreTensorOpOperandAdaptor adaptor(operands);
+    IREE::HAL::InterfaceStoreTensorOp::OperandAdaptor adaptor(operands);
     Value operand = adaptor.operand();
     // If we are just storing the buffer back to itself again, we can trivially
     // remove this op. Otherwise, copy the content from the source buffer to the

@@ -34,7 +34,7 @@ class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
   LogicalResult matchAndRewrite(
       DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    DimOpOperandAdaptor operands(rawOperands);
+    DimOp::OperandAdaptor operands(rawOperands);
     if (!dimOp.memrefOrTensor().getType().isa<TensorType>() ||
         !IREE::HAL::TensorRewriteAdaptor::isValidNewType(
             operands.memrefOrTensor().getType())) {
