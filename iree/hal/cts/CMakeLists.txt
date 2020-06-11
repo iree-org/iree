@@ -68,3 +68,14 @@ iree_cc_test(
     iree::hal::driver_registry
     iree::testing::gtest
 )
+
+iree_cc_test(
+  NAME
+    semaphore_test
+  SRCS
+    "semaphore_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::hal::driver_registry
+    iree::testing::gtest
+)
