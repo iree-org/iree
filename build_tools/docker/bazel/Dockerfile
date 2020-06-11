@@ -33,14 +33,8 @@ ENV CXX clang++
 ENV CC clang
 ENV PYTHON_BIN /usr/bin/python3
 
-# TODO(meadowlark): Remove once tested.
-# Install the newest version of git. This is necessary because the checkout
-# action (https://github.com/actions/checkout) requires `git >= 2.18` for this
-# action to work with git submodules.
-# RUN apt-get install -y software-properties-common
-# RUN add-apt-repository ppa:git-core/ppa
-# RUN apt-get update
-# RUN apt-get install -y git
+# Install git for updating IREE's submodules.
+RUN apt-get install -y git
 
 # Install Bazel.
 # https://docs.bazel.build/versions/master/install-ubuntu.html
