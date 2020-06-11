@@ -34,7 +34,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
-option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
+option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
@@ -56,11 +56,15 @@ if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
 endif()
 
 if(${IREE_BUILD_COMPILER})
-  set(IREE_ENABLE_LLVM ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
+  set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
-if(${IREE_ENABLE_EMITC} AND NOT ${IREE_ENABLE_LLVM})
-  message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_LLVM to ON.")
+if(${IREE_ENABLE_EMITC} AND NOT ${IREE_ENABLE_MLIR})
+  message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
+endif()
+
+if (${IREE_ENABLE_MLIR})
+  set(IREE_MLIR_DEP_MODE "BUNDLED" CACHE STRING "One of BUNDLED (default), DISABLED, INSTALLED")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -177,7 +181,75 @@ mark_as_advanced(
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
-# Third-party dependencies
+# MLIR/LLVM Dependency
+# We treat the LLVM dependency specially because we support several different
+# ways to use it:
+#   - Bundled (default): a source dependency directly on the 
+#     third_party/llvm-project submodule.
+#   - External: An external (source or installed) dependency on LLVM.
+#   - Provided: When IREE is used as a sub-project, it is assumed that the LLVM
+#     dependency is added prior to including this configuration.
+#-------------------------------------------------------------------------------
+
+
+# Adds bundled projects that must be included after the LLVM directory has
+# been added and within the scope of its settings (i.e. build type override, 
+# etc).
+function(add_bundled_mlir_dependent_projects)
+  if(${IREE_ENABLE_EMITC})
+  add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
+  endif()
+endfunction()
+
+function(add_iree_mlir_src_dep llvm_monorepo_path)
+  # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm
+  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+  if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
+    set(CMAKE_BUILD_TYPE "Debug")
+  endif()
+
+  add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
+  add_bundled_mlir_dependent_projects()
+
+  # Reset CMAKE_BUILD_TYPE to its previous setting
+  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+endfunction()
+
+if(${IREE_ENABLE_MLIR})
+  if(${IREE_MLIR_DEP_MODE} STREQUAL "DISABLED")
+    message(STATUS "Not adding MLIR/LLVM dep due to IREE_MLIR_DEP_MODE=DISABLED")
+  elseif(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
+    message(STATUS "Adding bundled LLVM source dependency")
+    add_iree_mlir_src_dep("third_party/llvm-project")
+  elseif(${IREE_MLIR_DEP_MODE} STREQUAL "INSTALLED")
+    message(STATUS "Looking for installed MLIR/LLVM packages (configure with MLIR_DIR variable)")
+    find_package(MLIR REQUIRED CONFIG)
+    message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+    message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+    list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+    list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+    include(TableGen)
+    include(AddLLVM)
+    include(AddMLIR)
+    include(HandleLLVMOptions)
+
+    # Add include/link directories
+    include_directories(${LLVM_INCLUDE_DIRS})
+    include_directories(${MLIR_INCLUDE_DIRS})
+    link_directories(${LLVM_BUILD_LIBRARY_DIR})
+    add_definitions(${LLVM_DEFINITIONS})
+  else()
+    message(FATAL "Unsupported IREE_MLIR_DEP_MODE=${IREE_MLIR_DEP_MODE}")
+  endif()
+
+  include(external_tablegen_library)
+  add_bundled_mlir_dependent_projects()
+endif()
+
+
+#-------------------------------------------------------------------------------
+# Non-LLVM Dependencies
 #-------------------------------------------------------------------------------
 
 # Use the (deprecated) FindPythonInterp/FindPythonLibs functions before
@@ -209,25 +281,6 @@ add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
-
-if(${IREE_ENABLE_LLVM})
-  # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm
-  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
-  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
-  if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
-    set(CMAKE_BUILD_TYPE "Debug")
-  endif()
-
-  add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
-  if(${IREE_ENABLE_EMITC})
-    add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
-  endif()
-
-  # Reset CMAKE_BUILD_TYPE to its previous setting
-  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-
-  include(external_tablegen_library)
-endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
@@ -277,14 +330,14 @@ add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/test)
 
-if(${IREE_ENABLE_LLVM})
+if(${IREE_ENABLE_MLIR})
   # The VM requires LLVM to build its op definitions.
   add_subdirectory(iree/vm)
 endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
-elseif(${IREE_ENABLE_LLVM})
+elseif(${IREE_ENABLE_MLIR})
   # If not building the compiler, tablegen is still needed
   # to generate vm ops so deep include it only.
   add_subdirectory(iree/compiler/Dialect/IREE/Tools)
