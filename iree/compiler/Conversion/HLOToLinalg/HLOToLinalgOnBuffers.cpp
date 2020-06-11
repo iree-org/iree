@@ -393,7 +393,7 @@ LogicalResult ConvOpConversion::apply(
 
 namespace {
 /// Converts xla_hlo.pad operation to linalg.indexed_generic op.
-// TODO(GH-1604): Lower the pad op to a Linalg named op.
+// TODO(#1604): Lower the pad op to a Linalg named op.
 struct PadOpConversion
     : public ConvertToLinalgBufferOp<PadOpConversion, xla_hlo::PadOp> {
   using ConvertToLinalgBufferOp<PadOpConversion,

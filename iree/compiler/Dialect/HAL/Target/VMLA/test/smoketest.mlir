@@ -42,7 +42,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
-// TODO(GH-1245): support dynamic shapes here.
+// TODO(#1245): support dynamic shapes here.
 // flow.executable @shaped_dispatch {
 //   flow.dispatch.entry @entry
 //   module {

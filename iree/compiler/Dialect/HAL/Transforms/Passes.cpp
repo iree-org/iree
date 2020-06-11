@@ -45,7 +45,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
-  // TODO(GH-1036): when dynamic pass registration is supported we can just
+  // TODO(#1036): when dynamic pass registration is supported we can just
   // directly call TargetBackend::buildTranslationPassPipeline function. For now
   // we need to run each backend translation in isolation and we do that within
   // this pass.
@@ -85,7 +85,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
-  // TODO(GH-1036): run this once per hal.executable.target in a nested pass
+  // TODO(#1036): run this once per hal.executable.target in a nested pass
   // manager so that we have as many passes as hal.executable.target ops.
   if (transformOptions.serializeExecutables) {
     passManager.addPass(createSerializeExecutablesPass(targetOptions));

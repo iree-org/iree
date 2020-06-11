@@ -28,7 +28,7 @@ package(
 )
 
 iree_e2e_test_suite(
-    # TODO(GH-2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
+    # TODO(#2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
     name = "linspace_test",
     srcs = ["linspace_test.py"],
     backends = [
