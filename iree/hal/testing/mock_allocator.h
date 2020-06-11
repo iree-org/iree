@@ -26,26 +26,28 @@ class MockAllocator : public ::testing::StrictMock<Allocator> {
  public:
   MockAllocator() : ::testing::StrictMock<Allocator>() {}
 
-  MOCK_CONST_METHOD4(CanUseBufferLike,
-                     bool(Allocator* source_allocator,
-                          MemoryTypeBitfield memory_type,
-                          BufferUsageBitfield buffer_usage,
-                          BufferUsageBitfield intended_usage));
+  MOCK_METHOD(bool, CanUseBufferLike,
+              (Allocator * source_allocator, MemoryTypeBitfield memory_type,
+               BufferUsageBitfield buffer_usage,
+               BufferUsageBitfield intended_usage),
+              (const, override));
 
-  MOCK_CONST_METHOD3(CanAllocate, bool(MemoryTypeBitfield memory_type,
-                                       BufferUsageBitfield buffer_usage,
-                                       size_t allocation_size));
+  MOCK_METHOD(bool, CanAllocate,
+              (MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
+               size_t allocation_size),
+              (const, override));
 
-  MOCK_METHOD3(Allocate,
-               StatusOr<ref_ptr<Buffer>>(MemoryTypeBitfield memory_type,
-                                         BufferUsageBitfield buffer_usage,
-                                         size_t allocation_size));
+  MOCK_METHOD(StatusOr<ref_ptr<Buffer>>, Allocate,
+              (MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
+               size_t allocation_size),
+              (override));
 
-  MOCK_METHOD5(WrapMutable,
-               StatusOr<ref_ptr<Buffer>>(MemoryTypeBitfield memory_type,
-                                         MemoryAccessBitfield allowed_access,
-                                         BufferUsageBitfield buffer_usage,
-                                         void* data, size_t data_length));
+  MOCK_METHOD(StatusOr<ref_ptr<Buffer>>, WrapMutable,
+              (MemoryTypeBitfield memory_type,
+               MemoryAccessBitfield allowed_access,
+               BufferUsageBitfield buffer_usage, void* data,
+               size_t data_length),
+              (override));
 };
 
 }  // namespace testing
