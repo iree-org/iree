@@ -31,14 +31,14 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Converts tie_shape op to an insert shape and stride information into Memref
-// descritor.
+// Upateds memref descriptors shape and strides informations and fold tie_shape
+// into updated memref descriptor.
 class ConvertTieShapePattern : public ConvertToLLVMPattern {
  public:
   explicit ConvertTieShapePattern(MLIRContext *context,
-                                  LLVMTypeConverter &lowering_)
+                                  LLVMTypeConverter &typeconverter)
       : ConvertToLLVMPattern(Shape::TieShapeOp::getOperationName(), context,
-                             lowering_) {}
+                             typeconverter) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
@@ -57,14 +57,16 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
 
     // Update memref descriptor shape and strides.
     for (int i = 0; i < shape.size(); ++i) {
-      if (shape[i] == -1) {
+      if (shape[i] == ShapedType::kDynamicSize) {
         sourceMemRef.setSize(rewriter, loc, i,
                              makeRankedShapeOp.dynamic_dimensions()[i]);
       } else {
         sourceMemRef.setConstantSize(rewriter, loc, i, shape[i]);
       }
     }
-    // Compute and update memref descriptor strides,
+    // Compute and update memref descriptor strides. Assumption here is memrefs
+    // are row-major e.g following index linearization x[i, j, k] = i * x.dim[1]
+    // * x.dim[2] + j * x.dim[2] + k
     sourceMemRef.setConstantStride(rewriter, loc, shape.size() - 1, 1);
     for (int i = shape.size() - 2; i >= 0; --i) {
       auto stride_i = sourceMemRef.stride(rewriter, loc, i + 1);
@@ -81,20 +83,21 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
 class ConvertRankedDimPattern : public ConvertToLLVMPattern {
  public:
   explicit ConvertRankedDimPattern(MLIRContext *context,
-                                   LLVMTypeConverter &lowering_)
+                                   LLVMTypeConverter &typeconverter)
       : ConvertToLLVMPattern(Shape::RankedDimOp::getOperationName(), context,
-                             lowering_) {}
+                             typeconverter) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto rankedDimOp = cast<Shape::RankedDimOp>(op);
-    auto makeRankedShapeOp =
-        cast<Shape::MakeRankedShapeOp>(rankedDimOp.shape().getDefiningOp());
+    auto rankedDimOp = dyn_cast_or_null<Shape::RankedDimOp>(op);
+    if (!rankedDimOp) return failure();
+    auto makeRankedShapeOp = dyn_cast_or_null<Shape::MakeRankedShapeOp>(
+        rankedDimOp.shape().getDefiningOp());
     if (!makeRankedShapeOp) return failure();
     auto dimIndex = rankedDimOp.index();
     auto dynamicDims =
-        makeRankedShapeOp.dynamic_dimensions()[*dimIndex.getRawData()];
+        makeRankedShapeOp.dynamic_dimensions()[dimIndex.getSExtValue()];
     rewriter.replaceOp(op, dynamicDims);
     return success();
   }
@@ -103,13 +106,18 @@ class ConvertRankedDimPattern : public ConvertToLLVMPattern {
 class RemoveMakeRankedShape : public ConvertToLLVMPattern {
  public:
   explicit RemoveMakeRankedShape(MLIRContext *context,
-                                 LLVMTypeConverter &lowering_)
+                                 LLVMTypeConverter &typeconverter)
       : ConvertToLLVMPattern(Shape::MakeRankedShapeOp::getOperationName(),
-                             context, lowering_) {}
+                             context, typeconverter) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    // Check users are ops are going to be folded away.
+    for (auto user : op->getUsers()) {
+      if (!cast<Shape::TieShapeOp>(user) && !cast<Shape::RankedDimOp>(user))
+        return failure();
+    }
     rewriter.eraseOp(op);
     return success();
   }
@@ -133,10 +141,9 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToSCFConversionPatterns(patterns, &getContext());
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
+  populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
   patterns.insert<ConvertRankedDimPattern, ConvertTieShapePattern,
                   RemoveMakeRankedShape>(&getContext(), converter);
-  populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
-
   LLVMConversionTarget target(getContext());
   target.addDynamicallyLegalOp<FuncOp>(
       [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
