@@ -17,8 +17,8 @@ instructions.
 
 If you do not have your environment setup to use IREE with Vulkan (see
 [the doc](../../../docs/vulkan_and_spirv.md)), then you can run the tests with
-`IREE_AVAILABLE_BACKENDS=tf,iree_vmla` (that is, by omitting `iree_vulkan` from
-the list of available backends).
+`IREE_AVAILABLE_BACKENDS=tf,iree_vmla,iree_llvmjit` (that is, by omitting
+`iree_vulkan` from the list of available backends).
 
 ## Running tests
 
