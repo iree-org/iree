@@ -14,15 +14,19 @@
 // CHECK-DAG: return %[[EXT1]]
 // Verify that the generated flow.dispatch op properly inputs individual shape dims
 // CHECK: func @dynamicRankedShape(%[[ARG0:.+]]: tensor<7x?x24x?xf32>)
-// CHECK-DAG: %[[D1:.+]] = dim %[[ARG0]], 1
-// CHECK-DAG: %[[D3:.+]] = dim %[[ARG0]], 3
+// CHECK-DAG: %[[C1:.*]] = constant 1 : index
+// CHECK-DAG: %[[C3:.*]] = constant 3 : index
+// CHECK-DAG: %[[D1:.+]] = dim %[[ARG0]], %[[C1]]
+// CHECK-DAG: %[[D3:.+]] = dim %[[ARG0]], %[[C3]]
 // CHECK-DAG: %[[WORKLOAD0:.+]] = constant 1024 : index
 // CHECK-DAG: %[[DISPATCH:.+]] = flow.dispatch @dynamicRankedShape_ex_dispatch_0::@dynamicRankedShape_ex_dispatch_0[%[[WORKLOAD0]] : index](%[[ARG0]], %[[D1]], %[[D3]]) : (tensor<7x?x24x?xf32>, index, index)
 // CHECK-DAG: return %[[DISPATCH]]
 module @dynamicRankedShapeModule {
 func @dynamicRankedShape(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
-  %dim1 = dim %arg0, 1 : tensor<7x?x24x?xf32>
-  %dim3 = dim %arg0, 3 : tensor<7x?x24x?xf32>
+  %c1 = constant 1 : index
+  %c3 = constant 3 : index
+  %dim1 = dim %arg0, %c1 : tensor<7x?x24x?xf32>
+  %dim3 = dim %arg0, %c3 : tensor<7x?x24x?xf32>
   %workload0 = constant 1024 : index
   %shape0 = shapex.make_ranked_shape %dim1, %dim3 : (index, index) -> !shapex.ranked_shape<[7,?,24,?]>
   %1 = flow.dispatch.region[%workload0 : index](%arg1 = %arg0 : tensor<7x?x24x?xf32>, %arg2 = %shape0 : !shapex.ranked_shape<[7,?,24,?]>) -> tensor<?x?x1024xf32> {

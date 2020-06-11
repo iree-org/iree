@@ -18,7 +18,8 @@ func @f(%arg0: tensor<?xf32>) {
   // CHECK: dim
   // CHECK: shapex.make_ranked_shape
   %t = addf %arg0, %arg0 : tensor<?xf32>
-  %dim = dim %t, 0 : tensor<?xf32>
+  %c0 = constant 0 : index
+  %dim = dim %t, %c0 : tensor<?xf32>
   %shape = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?]>
   shapex.tie_shape %t, %shape : tensor<?xf32>, !shapex.ranked_shape<[?]>
   return
