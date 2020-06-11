@@ -70,8 +70,6 @@ iree_check_single_backend_test_suite(
         # "gather.mlir",
         # "gather_concat.mlir",
         #
-        "gemm.mlir",
-        "gemm_large.mlir",
         "log.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -122,8 +120,6 @@ iree_check_single_backend_test_suite(
         "divide.mlir",
         "dot.mlir",
         "exponential.mlir",
-        "gemm.mlir",
-        "gemm_large.mlir",
         "log.mlir",
         "maximum.mlir",
         "minimum.mlir",
