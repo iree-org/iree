@@ -167,7 +167,7 @@ cc_binary(
         "//experimental/ModelBuilder:VulkanLaunchWrapper",
         "//iree/base:initializer",
         "//iree/compiler/Conversion/LinalgToSPIRV",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",
