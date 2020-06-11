@@ -50,7 +50,7 @@ cc_library(
         ":ShapeOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Utils",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:Parser",

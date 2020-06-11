@@ -31,10 +31,10 @@ cc_library(
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/schemas:llvmir_executable_def_cc_fbs",
-        "@llvm-project//llvm:ir",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
         # TODO(ataei): Link with native target dep.
-        "@llvm-project//llvm:x86_target",
+        "@llvm-project//llvm:X86CodeGen",
         "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
@@ -53,8 +53,8 @@ cc_library(
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/schemas:dylib_executable_def_cc_fbs",
-        "@llvm-project//llvm:ir",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
@@ -69,10 +69,10 @@ cc_library(
     ],
     deps = [
         ":LLVMTargetOptions",
-        "@llvm-project//llvm:ir",
-        "@llvm-project//llvm:passes",
-        "@llvm-project//llvm:support",
-        "@llvm-project//llvm:target_base",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Passes",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
         "@llvm-project//mlir:Support",
     ],
 )
@@ -86,7 +86,7 @@ cc_library(
         "LLVMTargetOptions.h",
     ],
     deps = [
-        "@llvm-project//llvm:passes",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Passes",
+        "@llvm-project//llvm:Support",
     ],
 )

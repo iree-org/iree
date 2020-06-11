@@ -55,7 +55,7 @@ cc_library(
         ":VMOpInterfaceGen",
         ":VMOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
