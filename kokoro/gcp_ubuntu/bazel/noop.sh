@@ -1,6 +1,6 @@
-# Format: //devtools/kokoro/config/proto/build.proto
+#!/bin/bash
 
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 # Common configuration for Kokoro builds that run the core build on bazel on
 # linux.
 
-# We point to another kokoro build configuration here as a part of moving the
-# old `kokoro/gcp_ubuntu/bazel/ configuration to `kokoro/gcp_ubuntu/bazel/core/`
-# TODO: Remove this file once it is disabled internally in kokoro.
-build_file: "iree/kokoro/gcp_ubuntu/bazel/noop.sh"
+# This file is intentionally left empty, and will be removed soon. This is being
+# done as a part of moving `kokoro/gcp_ubuntu/bazel/` to
+# `kokoro/gcp_ubuntu/bazel/core/`, and allows for our CI to gracefully stop
+# using this build config.
