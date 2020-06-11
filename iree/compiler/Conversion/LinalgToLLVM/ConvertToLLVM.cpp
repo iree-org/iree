@@ -69,9 +69,9 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
     // * x.dim[2] + j * x.dim[2] + k
     sourceMemRef.setConstantStride(rewriter, loc, shape.size() - 1, 1);
     for (int i = shape.size() - 2; i >= 0; --i) {
-      auto stride_i = sourceMemRef.stride(rewriter, loc, i + 1);
-      auto dim_i = sourceMemRef.size(rewriter, loc, i + 1);
-      Value strideVal = rewriter.create<LLVM::MulOp>(loc, stride_i, dim_i);
+      auto stride = sourceMemRef.stride(rewriter, loc, i + 1);
+      auto dim = sourceMemRef.size(rewriter, loc, i + 1);
+      Value strideVal = rewriter.create<LLVM::MulOp>(loc, stride, dim);
       sourceMemRef.setStride(rewriter, loc, i, strideVal);
     }
     rewriter.replaceOp(tieShapeOp, {sourceMemRef});
@@ -142,6 +142,10 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
   populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
+  // The following patterns resolves dynamic shapes by subbsitating tie_shape
+  // ops with an updated memref descriptors and replacing RankDimOp with actual
+  // index loaded from memref<?xi32> that holds all dynamic shapes
+  // push constants.
   patterns.insert<ConvertRankedDimPattern, ConvertTieShapePattern,
                   RemoveMakeRankedShape>(&getContext(), converter);
   LLVMConversionTarget target(getContext());
