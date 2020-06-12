@@ -179,7 +179,10 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_binary(
+# TODO(scotttodd): clean up bazel_to_cmake handling here
+#   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
+#   * the output file name is platform-specific, get it with $<TARGET_FILE:>
+iree_cc_library(
   NAME
     dynamic_library_test_library.so
   OUT
@@ -187,13 +190,14 @@ iree_cc_binary(
   SRCS
     "dynamic_library_test_library.cc"
   TESTONLY
+  SHARED
 )
 
 iree_cc_embed_data(
   NAME
     dynamic_library_test_library
-  SRCS
-    ":dynamic_library_test_library.so"
+  GENERATED_SRCS
+    "$<TARGET_FILE:iree::base::dynamic_library_test_library.so>"
   CC_FILE_OUTPUT
     "dynamic_library_test_library_embed.cc"
   H_FILE_OUTPUT
