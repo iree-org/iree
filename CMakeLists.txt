@@ -220,6 +220,9 @@ if(${IREE_ENABLE_MLIR})
   if(${IREE_MLIR_DEP_MODE} STREQUAL "DISABLED")
     message(STATUS "Not adding MLIR/LLVM dep due to IREE_MLIR_DEP_MODE=DISABLED")
   elseif(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
+    # TODO: See iree_copts.cmake where it sets include directories for this
+    # case. This should be cleaned up to be all in one place or the other for
+    # all modes.
     message(STATUS "Adding bundled LLVM source dependency")
     add_iree_mlir_src_dep("third_party/llvm-project")
   elseif(${IREE_MLIR_DEP_MODE} STREQUAL "INSTALLED")
@@ -363,3 +366,6 @@ iree_complete_binary_link_options()
 if(${IREE_BUILD_PYTHON_BINDINGS})
   iree_complete_py_extension_link_options()
 endif()
+
+set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
+    CACHE INTERNAL "IREE: Include Directories" FORCE)
