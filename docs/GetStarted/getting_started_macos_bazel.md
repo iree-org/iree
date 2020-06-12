@@ -1,4 +1,4 @@
-# Getting Started on Linux with Bazel
+# Getting Started on MacOS with Bazel
 
 <!--
 Notes to those updating this guide:
@@ -6,31 +6,61 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_windows_bazel.md and
-      getting_started_macos_bazel.md
+    * This document parallels getting_started_linux_bazel.md and
+      getting_started_windows_bazel.md
       Please keep them in sync.
 -->
 
 This guide walks through building the core compiler and runtime parts of IREE
 from source. Auxiliary components like the Python bindings and Vulkan driver are
-documented separately, as they require further setup.
+not documented for MacOS at this time.
+
+IREE is not officially supported on MacOS at this time. It may work, but it is
+not a part of our open source CI, and may be intermittently broken.
+Contributions related to MacOS support and documentation are welcome however.
 
 ## Prerequisites
 
 ### Install Bazel
 
-Install Bazel version > 2.0.0 (see
-[.bazelversion](https://github.com/google/iree/blob/master/.bazelversion) for
-the specific version IREE uses) by following the
-[official docs](https://docs.bazel.build/versions/master/install.html).
+Install the version of Bazel found in
+[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion).
+
+#### Install xcode.
+
+If you've already installed `xcode-select` and this fails with it can likely be
+ignored.
+
+```
+$ sudo xcodebuild -license accept
+```
+
+#### Download and install Bazel from a binary.
+```
+# Example using Bazel version `2.1.0`
+$ export BAZEL_VERSION=2.1.0
+
+# Download and install
+$ curl -LO "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
+$ chmod +x "bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
+$ ./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh
+
+# Add to path
+$ echo -e '\n# Add bazel to PATH:\nexport PATH="${PATH}:${HOME}/bin"' >> ~/.zshrc
+$ source ~/.zshrc
+
+# Confirm the version
+$ bazel --version # 2.1.0
+```
+
+See the
+[official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
+for additional guidance if needed.
 
 ### Install a Compiler
 
-We recommend Clang. GCC is not fully supported.
-
-```shell
-$ sudo apt install clang
-```
+We recommend Clang. GCC is not fully supported. Appropriate versions of `clang`
+and `clang++` ship with MacOS by default.
 
 Set environment variables for Bazel:
 
@@ -42,7 +72,7 @@ export CXX=clang++
 ### Install python3 numpy
 
 ```
-$ python3 -m pip install numpy
+$ python3 -m pip install numpy --user
 ```
 
 ## Clone and Build
@@ -64,16 +94,18 @@ $ python3 configure_bazel.py
 
 ### Build
 
-Run all core tests:
+Run all core tests that pass on our OSS CI:
 
 ```shell
-$ bazel test -k iree/...
+$ bazel test -k //iree/... \
+    --test_env=IREE_VULKAN_DISABLE=1 \
+    --build_tag_filters="-nokokoro" \
+    --test_tag_filters="--nokokoro,-driver=vulkan"
 ```
 
 > Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;You can add flags like
-> `--test_env=IREE_VULKAN_DISABLE=1` to your test command to change how/which
-> tests run.
+> &nbsp;&nbsp;&nbsp;&nbsp;Not all tests are passing on MacOS, but the build does
+> complete successfully at the time of writing.
 
 In general, build artifacts will be under the `bazel-bin` directory at the top
 level.
@@ -81,7 +113,7 @@ level.
 ## Recommended user.bazelrc
 
 You can put a user.bazelrc at the root of the repository and it will be ignored
-by git. The recommended contents for Linux are:
+by git. The recommended contents for Linux/MacOS are:
 
 ```
 build --disk_cache=/tmp/bazel-cache
@@ -123,7 +155,10 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir -input-valu
 
 *   For an introduction to IREE's project structure and developer tools, see
     [Developer Overview](../developer_overview.md)
+<!--
+TODO: Link to MacOS versions of these guides once they are developed.
 *   To target GPUs using Vulkan, see
     [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 *   To use IREE's Python bindings, see
     [Getting Started with Python](getting_started_python.md)
+ -->
