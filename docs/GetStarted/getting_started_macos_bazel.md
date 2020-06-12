@@ -26,36 +26,36 @@ Contributions related to MacOS support and documentation are welcome however.
 Install the version of Bazel found in
 [`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion).
 
-#### Install xcode.
+#### Install Xcode.
 
-If you've already installed `xcode-select` and this fails with it can likely be
-ignored.
+Running this may be sufficient (and takes up much less disk space):
 
 ```
-$ sudo xcodebuild -license accept
+$ xcode-select --install
 ```
+
+If you run into complications, see the
+[official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
+for guidance.
 
 #### Download and install Bazel from a binary.
+
 ```
 # Example using Bazel version `2.1.0`
-$ export BAZEL_VERSION=2.1.0
+$ export BAZEL_VERSION=2.1.0  # Use the version in .bazelversion
 
 # Download and install
 $ curl -LO "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
 $ chmod +x "bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
 $ ./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh
 
-# Add to path
+# Add to path in `.zshrc`. Swap with `.bashrc` if you are using bash.
 $ echo -e '\n# Add bazel to PATH:\nexport PATH="${PATH}:${HOME}/bin"' >> ~/.zshrc
 $ source ~/.zshrc
 
 # Confirm the version
 $ bazel --version # 2.1.0
 ```
-
-See the
-[official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
-for additional guidance if needed.
 
 ### Install a Compiler
 

@@ -25,7 +25,7 @@ documented separately, as they require further setup.
 ### Install Bazel
 
 Install Bazel version > 2.0.0 (see
-[.bazelversion](https://github.com/google/iree/blob/master/.bazelversion) for
+[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion) for
 the specific version IREE uses) by following the
 [official docs](https://docs.bazel.build/versions/master/install-windows.html).
 
