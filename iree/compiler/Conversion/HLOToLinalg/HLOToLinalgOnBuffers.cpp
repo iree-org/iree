@@ -998,10 +998,6 @@ struct TensorReshapeOpConversion
       linalg::TensorReshapeOp reshapeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     linalg::TensorReshapeOp::OperandAdaptor adaptor(operands);
-    if (!reshapeOp.src().hasOneUse())
-      return reshapeOp.emitError(
-          "unhandled conversion of tensor_reshape op when operand has more "
-          "than one uses");
     if (Value buffer =
             resolveResult(reshapeOp.src(), adaptor.src(), reshapeOp.result(),
                           resultTensorToBufferMap))
