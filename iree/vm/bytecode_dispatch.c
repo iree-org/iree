@@ -453,6 +453,19 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     //===------------------------------------------------------------------===//
+    // Lists
+    //===------------------------------------------------------------------===//
+
+    DISPATCH_OP(ListAlloc, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListReserve, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListSize, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListResize, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListGetI32, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListSetI32, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListGetRef, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListSetRef, { return IREE_STATUS_UNIMPLEMENTED; });
+
+    //===------------------------------------------------------------------===//
     // Conditional assignment
     //===------------------------------------------------------------------===//
 

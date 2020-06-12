@@ -68,8 +68,13 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       }
     } else if (auto rodataOp = dyn_cast<ConstRefRodataOp>(op)) {
       os << rodataOp.rodata();
-    } else if (op->getResult(0).getType().isa<IREE::VM::RefType>()) {
-      os << "ref";
+    } else if (auto refType =
+                   op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
+      if (refType.getObjectType().isa<ListType>()) {
+        os << "list";
+      } else {
+        os << "ref";
+      }
     } else if (isa<CmpEQI32Op>(op)) {
       os << "eq";
     } else if (isa<CmpNEI32Op>(op)) {
@@ -175,7 +180,7 @@ struct VMFolderInterface : public OpFolderDialectInterface {
 
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
-  addTypes<IREE::VM::OpaqueType, IREE::VM::RefType>();
+  addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
   addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
 
 #define GET_OP_LIST
@@ -191,7 +196,22 @@ VMDialect::VMDialect(MLIRContext *context)
 Type VMDialect::parseType(DialectAsmParser &parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec.consume_front("ref")) {
+  if (spec.consume_front("list")) {
+    if (!spec.consume_front("<") || !spec.consume_back(">")) {
+      parser.emitError(parser.getCurrentLocation())
+          << "malformed list type '" << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    auto elementType = mlir::parseType(spec, getContext());
+    if (!elementType) {
+      parser.emitError(parser.getCurrentLocation())
+          << "invalid list element type specification: '"
+          << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    return IREE::VM::RefType::getChecked(
+        IREE::VM::ListType::getChecked(elementType, loc), loc);
+  } else if (spec.consume_front("ref")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
           << "malformed ref_ptr type '" << parser.getFullSymbolSpec() << "'";
@@ -221,7 +241,9 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
   switch (type.getKind()) {
     case IREE::VM::TypeKind::Ref: {
       auto objectType = type.cast<IREE::VM::RefType>().getObjectType();
-      if (objectType.isa<IREE::VM::OpaqueType>()) {
+      if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
+        os << "list<" << listType.getElementType() << ">";
+      } else if (objectType.isa<IREE::VM::OpaqueType>()) {
         os << "ref<?>";
       } else {
         os << "ref<" << objectType << ">";

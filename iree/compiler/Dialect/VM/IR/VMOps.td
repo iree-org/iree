@@ -711,10 +711,231 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
 }
 
 //===----------------------------------------------------------------------===//
-// ref_ptr operations
+// Lists
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): model retain/release in here?
+// TODO(benvanik): vm.list.push.i32 / vm.list.pop.i32 (variadic)
+// TODO(benvanik): vm.list.copy(src_list, src_index, dst_list, dst_index, length)
+// TODO(benvanik): vm.list.slice(list, index, length) -> list
+// TODO(benvanik): export into a rwdata buffer
+
+def VM_ListAllocOp :
+    VM_PureOp<"list.alloc", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{allocates a new empty list}];
+  let description = [{
+    Allocates a new typed list with a minimum initial_capacity.
+  }];
+
+  let arguments = (ins
+    I32:$initial_capacity
+  );
+  let results = (outs
+    VM_AnyList:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($initial_capacity) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListAlloc>,
+    VM_EncType<"result().getType().cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()">,
+    VM_EncOperand<"initial_capacity", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_ListReserveOp :
+    VM_Op<"list.reserve", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{reserves capacity for list growth}];
+  let description = [{
+    Reserves storage for at least minimum_capacity elements. If the list already
+    has at least the specified capacity the operation is ignored.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$minimum_capacity
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListReserve>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"minimum_capacity", 1>,
+  ];
+}
+
+def VM_ListSizeOp :
+    VM_Op<"list.size", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{the size of the list in elements}];
+  let description = [{
+    Returns the current size of the list in elements.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list
+  );
+  let results = (outs
+    I32:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListSize>,
+    VM_EncOperand<"list", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_ListResizeOp :
+    VM_Op<"list.resize", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{resizes the list to a new count in elements}];
+  let description = [{
+    Resizes the list to contain new_size elements. This will either truncate
+    the list if the existing size is greater than new_size or extend the list
+    with the default list value of 0 if storing primitives and null if refs.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$new_size
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($new_size) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListResize>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"new_size", 1>,
+  ];
+}
+
+class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                            list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let summary = [{primitive type element accessor}];
+  let description = [{
+    Returns the value of the element at the given index.
+  }];
+
+  let arguments = (ins
+    VM_ListOf<VM_PrimitiveType>:$list,
+    I32:$index
+  );
+  let results = (outs
+    type:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncResult<"result">,
+  ];
+}
+
+class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                            list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let summary = [{primitive type element mutator}];
+  let description = [{
+    Sets the element at the given index to the new value.
+  }];
+
+  let arguments = (ins
+    VM_ListOf<VM_PrimitiveType>:$list,
+    I32:$index,
+    type:$value
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`";
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncOperand<"value", 2>,
+  ];
+}
+
+def VM_ListGetI32Op :
+    VM_ListGetPrimitiveOp<I32, "list.get.i32", VM_OPC_ListGetI32> {}
+
+def VM_ListSetI32Op :
+    VM_ListSetPrimitiveOp<I32, "list.set.i32", VM_OPC_ListSetI32> {}
+
+def VM_ListGetRefOp :
+    VM_PureOp<"list.get.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{ref type element accessor}];
+  let description = [{
+    Returns the ref value of the element at the given index. Note that the value
+    may be null if the element is null or the type does not match.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$index
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListGetRef>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncTypeOf<"result">,
+    VM_EncResult<"result">,
+  ];
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
+def VM_ListSetRefOp :
+    VM_Op<"list.set.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{ref type element mutator}];
+  let description = [{
+    Sets the element at the given index to the new ref value (possibly null).
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$index,
+    VM_AnyRef:$value
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListSetRef>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncOperand<"value", 2>,
+  ];
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
 
 //===----------------------------------------------------------------------===//
 // Conditional assignment
