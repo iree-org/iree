@@ -52,6 +52,7 @@ CompilerModuleBundle LoadXlaModuleProto(
 
   for (auto func : module->getOps<mlir::FuncOp>()) {
     func.setAttr("iree.module.export", mlir::UnitAttr::get(func.getContext()));
+    func.setVisibility(mlir::FuncOp::Visibility::Public);
   }
 
   return CompilerModuleBundle(context_bundle, module.release());
