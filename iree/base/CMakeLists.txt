@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(internal)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
@@ -168,7 +168,7 @@ iree_cc_library(
     "dynamic_library_win32.cc"
   LINKOPTS
     ${_DYNAMIC_LIBRARY_LINKOPTS}
-DEPS
+  DEPS
     ::logging
     ::platform_headers
     ::status
@@ -177,6 +177,47 @@ DEPS
     absl::memory
     absl::span
   PUBLIC
+)
+
+iree_cc_binary(
+  NAME
+    dynamic_library_test_library.so
+  OUT
+    dynamic_library_test_library.so
+  SRCS
+    "dynamic_library_test_library.cc"
+  TESTONLY
+)
+
+iree_cc_embed_data(
+  NAME
+    dynamic_library_test_library
+  SRCS
+    ":dynamic_library_test_library.so"
+  CC_FILE_OUTPUT
+    "dynamic_library_test_library_embed.cc"
+  H_FILE_OUTPUT
+    "dynamic_library_test_library_embed.h"
+  TESTONLY
+  CPP_NAMESPACE
+    "iree"
+  FLATTEN
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dynamic_library_test
+  SRCS
+    "dynamic_library_test.cc"
+  DEPS
+    ::dynamic_library
+    ::dynamic_library_test_library
+    ::file_io
+    ::status
+    ::status_matchers
+    ::target_platform
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -201,6 +242,7 @@ iree_cc_library(
     "file_io.h"
   DEPS
     ::status
+    absl::strings
   PUBLIC
 )
 
@@ -359,15 +401,16 @@ iree_cc_library(
 iree_cc_library(
   NAME
     main
+  HDRS
+    "main.h"
   SRCS
     "main_posix.cc"
     "main_win32.cc"
-  HDRS
-    "main.h"
   DEPS
-    iree::base::logging
-    iree::base::platform_headers
-    iree::base::target_platform
+    ::logging
+    ::platform_headers
+    ::target_platform
+  PUBLIC
 )
 
 iree_cc_library(
