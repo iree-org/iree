@@ -142,7 +142,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
   populateLinalgToLLVMConversionPatterns(converter, patterns, &getContext());
-  // The following patterns resolves dynamic shapes by subbsitating tie_shape
+  // The following patterns resolves dynamic shapes by substituting tie_shape
   // ops with an updated memref descriptors and replacing RankDimOp with actual
   // index loaded from memref<?xi32> that holds all dynamic shapes
   // push constants.
