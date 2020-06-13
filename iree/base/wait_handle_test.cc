@@ -384,10 +384,10 @@ class MockWaitableObject : public ::testing::StrictMock<WaitableObject> {
  public:
   MockWaitableObject() : ::testing::StrictMock<WaitableObject>() {}
 
-  MOCK_CONST_METHOD0(DebugString, std::string());
-  MOCK_METHOD1(AcquireFdForWait,
-               StatusOr<std::pair<FdType, int>>(absl::Time deadline));
-  MOCK_METHOD1(TryResolveWakeOnFd, StatusOr<bool>(int fd));
+  MOCK_METHOD(std::string, DebugString, (), (const, override));
+  MOCK_METHOD((StatusOr<std::pair<FdType, int>>), AcquireFdForWait,
+              (absl::Time deadline), (override));
+  MOCK_METHOD(StatusOr<bool>, TryResolveWakeOnFd, (int fd), (override));
 
   WaitHandle OnSomething() { return WaitHandle(add_ref(this)); }
 };

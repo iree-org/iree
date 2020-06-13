@@ -36,7 +36,6 @@ iree_train_test_suite(
     tags = [
         "guitar",
         "manual",
-        "noga",
         "nokokoro",
         "notap",
     ],
@@ -55,7 +54,6 @@ iree_train_test_suite(
     ],
     tags = [
         "manual",
-        "noga",
         "nokokoro",
         "notap",
     ],

@@ -35,6 +35,8 @@ cc_library(
         "//iree/hal:driver_registry",
 
         # HAL driver modules.
+        "//iree/hal/dylib:dylib_driver_module",  # build-cleaner: keep
+        "//iree/hal/llvmjit:llvmjit_driver_module",  # build-cleaner: keep
         "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
         # "//iree/hal/dawn:dawn_driver_module",  # build-cleaner: keep
@@ -68,6 +70,16 @@ cc_test(
 cc_test(
     name = "device_creation_test",
     srcs = ["device_creation_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal:driver_registry",
+        "//iree/testing:gtest",
+    ],
+)
+
+cc_test(
+    name = "semaphore_test",
+    srcs = ["semaphore_test.cc"],
     deps = [
         ":cts_test_base",
         "//iree/hal:driver_registry",

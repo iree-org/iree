@@ -117,7 +117,6 @@ iree_py_test(
     python_version = "PY3",
     # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = NUMPY_DEPS + [
@@ -142,7 +141,6 @@ iree_py_test(
     name = "system_api_test",
     srcs = ["system_api_test.py"],
     python_version = "PY3",
-    tags = ["noga"],
     deps = NUMPY_DEPS + [
         ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep

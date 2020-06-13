@@ -232,7 +232,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
   LogicalResult matchAndRewrite(
       xla_hlo::GatherOp gatherOp, ArrayRef<Value> operandValues,
       ConversionPatternRewriter &rewriter) const override {
-    xla_hlo::GatherOpOperandAdaptor operands(operandValues);
+    xla_hlo::GatherOp::OperandAdaptor operands(operandValues);
     auto dimension_numbers = gatherOp.dimension_numbers();
     if (dimension_numbers.index_vector_dim().getValue().getSExtValue() != 0) {
       gatherOp.emitRemark()
@@ -407,7 +407,7 @@ struct DynamicSliceOpConversion
   LogicalResult matchAndRewrite(
       xla_hlo::DynamicSliceOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    xla_hlo::DynamicSliceOpOperandAdaptor operands(rawOperands);
+    xla_hlo::DynamicSliceOp::OperandAdaptor operands(rawOperands);
     // TODO(benvanik): if the source is only used by this op then replace with
     // a vmla.buffer.view op.
 

@@ -31,64 +31,76 @@ class MockCommandBuffer : public ::testing::StrictMock<CommandBuffer> {
 
   bool is_recording() const override { return false; }
 
-  MOCK_METHOD0(Begin, Status());
-  MOCK_METHOD0(End, Status());
+  MOCK_METHOD(Status, Begin, (), (override));
+  MOCK_METHOD(Status, End, (), (override));
 
-  MOCK_METHOD4(ExecutionBarrier,
-               Status(ExecutionStageBitfield source_stage_mask,
-                      ExecutionStageBitfield target_stage_mask,
-                      absl::Span<const MemoryBarrier> memory_barriers,
-                      absl::Span<const BufferBarrier> buffer_barriers));
+  MOCK_METHOD(Status, ExecutionBarrier,
+              (ExecutionStageBitfield source_stage_mask,
+               ExecutionStageBitfield target_stage_mask,
+               absl::Span<const MemoryBarrier> memory_barriers,
+               absl::Span<const BufferBarrier> buffer_barriers),
+              (override));
 
-  MOCK_METHOD2(SignalEvent,
-               Status(Event* event, ExecutionStageBitfield source_stage_mask));
+  MOCK_METHOD(Status, SignalEvent,
+              (Event * event, ExecutionStageBitfield source_stage_mask),
+              (override));
 
-  MOCK_METHOD2(ResetEvent,
-               Status(Event* event, ExecutionStageBitfield source_stage_mask));
+  MOCK_METHOD(Status, ResetEvent,
+              (Event * event, ExecutionStageBitfield source_stage_mask),
+              (override));
 
-  MOCK_METHOD5(WaitEvents,
-               Status(absl::Span<Event*> events,
-                      ExecutionStageBitfield source_stage_mask,
-                      ExecutionStageBitfield target_stage_mask,
-                      absl::Span<const MemoryBarrier> memory_barriers,
-                      absl::Span<const BufferBarrier> buffer_barriers));
+  MOCK_METHOD(Status, WaitEvents,
+              (absl::Span<Event*> events,
+               ExecutionStageBitfield source_stage_mask,
+               ExecutionStageBitfield target_stage_mask,
+               absl::Span<const MemoryBarrier> memory_barriers,
+               absl::Span<const BufferBarrier> buffer_barriers),
+              (override));
 
-  MOCK_METHOD5(FillBuffer,
-               Status(Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length, const void* pattern,
-                      size_t pattern_length));
+  MOCK_METHOD(Status, FillBuffer,
+              (Buffer * target_buffer, device_size_t target_offset,
+               device_size_t length, const void* pattern,
+               size_t pattern_length),
+              (override));
 
-  MOCK_METHOD1(DiscardBuffer, Status(Buffer* buffer));
+  MOCK_METHOD(Status, DiscardBuffer, (Buffer * buffer), (override));
 
-  MOCK_METHOD5(UpdateBuffer,
-               Status(const void* source_buffer, device_size_t source_offset,
-                      Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length));
+  MOCK_METHOD(Status, UpdateBuffer,
+              (const void* source_buffer, device_size_t source_offset,
+               Buffer* target_buffer, device_size_t target_offset,
+               device_size_t length),
+              (override));
 
-  MOCK_METHOD5(CopyBuffer,
-               Status(Buffer* source_buffer, device_size_t source_offset,
-                      Buffer* target_buffer, device_size_t target_offset,
-                      device_size_t length));
+  MOCK_METHOD(Status, CopyBuffer,
+              (Buffer * source_buffer, device_size_t source_offset,
+               Buffer* target_buffer, device_size_t target_offset,
+               device_size_t length),
+              (override));
 
-  MOCK_METHOD3(PushConstants,
-               Status(ExecutableLayout* executable_layout, size_t offset,
-                      absl::Span<const uint32_t> values));
+  MOCK_METHOD(Status, PushConstants,
+              (ExecutableLayout * executable_layout, size_t offset,
+               absl::Span<const uint32_t> values),
+              (override));
 
-  MOCK_METHOD3(PushDescriptorSet,
-               Status(ExecutableLayout* executable_layout, int32_t set,
-                      absl::Span<const DescriptorSet::Binding> bindings));
-  MOCK_METHOD4(BindDescriptorSet,
-               Status(ExecutableLayout* executable_layout, int32_t set,
-                      DescriptorSet* descriptor_set,
-                      absl::Span<const device_size_t> dynamic_offsets));
+  MOCK_METHOD(Status, PushDescriptorSet,
+              (ExecutableLayout * executable_layout, int32_t set,
+               absl::Span<const DescriptorSet::Binding> bindings),
+              (override));
+  MOCK_METHOD(Status, BindDescriptorSet,
+              (ExecutableLayout * executable_layout, int32_t set,
+               DescriptorSet* descriptor_set,
+               absl::Span<const device_size_t> dynamic_offsets),
+              (override));
 
-  MOCK_METHOD3(Dispatch, Status(Executable* executable, int32_t entry_point,
-                                std::array<uint32_t, 3> workgroups));
+  MOCK_METHOD(Status, Dispatch,
+              (Executable * executable, int32_t entry_point,
+               (std::array<uint32_t, 3> workgroups)),
+              (override));
 
-  MOCK_METHOD4(DispatchIndirect,
-               Status(Executable* executable, int32_t entry_point,
-                      Buffer* workgroups_buffer,
-                      device_size_t workgroups_offset));
+  MOCK_METHOD(Status, DispatchIndirect,
+              (Executable * executable, int32_t entry_point,
+               Buffer* workgroups_buffer, device_size_t workgroups_offset),
+              (override));
 };
 
 }  // namespace testing

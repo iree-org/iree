@@ -23,5 +23,4 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
-    mlir-translate
 )

@@ -137,12 +137,15 @@ if(IREE_USE_LINKER)
   set(LLVM_USE_LINKER ${IREE_USE_LINKER} CACHE STRING "" FORCE)
 endif()
 
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-  ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-  ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-)
+# TODO: This should go in add_iree_mlir_src_dep at the top level.
+if(IREE_MLIR_DEP_MODE STREQUAL "BUNDLED")
+  list(APPEND IREE_COMMON_INCLUDE_DIRS
+    ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+    ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
+    ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+    ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+  )
+endif()
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 set(IREE_TABLEGEN_EXE iree-tblgen)

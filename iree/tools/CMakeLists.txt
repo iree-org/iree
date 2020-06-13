@@ -88,7 +88,7 @@ iree_cc_binary(
     ${IREE_HAL_DRIVER_MODULES}
 )
 
-if(${IREE_ENABLE_LLVM})
+if(${IREE_ENABLE_MLIR})
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -382,7 +382,7 @@ iree_cc_test(
     iree::vm::variant_list
 )
 
-if(${IREE_ENABLE_LLVM})
+if(${IREE_ENABLE_MLIR})
   add_custom_target(IreeFileCheck ALL
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
   )

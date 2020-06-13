@@ -17,9 +17,14 @@
 # Build using:
 # docker build --tag gcr.io/iree-oss/bazel build_tools/docker/bazel/
 
+# Run interactively using the following, where IREE_WORKDIR is the path to your
+# local dev environment:
+# docker run -it -rm --entrypoint bash --volume ${IREE_WORKDIR}:/usr/src/iree/ \
+#   gcr.io/iree-oss/bazel
+
 # Set up the image and working directory.
 FROM ubuntu:18.04
-WORKDIR /usr/src/git
+WORKDIR /usr/src/iree
 
 RUN apt-get update
 
@@ -28,22 +33,17 @@ ENV CXX clang++
 ENV CC clang
 ENV PYTHON_BIN /usr/bin/python3
 
-# Install the newest version of git. This is necessary because the checkout
-# action (https://github.com/actions/checkout) requires `git >= 2.18` for this
-# action to work with git submodules.
-RUN apt-get install -y software-properties-common
-RUN add-apt-repository ppa:git-core/ppa
-RUN apt-get update
+# Install git for updating IREE's submodules.
 RUN apt-get install -y git
 
 # Install Bazel.
 # https://docs.bazel.build/versions/master/install-ubuntu.html
 ENV BAZEL_VERSION 2.1.0
-RUN apt-get install unzip zip wget
-RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
-RUN chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
-RUN ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user
-RUN rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+RUN apt-get install -y unzip zip wget \
+  && wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh \
+  && chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh \
+  && ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user \
+  && rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
 ENV PATH "/root/bin:$PATH"
 
 # Install core IREE dependencies.
@@ -51,6 +51,6 @@ RUN apt-get install -y clang libsdl2-dev
 
 # Install python2 numpy. Temporary fix for issue #1737:
 # https://github.com/google/iree/issues/1737
-RUN apt-get install -y python-pip
-RUN python -m pip install --upgrade pip
-RUN python -m pip install numpy
+RUN apt-get install -y python-pip \
+  && python -m pip install --upgrade pip \
+  && python -m pip install numpy

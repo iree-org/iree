@@ -29,7 +29,7 @@ bazel --version
 "$CXX" --version
 "$CC" --version
 "$PYTHON_BIN" -V
-# TODO( #1875 ): Make PYTHON_BIN also control the runtime version
+# TODO(#1875): Make PYTHON_BIN also control the runtime version
 python3 -V
 
 echo "Initializing submodules"

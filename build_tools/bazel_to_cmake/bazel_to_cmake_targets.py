@@ -25,15 +25,15 @@ EXPLICIT_TARGET_MAPPING = {
         "dear_imgui::impl_sdl", "dear_imgui::impl_vulkan"
     ],
     # LLVM
-    "@llvm-project//llvm:asm_parser": ["LLVMAsmParser"],
-    "@llvm-project//llvm:ir": ["LLVMCore"],
-    "@llvm-project//llvm:execution_engine": ["LLVMExecutionEngine"],
-    "@llvm-project//llvm:passes": ["LLVMPasses"],
-    "@llvm-project//llvm:target_base": ["LLVMTarget"],
-    "@llvm-project//llvm:support": ["LLVMSupport"],
-    "@llvm-project//llvm:orcjit": ["LLVMOrcJIT"],
-    "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
-    "@llvm-project//llvm:x86_target": ["LLVMX86CodeGen"],
+    "@llvm-project//llvm:AsmParser": ["LLVMAsmParser"],
+    "@llvm-project//llvm:Core": ["LLVMCore"],
+    "@llvm-project//llvm:ExecutionEngine": ["LLVMExecutionEngine"],
+    "@llvm-project//llvm:Passes": ["LLVMPasses"],
+    "@llvm-project//llvm:Target": ["LLVMTarget"],
+    "@llvm-project//llvm:Support": ["LLVMSupport"],
+    "@llvm-project//llvm:OrcJIT": ["LLVMOrcJIT"],
+    "@llvm-project//llvm:TableGen": ["LLVMTableGen"],
+    "@llvm-project//llvm:X86CodeGen": ["LLVMX86CodeGen"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [

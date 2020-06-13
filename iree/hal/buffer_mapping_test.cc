@@ -49,32 +49,41 @@ class MockBuffer : public Buffer {
       : Buffer(allocator, memory_type, allowed_access, usage, allocation_size,
                0, allocation_size) {}
 
-  MOCK_METHOD4(FillImpl,
-               Status(device_size_t byte_offset, device_size_t byte_length,
-                      const void* pattern, device_size_t pattern_length));
+  MOCK_METHOD(Status, FillImpl,
+              (device_size_t byte_offset, device_size_t byte_length,
+               const void* pattern, device_size_t pattern_length),
+              (override));
 
-  MOCK_METHOD3(ReadDataImpl, Status(device_size_t source_offset, void* data,
-                                    device_size_t data_length));
-  MOCK_METHOD3(WriteDataImpl,
-               Status(device_size_t target_offset, const void* data,
-                      device_size_t data_length));
-  MOCK_METHOD4(CopyDataImpl,
-               Status(device_size_t target_offset, Buffer* source_buffer,
-                      device_size_t source_offset, device_size_t data_length));
+  MOCK_METHOD(Status, ReadDataImpl,
+              (device_size_t source_offset, void* data,
+               device_size_t data_length),
+              (override));
+  MOCK_METHOD(Status, WriteDataImpl,
+              (device_size_t target_offset, const void* data,
+               device_size_t data_length),
+              (override));
+  MOCK_METHOD(Status, CopyDataImpl,
+              (device_size_t target_offset, Buffer* source_buffer,
+               device_size_t source_offset, device_size_t data_length),
+              (override));
 
-  MOCK_METHOD5(MapMemoryImpl,
-               Status(MappingMode mapping_mode,
-                      MemoryAccessBitfield memory_access,
-                      device_size_t local_byte_offset,
-                      device_size_t local_byte_length, void** out_data));
-  MOCK_METHOD3(UnmapMemoryImpl,
-               Status(device_size_t local_byte_offset,
-                      device_size_t local_byte_length, void* data));
-  MOCK_METHOD2(InvalidateMappedMemoryImpl,
-               Status(device_size_t local_byte_offset,
-                      device_size_t local_byte_length));
-  MOCK_METHOD2(FlushMappedMemoryImpl, Status(device_size_t local_byte_offset,
-                                             device_size_t local_byte_length));
+  MOCK_METHOD(Status, MapMemoryImpl,
+              (MappingMode mapping_mode, MemoryAccessBitfield memory_access,
+               device_size_t local_byte_offset, device_size_t local_byte_length,
+               void** out_data),
+              (override));
+  MOCK_METHOD(Status, UnmapMemoryImpl,
+              (device_size_t local_byte_offset, device_size_t local_byte_length,
+               void* data),
+              (override));
+  MOCK_METHOD(Status, InvalidateMappedMemoryImpl,
+              (device_size_t local_byte_offset,
+               device_size_t local_byte_length),
+              (override));
+  MOCK_METHOD(Status, FlushMappedMemoryImpl,
+              (device_size_t local_byte_offset,
+               device_size_t local_byte_length),
+              (override));
 };
 
 TEST(MemoryMappingTest, MapWholeBuffer) {

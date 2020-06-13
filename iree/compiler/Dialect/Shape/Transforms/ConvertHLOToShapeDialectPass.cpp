@@ -51,7 +51,7 @@ class ConvertDynamicBroadcastInDim
   LogicalResult matchAndRewrite(
       xla_hlo::DynamicBroadcastInDimOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    xla_hlo::DynamicBroadcastInDimOpOperandAdaptor adapter(operands);
+    xla_hlo::DynamicBroadcastInDimOp::OperandAdaptor adapter(operands);
     Value rankedShape = rewriter.create<Shape::FromExtentTensorOp>(
         op.getLoc(), adapter.output_dimensions());
     rewriter.replaceOpWithNewOp<Shape::RankedBroadcastInDimOp>(

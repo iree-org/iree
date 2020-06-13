@@ -100,10 +100,11 @@ module {
     %c32 = constant 32 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
-    %0 = dim %arg0, 0 : memref<?x?x?x?xf32>
-    %1 = dim %arg0, 1 : memref<?x?x?x?xf32>
-    %2 = dim %arg0, 2 : memref<?x?x?x?xf32>
-    %3 = dim %arg0, 3 : memref<?x?x?x?xf32>
+    %c3 = constant 3 : index
+    %0 = dim %arg0, %c0 : memref<?x?x?x?xf32>
+    %1 = dim %arg0, %c1 : memref<?x?x?x?xf32>
+    %2 = dim %arg0, %c2 : memref<?x?x?x?xf32>
+    %3 = dim %arg0, %c3 : memref<?x?x?x?xf32>
     scf.parallel (%arg3, %arg4, %arg5, %arg6) = (%c0, %c0, %c0, %c0) to (%0, %1, %2, %3) step (%c2, %c2, %c2, %c32) {
       %12 = affine.min #map0(%arg3)[%0]
       %13 = affine.min #map0(%arg4)[%1]
@@ -132,7 +133,8 @@ module {
 // CHECK-DAG: %[[C32:.+]] = constant 32 : index
 // CHECK-DAG: %[[C0:.+]] = constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = constant 1 : index
-// CHECK-DAG: %[[SERIALDIMOUTER:.+]] = dim %{{.+}}, 3
+// CHECK-DAG: %[[C3:.+]] = constant 3 : index
+// CHECK-DAG: %[[SERIALDIMOUTER:.+]] = dim %{{.+}}, %[[C3]]
 // CHECK-DAG: %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"} : () -> index
 // CHECK-DAG: %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"} : () -> index
 // CHECK-DAG: %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"} : () -> index
@@ -181,8 +183,10 @@ module {
   }
 }
 
-// CHECK-DAG: %[[UBY:.+]] =  dim %{{.*}}, 0
-// CHECK-DAG: %[[UBX:.+]] =  dim %{{.*}}, 1
+// CHECK-DAG: %[[C0:.*]] = constant 0 : index
+// CHECK-DAG: %[[C1:.*]] = constant 1 : index
+// CHECK-DAG: %[[UBY:.+]] =  dim %{{.*}}, %[[C0]]
+// CHECK-DAG: %[[UBX:.+]] =  dim %{{.*}}, %[[C1]]
 // CHECK-DAG: %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 // CHECK-DAG: %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 // CHECK-DAG: %[[BLOCKSIZEX:.+]] = "gpu.block_dim"() {dimension = "x"}

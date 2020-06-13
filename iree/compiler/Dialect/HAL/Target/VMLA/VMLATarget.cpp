@@ -51,7 +51,7 @@ class VMLATargetBackend final : public TargetBackend {
                                     OpPassManager &passManager) override {
     IREE::VMLA::buildVMLATransformPassPipeline(passManager);
 
-    // TODO(GH-614): remove this when the std->vm conversion isn't looking for
+    // TODO(#614): remove this when the std->vm conversion isn't looking for
     // iree.module.export.
     passManager.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
 

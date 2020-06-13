@@ -200,7 +200,7 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
   LogicalResult matchAndRewrite(
       CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CmpIOpOperandAdaptor srcAdapter(operands);
+    CmpIOp::OperandAdaptor srcAdapter(operands);
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
       case CmpIPredicate::eq:
@@ -306,7 +306,7 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   LogicalResult matchAndRewrite(
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SelectOpOperandAdaptor srcAdaptor(operands);
+    SelectOp::OperandAdaptor srcAdaptor(operands);
     IntegerType requiredType = IntegerType::get(32, srcOp.getContext());
     // Note: This check can correctly just be a verification that
     // actualType == requiredType, but since the VM type conversion also
@@ -358,7 +358,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
   LogicalResult matchAndRewrite(
       CallOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CallOpOperandAdaptor srcAdaptor(operands);
+    CallOp::OperandAdaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.
     VMTypeConverter typeConverter;

@@ -177,7 +177,6 @@ cc_test(
     srcs = ["dynamic_symbols_test.cc"],
     # TODO(b/145815906) Get this running in OSS CI.
     tags = [
-        "noga",
         "nokokoro",
     ],
     deps = [
