@@ -24,11 +24,15 @@ iree_cc_library(
     "Passes.cpp"
     "ConvertToLLVM.cpp"
   DEPS
+    MLIRAffineToStandard
     MLIRIR
+    MLIRLLVMDialect
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRPass
+    MLIRSCFToStandard
     MLIRStandardOps
+    MLIRStandardToLLVM
     MLIRTransforms
     MLIRVectorToLLVM
     MLIRVectorToSCF
