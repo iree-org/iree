@@ -276,7 +276,7 @@ class VectorContractToCoopMatmul final
     if (!hasCooperativeMatrixMarker(contractOp)) return failure();
     auto loc = contractOp.getLoc();
     // Check that all the operands are cooperative matrix.
-    vector::ContractionOp::OperandAdaptor adaptor(operands);
+    vector::ContractionOp::Adaptor adaptor(operands);
     auto loadA = adaptor.lhs();
     auto loadB = adaptor.rhs();
     auto loadC = adaptor.acc();
