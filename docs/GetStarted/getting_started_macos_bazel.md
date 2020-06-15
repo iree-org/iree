@@ -44,10 +44,11 @@ for guidance.
 # Example using Bazel version `2.1.0`
 $ export BAZEL_VERSION=2.1.0  # Use the version in .bazelversion
 
-# Download and install
+# Download and install. `sudo` is required because the installer writes to 
+# `/usr/local/bin/`, which is read only by default.
 $ curl -LO "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
 $ chmod +x "bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
-$ ./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh
+$ sudo ./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh
 
 # Add to path in `.zshrc`. Swap with `.bashrc` if you are using bash.
 $ echo -e '\n# Add bazel to PATH:\nexport PATH="${PATH}:${HOME}/bin"' >> ~/.zshrc
