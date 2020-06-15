@@ -79,7 +79,7 @@ Status VMLACommandProcessor::DispatchInline(
                         /*outputs=*/nullptr),
                     IREE_LOC);
   iree_vm_stack_deinit(stack_);
-  return status;
+  return std::move(status);
 }
 
 }  // namespace vmla
