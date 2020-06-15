@@ -33,9 +33,12 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -190,95 +193,112 @@ struct LinalgReshapeConverter final
   }
 };
 
-/// Convert subgroup level matmul to SPIR-V cooperative matrix if those are
-/// supported.
-// TODO(thomasraoux): Move to MLIR core once this is stable.
-class LinalgMatMulConverter final : public SPIRVOpLowering<linalg::MatmulOp> {
+/// Convert subgroup level vector transfert to SPIR-V cooperative
+/// matrix load/store if those are supported.
+/// TODO(thomasraoux): Move to MLIR core once this is stable.
+template <typename OpTy>
+class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
  public:
-  using SPIRVOpLowering<linalg::MatmulOp>::SPIRVOpLowering;
+  using SPIRVOpLowering<OpTy>::SPIRVOpLowering;
 
   LogicalResult matchAndRewrite(
-      linalg::MatmulOp matmulOp, ArrayRef<Value> operands,
+      OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // Check that the matmul can be natively supported in SPIRV.
-    if (!hasSPIRVMarker(matmulOp)) return failure();
-    // Make sure we map the matmul to SPIRV ops.
-    if (!isRowMajorMatmul(matmulOp.indexing_maps()) &&
-        !isColumnMajorMatmul(matmulOp.indexing_maps()))
-      return failure();
-    auto loc = matmulOp.getLoc();
-    auto M = matmulOp.getOperand(0).getType().cast<MemRefType>().getDimSize(0);
-    auto K = matmulOp.getOperand(0).getType().cast<MemRefType>().getDimSize(1);
-    auto N = matmulOp.getOperand(1).getType().cast<MemRefType>().getDimSize(1);
-    auto loadA = loadMatrixFromSubview(0, matmulOp, operands, M, K, rewriter);
-    auto loadB = loadMatrixFromSubview(1, matmulOp, operands, K, N, rewriter);
-    auto loadC = loadMatrixFromSubview(2, matmulOp, operands, M, N, rewriter);
-    if (loadA == nullptr || loadB == nullptr || loadC == nullptr)
-      return failure();
-    auto matmul = rewriter.create<spirv::CooperativeMatrixMulAddNVOp>(
-        loc, loadC.getType(), loadA, loadB, loadC);
-    rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
-        loc, loadC.pointer(), matmul, loadC.stride(), loadC.columnmajor(),
-        IntegerAttr());
-    rewriter.eraseOp(matmulOp);
-    return success();
-  }
+    if (!hasCooperativeMatrixMarker(op)) return failure();
+    auto loc = op.getLoc();
+    auto vecType = op.getVectorType();
+    if (vecType.getRank() != 2) return failure();
+    // TODO(thomasraoux): use coloumn major operand when TransfertRead +
+    // TransposeOp.
+    if (!op.permutation_map().isIdentity()) return failure();
+    if (op.masked()) return failure();
+    auto matType = spirv::CooperativeMatrixNVType::get(
+        vecType.getElementType(), spirv::Scope::Subgroup, vecType.getDimSize(0),
+        vecType.getDimSize(1));
+    SmallVector<Value, 4> remappedIndices;
+    for (auto i : op.indices())
+      remappedIndices.push_back(rewriter.getRemappedValue(i));
+    Value ptr = spirv::getElementPtr(
+        SPIRVOpLowering<OpTy>::typeConverter, op.getMemRefType(),
+        rewriter.getRemappedValue(op.memref()), remappedIndices, loc, rewriter);
 
- private:
-  // Helper to load the cooperative matrix.
-  spirv::CooperativeMatrixLoadNVOp loadMatrixFromSubview(
-      int32_t index, linalg::MatmulOp matmulOp, ArrayRef<Value> operands,
-      int32_t dimX, int32_t dimY, ConversionPatternRewriter &rewriter) const {
-    auto loc = matmulOp.getLoc();
-    // Matrix must be loaded from a subview op.
-    auto subview = matmulOp.getOperand(index).getDefiningOp<SubViewOp>();
-    if (subview == nullptr) return nullptr;
-    // Convert the subview to a base pointer for the matrix.
-    SmallVector<Value, 4> remappedOperands;
-    for (auto op : subview.getOperands())
-      remappedOperands.push_back(rewriter.getRemappedValue(op));
-    SmallVector<int64_t, 2> strides;
-    int64_t offset;
-    getStridesAndOffset(subview.getBaseMemRefType(), strides, offset);
-    auto stride = strides[1];
-    auto spvBase = remappedOperands[0];
-    SmallVector<Value, 4> offsets =
-        getOrCreateOffsets(subview, remappedOperands, rewriter, loc);
-    Value ptr = spirv::getElementPtr(typeConverter, subview.getBaseMemRefType(),
-                                     spvBase, offsets, loc, rewriter);
-    // Load the cooperative matrix.
-    auto memref = matmulOp.getOperand(index).getType().cast<MemRefType>();
+    auto stride = op.getMemRefType().getDimSize(0);
     auto int32Type = rewriter.getI32Type();
     auto strideValue = rewriter.create<spirv::ConstantOp>(
         loc, int32Type, IntegerAttr::get(int32Type, stride));
     auto coloumnMajor = rewriter.create<spirv::ConstantOp>(
-        loc, rewriter.getI1Type(),
-        rewriter.getBoolAttr(isColumnMajorMatmul(matmulOp.indexing_maps())));
-    auto matType = spirv::CooperativeMatrixNVType::get(
-        memref.getElementType(), spirv::Scope::Subgroup, dimX, dimY);
-    auto load = rewriter.create<spirv::CooperativeMatrixLoadNVOp>(
-        loc, matType, ptr, strideValue, coloumnMajor, IntegerAttr());
-    if (subview.getOperation()->hasOneUse()) rewriter.eraseOp(subview);
-    return load;
+        loc, rewriter.getI1Type(), rewriter.getBoolAttr(false));
+    replaceTransferOp(op, loc, matType, ptr, strideValue, coloumnMajor,
+                      rewriter);
+    return success();
   }
 
-  /// Extract offsets from subview op. If the offets are static we need to
-  /// create a ConstantOp.
-  // TODO(thomasraoux): Merge with SubViewOp::getOrCreateOffsets to re-use code.
-  SmallVector<Value, 4> getOrCreateOffsets(SubViewOp subview,
-                                           ArrayRef<Value> operands,
-                                           OpBuilder &b, Location loc) const {
-    unsigned dynamicIdx = 1;
-    return llvm::to_vector<4>(llvm::map_range(
-        subview.static_offsets().cast<ArrayAttr>(), [&](Attribute a) -> Value {
-          int64_t staticOffset = a.cast<IntegerAttr>().getInt();
-          if (ShapedType::isDynamicStrideOrOffset(staticOffset))
-            return operands[dynamicIdx++];
-          else
-            return b.create<spirv::ConstantOp>(
-                loc, b.getI32Type(),
-                IntegerAttr::get(b.getI32Type(), staticOffset));
-        }));
+  /// Helper to generate the right load/store instruction and replace the
+  /// transfer op.
+  void replaceTransferOp(OpTy op, Location loc, Type matType, Value ptr,
+                         Value strideValue, Value coloumnMajor,
+                         ConversionPatternRewriter &rewriter) const;
+};
+
+template <>
+void TransferToCoopMatLoadStore<vector::TransferReadOp>::replaceTransferOp(
+    vector::TransferReadOp op, Location loc, Type matType, Value ptr,
+    Value strideValue, Value coloumnMajor,
+    ConversionPatternRewriter &rewriter) const {
+  Value load = rewriter.create<spirv::CooperativeMatrixLoadNVOp>(
+      loc, matType, ptr, strideValue, coloumnMajor, IntegerAttr());
+  rewriter.replaceOp(op, load);
+}
+
+template <>
+void TransferToCoopMatLoadStore<vector::TransferWriteOp>::replaceTransferOp(
+    vector::TransferWriteOp op, Location loc, Type matType, Value ptr,
+    Value strideValue, Value coloumnMajor,
+    ConversionPatternRewriter &rewriter) const {
+  rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
+      loc, ptr, rewriter.getRemappedValue(op.vector()), strideValue,
+      coloumnMajor, IntegerAttr());
+  rewriter.eraseOp(op);
+}
+
+/// Convert subgroup level vector contract to SPIR-V cooperative
+/// matrix matmuladd.
+class VectorContractToCoopMatmul final
+    : public SPIRVOpLowering<vector::ContractionOp> {
+ public:
+  using SPIRVOpLowering<vector::ContractionOp>::SPIRVOpLowering;
+
+  LogicalResult matchAndRewrite(
+      vector::ContractionOp contractOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // TODO(thomasraoux): Check that the size of the matmul is supported by the
+    // target.
+    if (!hasCooperativeMatrixMarker(contractOp)) return failure();
+    auto loc = contractOp.getLoc();
+    // Check that all the operands are cooperative matrix.
+    vector::ContractionOp::OperandAdaptor adaptor(operands);
+    auto loadA = adaptor.lhs();
+    auto loadB = adaptor.rhs();
+    auto loadC = adaptor.acc();
+    if (!loadA.getType().isa<spirv::CooperativeMatrixNVType>() ||
+        !loadB.getType().isa<spirv::CooperativeMatrixNVType>() ||
+        !loadC.getType().isa<spirv::CooperativeMatrixNVType>())
+      return failure();
+    if (llvm::size(contractOp.masks()) != 0) return failure();
+    // Check that this is a matmul operation.
+    auto iteratorTypes = contractOp.iterator_types().getValue();
+    if (!isParallelIterator(iteratorTypes[0]) ||
+        !isParallelIterator(iteratorTypes[1]) ||
+        !isReductionIterator(iteratorTypes[2]))
+      return failure();
+    // Coloumn major matmul should have been lowered to Transpose+contract
+    // by this point. Transpose can be handled by load/stoore operations.
+    if (!isRowMajorMatmul(contractOp.indexing_maps())) return failure();
+
+    Value matmul = rewriter.create<spirv::CooperativeMatrixMulAddNVOp>(
+        loc, loadC.getType(), loadA, loadB, loadC);
+    rewriter.replaceOp(contractOp, matmul);
+    return success();
   }
 };
 
@@ -290,6 +310,13 @@ class LinalgMatMulConverter final : public SPIRVOpLowering<linalg::MatmulOp> {
 struct ConvertToSPIRVPass
     : public PassWrapper<ConvertToSPIRVPass, OperationPass<ModuleOp>> {
   void runOnOperation() override;
+  ConvertToSPIRVPass() {}
+  ConvertToSPIRVPass(const ConvertToSPIRVPass &pass) {}
+  Option<bool> useCooperativeMatrix{
+      *this, "use-cooperative-matrix",
+      llvm::cl::desc("Experimental: Lower vector contract to cooperative "
+                     "matrix operations"),
+      llvm::cl::init(false)};
 };
 }  // namespace
 
@@ -341,6 +368,14 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
   return success();
 }
 
+static void populateVectorToSPIRVPatterns(MLIRContext *context,
+                                          SPIRVTypeConverter &typeConverter,
+                                          OwningRewritePatternList &patterns) {
+  patterns.insert<TransferToCoopMatLoadStore<vector::TransferReadOp>,
+                  TransferToCoopMatLoadStore<vector::TransferWriteOp>,
+                  VectorContractToCoopMatmul>(context, typeConverter);
+}
+
 void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
@@ -355,17 +390,17 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
+
+  if (useCooperativeMatrix) {
+    populateVectorToSPIRVPatterns(context, typeConverter, patterns);
+  }
   patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter,
-                  LinalgReshapeConverter, LinalgMatMulConverter>(context,
-                                                                 typeConverter);
+                  LinalgReshapeConverter>(context, typeConverter);
 
   std::unique_ptr<ConversionTarget> target =
       spirv::SPIRVConversionTarget::get(targetAttr);
   // Disallow all other ops.
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
-  // standard subview op must be legal as we cannot lower it on its own. It
-  // should be matched along with linalg instructions.
-  target->addLegalOp<SubViewOp>();
   SmallVector<FuncOp, 1> functions;
   for (FuncOp fn : moduleOp.getOps<FuncOp>()) {
     if (SymbolTable::getSymbolVisibility(fn) != SymbolTable::Visibility::Public)

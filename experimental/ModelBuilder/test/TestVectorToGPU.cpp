@@ -19,6 +19,9 @@
 
 // clang-format on
 #include <string>
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/ExecutionEngine/CRunnerUtils.h"
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
@@ -44,6 +47,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 
 using namespace mlir;                    // NOLINT
 using namespace mlir::edsc;              // NOLINT
@@ -53,6 +57,38 @@ static llvm::cl::opt<std::string> vulkanWrapper(
     "vulkan-wrapper", llvm::cl::desc("Vulkan wrapper library"),
     llvm::cl::value_desc("filename"), llvm::cl::init("-"));
 
+static llvm::cl::opt<bool> useCooperativeMatrix(
+    "cooperative-matrix",
+    llvm::cl::desc("Run cooperative matrix tests, this requires hardware "
+                   "supporting cooperative matrix extension"),
+    llvm::cl::init(false));
+
+static void addLoweringPasses(mlir::PassManager &pm, int size,
+                              const SmallVector<Type, 3> args) {
+  pm.addPass(mlir::iree_compiler::createVectorToGPUPass());
+  pm.addPass(mlir::createLowerAffinePass());
+  pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::iree_compiler::createConvertToSPIRVPass());
+
+  auto &spirvModulePM = pm.nest<mlir::spirv::ModuleOp>();
+  spirvModulePM.addPass(mlir::createSetSpirvABIPass());
+  spirvModulePM.addPass(mlir::spirv::createLowerABIAttributesPass());
+  spirvModulePM.addPass(mlir::createCanonicalizerPass());
+  spirvModulePM.addPass(mlir::createCSEPass());
+  spirvModulePM.addPass(
+      mlir::spirv::createUpdateVersionCapabilityExtensionPass());
+
+  pm.addPass(mlir::createAddVulkanLaunchWrapperPass(size, args));
+  mlir::LowerToLLVMOptions llvmOptions = {
+      /*useBarePtrCallConv=*/false,
+      /*emitCWrappers=*/true,
+      /*indexBitwidth=*/mlir::kDeriveIndexBitwidthFromDataLayout};
+  pm.addPass(createLowerToLLVMPass(llvmOptions));
+  pm.addPass(mlir::createConvertVulkanLaunchFuncToVulkanCallsPass());
+}
+
 void testVecAdd() {
   const int warpSize = 32;
   // Simple test a single warp.
@@ -60,7 +96,7 @@ void testVecAdd() {
   StringLiteral funcName = "kernel_vecadd";
   MLIRContext context;
   ModelBuilder modelBuilder;
-  auto nVectorType = modelBuilder.getVectorType({width}, modelBuilder.f32);
+  auto nVectorType = modelBuilder.getVectorType(width, modelBuilder.f32);
   auto typeA = modelBuilder.getMemRefType({width}, modelBuilder.f32);
   auto typeB = modelBuilder.getMemRefType({width}, modelBuilder.f32);
   auto typeC = modelBuilder.getMemRefType({width}, modelBuilder.f32);
@@ -94,28 +130,7 @@ void testVecAdd() {
   CompilationOptions options;
   SmallVector<Type, 3> args = {typeA, typeB, typeC};
   auto lowering = [&](mlir::PassManager &pm) {
-    pm.addPass(mlir::iree_compiler::createVectorToGPUPass());
-    pm.addPass(mlir::createLowerAffinePass());
-    pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
-    pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(mlir::createCSEPass());
-    pm.addPass(mlir::iree_compiler::createConvertToSPIRVPass());
-
-    auto &spirvModulePM = pm.nest<mlir::spirv::ModuleOp>();
-    spirvModulePM.addPass(mlir::createSetSpirvABIPass());
-    spirvModulePM.addPass(mlir::spirv::createLowerABIAttributesPass());
-    spirvModulePM.addPass(mlir::createCanonicalizerPass());
-    spirvModulePM.addPass(mlir::createCSEPass());
-    spirvModulePM.addPass(
-        mlir::spirv::createUpdateVersionCapabilityExtensionPass());
-
-    pm.addPass(mlir::createAddVulkanLaunchWrapperPass(width, args));
-    mlir::LowerToLLVMOptions llvmOptions = {
-        /*useBarePtrCallConv =*/false,
-        /*emitCWrappers = */ true,
-        /*indexBitwidth =*/mlir::kDeriveIndexBitwidthFromDataLayout};
-    pm.addPass(createLowerToLLVMPass(llvmOptions));
-    pm.addPass(mlir::createConvertVulkanLaunchFuncToVulkanCallsPass());
+    addLoweringPasses(pm, width, args);
   };
   options.loweringPasses = lowering;
   runner.compile(options, {vulkanWrapper});
@@ -128,6 +143,87 @@ void testVecAdd() {
   auto A = makeInitializedStridedMemRefDescriptor<float, 1>({width}, oneInit);
   auto B = makeInitializedStridedMemRefDescriptor<float, 1>({width}, incInit);
   auto C = makeInitializedStridedMemRefDescriptor<float, 1>({width}, zeroInit);
+
+  // 4. Call the funcOp named `funcName`.
+  auto err = runner.invoke(std::string(funcName) + "_wrapper", A, B, C);
+  if (err) llvm_unreachable("Error running function.");
+
+  // 5. Dump content of input and output buffer for testing with FileCheck.
+  ::impl::printMemRef(*A);
+  ::impl::printMemRef(*B);
+  ::impl::printMemRef(*C);
+}
+
+void testCooperativeMatMul() {
+  const int warpSize = 32;
+  // Simple test a single warp.
+  const int resRows = 16;
+  const int resColumns = 8;
+  const int reductionSize = 8;
+  StringLiteral funcName = "kernel_matmul";
+  MLIRContext context;
+  ModelBuilder modelBuilder;
+
+  auto typeA =
+      modelBuilder.getMemRefType({resRows, reductionSize}, modelBuilder.f32);
+  auto typeB =
+      modelBuilder.getMemRefType({reductionSize, resColumns}, modelBuilder.f32);
+  auto typeC =
+      modelBuilder.getMemRefType({resRows, resColumns}, modelBuilder.f32);
+  // 1. Build the kernel.
+  {
+    modelBuilder.addGPUAttr();
+    FuncOp kernelFunc = modelBuilder.makeFunction(
+        funcName, {}, {typeA, typeB, typeC}, MLIRFuncOpConfig());
+    // Right now we map one workgroup to one warp.
+    kernelFunc.setAttr(spirv::getEntryPointABIAttrName(),
+                       spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
+    OpBuilder b(&kernelFunc.getBody());
+    ScopedContext scope(b, kernelFunc.getLoc());
+
+    auto A = kernelFunc.getArgument(0);
+    auto B = kernelFunc.getArgument(1);
+    auto C = kernelFunc.getArgument(2);
+
+    (linalg_matmul(A, B, C));
+    std_ret();
+  }
+
+  // 2. Compile the function, pass in runtime support library to the execution
+  // engine for vector.print.
+  ModelRunner runner(modelBuilder.getModuleRef(),
+                     ModelRunner::Target::GPUTarget);
+  CompilationOptions options;
+  SmallVector<Type, 3> args = {typeA, typeB, typeC};
+  options.loweringPasses = [&](mlir::PassManager &pm) {
+    mlir::OwningRewritePatternList patterns;
+    patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>>(
+        pm.getContext());
+    mlir::applyPatternsAndFoldGreedily(*modelBuilder.getModuleRef(), patterns);
+    // TODO(thomasraoux): Markers are used as a workaround, those will either
+    // moved within the vectorToGPU pass only or will be replace by op
+    // interface.
+    modelBuilder.getModuleRef()->walk([&](Operation *op) {
+      if (isa<vector::ContractionOp>(op) || isa<vector::TransferReadOp>(op) ||
+          isa<vector::TransferWriteOp>(op))
+        iree_compiler::setCooperativeMatrixMarker(op);
+    });
+    addLoweringPasses(pm, resRows * resColumns, args);
+  };
+  ;
+  runner.compile(options, {vulkanWrapper});
+
+  // 3. Allocate data within data structures that interoperate with the MLIR ABI
+  // conventions used by codegen.
+  auto oneInit = [](unsigned idx, float *ptr) { ptr[idx] = 2.0f + 3 * idx; };
+  auto incInit = [](unsigned idx, float *ptr) { ptr[idx] = 1.0f + idx; };
+  auto zeroInit = [](unsigned idx, float *ptr) { ptr[idx] = 0.0f; };
+  auto A = makeInitializedStridedMemRefDescriptor<float, 2>(
+      {resRows, reductionSize}, oneInit);
+  auto B = makeInitializedStridedMemRefDescriptor<float, 2>(
+      {reductionSize, resColumns}, incInit);
+  auto C = makeInitializedStridedMemRefDescriptor<float, 2>(
+      {resRows, resColumns}, zeroInit);
 
   // 4. Call the funcOp named `funcName`.
   auto err = runner.invoke(std::string(funcName) + "_wrapper", A, B, C);
@@ -160,4 +256,7 @@ int main(int argc, char **argv) {
   // CHECK: 59,  63,  67,  71,  75,  79,  83,  87,  91,  95,  99,  103,  107,
   // CHECK: 111,  115,  119,  123,  127]
   testVecAdd();
+
+  if (useCooperativeMatrix)
+    testCooperativeMatMul();
 }
