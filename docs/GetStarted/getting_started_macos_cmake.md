@@ -72,6 +72,9 @@ Configure:
 $ cmake -G Ninja -B build/ .
 ```
 
+Note: this should use `Clang` by default on MacOS. `GCC` is not fully supported
+by IREE.
+
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;The root
 > [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt)
