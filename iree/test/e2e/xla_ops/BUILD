@@ -95,11 +95,7 @@ iree_check_single_backend_test_suite(
         "tanh.mlir",
         "torch_index_select.mlir",
         "transpose.mlir",
-
-        # TODO(#1688): Enable after integer widths are handled
-        # on structured ops path in vulkan
-
-        # "while.mlir",
+        "while.mlir",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
