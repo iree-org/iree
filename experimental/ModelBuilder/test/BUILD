@@ -31,7 +31,6 @@ iree_lit_test_suite(
     data = [
         # runtime libraries
         "@llvm-project//mlir:tools/libvulkan-runtime-wrappers.so",
-        "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
         ":runtime-support.so",
         # Tests.
         ":test-dot-prod",

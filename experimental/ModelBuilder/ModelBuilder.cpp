@@ -229,7 +229,7 @@ MLIRFuncOpConfig &MLIRFuncOpConfig::setPreferAvx512(bool v) {
   return *this;
 }
 MLIRFuncOpConfig &MLIRFuncOpConfig::setTargetCpu(StringRef s) {
-  targetCpu = s;
+  targetCpu = std::string(s);
   return *this;
 }
 MLIRFuncOpConfig &MLIRFuncOpConfig::setDeclOnly(bool v) {
