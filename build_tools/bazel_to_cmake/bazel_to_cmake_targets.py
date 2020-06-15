@@ -102,6 +102,14 @@ def _convert_mlir_target(target):
   return ["MLIR" + target.rsplit(":")[-1]]
 
 
+def _convert_llvm_target(target):
+  # Default to a pattern substitution approach.
+  # Prepend "LLVM" to the Bazel target name.
+  #   "@llvm-project//llvm:AsmParser" -> "LLVMAsmParser"
+  #   "@llvm-project//llvm:Core" -> "LLVMCore"
+  return ["LLVM" + target.rsplit(":")[-1]]
+
+
 def convert_external_target(target):
   """Converts an external (non-IREE) Bazel target to a list of CMake targets.
 
@@ -122,6 +130,8 @@ def convert_external_target(target):
     return EXPLICIT_TARGET_MAPPING[target]
   if target.startswith("@com_google_absl//absl"):
     return _convert_absl_target(target)
+  if target.startswith("@llvm-project//llvm"):
+    return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
