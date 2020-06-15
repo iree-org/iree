@@ -26,7 +26,7 @@ Contributions related to MacOS support and documentation are welcome however.
 Install the version of Bazel found in
 [`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion).
 
-#### Install Xcode.
+#### Install Xcode
 
 Running this may be sufficient (and takes up much less disk space):
 
@@ -38,7 +38,7 @@ If you run into complications, see the
 [official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
 for guidance.
 
-#### Download and install Bazel from a binary.
+#### Download and install Bazel from a binary
 
 ```
 # Example using Bazel version `2.1.0`
@@ -55,18 +55,6 @@ $ source ~/.zshrc
 
 # Confirm the version
 $ bazel --version # 2.1.0
-```
-
-### Install a Compiler
-
-We recommend Clang. GCC is not fully supported. Appropriate versions of `clang`
-and `clang++` ship with MacOS by default.
-
-Set environment variables for Bazel:
-
-```shell
-export CC=clang
-export CXX=clang++
 ```
 
 ### Install python3 numpy
@@ -148,7 +136,8 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
+    -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading

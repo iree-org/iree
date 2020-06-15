@@ -72,13 +72,13 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
+$ cmake -G Ninja -B build/ .
 ```
 
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;The root
-> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt) file
-> has options for configuring which parts of the project to enable.
+> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt)
+> file has options for configuring which parts of the project to enable.
 
 Build all targets:
 
@@ -102,7 +102,8 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
+    -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading

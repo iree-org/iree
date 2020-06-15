@@ -32,13 +32,6 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
-Set environment variables for Bazel:
-
-```shell
-export CC=clang
-export CXX=clang++
-```
-
 ### Install python3 numpy
 
 ```
@@ -116,7 +109,8 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
+    -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
