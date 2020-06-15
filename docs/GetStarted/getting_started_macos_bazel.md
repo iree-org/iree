@@ -30,7 +30,7 @@ Install the version of Bazel found in
 
 Running this may be sufficient (and takes up much less disk space):
 
-```
+```shell
 $ xcode-select --install
 ```
 
@@ -40,7 +40,7 @@ for guidance.
 
 #### Download and install Bazel from a binary
 
-```
+```shell
 # Example using Bazel version `2.1.0`
 $ export BAZEL_VERSION=2.1.0  # Use the version in .bazelversion
 
@@ -59,7 +59,7 @@ $ bazel --version # 2.1.0
 
 ### Install python3 numpy
 
-```
+```shell
 $ python3 -m pip install numpy --user
 ```
 
@@ -103,7 +103,7 @@ level.
 You can put a user.bazelrc at the root of the repository and it will be ignored
 by git. The recommended contents for Linux/MacOS are:
 
-```
+```shell
 build --disk_cache=/tmp/bazel-cache
 
 # Use --config=debug to compile iree and llvm without optimizations

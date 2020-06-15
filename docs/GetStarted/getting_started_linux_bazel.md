@@ -34,7 +34,7 @@ $ sudo apt install clang
 
 ### Install python3 numpy
 
-```
+```shell
 $ python3 -m pip install numpy
 ```
 
@@ -76,7 +76,7 @@ level.
 You can put a user.bazelrc at the root of the repository and it will be ignored
 by git. The recommended contents for Linux are:
 
-```
+```shell
 build --disk_cache=/tmp/bazel-cache
 
 # Use --config=debug to compile iree and llvm without optimizations

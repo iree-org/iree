@@ -44,7 +44,7 @@ $ cmake --version  # >= 3.13
 [Ninja](https://ninja-build.org/) is a fast build system that you can use as a
 CMake generator.
 
-```
+```shell
 $ brew install ninja
 ```
 
