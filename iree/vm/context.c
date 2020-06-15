@@ -46,17 +46,19 @@ static iree_status_t iree_vm_context_run_function(
 
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
-  if (!iree_status_is_ok(iree_vm_module_lookup_function_by_name(
-          module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name,
-          &call.function))) {
-    // Function doesn't exist (or otherwise).
+  iree_status_t status = iree_vm_module_lookup_function_by_name(
+      module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, &call.function);
+  if (iree_status_is_not_found(status)) {
+    // Function doesn't exist; that's ok as this was an optional call.
     IREE_TRACE_ZONE_END(z0);
     return IREE_STATUS_OK;
+  } else if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
   }
 
   iree_vm_execution_result_t result;
-  iree_status_t status =
-      module->begin_call(module->self, stack, &call, &result);
+  status = module->begin_call(module->self, stack, &call, &result);
 
   // TODO(benvanik): ensure completed synchronously.
 

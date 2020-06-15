@@ -132,6 +132,7 @@ iree_cc_library(
     ::stack
     iree::base::api
     iree::base::atomics
+    iree::base::tracing
   PUBLIC
 )
 
@@ -161,6 +162,7 @@ iree_cc_library(
     ::module
     ::variant_list
     iree::base::api
+    iree::base::tracing
   PUBLIC
 )
 
@@ -250,6 +252,7 @@ iree_cc_library(
     ::variant_list
     iree::base::alignment
     iree::base::api
+    iree::base::tracing
   PUBLIC
 )
 

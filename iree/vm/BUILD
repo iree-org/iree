@@ -119,6 +119,7 @@ cc_library(
         ":stack",
         "//iree/base:api",
         "//iree/base:atomics",
+        "//iree/base:tracing",
     ],
 )
 
@@ -142,6 +143,7 @@ cc_library(
         ":module",
         ":variant_list",
         "//iree/base:api",
+        "//iree/base:tracing",
     ],
 )
 
@@ -219,6 +221,7 @@ cc_library(
         ":variant_list",
         "//iree/base:alignment",
         "//iree/base:api",
+        "//iree/base:tracing",
     ],
 )
 

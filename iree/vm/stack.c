@@ -133,8 +133,8 @@
 //
 // The overhead of this marshaling is minimal as external functions can always
 // use move semantics on the ref objects. Since we are reusing the normal VM
-// code paths which are likely still in I$ the bulk of the work amounts to some
-// small memcpys.
+// code paths which are likely still in instruction cache the bulk of the work
+// amounts to some small memcpys.
 
 // Multiplier on the capacity of the stack frame storage when growing.
 // Since we never shrink stacks it's nice to keep this relative low. If we
@@ -236,7 +236,7 @@ struct iree_vm_stack {
 #endif  // _MSC_VER
 
 // https://en.wikipedia.org/wiki/Find_first_set
-int iree_math_count_leading_zeros_u32(uint32_t n) {
+static inline int iree_math_count_leading_zeros_u32(uint32_t n) {
 #if defined(_MSC_VER)
   unsigned long result = 0;  // NOLINT(runtime/int)
   if (_BitScanReverse(&result, n)) {
@@ -268,7 +268,7 @@ int iree_math_count_leading_zeros_u32(uint32_t n) {
 }
 
 // Rounds up the value to the nearest power of 2 (if not already a power of 2).
-uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
+static inline uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
   n--;
   n |= n >> 1;
   n |= n >> 2;
@@ -281,8 +281,8 @@ uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
 
 // Aligns |value| up to the given power-of-two |alignment| if required.
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
-iree_host_size_t iree_math_align(iree_host_size_t value,
-                                 iree_host_size_t alignment) {
+static inline iree_host_size_t iree_math_align(iree_host_size_t value,
+                                               iree_host_size_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
