@@ -16,6 +16,7 @@
 
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/vm/bytecode_module_impl.h"
@@ -411,15 +412,12 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
   }
 }
 
-static iree_status_t iree_vm_bytecode_module_alloc_state(
-    void* self, iree_allocator_t allocator,
-    iree_vm_module_state_t** out_module_state) {
-  if (!out_module_state) return IREE_STATUS_INVALID_ARGUMENT;
-  *out_module_state = NULL;
-
-  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
-
+// Lays out the nested tables within a |state| structure.
+// Returns the total size of the structure and all tables with padding applied.
+// |state| may be null if only the structure size is required for allocation.
+static iree_host_size_t iree_vm_bytecode_module_layout_state(
+    const iree::vm::BytecodeModuleDef* module_def,
+    iree_vm_bytecode_module_state_t* state) {
   int rwdata_storage_capacity =
       module_def->module_state()
           ? module_def->module_state()->global_bytes_capacity()
@@ -433,33 +431,61 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
                                   ? module_def->imported_functions()->size()
                                   : 0;
 
-  iree_host_size_t total_state_struct_size =
-      sizeof(iree_vm_bytecode_module_state_t);
-  total_state_struct_size += rwdata_storage_capacity;
-  total_state_struct_size += global_ref_count * sizeof(iree_vm_ref_t);
-  total_state_struct_size +=
-      rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t);
-  total_state_struct_size += import_function_count * sizeof(iree_vm_function_t);
+  uint8_t* base_ptr = (uint8_t*)state;
+  iree_host_size_t offset =
+      iree_align(sizeof(iree_vm_bytecode_module_state_t), 16);
 
+  if (state) {
+    state->rwdata_storage = {(base_ptr + offset),
+                             (iree_host_size_t)rwdata_storage_capacity};
+  }
+  offset += iree_align(rwdata_storage_capacity, 16);
+
+  if (state) {
+    state->global_ref_count = global_ref_count;
+    state->global_ref_table = (iree_vm_ref_t*)(base_ptr + offset);
+  }
+  offset += iree_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
+
+  if (state) {
+    state->rodata_ref_count = rodata_ref_count;
+    state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)(base_ptr + offset);
+  }
+  offset += iree_align(rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t), 16);
+
+  if (state) {
+    state->import_count = import_function_count;
+    state->import_table = (iree_vm_function_t*)(base_ptr + offset);
+  }
+  offset += iree_align(import_function_count * sizeof(iree_vm_function_t), 16);
+
+  return offset;
+}
+
+static iree_status_t iree_vm_bytecode_module_alloc_state(
+    void* self, iree_allocator_t allocator,
+    iree_vm_module_state_t** out_module_state) {
+  if (!out_module_state) return IREE_STATUS_INVALID_ARGUMENT;
+  *out_module_state = NULL;
+
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
+
+  // Compute the total size required (with padding) for the state structure.
+  iree_host_size_t total_state_struct_size =
+      iree_vm_bytecode_module_layout_state(module_def, NULL);
+
+  // Allocate the storage for the structure and all its nested tables.
   iree_vm_bytecode_module_state_t* state = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, total_state_struct_size,
                                              (void**)&state));
   state->allocator = allocator;
 
-  uint8_t* p = ((uint8_t*)state) + sizeof(iree_vm_bytecode_module_state_t);
-  state->rwdata_storage = {p, (iree_host_size_t)rwdata_storage_capacity};
-  p += rwdata_storage_capacity;
-  state->global_ref_count = global_ref_count;
-  state->global_ref_table = (iree_vm_ref_t*)p;
-  p += global_ref_count * sizeof(*state->global_ref_table);
-  state->rodata_ref_count = rodata_ref_count;
-  state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)p;
-  p += rodata_ref_count * sizeof(*state->rodata_ref_table);
-  state->import_count = import_function_count;
-  state->import_table = (iree_vm_function_t*)p;
-  p += import_function_count * sizeof(*state->import_table);
+  // Perform layout to get the pointers into the storage for each nested table.
+  iree_vm_bytecode_module_layout_state(module_def, state);
 
-  for (int i = 0; i < rodata_ref_count; ++i) {
+  // Setup rodata segments to point directly at the flatbuffer memory.
+  for (int i = 0; i < state->rodata_ref_count; ++i) {
     const iree::vm::RodataSegmentDef* segment =
         module_def->rodata_segments()->Get(i);
     iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];

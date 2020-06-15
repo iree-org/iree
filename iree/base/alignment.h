@@ -35,6 +35,10 @@ extern "C" {
 #define iree_alignof(x) __alignof__(x)
 #endif  // IREE_COMPILER_*
 
+// Rounds up to the next alignment value, if it is not already aligned.
+#define iree_align(value, alignment) \
+  (((value) + (alignment)-1) / (alignment)) * (alignment)
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
