@@ -32,13 +32,6 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
-Set environment variables for Bazel:
-
-```shell
-export CC=clang
-export CXX=clang++
-```
-
 ### Install python3 numpy
 
 ```shell
