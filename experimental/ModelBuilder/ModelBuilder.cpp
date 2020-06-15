@@ -70,8 +70,11 @@ FuncOp mlir::ModelBuilder::makeFunction(
 
 static spirv::TargetEnvAttr getTargetEnv(MLIRContext *context) {
   auto triple = spirv::VerCapExtAttr::get(
-      spirv::Version::V_1_0, {spirv::Capability::Shader},
-      {spirv::Extension::SPV_KHR_storage_buffer_storage_class}, context);
+      spirv::Version::V_1_0,
+      {spirv::Capability::Shader, spirv::Capability::CooperativeMatrixNV},
+      {spirv::Extension::SPV_KHR_storage_buffer_storage_class,
+       spirv::Extension::SPV_NV_cooperative_matrix},
+      context);
   return spirv::TargetEnvAttr::get(triple,
                                    spirv::getDefaultResourceLimits(context));
 }
