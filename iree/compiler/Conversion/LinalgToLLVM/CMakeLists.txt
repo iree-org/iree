@@ -26,7 +26,7 @@ iree_cc_library(
   DEPS
     MLIRAffineToStandard
     MLIRIR
-    MLIRLLVMDialect
+    MLIRLLVMIR
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRPass
