@@ -94,9 +94,7 @@ using edsc::intrinsics::affine_max;
 using edsc::intrinsics::affine_min;
 using edsc::intrinsics::AffineIndexedValue;
 // From the Loop Dialect.
-using edsc::AffineLoopNestBuilder;
 using edsc::loopNestBuilder;
-using edsc::ParallelLoopNestBuilder;
 // -----------------------------------------------------------------------------
 
 // Helper class to simplify MLIR function construction by adding proper
