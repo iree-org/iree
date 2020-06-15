@@ -127,7 +127,7 @@ class BuildFileFunctions(object):
     #    "file_3.h"
     if not files:
       return ""
-    files_list = "\n".join([f'    "{file}"' for file in files])
+    files_list = "\n".join([f'    "{file}"' for file in sorted(files)])
     return f"  {list_name}\n{files_list}\n"
 
   def _convert_hdrs_block(self, hdrs):
