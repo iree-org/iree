@@ -62,6 +62,7 @@ cc_library(
         ":memref_runtime",
         "//iree/base:dynamic_library",
         "//iree/base:file_io",
+        "//iree/base:localfile",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:executable",

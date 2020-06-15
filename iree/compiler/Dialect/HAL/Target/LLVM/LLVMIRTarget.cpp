@@ -74,8 +74,8 @@ class LLVMIRTargetBackend final : public TargetBackend {
                          options_.targetTriple);
       return failure();
     }
-    if (failed(runLLVMIRPasses(options_, std::move(targetMachine),
-                               llvmModule.get()))) {
+    if (failed(
+            runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
       return targetOp.emitError(
           "Can't build LLVMIR opt passes for ExecutableOp module");
     }

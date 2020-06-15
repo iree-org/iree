@@ -11,32 +11,30 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_TARGET_LINKER_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_TARGET_LINKER_H_
 
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Target/TargetOptions.h"
+#include <string>
+
+#include "iree/base/file_io.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-struct LLVMTargetOptions {
-  llvm::PipelineTuningOptions pipelineTuningOptions;
-  llvm::PassBuilder::OptimizationLevel optLevel;
-  llvm::TargetOptions options;
-  std::string targetTriple;
-};
+// Calls linker to link objects to shared lib and returns its binary blob.
+iree::StatusOr<std::string> linkLLVMAOTObjects(const std::string& objData);
 
-// Returns LLVMTargetOptions struct intialized with the
-// iree-hal-llvm-ir-* flags.
-LLVMTargetOptions getLLVMTargetOptionsFromFlags();
+iree::StatusOr<std::string> linkLLVMAOTObjectsWithLLD(
+    const std::string& objData);
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_TARGET_LINKER_H_
