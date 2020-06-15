@@ -75,7 +75,7 @@ class ModuleTerminatorOpConversion
   }
 };
 
-// Whitelist of function attributes to retain when converting to vm.func.
+// Allowlist of function attributes to retain when converting to vm.func.
 constexpr const char *kRetainedAttributes[] = {
     "iree.reflection",
     "sym_visibility",
@@ -117,7 +117,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
                                 newFuncOp.end());
 
-    // Retain function attributes in the whitelist.
+    // Retain function attributes in the allowlist.
     auto retainedAttributes = ArrayRef<const char *>(
         kRetainedAttributes,
         sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
