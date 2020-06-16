@@ -627,7 +627,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_388
+`value` | Attribute | anonymous_411
 
 #### Results:
 
@@ -901,7 +901,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | TypeAttr | any type attribute
 `is_mutable` | UnitAttr | unit attribute
 `initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_391
+`initial_value` | Attribute | anonymous_414
 `ordinal` | IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
@@ -1125,6 +1125,194 @@ an external VM module.
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `ordinal` | IntegerAttr | ordinal value
+
+### `vm.list.alloc` (IREE::VM::ListAllocOp)
+
+allocates a new empty list
+
+Syntax:
+
+```
+operation ::= `vm.list.alloc` operands attr-dict `:` `(` type($initial_capacity) `)` `->` type($result)
+```
+
+
+Allocates a new typed list with a minimum initial_capacity.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`initial_capacity` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | list
+
+### `vm.list.get.i32` (IREE::VM::ListGetI32Op)
+
+primitive type element accessor
+
+Syntax:
+
+```
+operation ::= `vm.list.get.i32` operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
+```
+
+
+Returns the value of the element at the given index.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list<8/16/32-bit integer or 16/32-bit float>
+`index` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.list.get.ref` (IREE::VM::ListGetRefOp)
+
+ref type element accessor
+
+Syntax:
+
+```
+operation ::= `vm.list.get.ref` operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
+```
+
+
+Returns the ref value of the element at the given index. Note that the value
+may be null if the element is null or the type does not match.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`index` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ref
+
+### `vm.list.reserve` (IREE::VM::ListReserveOp)
+
+reserves capacity for list growth
+
+Syntax:
+
+```
+operation ::= `vm.list.reserve` operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`
+```
+
+
+Reserves storage for at least minimum_capacity elements. If the list already
+has at least the specified capacity the operation is ignored.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`minimum_capacity` | 32-bit signless integer
+
+### `vm.list.resize` (IREE::VM::ListResizeOp)
+
+resizes the list to a new count in elements
+
+Syntax:
+
+```
+operation ::= `vm.list.resize` operands attr-dict `:` `(` type($list) `,` type($new_size) `)`
+```
+
+
+Resizes the list to contain new_size elements. This will either truncate
+the list if the existing size is greater than new_size or extend the list
+with the default list value of 0 if storing primitives and null if refs.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`new_size` | 32-bit signless integer
+
+### `vm.list.set.i32` (IREE::VM::ListSetI32Op)
+
+primitive type element mutator
+
+Syntax:
+
+```
+operation ::= `vm.list.set.i32` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
+```
+
+
+Sets the element at the given index to the new value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list<8/16/32-bit integer or 16/32-bit float>
+`index` | 32-bit signless integer
+`value` | 32-bit signless integer
+
+### `vm.list.set.ref` (IREE::VM::ListSetRefOp)
+
+ref type element mutator
+
+Syntax:
+
+```
+operation ::= `vm.list.set.ref` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
+```
+
+
+Sets the element at the given index to the new ref value (possibly null).
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+`index` | 32-bit signless integer
+`value` | ref
+
+### `vm.list.size` (IREE::VM::ListSizeOp)
+
+the size of the list in elements
+
+Syntax:
+
+```
+operation ::= `vm.list.size` operands attr-dict `:` `(` type($list) `)` `->` type($result)
+```
+
+
+Returns the current size of the list in elements.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
 
 ### `vm.module` (IREE::VM::ModuleOp)
 
