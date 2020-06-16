@@ -26,18 +26,23 @@ namespace {
 
 // Example import function that adds 1 to its value.
 static iree_status_t IREE_API_CALL SimpleAddExecute(
-    void* self, iree_vm_stack_t* stack, iree_vm_stack_frame_t* frame,
+    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
     iree_vm_execution_result_t* out_result) {
-  int32_t value = frame->registers.i32[0];
-  frame->registers.i32[0] = value + 1;
+  iree_vm_stack_frame_t* callee_frame;
+  IREE_CHECK_OK(iree_vm_stack_function_enter(
+      stack, call->function, call->argument_registers, call->result_registers,
+      &callee_frame));
+
+  auto& regs = callee_frame->registers;
+  int32_t value = regs.i32[0];
+  regs.i32[0] = value + 1;
 
   // TODO(benvanik): replace with macro? helper for none/i32/etc
   static const union {
     uint16_t reserved[2];
     iree_vm_register_list_t list;
-  } return_registers = {{1, 0}};
-  frame->return_registers = &return_registers.list;
-
+  } result_registers = {{1, 0}};
+  iree_vm_stack_function_leave(stack, &result_registers.list, NULL);
   return IREE_STATUS_OK;
 }
 
@@ -60,8 +65,10 @@ static iree_status_t RunFunction(benchmark::State& state,
   module->alloc_state(module->self, IREE_ALLOCATOR_SYSTEM, &module_state);
 
   iree_vm_module_t import_module;
-  import_module.execute = SimpleAddExecute;
+  memset(&import_module, 0, sizeof(import_module));
+  import_module.begin_call = SimpleAddExecute;
   iree_vm_function_t imported_func;
+  memset(&imported_func, 0, sizeof(imported_func));
   imported_func.module = &import_module;
   imported_func.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
   imported_func.ordinal = 0;
@@ -76,33 +83,50 @@ static iree_status_t RunFunction(benchmark::State& state,
         return IREE_STATUS_OK;
       }};
 
-  auto stack = std::make_unique<iree_vm_stack_t>();
-  iree_vm_stack_init(state_resolver, stack.get());
-
   iree_vm_function_t function;
-  IREE_CHECK_OK(module->lookup_function(
+  IREE_CHECK_OK(iree_vm_module_lookup_function_by_name(
       module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
       iree_string_view_t{function_name.data(), function_name.size()},
       &function))
       << "Exported function '" << function_name << "' not found";
+  auto signature = iree_vm_function_signature(&function);
 
-  while (state.KeepRunningBatch(batch_size)) {
-    iree_vm_stack_frame_t* entry_frame;
-    iree_vm_stack_function_enter(stack.get(), function, &entry_frame);
-    // TODO(benvanik): replace direct register manipulation with setter:
-    //   iree_vm_stack_frame_set_arguments(entry_frame, 1, i32_args, 0, {});
-    for (int i = 0; i < i32_args.size(); ++i) {
-      entry_frame->registers.i32[i] = i32_args[i];
-    }
-
-    iree_vm_execution_result_t result;
-    IREE_CHECK_OK(
-        module->execute(module->self, stack.get(), entry_frame, &result));
-
-    iree_vm_stack_function_leave(stack.get());
+  auto* argument_registers = (iree_vm_register_list_t*)iree_alloca(
+      sizeof(iree_vm_register_list_t) +
+      signature.argument_count * sizeof(uint16_t));
+  argument_registers->size = signature.argument_count;
+  for (int i = 0; i < argument_registers->size; ++i) {
+    argument_registers->registers[i] = i;
+  }
+  auto* result_registers = (iree_vm_register_list_t*)iree_alloca(
+      sizeof(iree_vm_register_list_t) +
+      signature.result_count * sizeof(uint16_t));
+  result_registers->size = signature.result_count;
+  for (int i = 0; i < result_registers->size; ++i) {
+    result_registers->registers[i] = i;
   }
 
-  iree_vm_stack_deinit(stack.get());
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver, IREE_ALLOCATOR_SYSTEM);
+  while (state.KeepRunningBatch(batch_size)) {
+    iree_vm_stack_frame_t* external_frame = NULL;
+    IREE_CHECK_OK(iree_vm_stack_external_enter(
+        stack, iree_make_cstring_view("invoke"), 8, &external_frame));
+
+    for (int i = 0; i < argument_registers->size; ++i) {
+      external_frame->registers.i32[i] = i32_args[i];
+    }
+
+    iree_vm_function_call_t call;
+    memset(&call, 0, sizeof(call));
+    call.function = function;
+    call.argument_registers = argument_registers;
+    call.result_registers = result_registers;
+    iree_vm_execution_result_t result;
+    IREE_CHECK_OK(module->begin_call(module->self, stack, &call, &result));
+
+    iree_vm_stack_external_leave(stack);
+  }
+  iree_vm_stack_deinitialize(stack);
 
   module->free_state(module->self, module_state);
   module->destroy(module->self);
@@ -232,36 +256,13 @@ BENCHMARK(BM_CallInternalFuncReference);
 
 static void BM_CallInternalFuncBytecode(benchmark::State& state) {
   IREE_CHECK_OK(RunFunction(state, "call_internal_func", {100},
-                            /*batch_size=*/10));
+                            /*batch_size=*/20));
 }
 BENCHMARK(BM_CallInternalFuncBytecode);
 
-static void BM_CallImportedFuncReference(benchmark::State& state) {
-  iree_vm_module_t import_module;
-  import_module.execute = SimpleAddExecute;
-  iree_vm_module_t* module_ptr = &import_module;
-  benchmark::DoNotOptimize(module_ptr);
-
-  auto stack = std::make_unique<iree_vm_stack_t>();
-  iree_vm_stack_frame_t* frame = &stack->frames[0];
-  iree_vm_execution_result_t result;
-  while (state.KeepRunningBatch(10)) {
-    int value = 100;
-    for (int i = 0; i < 10; ++i) {
-      frame->registers.i32[0] = value;
-      module_ptr->execute(module_ptr->self, stack.get(), frame, &result);
-      value = frame->registers.i32[0];
-      benchmark::DoNotOptimize(value);
-      benchmark::ClobberMemory();
-    }
-    benchmark::ClobberMemory();
-  }
-}
-BENCHMARK(BM_CallImportedFuncReference);
-
 static void BM_CallImportedFuncBytecode(benchmark::State& state) {
   IREE_CHECK_OK(RunFunction(state, "call_imported_func", {100},
-                            /*batch_size=*/10));
+                            /*batch_size=*/20));
 }
 BENCHMARK(BM_CallImportedFuncBytecode);
 

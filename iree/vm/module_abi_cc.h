@@ -79,7 +79,8 @@ class NativeModule {
   NativeModule(const char* name, iree_allocator_t allocator,
                absl::Span<const NativeFunction<State>> dispatch_table)
       : name_(name), allocator_(allocator), dispatch_table_(dispatch_table) {
-    CHECK_OK(FromApiStatus(iree_vm_module_init(&interface_, this), IREE_LOC));
+    CHECK_OK(
+        FromApiStatus(iree_vm_module_initialize(&interface_, this), IREE_LOC));
     interface_.destroy = NativeModule::ModuleDestroy;
     interface_.name = NativeModule::ModuleName;
     interface_.signature = NativeModule::ModuleSignature;
@@ -88,7 +89,7 @@ class NativeModule {
     interface_.alloc_state = NativeModule::ModuleAllocState;
     interface_.free_state = NativeModule::ModuleFreeState;
     interface_.resolve_import = NativeModule::ModuleResolveImport;
-    interface_.execute = NativeModule::ModuleExecute;
+    interface_.begin_call = NativeModule::ModuleBeginCall;
   }
 
   virtual ~NativeModule() = default;
@@ -208,27 +209,31 @@ class NativeModule {
     return IREE_STATUS_FAILED_PRECONDITION;
   }
 
-  static iree_status_t ModuleExecute(void* self, iree_vm_stack_t* stack,
-                                     iree_vm_stack_frame_t* frame,
-                                     iree_vm_execution_result_t* out_result) {
+  static iree_status_t ModuleBeginCall(void* self, iree_vm_stack_t* stack,
+                                       const iree_vm_function_call_t* call,
+                                       iree_vm_execution_result_t* out_result) {
     if (!out_result) return IREE_STATUS_INVALID_ARGUMENT;
     std::memset(out_result, 0, sizeof(*out_result));
-    if (!stack || !frame) return IREE_STATUS_INVALID_ARGUMENT;
-    int32_t ordinal = frame->function.ordinal;
+    if (!stack) return IREE_STATUS_INVALID_ARGUMENT;
     auto* module = FromModulePointer(self);
-    if (ordinal < 0 || ordinal > module->dispatch_table_.size()) {
+    if (call->function.ordinal < 0 ||
+        call->function.ordinal >= module->dispatch_table_.size()) {
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    const auto& info = module->dispatch_table_[ordinal];
-    auto* state = FromStatePointer(frame->module_state);
-    auto status = info.call(info.ptr, state, stack, frame, out_result);
+    const auto& info = module->dispatch_table_[call->function.ordinal];
+
+    iree_vm_module_state_t* module_state = nullptr;
+    IREE_RETURN_IF_ERROR(iree_vm_stack_query_module_state(
+        stack, call->function.module, &module_state));
+
+    auto* state = FromStatePointer(module_state);
+    auto status = info.call(info.ptr, state, stack, call, out_result);
     if (!status.ok()) {
       status = iree::Annotate(
           status,
           absl::StrCat("while executing ", module->name_, ".", info.name));
-      return ToApiStatus(status);
     }
-    return IREE_STATUS_OK;
+    return ToApiStatus(status);
   }
 
   const char* name_;

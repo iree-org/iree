@@ -72,6 +72,10 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_variant_list_init(
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_variant_list_free(iree_vm_variant_list_t* list);
 
+// Returns the capacity of the list in elements.
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL
+iree_vm_variant_list_capacity(const iree_vm_variant_list_t* list);
+
 // Returns the total number of elements added to the list.
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL
 iree_vm_variant_list_size(const iree_vm_variant_list_t* list);

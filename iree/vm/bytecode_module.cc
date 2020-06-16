@@ -279,6 +279,13 @@ static iree_status_t iree_vm_bytecode_module_get_function(
       out_function->module = &module->interface;
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
       out_function->ordinal = export_def->internal_ordinal();
+
+      const iree_vm_function_descriptor_t* function_descriptor =
+          &module->function_descriptor_table[export_def->internal_ordinal()];
+      out_function->i32_register_count =
+          function_descriptor->i32_register_count;
+      out_function->ref_register_count =
+          function_descriptor->ref_register_count;
     }
   } else {
     if (ordinal < 0 || ordinal >= module_def->internal_functions()->size()) {
@@ -291,6 +298,13 @@ static iree_status_t iree_vm_bytecode_module_get_function(
       out_function->module = &module->interface;
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
       out_function->ordinal = ordinal;
+
+      const iree_vm_function_descriptor_t* function_descriptor =
+          &module->function_descriptor_table[ordinal];
+      out_function->i32_register_count =
+          function_descriptor->i32_register_count;
+      out_function->ref_register_count =
+          function_descriptor->ref_register_count;
     }
   }
 
@@ -377,10 +391,8 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
          ++ordinal) {
       auto* import_def = module_def->imported_functions()->Get(ordinal);
       if (iree_vm_bytecode_module_compare_str(import_def->full_name(), name)) {
-        out_function->module = &module->interface;
-        out_function->linkage = linkage;
-        out_function->ordinal = ordinal;
-        return IREE_STATUS_OK;
+        return iree_vm_bytecode_module_get_function(self, linkage, ordinal,
+                                                    out_function, NULL, NULL);
       }
     }
     return IREE_STATUS_NOT_FOUND;
@@ -389,10 +401,9 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
          ++ordinal) {
       auto* export_def = module_def->exported_functions()->Get(ordinal);
       if (iree_vm_bytecode_module_compare_str(export_def->local_name(), name)) {
-        out_function->module = &module->interface;
-        out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-        out_function->ordinal = export_def->internal_ordinal();
-        return IREE_STATUS_OK;
+        return iree_vm_bytecode_module_get_function(
+            self, IREE_VM_FUNCTION_LINKAGE_INTERNAL,
+            export_def->internal_ordinal(), out_function, NULL, NULL);
       }
     }
     return IREE_STATUS_NOT_FOUND;
@@ -402,10 +413,9 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
       auto* function_def = module_def->internal_functions()->Get(ordinal);
       if (iree_vm_bytecode_module_compare_str(function_def->local_name(),
                                               name)) {
-        out_function->module = &module->interface;
-        out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-        out_function->ordinal = ordinal;
-        return IREE_STATUS_OK;
+        return iree_vm_bytecode_module_get_function(
+            self, IREE_VM_FUNCTION_LINKAGE_INTERNAL, ordinal, out_function,
+            NULL, NULL);
       }
     }
     return IREE_STATUS_NOT_FOUND;
@@ -527,8 +537,8 @@ static iree_status_t iree_vm_bytecode_module_resolve_import(
   return IREE_STATUS_OK;
 }
 
-static iree_status_t iree_vm_bytecode_module_execute(
-    void* self, iree_vm_stack_t* stack, iree_vm_stack_frame_t* frame,
+static iree_status_t iree_vm_bytecode_module_begin_call(
+    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
     iree_vm_execution_result_t* out_result) {
   // NOTE: any work here adds directly to the invocation time. Avoid doing too
   // much work or touching too many unlikely-to-be-cached structures (such as
@@ -536,30 +546,36 @@ static iree_status_t iree_vm_bytecode_module_execute(
 
   if (!out_result) return IREE_STATUS_INVALID_ARGUMENT;
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
-  if (!stack || !frame) return IREE_STATUS_INVALID_ARGUMENT;
-  if (frame->function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
+  if (!stack) return IREE_STATUS_INVALID_ARGUMENT;
+
+  // Only internal functions store the information needed for execution. We
+  // allow exports here as well to make things easier to call externally.
+  iree_vm_function_t function = call->function;
+  if (function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
-        self, frame->function.linkage, frame->function.ordinal,
-        &frame->function, NULL, NULL));
+        self, function.linkage, function.ordinal, &function, NULL, NULL));
   }
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  if (frame->function.ordinal < 0 ||
-      frame->function.ordinal >= module->function_descriptor_count) {
+  if (function.ordinal < 0 ||
+      function.ordinal >= module->function_descriptor_count) {
     // Invalid function ordinal.
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  const iree_vm_function_descriptor_t* function_descriptor =
-      &module->function_descriptor_table[frame->function.ordinal];
-  iree_vm_registers_t* regs = &frame->registers;
-  memset(&regs->ref[regs->ref_register_count], 0,
-         sizeof(iree_vm_ref_t) * (function_descriptor->ref_register_count -
-                                  regs->ref_register_count));
+  // Enter function (as this is the initial call).
+  // The callee's return will take care of storing the output registers when it
+  // actually does return, either immediately or in the future via a resume.
+  iree_vm_stack_frame_t* callee_frame = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_stack_function_enter(stack, function, call->argument_registers,
+                                   call->result_registers, &callee_frame));
 
+  // Jump into the dispatch routine to execute bytecode until the function
+  // either returns (synchronous) or yields (asynchronous).
   return iree_vm_bytecode_dispatch(
-      module, (iree_vm_bytecode_module_state_t*)frame->module_state, stack,
-      frame, out_result);
+      module, (iree_vm_bytecode_module_state_t*)callee_frame->module_state,
+      stack, callee_frame, out_result);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
@@ -614,7 +630,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
                                              sizeof(iree_vm_bytecode_module_t));
   iree_vm_bytecode_module_resolve_types(module_def, module->type_table);
 
-  iree_vm_module_init(&module->interface, module);
+  iree_vm_module_initialize(&module->interface, module);
   module->interface.destroy = iree_vm_bytecode_module_destroy;
   module->interface.name = iree_vm_bytecode_module_name;
   module->interface.signature = iree_vm_bytecode_module_signature;
@@ -623,7 +639,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
   module->interface.alloc_state = iree_vm_bytecode_module_alloc_state;
   module->interface.free_state = iree_vm_bytecode_module_free_state;
   module->interface.resolve_import = iree_vm_bytecode_module_resolve_import;
-  module->interface.execute = iree_vm_bytecode_module_execute;
+  module->interface.begin_call = iree_vm_bytecode_module_begin_call;
   module->interface.get_function_reflection_attr =
       iree_vm_bytecode_module_get_function_reflection_attr;
 

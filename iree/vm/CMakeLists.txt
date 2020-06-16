@@ -132,6 +132,7 @@ iree_cc_library(
     ::stack
     iree::base::api
     iree::base::atomics
+    iree::base::tracing
   PUBLIC
 )
 
@@ -161,6 +162,7 @@ iree_cc_library(
     ::module
     ::variant_list
     iree::base::api
+    iree::base::tracing
   PUBLIC
 )
 
@@ -172,6 +174,7 @@ iree_cc_library(
   SRCS
     "module.c"
   DEPS
+    iree::base::alignment
     iree::base::api
     iree::base::atomics
   PUBLIC
@@ -246,8 +249,10 @@ iree_cc_library(
   DEPS
     ::module
     ::ref
+    ::variant_list
     iree::base::alignment
     iree::base::api
+    iree::base::tracing
   PUBLIC
 )
 
