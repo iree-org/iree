@@ -136,7 +136,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 if(CMAKE_CROSSCOMPILING)
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-    message(FATAL_ERROR "Cross compilation with Windows host unspported yet")
+    message(FATAL_ERROR "Cross compilation with Windows host system is not supported yet")
   endif()
 
   message(STATUS "Detected cross compilation mode, configuring IREE on host...")

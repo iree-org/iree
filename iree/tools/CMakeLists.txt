@@ -278,9 +278,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
     PUBLIC
   )
-endif(${IREE_BUILD_COMPILER})
 
-if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
   iree_cc_binary(
     NAME
       iree-opt
@@ -334,7 +332,12 @@ if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
       ${IREE_HAL_DRIVER_MODULES}
     HOSTONLY
   )
+endif(${IREE_BUILD_COMPILER})
 
+# If cross-compiling, we need to declare iree-translate under host configuration
+# unconditionally because we need to run it on host  to generate VM modules
+# for tests.
+if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
   iree_cc_binary(
     NAME
       iree-translate
@@ -344,7 +347,7 @@ if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
       ::iree_translate_main
     HOSTONLY
   )
-endif(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
+endif()
 
 iree_cc_library(
   NAME
