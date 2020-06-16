@@ -1,4 +1,4 @@
-# Getting Started on MacOS with Bazel
+# Getting Started on macOS with Bazel
 
 <!--
 Notes to those updating this guide:
@@ -13,11 +13,11 @@ Notes to those updating this guide:
 
 This guide walks through building the core compiler and runtime parts of IREE
 from source. Auxiliary components like the Python bindings and Vulkan driver are
-not documented for MacOS at this time.
+not documented for macOS at this time.
 
-IREE is not officially supported on MacOS at this time. It may work, but it is
+IREE is not officially supported on macOS at this time. It may work, but it is
 not a part of our open source CI, and may be intermittently broken.
-Contributions related to MacOS support and documentation are welcome however.
+Contributions related to macOS support and documentation are welcome however.
 
 ## Prerequisites
 
@@ -93,7 +93,7 @@ $ bazel test -k //iree/... \
 ```
 
 > Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Not all tests are passing on MacOS, but the build does
+> &nbsp;&nbsp;&nbsp;&nbsp;Not all tests are passing on macOS, but the build does
 > complete successfully at the time of writing.
 
 In general, build artifacts will be under the `bazel-bin` directory at the top
@@ -102,7 +102,7 @@ level.
 ## Recommended user.bazelrc
 
 You can put a user.bazelrc at the root of the repository and it will be ignored
-by git. The recommended contents for Linux/MacOS are:
+by git. The recommended contents for Linux/macOS are:
 
 ```shell
 build --disk_cache=/tmp/bazel-cache
@@ -146,7 +146,7 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
 *   For an introduction to IREE's project structure and developer tools, see
     [Developer Overview](../developer_overview.md)
 <!--
-TODO: Link to MacOS versions of these guides once they are developed.
+TODO: Link to macOS versions of these guides once they are developed.
 *   To target GPUs using Vulkan, see
     [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 *   To use IREE's Python bindings, see

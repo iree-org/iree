@@ -1,4 +1,4 @@
-# Getting Started on MacOS with CMake
+# Getting Started on macOS with CMake
 
 <!--
 Notes to those updating this guide:
@@ -13,11 +13,11 @@ Notes to those updating this guide:
 
 This guide walks through building the core compiler and runtime parts of IREE
 from source. Auxiliary components like the Python bindings and Vulkan driver are
-not documented for MacOS at this time.
+not documented for macOS at this time.
 
-IREE is not officially supported on MacOS at this time. It may work, but it is
+IREE is not officially supported on macOS at this time. It may work, but it is
 not a part of our open source CI, and may be intermittently broken.
-Contributions related to MacOS support and documentation are welcome however.
+Contributions related to macOS support and documentation are welcome however.
 
 ## Prerequisites
 
@@ -72,7 +72,7 @@ Configure:
 $ cmake -G Ninja -B build/ .
 ```
 
-Note: this should use `Clang` by default on MacOS. `GCC` is not fully supported
+Note: this should use `Clang` by default on macOS. `GCC` is not fully supported
 by IREE.
 
 > Tip:<br>
@@ -111,7 +111,7 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
 *   For an introduction to IREE's project structure and developer tools, see
     [Developer Overview](../developer_overview.md)
 <!--
-TODO: Link to MacOS versions of these guides once they are developed.
+TODO: Link to macOS versions of these guides once they are developed.
 *   To target GPUs using Vulkan, see
     [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 *   To use IREE's Python bindings, see
