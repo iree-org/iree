@@ -28,7 +28,7 @@ This gives a brief explanation of IREE specific CMake options and variables.
 
 * `IREE_BUILD_DOCS`:BOOL
 
-  Builds IREE docs. Defaults to `OFF`.
+  Builds IREE documentation. Defaults to `OFF`.
 
 
 * `IREE_BUILD_SAMPLES`:BOOL
