@@ -29,7 +29,7 @@ namespace Shape {
 //===----------------------------------------------------------------------===//
 
 LogicalResult safeCastCompatibleShapePattern(
-    CastCompatibleShapeOp op, CastCompatibleShapeOpOperandAdaptor operands,
+    CastCompatibleShapeOp op, CastCompatibleShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   // TODO(laurenzo): This is just eliding if everything is the same. Make
   // it generic.
@@ -50,9 +50,9 @@ LogicalResult safeCastCompatibleShapePattern(
   return failure();
 }
 
-LogicalResult elideTiedGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOpOperandAdaptor operands,
-    PatternRewriter &rewriter) {
+LogicalResult elideTiedGetRankedShapePattern(GetRankedShapeOp op,
+                                             GetRankedShapeOp::Adaptor operands,
+                                             PatternRewriter &rewriter) {
   // If the immediate predecessor is a TieShapeOp, then this op can be
   // erased in favor of the input to the tie op.
   auto tieOp = dyn_cast_or_null<TieShapeOp>(operands.operand().getDefiningOp());
@@ -65,7 +65,7 @@ LogicalResult elideTiedGetRankedShapePattern(
 }
 
 LogicalResult elideDuplicateGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOpOperandAdaptor operands,
+    GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   // If the immediate predecessor is a GetRankedShapeOp, then this op can be
   // erased in favor of the input to the tie op.
@@ -78,7 +78,7 @@ LogicalResult elideDuplicateGetRankedShapePattern(
 }
 
 LogicalResult elideStaticGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOpOperandAdaptor operands,
+    GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   auto operandType = operands.operand().getType().dyn_cast<RankedTensorType>();
   auto resultShapeType = op.shape().getType().dyn_cast<RankedShapeType>();
@@ -91,7 +91,7 @@ LogicalResult elideStaticGetRankedShapePattern(
 }
 
 LogicalResult identityMakeRankedShapePattern(
-    MakeRankedShapeOp op, MakeRankedShapeOpOperandAdaptor operands,
+    MakeRankedShapeOp op, MakeRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   if (operands.dynamic_dimensions().empty()) {
     // Do not match static shapes.
@@ -148,18 +148,18 @@ LogicalResult identityMakeRankedShapePattern(
 // using the individual SSA values. This naturally produces a lot of unused
 // shapex.make_ranked_shape ops which we need to delete for legality reasons.
 // This pattern allows conversions to erase those ops.
-LogicalResult eraseUnusedMakeRankedShapeOp(
-    MakeRankedShapeOp op, MakeRankedShapeOpOperandAdaptor operands,
-    PatternRewriter &rewriter) {
+LogicalResult eraseUnusedMakeRankedShapeOp(MakeRankedShapeOp op,
+                                           MakeRankedShapeOp::Adaptor operands,
+                                           PatternRewriter &rewriter) {
   if (!op.getResult().use_empty())
     return rewriter.notifyMatchFailure(op, "op has uses");
   rewriter.eraseOp(op);
   return success();
 }
 
-LogicalResult dynamicMakeRankedShapeDimPattern(
-    RankedDimOp op, RankedDimOpOperandAdaptor operands,
-    PatternRewriter &rewriter) {
+LogicalResult dynamicMakeRankedShapeDimPattern(RankedDimOp op,
+                                               RankedDimOp::Adaptor operands,
+                                               PatternRewriter &rewriter) {
   // If the immediate predecessor is a MakeRankedShapeOp, then this op can be
   // erased in favor of the corresponding input to that op.
   auto shapeInput = operands.shape();
@@ -188,7 +188,7 @@ LogicalResult dynamicMakeRankedShapeDimPattern(
 }
 
 LogicalResult expandRankedShapeDimsPattern(RankedDimsOp op,
-                                           RankedDimsOpOperandAdaptor operands,
+                                           RankedDimsOp::Adaptor operands,
                                            PatternRewriter &rewriter) {
   auto shapeInput = operands.shape();
   auto rsType = shapeInput.getType().cast<RankedShapeType>();
@@ -202,7 +202,7 @@ LogicalResult expandRankedShapeDimsPattern(RankedDimsOp op,
 }
 
 LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
-                                            TieShapeOpOperandAdaptor operands,
+                                            TieShapeOp::Adaptor operands,
                                             PatternRewriter &rewriter) {
   // If the immediate predecessor is a TieShapeOp, then it can be possible
   // to merge these. This can often happen when function/block tie_shape
@@ -294,7 +294,7 @@ void RankedDimsOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 LogicalResult fromExtentTensorOfToExtentTensorIsIdentity(
-    FromExtentTensorOp op, FromExtentTensorOpOperandAdaptor operands,
+    FromExtentTensorOp op, FromExtentTensorOp::Adaptor operands,
     PatternRewriter &rewriter) {
   auto toOp =
       dyn_cast_or_null<ToExtentTensorOp>(op.extent_tensor().getDefiningOp());
@@ -323,7 +323,7 @@ struct TieShapeTypeConversionPattern : public OpConversionPattern<TieShapeOp> {
   LogicalResult matchAndRewrite(
       TieShapeOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    TieShapeOpOperandAdaptor adaptor(operands);
+    TieShapeOp::Adaptor adaptor(operands);
     Type operandType = adaptor.operand().getType();
     if (operandType == srcOp.getType()) {
       return failure();

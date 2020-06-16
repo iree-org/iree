@@ -69,7 +69,7 @@ class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
 
 // VMLA -> VM import conversion base for generic ops.
 // Handles signatures with integers, VM types, or simple buffers.
-template <typename T, typename Adaptor = typename T::OperandAdaptor>
+template <typename T, typename Adaptor = typename T::Adaptor>
 class VMLAImportOpConversion : public OpConversionPattern<T> {
  public:
   VMLAImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,

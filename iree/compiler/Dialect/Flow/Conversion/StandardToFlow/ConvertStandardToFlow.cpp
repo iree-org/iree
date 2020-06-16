@@ -31,14 +31,17 @@ struct ExtractElementOpLowering : public OpRewritePattern<ExtractElementOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ExtractElementOp op,
                                 PatternRewriter &rewriter) const override {
-    auto aggregateType = op.getAggregate().getType().dyn_cast<TensorType>();
-    if (!aggregateType) {
-      // We currently are only looking for tensor types.
-      return failure();
+    auto tensorType = op.getAggregate().getType().dyn_cast<TensorType>();
+    if (!tensorType) {
+      return rewriter.notifyMatchFailure(op, "expected tensor types");
+    }
+    // tensor<i1> is not valid to load, it needs to be converted to i8 or
+    // something else instead.
+    if (tensorType.getElementTypeBitWidth() == 1) {
+      return rewriter.notifyMatchFailure(op, "expected non-i1 type");
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
-        op, aggregateType.getElementType(), op.aggregate(),
-        llvm::to_vector<4>(op.indices()));
+        op, tensorType.getElementType(), op.aggregate(), op.indices());
     return success();
   }
 };

@@ -23,8 +23,8 @@ cc_library(
         "StructAttrGen.cpp",
     ],
     deps = [
-        "@llvm-project//llvm:support",
-        "@llvm-project//llvm:tablegen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",
     ],

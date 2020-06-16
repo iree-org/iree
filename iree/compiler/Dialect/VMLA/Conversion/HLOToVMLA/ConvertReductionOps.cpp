@@ -60,7 +60,7 @@ struct SplitIndependentReductionOpConversion
       return failure();
     }
     auto &block = srcOp.body().getBlocks().front();
-    xla_hlo::ReduceOpOperandAdaptor newOperands(operands);
+    xla_hlo::ReduceOp::Adaptor newOperands(operands);
     SmallVector<Value, 4> setResults;
     for (auto &op : block) {
       if (op.isKnownTerminator()) {

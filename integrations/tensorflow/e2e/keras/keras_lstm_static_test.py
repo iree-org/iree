@@ -52,7 +52,7 @@ class LstmTest(tf_test_utils.SavedModelTestCase):
                       dtype=np.float32).reshape(
                           [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]),
             shape=[NUM_BATCH, NUM_TIMESTEPS,
-                   NUM_UNITS])).print().assert_all_close()
+                   NUM_UNITS])).print().assert_all_close(1e-5, 1e-5)
 
 
 if __name__ == "__main__":

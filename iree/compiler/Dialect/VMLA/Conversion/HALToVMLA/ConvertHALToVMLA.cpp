@@ -62,7 +62,7 @@ struct InterfaceLoadConstantOpConversion
            "exported VMLA functions require vmla.interface ops as their only "
            "argument");
 
-    IREE::HAL::InterfaceLoadConstantOpOperandAdaptor newOperands(operands);
+    IREE::HAL::InterfaceLoadConstantOp::Adaptor newOperands(operands);
     rewriter.replaceOpWithNewOp<IREE::VMLA::InterfaceConstOp>(
         loadOp, typeConverter.convertType(loadOp.getResult().getType()),
         interfaceArg, loadOp.offsetAttr());
@@ -89,7 +89,7 @@ struct InterfaceLoadTensorOpConversion
            "argument");
     auto bindingOp = loadOp.queryBindingOp();
 
-    IREE::HAL::InterfaceLoadTensorOpOperandAdaptor newOperands(operands);
+    IREE::HAL::InterfaceLoadTensorOp::Adaptor newOperands(operands);
     auto bufferOp = rewriter.create<IREE::VMLA::InterfaceBindingOp>(
         loadOp.getLoc(), IREE::VMLA::BufferType::get(loadOp.getContext()),
         interfaceArg, bindingOp.set(), bindingOp.binding());
@@ -121,7 +121,7 @@ struct InterfaceStoreTensorOpConversion
            "argument");
     auto bindingOp = storeOp.queryBindingOp();
 
-    IREE::HAL::InterfaceStoreTensorOpOperandAdaptor newOperands(operands);
+    IREE::HAL::InterfaceStoreTensorOp::Adaptor newOperands(operands);
     auto bufferOp = rewriter.create<IREE::VMLA::InterfaceBindingOp>(
         storeOp.getLoc(), IREE::VMLA::BufferType::get(storeOp.getContext()),
         interfaceArg, bindingOp.set(), bindingOp.binding());

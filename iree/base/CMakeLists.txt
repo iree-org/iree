@@ -602,7 +602,7 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
     DEPS
       absl::core_headers
     DEFINES
-      # TODO(GH-2114): Change the mode to 2.
+      # TODO(#2114): Change the mode to 2.
       "IREE_TRACING_MODE=1"
     PUBLIC
   )

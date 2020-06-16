@@ -55,9 +55,10 @@ bool hasWorkGroupMarker(Operation *);
 /// partitioned to workitems.
 bool hasWorkItemMarker(Operation *);
 
-/// Returns true if an operation has marker to denote that it can be natively
-/// lowered to SPIRV.
-bool hasSPIRVMarker(Operation *);
+/// Returns true if an operation has a marker to denote that it will be mapped
+/// to cooperative matrix operations. Markers need to be consistent as
+/// cooperative matrices have their own type and load/store operations.
+bool hasCooperativeMatrixMarker(Operation *);
 
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
@@ -72,6 +73,10 @@ void setWorkGroupMarker(Operation *);
 /// Sets marker to denote that a linalg operation is to be partitioned to
 /// workitems.
 void setWorkItemMarker(Operation *);
+
+/// Sets marker to denote that a vector operation is to be execute on a
+/// cooperative matrix.
+void setCooperativeMatrixMarker(Operation *);
 
 }  // namespace iree_compiler
 }  // namespace mlir

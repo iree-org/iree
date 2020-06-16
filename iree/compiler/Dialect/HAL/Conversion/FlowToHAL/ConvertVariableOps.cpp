@@ -163,7 +163,7 @@ class VariableStoreOpConversion
   LogicalResult matchAndRewrite(
       IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::VariableStoreOpOperandAdaptor operands(newOperands);
+    IREE::Flow::VariableStoreOp::Adaptor operands(newOperands);
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableStoreOp>(
         storeOp, operands.value(),
@@ -182,7 +182,7 @@ class VariableStoreIndirectOpConversion
       IREE::Flow::VariableStoreIndirectOp storeOp,
       llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::VariableStoreIndirectOpOperandAdaptor operands(newOperands);
+    IREE::Flow::VariableStoreIndirectOp::Adaptor operands(newOperands);
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableStoreIndirectOp>(
         storeOp, operands.value(), storeOp.variable());

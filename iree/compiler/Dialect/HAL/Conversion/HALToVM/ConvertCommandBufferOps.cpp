@@ -116,8 +116,7 @@ class CommandBufferPushDescriptorSetOpConversion
       llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getType();
-    IREE::HAL::CommandBufferPushDescriptorSetOpOperandAdaptor newOperands(
-        operands);
+    IREE::HAL::CommandBufferPushDescriptorSetOp::Adaptor newOperands(operands);
 
     SmallVector<Value, 8> callOperands = {
         newOperands.command_buffer(),

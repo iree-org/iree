@@ -56,7 +56,7 @@ class ExecutableCachePrepareOpConversion
       llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = prepareOp.getLoc();
-    IREE::HAL::ExecutableCachePrepareOpOperandAdaptor newOperands(operands);
+    IREE::HAL::ExecutableCachePrepareOp::Adaptor newOperands(operands);
 
     auto funcOp = dyn_cast_or_null<IREE::VM::FuncOp>(
         rewriter.getInsertionBlock()->getParentOp());

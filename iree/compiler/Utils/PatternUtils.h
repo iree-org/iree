@@ -35,7 +35,7 @@ namespace iree_compiler {
 
 template <typename OpTy>
 using GenericOpRewritePattern = LogicalResult (*)(
-    OpTy op, typename OpTy::OperandAdaptor operands, PatternRewriter &rewriter);
+    OpTy op, typename OpTy::Adaptor operands, PatternRewriter &rewriter);
 
 template <typename OpTy>
 static void insertGreedyPattern(OwningRewritePatternList &patterns,
@@ -57,7 +57,7 @@ static void insertGreedyPattern(OwningRewritePatternList &patterns,
            ++i) {
         operands.push_back(op.getOperation()->getOperand(i));
       }
-      return f(op, typename OpTy::OperandAdaptor(operands), rewriter);
+      return f(op, typename OpTy::Adaptor(operands), rewriter);
     }
     GenericOpRewritePattern<OpTy> f;
   };
@@ -76,7 +76,7 @@ static void insertConversionPattern(OwningRewritePatternList &patterns,
     LogicalResult matchAndRewrite(
         OpTy op, ArrayRef<Value> operands,
         ConversionPatternRewriter &rewriter) const override {
-      return f(op, typename OpTy::OperandAdaptor(operands), rewriter);
+      return f(op, typename OpTy::Adaptor(operands), rewriter);
     }
     GenericOpRewritePattern<OpTy> f;
   };

@@ -15,7 +15,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
-#include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -35,19 +35,24 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  passManager.addPass(createResolveShapeOpsPass());
   // Convert ExecuableOp entry function to use memref arguments.
   passManager.addPass(createHALInterfaceToMemrefArgumentsPass());
 
   // (Linalg, STD) -> LLVM
   // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
-  passManager.addPass(createConvertLinalgToLLVMPass());
+  passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createInlinerPass());
+
+  // Propagates dynamic shapes computation on tensors.
+  passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+  passManager.addNestedPass<FuncOp>(
+      Shape::createMaterializeShapeCalculationsPass());
+  passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
 
   // HLO -> Linalg on buffers.
   passManager.addPass(createDecomposeHLOClampPass());

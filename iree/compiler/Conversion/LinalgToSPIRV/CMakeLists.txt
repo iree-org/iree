@@ -27,11 +27,11 @@ iree_cc_library(
     "LinalgTileAndFusePass.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
+    "VectorToGPUPass.cpp"
   DEPS
     LLVMSupport
     MLIRAffineOps
     MLIRAffineToStandard
-    MLIREDSC
     MLIRGPU
     MLIRGPUtoSPIRVTransforms
     MLIRIR
@@ -46,6 +46,7 @@ iree_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms
+    MLIRVector
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Dialect::HAL::IR

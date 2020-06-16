@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For use within a IREE bazel-tensorflow docker image on a Kokoro VM.
+# For use within a IREE bazel-bindings docker image on a Kokoro VM.
 # Log some information about the environment, initialize the submodules and then
 # run the bazel bindings tests.
 
@@ -29,7 +29,7 @@ bazel --version
 "$CXX" --version
 "$CC" --version
 "$PYTHON_BIN" -V
-# TODO( #1875 ): Make PYTHON_BIN also control the runtime version
+# TODO(#1875): Make PYTHON_BIN also control the runtime version
 python3 -V
 
 echo "Initializing submodules"

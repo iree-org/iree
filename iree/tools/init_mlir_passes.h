@@ -125,19 +125,8 @@ inline void registerMlirPasses() {
   createLocationSnapshotPass({});
 
   // Linalg
-  createLinalgFusionPass();
-  ::mlir::registerPass("linalg-fusion-for-tensor-ops",
-                       "Fuse Linalg ops on tensors",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createLinalgFusionOfTensorOpsPass();
-                       });
-  createLinalgTilingPass();
-  createLinalgTilingToParallelLoopsPass();
-  createLinalgPromotionPass(0);
-  createConvertLinalgToLoopsPass();
-  createConvertLinalgToParallelLoopsPass();
-  createConvertLinalgToAffineLoopsPass();
-  createConvertLinalgToLLVMPass();
+#define GEN_PASS_REGISTRATION
+#include "mlir/Dialect/Linalg/Passes.h.inc"
 
   // Loop
   createParallelLoopFusionPass();

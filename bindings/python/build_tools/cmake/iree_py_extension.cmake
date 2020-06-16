@@ -199,7 +199,7 @@ function(iree_complete_py_extension_link_options)
         get_target_property(_DEP_TYPE ${_DEP} TYPE)
         if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
           # Can't be ALWAYSLINK since it's an INTERFACE library.
-          # We also can't even query for the property, since it isn't whitelisted.
+          # We also can't even query for the property, since it isn't allowlisted.
         else()
           get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
         endif()

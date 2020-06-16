@@ -1,5 +1,3 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common configuration for Kokoro builds that run the core build on bazel on
-# linux.
+# Tests for common transforms.
 
-# We point to another kokoro build configuration here as a part of moving the
-# old `kokoro/gcp_ubuntu/bazel/ configuration to `kokoro/gcp_ubuntu/bazel/core/`
-# TODO: Remove this file once it is disabled internally in kokoro.
-build_file: "iree/kokoro/gcp_ubuntu/bazel/core/build_kokoro.sh"
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
+)

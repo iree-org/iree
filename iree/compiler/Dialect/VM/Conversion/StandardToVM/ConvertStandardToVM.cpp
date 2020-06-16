@@ -75,7 +75,7 @@ class ModuleTerminatorOpConversion
   }
 };
 
-// Whitelist of function attributes to retain when converting to vm.func.
+// Allowlist of function attributes to retain when converting to vm.func.
 constexpr const char *kRetainedAttributes[] = {
     "iree.reflection",
     "sym_visibility",
@@ -117,7 +117,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
                                 newFuncOp.end());
 
-    // Retain function attributes in the whitelist.
+    // Retain function attributes in the allowlist.
     auto retainedAttributes = ArrayRef<const char *>(
         kRetainedAttributes,
         sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
@@ -200,7 +200,7 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
   LogicalResult matchAndRewrite(
       CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CmpIOpOperandAdaptor srcAdapter(operands);
+    CmpIOp::Adaptor srcAdapter(operands);
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
       case CmpIPredicate::eq:
@@ -256,7 +256,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::OperandAdaptor srcAdapter(operands);
+    typename SrcOpTy::Adaptor srcAdapter(operands);
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
                                          srcAdapter.lhs(), srcAdapter.rhs());
@@ -271,7 +271,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    typename SrcOpTy::OperandAdaptor srcAdaptor(operands);
+    typename SrcOpTy::Adaptor srcAdaptor(operands);
     auto type = srcOp.getType();
     if (!type.isSignlessInteger() || type.getIntOrFloatBitWidth() != kBits) {
       return failure();
@@ -290,11 +290,12 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   }
 };
 
-class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+template <typename StdOp>
+class CastingOpConversion : public OpConversionPattern<StdOp> {
+  using OpConversionPattern<StdOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IndexCastOp srcOp, ArrayRef<Value> operands,
+      StdOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(srcOp, operands);
     return success();
@@ -306,7 +307,7 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   LogicalResult matchAndRewrite(
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SelectOpOperandAdaptor srcAdaptor(operands);
+    SelectOp::Adaptor srcAdaptor(operands);
     IntegerType requiredType = IntegerType::get(32, srcOp.getContext());
     // Note: This check can correctly just be a verification that
     // actualType == requiredType, but since the VM type conversion also
@@ -358,7 +359,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
   LogicalResult matchAndRewrite(
       CallOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CallOpOperandAdaptor srcAdaptor(operands);
+    CallOp::Adaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.
     VMTypeConverter typeConverter;
@@ -385,8 +386,8 @@ void populateStandardToVMPatterns(MLIRContext *context,
       .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
               CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
               ModuleTerminatorOpConversion, FuncOpConversion,
-              ReturnOpConversion, IndexCastOpConversion, SelectI32OpConversion>(
-          context);
+              ReturnOpConversion, CastingOpConversion<IndexCastOp>,
+              CastingOpConversion<TruncateIOp>, SelectI32OpConversion>(context);
 
   // Binary arithmetic ops
   patterns

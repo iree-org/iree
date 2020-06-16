@@ -42,7 +42,7 @@ fi
 declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
-  --test_env=IREE_AVAILABLE_BACKENDS="tf,iree_vmla"
+  --test_env=IREE_AVAILABLE_BACKENDS="tf,iree_vmla,iree_llvmjit"
 )
 
 declare -a default_build_tag_filters=("-nokokoro")

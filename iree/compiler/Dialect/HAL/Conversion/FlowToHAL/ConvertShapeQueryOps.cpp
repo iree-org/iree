@@ -34,7 +34,7 @@ class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
   LogicalResult matchAndRewrite(
       DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    DimOpOperandAdaptor operands(rawOperands);
+    DimOp::Adaptor operands(rawOperands);
     if (!dimOp.memrefOrTensor().getType().isa<TensorType>() ||
         !IREE::HAL::TensorRewriteAdaptor::isValidNewType(
             operands.memrefOrTensor().getType())) {
@@ -44,7 +44,10 @@ class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
         dimOp.getLoc(), dimOp.memrefOrTensor(), operands.memrefOrTensor(),
         rewriter);
 
-    auto dimIndex = rewriter.getI32IntegerAttr(dimOp.getIndex());
+    Optional<int64_t> index = dimOp.getConstantIndex();
+    assert(index.hasValue() && "expect constant index in `std.dim` operation");
+
+    auto dimIndex = rewriter.getI32IntegerAttr(index.getValue());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
         dimOp, dimOp.getResult().getType(), adaptor.getBufferView(), dimIndex);
     return success();

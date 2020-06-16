@@ -134,7 +134,7 @@ Optional<bool> Dispatchability::computeDispatchability(FuncOp funcOp) {
   }
 
   // All cases not handled above are (probably) dispatchable. This makes what we
-  // do here a blacklist, though as we move towards more frontend dialects that
+  // do here a blocklist, though as we move towards more frontend dialects that
   // may not be the best idea.
   return true;
 }

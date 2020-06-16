@@ -79,7 +79,7 @@ pybind_cc_library(
     deps = [
         "//bindings/python/pyiree/common",
         "//bindings/python/pyiree/compiler:compiler_library",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo_module_importer",
         "@org_tensorflow//tensorflow/compiler/xla/client:xla_computation",

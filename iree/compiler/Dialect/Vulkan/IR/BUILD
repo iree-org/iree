@@ -44,7 +44,7 @@ cc_library(
         ":VulkanAttrsGen",
         ":VulkanEnumsGen",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
     ],

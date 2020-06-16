@@ -50,11 +50,13 @@ func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
 // CHECK-LABEL: @messageToTensorReturnDim
 func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<?x4xf32>
-  %1 = dim %0, 0 : tensor<?x4xf32>
-  // CHECK-DAG: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
-  // CHECK-DAG: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-  // CHECK-DAG: [[ZERO:%.+]] = vm.const.i32.zero
-  // CHECK-DAG: [[DIM:%.+]] = vm.call @hal.buffer_view.dim([[VIEW]], [[ZERO]])
+  %c0 = constant 0 : index
+  %1 = dim %0, %c0 : tensor<?x4xf32>
+  // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
+  // CHECK: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  // CHECK: %{{.*}} = vm.const.i32.zero
+  // CHECK: [[ZERO:%.+]] = vm.const.i32.zero
+  // CHECK: [[DIM:%.+]] = vm.call @hal.buffer_view.dim([[VIEW]], [[ZERO]])
   // CHECK: vm.return [[DIM]]
   return %1 : index
 }

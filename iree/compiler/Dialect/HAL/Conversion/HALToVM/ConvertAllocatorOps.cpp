@@ -51,7 +51,7 @@ class AllocatorAllocateConstOpConversion
     auto loadRodataOp =
         rewriter.create<IREE::VM::ConstRefRodataOp>(op.getLoc(), rodataOp);
 
-    IREE::HAL::AllocatorAllocateConstOpOperandAdaptor opAdaptor(operands);
+    IREE::HAL::AllocatorAllocateConstOp::Adaptor opAdaptor(operands);
     auto shape = IREE::HAL::getStaticShapeDims(op.getLoc(),
                                                op.value().getType(), rewriter);
     SmallVector<Value, 8> callOperands = {

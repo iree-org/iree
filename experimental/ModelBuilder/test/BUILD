@@ -31,7 +31,6 @@ iree_lit_test_suite(
     data = [
         # runtime libraries
         "@llvm-project//mlir:tools/libvulkan-runtime-wrappers.so",
-        "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
         ":runtime-support.so",
         # Tests.
         ":test-dot-prod",
@@ -40,7 +39,8 @@ iree_lit_test_suite(
         ":test-simple-jit-vulkan",
         ":test-simple-mlir",
         ":test-vector-transfers-jit",
-        "test-matmul-vulkan",
+        ":test-matmul-vulkan",
+        ":test-vec-to-gpu",
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
@@ -52,7 +52,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
@@ -67,7 +67,7 @@ cc_binary(
         ":runtime-support.so",
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
@@ -96,7 +96,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
@@ -111,7 +111,7 @@ cc_binary(
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
         "//iree/base:initializer",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
@@ -129,7 +129,7 @@ cc_binary(
         "//experimental/ModelBuilder:VulkanLaunchWrapper",
         "//iree/base:initializer",
         "//iree/compiler/Conversion/LinalgToSPIRV",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
@@ -149,6 +149,40 @@ cc_binary(
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorToLLVM",
+        # mlir_runner_utils with iostream needed for printMemRef atm
+        "@llvm-project//mlir:mlir_runner_utils",
+    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+)
+
+cc_binary(
+    name = "test-vec-to-gpu",
+    srcs = ["TestVectorToGPU.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "//experimental/ModelBuilder:VulkanLaunchWrapper",
+        "//iree/base:initializer",
+        "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/LinalgToSPIRV",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:GPUToVulkanTransforms",
+        "@llvm-project//mlir:GPUTransforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:StandardToSPIRVConversions",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:mlir_c_runner_utils",
         # mlir_runner_utils with iostream needed for printMemRef atm
         "@llvm-project//mlir:mlir_runner_utils",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
