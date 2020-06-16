@@ -53,7 +53,7 @@ This gives a brief explanation of IREE specific CMake options and variables.
 
 * `IREE_HAL_DRIVERS_TO_BUILD`:STRING
 
-  *This does not has any effect at the moment, but will be supported in the future!*
+  *This does not have any effect at the moment, but will be supported in the future!*
   Semicolon-separated list of HAL drivers to build, or `all` for building all HAL drivers. Case-insensitive. Defaults to `all`. Example: `-DIREE_HAL_DRIVERS_TO_BUILD="Vulkan;VMLA"`.
 
 
