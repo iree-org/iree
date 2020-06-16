@@ -27,6 +27,54 @@ namespace IREE {
 namespace VM {
 
 //===----------------------------------------------------------------------===//
+// ListType
+//===----------------------------------------------------------------------===//
+
+namespace detail {
+
+struct ListTypeStorage : public TypeStorage {
+  ListTypeStorage(Type elementType, unsigned subclassData = 0)
+      : TypeStorage(subclassData), elementType(elementType) {}
+
+  /// The hash key used for uniquing.
+  using KeyTy = Type;
+  bool operator==(const KeyTy &key) const { return key == elementType; }
+
+  static ListTypeStorage *construct(TypeStorageAllocator &allocator,
+                                    const KeyTy &key) {
+    // Initialize the memory using placement new.
+    return new (allocator.allocate<ListTypeStorage>()) ListTypeStorage(key);
+  }
+
+  Type elementType;
+};
+
+}  // namespace detail
+
+// static
+bool ListType::isCompatible(Type type) {
+  if (type.isa<RefType>()) {
+    // Allow all ref types.
+    return true;
+  } else if (type.isIntOrFloat()) {
+    // Allow all byte-aligned types.
+    return (type.getIntOrFloatBitWidth() % 8) == 0;
+  }
+  // Disallow undefined types.
+  return false;
+}
+
+ListType ListType::get(Type elementType) {
+  return Base::get(elementType.getContext(), TypeKind::List, elementType);
+}
+
+ListType ListType::getChecked(Type elementType, Location location) {
+  return Base::getChecked(location, TypeKind::List, elementType);
+}
+
+Type ListType::getElementType() { return getImpl()->elementType; }
+
+//===----------------------------------------------------------------------===//
 // RefType
 //===----------------------------------------------------------------------===//
 
