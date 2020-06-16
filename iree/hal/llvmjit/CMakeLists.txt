@@ -77,6 +77,7 @@ iree_cc_library(
     flatbuffers
     iree::base::status
     iree::base::tracing
+    iree::hal::buffer
     iree::hal::executable
     iree::hal::executable_spec
     iree::hal::host::host_executable

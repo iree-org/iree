@@ -149,6 +149,7 @@ iree_cc_library(
     iree::vm::bytecode_module
     iree::vm::context
     iree::vm::instance
+    iree::vm::invocation
     iree::vm::module
     iree::vm::variant_list
   PUBLIC

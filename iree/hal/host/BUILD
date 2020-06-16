@@ -137,6 +137,7 @@ cc_library(
         "//iree/hal:command_buffer_validation",
         "//iree/hal:device",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
     ],
 )

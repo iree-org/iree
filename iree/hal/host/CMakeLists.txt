@@ -149,6 +149,7 @@ iree_cc_library(
     ::host_local_allocator
     ::scheduling_model
     absl::core_headers
+    absl::memory
     absl::span
     iree::base::memory
     iree::base::status
