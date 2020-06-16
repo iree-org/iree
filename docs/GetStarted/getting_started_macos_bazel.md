@@ -23,40 +23,10 @@ Contributions related to macOS support and documentation are welcome however.
 
 ### Install Bazel
 
-Install the version of Bazel found in
-[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion).
-
-#### Install Xcode
-
-Running this may be sufficient (and takes up much less disk space):
-
-```shell
-$ xcode-select --install
-```
-
-If you run into complications, see the
-[official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x)
-for guidance.
-
-#### Download and install Bazel from a binary
-
-```shell
-# Example using Bazel version `2.1.0`
-$ export BAZEL_VERSION=2.1.0  # Use the version in .bazelversion
-
-# Download and install. `sudo` is required because the installer writes to 
-# `/usr/local/bin/`, which is read only by default.
-$ curl -LO "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
-$ chmod +x "bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh"
-$ sudo ./bazel-${BAZEL_VERSION}-installer-darwin-x86_64.sh
-
-# Add to path in `.zshrc`. Swap with `.bashrc` if you are using bash.
-$ echo -e '\n# Add bazel to PATH:\nexport PATH="${PATH}:${HOME}/bin"' >> ~/.zshrc
-$ source ~/.zshrc
-
-# Confirm the version
-$ bazel --version # 2.1.0
-```
+Install Bazel version > 2.0.0 (see 
+[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion) 
+for the specific version IREE uses) by following the 
+[official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x).
 
 ### Install python3 numpy
 
