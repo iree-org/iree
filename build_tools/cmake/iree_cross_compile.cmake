@@ -76,7 +76,7 @@ function(iree_create_configuration config_name)
 
   # LINT.IfChange(iree_cross_compile_options)
   iree_to_bool(_CONFIG_ENABLE_RUNTIME_TRACING "${IREE_${config_name}_ENABLE_RUNTIME_TRACING}")
-  iree_to_bool(_CONFIG_ENABLE_LLVM "${IREE_${config_name}_ENABLE_LLVM}")
+  iree_to_bool(_CONFIG_ENABLE_MLIR "${IREE_${config_name}_ENABLE_MLIR}")
   iree_to_bool(_CONFIG_ENABLE_EMITC "${IREE_${config_name}_ENABLE_EMITC}")
 
   iree_to_bool(_CONFIG_BUILD_COMPILER "${IREE_${config_name}_BUILD_COMPILER}")
@@ -103,7 +103,7 @@ function(iree_create_configuration config_name)
         -DCMAKE_C_COMPILER="${_CONFIG_C_COMPILER}"
         -DCMAKE_CXX_COMPILER="${_CONFIG_CXX_COMPILER}"
         -DIREE_ENABLE_RUNTIME_TRACING=${_CONFIG_ENABLE_RUNTIME_TRACING}
-        -DIREE_ENABLE_LLVM=${_CONFIG_ENABLE_LLVM}
+        -DIREE_ENABLE_MLIR=${_CONFIG_ENABLE_MLIR}
         -DIREE_ENABLE_EMITC=${_CONFIG_ENABLE_EMITC}
         -DIREE_BUILD_COMPILER=${_CONFIG_BUILD_COMPILER}
         -DIREE_BUILD_TESTS=${_CONFIG_BUILD_TESTS}
