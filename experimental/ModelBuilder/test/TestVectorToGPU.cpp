@@ -185,7 +185,7 @@ void testCooperativeMatMul() {
     auto B = kernelFunc.getArgument(1);
     auto C = kernelFunc.getArgument(2);
 
-    (linalg_matmul(A, B, C));
+    linalg_matmul(TypeRange{}, ValueRange{A, B, C});
     std_ret();
   }
 

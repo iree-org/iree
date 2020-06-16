@@ -277,8 +277,9 @@ struct DotOpConversion
         rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
         return failure();
       }
-      rewriter.create<LinalgOpTy>(op.getLoc(), inputBuffers[0], inputBuffers[1],
-                                  resultBuffers[0]);
+      rewriter.create<LinalgOpTy>(
+          op.getLoc(), TypeRange{},
+          ValueRange{inputBuffers[0], inputBuffers[1], resultBuffers[0]});
       return success();
     }
     return failure();
