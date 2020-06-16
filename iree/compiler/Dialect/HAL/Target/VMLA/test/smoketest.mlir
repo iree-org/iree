@@ -12,7 +12,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0 attributes {sym_visibility = "private"} {
+// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
 //  CHECK-NEXT:   hal.interface @legacy_io {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -21,7 +21,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 //  CHECK-NEXT:   hal.executable.target "vmla" {
 //  CHECK-NEXT:     module {
 //  CHECK-NEXT:       vm.module @module {
-//  CHECK-NEXT:         vm.func @simpleMath_rgn_dispatch_0(%arg0: !vm.ref<!vmla.interface>) {
+//  CHECK-NEXT:         vm.func @simpleMath_rgn_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
 //   CHECK-DAG:           %zero = vm.const.i32.zero : i32
 //   CHECK-DAG:           %c16 = vm.const.i32 16 : i32
 //   CHECK-DAG:           %c1 = vm.const.i32 1 : i32
@@ -42,19 +42,43 @@ flow.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
-// TODO(#1245): support dynamic shapes here.
-// flow.executable @shaped_dispatch {
-//   flow.dispatch.entry @entry
-//   module {
-//     func @entry(%arg0: tensor<4x?xf32>, %arg1 : index) -> tensor<4x?xf32> {
-//       %0 = shapex.make_ranked_shape %arg1 : (index) -> !shapex.ranked_shape<[4,?]>
-//       %1 = shapex.tie_shape %arg0, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
-//       %2 = xla_hlo.add %1, %1 : tensor<4x?xf32>
-//       %3 = shapex.tie_shape %2, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
-//       return %3 : tensor<4x?xf32>
-//     }
-//   }
-// }
+flow.executable @shaped_dispatch {
+  flow.dispatch.entry @entry
+  module {
+    func @entry(%arg0: tensor<4x?xf32>, %arg1 : index) -> tensor<4x?xf32> {
+      %0 = shapex.make_ranked_shape %arg1 : (index) -> !shapex.ranked_shape<[4,?]>
+      %1 = shapex.tie_shape %arg0, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+      %2 = xla_hlo.add %1, %1 : tensor<4x?xf32>
+      %3 = shapex.tie_shape %2, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+      return %3 : tensor<4x?xf32>
+    }
+  }
+}
+
+// CHECK-LABEL: hal.executable @shaped_dispatch
+//  CHECK-NEXT:   hal.interface @legacy_io attributes {push_constants = 1 : i32} {
+//  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT:   }
+//  CHECK-NEXT:   hal.executable.entry_point @entry attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x?xf32>, index) -> tensor<4x?xf32>}
+//  CHECK-NEXT:   hal.executable.target "vmla" {
+//  CHECK-NEXT:     module {
+//  CHECK-NEXT:       vm.module @module {
+//  CHECK-NEXT:         vm.func @entry(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
+//   CHECK-DAG:           %zero = vm.const.i32.zero : i32
+//   CHECK-DAG:           %c16 = vm.const.i32 16 : i32
+//   CHECK-DAG:           %c1 = vm.const.i32 1 : i32
+//  CHECK-NEXT:           %0 = vm.call @vmla.interface.const(%arg0, %zero) : (!vm.ref<!vmla.interface>, i32) -> i32
+//  CHECK-NEXT:           %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:           %1 = vm.mul.i32 %0, %c16 : i32
+//  CHECK-NEXT:           %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %1) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:           %ref_1 = vm.call @vmla.buffer.alloc(%1) : (i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:           vm.call @vmla.add.f32(%ref_0, %ref_0, %ref_1) : (!vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>) -> ()
+//  CHECK-NEXT:           %ref_2 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:           vm.call @vmla.buffer.copy(%ref_1, %zero, %ref_2, %zero, %1) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+//  CHECK-NEXT:           vm.return
+//  CHECK-NEXT:         }
+//  CHECK-NEXT:         vm.export @entry
 
 // -----
 
@@ -73,7 +97,7 @@ flow.executable @reduction_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @reduction_ex_dispatch_0 attributes {sym_visibility = "private"} {
+// CHECK-LABEL: hal.executable @reduction_ex_dispatch_0
 //  CHECK-NEXT:   hal.interface @legacy_io {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -83,7 +107,7 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:     module {
 //  CHECK-NEXT:       vm.module @module {
 //  CHECK-NEXT:         vm.rodata @reduction_ex_dispatch_0_const_0 dense<0.000000e+00> : tensor<f32>
-//  CHECK-NEXT:         vm.func @reduction_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>) {
+//  CHECK-NEXT:         vm.func @reduction_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
 //  CHECK-NEXT:           %zero = vm.const.i32.zero : i32
 //  CHECK-NEXT:           %c128 = vm.const.i32 128 : i32
 //  CHECK-NEXT:           %c16 = vm.const.i32 16 : i32

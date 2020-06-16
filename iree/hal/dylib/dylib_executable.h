@@ -19,12 +19,10 @@
 #include <string>
 
 #include "absl/container/inlined_vector.h"
-#include "absl/types/span.h"
 #include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
+#include "iree/hal/host/host_executable.h"
 
 namespace iree {
 namespace hal {
@@ -32,21 +30,23 @@ namespace dylib {
 
 struct MemrefType;
 
-class DyLibExecutable final : public Executable {
+class DyLibExecutable final : public HostExecutable {
  public:
-  static StatusOr<ref_ptr<DyLibExecutable>> Load(hal::Allocator* allocator,
-                                                 ExecutableSpec spec);
-  DyLibExecutable(ExecutableSpec spec);
+  static StatusOr<ref_ptr<DyLibExecutable>> Load(ExecutableSpec spec);
+
+  DyLibExecutable();
   ~DyLibExecutable() override;
 
   bool supports_debugging() const override { return false; }
 
-  Status Invoke(int func_id, absl::Span<void*> args) const;
+  StatusOr<ref_ptr<DispatchState>> PrepareDispatch(
+      const DispatchParams& params) override;
+  Status DispatchTile(DispatchState* state,
+                      std::array<uint32_t, 3> workgroup_xyz) override;
 
  private:
-  Status Initialize();
+  Status Initialize(ExecutableSpec spec);
 
-  ExecutableSpec spec_;
   std::string executable_library_temp_path_;
   std::unique_ptr<DynamicLibrary> executable_library_;
   absl::InlinedVector<void*, 4> entry_functions_;

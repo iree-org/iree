@@ -12,36 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
-#define IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
+#ifndef IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
+#define IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/command_buffer.h"
+#include "iree/hal/host/host_executable.h"
 
 namespace iree {
 namespace hal {
-
-struct PushConstantBlock {
-  // We limit ourselves to 32 constants (32*sizeof(uint32) = 128b).
-  // This is the lower bound for Vulkan implementations and ensures that we have
-  // consistent support everywhere.
-  std::array<uint32_t, 32> values;
-};
 
 // Host-local command processor for dispatching transfer operations against
 // buffers allocated from the HostLocalAllocator.
 // This assumes that all buffers are host-visible (if not local) and that all
 // buffers can be mapped for access.
 //
-// Subclasses may implement Dispatch, otherwise the default implementation just
-// returns failure.
+// Uses HostExecutable to perform tiled dispatch processing.
 //
 // Thread-compatible (as with CommandBuffer itself).
-class HostLocalCommandProcessor : public CommandBuffer {
+class SerialCommandProcessor final : public CommandBuffer {
  public:
-  HostLocalCommandProcessor(Allocator* allocator,
-                            CommandCategoryBitfield command_categories);
-  ~HostLocalCommandProcessor() override;
+  explicit SerialCommandProcessor(CommandCategoryBitfield command_categories);
+  ~SerialCommandProcessor() override;
 
   bool is_recording() const override { return is_recording_; }
 
@@ -99,17 +91,10 @@ class HostLocalCommandProcessor : public CommandBuffer {
                           Buffer* workgroups_buffer,
                           device_size_t workgroups_offset) override;
 
- protected:
-  virtual Status DispatchInline(
-      Executable* executable, int32_t entry_point,
-      std::array<uint32_t, 3> workgroups,
-      const PushConstantBlock& push_constants,
-      absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "Command processor does not support dispatch operations";
-  }
-
  private:
+  Status DispatchGrid(Executable* executable, int32_t entry_point,
+                      std::array<uint32_t, 3> workgroup_count);
+
   bool is_recording_ = false;
 
   PushConstantBlock push_constants_;
@@ -120,4 +105,4 @@ class HostLocalCommandProcessor : public CommandBuffer {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
+#endif  // IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_

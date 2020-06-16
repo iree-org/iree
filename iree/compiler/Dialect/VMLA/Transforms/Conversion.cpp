@@ -37,6 +37,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace VMLA {
 
+// Rewrites entry functions to have a vmla.interface and an XYZ workgroup ID.
+// The runtime will provide these values during invocation.
 static LogicalResult insertInterfacesToEntryPoints(mlir::ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     if (SymbolTable::getSymbolVisibility(funcOp) !=
@@ -48,10 +50,13 @@ static LogicalResult insertInterfacesToEntryPoints(mlir::ModuleOp moduleOp) {
       return funcOp.emitError() << "exported functions must have no I/O";
     }
     auto interfaceType = IREE::VMLA::InterfaceType::get(moduleOp.getContext());
+    auto indexType = IndexType::get(moduleOp.getContext());
     auto newType =
-        FunctionType::get({interfaceType}, {}, moduleOp.getContext());
+        FunctionType::get({interfaceType, indexType, indexType, indexType}, {},
+                          moduleOp.getContext());
     funcOp.setType(newType);
-    funcOp.front().addArgument(interfaceType);
+    funcOp.front().addArguments(
+        {interfaceType, indexType, indexType, indexType});
   }
   return success();
 }

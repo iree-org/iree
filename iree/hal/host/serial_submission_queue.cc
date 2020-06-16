@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_submission_queue.h"
+#include "iree/hal/host/serial_submission_queue.h"
 
 #include <atomic>
 #include <cstdint>
@@ -24,11 +24,11 @@
 namespace iree {
 namespace hal {
 
-HostSubmissionQueue::HostSubmissionQueue() = default;
+SerialSubmissionQueue::SerialSubmissionQueue() = default;
 
-HostSubmissionQueue::~HostSubmissionQueue() = default;
+SerialSubmissionQueue::~SerialSubmissionQueue() = default;
 
-StatusOr<bool> HostSubmissionQueue::CheckBatchReady(
+StatusOr<bool> SerialSubmissionQueue::CheckBatchReady(
     const PendingBatch& batch) const {
   for (auto& wait_point : batch.wait_semaphores) {
     auto* semaphore = reinterpret_cast<HostSemaphore*>(wait_point.semaphore);
@@ -40,8 +40,9 @@ StatusOr<bool> HostSubmissionQueue::CheckBatchReady(
   return true;
 }
 
-Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches) {
-  IREE_TRACE_SCOPE0("HostSubmissionQueue::Enqueue");
+Status SerialSubmissionQueue::Enqueue(
+    absl::Span<const SubmissionBatch> batches) {
+  IREE_TRACE_SCOPE0("SerialSubmissionQueue::Enqueue");
 
   if (has_shutdown_) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
@@ -66,8 +67,8 @@ Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches) {
   return OkStatus();
 }
 
-Status HostSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
-  IREE_TRACE_SCOPE0("HostSubmissionQueue::ProcessBatches");
+Status SerialSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
+  IREE_TRACE_SCOPE0("SerialSubmissionQueue::ProcessBatches");
 
   if (!permanent_error_.ok()) {
     // Sticky failure state.
@@ -129,9 +130,9 @@ Status HostSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
   return OkStatus();
 }
 
-Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
-                                         const ExecuteFn& execute_fn) {
-  IREE_TRACE_SCOPE0("HostSubmissionQueue::ProcessBatch");
+Status SerialSubmissionQueue::ProcessBatch(const PendingBatch& batch,
+                                           const ExecuteFn& execute_fn) {
+  IREE_TRACE_SCOPE0("SerialSubmissionQueue::ProcessBatch");
 
   // NOTE: the precondition is that the batch is ready to execute so we don't
   // need to check the wait semaphores here.
@@ -148,9 +149,9 @@ Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
   return OkStatus();
 }
 
-void HostSubmissionQueue::CompleteSubmission(Submission* submission,
-                                             Status status) {
-  IREE_TRACE_SCOPE0("HostSubmissionQueue::CompleteSubmission");
+void SerialSubmissionQueue::CompleteSubmission(Submission* submission,
+                                               Status status) {
+  IREE_TRACE_SCOPE0("SerialSubmissionQueue::CompleteSubmission");
 
   if (status.ok() && !submission->pending_batches.empty()) {
     // Completed with work remaining? Cause a failure.
@@ -172,15 +173,15 @@ void HostSubmissionQueue::CompleteSubmission(Submission* submission,
   list_.take(submission).reset();
 }
 
-void HostSubmissionQueue::FailAllPending(Status status) {
-  IREE_TRACE_SCOPE0("HostSubmissionQueue::FailAllPending");
+void SerialSubmissionQueue::FailAllPending(Status status) {
+  IREE_TRACE_SCOPE0("SerialSubmissionQueue::FailAllPending");
   while (!list_.empty()) {
     CompleteSubmission(list_.front(), status);
   }
 }
 
-void HostSubmissionQueue::SignalShutdown() {
-  IREE_TRACE_SCOPE0("HostSubmissionQueue::SignalShutdown");
+void SerialSubmissionQueue::SignalShutdown() {
+  IREE_TRACE_SCOPE0("SerialSubmissionQueue::SignalShutdown");
   has_shutdown_ = true;
 }
 

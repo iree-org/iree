@@ -29,8 +29,13 @@ namespace {
 // by unsafe code or when early and readable diagnostics are needed.
 class ValidatingCommandBuffer : public CommandBuffer {
  public:
-  explicit ValidatingCommandBuffer(ref_ptr<CommandBuffer> impl);
+  explicit ValidatingCommandBuffer(Allocator* allocator,
+                                   ref_ptr<CommandBuffer> impl);
   ~ValidatingCommandBuffer() override;
+
+  // Device allocator that commands encoded into the buffer share compatibility
+  // with.
+  Allocator* allocator() const { return allocator_; }
 
   CommandBuffer* impl() override { return impl_.get(); }
 
@@ -99,12 +104,14 @@ class ValidatingCommandBuffer : public CommandBuffer {
   // executable entry point.
   Status ValidateDispatchBindings(Executable* executable, int32_t entry_point);
 
+  Allocator* const allocator_;
   ref_ptr<CommandBuffer> impl_;
 };
 
-ValidatingCommandBuffer::ValidatingCommandBuffer(ref_ptr<CommandBuffer> impl)
-    : CommandBuffer(impl->allocator(), impl->mode(),
-                    impl->command_categories()),
+ValidatingCommandBuffer::ValidatingCommandBuffer(Allocator* allocator,
+                                                 ref_ptr<CommandBuffer> impl)
+    : CommandBuffer(impl->mode(), impl->command_categories()),
+      allocator_(allocator),
       impl_(std::move(impl)) {}
 
 ValidatingCommandBuffer::~ValidatingCommandBuffer() = default;
@@ -493,8 +500,8 @@ Status ValidatingCommandBuffer::DispatchIndirect(
 }  // namespace
 
 ref_ptr<CommandBuffer> WrapCommandBufferWithValidation(
-    ref_ptr<CommandBuffer> impl) {
-  return make_ref<ValidatingCommandBuffer>(std::move(impl));
+    Allocator* allocator, ref_ptr<CommandBuffer> impl) {
+  return make_ref<ValidatingCommandBuffer>(allocator, std::move(impl));
 }
 
 }  // namespace hal

@@ -24,10 +24,9 @@ namespace testing {
 
 class MockCommandBuffer : public ::testing::StrictMock<CommandBuffer> {
  public:
-  MockCommandBuffer(Allocator* allocator, CommandBufferModeBitfield mode,
+  MockCommandBuffer(CommandBufferModeBitfield mode,
                     CommandCategoryBitfield command_categories)
-      : ::testing::StrictMock<CommandBuffer>(allocator, mode,
-                                             command_categories) {}
+      : ::testing::StrictMock<CommandBuffer>(mode, command_categories) {}
 
   bool is_recording() const override { return false; }
 

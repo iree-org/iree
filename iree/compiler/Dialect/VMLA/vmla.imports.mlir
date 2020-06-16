@@ -21,9 +21,6 @@ vm.module @vmla {
 // VMLA Ops: ABI
 //===----------------------------------------------------------------------===//
 
-vm.import @interface.current() -> !vm.ref<!vmla.interface>
-attributes {nosideeffects}
-
 vm.import @interface.const(
   %interface : !vm.ref<!vmla.interface>,
   %offset : i32

@@ -19,6 +19,7 @@
 #include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
+#include "iree/hal/host/serial_scheduling_model.h"
 #include "iree/hal/vmla/vmla_device.h"
 #include "iree/hal/vmla/vmla_module.h"
 #include "iree/vm/module.h"
@@ -83,8 +84,10 @@ StatusOr<ref_ptr<Device>> VMLADriver::CreateDefaultDevice() {
 }
 
 StatusOr<ref_ptr<Device>> VMLADriver::CreateDevice(DriverDeviceID device_id) {
+  auto scheduling_model = std::make_unique<SerialSchedulingModel>();
   auto device =
-      make_ref<VMLADevice>(GetDefaultDeviceInfo(), instance_, vmla_module_);
+      make_ref<VMLADevice>(GetDefaultDeviceInfo(), std::move(scheduling_model),
+                           instance_, vmla_module_);
   return device;
 }
 
