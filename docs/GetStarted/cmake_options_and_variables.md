@@ -70,7 +70,7 @@ This gives a brief explanation of IREE specific CMake options and variables.
 
 * `IREE_MLIR_DEP_MODE`:STRING
 
-  Defines the MLIR dependency mode. Case-sensitive. Can be `BUNDELED`, `DISABLED` or `INSTALLED`. Defaults to `INSTALLED`.
+  Defines the MLIR dependency mode. Case-sensitive. Can be `BUNDLED`, `DISABLED` or `INSTALLED`. Defaults to `INSTALLED`.
   If set to `INSTALLED`, the variable `MLIR_DIR` needs to be passed and that LLVM needs to be compiled with `LLVM_ENABLE_RTTI` set to `ON`.
 
 
