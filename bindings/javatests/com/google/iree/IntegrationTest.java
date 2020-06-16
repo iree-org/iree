@@ -30,11 +30,10 @@ import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-// TODO(jennik): This is not really a context test anymore, so rename it as an e2e test.
 @RunWith(AndroidJUnit4.class)
-public final class ContextTest {
+public final class IntegrationTest {
   @Test
-  public void create_throwsExceptionWithoutNativeLib() throws Exception {
+  public void throwsExceptionWithoutNativeLib() throws Exception {
     try {
       new Instance();
       fail();
