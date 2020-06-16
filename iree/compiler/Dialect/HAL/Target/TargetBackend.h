@@ -290,6 +290,16 @@ class TargetBackend {
       IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
       OpBuilder &builder);
 
+  /// Calculates the workgroup count (x, y, z) given the |dispatchState| and
+  /// |workgroupSize|.
+  virtual std::array<Value, 3> calculateDispatchWorkgroupCount(
+      Location loc, DispatchState dispatchState,
+      const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+    return calculateDispatchWorkgroupCount(loc, dispatchState.executableOp,
+                                           dispatchState.entryPointOp,
+                                           dispatchState.workload, builder);
+  }
+
   // Calculates the workgroup count (x, y, z) for dispatching to the given
   // |entryPointOp|. The provided |workload| is the total number of invocations
   // required as calculated by the generic workload logic (basically, number of

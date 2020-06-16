@@ -33,6 +33,7 @@
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
@@ -180,15 +181,16 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto commandBuffer = entryBlock.getArgument(1);
     auto executable = entryBlock.getArgument(2);
 
-    // We have multiple entry points to dispatch. Record in the order specified
-    // by entry point schedule and insert barrier between sequential ones.
+    // We have multiple entry points to dispatch. Record in the order
+    // specified by entry point schedule and insert barrier between sequential
+    // ones.
     for (int i = 0, e = entryPointScheduleAttr.size(); i < e; ++i) {
       StringRef entryName =
           entryPointScheduleAttr[i].cast<StringAttr>().getValue();
       auto workgroupSize = calculateDispatchWorkgroupSize(
           loc, spvModuleOp, entryName, workload, builder);
       auto workgroupCount = calculateDispatchWorkgroupCount(
-          loc, workload, workgroupSize, builder);
+          loc, dispatchState, workgroupSize, builder);
       builder.create<IREE::HAL::CommandBufferDispatchOp>(
           loc, commandBuffer, executable, /*entryPointOrdinal=*/i,
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);
@@ -228,6 +230,55 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
     return calculateDispatchWorkgroupSize(
         loc, spvModuleOp, entryPointOp.sym_name(), workload, builder);
+  }
+
+  /// Computes the number of workgroups to use for an entry point function.
+  /// - If the workgroup size is of the form `{workgroupSizeX, 1, 1}` then
+  ///   linearize the result dimensions to `linearizedSize`, and return the
+  ///   count as `{ceil(linearizedSize/workgroupSizeX), 1, 1}`. Here its OK if
+  ///   the number of results is more than one, but all the results are expected
+  ///   to have the same `linearizedSize`.
+  /// - The workgroup size is more generally `{workgourpSizeX, workgroupSizeY,
+  ///   workgroupSizeZ}`, and result is of size `{s1, s2, s3, ...}`, the number
+  ///   of workgroups is calculated as `{ceil(s3, workgroupSizeX), ceil(s2,
+  ///   workgroupSizeY), ceil(s1, workgroupSizeX)}` (with s1, s2 and s3 being 1
+  ///   if the rank of the result is less than 3)
+  // TODO(ravishankarm, benvanik): This is very fragile and will probably be
+  // inadequate very soon. Ideally the backend can generate a function that
+  // computes the workgroup count, which can be inlined here.
+  std::array<Value, 3> calculateDispatchWorkgroupCount(
+      Location loc, TargetBackend::DispatchState dispatchState,
+      const std::array<Value, 3> &workgroupSize, OpBuilder &builder) override {
+    assert(!dispatchState.results.empty());
+    Value one = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
+    Optional<TensorRewriteAdaptor> result = dispatchState.results[0];
+    // If the output is not a shaped type, assume it is a scalar, and return {1,
+    // 1, 1};
+    if (!result) return {one, one, one};
+
+    Optional<SmallVector<Value, 4>> resultSize = result->getShapeDims(builder);
+    if (!resultSize) return {nullptr, nullptr, nullptr};
+
+    SmallVector<Value, 4> resultSizeVec(reverse(*resultSize));
+    auto ceilFn = [&loc, &builder, &one](Value n, Value d) -> Value {
+      Value dm1 = builder.create<SubIOp>(loc, d, one);
+      return builder.create<SignedDivIOp>(
+          loc, builder.create<AddIOp>(loc, n, dm1), d);
+    };
+
+    if (mlir::matchPattern(workgroupSize[1], m_One()) &&
+        mlir::matchPattern(workgroupSize[2], m_One())) {
+      Value linearizedSize = one;
+      for (Value dim : resultSizeVec)
+        linearizedSize = builder.create<MulIOp>(loc, linearizedSize, dim);
+      return {ceilFn(linearizedSize, workgroupSize[0]), one, one};
+    } else if (dispatchState.results.size() == 1) {
+      resultSizeVec.resize(3, one);
+      return {ceilFn(resultSizeVec[0], workgroupSize[0]),
+              ceilFn(resultSizeVec[1], workgroupSize[1]),
+              ceilFn(resultSizeVec[2], workgroupSize[2])};
+    }
+    return {nullptr, nullptr, nullptr};
   }
 
   std::array<Value, 3> calculateDispatchWorkgroupSize(
