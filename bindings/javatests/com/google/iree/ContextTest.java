@@ -19,7 +19,14 @@ package com.google.iree;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
+import android.content.Context;
+import android.content.res.Resources;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -36,14 +43,30 @@ public final class ContextTest {
   }
 
   @Test
-  public void create_createsContextWithId() throws Exception {
+  public void simpleMul() throws Exception {
     Instance.loadNativeLibrary();
     Instance instance = new Instance();
-    Context context = new Context(instance);
+    com.google.iree.Context ireeContext = new com.google.iree.Context(instance);
 
-    assertNotEquals(context.getId(), -1);
+    assertNotEquals(ireeContext.getId(), -1);
 
-    context.free();
+    Context context = ApplicationProvider.getApplicationContext();
+    Resources resources = context.getResources();
+    InputStream moduleInputStream = resources.openRawResource(R.raw.simple_mul_bytecode_module);
+    ByteBuffer moduleByteBuffer = convertInputStreamToByteBuffer(moduleInputStream);
+    Module module = new Module(moduleByteBuffer);
+    // TODO(jennik): Register modules with the context.
+
+    module.free();
+    ireeContext.free();
     instance.free();
+  }
+
+  private static ByteBuffer convertInputStreamToByteBuffer(InputStream inputStream)
+      throws IOException {
+    byte[] bytes = IOUtils.toByteArray(inputStream);
+    ByteBuffer byteBuffer = ByteBuffer.allocateDirect(bytes.length);
+    byteBuffer.put(bytes, 0, bytes.length);
+    return byteBuffer;
   }
 }
