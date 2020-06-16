@@ -20,8 +20,8 @@ include(iree_macros)
 # configuration means a new IREE CMake invocation with its own set of
 # parameters.
 #
-# This function defines two custom target, `iree_prepare_${config_name}_dir`
-# and `iree_configure_${config_name}`, to drive the creation of a directory
+# This function defines two custom target, `iree_prepare_${CONFIG_NAME}_dir`
+# and `iree_configure_${CONFIG_NAME}`, to drive the creation of a directory
 # for hosting the new IREE configuration and its corresponding `CMakeCache.txt`
 # file, respectively. Callers can then depend on either the file or the
 # target to make sure the configuration is invoked as a dependency.
@@ -34,36 +34,36 @@ include(iree_macros)
 # by another CMake invocation configured by this function.
 #
 # Supported CMake options:
-# - IREE_<config_name>_BINARY_ROOT: the root directory for containing IREE build
-#   artifacts for the given `config_name`. If not specified in caller, this is
-#   set to a directory named as `config_name` under the current CMake binary
+# - IREE_<CONFIG_NAME>_BINARY_ROOT: the root directory for containing IREE build
+#   artifacts for the given `CONFIG_NAME`. If not specified in caller, this is
+#   set to a directory named as `CONFIG_NAME` under the current CMake binary
 #   directory.
-# - IREE_<config_name>_C_COMPILER: C compiler for the given `config_name`.
+# - IREE_<CONFIG_NAME>_C_COMPILER: C compiler for the given `CONFIG_NAME`.
 #   This must be defined by the caller.
-# - IREE_<config_name>_CXX_COMPILER: C++ compiler for the given `config_name`.
+# - IREE_<CONFIG_NAME>_CXX_COMPILER: C++ compiler for the given `CONFIG_NAME`.
 #   This must be defined by the caller.
-# - IREE_<config_name>_<option>: switch for the given `option` specifically for
-#   `config_name`. If missing, default to OFF for bool options; default to
+# - IREE_<CONFIG_NAME>_<option>: switch for the given `option` specifically for
+#   `CONFIG_NAME`. If missing, default to OFF for bool options; default to
 #   IREE_<option> for non-bool variables.
-function(iree_create_configuration config_name)
-  # Set IREE_${config_name}_BINARY_ROOT if missing.
-  if(NOT DEFINED IREE_${config_name}_BINARY_ROOT)
-    set(IREE_${config_name}_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/${config_name}")
-    set(IREE_${config_name}_BINARY_ROOT ${IREE_${config_name}_BINARY_ROOT} PARENT_SCOPE)
-    message(STATUS "Setting ${config_name} build directory to ${IREE_${config_name}_BINARY_ROOT}")
+function(iree_create_configuration CONFIG_NAME)
+  # Set IREE_${CONFIG_NAME}_BINARY_ROOT if missing.
+  if(NOT DEFINED IREE_${CONFIG_NAME}_BINARY_ROOT)
+    set(IREE_${CONFIG_NAME}_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}")
+    set(IREE_${CONFIG_NAME}_BINARY_ROOT ${IREE_${CONFIG_NAME}_BINARY_ROOT} PARENT_SCOPE)
+    message(STATUS "Setting ${CONFIG_NAME} build directory to ${IREE_${CONFIG_NAME}_BINARY_ROOT}")
   endif()
 
-  set(_CONFIG_BINARY_ROOT ${IREE_${config_name}_BINARY_ROOT})
+  set(_CONFIG_BINARY_ROOT ${IREE_${CONFIG_NAME}_BINARY_ROOT})
 
-  set(_CONFIG_C_COMPILER ${IREE_${config_name}_C_COMPILER})
-  set(_CONFIG_CXX_COMPILER ${IREE_${config_name}_CXX_COMPILER})
+  set(_CONFIG_C_COMPILER ${IREE_${CONFIG_NAME}_C_COMPILER})
+  set(_CONFIG_CXX_COMPILER ${IREE_${CONFIG_NAME}_CXX_COMPILER})
 
   # Check the compilers are specified in the caller.
   if("${_CONFIG_C_COMPILER}" STREQUAL "")
-    message(FATAL_ERROR "Must define IREE_${config_name}_C_COMPILER for \"${config_name}\" configuration build")
+    message(FATAL_ERROR "Must define IREE_${CONFIG_NAME}_C_COMPILER for \"${CONFIG_NAME}\" configuration build")
   endif()
   if("${_CONFIG_CXX_COMPILER}" STREQUAL "")
-    message(FATAL_ERROR "Must define IREE_${config_name}_CXX_COMPILER for \"${config_name}\" configuration build")
+    message(FATAL_ERROR "Must define IREE_${CONFIG_NAME}_CXX_COMPILER for \"${CONFIG_NAME}\" configuration build")
   endif()
 
   add_custom_command(OUTPUT ${_CONFIG_BINARY_ROOT}
@@ -72,20 +72,20 @@ function(iree_create_configuration config_name)
 
   # Give it a custom target so we can drive the generation manually
   # when useful.
-  add_custom_target(iree_prepare_${config_name}_dir DEPENDS ${_CONFIG_BINARY_ROOT})
+  add_custom_target(iree_prepare_${CONFIG_NAME}_dir DEPENDS ${_CONFIG_BINARY_ROOT})
 
   # LINT.IfChange(iree_cross_compile_options)
-  iree_to_bool(_CONFIG_ENABLE_RUNTIME_TRACING "${IREE_${config_name}_ENABLE_RUNTIME_TRACING}")
-  iree_to_bool(_CONFIG_ENABLE_MLIR "${IREE_${config_name}_ENABLE_MLIR}")
-  iree_to_bool(_CONFIG_ENABLE_EMITC "${IREE_${config_name}_ENABLE_EMITC}")
+  iree_to_bool(_CONFIG_ENABLE_RUNTIME_TRACING "${IREE_${CONFIG_NAME}_ENABLE_RUNTIME_TRACING}")
+  iree_to_bool(_CONFIG_ENABLE_MLIR "${IREE_${CONFIG_NAME}_ENABLE_MLIR}")
+  iree_to_bool(_CONFIG_ENABLE_EMITC "${IREE_${CONFIG_NAME}_ENABLE_EMITC}")
 
-  iree_to_bool(_CONFIG_BUILD_COMPILER "${IREE_${config_name}_BUILD_COMPILER}")
-  iree_to_bool(_CONFIG_BUILD_TESTS "${IREE_${config_name}_BUILD_TESTS}")
-  iree_to_bool(_CONFIG_BUILD_DOCS "${IREE_${config_name}_BUILD_DOCS}")
-  iree_to_bool(_CONFIG_BUILD_SAMPLES "${IREE_${config_name}_BUILD_SAMPLES}")
-  iree_to_bool(_CONFIG_BUILD_DEBUGGER "${IREE_${config_name}_BUILD_DEBUGGER}")
-  iree_to_bool(_CONFIG_BUILD_PYTHON_BINDINGS "${IREE_${config_name}_BUILD_PYTHON_BINDINGS}")
-  iree_to_bool(_CONFIG_BUILD_EXPERIMENTAL "${IREE_${config_name}_BUILD_EXPERIMENTAL}")
+  iree_to_bool(_CONFIG_BUILD_COMPILER "${IREE_${CONFIG_NAME}_BUILD_COMPILER}")
+  iree_to_bool(_CONFIG_BUILD_TESTS "${IREE_${CONFIG_NAME}_BUILD_TESTS}")
+  iree_to_bool(_CONFIG_BUILD_DOCS "${IREE_${CONFIG_NAME}_BUILD_DOCS}")
+  iree_to_bool(_CONFIG_BUILD_SAMPLES "${IREE_${CONFIG_NAME}_BUILD_SAMPLES}")
+  iree_to_bool(_CONFIG_BUILD_DEBUGGER "${IREE_${CONFIG_NAME}_BUILD_DEBUGGER}")
+  iree_to_bool(_CONFIG_BUILD_PYTHON_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_PYTHON_BINDINGS}")
+  iree_to_bool(_CONFIG_BUILD_EXPERIMENTAL "${IREE_${CONFIG_NAME}_BUILD_EXPERIMENTAL}")
 
   # Escape semicolons in the targets list so that CMake doesn't expand them to
   # spaces.
@@ -93,10 +93,10 @@ function(iree_create_configuration config_name)
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_TARGET_BACKENDS_TO_BUILD "${IREE_TARGET_BACKENDS_TO_BUILD}")
   # LINT.ThenChange(https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options)
 
-  message(STATUS "C compiler for ${config_name} build: ${_CONFIG_C_COMPILER}")
-  message(STATUS "C++ compiler for ${config_name} build: ${_CONFIG_CXX_COMPILER}")
+  message(STATUS "C compiler for ${CONFIG_NAME} build: ${_CONFIG_C_COMPILER}")
+  message(STATUS "C++ compiler for ${CONFIG_NAME} build: ${_CONFIG_CXX_COMPILER}")
 
-  add_custom_command(OUTPUT ${IREE_${config_name}_BINARY_ROOT}/CMakeCache.txt
+  add_custom_command(OUTPUT ${IREE_${CONFIG_NAME}_BINARY_ROOT}/CMakeCache.txt
     COMMAND "${CMAKE_COMMAND}" "${PROJECT_SOURCE_DIR}" -G "${CMAKE_GENERATOR}"
         -DCMAKE_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
@@ -115,30 +115,34 @@ function(iree_create_configuration config_name)
         -DIREE_HAL_DRIVERS_TO_BUILD="${_CONFIG_HAL_DRIVERS_TO_BUILD}"
         -DIREE_TARGET_BACKENDS_TO_BUILD="${_CONFIG_TARGET_BACKENDS_TO_BUILD}"
     WORKING_DIRECTORY ${_CONFIG_BINARY_ROOT}
-    DEPENDS iree_prepare_${config_name}_dir
-    COMMENT "Configuring IREE for ${config_name} build...")
+    DEPENDS iree_prepare_${CONFIG_NAME}_dir
+    COMMENT "Configuring IREE for ${CONFIG_NAME} build...")
 
-  add_custom_target(iree_configure_${config_name} DEPENDS ${_CONFIG_BINARY_ROOT}/CMakeCache.txt)
+  add_custom_target(iree_configure_${CONFIG_NAME} DEPENDS ${_CONFIG_BINARY_ROOT}/CMakeCache.txt)
 endfunction()
 
 # iree_get_build_command
 #
-# Gets the CMake build command for the given `target`.
+# Gets the CMake build command for the given `TARGET`.
 #
 # Parameters:
-# - target: the target to build.
-# - bin_dir: root binary directory containing CMakeCache.txt.
-# - cmd_var: variable name for receiving the build command.
-function(iree_get_build_command target bin_dir cmd_var)
-  cmake_parse_arguments(_RULE "" "CONFIG" "" ${ARGN})
+# TARGET: the target to build.
+# BINDIR: root binary directory containing CMakeCache.txt.
+# CMDVAR: variable name for receiving the build command.
+function(iree_get_build_command TARGET)
+  cmake_parse_arguments(_RULE "" "BINDIR;CMDVAR;CONFIG" "" ${ARGN})
   if(NOT _RULE_CONFIG)
     set(_RULE_CONFIG "$<CONFIG>")
   endif()
   if (CMAKE_GENERATOR MATCHES "Make")
     # Use special command for Makefiles to support parallelism.
-    set(${cmd_var} "$(MAKE)" "-C" "${bin_dir}" "${target}" PARENT_SCOPE)
+    set(${_RULE_CMDVAR}
+        "$(MAKE)" "-C" "${_RULE_BINDIR}" "${TARGET}" PARENT_SCOPE)
   else()
-    set(${cmd_var} "${CMAKE_COMMAND}" --build ${bin_dir} --target ${target} --config ${_RULE_CONFIG} PARENT_SCOPE)
+    set(${_RULE_CMDVAR}
+        "${CMAKE_COMMAND}" --build ${_RULE_BINDIR}
+                           --target ${TARGET}
+                           --config ${_RULE_CONFIG} PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -146,17 +150,17 @@ endfunction()
 #
 # Defines custom commands and targets for installing the given `target` under
 # host configuration. The custom target for install will be named as
-# `iree_host_install_${target}`.
+# `iree_host_install_${TARGET}`.
 #
 # Precondition:
-# - iree_create_configuration(HOST) is invoked previously.
+# iree_create_configuration(HOST) is invoked previously.
 #
 # Parameters:
-# - COMPONENT: installation component; used for filtering installation targets.
-# - PREFIX: the root installation path prefix.
-# - DEPENDS: addtional dependencies for the installation.
-function(iree_host_install target)
-  cmake_parse_arguments(_RULE "" "COMPONENT;PREFIX" "DEPENDS" ${ARGN})
+# COMPONENT: installation component; used for filtering installation targets.
+# PREFIX: the root installation path prefix.
+# DEPENDS: addtional dependencies for the installation.
+function(iree_host_install TARGET)
+  cmake_parse_arguments(_RULE "" "TARGET;COMPONENT;PREFIX" "DEPENDS" ${ARGN})
   if(_RULE_COMPONENT)
     set(component_option -DCMAKE_INSTALL_COMPONENT="${_RULE_COMPONENT}")
   endif()
@@ -164,7 +168,7 @@ function(iree_host_install target)
     set(prefix_option -DCMAKE_INSTALL_PREFIX="${_RULE_PREFIX}")
   endif()
 
-  iree_get_executable_path(${target} output_path)
+  iree_get_executable_path(${TARGET} output_path)
 
   add_custom_command(
     OUTPUT ${output_path}
@@ -175,7 +179,7 @@ function(iree_host_install target)
 
   # Give it a custom target so we can drive the generation manually
   # when useful.
-  add_custom_target(iree_host_install_${target} DEPENDS ${output_path})
+  add_custom_target(iree_host_install_${TARGET} DEPENDS ${output_path})
 endfunction()
 
 # iree_declare_host_excutable
@@ -184,36 +188,38 @@ endfunction()
 # host for cross-compilation.
 #
 # Precondition:
-# - iree_create_configuration(HOST) is invoked previously.
+# iree_create_configuration(HOST) is invoked previously.
 #
 # Parameters:
-# - target: the target to build on host.
-# - BUILDONLY: only generates commands for building the target.
-# - DEPENDS: any additional dependencies for the target.
-function(iree_declare_host_excutable target)
+# TARGET: the target to build on host.
+# BUILDONLY: only generates commands for building the target.
+# DEPENDS: any additional dependencies for the target.
+function(iree_declare_host_excutable TARGET)
   cmake_parse_arguments(_RULE "BUILDONLY" "" "DEPENDS" ${ARGN})
 
-  iree_get_executable_path(${target} output_path)
+  iree_get_executable_path(${TARGET} output_path)
 
-  iree_get_build_command(${target} ${IREE_HOST_BINARY_ROOT} build_cmd)
+  iree_get_build_command(${TARGET}
+    BINDIR ${IREE_HOST_BINARY_ROOT}
+    CMDVAR build_cmd)
 
-  add_custom_target(iree_host_build_${target}
+  add_custom_target(iree_host_build_${TARGET}
                     COMMAND ${build_cmd}
                     DEPENDS iree_configure_HOST ${_RULE_DEPENDS}
                     WORKING_DIRECTORY "${IREE_HOST_BINARY_ROOT}"
-                    COMMENT "Building host ${target}..."
+                    COMMENT "Building host ${TARGET}..."
                     USES_TERMINAL)
 
   if(_RULE_BUILDONLY)
     return()
   endif()
 
-  iree_host_install(${target}
-                    COMPONENT ${target}
+  iree_host_install(${TARGET}
+                    COMPONENT ${TARGET}
                     PREFIX ${IREE_HOST_BINARY_ROOT}
-                    DEPENDS iree_host_build_${target})
+                    DEPENDS iree_host_build_${TARGET})
 
   # Give it a custom target so we can drive the generation manually
   # when useful.
-  add_custom_target(iree_host_${target} DEPENDS "${output_path}")
+  add_custom_target(iree_host_${TARGET} DEPENDS "${output_path}")
 endfunction()
