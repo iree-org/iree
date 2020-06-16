@@ -168,7 +168,7 @@ endif()
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
 # tools in LLVM.
-iree_get_executable_path(iree-tblgen IREE_TABLEGEN_EXE)
+iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 
 #-------------------------------------------------------------------------------
 # Third party: tensorflow

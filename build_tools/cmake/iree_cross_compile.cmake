@@ -162,24 +162,24 @@ endfunction()
 function(iree_host_install TARGET)
   cmake_parse_arguments(_RULE "" "TARGET;COMPONENT;PREFIX" "DEPENDS" ${ARGN})
   if(_RULE_COMPONENT)
-    set(component_option -DCMAKE_INSTALL_COMPONENT="${_RULE_COMPONENT}")
+    set(_COMPONENT_OPTION -DCMAKE_INSTALL_COMPONENT="${_RULE_COMPONENT}")
   endif()
   if(_RULE_PREFIX)
-    set(prefix_option -DCMAKE_INSTALL_PREFIX="${_RULE_PREFIX}")
+    set(_PREFIX_OPTION -DCMAKE_INSTALL_PREFIX="${_RULE_PREFIX}")
   endif()
 
-  iree_get_executable_path(${TARGET} output_path)
+  iree_get_executable_path(_OUTPUT_PATH ${TARGET})
 
   add_custom_command(
-    OUTPUT ${output_path}
+    OUTPUT ${_OUTPUT_PATH}
     DEPENDS ${_RULE_DEPENDS}
-    COMMAND "${CMAKE_COMMAND}" ${component_option} ${prefix_option}
+    COMMAND "${CMAKE_COMMAND}" ${_COMPONENT_OPTION} ${_PREFIX_OPTION}
             -P "${IREE_HOST_BINARY_ROOT}/cmake_install.cmake"
     USES_TERMINAL)
 
   # Give it a custom target so we can drive the generation manually
   # when useful.
-  add_custom_target(iree_host_install_${TARGET} DEPENDS ${output_path})
+  add_custom_target(iree_host_install_${TARGET} DEPENDS ${_OUTPUT_PATH})
 endfunction()
 
 # iree_declare_host_excutable
@@ -197,7 +197,7 @@ endfunction()
 function(iree_declare_host_excutable TARGET)
   cmake_parse_arguments(_RULE "BUILDONLY" "" "DEPENDS" ${ARGN})
 
-  iree_get_executable_path(${TARGET} output_path)
+  iree_get_executable_path(_OUTPUT_PATH ${TARGET})
 
   iree_get_build_command(${TARGET}
     BINDIR ${IREE_HOST_BINARY_ROOT}
@@ -219,7 +219,8 @@ function(iree_declare_host_excutable TARGET)
                     PREFIX ${IREE_HOST_BINARY_ROOT}
                     DEPENDS iree_host_build_${TARGET})
 
-  # Give it a custom target so we can drive the generation manually
-  # when useful.
-  add_custom_target(iree_host_${TARGET} DEPENDS "${output_path}")
+  # Note that this is not enabled when BUILDONLY so we can define
+  # iree_host_${TARGET} to point to another installation path to
+  # allow flexibility.
+  add_custom_target(iree_host_${TARGET} DEPENDS "${_OUTPUT_PATH}")
 endfunction()

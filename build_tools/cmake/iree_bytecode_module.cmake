@@ -59,7 +59,7 @@ function(iree_bytecode_module)
     set(_TRANSLATE_TOOL "iree-translate")
   endif()
 
-  iree_get_executable_path(${_TRANSLATE_TOOL} _TRANSLATE_TOOL_EXECUTABLE)
+  iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
 
   set(_ARGS "${_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")

@@ -95,18 +95,18 @@ endfunction()
 # can only be built on host.
 #
 # Paramters:
-# - target: the target to build on host.
-# - output_path_var: variable name for receiving the path to the built target.
-function(iree_get_executable_path target output_path_var)
+# - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
+# - TARGET: the target to build on host.
+function(iree_get_executable_path OUTPUT_PATH_VAR TARGET)
   if(CMAKE_CROSSCOMPILING)
     # The target is defined in the CMake invocation for host. We don't have
     # access to the target; relying on the path here.
-    set(output_path "${IREE_HOST_BINARY_ROOT}/bin/${target}")
-    set(${output_path_var} "${output_path}" PARENT_SCOPE)
+    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${TARGET}")
+    set(${OUTPUT_PATH_VAR} "${_OUTPUT_PATH}" PARENT_SCOPE)
   else()
     # The target is defined in this CMake invocation. We can query the location
     # directly from CMake.
-    set(${output_path_var} "$<TARGET_FILE:${target}>" PARENT_SCOPE)
+    set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${TARGET}>" PARENT_SCOPE)
   endif()
 endfunction()
 

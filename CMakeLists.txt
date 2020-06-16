@@ -330,7 +330,7 @@ if(CMAKE_CROSSCOMPILING)
 
   # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
   # binary in BuildFlatBuffers().
-  iree_get_executable_path(flatc FLATBUFFERS_FLATC_EXECUTABLE)
+  iree_get_executable_path(FLATBUFFERS_FLATC_EXECUTABLE flatc)
 
   # Add a custom target to copy the flatc to the binary directory.
   add_custom_target(iree_host_flatc
