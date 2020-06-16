@@ -355,6 +355,11 @@ def VMLA_ClampOp : VMLA_TernaryOp<"clamp", VMLA_AnyTypeAttr>;
 def VMLA_FloorOp : VMLA_UnaryOp<"floor", VMLA_FloatTypeAttr>;
 def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
 
+def VMLA_FftFftOp : VMLA_BaseFftOp<"fft.fft", VMLA_FloatTypeAttr>;
+def VMLA_FftIFftOp : VMLA_BaseFftOp<"fft.ifft", VMLA_FloatTypeAttr>;
+def VMLA_FftRFftOp : VMLA_BaseFftOp<"fft.rfft", VMLA_FloatTypeAttr>;
+def VMLA_FftIRFftOp : VMLA_BaseFftOp<"fft.irfft", VMLA_FloatTypeAttr>;
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: conversion
 //===----------------------------------------------------------------------===//

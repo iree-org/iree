@@ -37,6 +37,43 @@ func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer,
   return
 }
 
+// -----
+
+// CHECK-LABEL: @fftFftOp
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @fftFftOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
+  // CHECK: vmla.fft.fft %[[SRC]], out %[[DST]] : f32
+  vmla.fft.fft %src, out %dst : f32
+  return
+}
+
+// CHECK-LABEL: @fftIFftOp
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @fftIFftOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
+ // CHECK: vmla.fft.ifft %[[SRC]], out %[[DST]] : f32
+  vmla.fft.ifft %src, out %dst : f32
+  return
+}
+
+// CHECK-LABEL: @fftRFftOp
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @fftRFftOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
+ // CHECK: vmla.fft.rfft %[[SRC]], out %[[DST]] : f32
+  vmla.fft.rfft %src, out %dst : f32
+  return
+}
+
+// CHECK-LABEL: @fftIRFftOp
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @fftIRFftOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
+ // CHECK: vmla.fft.irfft %[[SRC]], out %[[DST]] : f32
+  vmla.fft.irfft %src, out %dst : f32
+  return
+}
 
 // -----
 

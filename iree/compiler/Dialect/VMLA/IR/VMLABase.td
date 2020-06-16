@@ -203,4 +203,15 @@ class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
   let assemblyFormat = "$a`,` $b`,` $c`,` `out` $dst attr-dict `:` $element_type";
 }
 
+class VMLA_BaseFftOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
+    VMLA_ElementTypeOp<mnemonic, traits> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Buffer:$dst,
+    typeAttr:$element_type
+  );
+
+  let assemblyFormat = "$src`,` `out` $dst attr-dict `:` $element_type";
+}
+
 #endif  // IREE_DIALECT_VMLA_BASE

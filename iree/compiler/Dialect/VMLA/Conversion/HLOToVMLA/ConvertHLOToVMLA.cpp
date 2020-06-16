@@ -536,6 +536,62 @@ struct ConvertOpConversion : public OpConversionPattern<xla_hlo::ConvertOp> {
   TypeConverter &typeConverter;
 };
 
+struct FftOpConversion : public OpConversionPattern<xla_hlo::FftOp> {
+  FftOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      xla_hlo::FftOp srcOp, ArrayRef<Value> operandValues,
+      ConversionPatternRewriter &rewriter) const override {
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    auto srcShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+    auto srcType = srcShape.getType().dyn_cast<Shape::RankedShapeType>();
+
+    int64_t fft_length = srcType.getAllDims().back();
+    if (fft_length != srcOp.fft_length().getValue<IntegerAttr>({0}).getInt()) {
+      srcOp.emitWarning(
+          "The fft length provided doesn't match the last dimension of the "
+          "tensor");
+      return failure();
+    }
+    auto fft_type = llvm::StringSwitch<int32_t>(srcOp.fft_type())
+                        .Case("FFT", 1)
+                        .Case("IFFT", 2)
+                        .Case("RFFT", 3)
+                        .Case("IRFFT", 4)
+                        .Default(0);
+    switch (fft_type) {
+      case 1:
+        rewriter.replaceOpWithNewOp<IREE::VMLA::FftFftOp>(
+            srcOp, operandValues[0], dst,
+            TypeAttr::get(srcOp.operand().getType()));
+        break;
+      case 2:
+        rewriter.replaceOpWithNewOp<IREE::VMLA::FftIFftOp>(
+            srcOp, operandValues[0], dst,
+            TypeAttr::get(srcOp.operand().getType()));
+        break;
+      case 3:
+        rewriter.replaceOpWithNewOp<IREE::VMLA::FftRFftOp>(
+            srcOp, operandValues[0], dst,
+            TypeAttr::get(srcOp.operand().getType()));
+        break;
+      case 4:
+        rewriter.replaceOpWithNewOp<IREE::VMLA::FftIRFftOp>(
+            srcOp, operandValues[0], dst,
+            TypeAttr::get(srcOp.operand().getType()));
+        break;
+      default:
+        llvm_unreachable("unhandled fft type");
+        return failure();
+    }
+    return success();
+  }
+  TypeConverter &typeConverter;
+};
+
 }  // namespace
 
 void populateHLOToVMLAPatterns(MLIRContext *context,
@@ -644,6 +700,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<GatherOpConversion>(context, typeConverter);
   patterns.insert<SliceOpConversion>(context, typeConverter);
   patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
+
+  // The fft op is mapped from one Op with 4 variations to 4 different ops.
+  patterns.insert<FftOpConversion>(context, typeConverter);
 
   // Tensor-level canonicalizations to reduce the op surface area of the
   // runtime.
