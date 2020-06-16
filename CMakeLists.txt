@@ -139,7 +139,7 @@ if(CMAKE_CROSSCOMPILING)
     message(FATAL_ERROR "Cross compilation with Windows host system is not supported yet")
   endif()
 
-  message(STATUS "Detected cross compilation mode, configuring IREE on host...")
+  message(STATUS "Detected cross compilation mode; configuring IREE on host...")
 
   # C/C++ compilers for host compilation.
   # Note: we need to explicitly set this because IREE does not work well with
@@ -163,7 +163,7 @@ if(CMAKE_CROSSCOMPILING)
   # Use another CMake invocation to configure a build for host.
   iree_create_configuration(HOST)
 
-  message(STATUS "Done configuring IREE on host")
+  message(STATUS "Done configuring IREE on host in ${IREE_HOST_BINARY_ROOT}")
 endif()
 
 #-------------------------------------------------------------------------------
