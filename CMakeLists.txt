@@ -210,7 +210,6 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
   endif()
 
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
-  add_bundled_mlir_dependent_projects()
 
   # Reset CMAKE_BUILD_TYPE to its previous setting
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
