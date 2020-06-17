@@ -25,7 +25,6 @@
 #include "iree/base/intrusive_list.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
-#include "iree/hal/semaphore.h"
 #include "iree/hal/vulkan/handle_util.h"
 
 namespace iree {

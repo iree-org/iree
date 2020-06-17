@@ -14,7 +14,6 @@
 
 #include "iree/hal/vulkan/timepoint_util.h"
 
-#include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
 #include "absl/utility/utility.h"

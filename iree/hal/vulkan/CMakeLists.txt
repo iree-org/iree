@@ -222,8 +222,11 @@ iree_cc_library(
     ::handle_util
     ::status_util
     ::timepoint_util
+    absl::inlined_vector
     absl::synchronization
     absl::time
+    iree::base::intrusive_list
+    iree::base::status
     iree::base::tracing
     iree::hal::semaphore
     Vulkan::Headers
@@ -419,18 +422,16 @@ iree_cc_library(
   COPTS
     "-DVK_NO_PROTOTYPES"
   DEPS
-    absl::core_headers
+    ::direct_command_buffer
+    ::emulated_timeline_semaphore
+    ::handle_util
+    ::status_util
+    ::timepoint_util
+    absl::inlined_vector
     absl::synchronization
-    absl::time
-    iree::base::memory
     iree::base::status
     iree::base::tracing
     iree::hal::command_queue
-    iree::hal::vulkan::direct_command_buffer
-    iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::status_util
-    iree::hal::vulkan::timepoint_util
     Vulkan::Headers
   PUBLIC
 )
@@ -461,9 +462,10 @@ iree_cc_library(
     "-DVK_NO_PROTOTYPES"
   DEPS
     ::handle_util
-    ::status_util
     absl::synchronization
-    absl::time
+    iree::base::intrusive_list
+    iree::base::ref_ptr
+    iree::base::status
     iree::base::tracing
     Vulkan::Headers
   PUBLIC
