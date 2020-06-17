@@ -393,9 +393,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
       std::move(driver), device_info, physical_device,
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
-      std::move(transfer_command_pool),
-      std::move(semaphore_pool), std::move(fence_pool),
-      debug_capture_manager));
+      std::move(transfer_command_pool), std::move(semaphore_pool),
+      std::move(fence_pool), debug_capture_manager));
 }
 
 // static

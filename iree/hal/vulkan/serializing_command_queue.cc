@@ -316,6 +316,10 @@ Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
 }
 
 Status SerializingCommandQueue::AdvanceQueueSubmission() {
+  // The returned value just indicates whether there were newly ready
+  // submissions gotten submitted to the GPU. Other callers might be
+  // interested in that information but for this API we just want to advance
+  // queue submisison if possible. So we ignore it here.
   ASSIGN_OR_RETURN(std::ignore, ProcessDeferredSubmissions());
   return OkStatus();
 }

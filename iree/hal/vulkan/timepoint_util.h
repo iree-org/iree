@@ -107,7 +107,7 @@ struct TimePointSemaphore final : public IntrusiveLinkBase<void> {
   ref_ptr<TimePointFence> signal_fence = nullptr;
 
   // The fence associated with the queue submission waiting this semaphore.
-  // nullptr means this binary semaphore has is not waited by any queue
+  // nullptr means this binary semaphore has not been waited by any queue
   // submission.
   ref_ptr<TimePointFence> wait_fence = nullptr;
 };

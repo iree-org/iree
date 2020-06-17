@@ -103,7 +103,7 @@ Status TimePointFencePool::PreallocateFences() {
   std::array<TimePointFence*, kMaxInFlightFenceCount> fences;
   {
     absl::MutexLock lock(&mutex_);
-    for (int i = 0; i < kMaxInFlightFenceCount; ++i) {
+    for (int i = 0; i < fences.size(); ++i) {
       VkFence fence = VK_NULL_HANDLE;
       VK_RETURN_IF_ERROR(syms()->vkCreateFence(*logical_device_, &create_info,
                                                logical_device_->allocator(),
@@ -112,7 +112,7 @@ Status TimePointFencePool::PreallocateFences() {
     }
   }
 
-  for (int i = 0; i < kMaxInFlightFenceCount; ++i) {
+  for (int i = 0; i < fences.size(); ++i) {
     // The `TimePointFence`s was created with an initial ref-count of one.
     // Decrease explicitly to zero so that later we can rely on the ref-count
     // reaching zero to auto-release the `TimePointFence` back to the free

@@ -75,7 +75,7 @@ class SerializingCommandQueue final : public CommandQueue {
     ref_ptr<TimePointFence> fence;
 
     FencedSubmission(const SubmissionBatch& batch,
-                     ref_ptr<TimePointFence>&& fence)
+                     ref_ptr<TimePointFence> fence)
         : batch(batch), fence(std::move(fence)) {}
   };
 
