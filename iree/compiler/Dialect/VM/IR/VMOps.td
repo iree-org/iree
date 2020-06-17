@@ -1358,36 +1358,42 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 def VM_CmpEQI32Op :
     VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32, [Commutative]> {
   let summary = [{integer equality comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNEI32Op :
     VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32, [Commutative]> {
   let summary = [{integer inequality comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S> {
   let summary = [{signed integer less-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U> {
   let summary = [{unsigned integer less-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.lte.i32.s", VM_OPC_CmpLTEI32S> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.lte.i32.u", VM_OPC_CmpLTEI32U> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -1395,24 +1401,28 @@ def VM_CmpLTEI32UOp :
 def VM_CmpGTI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.gt.i32.s", VM_OPC_CmpGTI32S> {
   let summary = [{signed integer greater-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.gt.i32.u", VM_OPC_CmpGTI32U> {
   let summary = [{unsigned integer greater-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.gte.i32.s", VM_OPC_CmpGTEI32S> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.gte.i32.u", VM_OPC_CmpGTEI32U> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 

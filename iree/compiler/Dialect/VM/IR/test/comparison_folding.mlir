@@ -397,7 +397,7 @@ vm.module @cmp_eq_ref_folds {
   // CHECK-LABEL: @cmp_null
   vm.func @cmp_null(%arg0 : !vm.ref<?>) -> i32 {
     // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !vm.ref<?>
-    // CHECK-NEXT: %0 = vm.not.i32 %rnz : i32
+    // CHECK-NEXT: %0 = vm.xor.i32 %rnz, %c1 : i32
     // CHECK-NEXT: vm.return %0 : i32
     %null = vm.const.ref.zero : !vm.ref<?>
     %eq = vm.cmp.eq.ref %arg0, %null : !vm.ref<?>
