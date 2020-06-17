@@ -16,7 +16,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
 
-//      CHECK: func @simpleMath_rgn_dispatch_0(%arg0: !vmla.interface) {
+//      CHECK: func @simpleMath_rgn_dispatch_0(%arg0: !vmla.interface, %arg1: index, %arg2: index, %arg3: index) {
 // CHECK-NEXT:   %c0 = constant 0 : index
 // CHECK-NEXT:   %c16 = constant 16 : index
 // CHECK-NEXT:   %0 = vmla.interface.binding %arg0 {binding = 0 : i32, set = 0 : i32} : !vmla.buffer

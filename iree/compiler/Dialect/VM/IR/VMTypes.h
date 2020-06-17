@@ -32,8 +32,41 @@ namespace IREE {
 namespace VM {
 
 namespace detail {
+struct ListTypeStorage;
 struct RefTypeStorage;
 }  // namespace detail
+
+/// A list containing an optional element type.
+class ListType
+    : public Type::TypeBase<ListType, Type, detail::ListTypeStorage> {
+ public:
+  using Base::Base;
+
+  /// Returns true if the given type can be wrapped in a list.
+  static bool isCompatible(Type type);
+
+  /// Gets or creates a ListType with the provided element type.
+  static ListType get(Type elementType);
+
+  /// Gets or creates a ListType with the provided element type.
+  /// This emits an error at the specified location and returns null if the
+  /// element type isn't supported.
+  static ListType getChecked(Type elementType, Location location);
+
+  /// Verifies construction of a type with the given object.
+  static LogicalResult verifyConstructionInvariants(Location loc,
+                                                    Type elementType) {
+    if (!isCompatible(elementType)) {
+      return emitError(loc)
+             << "invalid element type for a list: " << elementType;
+    }
+    return success();
+  }
+
+  Type getElementType();
+
+  static bool kindof(unsigned kind) { return kind == TypeKind::List; }
+};
 
 /// An opaque ref object that comes from an external source.
 class OpaqueType : public Type::TypeBase<OpaqueType, Type> {

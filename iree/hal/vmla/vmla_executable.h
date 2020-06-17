@@ -20,9 +20,8 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
-#include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
+#include "iree/hal/host/host_executable.h"
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
@@ -34,7 +33,7 @@ namespace vmla {
 
 class Interface;
 
-class VMLAExecutable final : public Executable {
+class VMLAExecutable final : public HostExecutable {
  public:
   static StatusOr<ref_ptr<VMLAExecutable>> Load(iree_vm_instance_t* instance,
                                                 iree_vm_module_t* vmla_module,
@@ -59,11 +58,10 @@ class VMLAExecutable final : public Executable {
     return absl::MakeConstSpan(entry_functions_);
   }
 
-  // ABI vmla.interface binding block.
-  Interface* interface() const { return interface_; }
-
-  // Entry point inputs list of a single vmla.interface.
-  iree_vm_variant_list_t* interface_inputs() const { return interface_inputs_; }
+  StatusOr<ref_ptr<DispatchState>> PrepareDispatch(
+      const DispatchParams& params) override;
+  Status DispatchTile(DispatchState* state,
+                      std::array<uint32_t, 3> workgroup_xyz) override;
 
  private:
   Status Initialize(iree_vm_instance_t* instance,
@@ -74,8 +72,6 @@ class VMLAExecutable final : public Executable {
 
   iree_vm_context_t* context_ = nullptr;
   absl::InlinedVector<iree_vm_function_t, 4> entry_functions_;
-  Interface* interface_ = nullptr;
-  iree_vm_variant_list_t* interface_inputs_ = nullptr;
 };
 
 }  // namespace vmla

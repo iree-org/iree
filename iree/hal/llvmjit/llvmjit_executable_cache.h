@@ -15,7 +15,6 @@
 #ifndef IREE_HAL_LLVMJIT_EXECUTABLE_CACHE_H_
 #define IREE_HAL_LLVMJIT_EXECUTABLE_CACHE_H_
 
-#include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
 
@@ -25,7 +24,7 @@ namespace llvmjit {
 
 class LLVMJITExecutableCache final : public ExecutableCache {
  public:
-  explicit LLVMJITExecutableCache(hal::Allocator* allocator);
+  LLVMJITExecutableCache();
   ~LLVMJITExecutableCache() override;
 
   bool CanPrepareFormat(ExecutableFormat format) const override;
@@ -33,9 +32,6 @@ class LLVMJITExecutableCache final : public ExecutableCache {
   StatusOr<ref_ptr<Executable>> PrepareExecutable(
       ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
       const ExecutableSpec& spec) override;
-
- private:
-  hal::Allocator* allocator_;
 };
 
 }  // namespace llvmjit

@@ -55,7 +55,7 @@ const CustomOpShapeBuilderList *getCustomOpShapeBuilder() {
 }
 
 Value rewriteShapexRankedBroadcastShape(
-    RankedBroadcastShapeOp op, RankedBroadcastShapeOp::OperandAdaptor operands,
+    RankedBroadcastShapeOp op, RankedBroadcastShapeOp::Adaptor operands,
     OpBuilder &builder) {
   auto lhs = operands.lhs();
   auto rhs = operands.rhs();
@@ -106,7 +106,7 @@ Value rewriteShapexRankedBroadcastShape(
 }
 
 LogicalResult expandGatherExtentsOp(GatherExtentsOp op,
-                                    GatherExtentsOp::OperandAdaptor operands,
+                                    GatherExtentsOp::Adaptor operands,
                                     PatternRewriter &rewriter) {
   // Calculate cumulative sums of the ranks of each operand, which allows
   // us to map each index to its corresponding operand easily.
@@ -144,8 +144,7 @@ LogicalResult expandGatherExtentsOp(GatherExtentsOp op,
 }
 
 LogicalResult expandRankedBroadcastShapePattern(
-    RankedBroadcastShapeOp bcastOp,
-    RankedBroadcastShapeOp::OperandAdaptor operands,
+    RankedBroadcastShapeOp bcastOp, RankedBroadcastShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   auto newValue =
       rewriteShapexRankedBroadcastShape(bcastOp, operands, rewriter);
@@ -171,7 +170,7 @@ LogicalResult rewriteSameOperandsAndResultShape(GetRankedShapeOp getShapeOp,
 // operation. This is the primary supported case as other rewrites should
 // have isolated function/block boundaries with TieShape ops.
 LogicalResult rewriteInputOp(GetRankedShapeOp getShapeOp,
-                             GetRankedShapeOp::OperandAdaptor operands,
+                             GetRankedShapeOp::Adaptor operands,
                              Operation *inputOperation,
                              PatternRewriter &rewriter) {
   // SameOperandsAndResultShape trait.
@@ -199,7 +198,7 @@ LogicalResult rewriteInputOp(GetRankedShapeOp getShapeOp,
 }
 
 void rewriteRuntimeShape(GetRankedShapeOp getShapeOp,
-                         GetRankedShapeOp::OperandAdaptor operands,
+                         GetRankedShapeOp::Adaptor operands,
                          PatternRewriter &rewriter) {
   auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
   SmallVector<Value, 4> dynamicDims;
@@ -225,9 +224,9 @@ void rewriteRuntimeShape(GetRankedShapeOp getShapeOp,
 }
 
 // Low benefit fallback pattern to materialize a ranked shape.
-LogicalResult materializeRankedShapePattern(
-    GetRankedShapeOp getShapeOp, GetRankedShapeOp::OperandAdaptor operands,
-    PatternRewriter &rewriter) {
+LogicalResult materializeRankedShapePattern(GetRankedShapeOp getShapeOp,
+                                            GetRankedShapeOp::Adaptor operands,
+                                            PatternRewriter &rewriter) {
   // Check for static shape and elide.
   auto operandType = operands.operand().getType().dyn_cast<RankedTensorType>();
   auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
@@ -256,7 +255,7 @@ LogicalResult materializeRankedShapePattern(
 // Matches a tie_shape -> get_ranked_shape pattern and resolves it statically.
 // This must be a higher benefit than materializeRankedShapePattern.
 LogicalResult passThroughTiedGetRankedShapePattern(
-    GetRankedShapeOp getShapeOp, GetRankedShapeOp::OperandAdaptor operands,
+    GetRankedShapeOp getShapeOp, GetRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
   // Check for input operation (unless if a small set of shape ops).
   Operation *inputOperation = operands.operand().getDefiningOp();

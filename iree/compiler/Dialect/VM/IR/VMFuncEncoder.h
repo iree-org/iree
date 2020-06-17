@@ -52,6 +52,7 @@ class VMFuncEncoder {
 
   // Encodes a value type as an integer kind.
   virtual LogicalResult encodeType(Value value) = 0;
+  virtual LogicalResult encodeType(Type type) = 0;
 
   // Encodes an integer attribute as a fixed byte length based on bitwidth.
   virtual LogicalResult encodeIntAttr(IntegerAttr value) = 0;

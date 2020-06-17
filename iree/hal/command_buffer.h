@@ -19,7 +19,6 @@
 
 #include "iree/base/bitfield.h"
 #include "iree/base/status.h"
-#include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/descriptor_set.h"
 #include "iree/hal/event.h"
@@ -163,10 +162,6 @@ struct BufferBarrier {
 class CommandBuffer : public Resource {
  public:
   virtual CommandBuffer* impl() { return this; }
-
-  // Device allocator that commands encoded into the buffer share compatibility
-  // with.
-  Allocator* allocator() const { return allocator_; }
 
   // Command buffer operation mode.
   CommandBufferModeBitfield mode() const { return mode_; }
@@ -344,14 +339,11 @@ class CommandBuffer : public Resource {
                                   device_size_t workgroups_offset) = 0;
 
  protected:
-  CommandBuffer(Allocator* allocator, CommandBufferModeBitfield mode,
+  CommandBuffer(CommandBufferModeBitfield mode,
                 CommandCategoryBitfield command_categories)
-      : allocator_(allocator),
-        mode_(mode),
-        command_categories_(command_categories) {}
+      : mode_(mode), command_categories_(command_categories) {}
 
  private:
-  Allocator* const allocator_;
   const CommandBufferModeBitfield mode_;
   const CommandCategoryBitfield command_categories_;
 };

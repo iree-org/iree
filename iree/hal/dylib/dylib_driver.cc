@@ -18,6 +18,7 @@
 
 #include "iree/hal/device_info.h"
 #include "iree/hal/dylib/dylib_device.h"
+#include "iree/hal/host/serial_scheduling_model.h"
 
 namespace iree {
 namespace hal {
@@ -55,7 +56,9 @@ StatusOr<ref_ptr<Device>> DyLibDriver::CreateDefaultDevice() {
 
 StatusOr<ref_ptr<Device>> DyLibDriver::CreateDevice(DriverDeviceID device_id) {
   // Only one device, ignore device_id.
-  return DyLibDevice::CreateDyLibDevice(GetDefaultDeviceInfo());
+  auto scheduling_model = std::make_unique<SerialSchedulingModel>();
+  return make_ref<DyLibDevice>(GetDefaultDeviceInfo(),
+                               std::move(scheduling_model));
 }
 
 }  // namespace dylib

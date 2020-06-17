@@ -24,8 +24,7 @@ namespace iree {
 namespace hal {
 namespace llvmjit {
 
-LLVMJITExecutableCache::LLVMJITExecutableCache(hal::Allocator* allocator)
-    : allocator_(allocator) {}
+LLVMJITExecutableCache::LLVMJITExecutableCache() = default;
 
 LLVMJITExecutableCache::~LLVMJITExecutableCache() = default;
 
@@ -41,9 +40,8 @@ StatusOr<ref_ptr<Executable>> LLVMJITExecutableCache::PrepareExecutable(
   // Wrap the data (or copy it).
   bool allow_aliasing_data =
       AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
-  ASSIGN_OR_RETURN(
-      auto executable,
-      LLVMJITExecutable::Load(allocator_, spec, !allow_aliasing_data));
+  ASSIGN_OR_RETURN(auto executable,
+                   LLVMJITExecutable::Load(spec, !allow_aliasing_data));
 
   return executable;
 }

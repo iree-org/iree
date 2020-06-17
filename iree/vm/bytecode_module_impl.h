@@ -101,7 +101,7 @@ typedef struct {
   iree_allocator_t allocator;
 } iree_vm_bytecode_module_state_t;
 
-// Begins (or resumes) execution of the given |entry_frame| and continues until
+// Begins (or resumes) execution of the current frame and continues until
 // either a yield or return. |out_result| will contain the result status for
 // continuation, if needed.
 iree_status_t iree_vm_bytecode_dispatch(

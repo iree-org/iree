@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
@@ -25,6 +26,21 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+// Legalize the type from operand() -> result() for tie_shape op.
+// At this level, we preserve any remaining tie_shapes since they may still
+// provide information in some contexts.
+class LegalizeTieShapePattern : public OpConversionPattern<Shape::TieShapeOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      Shape::TieShapeOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(op, operands[0],
+                                                   operands[1]);
+    return success();
+  }
+};
+
 // Lowers dim operations against values that were originally tensors but have
 // been converted to HAL buffer types.
 class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
@@ -34,7 +50,7 @@ class BackingBufferBufferViewDimPattern : public OpConversionPattern<DimOp> {
   LogicalResult matchAndRewrite(
       DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    DimOp::OperandAdaptor operands(rawOperands);
+    DimOp::Adaptor operands(rawOperands);
     if (!dimOp.memrefOrTensor().getType().isa<TensorType>() ||
         !IREE::HAL::TensorRewriteAdaptor::isValidNewType(
             operands.memrefOrTensor().getType())) {
@@ -82,7 +98,8 @@ void populateHalBufferViewShapePatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns,
                                         TypeConverter &converter) {
   patterns.insert<BackingBufferBufferViewDimPattern,
-                  BackingBufferBufferViewRankPattern>(context);
+                  BackingBufferBufferViewRankPattern, LegalizeTieShapePattern>(
+      context);
 }
 
 }  // namespace iree_compiler

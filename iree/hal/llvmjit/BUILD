@@ -20,79 +20,13 @@ package(
 )
 
 cc_library(
-    name = "llvmjit_executable",
-    srcs = ["llvmjit_executable.cc"],
-    hdrs = ["llvmjit_executable.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/hal:allocator",
-        "//iree/hal:executable",
-        "//iree/hal:executable_spec",
-        "//iree/schemas:llvmir_executable_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_absl//absl/types:span",
-        "@llvm-project//llvm:AsmParser",
-        "@llvm-project//llvm:Core",
-        "@llvm-project//llvm:OrcJIT",
-        "@llvm-project//llvm:Support",
-    ],
-)
-
-cc_library(
-    name = "llvmjit_command_processor",
-    srcs = ["llvmjit_command_processor.cc"],
-    hdrs = ["llvmjit_command_processor.h"],
-    deps = [
-        ":llvmjit_executable",
-        ":memref_runtime",
-        "//iree/base:tracing",
-        "//iree/hal:buffer",
-        "//iree/hal/host:host_local_command_processor",
-    ],
-)
-
-cc_library(
-    name = "llvmjit_executable_cache",
-    srcs = ["llvmjit_executable_cache.cc"],
-    hdrs = ["llvmjit_executable_cache.h"],
-    deps = [
-        ":llvmjit_executable",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:allocator",
-        "//iree/hal:executable",
-        "//iree/hal:executable_cache",
-        "//iree/hal:executable_format",
-        "@llvm-project//llvm:OrcJIT",
-    ],
-)
-
-cc_library(
     name = "llvmjit_device",
     srcs = ["llvmjit_device.cc"],
     hdrs = ["llvmjit_device.h"],
     deps = [
-        ":llvmjit_command_processor",
         ":llvmjit_executable_cache",
-        "//iree/base:memory",
-        "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:command_buffer_validation",
-        "//iree/hal:command_queue",
-        "//iree/hal:device",
-        "//iree/hal:semaphore",
-        "//iree/hal/host:async_command_queue",
-        "//iree/hal/host:host_descriptor_set",
-        "//iree/hal/host:host_event",
-        "//iree/hal/host:host_executable_layout",
-        "//iree/hal/host:host_local_allocator",
-        "//iree/hal/host:host_submission_queue",
-        "//iree/hal/host:inproc_command_buffer",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "//iree/hal/host:host_local_device",
     ],
 )
 
@@ -104,6 +38,7 @@ cc_library(
         ":llvmjit_device",
         "//iree/hal:device_info",
         "//iree/hal:driver",
+        "//iree/hal/host:serial_scheduling_model",
         "@llvm-project//llvm:ExecutionEngine",
     ],
 )
@@ -121,6 +56,43 @@ cc_library(
         "@llvm-project//llvm:X86CodeGen",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "llvmjit_executable",
+    srcs = ["llvmjit_executable.cc"],
+    hdrs = ["llvmjit_executable.h"],
+    deps = [
+        ":memref_runtime",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:buffer",
+        "//iree/hal:executable",
+        "//iree/hal:executable_spec",
+        "//iree/hal/host:host_executable",
+        "//iree/schemas:llvmir_executable_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_absl//absl/types:span",
+        "@llvm-project//llvm:AsmParser",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:OrcJIT",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+cc_library(
+    name = "llvmjit_executable_cache",
+    srcs = ["llvmjit_executable_cache.cc"],
+    hdrs = ["llvmjit_executable_cache.h"],
+    deps = [
+        ":llvmjit_executable",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:executable",
+        "//iree/hal:executable_cache",
+        "//iree/hal:executable_format",
+    ],
 )
 
 cc_library(

@@ -112,11 +112,10 @@ uint32_t SplatPattern(const void* pattern, size_t pattern_length) {
 }  // namespace
 
 DirectCommandBuffer::DirectCommandBuffer(
-    Allocator* allocator, CommandBufferModeBitfield mode,
-    CommandCategoryBitfield command_categories,
+    CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories,
     ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
     ref_ptr<VkCommandPoolHandle> command_pool, VkCommandBuffer command_buffer)
-    : CommandBuffer(allocator, mode, command_categories),
+    : CommandBuffer(mode, command_categories),
       command_pool_(std::move(command_pool)),
       command_buffer_(command_buffer),
       descriptor_set_arena_(std::move(descriptor_pool_cache)) {}

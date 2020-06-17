@@ -24,16 +24,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@dear_imgui//:imgui_sdl_vulkan": [
         "dear_imgui::impl_sdl", "dear_imgui::impl_vulkan"
     ],
-    # LLVM
-    "@llvm-project//llvm:AsmParser": ["LLVMAsmParser"],
-    "@llvm-project//llvm:Core": ["LLVMCore"],
-    "@llvm-project//llvm:ExecutionEngine": ["LLVMExecutionEngine"],
-    "@llvm-project//llvm:Passes": ["LLVMPasses"],
-    "@llvm-project//llvm:Target": ["LLVMTarget"],
-    "@llvm-project//llvm:Support": ["LLVMSupport"],
-    "@llvm-project//llvm:OrcJIT": ["LLVMOrcJIT"],
-    "@llvm-project//llvm:TableGen": ["LLVMTableGen"],
-    "@llvm-project//llvm:X86CodeGen": ["LLVMX86CodeGen"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
@@ -46,10 +36,10 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUToSPIRVTransforms": ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
+    "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
-    "@llvm-project//mlir:SCFTransforms": ["MLIRSCFTransforms"],
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
@@ -59,7 +49,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:StandardToSPIRVConversions": [
         "MLIRStandardToSPIRVTransforms"
     ],
-    "@llvm-project//mlir:TableGen": ["MLIRTableGen"],
     "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
@@ -102,6 +91,14 @@ def _convert_mlir_target(target):
   return ["MLIR" + target.rsplit(":")[-1]]
 
 
+def _convert_llvm_target(target):
+  # Default to a pattern substitution approach.
+  # Prepend "LLVM" to the Bazel target name.
+  #   "@llvm-project//llvm:AsmParser" -> "LLVMAsmParser"
+  #   "@llvm-project//llvm:Core" -> "LLVMCore"
+  return ["LLVM" + target.rsplit(":")[-1]]
+
+
 def convert_external_target(target):
   """Converts an external (non-IREE) Bazel target to a list of CMake targets.
 
@@ -122,6 +119,8 @@ def convert_external_target(target):
     return EXPLICIT_TARGET_MAPPING[target]
   if target.startswith("@com_google_absl//absl"):
     return _convert_absl_target(target)
+  if target.startswith("@llvm-project//llvm"):
+    return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):

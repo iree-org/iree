@@ -53,9 +53,9 @@ extern Pass* createLowerMatrixIntrinsicsPass();
 
 void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
                                 llvm::ArrayRef<const std::string> runtime) {
-  // Lower vector operations progressively into more elementary
-  // vector operations before running the regular compiler passes.
-  {
+  if (target == Target::CPUTarget) {
+    // Lower vector operations progressively into more elementary
+    // vector operations before running the regular compiler passes.
     mlir::OwningRewritePatternList patterns;
     mlir::vector::populateVectorSlicesLoweringPatterns(patterns,
                                                        module->getContext());

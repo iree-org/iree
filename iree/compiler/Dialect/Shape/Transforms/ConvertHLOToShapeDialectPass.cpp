@@ -31,27 +31,13 @@ namespace iree_compiler {
 namespace Shape {
 namespace {
 
-// Returns a 1-d i64 elements attribute populated with numbers from start to
-// end, excluding.
-static DenseIntElementsAttr getI64ElementsAttrForSeq(int start, int end,
-                                                     Builder &builder) {
-  int size = end - start;
-
-  SmallVector<int64_t, 4> vals;
-  vals.resize(size);
-  std::iota(vals.begin(), vals.end(), start);
-
-  TensorType ty = RankedTensorType::get({size}, builder.getIntegerType(64));
-  return DenseIntElementsAttr::get(ty, vals);
-}
-
 class ConvertDynamicBroadcastInDim
     : public OpConversionPattern<xla_hlo::DynamicBroadcastInDimOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
       xla_hlo::DynamicBroadcastInDimOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    xla_hlo::DynamicBroadcastInDimOp::OperandAdaptor adapter(operands);
+    xla_hlo::DynamicBroadcastInDimOp::Adaptor adapter(operands);
     Value rankedShape = rewriter.create<Shape::FromExtentTensorOp>(
         op.getLoc(), adapter.output_dimensions());
     rewriter.replaceOpWithNewOp<Shape::RankedBroadcastInDimOp>(

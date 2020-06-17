@@ -31,7 +31,6 @@ iree_lit_test_suite(
     data = [
         # runtime libraries
         "@llvm-project//mlir:tools/libvulkan-runtime-wrappers.so",
-        "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
         ":runtime-support.so",
         # Tests.
         ":test-dot-prod",
@@ -166,6 +165,7 @@ cc_binary(
         "//experimental/ModelBuilder:ModelRunner",
         "//experimental/ModelBuilder:VulkanLaunchWrapper",
         "//iree/base:initializer",
+        "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialects",
@@ -181,6 +181,8 @@ cc_binary(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:mlir_c_runner_utils",
         # mlir_runner_utils with iostream needed for printMemRef atm
         "@llvm-project//mlir:mlir_runner_utils",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,

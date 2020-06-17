@@ -19,7 +19,7 @@
 #include "iree/base/atomics.h"
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_module_init(iree_vm_module_t* module, void* self) {
+iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
   memset(module, 0, sizeof(iree_vm_module_t));
   module->self = self;
   iree_atomic_store(&module->ref_count, 1);
@@ -88,6 +88,18 @@ iree_vm_function_name(const iree_vm_function_t* function) {
     return iree_make_cstring_view("<error>");
   }
   return name;
+}
+
+IREE_API_EXPORT iree_vm_function_signature_t IREE_API_CALL
+iree_vm_function_signature(const iree_vm_function_t* function) {
+  iree_vm_function_signature_t signature;
+  memset(&signature, 0, sizeof(signature));
+  IREE_IGNORE_ERROR(function->module->get_function(
+      function->module->self, function->linkage, function->ordinal,
+      /*out_function=*/NULL,
+      /*out_name=*/NULL,
+      /*out_signature=*/&signature));
+  return signature;
 }
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL

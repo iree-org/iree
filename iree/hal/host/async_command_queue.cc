@@ -56,7 +56,7 @@ void AsyncCommandQueue::ThreadMain() {
     // submissions.
     submission_mutex_.Lock();
     submission_mutex_.Await(absl::Condition(
-        +[](HostSubmissionQueue* queue) {
+        +[](SerialSubmissionQueue* queue) {
           return queue->has_shutdown() || !queue->empty();
         },
         &submission_queue_));
@@ -110,7 +110,7 @@ Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
   absl::MutexLock lock(&submission_mutex_);
   if (!submission_mutex_.AwaitWithDeadline(
           absl::Condition(
-              +[](HostSubmissionQueue* queue) {
+              +[](SerialSubmissionQueue* queue) {
                 return queue->empty() || !queue->permanent_error().ok();
               },
               &submission_queue_),

@@ -50,3 +50,6 @@
 [submodule "third_party/mlir-emitc"]
 	path = third_party/mlir-emitc
 	url = https://github.com/iml130/mlir-emitc.git
+[submodule "third_party/marl"]
+	path = third_party/marl
+	url = https://github.com/google/marl.git

@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_COMMAND_BUFFER_VALIDATION_H_
 #define IREE_HAL_COMMAND_BUFFER_VALIDATION_H_
 
+#include "iree/hal/allocator.h"
 #include "iree/hal/command_buffer.h"
 
 namespace iree {
@@ -24,7 +25,7 @@ namespace hal {
 // recording. This should be enabled whenever the command buffer is being driven
 // by unsafe code or when early and readable diagnostics are needed.
 ref_ptr<CommandBuffer> WrapCommandBufferWithValidation(
-    ref_ptr<CommandBuffer> impl);
+    Allocator* allocator, ref_ptr<CommandBuffer> impl);
 
 }  // namespace hal
 }  // namespace iree

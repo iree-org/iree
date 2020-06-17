@@ -49,7 +49,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
 // Rewrites the op T to a VM call to |importOp|.
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
-template <typename T, typename Adaptor = typename T::OperandAdaptor>
+template <typename T, typename Adaptor = typename T::Adaptor>
 LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
                             TypeConverter &typeConverter,
                             ConversionPatternRewriter &rewriter) {
@@ -134,7 +134,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
 }
 
 // Utility for op to vm.call conversion.
-template <typename T, typename Adaptor = typename T::OperandAdaptor>
+template <typename T, typename Adaptor = typename T::Adaptor>
 class VMImportOpConversion : public OpConversionPattern<T> {
  public:
   VMImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,

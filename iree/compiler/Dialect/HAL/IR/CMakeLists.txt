@@ -24,10 +24,10 @@ iree_cc_library(
   TEXTUAL_HDRS
     "HALEnums.cpp.inc"
     "HALEnums.h.inc"
-    "HALOps.cpp.inc"
-    "HALOps.h.inc"
     "HALOpInterface.cpp.inc"
     "HALOpInterface.h.inc"
+    "HALOps.cpp.inc"
+    "HALOps.h.inc"
     "HALStructs.cpp.inc"
     "HALStructs.h.inc"
   SRCS
