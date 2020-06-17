@@ -143,7 +143,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRAffineOps
       MLIRAffineTransforms
       MLIRGPU
-      MLIRGPUtoSPIRVTransforms
+      MLIRGPUToSPIRVTransforms
       MLIRIR
       MLIRLLVMIR
       MLIRLinalgOps
