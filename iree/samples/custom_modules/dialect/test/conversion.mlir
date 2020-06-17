@@ -16,7 +16,7 @@
 // Depending on whether any manual conversion is performed this may get complex,
 // such as when versioning imports or performing optimizations.
 
-// RUN: custom-opt %s -iree-convert-flow-to-hal -iree-vm-conversion -split-input-file | IreeFileCheck %s
+// RUN: custom-opt %s -iree-convert-flow-to-hal -iree-shape-expand-function-ranked-shape-dims -iree-vm-conversion -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @tensorToMessage
 func @tensorToMessage(%tensor : tensor<2x4xf32>) {
@@ -45,6 +45,22 @@ func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : ind
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %shape = shapex.make_ranked_shape %arg1, %arg2 : (index, index) -> !shapex.ranked_shape<[?, ?]>
   %shaped_tensor = shapex.tie_shape %arg0, %shape : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
+  %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message
+  %c1 = constant 1 : i32
+  // CHECK: vm.call @custom.print([[MSG]]
+  "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @dynamicTensorToMessage2
+func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?, ?]> {iree.reflection = {}}) {
+  // CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
+  // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(%arg0,
+  // CHECK-SAME: [%arg1, %arg2], [[TYPE]])
+  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
+  %shaped_tensor = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
   %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message
   %c1 = constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
