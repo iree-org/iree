@@ -1836,6 +1836,11 @@ def VM_FailOp : VM_Op<"fail", [
     have a latency between when they are emitted and when the application can
     observe the failure. It's also possible that other work that is in-flight
     or pending when the failure occurs will complete.
+
+    ```
+    %statusCode = vm.const.i32 9 : i32
+    vm.fail %statusCode, "oh no!"
+    ```
   }];
 
   let arguments = (ins
@@ -1865,6 +1870,143 @@ def VM_FailOp : VM_Op<"fail", [
   ];
 
   let verifier = [{ return verifyFailOp(*this); }];
+}
+
+def VM_CondFailOp : VM_Op<"cond_fail", [
+    HasParent<"IREE::VM::FuncOp">,
+    VM_PseudoOp,
+  ]> {
+  let summary = [{raises a global failure if the condition is true}];
+  let description = [{
+    When the condition is true this signals a runtime failure that causes the
+    entire active invocation - and possibly *all* in-flight and pending
+    invocations - to fail with the given status. The status will be propagated
+    back via the available runtime error handling mechanisms such as semaphores
+    or synchronous invocation results.
+
+    As the IREE execution model is deeply pipelined it's possible that failures
+    have a latency between when they are emitted and when the application can
+    observe the failure. It's also possible that other work that is in-flight
+    or pending when the failure occurs will complete.
+
+    This is implemented as a pseudo-op that transforms into a vm.fail operation
+    guarded by the condition.
+
+    ```
+    %nz = vm.cmp.nz.i32 %value : i32
+    %statusCode = vm.const.i32 9 : i32
+    vm.cond_fail %nz, %statusCode, "expected non-zero"
+    ```
+  }];
+
+  let arguments = (ins
+    VM_CondValue:$condition,
+    IREE_Status:$status,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $condition `,` $status (`,` $message^)? attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value condition, Value status, StringRef message = ""
+    }], [{
+      build(
+          builder, result, condition, status,
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+  ];
+
+  let verifier = [{ return verifyFailOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+class VM_CheckOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      VM_PseudoOp,
+    ])> {
+  let summary = [{raises a global failure if the condition is true}];
+  let description = [{
+    When the condition is true this signals a runtime failure that causes the
+    entire active invocation - and possibly *all* in-flight and pending
+    invocations - to fail. The status will be propagated back via the available
+    runtime error handling mechanisms such as semaphores or synchronous
+    invocation results.
+
+    This is implemented as a pseudo-op that transforms into a vm.cond_fail
+    operation.
+
+    ```
+    vm.check.eq %a, %b, "a == b" : i32
+    vm.check.nz %ref, "!null" : !vm.ref<?>
+    ```
+  }];
+}
+
+class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_CheckOp<mnemonic, traits> {
+  let arguments = (ins
+    VM_AnyType:$value,
+    OptionalAttr<StrAttr>:$message
+  );
+
+
+  let assemblyFormat = [{
+    $value (`,` $message^)? attr-dict `:` type($value)
+  }];
+
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value value, StringRef message = ""
+    }], [{
+      build(
+          builder, result, value,
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
+class VM_BinaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_CheckOp<mnemonic, !listconcat(traits, [
+      AllTypesMatch<["lhs", "rhs"]>,
+    ])> {
+  let arguments = (ins
+    VM_AnyType:$lhs,
+    VM_AnyType:$rhs,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
+  }];
+
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value lhs, Value rhs, StringRef message = ""
+    }], [{
+      build(
+          builder, result, lhs, rhs,
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
+def VM_CheckEQOp : VM_BinaryCheckOp<"check.eq", [Commutative]> {
+  let hasCanonicalizer = 1;
+}
+
+def VM_CheckNEOp : VM_BinaryCheckOp<"check.ne", [Commutative]> {
+  let hasCanonicalizer = 1;
+}
+
+def VM_CheckNZOp : VM_UnaryCheckOp<"check.nz"> {
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2008,6 +2150,7 @@ def VM_BreakOp : VM_Op<"break", [
   let hasCanonicalizer = 1;
 }
 
+// TODO(benvanik): remove and turn into a compare + branch + vm.break.
 def VM_CondBreakOp : VM_Op<"cond_break", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,

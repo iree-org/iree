@@ -1151,6 +1151,94 @@ void CallVariadicOp::getCanonicalizationPatterns(
       context);
 }
 
+namespace {
+
+/// Rewrites a cond_fail op to a cond_branch to a fail op.
+struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
+  using OpRewritePattern<CondFailOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CondFailOp op,
+                                PatternRewriter &rewriter) const override {
+    auto *block = rewriter.getInsertionBlock();
+
+    // Create the block with the vm.fail in it.
+    // This is what we will branch to if the condition is true at runtime.
+    auto *failBlock = rewriter.createBlock(block, {op.status().getType()});
+    block->moveBefore(failBlock);
+    rewriter.setInsertionPointToStart(failBlock);
+    rewriter.create<FailOp>(
+        op.getLoc(), failBlock->getArgument(0),
+        op.message().hasValue() ? op.message().getValue() : "");
+
+    // Replace the original cond_fail with our cond_branch, splitting the block
+    // and continuing if the condition is not taken.
+    auto *continueBlock = rewriter.splitBlock(
+        block, op.getOperation()->getNextNode()->getIterator());
+    rewriter.setInsertionPointToEnd(block);
+    rewriter.replaceOpWithNewOp<CondBranchOp>(op, op.condition(), failBlock,
+                                              ValueRange{op.status()},
+                                              continueBlock, ValueRange{});
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void CondFailOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<RewriteCondFailToBranchFail>(context);
+}
+
+namespace {
+
+/// Rewrites a check op to a cmp and a cond_fail.
+template <typename CheckOp, typename CmpI32Op, typename CmpRefOp>
+struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
+  using OpRewritePattern<CheckOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CheckOp op,
+                                PatternRewriter &rewriter) const override {
+    Type condType = rewriter.getI32Type();
+    Value condValue;
+    if (op.getOperation()->getOperand(0).getType().template isa<RefType>()) {
+      condValue = rewriter.template createOrFold<CmpRefOp>(
+          op.getLoc(), ArrayRef<Type>{condType},
+          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+    } else {
+      condValue = rewriter.template createOrFold<CmpI32Op>(
+          op.getLoc(), ArrayRef<Type>{condType},
+          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+    }
+    condValue = rewriter.createOrFold<XorI32Op>(
+        op.getLoc(), condType, condValue,
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
+    auto statusCode = rewriter.createOrFold<ConstI32Op>(
+        op.getLoc(), /*IREE_STATUS_FAILED_PRECONDITION=*/9);
+    rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(op, condValue, statusCode,
+                                                      op.messageAttr());
+    return success();
+  }
+};
+
+}  // namespace
+
+void CheckEQOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<RewriteCheckToCondFail<CheckEQOp, CmpEQI32Op, CmpEQRefOp>>(
+      context);
+}
+
+void CheckNEOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<RewriteCheckToCondFail<CheckNEOp, CmpNEI32Op, CmpNERefOp>>(
+      context);
+}
+
+void CheckNZOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZRefOp>>(
+      context);
+}
+
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//

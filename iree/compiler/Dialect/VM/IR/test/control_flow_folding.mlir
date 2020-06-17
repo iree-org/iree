@@ -78,3 +78,65 @@ vm.module @cond_br_folds {
   vm.import @nonvariadic_func(%arg0 : i32) -> i32
   vm.import @variadic_func(%arg0 : i32, %arg1 : i32 ...) -> i32
 }
+
+// -----
+
+// CHECK-LABEL: @cond_fail_folds
+vm.module @cond_fail_folds {
+  // CHECK-LABEL: @cond_fail_to_cond_br_fail
+  // CHECK-SAME: %[[COND:.+]]:
+  vm.func @cond_fail_to_cond_br_fail(%cond : i32) {
+    // CHECK-DAG: %[[CODE2:.+]] = constant 2
+    %code2 = constant 2 : i32
+    // CHECK: vm.cond_br %[[COND]], ^bb2(%[[CODE2]] : i32), ^bb1
+    vm.cond_fail %cond, %code2, "message"
+    // CHECK-NEXT: ^bb1:
+    // CHECK-NEXT: vm.return
+    vm.return
+    // CHECK-NEXT: ^bb2(%[[STATUS:.+]]: i32):
+    // CHECK-NEXT: vm.fail %[[STATUS]], "message"
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @check_folds
+vm.module @check_folds {
+  // CHECK-LABEL: @check_eq_i32
+  vm.func @check_eq_i32(%arg0 : i32, %arg1 : i32) {
+    // CHECK: %[[COND:.+]] = vm.cmp.ne.i32 %arg0, %arg1 : i32
+    // CHECK-NEXT: vm.cond_br %[[COND]], ^bb2({{.+}}), ^bb1
+    vm.check.eq %arg0, %arg1, "expected eq" : i32
+    // CHECK-NEXT: ^bb1:
+    // CHECK-NEXT: vm.return
+    vm.return
+    // CHECK-NEXT: ^bb2(%[[STATUS:.+]]: i32):
+    // CHECK-NEXT: vm.fail %[[STATUS]], "expected eq"
+  }
+
+  // CHECK-LABEL: @check_nz_i32
+  vm.func @check_nz_i32(%arg0 : i32) {
+    // CHECK: %[[COND:.+]] = vm.cmp.nz.i32 %arg0 : i32
+    // CHECK: %[[INV_COND:.+]] = vm.xor.i32 %[[COND]], %c1 : i32
+    // CHECK-NEXT: vm.cond_br %[[INV_COND]], ^bb2({{.+}}), ^bb1
+    vm.check.nz %arg0, "expected nz" : i32
+    // CHECK-NEXT: ^bb1:
+    // CHECK-NEXT: vm.return
+    vm.return
+    // CHECK-NEXT: ^bb2(%[[STATUS:.+]]: i32):
+    // CHECK-NEXT: vm.fail %[[STATUS]], "expected nz"
+  }
+
+  // CHECK-LABEL: @check_nz_ref
+  vm.func @check_nz_ref(%arg0 : !vm.ref<?>) {
+    // CHECK: %[[COND:.+]] = vm.cmp.nz.ref %arg0 : !vm.ref<?>
+    // CHECK: %[[INV_COND:.+]] = vm.xor.i32 %[[COND]], %c1 : i32
+    // CHECK-NEXT: vm.cond_br %[[INV_COND]], ^bb2({{.+}}), ^bb1
+    vm.check.nz %arg0, "expected nz" : !vm.ref<?>
+    // CHECK-NEXT: ^bb1:
+    // CHECK-NEXT: vm.return
+    vm.return
+    // CHECK-NEXT: ^bb2(%[[STATUS:.+]]: i32):
+    // CHECK-NEXT: vm.fail %[[STATUS]], "expected nz"
+  }
+}
