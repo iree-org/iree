@@ -69,7 +69,7 @@ class TimePointFence final : public RefObject<TimePointFence>,
   VkResult GetStatus();
 
   // Returns the pool from which this fence comes.
-  TimePointFencePool* getPool() const { return pool_; }
+  TimePointFencePool* pool() const { return pool_; }
 
  private:
   // The pool from which this fence comes.
@@ -113,7 +113,7 @@ struct TimePointSemaphore final : public IntrusiveLinkBase<void> {
   ref_ptr<TimePointFence> wait_fence = nullptr;
 };
 
-// A timeline semaphore enumlated via `VkFence`s and binary `VkSemaphore`s.
+// A timeline semaphore emulated via `VkFence`s and binary `VkSemaphore`s.
 //
 // Vulkan provides several explicit synchronization primitives: fences,
 // (binary/timeline) semaphores, events, pipeline barriers, and render passes.
@@ -139,7 +139,7 @@ struct TimePointSemaphore final : public IntrusiveLinkBase<void> {
 //   not need to be reset.
 //
 // It's clear that timeline semaphore is more flexible than fences and binary
-// semaphores: it unfies GPU and CPU synchronization with a single primitive.
+// semaphores: it unifies GPU and CPU synchronization with a single primitive.
 // But it's not always available: it requires the VK_KHR_timeline_semaphore
 // or Vulkan 1.2. When it's not available, it can be emulated via `VkFence`s
 // and binary `VkSemaphore`s. The emulation need to provide the functionality of
@@ -181,15 +181,15 @@ struct TimePointSemaphore final : public IntrusiveLinkBase<void> {
 // ### GPU -> CPU (via `vkWaitSemaphores`)
 //
 // Without timeline semaphore, we need to use fences to let CPU wait on GPU
-// progress. So this direction be emulated by `vkWaitFences`. It means we need
-// to associate a `VkFence` with the given waited timeline semaphores. Because
-// we don't know whether a particular `vkQueueSubmit` with timeline semaphores
-// will be later waited on by CPUi beforehand, we need to bundle each of them
-// with a `VkFence` just in case they will be waited on later.
+// progress. So this direction can be emulated by `vkWaitFences`. It means we
+// need to associate a `VkFence` with the given waited timeline semaphores.
+// Because we don't know whether a particular `vkQueueSubmit` with timeline
+// semaphores will be later waited on by CPU beforehand, we need to bundle each
+// of them with a `VkFence` just in case they will be waited on later.
 //
 // ### CPU -> GPU (via `vkSignalSemaphore`)
 //
-// This direction can he handled by bumping the signaled timeline value and
+// This direction can be handled by bumping the signaled timeline value and
 // scan the self-managed queue to submit more work to GPU if possible.
 //
 // ### CPU -> CPU (via `vkWaitSemaphores`)
@@ -229,7 +229,7 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   void Fail(Status status) override;
 
   // Gets a binary semaphore for waiting on the timeline to advance to the given
-  // |value|. The semaphore returned won't be waited by anyone elese. Returns
+  // |value|. The semaphore returned won't be waited by anyone else. Returns
   // VK_NULL_HANDLE if no available semaphores for the given |value|.
   // |wait_fence| is the fence associated with the queue submission that waiting
   // on this semaphore.
@@ -241,13 +241,13 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   Status CancelWaitSemaphore(VkSemaphore semaphore);
 
   // Gets a binary semaphore for signaling the timeline to the given |value|.
-  // |value| must be smaller than the current timeline value. |singal_fence| is
+  // |value| must be smaller than the current timeline value. |signal_fence| is
   // the fence associated with the queue submission that signals this semaphore.
   StatusOr<VkSemaphore> GetSignalSemaphore(
       uint64_t value, const ref_ptr<TimePointFence>& signal_fence);
 
  private:
-  /// Tries to advance the timeline to the given |to_uppoer_value|.
+  // Tries to advance the timeline to the given |to_upper_value|.
   Status TryToAdvanceTimeline(uint64_t to_upper_value)
       ABSL_LOCKS_EXCLUDED(mutex_);
 
@@ -276,7 +276,7 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   // * Signaled and not ever waited state: value <= signaled value, singal/wait
   //   fence = nullptr. This is the state of the semaphore when we know it's
   //   already signaled on GPU and there is no waiters for it.
-  // * Signaled and waiting state: value <= signaled value, singal fence =
+  // * Signaled and waiting state: value <= signaled value, signal fence =
   //   nullptr, wait fence = <some-fence>. This is the state of the semaphore
   //   when we know it's already signaled on GPU and there is still one queue
   //   submission on GPU is waiting for it.
@@ -334,7 +334,7 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
 };
 
 // A pool of `VkSemaphore`s that can be used by `EmulatedTimelineSemaphore` to
-// simulate indivisual timeline value signaling.
+// simulate individual timeline value signaling.
 class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
  public:
   static constexpr int kMaxInFlightSemaphoreCount = 64;

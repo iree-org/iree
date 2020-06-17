@@ -29,13 +29,13 @@ namespace vulkan {
 
 // static
 void TimePointFence::Delete(TimePointFence* ptr) {
-  ptr->getPool()->ReleaseResolved(ptr);
+  ptr->pool()->ReleaseResolved(ptr);
 }
 
 VkResult TimePointFence::GetStatus() {
   absl::MutexLock lock(&status_mutex_);
   if (status_ == VK_NOT_READY) {
-    const auto& device = getPool()->logical_device();
+    const auto& device = pool()->logical_device();
     status_ = device->syms()->vkGetFenceStatus(*device, fence_);
   }
   return status_;
@@ -164,8 +164,9 @@ Status EmulatedTimelineSemaphore::CancelWaitSemaphore(VkSemaphore semaphore) {
   for (TimePointSemaphore* point : outstanding_semaphores_) {
     if (point->semaphore != semaphore) continue;
 
-    if (!point->wait_fence)
+    if (!point->wait_fence) {
       return InternalError("Time point wasn't waited before");
+    }
     point->wait_fence = nullptr;
     return OkStatus();
   }
@@ -176,7 +177,7 @@ StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
     uint64_t value, const ref_ptr<TimePointFence>& signal_fence) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::GetSignalSemaphore");
 
-  assert(signaled_value_.load() < value);
+  DCHECK_LT(signaled_value_.load(), value);
 
   absl::MutexLock lock(&mutex_);
 
@@ -188,7 +189,7 @@ StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
   ASSIGN_OR_RETURN(TimePointSemaphore * semaphore, semaphore_pool_->Acquire());
   semaphore->value = value;
   semaphore->signal_fence = add_ref(signal_fence);
-  assert(!semaphore->wait_fence);
+  DCHECK(!semaphore->wait_fence);
   outstanding_semaphores_.insert(insertion_point, semaphore);
 
   return OkStatus();
@@ -204,8 +205,9 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
 
   // Fast path for when already signaled past the desired value or when we have
   // no outstanding semaphores.
-  if (signaled_value_ >= to_upper_value || outstanding_semaphores_.empty())
+  if (signaled_value_ >= to_upper_value || outstanding_semaphores_.empty()) {
     return OkStatus();
+  }
 
   uint64_t past_value = signaled_value_.load();
 
@@ -234,7 +236,7 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     // signaled value, then we know it was signaled previously. But there might
     // be a waiter on it on GPU.
     if (semaphore->value <= past_value) {
-      assert(!semaphore->signal_fence);
+      DCHECK(!semaphore->signal_fence);
 
       // If ther is no waiters, we can recycle this semaphore now. If there
       // exists one waiter, then query its status and recycle on success. We
@@ -252,7 +254,7 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     // This semaphore represents a value gerater than the known previously
     // signaled value. We don't know its status so we need to really query now.
 
-    assert(semaphore->signal_fence);
+    DCHECK(semaphore->signal_fence);
     VkResult signal_status = semaphore->signal_fence->GetStatus();
 
     switch (signal_status) {
@@ -309,7 +311,7 @@ TimePointFencePool::~TimePointFencePool() {
                            logical_device_->allocator());
     ++free_count;
   }
-  assert(free_count == kMaxInFlightFenceCount && "not all fences are returned");
+  DCHECK_EQ(free_count, kMaxInFlightFenceCount);
   free_fences_.clear();
 }
 
@@ -391,8 +393,7 @@ TimePointSemaphorePool::~TimePointSemaphorePool() {
 
   absl::MutexLock lock(&mutex_);
 
-  assert(free_semaphores_.size() == kMaxInFlightSemaphoreCount &&
-         "not all semaphores are returned");
+  DCHECK_EQ(free_semaphores_.size(), kMaxInFlightSemaphoreCount);
   free_semaphores_.clear();
 
   for (auto& semaphore : storage_) {
@@ -420,7 +421,7 @@ void TimePointSemaphorePool::ReleaseResolved(
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::ReleaseResolved");
 
   for (auto* semaphore : *semaphores) {
-    assert(!semaphore->signal_fence && !semaphore->wait_fence);
+    DCHECK(!semaphore->signal_fence && !semaphore->wait_fence);
     semaphore->value = UINT64_MAX;
   }
 

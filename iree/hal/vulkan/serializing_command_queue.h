@@ -37,8 +37,8 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
-// A command queue that potentially deferres and serializes command buffer
-// releasing to the GPU.
+// A command queue that potentially defers and serializes command buffer
+// submission to the GPU.
 //
 // This command queue is designed to be used together with emulated timeline
 // semaphores. Timeline semaphores can follow wait-before-signal submission
@@ -68,7 +68,7 @@ class SerializingCommandQueue final : public CommandQueue {
   // See the documentation on `iree::hal::CommandQueue`.
   Status WaitIdle(absl::Time deadline) override;
 
-  // Releases all deferred submissions are are able to submit to the GPU.
+  // Releases all deferred submissions ready to submit to the GPU.
   Status AdvanceQueueSubmission();
 
  private:
