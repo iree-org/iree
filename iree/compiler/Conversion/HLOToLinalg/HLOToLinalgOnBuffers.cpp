@@ -389,6 +389,107 @@ LogicalResult ConvOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
+// xla_hlo.concatenate conversion patterns and utility functions.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts a xla_hlo.concatenate op to an indexed_generic op. The
+/// implementation adds more dimensions to make the loops correct, because
+/// each dimension in indexing maps matches to exactly one range.
+class ConcatenateOpConversion
+    : public ConvertToLinalgBufferOp<ConcatenateOpConversion,
+                                     xla_hlo::ConcatenateOp> {
+ public:
+  using ConvertToLinalgBufferOp<
+      ConcatenateOpConversion, xla_hlo::ConcatenateOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(xla_hlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const;
+};
+}  // namespace
+
+LogicalResult ConcatenateOpConversion::apply(
+    xla_hlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
+    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
+  Location loc = op.getLoc();
+  int dim = op.dimension().getSExtValue();
+  int rank = inputBuffers[0].getType().cast<ShapedType>().getRank();
+
+  SmallVector<Attribute, 2> indexingMaps;
+  SmallVector<AffineExpr, 4> exprs;
+  exprs.resize(rank);
+  for (int i = 0, j = 0, e = rank; i < e; ++i) {
+    if (i == dim) continue;
+    exprs[i] = rewriter.getAffineDimExpr(j++);
+  }
+  int nloops = rank + inputBuffers.size();
+  for (int i = 0, e = inputBuffers.size(); i < e; ++i) {
+    exprs[dim] = rewriter.getAffineDimExpr(rank + i);
+    indexingMaps.emplace_back(AffineMapAttr::get(AffineMap::get(
+        nloops, /*symbolCount=*/0, exprs, rewriter.getContext())));
+  }
+  exprs[dim] = rewriter.getAffineDimExpr(rank - 1);
+  indexingMaps.emplace_back(AffineMapAttr::get(
+      AffineMap::get(nloops, /*symbolCount=*/0, exprs, rewriter.getContext())));
+
+  SmallVector<Type, 4> bodyArgTypes, opResultTypes;
+  // Also make the dimension to be concatenated not a parallel loop.
+  int nonParallelLoops = nloops - rank + 1;
+  SmallVector<Value, 2> linalgOpArgs(inputBuffers.begin(), inputBuffers.end());
+  linalgOpArgs.push_back(resultBuffers[0]);
+  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
+      loc, opResultTypes, linalgOpArgs,
+      rewriter.getI64IntegerAttr(inputBuffers.size()),  // args_in
+      rewriter.getI64IntegerAttr(1),                    // args_out
+      rewriter.getArrayAttr(indexingMaps),
+      getParallelAndReductionIterAttrs(rewriter, nloops, nonParallelLoops),
+      /*doc=*/nullptr, /*library_call=*/nullptr);
+
+  // Add a block to the region.
+  auto *region = &linalgOp.region();
+  auto *block = rewriter.createBlock(region, region->end());
+  bodyArgTypes.append(nloops, rewriter.getIndexType());
+  auto resultType = op.getResult().getType().dyn_cast<ShapedType>();
+  bodyArgTypes.append(linalgOpArgs.size(), resultType.getElementType());
+  block->addArguments(bodyArgTypes);
+  rewriter.setInsertionPointToEnd(block);
+
+  Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
+  Value dimArg = block->getArgument(rank - 1);
+  Value res = block->getArgument(nloops);
+  // Update the output buffer only when it iterate on the correct index of the
+  // operand. For example, if we are updating the first element of the
+  // concatenating dimension, the index of the first operand must be 0. If it's
+  // 1 or other, we need to keep the element the same.
+  Value canUpdate =
+      rewriter.create<ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
+  for (int i = 0, e = inputBuffers.size(); i < e; ++i) {
+    Value t1 = rewriter.create<SubIOp>(loc, dimArg, accBound);
+    // The loop indice of operands start from the `rank`-th argument of the
+    // block.
+    Value t2 = rewriter.create<CmpIOp>(loc, CmpIPredicate::eq, t1,
+                                       block->getArgument(rank + i));
+    canUpdate = rewriter.create<OrOp>(loc, canUpdate, t2);
+
+    Value dimSize = rewriter.create<DimOp>(loc, inputBuffers[i], dim);
+    Value lbCond =
+        rewriter.create<CmpIOp>(loc, CmpIPredicate::sge, dimArg, accBound);
+    accBound = rewriter.create<AddIOp>(loc, accBound, dimSize);
+    Value ubCond =
+        rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, dimArg, accBound);
+    Value cond = rewriter.create<AndOp>(loc, lbCond, ubCond);
+    // The first `nloops` arguments are indices.
+    res = rewriter.create<SelectOp>(loc, cond, block->getArgument(nloops + i),
+                                    res);
+  }
+  res = rewriter.create<SelectOp>(
+      loc, canUpdate, res, block->getArgument(nloops + inputBuffers.size()));
+  rewriter.create<linalg::YieldOp>(loc, res);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // xla_hlo.pad conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
@@ -1239,7 +1340,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
   patterns
-      .insert<ConvOpConversion,
+      .insert<ConvOpConversion, ConcatenateOpConversion,
               DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
               LinalgOpOnTensorConversion<linalg::GenericOp>,
               LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
