@@ -160,14 +160,14 @@ cc_library(
 
 cc_binary(
     name = "dynamic_library_test_library.so",
-    testonly = 1,
+    testonly = True,
     srcs = ["dynamic_library_test_library.cc"],
-    linkshared = 1,
+    linkshared = True,
 )
 
 cc_embed_data(
     name = "dynamic_library_test_library",
-    testonly = 1,
+    testonly = True,
     srcs = [":dynamic_library_test_library.so"],
     cc_file_output = "dynamic_library_test_library_embed.cc",
     cpp_namespace = "iree",
