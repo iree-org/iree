@@ -115,7 +115,7 @@ NAVI_ORDER_DICT = {
     'getting_started_windows_bazel.md': 5,
     'getting_started_windows_vulkan.md': 6,
     'getting_started_macos_cmake.md': 7,
-    'getting_started_macos_bazel.md': 8
+    'getting_started_macos_bazel.md': 8,
     'getting_started_python.md': 9,
     'generic_vulkan_env_setup.md': 10,
 }
