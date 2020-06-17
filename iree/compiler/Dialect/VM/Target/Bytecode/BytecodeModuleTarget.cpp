@@ -19,6 +19,7 @@
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -141,6 +142,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   OwningRewritePatternList patterns;
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
+  target.addLegalOp<IREE::DoNotOptimizeOp>();
 
   if (targetOptions.stripDebugOps) {
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
@@ -161,6 +163,8 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     modulePasses.addPass(mlir::createCSEPass());
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
+
+  modulePasses.addPass(createDropCompilerHintsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
