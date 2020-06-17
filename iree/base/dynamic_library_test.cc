@@ -31,8 +31,15 @@ static const char* kUnknownName = "library_that_does_not_exist.so";
 class DynamicLibraryTest : public ::testing::Test {
  public:
   static void SetUpTestCase() {
+    // Making files available to tests, particularly across operating systems
+    // and build tools (Bazel/CMake) is complicated. Rather than include a test
+    // dynamic library as a "testdata" file, we use cc_embed_data to package
+    // the file so it's embedded in a C++ module, then write that embedded file
+    // to a platform/test-environment specific temp file for loading.
+
     std::string base_name = "dynamic_library_test_library";
     ASSERT_OK_AND_ASSIGN(library_temp_path_, file_io::GetTempFile(base_name));
+    // System APIs for loading dynamic libraries typically require an extension.
 #if defined(IREE_PLATFORM_WINDOWS)
     library_temp_path_ += ".dll";
 #else
