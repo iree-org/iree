@@ -62,7 +62,7 @@ class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
   LogicalResult matchAndRewrite(
       Shape::TieShapeOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, op.operand());
+    rewriter.replaceOp(op, operands[0]);
     return success();
   }
 };
