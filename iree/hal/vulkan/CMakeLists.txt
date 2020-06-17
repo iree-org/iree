@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(antiagainst): We should probably always compiling the emulation in and
+# probe at runtime to enable if the device does not support native timeline
+# semaphore.
 option(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE
        "Emulates timeline semaphore with binary semaphores and fences" OFF)
 
