@@ -30,8 +30,8 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/timepoint_util.h"
 
 namespace iree {
 namespace hal {

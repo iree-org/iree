@@ -221,6 +221,9 @@ iree_cc_library(
   DEPS
     ::handle_util
     ::status_util
+    ::timepoint_util
+    absl::synchronization
+    absl::time
     iree::base::tracing
     iree::hal::semaphore
     Vulkan::Headers
@@ -425,9 +428,9 @@ iree_cc_library(
     iree::hal::command_queue
     iree::hal::vulkan::direct_command_buffer
     iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::emulated_timeline_semaphore
     iree::hal::vulkan::handle_util
     iree::hal::vulkan::status_util
+    iree::hal::vulkan::timepoint_util
     Vulkan::Headers
   PUBLIC
 )
@@ -443,6 +446,25 @@ iree_cc_library(
     "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::status
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    timepoint_util
+  HDRS
+    "timepoint_util.h"
+  SRCS
+    "timepoint_util.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
+  DEPS
+    ::handle_util
+    ::status_util
+    absl::synchronization
+    absl::time
+    iree::base::tracing
     Vulkan::Headers
   PUBLIC
 )
