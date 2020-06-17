@@ -81,11 +81,7 @@ iree_check_single_backend_test_suite(
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
-
-        # TODO(#1698): Enable after xla_hlo.slice is lowered to linalg and can
-        # be handled effectively.
-        # "slice.mlir",
-        #
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "tanh.mlir",
@@ -130,6 +126,7 @@ iree_check_single_backend_test_suite(
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "torch_index_select.mlir",

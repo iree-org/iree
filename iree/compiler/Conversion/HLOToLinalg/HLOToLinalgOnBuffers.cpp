@@ -618,6 +618,49 @@ LogicalResult PadOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
+// xla_hlo.slice conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts xla_hlo.slice operation to linalg.subview + linalg.copy
+struct SliceOpConversion
+    : public ConvertToLinalgBufferOp<SliceOpConversion, xla_hlo::SliceOp> {
+  using ConvertToLinalgBufferOp<SliceOpConversion,
+                                xla_hlo::SliceOp>::ConvertToLinalgBufferOp;
+
+  LogicalResult apply(xla_hlo::SliceOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const;
+};
+}  // namespace
+
+LogicalResult SliceOpConversion::apply(
+    xla_hlo::SliceOp op, ArrayRef<Value> inputBuffers,
+    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
+  auto loc = op.getLoc();
+  auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
+  if (!argType || !argType.hasRank())
+    return op.emitError("expected known-rank args");
+
+  SmallVector<Value, 3> offsets, sizes, strides;
+  for (int i = 0, e = argType.getRank(); i < e; ++i) {
+    Value startIndex = rewriter.create<ConstantIndexOp>(
+        loc, op.start_indices().getValue<int64_t>(i));
+    offsets.push_back(startIndex);
+    Value size = rewriter.create<DimOp>(loc, resultBuffers[0], i);
+    sizes.push_back(size);
+    Value stride = rewriter.create<ConstantIndexOp>(
+        loc, op.strides().getValue<int64_t>(i));
+    strides.push_back(stride);
+  }
+  auto subViewOp =
+      rewriter.create<SubViewOp>(loc, inputBuffers[0], offsets, sizes, strides);
+  rewriter.create<linalg::CopyOp>(loc, subViewOp, resultBuffers[0]);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // xla_hlo.torch_index_select conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -1339,14 +1382,14 @@ struct ConvertHLOToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     TensorToBufferMap const &resultTensorToBufferMap) {
-  patterns
-      .insert<ConvOpConversion, ConcatenateOpConversion,
-              DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
-              LinalgOpOnTensorConversion<linalg::GenericOp>,
-              LinalgOpOnTensorConversion<linalg::IndexedGenericOp>,
-              PadOpConversion, ReduceOpConversion, ReduceWindowOpConversion,
-              TensorReshapeOpConversion, TorchIndexSelectOpConversion>(
-          context, resultTensorToBufferMap);
+  patterns.insert<
+      ConvOpConversion, ConcatenateOpConversion,
+      DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
+      LinalgOpOnTensorConversion<linalg::GenericOp>,
+      LinalgOpOnTensorConversion<linalg::IndexedGenericOp>, PadOpConversion,
+      ReduceOpConversion, ReduceWindowOpConversion, SliceOpConversion,
+      TensorReshapeOpConversion, TorchIndexSelectOpConversion>(
+      context, resultTensorToBufferMap);
   // Reduce region operation conversions.
   patterns.insert<ReduceRegionXLAOpConversion<xla_hlo::AddOp>,
                   ReduceRegionXLAOpConversion<xla_hlo::MinOp>,
