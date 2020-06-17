@@ -37,7 +37,7 @@
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 #include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #else
@@ -170,9 +170,9 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     const DeviceInfo& device_info,
     const ref_ptr<VkDeviceHandle>& logical_device,
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     const ref_ptr<TimePointFencePool>& fence_pool,
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     const ref_ptr<DynamicSymbols>& syms) {
   absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues;
 
@@ -184,7 +184,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     syms->vkGetDeviceQueue(*logical_device,
                            compute_queue_set.queue_family_index, i, &queue);
     std::string queue_name = absl::StrCat(device_info.name(), ":d", i);
-#if IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     command_queues.push_back(absl::make_unique<SerializingCommandQueue>(
         std::move(queue_name),
         CommandCategory::kDispatch | CommandCategory::kTransfer, logical_device,
@@ -194,7 +194,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
         std::move(queue_name),
         CommandCategory::kDispatch | CommandCategory::kTransfer, logical_device,
         queue));
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   }
 
   uint64_t transfer_queue_count = CountOnes64(transfer_queue_set.queue_indices);
@@ -205,7 +205,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     syms->vkGetDeviceQueue(*logical_device,
                            transfer_queue_set.queue_family_index, i, &queue);
     std::string queue_name = absl::StrCat(device_info.name(), ":t", i);
-#if IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     command_queues.push_back(absl::make_unique<SerializingCommandQueue>(
         std::move(queue_name), CommandCategory::kTransfer, logical_device,
         fence_pool, queue));
@@ -213,7 +213,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     command_queues.push_back(absl::make_unique<DirectCommandQueue>(
         std::move(queue_name), CommandCategory::kTransfer, logical_device,
         queue));
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   }
 
   return command_queues;
@@ -377,7 +377,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     transfer_queue_set.queue_indices |= 1 << (i + base_queue_index);
   }
 
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   ASSIGN_OR_RETURN(auto semaphore_pool,
                    TimePointSemaphorePool::Create(add_ref(logical_device)));
   ASSIGN_OR_RETURN(auto fence_pool,
@@ -395,16 +395,16 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
 #else
   auto command_queues = CreateCommandQueues(
       device_info, logical_device, compute_queue_set, transfer_queue_set, syms);
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 
   return assign_ref(new VulkanDevice(
       std::move(driver), device_info, physical_device,
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
       std::move(transfer_command_pool),
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       std::move(semaphore_pool), std::move(fence_pool),
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       debug_capture_manager));
 }
 
@@ -465,7 +465,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
                          device_handle, transfer_queue_set.queue_family_index));
   }
 
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   ASSIGN_OR_RETURN(auto semaphore_pool,
                    TimePointSemaphorePool::Create(add_ref(device_handle)));
   ASSIGN_OR_RETURN(auto fence_pool,
@@ -482,15 +482,15 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
 #else
   auto command_queues = CreateCommandQueues(
       device_info, device_handle, compute_queue_set, transfer_queue_set, syms);
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 
   return assign_ref(new VulkanDevice(
       std::move(driver), device_info, physical_device, std::move(device_handle),
       std::move(allocator), std::move(command_queues),
       std::move(dispatch_command_pool), std::move(transfer_command_pool),
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       std::move(semaphore_pool), std::move(fence_pool),
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       /*debug_capture_manager=*/nullptr));
 }
 
@@ -501,10 +501,10 @@ VulkanDevice::VulkanDevice(
     absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
     ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
     ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     ref_ptr<TimePointSemaphorePool> semaphore_pool,
     ref_ptr<TimePointFencePool> fence_pool,
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     DebugCaptureManager* debug_capture_manager)
     : Device(device_info),
       driver_(std::move(driver)),
@@ -516,10 +516,10 @@ VulkanDevice::VulkanDevice(
           make_ref<DescriptorPoolCache>(add_ref(logical_device_))),
       dispatch_command_pool_(std::move(dispatch_command_pool)),
       transfer_command_pool_(std::move(transfer_command_pool)),
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       semaphore_pool_(std::move(semaphore_pool)),
       fence_pool_(std::move(fence_pool)),
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       debug_capture_manager_(debug_capture_manager) {
   // Populate the queue lists based on queue capabilities.
   for (auto& command_queue : command_queues_) {
@@ -721,13 +721,13 @@ StatusOr<ref_ptr<Event>> VulkanDevice::CreateEvent() {
 StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
     uint64_t initial_value) {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateSemaphore");
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   return EmulatedTimelineSemaphore::Create(
       add_ref(logical_device_), add_ref(semaphore_pool_), initial_value);
 #else
   return NativeTimelineSemaphore::Create(add_ref(logical_device_),
                                          initial_value);
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 }
 
 Status VulkanDevice::WaitAllSemaphores(
@@ -748,7 +748,7 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
                                     VkSemaphoreWaitFlags wait_flags) {
   IREE_TRACE_SCOPE0("VulkanDevice::WaitSemaphores");
 
-#ifdef IREE_EMULATE_TIMELINE_SEMAPHORE
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 
   // TODO(antiagainst): We actually should get the fences associated with the
   // emulated timeline semaphores so that we can wait them in a bunch. This
@@ -808,7 +808,7 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
 
   return OkStatus();
 
-#endif  // IREE_EMULATE_TIMELINE_SEMAPHORE
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 }
 
 Status VulkanDevice::WaitIdle(absl::Time deadline) {

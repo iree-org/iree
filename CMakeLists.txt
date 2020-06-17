@@ -129,17 +129,6 @@ list(APPEND CMAKE_MODULE_PATH
 )
 
 #-------------------------------------------------------------------------------
-# Backend functionality configuration
-#-------------------------------------------------------------------------------
-
-option(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE
-       "Emulates timeline semaphore with binary semaphores and fences" OFF)
-
-if(NOT IREE_HAL_DRIVER_VULKAN)
-  set(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE OFF CACHE BOOL "" FORCE)
-endif()
-
-#-------------------------------------------------------------------------------
 # IREE utility definitions
 #-------------------------------------------------------------------------------
 

@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+option(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE
+       "Emulates timeline semaphore with binary semaphores and fences" OFF)
+
+if(NOT IREE_HAL_DRIVER_VULKAN)
+  set(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE OFF CACHE BOOL "" FORCE)
+endif()
+
+if(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE)
+  set(IREE_EMULATE_TIMELINE_SEMAPHORE 1)
+else()
+  set(IREE_EMULATE_TIMELINE_SEMAPHORE 0)
+endif()
+
 set(VMA_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
 )
-
-if(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE)
-  add_definitions(-DIREE_EMULATE_TIMELINE_SEMAPHORE)
-endif()
 
 iree_cc_library(
   NAME
@@ -480,6 +489,7 @@ iree_cc_library(
   SRCS
     "vulkan_device.cc"
   COPTS
+    "-DIREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES=${IREE_EMULATE_TIMELINE_SEMAPHORE}"
     "-DVK_NO_PROTOTYPES"
   DEPS
     ::descriptor_pool_cache
@@ -549,6 +559,7 @@ iree_cc_library(
   SRCS
     "vulkan_driver_module.cc"
   COPTS
+    "-DIREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES=${IREE_EMULATE_TIMELINE_SEMAPHORE}"
     "-DVK_NO_PROTOTYPES"
   DEPS
     absl::flags
