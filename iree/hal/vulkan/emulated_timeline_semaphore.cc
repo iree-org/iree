@@ -165,19 +165,24 @@ Status EmulatedTimelineSemaphore::CancelWaitSemaphore(VkSemaphore semaphore) {
     if (point->semaphore != semaphore) continue;
 
     if (!point->wait_fence) {
-      return InternalError("Time point wasn't waited before");
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Time point wasn't waited before";
     }
     point->wait_fence = nullptr;
     return OkStatus();
   }
-  return InvalidArgumentError("No time point for the given semaphore");
+  return InvalidArgumentErrorBuilder(IREE_LOC)
+         << "No time point for the given semaphore";
 }
 
 StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
     uint64_t value, const ref_ptr<TimePointFence>& signal_fence) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::GetSignalSemaphore");
 
-  DCHECK_LT(signaled_value_.load(), value);
+  if (signaled_value_.load() >= value) {
+    return FailedPreconditionErrorBuilder(IREE_LOC)
+           << "Timeline semaphore already signaled past " << value;
+  }
 
   absl::MutexLock lock(&mutex_);
 
@@ -189,7 +194,10 @@ StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
   ASSIGN_OR_RETURN(TimePointSemaphore * semaphore, semaphore_pool_->Acquire());
   semaphore->value = value;
   semaphore->signal_fence = add_ref(signal_fence);
-  DCHECK(!semaphore->wait_fence);
+  if (semaphore->wait_fence) {
+    return InternalErrorBuilder(IREE_LOC)
+           << "Newly acquired time point semaphore should not have waiters";
+  }
   outstanding_semaphores_.insert(insertion_point, semaphore);
 
   return OkStatus();
@@ -236,7 +244,11 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     // signaled value, then we know it was signaled previously. But there might
     // be a waiter on it on GPU.
     if (semaphore->value <= past_value) {
-      DCHECK(!semaphore->signal_fence);
+      if (semaphore->signal_fence) {
+        return InternalErrorBuilder(IREE_LOC)
+               << "Timeline should already signaled past this time point and "
+                  "cleared the signal fence";
+      }
 
       // If ther is no waiters, we can recycle this semaphore now. If there
       // exists one waiter, then query its status and recycle on success. We
@@ -254,7 +266,11 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     // This semaphore represents a value gerater than the known previously
     // signaled value. We don't know its status so we need to really query now.
 
-    DCHECK(semaphore->signal_fence);
+    if (!semaphore->signal_fence) {
+      return InternalErrorBuilder(IREE_LOC)
+             << "The status of this time point in the timeline should still be "
+                "pending with a singal fence";
+    }
     VkResult signal_status = semaphore->signal_fence->GetStatus();
 
     switch (signal_status) {
