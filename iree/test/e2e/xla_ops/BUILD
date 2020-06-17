@@ -46,11 +46,7 @@ iree_check_single_backend_test_suite(
         "compare.mlir",
         "convolution.mlir",
         "convert.mlir",
-
-        # TODO(#1695): Enable when xla.concat can be lowered to linalg
-        # effectively.
-        # "concatenate.mlir",
-        #
+        "concatenate.mlir",
         "constant.mlir",
 
         # TODO(#1687): Enable after casting from fp to int is handled
@@ -85,11 +81,7 @@ iree_check_single_backend_test_suite(
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
-
-        # TODO(#1698): Enable after xla_hlo.slice is lowered to linalg and can
-        # be handled effectively.
-        # "slice.mlir",
-        #
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "tanh.mlir",
@@ -113,6 +105,7 @@ iree_check_single_backend_test_suite(
         "broadcast_in_dim.mlir",
         "clamp.mlir",
         "compare.mlir",
+        "concatenate.mlir",
         "constant.mlir",
         "convolution.mlir",
         "cosine.mlir",
@@ -133,6 +126,7 @@ iree_check_single_backend_test_suite(
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "torch_index_select.mlir",

@@ -34,7 +34,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
     "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
-    "@llvm-project//mlir:GPUToSPIRVTransforms": ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
