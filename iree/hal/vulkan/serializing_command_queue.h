@@ -57,15 +57,12 @@ class SerializingCommandQueue final : public CommandQueue {
                           VkQueue queue);
   ~SerializingCommandQueue() override;
 
-  // See the documentation on `iree::hal::CommandQueue`.
   const ref_ptr<DynamicSymbols>& syms() const {
     return logical_device_->syms();
   }
 
-  // See the documentation on `iree::hal::CommandQueue`.
   Status Submit(absl::Span<const SubmissionBatch> batches) override;
 
-  // See the documentation on `iree::hal::CommandQueue`.
   Status WaitIdle(absl::Time deadline) override;
 
   // Releases all deferred submissions ready to submit to the GPU.

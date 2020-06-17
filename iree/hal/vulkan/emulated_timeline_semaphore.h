@@ -216,16 +216,12 @@ class EmulatedTimelineSemaphore final : public Semaphore {
 
   ~EmulatedTimelineSemaphore() override;
 
-  // See the documentation on `iree::hal::Semaphore`.
   StatusOr<uint64_t> Query() override;
 
-  // See the documentation on `iree::hal::Semaphore`.
   Status Signal(uint64_t value) override;
 
-  // See the documentation on `iree::hal::Semaphore`.
   Status Wait(uint64_t value, absl::Time deadline) override;
 
-  // See the documentation on `iree::hal::Semaphore`.
   void Fail(Status status) override;
 
   // Gets a binary semaphore for waiting on the timeline to advance to the given
