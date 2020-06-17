@@ -137,8 +137,8 @@ module attributes {
   func @no_tile(%arg0: memref<?x?xf32>,
                 %arg1: memref<?x?xf32>,
                 %ret0: memref<?x?xf32>) {
-    linalg.matmul(%arg0, %arg1, %ret0) {__internal_linalg_transform__ = "no-tile"} :
-      memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
+    linalg.matmul %arg0, %arg1, %ret0 {__internal_linalg_transform__ = "no-tile"} :
+      (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>)
     return
   }
 }
