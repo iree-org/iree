@@ -1507,7 +1507,7 @@ def VM_BranchOp : VM_Op<"br", [
     void eraseOperand(unsigned index);
   }];
 
-  // TODO(b/143189330): canonicalize branches to targets with one incoming edge.
+  let hasCanonicalizer = 1;
 }
 
 def VM_CondBranchOp : VM_Op<"cond_br", [
