@@ -39,12 +39,12 @@ namespace VM {
 namespace {
 
 /// Creates a constant zero attribute matching the given type.
-Attribute zerosOfType(Type type) {
+Attribute zeroOfType(Type type) {
   return Builder(type.getContext()).getZeroAttr(type);
 }
 
 /// Creates a constant one attribute matching the given type.
-Attribute onesOfType(Type type) {
+Attribute oneOfType(Type type) {
   Builder builder(type.getContext());
   switch (type.getKind()) {
     case StandardTypes::BF16:
@@ -60,7 +60,7 @@ Attribute onesOfType(Type type) {
     case StandardTypes::Vector:
     case StandardTypes::RankedTensor: {
       auto vtType = type.cast<ShapedType>();
-      auto element = onesOfType(vtType.getElementType());
+      auto element = oneOfType(vtType.getElementType());
       if (!element) return {};
       return DenseElementsAttr::get(vtType, element);
     }
@@ -438,7 +438,7 @@ OpFoldResult SubI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult MulI32Op::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(rhs(), m_Zero())) {
     // x * 0 = 0 or 0 * y = 0 (commutative)
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (matchPattern(rhs(), m_One())) {
     // x * 1 = x or 1 * y = y (commutative)
     return lhs();
@@ -454,7 +454,7 @@ OpFoldResult DivI32SOp::fold(ArrayRef<Attribute> operands) {
     return {};
   } else if (matchPattern(lhs(), m_Zero())) {
     // 0 / y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (matchPattern(rhs(), m_One())) {
     // x / 1 = x
     return lhs();
@@ -470,7 +470,7 @@ OpFoldResult DivI32UOp::fold(ArrayRef<Attribute> operands) {
     return {};
   } else if (matchPattern(lhs(), m_Zero())) {
     // 0 / y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (matchPattern(rhs(), m_One())) {
     // x / 1 = x
     return lhs();
@@ -487,7 +487,7 @@ OpFoldResult RemI32SOp::fold(ArrayRef<Attribute> operands) {
   } else if (matchPattern(lhs(), m_Zero()) || matchPattern(rhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](APInt a, APInt b) { return a.srem(b); });
@@ -497,7 +497,7 @@ OpFoldResult RemI32UOp::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(lhs(), m_Zero()) || matchPattern(rhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](APInt a, APInt b) { return a.urem(b); });
@@ -513,7 +513,7 @@ OpFoldResult NotI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult AndI32Op::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(rhs(), m_Zero())) {
     // x & 0 = 0 or 0 & y = 0 (commutative)
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (lhs() == rhs()) {
     // x & x = x
     return lhs();
@@ -540,7 +540,7 @@ OpFoldResult XorI32Op::fold(ArrayRef<Attribute> operands) {
     return lhs();
   } else if (lhs() == rhs()) {
     // x ^ x = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(operands,
                                         [](APInt a, APInt b) { return a ^ b; });
@@ -553,7 +553,7 @@ OpFoldResult XorI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(operand(), m_Zero())) {
     // 0 << y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (amount() == 0) {
     // x << 0 = x
     return operand();
@@ -565,7 +565,7 @@ OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(operand(), m_Zero())) {
     // 0 >> y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (amount() == 0) {
     // x >> 0 = x
     return operand();
@@ -577,7 +577,7 @@ OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(operand(), m_Zero())) {
     // 0 >> y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (amount() == 0) {
     // x >> 0 = x
     return operand();
@@ -621,7 +621,7 @@ OpFoldResult ExtI16I32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpEQI32Op::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x == x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.eq(b); });
@@ -630,7 +630,7 @@ OpFoldResult CmpEQI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x != x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ne(b); });
@@ -639,7 +639,7 @@ OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x < x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.slt(b); });
@@ -648,7 +648,7 @@ OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x < x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ult(b); });
@@ -657,7 +657,7 @@ OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x <= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.sle(b); });
@@ -666,7 +666,7 @@ OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x <= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ule(b); });
@@ -675,7 +675,7 @@ OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x > x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.sgt(b); });
@@ -684,7 +684,7 @@ OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x > x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ugt(b); });
@@ -693,7 +693,7 @@ OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x >= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.sge(b); });
@@ -702,7 +702,7 @@ OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x >= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.uge(b); });
@@ -716,10 +716,10 @@ OpFoldResult CmpNZI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpEQRefOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x == x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   } else if (operands[0] && operands[1]) {
     // Constant null == null = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return {};
 }
@@ -757,7 +757,7 @@ void CmpEQRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 OpFoldResult CmpNERefOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x != x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return {};
 }
@@ -792,7 +792,7 @@ OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
   Attribute operandValue;
   if (matchPattern(operand(), m_Constant(&operandValue))) {
     // x == null
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return {};
 }
