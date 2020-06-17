@@ -864,11 +864,11 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncOperand<"status", 0>,
       //   VM_EncStrAttr<"message">,
       // ];
-      uint32_t status_code = OP_I8(0);
+      uint32_t status_code = OP_R_I32(0);
       iree_string_view_t str;
-      str.size = OP_I16(1);
-      str.data = (const char*)&bytecode_data[pc + 3];
-      pc += 1 + 2 + str.size;
+      str.size = OP_I16(2);
+      str.data = (const char*)&bytecode_data[pc + 2 + 2];
+      pc += 2 + 2 + str.size;
       // TODO(benvanik): attach string and stack.
       if (status_code == 0) {
         // Shouldn't happen; we expect to die here, so there's no way to no-op.
