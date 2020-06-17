@@ -376,6 +376,10 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
 // VM traits
 //===----------------------------------------------------------------------===//
 
+// Operations with this trait are pseudo-ops that must be converted to other ops
+// prior to serialization. There are no runtime equivalents of the op.
+def VM_PseudoOp : NativeOpTrait<"IREE::VM::PseudoOp">;
+
 // Operations with this trait will be stripped in builds where
 // debugging-related operations are not needed (such as release builds).
 def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;

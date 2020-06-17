@@ -40,6 +40,15 @@ class FullBarrier : public OpTrait::TraitBase<ConcreteType, FullBarrier> {
   }
 };
 
+template <typename ConcreteType>
+class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
+ public:
+  static LogicalResult verifyTrait(Operation *op) {
+    // TODO(benvanik): verify pseudo op (not serializable?).
+    return success();
+  }
+};
+
 }  // namespace VM
 }  // namespace IREE
 }  // namespace OpTrait
