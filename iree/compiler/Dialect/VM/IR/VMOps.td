@@ -1416,6 +1416,15 @@ def VM_CmpGTEI32UOp :
   let hasFolder = 1;
 }
 
+def VM_CmpNZI32Op :
+    VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32> {
+  let summary = [{integer non-zero comparison operation}];
+  let description = [{
+    Compares the given integer operand for a non-zero value.
+  }];
+  let hasFolder = 1;
+}
+
 def VM_CmpEQRefOp :
     VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef,
                           [Commutative]> {

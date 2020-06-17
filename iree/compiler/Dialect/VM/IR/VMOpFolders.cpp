@@ -708,6 +708,11 @@ OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
       operands, [&](APInt a, APInt b) { return a.uge(b); });
 }
 
+OpFoldResult CmpNZI32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return APInt(32, a.getBoolValue()); });
+}
+
 OpFoldResult CmpEQRefOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x == x = true

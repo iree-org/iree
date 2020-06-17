@@ -625,6 +625,10 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CMP_I32(CmpGTI32U, uint32_t, >);
     DISPATCH_OP_CMP_I32(CmpGTEI32S, int32_t, >=);
     DISPATCH_OP_CMP_I32(CmpGTEI32U, uint32_t, >=);
+    DISPATCH_OP(CmpNZI32, {
+      OP_R_I32(2) = (OP_R_I32(0) != 0) ? 1 : 0;
+      pc += kRegSize + kRegSize;
+    });
 
     DISPATCH_OP(CmpEQRef, {
       // let encoding = [

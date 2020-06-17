@@ -73,6 +73,16 @@ vm.module @cmp_ne_i32_folds {
     %ne = vm.cmp.ne.i32 %c1, %c1d : i32
     vm.return %ne : i32
   }
+
+  // CHECK-LABEL: @cmp_const_zero
+  vm.func @cmp_const_zero(%arg0 : i32, %arg1 : i32) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.nz.i32 %arg0 : i32
+    // CHECK-DAG: vm.cmp.nz.i32 %arg1 : i32
+    %c0 = vm.const.i32 0 : i32
+    %nz0 = vm.cmp.ne.i32 %arg0, %c0 : i32
+    %nz1 = vm.cmp.ne.i32 %c0, %arg1 : i32
+    vm.return %nz0, %nz1 : i32, i32
+  }
 }
 
 // -----
@@ -336,6 +346,29 @@ vm.module @cmp_ugte_i32_folds {
     %c2 = vm.const.i32 2 : i32
     %cmp = vm.cmp.gte.i32.u %c2, %c1 : i32
     vm.return %cmp : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cmp_nz_i32_folds
+vm.module @cmp_nz_i32_folds {
+  // CHECK-LABEL: @const_nonzero
+  vm.func @const_nonzero() -> i32 {
+    // CHECK: %c1 = vm.const.i32 1 : i32
+    // CHECK-NEXT: vm.return %c1 : i32
+    %c1 = vm.const.i32 1 : i32
+    %nz = vm.cmp.nz.i32 %c1 : i32
+    vm.return %nz : i32
+  }
+
+  // CHECK-LABEL: @const_zero
+  vm.func @const_zero() -> i32 {
+    // CHECK: %zero = vm.const.i32.zero : i32
+    // CHECK-NEXT: vm.return %zero : i32
+    %c0 = vm.const.i32 0 : i32
+    %nz = vm.cmp.nz.i32 %c0 : i32
+    vm.return %nz : i32
   }
 }
 
