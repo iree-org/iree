@@ -21,12 +21,24 @@ Contributions related to macOS support and documentation are welcome however.
 
 ## Prerequisites
 
+### Install Homebrew
+
+This guide uses [Homebrew](https://brew.sh/) to install IREE's dependencies.
+
+```shell
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+```
+
 ### Install Bazel
 
-Install Bazel version > 2.0.0 (see 
-[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion) 
-for the specific version IREE uses) by following the 
-[official docs](https://docs.bazel.build/versions/master/install-os-x.html#install-with-installer-mac-os-x).
+Install Bazel via Homebrew:
+
+```shell
+$ brew install bazel
+```
+
+Note: when you first run `bazel` to build IREE, it will prompt you to copy and
+run a shell command to select the right version.
 
 ### Install python3 numpy
 
