@@ -33,7 +33,7 @@ iree_cc_library(
     MLIRAffineOps
     MLIRAffineToStandard
     MLIRGPU
-    MLIRGPUtoSPIRVTransforms
+    MLIRGPUToSPIRVTransforms
     MLIRIR
     MLIRLinalgOps
     MLIRLinalgTransforms
