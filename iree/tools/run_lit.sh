@@ -30,7 +30,10 @@ set -e
 function find_executables() {
   set -e
   local p="$1"
-  if [ -z "$cygpath" ]; then
+  if [ "$(uname)" == "Darwin" ]; then
+    # For macOS, xtype isn't avaliable and perm can't use `/u=x,g=x,o=x` syntax.
+    find "${p}" -type l -perm +111
+  elif [ -z "$cygpath" ]; then
     # For non-windows, use the perm based executable check, which has been
     # supported by find for a very long time.
     find "${p}" -xtype f -perm /u=x,g=x,o=x -print
