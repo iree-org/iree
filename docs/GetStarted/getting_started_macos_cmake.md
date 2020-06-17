@@ -1,12 +1,12 @@
 ---
 layout: default
-permalink: GetStarted/LinuxCMake
+permalink: GetStarted/macOSCMake
 parent: Getting Started
-title: Linux with CMake
-nav_order: 1
+title: macOS with CMake
+nav_order: 7
 ---
 
-# Getting Started on Linux with CMake
+# Getting Started on macOS with CMake
 {: .no_toc }
 
 <!--
@@ -15,50 +15,46 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_windows_cmake.md and
-      getting_started_macos_bazel.md
+    * This document parallels getting_started_linux_cmake.md and
+      getting_started_windows_cmake.md
       Please keep them in sync.
 -->
 
 This guide walks through building the core compiler and runtime parts of IREE
 from source. Auxiliary components like the Python bindings and Vulkan driver are
-documented separately, as they require further setup.
+not documented for macOS at this time.
+
+IREE is not officially supported on macOS at this time. It may work, but it is
+not a part of our open source CI, and may be intermittently broken.
+Contributions related to macOS support and documentation are welcome however.
 
 ## Prerequisites
 
-### Install CMake
+### Install Homebrew
 
-IREE uses CMake version `>= 3.13`. First try installing via your distribution's
-package manager and verify the version:
+This guide uses [Homebrew](https://brew.sh/) to install IREE's dependencies.
 
 ```shell
-$ sudo apt install cmake
-$ cmake --version # >= 3.13
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
-Some package managers (like `apt`) distribute old versions of cmake. If your
-package manager installs a version `< 3.13`, then follow the installation
-instructions [here](https://cmake.org/install/) to install a newer version (e.g.
-the latest).
+### Install CMake
 
-> Tip
-> {: .label .label-green }
-> Your editor of choice likely has plugins for CMake,
-> such as the Visual Studio Code
-> [CMake Tools](https://github.com/microsoft/vscode-cmake-tools) extension.
+IREE uses [CMake](https://cmake.org/) version `>= 3.13`. Brew ships the latest
+release.
+
+```shell
+$ brew install cmake
+$ cmake --version  # >= 3.13
+```
 
 ### Install Ninja
 
 [Ninja](https://ninja-build.org/) is a fast build system that you can use as a
-CMake generator. Follow Ninja's
-[installing documentation](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages).
-
-### Install a Compiler
-
-We recommend Clang. GCC is not fully supported.
+CMake generator.
 
 ```shell
-$ sudo apt install clang
+$ brew install ninja
 ```
 
 ## Clone and Build
@@ -83,8 +79,11 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
+$ cmake -G Ninja -B build/ .
 ```
+
+Note: this should use `Clang` by default on macOS. `GCC` is not fully supported
+by IREE.
 
 > Tip
 > {: .label .label-green }
@@ -121,8 +120,9 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
 ### Further Reading
 
 *   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developer_overview.md)
+    [Developer Overview](../developer_overview.md) <!-- TODO: Link to macOS
+    versions of these guides once they are developed.
 *   To target GPUs using Vulkan, see
     [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 *   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)
+    [Getting Started with Python](getting_started_python.md) -->

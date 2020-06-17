@@ -15,12 +15,13 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_linux_cmake.md.
+    * This document parallels getting_started_linux_cmake.md and
+      getting_started_macos_cmake.md
       Please keep them in sync.
 -->
 
 This guide walks through building the core compiler and runtime parts of IREE
-from source. Auxilary components like the Python bindings and Vulkan driver are
+from source. Auxiliary components like the Python bindings and Vulkan driver are
 documented separately, as they require further setup.
 
 ## Prerequisites
@@ -86,8 +87,8 @@ Configure:
 > Tip
 > {: .label .label-green }
 > The root
-> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt) file
-> has options for configuring which parts of the project to enable.
+> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt)
+> file has options for configuring which parts of the project to enable.
 
 Build all targets:
 

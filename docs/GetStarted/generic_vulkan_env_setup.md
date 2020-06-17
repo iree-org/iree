@@ -3,7 +3,7 @@ layout: default
 permalink: GetStarted/GenericVulkanSetup
 parent: Getting Started
 title: Generic Vulkan Setup
-nav_order: 8
+nav_order: 10
 ---
 
 # Generic Vulkan Development Environment Setup and Troubleshooting
