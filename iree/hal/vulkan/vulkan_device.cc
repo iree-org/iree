@@ -28,22 +28,18 @@
 #include "iree/hal/command_queue.h"
 #include "iree/hal/semaphore.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
+#include "iree/hal/vulkan/direct_command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/native_event.h"
+#include "iree/hal/vulkan/native_timeline_semaphore.h"
 #include "iree/hal/vulkan/pipeline_cache.h"
 #include "iree/hal/vulkan/pipeline_executable_layout.h"
+#include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_allocator.h"
-
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
-#include "iree/hal/vulkan/emulated_timeline_semaphore.h"
-#include "iree/hal/vulkan/serializing_command_queue.h"
-#else
-#include "iree/hal/vulkan/direct_command_queue.h"
-#include "iree/hal/vulkan/native_timeline_semaphore.h"
-#endif
 
 namespace iree {
 namespace hal {
@@ -170,9 +166,7 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
     const DeviceInfo& device_info,
     const ref_ptr<VkDeviceHandle>& logical_device,
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     const ref_ptr<TimePointFencePool>& fence_pool,
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     const ref_ptr<DynamicSymbols>& syms) {
   absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues;
 
@@ -393,8 +387,12 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     (*device_queues)[i] = command_queues[i].get();
   }
 #else
-  auto command_queues = CreateCommandQueues(
-      device_info, logical_device, compute_queue_set, transfer_queue_set, syms);
+  ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
+  ref_ptr<TimePointFencePool> fence_pool = nullptr;
+
+  auto command_queues =
+      CreateCommandQueues(device_info, logical_device, compute_queue_set,
+                          transfer_queue_set, fence_pool, syms);
 #endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 
   return assign_ref(new VulkanDevice(
@@ -402,9 +400,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
       std::move(transfer_command_pool),
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       std::move(semaphore_pool), std::move(fence_pool),
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       debug_capture_manager));
 }
 
@@ -480,17 +476,19 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
     (*device_queues)[i] = command_queues[i].get();
   }
 #else
-  auto command_queues = CreateCommandQueues(
-      device_info, device_handle, compute_queue_set, transfer_queue_set, syms);
+  ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
+  ref_ptr<TimePointFencePool> fence_pool = nullptr;
+
+  auto command_queues =
+      CreateCommandQueues(device_info, device_handle, compute_queue_set,
+                          transfer_queue_set, fence_pool, syms);
 #endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 
   return assign_ref(new VulkanDevice(
       std::move(driver), device_info, physical_device, std::move(device_handle),
       std::move(allocator), std::move(command_queues),
       std::move(dispatch_command_pool), std::move(transfer_command_pool),
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       std::move(semaphore_pool), std::move(fence_pool),
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       /*debug_capture_manager=*/nullptr));
 }
 
@@ -501,10 +499,8 @@ VulkanDevice::VulkanDevice(
     absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
     ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
     ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     ref_ptr<TimePointSemaphorePool> semaphore_pool,
     ref_ptr<TimePointFencePool> fence_pool,
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
     DebugCaptureManager* debug_capture_manager)
     : Device(device_info),
       driver_(std::move(driver)),
@@ -516,10 +512,8 @@ VulkanDevice::VulkanDevice(
           make_ref<DescriptorPoolCache>(add_ref(logical_device_))),
       dispatch_command_pool_(std::move(dispatch_command_pool)),
       transfer_command_pool_(std::move(transfer_command_pool)),
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       semaphore_pool_(std::move(semaphore_pool)),
       fence_pool_(std::move(fence_pool)),
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
       debug_capture_manager_(debug_capture_manager) {
   // Populate the queue lists based on queue capabilities.
   for (auto& command_queue : command_queues_) {
