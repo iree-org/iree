@@ -177,6 +177,20 @@ void TimePointSemaphorePool::ReleaseResolved(
   free_semaphores_.merge_from(semaphores);
 }
 
+void TimePointSemaphorePool::ReleaseUnresolved(
+    IntrusiveList<TimePointSemaphore>* semaphores) {
+  IREE_TRACE_SCOPE0("TimePointSemaphorePool::ReleaseUnresolved");
+
+  for (auto* semaphore : *semaphores) {
+    semaphore->signal_fence = nullptr;
+    semaphore->wait_fence = nullptr;
+    semaphore->value = UINT64_MAX;
+  }
+
+  absl::MutexLock lock(&mutex_);
+  free_semaphores_.merge_from(semaphores);
+}
+
 TimePointSemaphorePool::TimePointSemaphorePool(
     ref_ptr<VkDeviceHandle> logical_device)
     : logical_device_(std::move(logical_device)) {}

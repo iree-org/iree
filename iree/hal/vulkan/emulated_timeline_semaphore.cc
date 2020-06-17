@@ -30,19 +30,22 @@ namespace vulkan {
 StatusOr<ref_ptr<Semaphore>> EmulatedTimelineSemaphore::Create(
     ref_ptr<VkDeviceHandle> logical_device,
     std::function<Status(Semaphore*)> on_signal,
+    std::function<void(Semaphore*)> on_failure,
     ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Create");
   return make_ref<EmulatedTimelineSemaphore>(
-      std::move(logical_device), std::move(on_signal),
+      std::move(logical_device), std::move(on_signal), std::move(on_failure),
       std::move(semaphore_pool), initial_value);
 }
 
 EmulatedTimelineSemaphore::EmulatedTimelineSemaphore(
     ref_ptr<VkDeviceHandle> logical_device,
     std::function<Status(Semaphore*)> on_signal,
+    std::function<void(Semaphore*)> on_failure,
     ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value)
     : signaled_value_(initial_value),
       on_signal_(std::move(on_signal)),
+      on_failure_(std::move(on_failure)),
       logical_device_(std::move(logical_device)),
       semaphore_pool_(std::move(semaphore_pool)) {}
 
@@ -287,7 +290,8 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
 
   semaphore_pool_->ReleaseResolved(&resolved_semaphores);
   if (!status_.ok()) {
-    // TODO: release unresolved semaphores on failure
+    on_failure_(this);
+    semaphore_pool_->ReleaseUnresolved(&outstanding_semaphores_);
   }
 
   return status_;

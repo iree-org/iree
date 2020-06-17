@@ -708,6 +708,9 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
       [this](Semaphore* semaphore) {
         return this->OnSemaphoreSignal(semaphore);
       },
+      [this](Semaphore* semaphore) {
+        return this->OnSemaphoreFailure(semaphore);
+      },
       add_ref(semaphore_pool_), initial_value);
 #else
   return NativeTimelineSemaphore::Create(add_ref(logical_device_),
@@ -809,6 +812,17 @@ Status VulkanDevice::OnSemaphoreSignal(Semaphore* /*semaphore*/) {
 #endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 
   return OkStatus();
+}
+
+void VulkanDevice::OnSemaphoreFailure(Semaphore* /*semaphore*/) {
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
+  for (CommandQueue* queue : dispatch_queues_) {
+    static_cast<SerializingCommandQueue*>(queue)->AbortQueueSubmission();
+  }
+  for (CommandQueue* queue : transfer_queues_) {
+    static_cast<SerializingCommandQueue*>(queue)->AbortQueueSubmission();
+  }
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 }
 
 Status VulkanDevice::WaitIdle(absl::Time deadline) {

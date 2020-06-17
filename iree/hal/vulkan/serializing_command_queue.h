@@ -68,6 +68,9 @@ class SerializingCommandQueue final : public CommandQueue {
   // Releases all deferred submissions ready to submit to the GPU.
   Status AdvanceQueueSubmission();
 
+  // Aborts all deferred submissions and waits for submitted work to complete.
+  void AbortQueueSubmission();
+
  private:
   // A submission batch together with the fence to singal its status.
   struct FencedSubmission : IntrusiveLinkBase<void> {

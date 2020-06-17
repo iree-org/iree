@@ -182,6 +182,11 @@ class TimePointSemaphorePool final : public RefObject<TimePointSemaphorePool> {
   // be unsignaled and not in flight on GPU.
   void ReleaseResolved(IntrusiveList<TimePointSemaphore>* semaphores);
 
+  // Releases one or more semaphores back to the pool. These may be in any state
+  // and will be assumed as untouchable; the pool will unconditionally recycle
+  // them.
+  void ReleaseUnresolved(IntrusiveList<TimePointSemaphore>* semaphores);
+
  private:
   explicit TimePointSemaphorePool(ref_ptr<VkDeviceHandle> logical_device);
 

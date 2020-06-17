@@ -324,6 +324,25 @@ Status SerializingCommandQueue::AdvanceQueueSubmission() {
   return OkStatus();
 }
 
+void SerializingCommandQueue::AbortQueueSubmission() {
+  absl::MutexLock lock(&mutex_);
+
+  // We have fences in deferred_submissions_ but they are not submitted to GPU
+  // yet so we don't need to reset.
+  deferred_submissions_.clear();
+
+  std::vector<VkFence> fences;
+  fences.reserve(pending_fences_.size());
+  for (const auto& fence : pending_fences_) fences.push_back(fence->value());
+
+  VkResult result =
+      syms()->vkWaitForFences(*logical_device_, fences.size(), fences.data(),
+                              /*waitAll=*/VK_TRUE, /*timeout=*/UINT64_MAX);
+  // Clear the list. Fences will be automatically returned back to the queue
+  // after refcount reaches 0.
+  pending_fences_.clear();
+}
+
 }  // namespace vulkan
 }  // namespace hal
 }  // namespace iree

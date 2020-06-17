@@ -114,6 +114,10 @@ class VulkanDevice final : public Device {
   // signaled for the gvien timeline |semaphore|.
   Status OnSemaphoreSignal(Semaphore* semaphore);
 
+  // Triggers necessary processing on this device due to failures for the given
+  // timeline |semaphore|.
+  void OnSemaphoreFailure(Semaphore* semaphore);
+
   Status WaitIdle(absl::Time deadline) override;
 
  private:
