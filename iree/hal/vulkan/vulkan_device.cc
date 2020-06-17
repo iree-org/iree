@@ -380,12 +380,6 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   auto command_queues =
       CreateCommandQueues(device_info, logical_device, compute_queue_set,
                           transfer_queue_set, fence_pool, syms);
-
-  auto* device_queues = logical_device->mutable_queues();
-  device_queues->resize(command_queues.size());
-  for (int i = 0; i < command_queues.size(); ++i) {
-    (*device_queues)[i] = command_queues[i].get();
-  }
 #else
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
@@ -469,12 +463,6 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   auto command_queues =
       CreateCommandQueues(device_info, device_handle, compute_queue_set,
                           transfer_queue_set, fence_pool, syms);
-
-  auto* device_queues = device_handle->mutable_queues();
-  device_queues->resize(command_queues.size());
-  for (int i = 0; i < command_queues.size(); ++i) {
-    (*device_queues)[i] = command_queues[i].get();
-  }
 #else
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
@@ -717,7 +705,11 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
   IREE_TRACE_SCOPE0("VulkanDevice::CreateSemaphore");
 #if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   return EmulatedTimelineSemaphore::Create(
-      add_ref(logical_device_), add_ref(semaphore_pool_), initial_value);
+      add_ref(logical_device_),
+      [this](Semaphore* semaphore) {
+        return this->OnSemaphoreSignal(semaphore);
+      },
+      add_ref(semaphore_pool_), initial_value);
 #else
   return NativeTimelineSemaphore::Create(add_ref(logical_device_),
                                          initial_value);
@@ -803,6 +795,21 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
   return OkStatus();
 
 #endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
+}
+
+Status VulkanDevice::OnSemaphoreSignal(Semaphore* /*semaphore*/) {
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
+  for (CommandQueue* queue : dispatch_queues_) {
+    RETURN_IF_ERROR(
+        static_cast<SerializingCommandQueue*>(queue)->AdvanceQueueSubmission());
+  }
+  for (CommandQueue* queue : transfer_queues_) {
+    RETURN_IF_ERROR(
+        static_cast<SerializingCommandQueue*>(queue)->AdvanceQueueSubmission());
+  }
+#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
+
+  return OkStatus();
 }
 
 Status VulkanDevice::WaitIdle(absl::Time deadline) {

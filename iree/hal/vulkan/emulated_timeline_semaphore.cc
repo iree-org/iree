@@ -20,7 +20,6 @@
 #include "absl/utility/utility.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
 
 namespace iree {
@@ -30,16 +29,20 @@ namespace vulkan {
 // static
 StatusOr<ref_ptr<Semaphore>> EmulatedTimelineSemaphore::Create(
     ref_ptr<VkDeviceHandle> logical_device,
+    std::function<Status(Semaphore*)> on_signal,
     ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Create");
   return make_ref<EmulatedTimelineSemaphore>(
-      std::move(logical_device), std::move(semaphore_pool), initial_value);
+      std::move(logical_device), std::move(on_signal),
+      std::move(semaphore_pool), initial_value);
 }
 
 EmulatedTimelineSemaphore::EmulatedTimelineSemaphore(
     ref_ptr<VkDeviceHandle> logical_device,
+    std::function<Status(Semaphore*)> on_signal,
     ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value)
     : signaled_value_(initial_value),
+      on_signal_(std::move(on_signal)),
       logical_device_(std::move(logical_device)),
       semaphore_pool_(std::move(semaphore_pool)) {}
 
@@ -70,11 +73,8 @@ Status EmulatedTimelineSemaphore::Signal(uint64_t value) {
       << "Attempting to signal a timeline value out of order; trying " << value
       << " but " << signaled_value << " already signaled";
 
-  // Inform all queues to make progress given we have a new value signaled now.
-  for (CommandQueue* queue : logical_device_->queues()) {
-    RETURN_IF_ERROR(
-        static_cast<SerializingCommandQueue*>(queue)->AdvanceQueueSubmission());
-  }
+  // Inform the device to make progress given we have a new value signaled now.
+  RETURN_IF_ERROR(on_signal_(this));
 
   return OkStatus();
 }

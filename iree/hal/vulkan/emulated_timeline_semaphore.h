@@ -128,9 +128,11 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   // Creates a timeline semaphore with the given |initial_value|.
   static StatusOr<ref_ptr<Semaphore>> Create(
       ref_ptr<VkDeviceHandle> logical_device,
+      std::function<Status(Semaphore*)> on_signal,
       ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value);
 
   EmulatedTimelineSemaphore(ref_ptr<VkDeviceHandle> logical_device,
+                            std::function<Status(Semaphore*)> on_signal,
                             ref_ptr<TimePointSemaphorePool> semaphore_pool,
                             uint64_t initialValue);
 
@@ -170,6 +172,9 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   std::atomic<uint64_t> signaled_value_;
 
   ref_ptr<VkDeviceHandle> logical_device_;
+
+  // Callback to inform that this timeline semaphore has signaled a new value.
+  std::function<Status(Semaphore*)> on_signal_;
 
   ref_ptr<TimePointSemaphorePool> semaphore_pool_;
 

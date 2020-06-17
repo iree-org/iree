@@ -26,11 +26,9 @@
 
 #include <vulkan/vulkan.h>
 
-#include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/utility/utility.h"
 #include "iree/base/ref_ptr.h"
-#include "iree/hal/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 
@@ -78,19 +76,11 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
     return enabled_extensions_;
   }
 
-  const absl::InlinedVector<CommandQueue*, 2>& queues() const noexcept {
-    return queues_;
-  }
-  absl::InlinedVector<CommandQueue*, 2>* mutable_queues() noexcept {
-    return &queues_;
-  }
-
  private:
   VkDevice value_ = VK_NULL_HANDLE;
   ref_ptr<DynamicSymbols> syms_;
   DeviceExtensions enabled_extensions_;
   bool owns_device_;
-  absl::InlinedVector<CommandQueue*, 2> queues_;
   const VkAllocationCallbacks* allocator_ = nullptr;
 };
 

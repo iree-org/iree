@@ -208,8 +208,6 @@ cc_library(
         ":dynamic_symbols",
         ":extensibility_util",
         "//iree/base:ref_ptr",
-        "//iree/hal:command_queue",
-        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/utility",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
