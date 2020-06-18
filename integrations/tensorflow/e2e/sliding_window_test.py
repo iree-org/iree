@@ -75,7 +75,6 @@ class SlidingWindowM(tf.Module):
     return self.sw(x)
 
 
-# TODO(b/148495516)
 @tf_test_utils.compile_modules(
     backends=["tf"], sw=(SlidingWindowM, ["predict"]))
 class SlidingWindowTest(tf_test_utils.SavedModelTestCase):

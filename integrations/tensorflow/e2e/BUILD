@@ -16,6 +16,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+    "iree_py_test",
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
@@ -27,15 +28,112 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Special cases to exclude from automatically expanding targets for all
+# backends.
+SPECIAL_CASES = [
+    "explicit_backend_test.py",
+    "linspace_test.py",
+]
+
+VMLA_FAILING = [
+    "fill_test.py",
+    "mandelbrot_test.py",
+    "resource_ops_test.py",
+    "ring_buffer_test.py",
+    "strings_test.py",
+]
+
+LLVM_FAILING = [
+    "broadcasting_test.py",
+    "depth_conv_test.py",
+    "dynamic_mlp_relu_test.py",
+    "dynamic_mlp_test.py",
+    "fill_test.py",
+    "mandelbrot_test.py",
+    "matrix_ops_test.py",
+    "resource_ops_test.py",
+    "ring_buffer_test.py",
+    "sliding_window_test.py",
+    "strings_test.py",
+]
+
+VULKAN_FAILING = [
+    "broadcasting_test.py",
+    "depth_conv_test.py",
+    "dynamic_mlp_relu_test.py",
+    "dynamic_mlp_test.py",
+    "fill_test.py",
+    "mandelbrot_test.py",
+    "matrix_ops_test.py",
+    "resource_ops_test.py",
+    "ring_buffer_test.py",
+    "sliding_window_test.py",
+    "strings_test.py",
+    "tensorlist_test.py",
+]
+
+TF_PASSING = glob(
+    ["*_test.py"],
+    exclude = SPECIAL_CASES,
+)
+
+VMLA_PASSING = glob(
+    ["*_test.py"],
+    exclude = VMLA_FAILING + SPECIAL_CASES,
+)
+
+LLVM_PASSING = glob(
+    ["*_test.py"],
+    exclude = LLVM_FAILING + SPECIAL_CASES,
+)
+
+VULKAN_PASSING = glob(
+    ["*_test.py"],
+    exclude = VULKAN_FAILING + SPECIAL_CASES,
+)
+
+iree_e2e_test_suite(
+    name = "e2e",
+    backends_to_srcs = {
+        "tf_also": TF_PASSING,
+        "iree_vmla": VMLA_PASSING,
+        "iree_llvmjit": LLVM_PASSING,
+        "iree_vulkan": VULKAN_PASSING,
+    },
+    reference_backend = "tf",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_e2e_test_suite(
+    name = "e2e_failing",
+    backends_to_srcs = {
+        "iree_vmla": VMLA_FAILING,
+        "iree_llvmjit": LLVM_FAILING,
+        "iree_vulkan": VULKAN_FAILING,
+    },
+    reference_backend = "tf",
+    tags = [
+        "manual",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+# Special cases.
+
+# linspace_test passes internally, but fails in the OSS CI.
 iree_e2e_test_suite(
     # TODO(#2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
-    name = "linspace_test",
-    srcs = ["linspace_test.py"],
-    backends = [
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
+    name = "linspace",
+    backends_to_srcs = {
+        "tf_also": ["linspace_test.py"],
+        "iree_vmla": ["linspace_test.py"],
+    },
     reference_backend = "tf",
     tags = [
         "nokokoro",
@@ -46,17 +144,28 @@ iree_e2e_test_suite(
 )
 
 iree_e2e_test_suite(
-    name = "e2e",
-    srcs = glob(
-        ["*_test.py"],
-        exclude = ["linspace_test.py"],
-    ),
-    backends = [
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
+    name = "linspace_failing",
+    backends_to_srcs = {
+        "iree_llvmjit": ["linspace_test.py"],
+        "iree_vulkan": ["linspace_test.py"],
+    },
     reference_backend = "tf",
+    tags = [
+        "manual",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+# This tests explicitly writing which backends to use in Python.
+iree_py_test(
+    name = "explicit_backend_test",
+    srcs = ["explicit_backend_test.py"],
+    main = "explicit_backend_test.py",
+    python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
