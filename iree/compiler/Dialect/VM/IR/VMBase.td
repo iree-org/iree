@@ -141,7 +141,6 @@ def VM_OPC_CmpGTI32S             : VM_OPC<0x46, "CmpGTI32S">;
 def VM_OPC_CmpGTI32U             : VM_OPC<0x47, "CmpGTI32U">;
 def VM_OPC_CmpGTEI32S            : VM_OPC<0x48, "CmpGTEI32S">;
 def VM_OPC_CmpGTEI32U            : VM_OPC<0x49, "CmpGTEI32U">;
-def VM_OPC_CmpNZI32              : VM_OPC<0x4D, "CmpNZI32">;
 def VM_OPC_CmpEQRef              : VM_OPC<0x4A, "CmpEQRef">;
 def VM_OPC_CmpNERef              : VM_OPC<0x4B, "CmpNERef">;
 def VM_OPC_CmpNZRef              : VM_OPC<0x4C, "CmpNZRef">;
@@ -213,7 +212,6 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_CmpGTI32U,
     VM_OPC_CmpGTEI32S,
     VM_OPC_CmpGTEI32U,
-    VM_OPC_CmpNZI32,
     VM_OPC_CmpEQRef,
     VM_OPC_CmpNERef,
     VM_OPC_CmpNZRef,
@@ -377,10 +375,6 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 // VM traits
 //===----------------------------------------------------------------------===//
-
-// Operations with this trait are pseudo-ops that must be converted to other ops
-// prior to serialization. There are no runtime equivalents of the op.
-def VM_PseudoOp : NativeOpTrait<"IREE::VM::PseudoOp">;
 
 // Operations with this trait will be stripped in builds where
 // debugging-related operations are not needed (such as release builds).
