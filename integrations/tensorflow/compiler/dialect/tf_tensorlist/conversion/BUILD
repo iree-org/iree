@@ -35,6 +35,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_ops",
     ],
     alwayslink = 1,
 )
