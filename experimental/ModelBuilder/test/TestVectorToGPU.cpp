@@ -157,19 +157,22 @@ void testVecAdd() {
 void testCooperativeMatMul() {
   const int warpSize = 32;
   // Simple test a single warp.
-  const int resRows = 16;
+  // Hardcode types and size to what is supported in Cooperative Matrix
+  // extension
+  // Matrix of size 8x8x32 with uint8xuint8xuint32 types.
+  const int resRows = 8;
   const int resColumns = 8;
-  const int reductionSize = 8;
+  const int reductionSize = 32;
   StringLiteral funcName = "kernel_matmul";
   MLIRContext context;
   ModelBuilder modelBuilder;
 
   auto typeA =
-      modelBuilder.getMemRefType({resRows, reductionSize}, modelBuilder.f32);
+      modelBuilder.getMemRefType({resRows, reductionSize}, modelBuilder.i8);
   auto typeB =
-      modelBuilder.getMemRefType({reductionSize, resColumns}, modelBuilder.f32);
-  auto typeC =
-      modelBuilder.getMemRefType({resRows, resColumns}, modelBuilder.f32);
+      modelBuilder.getMemRefType({reductionSize, resColumns}, modelBuilder.i8);
+  auto typeC = modelBuilder.getMemRefType({resRows, resColumns},
+                                          modelBuilder.getI32Type());
   // 1. Build the kernel.
   {
     modelBuilder.addGPUAttr();
@@ -215,14 +218,14 @@ void testCooperativeMatMul() {
 
   // 3. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
-  auto oneInit = [](unsigned idx, float *ptr) { ptr[idx] = 2.0f + 3 * idx; };
-  auto incInit = [](unsigned idx, float *ptr) { ptr[idx] = 1.0f + idx; };
-  auto zeroInit = [](unsigned idx, float *ptr) { ptr[idx] = 0.0f; };
-  auto A = makeInitializedStridedMemRefDescriptor<float, 2>(
+  auto oneInit = [](unsigned idx, uint8_t *ptr) { ptr[idx] = 2 * idx + 1; };
+  auto incInit = [](unsigned idx, uint8_t *ptr) { ptr[idx] = idx; };
+  auto zeroInit = [](unsigned idx, uint32_t *ptr) { ptr[idx] = 0; };
+  auto A = makeInitializedStridedMemRefDescriptor<uint8_t, 2>(
       {resRows, reductionSize}, oneInit);
-  auto B = makeInitializedStridedMemRefDescriptor<float, 2>(
+  auto B = makeInitializedStridedMemRefDescriptor<uint8_t, 2>(
       {reductionSize, resColumns}, incInit);
-  auto C = makeInitializedStridedMemRefDescriptor<float, 2>(
+  auto C = makeInitializedStridedMemRefDescriptor<uint32_t, 2>(
       {resRows, resColumns}, zeroInit);
 
   // 4. Call the funcOp named `funcName`.
