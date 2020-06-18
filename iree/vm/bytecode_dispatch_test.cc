@@ -19,49 +19,57 @@
 // that we can't run the full MLIR compiler stack on.
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 #include "iree/base/logging.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm/bytecode_dispatch_test_module.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/invocation.h"
 #include "iree/vm/module.h"
 
+// Compiled module embedded here to avoid file IO:
+#include "iree/vm/test/all_bytecode_modules.h"
+
 namespace {
 
 struct TestParams {
+  const iree::FileToc& module_file;
   std::string function_name;
 };
 
 std::ostream& operator<<(std::ostream& os, const TestParams& params) {
-  return os << params.function_name;
+  return os << absl::StrReplaceAll(params.module_file.name,
+                                   {{":", "_"}, {".", "_"}})
+            << "_" << params.function_name;
 }
 
 std::vector<TestParams> GetModuleTestParams() {
-  std::vector<TestParams> function_names;
+  std::vector<TestParams> test_params;
 
-  const auto* module_file_toc =
-      iree::vm::bytecode_dispatch_test_module_create();
-  iree_vm_module_t* module = nullptr;
-  IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      iree_const_byte_span_t{
-          reinterpret_cast<const uint8_t*>(module_file_toc->data),
-          module_file_toc->size},
-      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
-      << "Bytecode module failed to load";
-  iree_vm_module_signature_t signature = module->signature(module->self);
-  function_names.reserve(signature.export_function_count);
-  for (int i = 0; i < signature.export_function_count; ++i) {
-    iree_string_view_t name;
-    IREE_CHECK_OK(module->get_function(module->self,
-                                       IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-                                       nullptr, &name, nullptr));
-    function_names.push_back({std::string(name.data, name.size)});
+  auto* module_file_toc = iree::vm::test::all_bytecode_modules_cc_create();
+  for (size_t i = 0; i < iree::vm::test::all_bytecode_modules_cc_size(); ++i) {
+    const auto& module_file = module_file_toc[i];
+    iree_vm_module_t* module = nullptr;
+    IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        iree_const_byte_span_t{
+            reinterpret_cast<const uint8_t*>(module_file.data),
+            module_file.size},
+        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+        << "Bytecode module failed to load";
+    iree_vm_module_signature_t signature = module->signature(module->self);
+    test_params.reserve(test_params.size() + signature.export_function_count);
+    for (int i = 0; i < signature.export_function_count; ++i) {
+      iree_string_view_t name;
+      IREE_CHECK_OK(module->get_function(module->self,
+                                         IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
+                                         nullptr, &name, nullptr));
+      test_params.push_back({module_file, std::string(name.data, name.size)});
+    }
+    iree_vm_module_release(module);
   }
-  iree_vm_module_release(module);
 
-  return function_names;
+  return test_params;
 }
 
 class VMBytecodeDispatchTest
@@ -69,14 +77,14 @@ class VMBytecodeDispatchTest
       public ::testing::WithParamInterface<TestParams> {
  protected:
   virtual void SetUp() {
+    const auto& test_params = GetParam();
+
     IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
 
-    const auto* module_file_toc =
-        iree::vm::bytecode_dispatch_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
-            reinterpret_cast<const uint8_t*>(module_file_toc->data),
-            module_file_toc->size},
+            reinterpret_cast<const uint8_t*>(test_params.module_file.data),
+            test_params.module_file.size},
         IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
         << "Bytecode module failed to load";
 
@@ -126,7 +134,7 @@ TEST_P(VMBytecodeDispatchTest, Check) {
       GTEST_SUCCEED();
     } else {
       GTEST_FAIL() << "Function expected success but failed with error "
-                   << result;
+                   << iree_status_code_string(iree_status_code(result));
     }
   }
 }

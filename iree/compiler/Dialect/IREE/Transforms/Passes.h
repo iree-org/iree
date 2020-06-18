@@ -15,14 +15,13 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
-#include "mlir/IR/Module.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
-std::unique_ptr<OperationPass<ModuleOp>> createDropCompilerHintsPass();
+std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
 
 // Register all Passes
 inline void registerTransformPasses() { createDropCompilerHintsPass(); }
