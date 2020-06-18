@@ -194,9 +194,11 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   // completes and since there are a bunch of them we use an arena.
   Arena arena(4 * 1024);
 
+  absl::InlinedVector<VkSubmitInfo, 4> submit_infos;
+  absl::InlinedVector<VkFence, 4> submit_fences;
+
   absl::InlinedVector<VkSemaphore, 4> wait_semaphores;
   absl::InlinedVector<VkSemaphore, 4> signal_semaphores;
-  absl::InlinedVector<VkSubmitInfo, 4> submit_infos;
 
   // A list of submissions that still needs to be deferred.
   IntrusiveList<std::unique_ptr<FencedSubmission>> remaining_submissions;
@@ -217,6 +219,7 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
       submit_infos.emplace_back();
       PrepareSubmitInfo(wait_semaphores, batch.command_buffers,
                         signal_semaphores, &submit_infos.back(), &arena);
+      submit_fences.push_back(fence->value());
       pending_fences_.emplace_back(std::move(fence));
     } else {
       // We need to defer the submission until later.
@@ -231,8 +234,12 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
     infos[i] = submit_infos[i];
   }
 
-  VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(queue_, infos.size(), infos.data(),
-                                           VK_NULL_HANDLE));
+  // Note: We might be able to batch the submission but it involves non-trivial
+  // fence handling. We can handle that if really needed.
+  for (int i = 0, e = submit_infos.size(); i < e; ++i) {
+    VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(
+        queue_, /*submitCount=*/1, &submit_infos[i], submit_fences[i]));
+  }
 
   while (!remaining_submissions.empty()) {
     deferred_submissions_.push_back(
@@ -270,7 +277,7 @@ Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
 
   // Keep trying to submit more workload to the GPU until reaching the deadline.
   do {
-    ASSIGN_OR_RETURN(std::ignore, ProcessDeferredSubmissions());
+    RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
 
     uint64_t timeout_nanos;
     if (deadline == absl::InfinitePast()) {

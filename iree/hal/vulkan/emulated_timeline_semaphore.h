@@ -167,8 +167,9 @@ class EmulatedTimelineSemaphore final : public Semaphore {
       uint64_t value, const ref_ptr<TimePointFence>& signal_fence);
 
  private:
-  // Tries to advance the timeline to the given |to_upper_value|.
-  Status TryToAdvanceTimeline(uint64_t to_upper_value)
+  // Tries to advance the timeline to the given |to_upper_value| without
+  // blocking and returns whether the |to_upper_value| is reached.
+  StatusOr<bool> TryToAdvanceTimeline(uint64_t to_upper_value)
       ABSL_LOCKS_EXCLUDED(mutex_);
 
   std::atomic<uint64_t> signaled_value_;

@@ -51,7 +51,7 @@ EmulatedTimelineSemaphore::EmulatedTimelineSemaphore(
 
 EmulatedTimelineSemaphore::~EmulatedTimelineSemaphore() {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::dtor");
-  CHECK_OK(TryToAdvanceTimeline(UINT64_MAX));
+  CHECK_OK(TryToAdvanceTimeline(UINT64_MAX).status());
   absl::MutexLock lock(&mutex_);
   CHECK(outstanding_semaphores_.empty())
       << "Destroying an emulated timeline semaphore without first waiting on "
@@ -59,7 +59,7 @@ EmulatedTimelineSemaphore::~EmulatedTimelineSemaphore() {
 }
 
 StatusOr<uint64_t> EmulatedTimelineSemaphore::Query() {
-  RETURN_IF_ERROR(TryToAdvanceTimeline(UINT64_MAX));
+  RETURN_IF_ERROR(TryToAdvanceTimeline(UINT64_MAX).status());
   uint64_t value = signaled_value_.load();
   if (value == UINT64_MAX) {
     absl::MutexLock lock(&mutex_);
@@ -85,25 +85,37 @@ Status EmulatedTimelineSemaphore::Signal(uint64_t value) {
 Status EmulatedTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Wait");
 
-  RETURN_IF_ERROR(TryToAdvanceTimeline(value));
+  VkFence fence = VK_NULL_HANDLE;
+  do {
+    // First try to advance the timeline without blocking to see whether we've
+    // already reached the desired value.
+    ASSIGN_OR_RETURN(bool reached_desired_value, TryToAdvanceTimeline(value));
+    if (reached_desired_value) return OkStatus();
 
-  // Collect the fences associated with all the time points that are before the
-  // deadline. We need to wait on them to be all signaled so that we can make
-  // sure the timeline is advanced to the required value.
-
-  absl::InlinedVector<VkFence, 4> fences;
-  {
+    // We must wait now. Find the first emulated time point that has a value >=
+    // the desired value so we can wait on its associated signal fence to make
+    // sure the timeline is advanced to the desired value.
     absl::MutexLock lock(&mutex_);
-    for (auto* semaphore : outstanding_semaphores_) {
-      if (semaphore->value <= value) {
-        fences.push_back(semaphore->wait_fence->value());
-      } else {
-        break;
-      }
+    auto semaphore = outstanding_semaphores_.begin();
+    for (; semaphore != outstanding_semaphores_.end(); ++semaphore) {
+      if ((*semaphore)->value >= value) break;
     }
-  }
+    if (semaphore != outstanding_semaphores_.end()) {
+      if (!(*semaphore)->signal_fence) {
+        return InternalErrorBuilder(IREE_LOC)
+               << "Timeline should have a signal fence for the first time "
+                  "point beyond the signaled value";
+      }
+      fence = (*semaphore)->signal_fence->value();
+      // Found; we can break the loop and proceed to waiting now.
+      break;
+    }
+  } while (absl::Now() < deadline);
 
-  if (fences.empty()) return OkStatus();
+  if (fence == VK_NULL_HANDLE) {
+    return DeadlineExceededErrorBuilder(IREE_LOC)
+           << "Deadline reached when waiting timeline semaphore";
+  }
 
   uint64_t timeout_nanos;
   if (deadline == absl::InfiniteFuture()) {
@@ -116,10 +128,10 @@ Status EmulatedTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
   }
 
   VK_RETURN_IF_ERROR(logical_device_->syms()->vkWaitForFences(
-      *logical_device_, fences.size(), fences.data(), /*waitAll=*/true,
+      *logical_device_, /*fenceCount=*/1, &fence, /*waitAll=*/true,
       timeout_nanos));
 
-  RETURN_IF_ERROR(TryToAdvanceTimeline(value));
+  RETURN_IF_ERROR(TryToAdvanceTimeline(value).status());
   return OkStatus();
 }
 
@@ -192,7 +204,7 @@ StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
   return semaphore->semaphore;
 }
 
-Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
+StatusOr<bool> EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     uint64_t to_upper_value) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::TryToAdvanceTimeline");
 
@@ -200,13 +212,15 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
   // to the furthest possible value.
   absl::MutexLock lock(&mutex_);
 
-  // Fast path for when already signaled past the desired value or when we have
-  // no outstanding semaphores.
-  if (signaled_value_ >= to_upper_value || outstanding_semaphores_.empty()) {
-    return OkStatus();
-  }
-
   uint64_t past_value = signaled_value_.load();
+
+  // Fast path for when already signaled past the desired value.
+  if (past_value >= to_upper_value) return true;
+
+  // The timeline has not signaled past the desired value and there is no
+  // binary semaphore pending on GPU yet: certainly the timeline cannot
+  // advance to the desired value.
+  if (outstanding_semaphores_.empty()) return false;
 
   IntrusiveList<TimePointSemaphore> resolved_semaphores;
   auto moveResolvedSemaphore = [&](TimePointSemaphore* s) {
@@ -217,6 +231,7 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
   };
 
   bool keep_resolving = true;
+  bool reached_desired_value = false;
   while (keep_resolving && !outstanding_semaphores_.empty()) {
     auto* semaphore = outstanding_semaphores_.front();
 
@@ -226,6 +241,7 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
     // fences as fast/faster than another thread can consume them.
     if (semaphore->value > to_upper_value) {
       keep_resolving = false;
+      reached_desired_value = true;
       break;
     }
 
@@ -279,11 +295,10 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
         // Propagate this back to our status (and thus any waiters).
         // Since we only take the first error we find we skip all remaining
         // fences.
+        keep_resolving = false;
+        semaphore->signal_fence = nullptr;
         status_ = VkResultToStatus(signal_status);
         signaled_value_.store(UINT64_MAX);
-        semaphore->signal_fence = nullptr;
-        // If no waiters, we can recycle this semaphore now.
-        if (!semaphore->wait_fence) moveResolvedSemaphore(semaphore);
         break;
     }
   }
@@ -292,9 +307,10 @@ Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
   if (!status_.ok()) {
     on_failure_(this);
     semaphore_pool_->ReleaseUnresolved(&outstanding_semaphores_);
+    return status_;
   }
 
-  return status_;
+  return reached_desired_value;
 }
 
 }  // namespace vulkan
