@@ -19,7 +19,8 @@
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
-# docker run -it -rm --entrypoint bash --volume ${IREE_WORKDIR}:/usr/src/iree/ \
+# docker run -it -rm --entrypoint bash \
+#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
 #   gcr.io/iree-oss/bazel
 
 # Set up the image and working directory.
@@ -40,11 +41,11 @@ RUN apt-get install -y git
 # https://docs.bazel.build/versions/master/install-ubuntu.html
 ENV BAZEL_VERSION 2.1.0
 RUN apt-get install -y unzip zip wget \
-  && wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh \
-  && chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh \
-  && ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user \
-  && rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
-ENV PATH "/root/bin:$PATH"
+  && wget "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
+  && chmod +x "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
+  && "./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" --user \
+  && rm "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh"
+ENV PATH "/root/bin:${PATH?}"
 
 # Install core IREE dependencies.
 RUN apt-get install -y clang libsdl2-dev
