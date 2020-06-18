@@ -58,6 +58,7 @@ DOC_TITLE_DICT = {
     'getting_started_macos_cmake.md': 'macOS with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
     'getting_started_python.md': 'Python',
+    'cmake_options_and_variables.md': 'CMake Options and Variables',
     'op_coverage.md': 'XLA HLO Operation Coverage',
     'roadmap.md': 'Short-term Focus Areas',
     'roadmap_design.md': 'Long-term Design Roadmap',
@@ -82,6 +83,7 @@ PERMALINK_DICT = {
     'getting_started_macos_vulkan.md': 'GetStarted/macOSVulkan',
     'generic_vulkan_env_setup.md': 'GetStarted/GenericVulkanSetup',
     'getting_started_python.md': 'GetStarted/Python',
+    'cmake_options_and_variables.md': 'GetStarted/CMakeOptionsVariables',
     'developer_overview.md': 'DeveloperOverview',
     'testing_guide.md': 'TestingGuide',
     'op_coverage.md': 'HLOOpCoverage',
@@ -118,6 +120,7 @@ NAVI_ORDER_DICT = {
     'getting_started_macos_bazel.md': 8,
     'getting_started_python.md': 9,
     'generic_vulkan_env_setup.md': 10,
+    'cmake_options_and_variables.md': 11,
 }
 
 # A dictionary containing source directory to section tile mappings.

@@ -75,3 +75,4 @@ cp docs/GetStarted/getting_started_macos_bazel.md ${BUILD_DIR}/doc/GetStarted/
 cp docs/GetStarted/getting_started_macos_cmake.md ${BUILD_DIR}/doc/GetStarted/
 cp docs/GetStarted/getting_started_python.md ${BUILD_DIR}/doc/GetStarted/
 cp docs/GetStarted/generic_vulkan_env_setup.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/GetStarted/cmake_options_and_variables.md ${BUILD_DIR}/doc/GetStarted/
