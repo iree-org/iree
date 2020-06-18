@@ -112,6 +112,17 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @cmp_nz_i32
+vm.module @my_module {
+  vm.func @cmp_nz_i32(%arg0 : i32) -> i32 {
+    // CHECK: %nz = vm.cmp.nz.i32 %arg0 : i32
+    %nz = vm.cmp.nz.i32 %arg0 : i32
+    vm.return %nz : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @cmp_eq_ref
 vm.module @my_module {
   vm.func @cmp_eq_ref(%arg0 : !vm.ref<?>,
