@@ -49,6 +49,8 @@ def iree_vision_test_suite(
       tags:
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
+      deps:
+        test dependencies.
       size:
         size of the tests. Default: "large".
       python_version:
@@ -84,8 +86,8 @@ def iree_vision_test_suite(
 
                     iree_py_test(
                         name = test_name,
-                        main = "keras_vision_model_test.py",
-                        srcs = ["keras_vision_model_test.py"],
+                        main = "vision_model_test.py",
+                        srcs = ["vision_model_test.py"],
                         args = args,
                         tags = tags,
                         deps = deps,

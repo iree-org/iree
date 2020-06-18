@@ -19,12 +19,12 @@ load(
     "iree_py_test",
 )
 load(
-    "//build_tools/bazel:iree_py_test_suite.bzl",
-    "iree_py_test_suite",
-)
-load(
     "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.bzl",
     "iree_vision_test_suite",
+)
+load(
+    "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
+    "iree_e2e_test_suite",
 )
 
 package(
@@ -32,14 +32,70 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_py_test(
-    # TODO(#1620): Include after fixing the failure on the OSS CI.
-    name = "keras_lstm_static_test",
-    srcs = ["keras_lstm_static_test.py"],
-    main = "keras_lstm_static_test.py",
-    python_version = "PY3",
+SPECIAL_CASES = [
+    "vision_model_test.py",
+]
+
+VMLA_FAILING = [
+    "lstm_test.py",
+]
+
+LLVM_FAILING = [
+    "lstm_test.py",
+    "lstm_static_test.py",
+]
+
+VULKAN_FAILING = [
+    "lstm_test.py",
+    "lstm_static_test.py",
+]
+
+TF_PASSING = glob(
+    ["*_test.py"],
+    exclude = SPECIAL_CASES,
+)
+
+VMLA_PASSING = glob(
+    ["*_test.py"],
+    exclude = VMLA_FAILING + SPECIAL_CASES,
+)
+
+LLVM_PASSING = glob(
+    ["*_test.py"],
+    exclude = LLVM_FAILING + SPECIAL_CASES,
+)
+
+VULKAN_PASSING = glob(
+    ["*_test.py"],
+    exclude = VULKAN_FAILING + SPECIAL_CASES,
+)
+
+iree_e2e_test_suite(
+    name = "keras",
+    backends_to_srcs = {
+        "tf_also": TF_PASSING,
+        "iree_vmla": VMLA_PASSING,
+        "iree_llvmjit": LLVM_PASSING,
+        "iree_vulkan": VULKAN_PASSING,
+    },
+    reference_backend = "tf",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_e2e_test_suite(
+    name = "keras_failing",
+    backends_to_srcs = {
+        "iree_vmla": VMLA_FAILING,
+        "iree_llvmjit": LLVM_FAILING,
+        "iree_vulkan": VULKAN_FAILING,
+    },
+    reference_backend = "tf",
     tags = [
+        "manual",
         "nokokoro",
+        "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
@@ -48,9 +104,9 @@ iree_py_test(
 
 # @unused
 DOC = """
-keras_vision_models_test is for manual testing of all keras vision models.
+vision_models_test is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
-bazel run -c opt integrations/tensorflow/e2e/keras/keras_vision_models_test -- \
+bazel run -c opt integrations/tensorflow/e2e/keras/vision_models_test -- \
 --override_backends=tf,iree_vmla,iree_llvmjit \
 --data=imagenet \
 --include_top=1 \
@@ -75,9 +131,9 @@ Command arguments description:
 """
 
 iree_py_test(
-    name = "keras_vision_models_test",
-    srcs = ["keras_vision_model_test.py"],
-    main = "keras_vision_model_test.py",
+    name = "vision_models_test",
+    srcs = ["vision_model_test.py"],
+    main = "vision_model_test.py",
     python_version = "PY3",
     tags = [
         "external",
@@ -90,27 +146,14 @@ iree_py_test(
     ],
 )
 
-iree_py_test_suite(
-    name = "non_vision",
-    srcs = glob(
-        ["*_test.py"],
-        exclude = [
-            "keras_vision_model_test.py",
-            "keras_lstm_static_test.py",
-        ],
-    ),
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
 iree_vision_test_suite(
-    name = "keras_vision_models",
+    name = "vision_models",
     datasets = ["cifar10"],
     models_to_backends = {
         "ResNet50": [
-            "iree_llvmjit",
+            "tf_also",
             "iree_vmla",
+            "iree_llvmjit",
             "iree_vulkan",
         ],
     },
@@ -122,17 +165,21 @@ iree_vision_test_suite(
 )
 
 iree_vision_test_suite(
-    name = "keras_vision_models_external",
+    name = "vision_models_external",
     datasets = [
         "cifar10",
         "imagenet",
     ],
     external_weights = "https://storage.googleapis.com/iree_models/",
     models_to_backends = {
-        ("MobileNet", "MobileNetV2"): ["iree_vmla"],
-        "ResNet50": [
-            "iree_llvmjit",
+        ("MobileNet", "MobileNetV2"): [
+            "tf_also",
             "iree_vmla",
+        ],
+        "ResNet50": [
+            "tf_also",
+            "iree_vmla",
+            "iree_llvmjit",
             "iree_vulkan",
         ],
     },
@@ -152,7 +199,7 @@ iree_vision_test_suite(
 iree_vision_test_suite(
     # TODO: Combine this suite with keras_vision_models_external once these
     # tests pass.
-    name = "keras_vision_models_external_failing",
+    name = "vision_models_external_failing",
     datasets = [
         "cifar10",
         "imagenet",
