@@ -1030,8 +1030,7 @@ Optional<MutableOperandRange> CondBranchOp::getMutableSuccessorOperands(
                             : falseDestOperandsMutable();
 }
 
-template <typename T>
-static LogicalResult verifyFailOp(T op) {
+static LogicalResult verifyFailOp(FailOp op) {
   APInt status;
   if (matchPattern(op.status(), m_ConstantInt(&status))) {
     if (status == 0) {

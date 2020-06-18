@@ -137,18 +137,7 @@ class BuildFileFunctions(object):
     return self._convert_file_list_block("TEXTUAL_HDRS", textual_hdrs)
 
   def _convert_srcs_block(self, srcs):
-    if not srcs:
-      return ""
-    generated_srcs = [src for src in srcs if src.startswith(":")]
-    srcs = [src for src in srcs if src not in generated_srcs]
-    sets = []
-    if srcs:
-      sets.append(self._convert_file_list_block("SRCS", srcs))
-    if generated_srcs:
-      sets.append(
-          self._convert_file_list_block("GENERATED_SRCS",
-                                        [src[1:] for src in generated_srcs]))
-    return "\n".join(sets)
+    return self._convert_file_list_block("SRCS", srcs)
 
   def _convert_src_block(self, src):
     return f'  SRC\n    "{src}"\n'

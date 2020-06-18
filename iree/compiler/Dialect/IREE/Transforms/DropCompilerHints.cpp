@@ -23,19 +23,19 @@ namespace iree_compiler {
 namespace IREE {
 
 class DropCompilerHintsPass
-    : public PassWrapper<DropCompilerHintsPass, OperationPass<void>> {
+    : public PassWrapper<DropCompilerHintsPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
-    getOperation()->walk([&](DoNotOptimizeOp op) {
+    getOperation().walk([&](DoNotOptimizeOp op) {
       op.replaceAllUsesWith(op.getOperands());
       op.erase();
     });
   }
 };
 
-std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createDropCompilerHintsPass() {
   return std::make_unique<DropCompilerHintsPass>();
 }
 
