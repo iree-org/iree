@@ -48,7 +48,6 @@ OutputFormat = binding.OutputFormat
 # for input to the IREE compiler.
 TF_IMPORT_PASS_PIPELINE = (
     # Clean up tf_executor and extraneous unused functions.
-    "tf-saved-model-mark-func-visibility",
     "symbol-dce",
     "tf-executor-graph-pruning",
     "iree-guarantee-all-funcs-one-use",
@@ -70,7 +69,6 @@ TF_IMPORT_PASS_PIPELINE = (
     "inline",
 
     # Some further cleanups now that control flow is in better shape.
-    "tf-saved-model-mark-func-visibility",
     "symbol-dce",
     "canonicalize",
 
