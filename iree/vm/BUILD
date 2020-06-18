@@ -13,6 +13,7 @@ cc_library(
     srcs = ["builtin_types.c"],
     hdrs = ["builtin_types.h"],
     deps = [
+        ":list",
         ":ref",
         "//iree/base:api",
     ],
@@ -49,6 +50,7 @@ cc_library(
     deps = [
         ":builtin_types",
         ":bytecode_op_table_gen",
+        ":list",
         ":module",
         ":ref",
         ":stack",
@@ -60,6 +62,7 @@ cc_library(
         "//iree/base:target_platform",
         "//iree/schemas:bytecode_module_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -149,6 +152,30 @@ cc_library(
         ":variant_list",
         "//iree/base:api",
         "//iree/base:tracing",
+    ],
+)
+
+cc_library(
+    name = "list",
+    srcs = ["list.c"],
+    hdrs = ["list.h"],
+    deps = [
+        ":ref",
+        ":type_def",
+        ":value",
+        "//iree/base:alignment",
+        "//iree/base:api",
+    ],
+)
+
+cc_test(
+    name = "list_test",
+    srcs = ["list_test.cc"],
+    deps = [
+        ":list",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -275,6 +302,7 @@ cc_library(
         ":context",
         ":instance",
         ":invocation",
+        ":list",
         ":module",
         ":ref",
         ":stack",

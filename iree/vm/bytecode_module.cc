@@ -16,6 +16,7 @@
 
 #include <string.h>
 
+#include "absl/strings/match.h"
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/flatbuffer_util.h"
@@ -54,6 +55,11 @@ static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
     result.value_type = IREE_VM_VALUE_TYPE_I64;
   } else if (!full_name.empty() && full_name[0] == '!') {
     full_name.remove_prefix(1);
+    if (absl::StartsWith(full_name, "vm.list<")) {
+      // This is a !vm.list<...> type. We don't actually care about the type as
+      // we allow list types to be widened.
+      full_name.remove_suffix(full_name.size() - 7);
+    }
     const iree_vm_ref_type_descriptor_t* type_descriptor =
         iree_vm_ref_lookup_registered_type(
             iree_string_view_t{full_name.data(), full_name.size()});

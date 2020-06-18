@@ -34,6 +34,8 @@ static void iree_vm_rw_byte_buffer_destroy(void* ptr) {
   }
 }
 
+iree_status_t iree_vm_list_register_types();
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
   if (iree_vm_ro_byte_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
     return IREE_STATUS_OK;
@@ -54,6 +56,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
       iree_make_cstring_view("iree.mutable_byte_buffer");
   IREE_RETURN_IF_ERROR(
       iree_vm_ref_register_type(&iree_vm_rw_byte_buffer_descriptor));
+
+  IREE_RETURN_IF_ERROR(iree_vm_list_register_types());
 
   return IREE_STATUS_OK;
 }

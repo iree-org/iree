@@ -73,7 +73,9 @@ inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
   ((v)->value_type == IREE_VM_VALUE_TYPE_NONE && \
    (v)->ref_type == IREE_VM_REF_TYPE_NULL)
 
-// An variant element value of an iree_vm_list_t (!vm.list<?>).
+// An variant value that can be either a primitive value type or a ref type.
+// Each variant value stores its type but users are required to check the type
+// prior to accessing any of the data.
 typedef struct {
   iree_vm_type_def_t type;
   union {

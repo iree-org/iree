@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "builtin_types.c"
   DEPS
+    ::list
     ::ref
     iree::base::api
   PUBLIC
@@ -57,6 +58,7 @@ iree_cc_library(
     "bytecode_op_table.h"
   DEPS
     ::builtin_types
+    ::list
     ::module
     ::ref
     ::stack
@@ -168,6 +170,34 @@ iree_cc_library(
     iree::base::api
     iree::base::tracing
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    list
+  HDRS
+    "list.h"
+  SRCS
+    "list.c"
+  DEPS
+    ::ref
+    ::type_def
+    ::value
+    iree::base::alignment
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    list_test
+  SRCS
+    "list_test.cc"
+  DEPS
+    ::list
+    iree::base::api
+    iree::base::ref_ptr
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -314,6 +344,7 @@ iree_cc_library(
     ::context
     ::instance
     ::invocation
+    ::list
     ::module
     ::ref
     ::stack
