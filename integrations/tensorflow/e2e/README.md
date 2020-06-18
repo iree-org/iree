@@ -22,13 +22,18 @@ If you do not have your environment setup to use IREE with Vulkan (see
 
 ## Running tests
 
+NOTE: We are in the process of reworking how backend specification functions, so
+you have to specify the target name including the name of the test suite and
+using a specific backend pair even if you are overriding the backends. The
+override backends take precedence.
+
 ```shell
 # For locally running tests and iterating on backend development,
 # `bazel run` is preferred.
-bazel run :math_test -- --override_backends=iree_vulkan
+bazel run :e2e_math_test_tf_tf_also -- --override_backends=iree_vulkan
 
 # Same as above, but add `tf` backend to cross-check numerical correctness.
-bazel run :math_test -- --override_backends=tf,iree_vulkan
+bazel run :e2e_math_test_tf_tf_also -- --override_backends=tf,iree_vulkan
 
 # Run all tests with defaults and output on failure.
 bazel test ... --test_output=errors
@@ -39,10 +44,6 @@ bazel test simple_arithmetic_test --test_output=streamed
 # Run tests with an altered list of backends.
 bazel test ... --test_output=errors \
     --test_arg=--override_backends=tf,iree_vmla,iree_vulkan
-
-# (alternative) Run tests with an altered list of backends.
-bazel test ... --test_env=IREE_OVERRIDE_BACKENDS=tf,iree_vmla,iree_vulkan \
-    --test_output=errors
 ```
 
 If you specify the same backend multiple times, for example
@@ -72,9 +73,22 @@ runs on multiple backends.
 
 ### Limiting a test to only certain backends
 
-The `@tf_test_utils.compile_modules` decorator on tests takes a `backends=`
-keyword argument. This argument should be a Python list of backends, which
-accepts the same keys as the `--override_backends` flags.
+The BUILD file specifies which targets work on which backends and controls which
+backends tests are run on by using the `--override_backends` flag. If you add a
+new test that does not work on some backends, list it as failing on those
+backends in the BUILD file.
+
+```build
+VULKAN_FAILING = [
+    "my_experimental_new_test.py",
+]
+```
+
+The `@tf_test_utils.compile_modules` decorator on tests also takes a `backends=`
+keyword argument. Many tests still specify this, but it is ignored in the CI,
+which runs with `bazel test`. When running with `bazel run` this indicates the
+set of backends to use in the absence of the `--override_backends` flags (and
+accepts the same arguments).
 
 Example:
 
@@ -84,8 +98,8 @@ class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
   ... the test case ...
 ```
 
-Limiting this statically in the code can be useful for tests that are known to
-fail on certain backends but are still useful to have checked in.
+Limiting backends is useful for tests that are known to fail on certain backends
+but are still useful to have checked in.
 
 The priority order for which backends are ultimately used is:
 
