@@ -13,7 +13,6 @@
 # limitations under the License.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
