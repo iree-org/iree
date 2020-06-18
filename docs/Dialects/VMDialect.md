@@ -210,6 +210,119 @@ attribute.
 | :----: | ----------- |
 `results` | 32-bit signless integer or 32-bit signless integer or ref
 
+### `vm.check.eq` (IREE::VM::CheckEQOp)
+
+raises a global failure if the condition is true
+
+Syntax:
+
+```
+operation ::= `vm.check.eq` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
+```
+
+
+When the condition is true this signals a runtime failure that causes the
+entire active invocation - and possibly *all* in-flight and pending
+invocations - to fail. The status will be propagated back via the available
+runtime error handling mechanisms such as semaphores or synchronous
+invocation results.
+
+This is implemented as a pseudo-op that transforms into a vm.cond_fail
+operation.
+
+```
+vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref<?>
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 32-bit signless integer or 32-bit signless integer or ref
+`rhs` | 32-bit signless integer or 32-bit signless integer or ref
+
+### `vm.check.ne` (IREE::VM::CheckNEOp)
+
+raises a global failure if the condition is true
+
+Syntax:
+
+```
+operation ::= `vm.check.ne` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
+```
+
+
+When the condition is true this signals a runtime failure that causes the
+entire active invocation - and possibly *all* in-flight and pending
+invocations - to fail. The status will be propagated back via the available
+runtime error handling mechanisms such as semaphores or synchronous
+invocation results.
+
+This is implemented as a pseudo-op that transforms into a vm.cond_fail
+operation.
+
+```
+vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref<?>
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 32-bit signless integer or 32-bit signless integer or ref
+`rhs` | 32-bit signless integer or 32-bit signless integer or ref
+
+### `vm.check.nz` (IREE::VM::CheckNZOp)
+
+raises a global failure if the condition is true
+
+Syntax:
+
+```
+operation ::= `vm.check.nz` $value (`,` $message^)? attr-dict `:` type($value)
+```
+
+
+When the condition is true this signals a runtime failure that causes the
+entire active invocation - and possibly *all* in-flight and pending
+invocations - to fail. The status will be propagated back via the available
+runtime error handling mechanisms such as semaphores or synchronous
+invocation results.
+
+This is implemented as a pseudo-op that transforms into a vm.cond_fail
+operation.
+
+```
+vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref<?>
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`value` | 32-bit signless integer or 32-bit signless integer or ref
+
 ### `vm.cmp.eq.i32` (IREE::VM::CmpEQI32Op)
 
 integer equality comparison operation
@@ -522,6 +635,31 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.cmp.nz.i32` (IREE::VM::CmpNZI32Op)
+
+integer non-zero comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.nz.i32` $operand attr-dict `:` type($operand)
+```
+
+
+Compares the given integer operand for a non-zero value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
 ### `vm.cmp.nz.ref` (IREE::VM::CmpNZRefOp)
 
 ref_ptr non-zero comparison operation
@@ -617,6 +755,50 @@ attached) execution will continue at the target block.
 | :-------: | ----------- |
 `dest` | any successor
 
+### `vm.cond_fail` (IREE::VM::CondFailOp)
+
+raises a global failure if the condition is true
+
+Syntax:
+
+```
+operation ::= `vm.cond_fail` $condition `,` $status (`,` $message^)? attr-dict
+```
+
+
+When the condition is true this signals a runtime failure that causes the
+entire active invocation - and possibly *all* in-flight and pending
+invocations - to fail with the given status. The status will be propagated
+back via the available runtime error handling mechanisms such as semaphores
+or synchronous invocation results.
+
+As the IREE execution model is deeply pipelined it's possible that failures
+have a latency between when they are emitted and when the application can
+observe the failure. It's also possible that other work that is in-flight
+or pending when the failure occurs will complete.
+
+This is implemented as a pseudo-op that transforms into a vm.fail operation
+guarded by the condition.
+
+```
+%nz = vm.cmp.nz.i32 %value : i32
+%statusCode = vm.const.i32 9 : i32
+vm.cond_fail %nz, %statusCode, "expected non-zero"
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`condition` | 32-bit signless integer
+`status` | 32-bit signless integer
+
 ### `vm.const.i32` (IREE::VM::ConstI32Op)
 
 32-bit integer constant operation
@@ -627,7 +809,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_411
+`value` | Attribute | anonymous_412
 
 #### Results:
 
@@ -833,6 +1015,11 @@ have a latency between when they are emitted and when the application can
 observe the failure. It's also possible that other work that is in-flight
 or pending when the failure occurs will complete.
 
+```
+%statusCode = vm.const.i32 9 : i32
+vm.fail %statusCode, "oh no!"
+```
+
 #### Attributes:
 
 | Attribute | MLIR Type | Description |
@@ -901,7 +1088,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | TypeAttr | any type attribute
 `is_mutable` | UnitAttr | unit attribute
 `initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_414
+`initial_value` | Attribute | anonymous_415
 `ordinal` | IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
