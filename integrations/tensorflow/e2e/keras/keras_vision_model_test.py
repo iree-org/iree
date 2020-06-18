@@ -136,7 +136,7 @@ class AppTest(tf_test_utils.SavedModelTestCase):
         np.float32)
     input_data = input_data.reshape(input_shape)
     self.modules.applications.all.predict(input_data).print().assert_all_close(
-        atol=1e-6)
+        atol=3e-5)
 
 
 if __name__ == '__main__':
