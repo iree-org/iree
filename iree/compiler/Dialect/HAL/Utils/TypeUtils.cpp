@@ -63,8 +63,8 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(
     SmallVector<Value, 4> dims;
     // Note that in the following, we require that the dims resolve
     // to discrete SSA values, which in a stream, will be block args.
-    if (failed(Shape::getRankedDimsFromRankedShape(loc, rsValue, false, dims,
-                                                   rewriter))) {
+    if (failed(Shape::getRankedDimsFromRankedShape(
+            loc, rsValue, /*createIntermediateOps=*/true, dims, rewriter))) {
       return llvm::None;
     }
     for (auto &dim : dims) {
