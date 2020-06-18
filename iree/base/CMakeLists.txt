@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(internal)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
@@ -168,7 +168,7 @@ iree_cc_library(
     "dynamic_library_win32.cc"
   LINKOPTS
     ${_DYNAMIC_LIBRARY_LINKOPTS}
-DEPS
+  DEPS
     ::logging
     ::platform_headers
     ::status
@@ -177,6 +177,51 @@ DEPS
     absl::memory
     absl::span
   PUBLIC
+)
+
+# TODO(scotttodd): clean up bazel_to_cmake handling here
+#   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
+#   * the output file name is platform-specific, get it with $<TARGET_FILE:>
+iree_cc_library(
+  NAME
+    dynamic_library_test_library.so
+  OUT
+    dynamic_library_test_library.so
+  SRCS
+    "dynamic_library_test_library.cc"
+  TESTONLY
+  SHARED
+)
+
+iree_cc_embed_data(
+  NAME
+    dynamic_library_test_library
+  GENERATED_SRCS
+    "$<TARGET_FILE:iree::base::dynamic_library_test_library.so>"
+  CC_FILE_OUTPUT
+    "dynamic_library_test_library_embed.cc"
+  H_FILE_OUTPUT
+    "dynamic_library_test_library_embed.h"
+  TESTONLY
+  CPP_NAMESPACE
+    "iree"
+  FLATTEN
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dynamic_library_test
+  SRCS
+    "dynamic_library_test.cc"
+  DEPS
+    ::dynamic_library
+    ::dynamic_library_test_library
+    ::file_io
+    ::status
+    ::status_matchers
+    ::target_platform
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -201,6 +246,7 @@ iree_cc_library(
     "file_io.h"
   DEPS
     ::status
+    absl::strings
   PUBLIC
 )
 
@@ -359,15 +405,16 @@ iree_cc_library(
 iree_cc_library(
   NAME
     main
+  HDRS
+    "main.h"
   SRCS
     "main_posix.cc"
     "main_win32.cc"
-  HDRS
-    "main.h"
   DEPS
-    iree::base::logging
-    iree::base::platform_headers
-    iree::base::target_platform
+    ::logging
+    ::platform_headers
+    ::target_platform
+  PUBLIC
 )
 
 iree_cc_library(
