@@ -39,12 +39,12 @@ namespace VM {
 namespace {
 
 /// Creates a constant zero attribute matching the given type.
-Attribute zerosOfType(Type type) {
+Attribute zeroOfType(Type type) {
   return Builder(type.getContext()).getZeroAttr(type);
 }
 
 /// Creates a constant one attribute matching the given type.
-Attribute onesOfType(Type type) {
+Attribute oneOfType(Type type) {
   Builder builder(type.getContext());
   switch (type.getKind()) {
     case StandardTypes::BF16:
@@ -60,7 +60,7 @@ Attribute onesOfType(Type type) {
     case StandardTypes::Vector:
     case StandardTypes::RankedTensor: {
       auto vtType = type.cast<ShapedType>();
-      auto element = onesOfType(vtType.getElementType());
+      auto element = oneOfType(vtType.getElementType());
       if (!element) return {};
       return DenseElementsAttr::get(vtType, element);
     }
@@ -438,7 +438,7 @@ OpFoldResult SubI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult MulI32Op::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(rhs(), m_Zero())) {
     // x * 0 = 0 or 0 * y = 0 (commutative)
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (matchPattern(rhs(), m_One())) {
     // x * 1 = x or 1 * y = y (commutative)
     return lhs();
@@ -454,7 +454,7 @@ OpFoldResult DivI32SOp::fold(ArrayRef<Attribute> operands) {
     return {};
   } else if (matchPattern(lhs(), m_Zero())) {
     // 0 / y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (matchPattern(rhs(), m_One())) {
     // x / 1 = x
     return lhs();
@@ -470,7 +470,7 @@ OpFoldResult DivI32UOp::fold(ArrayRef<Attribute> operands) {
     return {};
   } else if (matchPattern(lhs(), m_Zero())) {
     // 0 / y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (matchPattern(rhs(), m_One())) {
     // x / 1 = x
     return lhs();
@@ -487,7 +487,7 @@ OpFoldResult RemI32SOp::fold(ArrayRef<Attribute> operands) {
   } else if (matchPattern(lhs(), m_Zero()) || matchPattern(rhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](APInt a, APInt b) { return a.srem(b); });
@@ -497,7 +497,7 @@ OpFoldResult RemI32UOp::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(lhs(), m_Zero()) || matchPattern(rhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](APInt a, APInt b) { return a.urem(b); });
@@ -513,7 +513,7 @@ OpFoldResult NotI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult AndI32Op::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(rhs(), m_Zero())) {
     // x & 0 = 0 or 0 & y = 0 (commutative)
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (lhs() == rhs()) {
     // x & x = x
     return lhs();
@@ -540,7 +540,7 @@ OpFoldResult XorI32Op::fold(ArrayRef<Attribute> operands) {
     return lhs();
   } else if (lhs() == rhs()) {
     // x ^ x = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(operands,
                                         [](APInt a, APInt b) { return a ^ b; });
@@ -553,7 +553,7 @@ OpFoldResult XorI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(operand(), m_Zero())) {
     // 0 << y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (amount() == 0) {
     // x << 0 = x
     return operand();
@@ -565,7 +565,7 @@ OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(operand(), m_Zero())) {
     // 0 >> y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (amount() == 0) {
     // x >> 0 = x
     return operand();
@@ -577,7 +577,7 @@ OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {
   if (matchPattern(operand(), m_Zero())) {
     // 0 >> y = 0
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   } else if (amount() == 0) {
     // x >> 0 = x
     return operand();
@@ -618,19 +618,79 @@ OpFoldResult ExtI16I32SOp::fold(ArrayRef<Attribute> operands) {
 // Comparison ops
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+/// Swaps the cmp op with its inverse if the result is inverted.
+template <typename OP, typename INV>
+struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
+  using OpRewritePattern<OP>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OP op,
+                                PatternRewriter &rewriter) const override {
+    // We generate xor(cmp(...), 1) to flip conditions, so look for that pattern
+    // so that we can do the swap here and remove the xor.
+    if (!op.result().hasOneUse()) {
+      // Can't change if there are multiple users.
+      return failure();
+    }
+    if (auto xorOp = dyn_cast_or_null<XorI32Op>(*op.result().user_begin())) {
+      Attribute rhs;
+      if (xorOp.lhs() == op.result() &&
+          matchPattern(xorOp.rhs(), m_Constant(&rhs)) &&
+          rhs.cast<IntegerAttr>().getInt() == 1) {
+        auto invValue = rewriter.createOrFold<INV>(
+            op.getLoc(), op.result().getType(), op.lhs(), op.rhs());
+        rewriter.replaceOp(op, {invValue});
+        rewriter.replaceOp(xorOp, {invValue});
+        return success();
+      }
+    }
+    return failure();
+  }
+};
+
+}  // namespace
+
 OpFoldResult CmpEQI32Op::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x == x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.eq(b); });
 }
 
+void CmpEQI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpEQI32Op, CmpNEI32Op>>(context);
+}
+
+namespace {
+
+/// Changes a cmp.ne.i32 check against 0 to a cmp.nz.i32.
+struct CmpNEI32ZeroToCmpNZI32 : public OpRewritePattern<CmpNEI32Op> {
+  using OpRewritePattern<CmpNEI32Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CmpNEI32Op op,
+                                PatternRewriter &rewriter) const override {
+    if (matchPattern(op.rhs(), m_Zero())) {
+      rewriter.replaceOpWithNewOp<CmpNZI32Op>(op, op.getType(), op.lhs());
+      return success();
+    }
+    return failure();
+  }
+};
+
+}  // namespace
+
+void CmpNEI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpNEI32Op, CmpEQI32Op>,
+                 CmpNEI32ZeroToCmpNZI32>(context);
+}
+
 OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x != x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ne(b); });
@@ -639,82 +699,127 @@ OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
 OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x < x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.slt(b); });
 }
 
+void CmpLTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpLTI32SOp, CmpGTEI32SOp>>(context);
+}
+
 OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x < x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ult(b); });
 }
 
+void CmpLTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpLTI32UOp, CmpGTEI32UOp>>(context);
+}
+
 OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x <= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.sle(b); });
 }
 
+void CmpLTEI32SOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpLTEI32SOp, CmpGTI32SOp>>(context);
+}
+
 OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x <= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ule(b); });
 }
 
+void CmpLTEI32UOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpLTEI32UOp, CmpGTI32UOp>>(context);
+}
+
 OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x > x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.sgt(b); });
 }
 
+void CmpGTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTI32SOp, CmpLTEI32SOp>>(context);
+}
+
 OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x > x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.ugt(b); });
 }
 
+void CmpGTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTI32UOp, CmpLTEI32UOp>>(context);
+}
+
 OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x >= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.sge(b); });
 }
 
+void CmpGTEI32SOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTEI32SOp, CmpLTI32SOp>>(context);
+}
+
 OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x >= x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](APInt a, APInt b) { return a.uge(b); });
 }
 
+void CmpGTEI32UOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SwapInvertedCmpOps<CmpGTEI32UOp, CmpLTI32UOp>>(context);
+}
+
+OpFoldResult CmpNZI32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return APInt(32, a.getBoolValue()); });
+}
+
 OpFoldResult CmpEQRefOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x == x = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   } else if (operands[0] && operands[1]) {
     // Constant null == null = true
-    return onesOfType(getType());
+    return oneOfType(getType());
   }
   return {};
 }
@@ -726,16 +831,13 @@ struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
   using OpRewritePattern<CmpEQRefOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CmpEQRefOp op,
                                 PatternRewriter &rewriter) const override {
-    Attribute lhs, rhs;
-    if (matchPattern(op.lhs(), m_Constant(&lhs))) {
-      auto cmpNz =
-          rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.rhs());
-      rewriter.replaceOpWithNewOp<NotI32Op>(op, op.getType(), cmpNz);
-      return success();
-    } else if (matchPattern(op.rhs(), m_Constant(&rhs))) {
+    Attribute rhs;
+    if (matchPattern(op.rhs(), m_Constant(&rhs))) {
       auto cmpNz =
           rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.lhs());
-      rewriter.replaceOpWithNewOp<NotI32Op>(op, op.getType(), cmpNz);
+      rewriter.replaceOpWithNewOp<XorI32Op>(
+          op, op.getType(), cmpNz,
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
       return success();
     }
     return failure();
@@ -752,7 +854,7 @@ void CmpEQRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 OpFoldResult CmpNERefOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
     // x != x = false
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return {};
 }
@@ -764,11 +866,8 @@ struct NullCheckCmpNERefToCmpNZRef : public OpRewritePattern<CmpNERefOp> {
   using OpRewritePattern<CmpNERefOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CmpNERefOp op,
                                 PatternRewriter &rewriter) const override {
-    Attribute lhs, rhs;
-    if (matchPattern(op.lhs(), m_Constant(&lhs))) {
-      rewriter.replaceOpWithNewOp<CmpNZRefOp>(op, op.getType(), op.rhs());
-      return success();
-    } else if (matchPattern(op.rhs(), m_Constant(&rhs))) {
+    Attribute rhs;
+    if (matchPattern(op.rhs(), m_Constant(&rhs))) {
       rewriter.replaceOpWithNewOp<CmpNZRefOp>(op, op.getType(), op.lhs());
       return success();
     }
@@ -787,7 +886,7 @@ OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
   Attribute operandValue;
   if (matchPattern(operand(), m_Constant(&operandValue))) {
     // x == null
-    return zerosOfType(getType());
+    return zeroOfType(getType());
   }
   return {};
 }
@@ -795,6 +894,112 @@ OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 // Control flow
 //===----------------------------------------------------------------------===//
+
+/// Given a successor, try to collapse it to a new destination if it only
+/// contains a passthrough unconditional branch. If the successor is
+/// collapsable, `successor` and `successorOperands` are updated to reference
+/// the new destination and values. `argStorage` is an optional storage to use
+/// if operands to the collapsed successor need to be remapped.
+static LogicalResult collapseBranch(Block *&successor,
+                                    ValueRange &successorOperands,
+                                    SmallVectorImpl<Value> &argStorage) {
+  // Check that the successor only contains a unconditional branch.
+  if (std::next(successor->begin()) != successor->end()) return failure();
+  // Check that the terminator is an unconditional branch.
+  BranchOp successorBranch = dyn_cast<BranchOp>(successor->getTerminator());
+  if (!successorBranch) return failure();
+  // Check that the arguments are only used within the terminator.
+  for (BlockArgument arg : successor->getArguments()) {
+    for (Operation *user : arg.getUsers())
+      if (user != successorBranch) return failure();
+  }
+  // Don't try to collapse branches to infinite loops.
+  Block *successorDest = successorBranch.getDest();
+  if (successorDest == successor) return failure();
+
+  // Update the operands to the successor. If the branch parent has no
+  // arguments, we can use the branch operands directly.
+  OperandRange operands = successorBranch.getOperands();
+  if (successor->args_empty()) {
+    successor = successorDest;
+    successorOperands = operands;
+    return success();
+  }
+
+  // Otherwise, we need to remap any argument operands.
+  for (Value operand : operands) {
+    BlockArgument argOperand = operand.dyn_cast<BlockArgument>();
+    if (argOperand && argOperand.getOwner() == successor)
+      argStorage.push_back(successorOperands[argOperand.getArgNumber()]);
+    else
+      argStorage.push_back(operand);
+  }
+  successor = successorDest;
+  successorOperands = argStorage;
+  return success();
+}
+
+namespace {
+
+/// Simplify a branch to a block that has a single predecessor. This effectively
+/// merges the two blocks.
+///
+/// (same logic as for std.br)
+struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
+  using OpRewritePattern<BranchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BranchOp op,
+                                PatternRewriter &rewriter) const override {
+    // Check that the successor block has a single predecessor.
+    Block *succ = op.getDest();
+    Block *opParent = op.getOperation()->getBlock();
+    if (succ == opParent || !llvm::hasSingleElement(succ->getPredecessors())) {
+      return failure();
+    }
+
+    // Merge the successor into the current block and erase the branch.
+    rewriter.mergeBlocks(succ, opParent, op.getOperands());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+///   br ^bb1
+/// ^bb1
+///   br ^bbN(...)
+///
+///  -> br ^bbN(...)
+///
+/// (same logic as for std.br)
+struct SimplifyPassThroughBr : public OpRewritePattern<BranchOp> {
+  using OpRewritePattern<BranchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BranchOp op,
+                                PatternRewriter &rewriter) const override {
+    Block *dest = op.getDest();
+    ValueRange destOperands = op.getOperands();
+    SmallVector<Value, 4> destOperandStorage;
+
+    // Try to collapse the successor if it points somewhere other than this
+    // block.
+    if (dest == op.getOperation()->getBlock() ||
+        failed(collapseBranch(dest, destOperands, destOperandStorage))) {
+      return failure();
+    }
+
+    // Create a new branch with the collapsed successor.
+    rewriter.replaceOpWithNewOp<BranchOp>(op, dest, destOperands);
+    return success();
+  }
+};
+
+}  // namespace
+
+void BranchOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<SimplifyBrToBlockWithSinglePred, SimplifyPassThroughBr>(
+      context);
+}
 
 namespace {
 
@@ -847,15 +1052,21 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getCondition().getDefiningOp()) {
-      return failure();
-    }
-    if (auto notOp = dyn_cast<NotI32Op>(op.getCondition().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<CondBranchOp>(
-          op, notOp.getOperand(), op.getFalseDest(), op.getFalseOperands(),
-          op.getTrueDest(), op.getTrueOperands());
-      return success();
-    }
+    // TODO(benvanik): figure out something more reliable when the xor may be
+    // used on a non-binary value.
+    // We generate xor(cmp(...), 1) to flip conditions, so look for that pattern
+    // so that we can do the swap here and remove the xor.
+    // auto condValue = op.getCondition();
+    // if (auto xorOp = dyn_cast_or_null<XorI32Op>(condValue.getDefiningOp())) {
+    //   Attribute rhs;
+    //   if (matchPattern(xorOp.rhs(), m_Constant(&rhs)) &&
+    //       rhs.cast<IntegerAttr>().getInt() == 1) {
+    //     rewriter.replaceOpWithNewOp<CondBranchOp>(
+    //         op, xorOp.lhs(), op.getFalseDest(), op.getFalseOperands(),
+    //         op.getTrueDest(), op.getTrueOperands());
+    //     return success();
+    //   }
+    // }
     return failure();
   }
 };
@@ -937,6 +1148,94 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
 void CallVariadicOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<EraseUnusedCallOp<CallVariadicOp>, ConvertNonVariadicToCallOp>(
+      context);
+}
+
+namespace {
+
+/// Rewrites a cond_fail op to a cond_branch to a fail op.
+struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
+  using OpRewritePattern<CondFailOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CondFailOp op,
+                                PatternRewriter &rewriter) const override {
+    auto *block = rewriter.getInsertionBlock();
+
+    // Create the block with the vm.fail in it.
+    // This is what we will branch to if the condition is true at runtime.
+    auto *failBlock = rewriter.createBlock(block, {op.status().getType()});
+    block->moveBefore(failBlock);
+    rewriter.setInsertionPointToStart(failBlock);
+    rewriter.create<FailOp>(
+        op.getLoc(), failBlock->getArgument(0),
+        op.message().hasValue() ? op.message().getValue() : "");
+
+    // Replace the original cond_fail with our cond_branch, splitting the block
+    // and continuing if the condition is not taken.
+    auto *continueBlock = rewriter.splitBlock(
+        block, op.getOperation()->getNextNode()->getIterator());
+    rewriter.setInsertionPointToEnd(block);
+    rewriter.replaceOpWithNewOp<CondBranchOp>(op, op.condition(), failBlock,
+                                              ValueRange{op.status()},
+                                              continueBlock, ValueRange{});
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void CondFailOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<RewriteCondFailToBranchFail>(context);
+}
+
+namespace {
+
+/// Rewrites a check op to a cmp and a cond_fail.
+template <typename CheckOp, typename CmpI32Op, typename CmpRefOp>
+struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
+  using OpRewritePattern<CheckOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CheckOp op,
+                                PatternRewriter &rewriter) const override {
+    Type condType = rewriter.getI32Type();
+    Value condValue;
+    if (op.getOperation()->getOperand(0).getType().template isa<RefType>()) {
+      condValue = rewriter.template createOrFold<CmpRefOp>(
+          op.getLoc(), ArrayRef<Type>{condType},
+          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+    } else {
+      condValue = rewriter.template createOrFold<CmpI32Op>(
+          op.getLoc(), ArrayRef<Type>{condType},
+          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+    }
+    condValue = rewriter.createOrFold<XorI32Op>(
+        op.getLoc(), condType, condValue,
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
+    auto statusCode = rewriter.createOrFold<ConstI32Op>(
+        op.getLoc(), /*IREE_STATUS_FAILED_PRECONDITION=*/9);
+    rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(op, condValue, statusCode,
+                                                      op.messageAttr());
+    return success();
+  }
+};
+
+}  // namespace
+
+void CheckEQOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<RewriteCheckToCondFail<CheckEQOp, CmpEQI32Op, CmpEQRefOp>>(
+      context);
+}
+
+void CheckNEOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<RewriteCheckToCondFail<CheckNEOp, CmpNEI32Op, CmpNERefOp>>(
+      context);
+}
+
+void CheckNZOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZRefOp>>(
       context);
 }
 

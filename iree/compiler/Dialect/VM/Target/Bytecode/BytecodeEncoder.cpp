@@ -127,6 +127,9 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeStrAttr(StringAttr value) override {
+    if (!value) {
+      return writeUint16(0);
+    }
     auto stringValue = value.getValue();
     if (stringValue.size() > UINT16_MAX) {
       return currentOp_->emitOpError()

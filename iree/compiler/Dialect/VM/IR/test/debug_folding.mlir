@@ -15,7 +15,7 @@ vm.module @cond_break_folds {
 
   // CHECK-LABEL: @const_cond_break_false
   vm.func @const_cond_break_false(%arg0 : i32) -> i32 {
-    // CHECK-NEXT: vm.br ^bb1(%arg0 : i32)
+    // CHECK-NEXT: vm.return %arg0 : i32
     %zero = vm.const.i32.zero : i32
     vm.cond_break %zero, ^bb1(%arg0 : i32)
   ^bb1(%0 : i32):
