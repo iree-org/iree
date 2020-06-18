@@ -189,7 +189,7 @@ StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
   }
   outstanding_semaphores_.insert(insertion_point, semaphore);
 
-  return OkStatus();
+  return semaphore->semaphore;
 }
 
 Status EmulatedTimelineSemaphore::TryToAdvanceTimeline(
