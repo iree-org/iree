@@ -30,7 +30,6 @@
 #include "iree/vm/module_abi_cc.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
-#include "iree/vm/types.h"
 
 extern "C" iree_status_t strings_string_create(iree_string_view_t value,
                                                iree_allocator_t allocator,

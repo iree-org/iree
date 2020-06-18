@@ -172,6 +172,5 @@ iree_cc_library(
     iree::base::tracing
     iree::vm
     iree::vm::module_abi_cc
-    iree::vm::types
   PUBLIC
 )

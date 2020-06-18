@@ -126,7 +126,7 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
                  << input_string << "'";
         }
         iree_vm_variant_list_append_value(variant_list,
-                                          IREE_VM_VALUE_MAKE_I32(val));
+                                          iree_vm_value_make_i32(val));
         break;
       }
       case RawSignatureParser::Type::kBuffer: {

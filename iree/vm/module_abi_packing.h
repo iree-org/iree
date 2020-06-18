@@ -23,11 +23,11 @@
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/status.h"
+#include "iree/vm/builtin_types.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/ref_cc.h"
 #include "iree/vm/stack.h"
-#include "iree/vm/types.h"
 
 namespace iree {
 namespace vm {

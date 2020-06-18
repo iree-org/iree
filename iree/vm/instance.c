@@ -15,7 +15,7 @@
 #include "iree/vm/instance.h"
 
 #include "iree/base/atomics.h"
-#include "iree/vm/types.h"
+#include "iree/vm/builtin_types.h"
 
 struct iree_vm_instance {
   iree_atomic_intptr_t ref_count;

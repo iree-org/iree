@@ -8,10 +8,21 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "builtin_types",
+    srcs = ["builtin_types.c"],
+    hdrs = ["builtin_types.h"],
+    deps = [
+        ":ref",
+        "//iree/base:api",
+    ],
+)
+
 cc_test(
     name = "bytecode_dispatch_test",
     srcs = ["bytecode_dispatch_test.cc"],
     deps = [
+        ":builtin_types",
         ":bytecode_module",
         ":context",
         ":instance",
@@ -36,11 +47,12 @@ cc_library(
         "bytecode_module.h",
     ],
     deps = [
+        ":builtin_types",
         ":bytecode_op_table_gen",
         ":module",
         ":ref",
         ":stack",
-        ":types",
+        ":type_def",
         ":value",
         "//iree/base:alignment",
         "//iree/base:api",
@@ -121,7 +133,7 @@ cc_library(
     srcs = ["instance.c"],
     hdrs = ["instance.h"],
     deps = [
-        ":types",
+        ":builtin_types",
         "//iree/base:api",
         "//iree/base:atomics",
     ],
@@ -158,11 +170,11 @@ cc_library(
         "module_abi_packing.h",
     ],
     deps = [
+        ":builtin_types",
         ":module",
         ":ref",
         ":ref_cc",
         ":stack",
-        ":types",
         "//iree/base:api",
         "//iree/base:api_util",
         "//iree/base:ref_ptr",
@@ -198,7 +210,6 @@ cc_library(
     hdrs = ["ref_cc.h"],
     deps = [
         ":ref",
-        ":types",
         "//iree/base:api",
         "@com_google_absl//absl/base:core_headers",
     ],
@@ -231,12 +242,11 @@ cc_test(
 )
 
 cc_library(
-    name = "types",
-    srcs = ["types.c"],
-    hdrs = ["types.h"],
+    name = "type_def",
+    hdrs = ["type_def.h"],
     deps = [
         ":ref",
-        "//iree/base:api",
+        ":value",
     ],
 )
 
@@ -261,13 +271,14 @@ cc_library(
         "api.h",
     ],
     deps = [
+        ":builtin_types",
         ":context",
         ":instance",
         ":invocation",
         ":module",
         ":ref",
         ":stack",
-        ":types",
+        ":type_def",
         ":value",
         ":variant_list",
         "//iree/base:api",

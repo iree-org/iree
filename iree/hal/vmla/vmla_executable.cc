@@ -170,11 +170,11 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
   iree_vm_variant_list_append_ref_retain(input_list,
                                          &dispatch_state->interface_ref);
   iree_vm_variant_list_append_value(input_list,
-                                    IREE_VM_VALUE_MAKE_I32(workgroup_xyz[0]));
+                                    iree_vm_value_make_i32(workgroup_xyz[0]));
   iree_vm_variant_list_append_value(input_list,
-                                    IREE_VM_VALUE_MAKE_I32(workgroup_xyz[1]));
+                                    iree_vm_value_make_i32(workgroup_xyz[1]));
   iree_vm_variant_list_append_value(input_list,
-                                    IREE_VM_VALUE_MAKE_I32(workgroup_xyz[2]));
+                                    iree_vm_value_make_i32(workgroup_xyz[2]));
 
   auto status =
       FromApiStatus(iree_vm_invoke(context(), dispatch_state->function,

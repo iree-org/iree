@@ -22,6 +22,7 @@
 #include "absl/strings/str_replace.h"
 #include "iree/base/logging.h"
 #include "iree/testing/gtest.h"
+#include "iree/vm/builtin_types.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
@@ -46,6 +47,8 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
 
 std::vector<TestParams> GetModuleTestParams() {
   std::vector<TestParams> test_params;
+
+  IREE_CHECK_OK(iree_vm_register_builtin_types());
 
   auto* module_file_toc = iree::vm::test::all_bytecode_modules_cc_create();
   for (size_t i = 0; i < iree::vm::test::all_bytecode_modules_cc_size(); ++i) {

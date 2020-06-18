@@ -40,7 +40,6 @@ iree_cc_library(
     iree::vm::ref
     iree::vm::ref_cc
     iree::vm::stack
-    iree::vm::types
   PUBLIC
 )
 
@@ -68,7 +67,6 @@ iree_cc_test(
     iree::vm::ref
     iree::vm::ref_cc
     iree::vm::stack
-    iree::vm::types
 )
 
 iree_bytecode_module(

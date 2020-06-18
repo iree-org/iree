@@ -21,7 +21,6 @@
 #include "absl/base/attributes.h"
 #include "iree/base/api.h"
 #include "iree/vm/ref.h"
-#include "iree/vm/types.h"
 
 #ifndef __cplusplus
 #error "This header is meant for use with C++ implementations."

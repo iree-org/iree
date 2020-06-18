@@ -18,25 +18,16 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/vm/builtin_types.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
-#include "iree/vm/types.h"
+#include "iree/vm/type_def.h"
 #include "iree/vm/value.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-// Describes a type in the type table, mapping from a local module type ID to
-// either a primitive value type or registered ref type.
-//
-// If value_type is non-zero (IREE_VM_VALUE_TYPE_NONE) then the type represents
-// a ref object of type ref_type.
-typedef struct {
-  iree_vm_value_type_t value_type : 8;
-  iree_vm_ref_type_t ref_type : 24;
-} iree_vm_type_def_t;
 
 // Matches the FunctionDescriptor struct in the flatbuffer.
 typedef struct {
