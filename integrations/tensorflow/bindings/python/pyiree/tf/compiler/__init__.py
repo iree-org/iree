@@ -52,6 +52,7 @@ TF_IMPORT_PASS_PIPELINE = (
     "tf-executor-graph-pruning",
     "iree-guarantee-all-funcs-one-use",
     "tf-standard-pipeline",
+    "tf-device-index-selector",
 
     # Try to get the IR in good condition.
     # In particular, because IREE doesn't handle dynamic shapes, we need to

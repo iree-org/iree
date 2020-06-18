@@ -516,13 +516,21 @@ struct ConvertOpConversion : public OpConversionPattern<xla_hlo::ConvertOp> {
   LogicalResult matchAndRewrite(
       xla_hlo::ConvertOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    int srcBit =
-        srcOp.operand().getType().cast<ShapedType>().getElementTypeBitWidth();
-    int dstBit =
-        srcOp.getResult().getType().cast<ShapedType>().getElementTypeBitWidth();
+    auto srcType = srcOp.operand().getType().cast<ShapedType>();
+    auto dstType = srcOp.getResult().getType().cast<ShapedType>();
+
+    // The xla_hlo.convert op can have the same src and dst element types, in
+    // which case it just represents a static structural annotation of a shape
+    // change, so it is just an identity op at runtime.
+    if (srcType.getElementType() == dstType.getElementType()) {
+      return IdentityOpConversion<xla_hlo::ConvertOp>{rewriter.getContext()}
+          .matchAndRewrite(srcOp, rawOperands, rewriter);
+    }
+
     // VMLA does not support tensors of i1. tensor<*xi1> will be converted to
     // tensor<*xi8>.
-    if (srcBit == 1 && dstBit == 8) {
+    if (srcType.getElementTypeBitWidth() == 1 &&
+        dstType.getElementTypeBitWidth() == 8) {
       rewriter.replaceOp(srcOp, rawOperands);
     } else {
       return VMLAConversionTarget::applyDefaultBufferRewrite(
