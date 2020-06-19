@@ -1,4 +1,20 @@
-# IREE-specific CMake Options and Variables
+# CMake Options and Variables
+
+## Frequently-used CMake Variables
+
+*   `CMAKE_BUILD_TYPE`:STRING
+
+    Sets the build type. Possible values are `Release`, `Debug`,
+    `RelWithDebInfo`/`FastBuild` and `MinSizeRel`. If unset, build type is set
+    to `Release`.
+
+*   `CMAKE_<LANG>_COMPILER`:STRING
+
+    This is the command that will be used as the `<LANG>` compiler, which are
+    `C` and `CXX` in IREE. These variables are set to compile IREE with
+    `clang` or rather `clang++`. Once set, these variables can not be changed.
+
+## IREE-specific CMake Options and Variables
 
 This gives a brief explanation of IREE specific CMake options and variables.
 
@@ -67,6 +83,8 @@ This gives a brief explanation of IREE specific CMake options and variables.
     `DISABLED` or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the
     variable `MLIR_DIR` needs to be passed and that LLVM needs to be compiled
     with `LLVM_ENABLE_RTTI` set to `ON`.
+
+## MLIR-specific CMake Options and Variables
 
 *   `MLIR_DIR`:STRING
 
