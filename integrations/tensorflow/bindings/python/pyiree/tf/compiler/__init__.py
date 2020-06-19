@@ -60,6 +60,8 @@ TF_IMPORT_PASS_PIPELINE = (
     # TODO(silvasean): Add a verifier pass that enforces that.
     "inline",
     "canonicalize",
+    "tf-device-decompose-resource-ops",
+    "iree-propagate-resource-casts",
     "tf-shape-inference",
 
     # Lower to CFG.
@@ -74,7 +76,6 @@ TF_IMPORT_PASS_PIPELINE = (
     "canonicalize",
 
     # Legalize to XLA
-    "tf-device-decompose-resource-ops",
     "xla-legalize-tf{allow-partial-conversion=true}",
     "canonicalize",
 

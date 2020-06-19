@@ -38,7 +38,6 @@ SPECIAL_CASES = [
 VMLA_FAILING = [
     "fill_test.py",
     "mandelbrot_test.py",
-    "resource_ops_test.py",
     "ring_buffer_test.py",
     "strings_test.py",
 ]
