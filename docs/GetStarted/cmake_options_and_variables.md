@@ -24,12 +24,14 @@ Enables instrumented runtime tracing. Defaults to `OFF`.
 
 #### `IREE_ENABLE_MLIR`:BOOL
 
-Enables MLIR/LLVM dependencies. Defaults to `ON`.
+Enables MLIR/LLVM dependencies. Defaults to `ON`. MLIR/LLVM dependencies are
+required if the IREE compiler should be build. Therefore, the option is
+automatically set to `ON` if `IREE_BUILD_COMPILER` is set to `ON`.
 
 #### `IREE_ENABLE_EMITC`:BOOL
 
-Enables MLIR EmitC dependencies. Defaults to OFF. Requires that
-`IREE_ENABLE_MLIR` is set to `ON`.
+Enables the build of the out-of-tree MLIR dialect EmitC. Defaults to `OFF`. To
+build the EmitC dialect, `IREE_ENABLE_MLIR` must be set to `ON`.
 
 #### `IREE_BUILD_COMPILER`:BOOL
 
@@ -53,7 +55,7 @@ Builds the IREE debugger app. Defaults to `OFF`.
 
 #### `IREE_BUILD_PYTHON_BINDINGS`:BOOL
 
-Builds the IREE python bindings Defaults to `OFF`.
+Builds the IREE python bindings. Defaults to `OFF`.
 
 #### `IREE_BUILD_EXPERIMENTAL`:BOOL
 
@@ -75,7 +77,9 @@ building all HAL drivers. Case-insensitive. Defaults to `all`. Example:
 
 #### `IREE_ENABLE_LLD`:BOOL
 
-Use lld when linking. Defaults to `OFF`.
+Use lld when linking. Defaults to `OFF`. This option is equivalent to
+`-DIREE_USE_LINKER=lld`. The option `IREE_ENABLE_LLD` and `IREE_USE_LINKER` can
+not be set at the same time.
 
 #### `IREE_MLIR_DEP_MODE`:STRING
 
