@@ -107,6 +107,7 @@ iree_check_single_backend_test_suite(
     "slice.mlir"
     "sqrt.mlir"
     "subtract.mlir"
+    "tanh.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "while.mlir"
