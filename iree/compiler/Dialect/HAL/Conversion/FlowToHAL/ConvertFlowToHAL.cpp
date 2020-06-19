@@ -108,8 +108,7 @@ class ConvertFlowToHALPass
     // NOTE: we allow ops that we don't know about to allow custom dialects
     // that don't need anything HAL-specific to pass through. This is handled by
     // the fallback type legality support of the
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      &typeConverter))) {
+    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
       return signalPassFailure();
     }
   }

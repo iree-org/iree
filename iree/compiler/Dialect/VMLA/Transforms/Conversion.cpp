@@ -121,7 +121,7 @@ class ConversionPass
     conversionTarget.addIllegalOp<Shape::RankedBroadcastInDimOp>();
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
-                                      conversionPatterns, &typeConverter))) {
+                                      conversionPatterns))) {
       getOperation().emitError() << "conversion to the VMLA dialect failed";
       return signalPassFailure();
     }
