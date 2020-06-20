@@ -169,7 +169,7 @@ void testMatmulOnVectors(StringLiteral funcName) {
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());
   Value A(func.getArgument(0)), B(func.getArgument(1)), C(func.getArgument(2));
-  auto contractionBuilder = [](ArrayRef<BlockArgument> args) {
+  auto contractionBuilder = [](ValueRange args) {
     assert(args.size() == 3 && "expected 3 block arguments");
     (linalg_yield(vector_contraction_matmul(args[0], args[1], args[2])));
   };
