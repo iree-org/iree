@@ -89,7 +89,8 @@ by IREE.
 > {: .label .label-green }
 > The root
 > [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt)
-> file has options for configuring which parts of the project to enable.
+> file has options for configuring which parts of the project to enable.<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
 
 Build all targets:
 
