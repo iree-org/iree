@@ -7,6 +7,13 @@ external contributors, but they are documented here for clarity and
 transparency. If any of these things are particularly troublesome or painful for
 your workflow, please reach out to us so we can prioritize a fix.
 
+NOTE: We are currently in the process of migrating our repository to be
+GitHub-first and hide the merging complexity in a separate `google` feature
+branch so that standard development workflows don't have to bear the cost for
+every contribution. During this part of the migration period, please direct PRs
+to the `google` branch (which will be marked as the default branch). See
+https://groups.google.com/d/msg/iree-discuss/F07vsG9Ah4o/uAIusKO-BQAJ.
+
 ## Dependencies
 
 As a project which brings together compiler, runtime and graphics systems,
