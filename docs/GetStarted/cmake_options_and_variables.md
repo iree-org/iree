@@ -25,7 +25,7 @@ Enables instrumented runtime tracing. Defaults to `OFF`.
 #### `IREE_ENABLE_MLIR`:BOOL
 
 Enables MLIR/LLVM dependencies. Defaults to `ON`. MLIR/LLVM dependencies are
-required if the IREE compiler should be build. Therefore, the option is
+required when building the IREE compiler components. Therefore, the option is
 automatically set to `ON` if `IREE_BUILD_COMPILER` is set to `ON`.
 
 #### `IREE_ENABLE_EMITC`:BOOL
