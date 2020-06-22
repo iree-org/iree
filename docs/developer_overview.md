@@ -74,18 +74,16 @@ Test `.mlir` files that are checked in typically include a `RUN` block at the
 top of the file that specifies which passes should be performed and if
 `FileCheck` should be used to test the generated output.
 
-For example, to run some passes on the
-[reshape.mlir](https://github.com/google/iree/blob/master/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir)
-test file:
+For example, to run IREE's complete transformation pipeline targetting the VMLA
+backend on the
+[fullyconnected.mlir](https://github.com/google/iree/blob/master/iree/test/e2e/models/fullyconnected.mlir)
+model file:
 
 ```shell
 $ bazel run iree/tools:iree-opt -- \
-  -split-input-file \
-  -iree-index-computation \
-  -simplify-spirv-affine-exprs=false \
-  -convert-iree-to-spirv \
-  -verify-diagnostics \
-  $PWD/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir
+  -iree-transformation-pipeline \
+  -iree-hal-target-backends=vmla \
+  $PWD/iree/test/e2e/models/fullyconnected.mlir
 ```
 
 Custom passes may also be layered on top of `iree-opt`, see
