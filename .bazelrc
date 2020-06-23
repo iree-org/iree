@@ -45,6 +45,7 @@ build:generic_clang --copt=-Wno-unused-function
 
 # Enable warnings we do care about.
 build:generic_clang --copt=-Wimplicit-fallthrough
+build:generic_clang --copt=-Wthread-safety-analysis
 
 # C++14 standard version is required.
 build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
@@ -193,4 +194,3 @@ try-import %workspace%/configured.bazelrc
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.
 try-import %workspace%/user.bazelrc
-
