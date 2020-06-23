@@ -68,14 +68,25 @@ translations, and other transformations step by step.
 [mlir-opt](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-opt)
 and runs sets of IREE's compiler passes on `.mlir` input files. See "conversion"
 in [MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#conversion)
-for more information.
+for more information. Compiler "passes" can range from isolated manipulations to
+broad pipelines that encompass a sequence of steps.
 
 Test `.mlir` files that are checked in typically include a `RUN` block at the
 top of the file that specifies which passes should be performed and if
 `FileCheck` should be used to test the generated output.
 
-For example, to run IREE's complete transformation pipeline targetting the VMLA
-backend on the
+Here's an example of a small compiler pass running on a
+[test file](https://github.com/google/iree/blob/master/iree/compiler/Dialect/VM/Transforms/test/mark_public_symbols_exported.mlir):
+
+```shell
+$ bazel run iree/tools:iree-opt -- \
+  -iree-vm-mark-public-symbols-exported \
+  -iree-hal-target-backends=vmla \
+  $PWD/iree/compiler/Dialect/VM/Transforms/test/mark_public_symbols_exported.mlir
+```
+
+For a more complex example, here's how to run IREE's complete transformation
+pipeline targeting the VMLA backend on the
 [fullyconnected.mlir](https://github.com/google/iree/blob/master/iree/test/e2e/models/fullyconnected.mlir)
 model file:
 
