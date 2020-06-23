@@ -14,6 +14,8 @@
 
 #include "iree/hal/vulkan/timepoint_util.h"
 
+#include <memory>
+
 #include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
 #include "absl/utility/utility.h"
@@ -100,7 +102,7 @@ Status TimePointFencePool::PreallocateFences() {
   create_info.pNext = nullptr;
   create_info.flags = 0;
 
-  std::array<TimePointFence*, kMaxInFlightFenceCount> fences;
+  std::array<std::unique_ptr<TimePointFence>, kMaxInFlightFenceCount> fences;
   {
     absl::MutexLock lock(&mutex_);
     for (int i = 0; i < fences.size(); ++i) {
@@ -108,7 +110,7 @@ Status TimePointFencePool::PreallocateFences() {
       VK_RETURN_IF_ERROR(syms()->vkCreateFence(*logical_device_, &create_info,
                                                logical_device_->allocator(),
                                                &fence));
-      fences[i] = new TimePointFence(this, fence);
+      fences[i].reset(new TimePointFence(this, fence));
     }
   }
 
@@ -120,7 +122,7 @@ Status TimePointFencePool::PreallocateFences() {
     // with all newly created fences.
     // TODO: Might want to avoid acquiring and releasing the mutex for each
     // fence.
-    fences[i]->ReleaseReference();
+    fences[i].release()->ReleaseReference();
   }
 
   return OkStatus();

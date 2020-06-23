@@ -110,6 +110,7 @@ Status EmulatedTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
       // Found; we can break the loop and proceed to waiting now.
       break;
     }
+    // TODO(antiagainst): figure out a better way instead of the busy loop here.
   } while (absl::Now() < deadline);
 
   if (fence == VK_NULL_HANDLE) {

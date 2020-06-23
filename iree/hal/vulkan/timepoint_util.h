@@ -49,7 +49,7 @@ class TimePointFence final : public RefObject<TimePointFence>,
                              public IntrusiveLinkBase<void> {
  public:
   TimePointFence(TimePointFencePool* pool, VkFence fence)
-      : pool_(pool), fence_(fence), status_(VK_NOT_READY) {}
+      : pool_(pool), fence_(fence) {}
 
   TimePointFence(TimePointFence&& that) = delete;
   TimePointFence& operator=(TimePointFence&&) = delete;
@@ -81,7 +81,7 @@ class TimePointFence final : public RefObject<TimePointFence>,
 
   // The fence's status.
   absl::Mutex status_mutex_;
-  VkResult status_ ABSL_GUARDED_BY(status_mutex_);
+  VkResult status_ ABSL_GUARDED_BY(status_mutex_) = VK_NOT_READY;
 };
 
 // A semaphore used for emulating a specific time point of timeline semaphores.

@@ -316,7 +316,7 @@ Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
       default:
         return VkResultToStatus(result);
     }
-    // As long as there are submitted work and deferred work.
+    // As long as there is submitted or deferred work still pending.
   } while (!pending_fences_.empty() || !deferred_submissions_.empty());
 
   return OkStatus();
