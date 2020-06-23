@@ -63,7 +63,7 @@ CompilerModuleBundle LoadSavedModel(
                               absl::MakeSpan(mutable_exported_names));
   if (!module_or.status().ok()) {
     std::stringstream msg;
-    msg << "Failed to convert saved model to MLIR'" << saved_model_dir
+    msg << "Failed to convert saved model to MLIR '" << saved_model_dir
         << "': " << module_or.status();
     throw RaisePyError(PyExc_RuntimeError, msg.str().c_str());
   }
@@ -93,7 +93,7 @@ CompilerModuleBundle LoadSignatureDefSavedModel(
                                 context_bundle->mlir_context());
   if (!module_or.status().ok()) {
     std::stringstream msg;
-    msg << "Failed to convert saved model to MLIR'" << saved_model_dir
+    msg << "Failed to convert saved model to MLIR '" << saved_model_dir
         << "': " << module_or.status();
     throw RaisePyError(PyExc_RuntimeError, msg.str().c_str());
   }
