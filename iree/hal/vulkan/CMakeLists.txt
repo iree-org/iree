@@ -86,6 +86,7 @@ iree_cc_library(
   COPTS
     "-DVK_NO_PROTOTYPES"
   DEPS
+    iree::base::alignment
     iree::base::arena
     iree::base::math
     iree::base::status
