@@ -87,6 +87,7 @@ Status EmulatedTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
 
   VkFence fence = VK_NULL_HANDLE;
   do {
+    IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Wait#loop");
     // First try to advance the timeline without blocking to see whether we've
     // already reached the desired value.
     ASSIGN_OR_RETURN(bool reached_desired_value, TryToAdvanceTimeline(value));

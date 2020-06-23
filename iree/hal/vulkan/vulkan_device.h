@@ -110,14 +110,6 @@ class VulkanDevice final : public Device {
   StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
                                  absl::Time deadline) override;
 
-  // Triggers necessary processing on this device due to new values gotten
-  // signaled for the gvien timeline |semaphore|.
-  Status OnSemaphoreSignal(Semaphore* semaphore);
-
-  // Triggers necessary processing on this device due to failures for the given
-  // timeline |semaphore|.
-  void OnSemaphoreFailure(Semaphore* semaphore);
-
   Status WaitIdle(absl::Time deadline) override;
 
  private:

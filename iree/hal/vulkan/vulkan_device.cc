@@ -698,11 +698,24 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
 #if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
   return EmulatedTimelineSemaphore::Create(
       add_ref(logical_device_),
-      [this](Semaphore* semaphore) {
-        return this->OnSemaphoreSignal(semaphore);
+      // Triggers necessary processing on all queues due to new values gotten
+      // signaled for the given timeline |semaphore|.
+      [this](Semaphore* /*semaphore*/) -> Status {
+        IREE_TRACE_SCOPE0("<lambda>::OnSemaphoreSignal");
+        for (const auto& queue : command_queues_) {
+          RETURN_IF_ERROR(static_cast<SerializingCommandQueue*>(queue.get())
+                              ->AdvanceQueueSubmission());
+        }
+        return OkStatus();
       },
-      [this](Semaphore* semaphore) {
-        return this->OnSemaphoreFailure(semaphore);
+      // Triggers necessary processing on all queues due to failures for the
+      // given timeline |semaphore|.
+      [this](Semaphore* /*semaphore*/) {
+        IREE_TRACE_SCOPE0("<lambda>::OnSemaphoreFailure");
+        for (const auto& queue : command_queues_) {
+          static_cast<SerializingCommandQueue*>(queue.get())
+              ->AbortQueueSubmission();
+        }
       },
       add_ref(semaphore_pool_), initial_value);
 #else
@@ -789,32 +802,6 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
 
   return OkStatus();
 
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
-}
-
-Status VulkanDevice::OnSemaphoreSignal(Semaphore* /*semaphore*/) {
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
-  for (CommandQueue* queue : dispatch_queues_) {
-    RETURN_IF_ERROR(
-        static_cast<SerializingCommandQueue*>(queue)->AdvanceQueueSubmission());
-  }
-  for (CommandQueue* queue : transfer_queues_) {
-    RETURN_IF_ERROR(
-        static_cast<SerializingCommandQueue*>(queue)->AdvanceQueueSubmission());
-  }
-#endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
-
-  return OkStatus();
-}
-
-void VulkanDevice::OnSemaphoreFailure(Semaphore* /*semaphore*/) {
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
-  for (CommandQueue* queue : dispatch_queues_) {
-    static_cast<SerializingCommandQueue*>(queue)->AbortQueueSubmission();
-  }
-  for (CommandQueue* queue : transfer_queues_) {
-    static_cast<SerializingCommandQueue*>(queue)->AbortQueueSubmission();
-  }
 #endif  // IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES
 }
 
