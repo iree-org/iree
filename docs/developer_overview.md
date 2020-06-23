@@ -76,13 +76,14 @@ top of the file that specifies which passes should be performed and if
 `FileCheck` should be used to test the generated output.
 
 Here's an example of a small compiler pass running on a
-[test file](https://github.com/google/iree/blob/master/iree/compiler/Dialect/VM/Transforms/test/mark_public_symbols_exported.mlir):
+[test file](https://github.com/google/iree/blob/master/iree/compiler/Dialect/IREE/Transforms/test/drop_compiler_hints.mlir):
 
 ```shell
 $ bazel run iree/tools:iree-opt -- \
-  -iree-vm-mark-public-symbols-exported \
-  -iree-hal-target-backends=vmla \
-  $PWD/iree/compiler/Dialect/VM/Transforms/test/mark_public_symbols_exported.mlir
+  -split-input-file \
+  -print-ir-before-all \
+  -iree-drop-compiler-hints \
+  $PWD/iree/compiler/Dialect/IREE/Transforms/test/drop_compiler_hints.mlir
 ```
 
 For a more complex example, here's how to run IREE's complete transformation
