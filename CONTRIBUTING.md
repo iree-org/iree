@@ -50,6 +50,11 @@ will match the PR title followed by the PR description. Accordingly, please
 write these as you would a helpful commit message. Please also keep PRs small
 (focused on a single issue) to streamline review and ease later culprit-finding.
 
+As part of a migration to make the project GitHub-first, our default branch is
+currently called `google` and all PRs should be directed there. This is an
+intermediate state. See
+https://groups.google.com/d/msg/iree-discuss/F07vsG9Ah4o/uAIusKO-BQAJ
+
 Our documentation on
 [repository management](https://github.com/google/iree/blob/master/docs/repository_management.md)
 has more information on some of the oddities in our repository setup and
