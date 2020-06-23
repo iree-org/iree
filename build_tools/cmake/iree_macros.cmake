@@ -90,9 +90,9 @@ endfunction()
 
 # iree_get_executable_path
 #
-# Gets the path to an executable in a cross-compilation-aware way. This is
-# meant to be used for binaries that are used to generate source files and
-# can only be built on host.
+# Gets the path to an executable in a cross-compilation-aware way. This
+# should be used when accessing binaries that are used as part of the build,
+# such as for generating files used for later build steps.
 #
 # Paramters:
 # - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
@@ -210,9 +210,9 @@ endfunction()
 
 # iree_add_executable_dependencies
 #
-# Adds dependency to a target in a cross-compilation-aware way. This is meant
-# to be used for dependencies that are used to generate source files and can
-# only be built on host.
+# Adds dependency on a target in a cross-compilation-aware way. This should
+# be used for depending on targets that are used as part of the build, such
+# as for generating files used for later build steps.
 #
 # Parameters:
 # TARGET: the target to take on dependencies

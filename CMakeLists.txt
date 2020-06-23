@@ -51,7 +51,10 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\"." FORCE)
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\"." FORCE)
-# LINT.ThenChange(https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options)
+# LINT.ThenChange(
+#   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
+#   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
+# )
 
 if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
@@ -149,7 +152,9 @@ if(CMAKE_CROSSCOMPILING)
 
   # Master configuration for the binary directory containing all artifacts
   # compiled for host.
-  set(IREE_HOST_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/host")
+  if(NOT IREE_HOST_BINARY_ROOT)
+    set(IREE_HOST_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/host" CACHE FILEPATH "directory containing host artifacts")
+  endif()
 
   set(IREE_HOST_BUILD_COMPILER ON) # For iree-translate
   set(IREE_HOST_ENABLE_LLVM ON)    # For iree-tblgen

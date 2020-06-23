@@ -20,11 +20,11 @@ include(iree_macros)
 # configuration means a new IREE CMake invocation with its own set of
 # parameters.
 #
-# This function defines two custom target, `iree_prepare_${CONFIG_NAME}_dir`
-# and `iree_configure_${CONFIG_NAME}`, to drive the creation of a directory
-# for hosting the new IREE configuration and its corresponding `CMakeCache.txt`
-# file, respectively. Callers can then depend on either the file or the
-# target to make sure the configuration is invoked as a dependency.
+# This function defines a custom target, `iree_configure_${CONFIG_NAME}`,
+# to drive the generation of a new IREE configuration's `CMakeCache.txt`
+# file. Callers can then depend on either the `CMakeCache.txt` file or the
+# `iree_configure_${CONFIG_NAME}` target to make sure the configuration
+# is invoked as a dependency.
 #
 # This function is typically useful when cross-compiling towards another
 # architecture. For example, when cross-compiling towards Android, we need
@@ -91,7 +91,10 @@ function(iree_create_configuration CONFIG_NAME)
   # spaces.
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_HAL_DRIVERS_TO_BUILD "${IREE_HAL_DRIVERS_TO_BUILD}")
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_TARGET_BACKENDS_TO_BUILD "${IREE_TARGET_BACKENDS_TO_BUILD}")
-  # LINT.ThenChange(https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options)
+  # LINT.ThenChange(
+  #   https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options,
+  #   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
+  # )
 
   message(STATUS "C compiler for ${CONFIG_NAME} build: ${_CONFIG_C_COMPILER}")
   message(STATUS "C++ compiler for ${CONFIG_NAME} build: ${_CONFIG_CXX_COMPILER}")
@@ -102,6 +105,7 @@ function(iree_create_configuration CONFIG_NAME)
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
         -DCMAKE_C_COMPILER="${_CONFIG_C_COMPILER}"
         -DCMAKE_CXX_COMPILER="${_CONFIG_CXX_COMPILER}"
+        # LINT.IfChange(iree_cross_compile_invoke)
         -DIREE_ENABLE_RUNTIME_TRACING=${_CONFIG_ENABLE_RUNTIME_TRACING}
         -DIREE_ENABLE_MLIR=${_CONFIG_ENABLE_MLIR}
         -DIREE_ENABLE_EMITC=${_CONFIG_ENABLE_EMITC}
@@ -112,6 +116,10 @@ function(iree_create_configuration CONFIG_NAME)
         -DIREE_BUILD_DEBUGGER=${_CONFIG_BUILD_DEBUGGER}
         -DIREE_BUILD_PYTHON_BINDINGS=${_CONFIG_BUILD_PYTHON_BINDINGS}
         -DIREE_BUILD_EXPERIMENTAL=${_CONFIG_BUILD_EXPERIMENTAL}
+        # LINT.ThenChange(
+        #   https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options,
+        #   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
+        # )
         -DIREE_HAL_DRIVERS_TO_BUILD="${_CONFIG_HAL_DRIVERS_TO_BUILD}"
         -DIREE_TARGET_BACKENDS_TO_BUILD="${_CONFIG_TARGET_BACKENDS_TO_BUILD}"
     WORKING_DIRECTORY ${_CONFIG_BINARY_ROOT}
