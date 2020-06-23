@@ -35,3 +35,15 @@ iree_py_library(
         "//bindings/python/pyiree/rt",
     ],
 )
+
+py_test(
+    name = "tf_test_utils_test",
+    srcs = [
+        "tf_test_utils.py",
+        "tf_test_utils_test.py",
+    ],
+    python_version = "PY3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
