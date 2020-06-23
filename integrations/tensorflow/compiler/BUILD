@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "GuaranteeAllFuncsOneUse.cpp",
         "Passes.cpp",
+        "PropagateResourceCasts.cpp",
         "TFSavedModelLowerExportedFunctions.cpp",
         "TFSavedModelLowerGlobalTensors.cpp",
     ],

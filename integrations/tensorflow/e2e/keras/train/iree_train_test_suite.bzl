@@ -19,24 +19,30 @@ load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 def iree_train_test_suite(
         name,
         configurations,
-        deps = None,
         tags = None,
+        deps = None,
         size = None,
         python_version = "PY3",
         **kwargs):
     """Creates one iree_py_test per configuration tuple and a test suite that bundles them.
 
     Args:
-      name: name of the generated test suite.
-      configurations: a list of tuples of (optimizer, backends).
-      tags: tags to apply to the test. Note that as in standard test suites,
-            manual is treated specially and will also apply to the test suite
-            itself.
-      size: size of the tests.
-      python_version: the python version to run the tests with. Uses python3
-                      by default.
-      **kwargs: Any additional arguments that will be passed to the underlying
-                tests and test_suite.
+      name:
+        name of the generated test suite.
+      configurations:
+        a list of tuples of (optimizer, backends).
+      tags:
+        tags to apply to the test. Note that as in standard test suites, manual
+        is treated specially and will also apply to the test suite itself.
+      deps:
+        test dependencies.
+      size:
+        size of the tests.
+      python_version:
+        the python version to run the tests with. Uses python3 by default.
+      **kwargs:
+        Any additional arguments that will be passed to the underlying tests
+        and test_suite.
     """
     tests = []
     for optimizer, backends in configurations:
@@ -50,8 +56,8 @@ def iree_train_test_suite(
 
         iree_py_test(
             name = test_name,
-            main = "keras_model_train_test.py",
-            srcs = ["keras_model_train_test.py"],
+            main = "model_train_test.py",
+            srcs = ["model_train_test.py"],
             args = args,
             tags = tags,
             deps = deps,

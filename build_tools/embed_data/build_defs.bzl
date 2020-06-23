@@ -19,6 +19,7 @@ def cc_embed_data(
         srcs,
         cc_file_output,
         h_file_output,
+        testonly = False,
         cpp_namespace = None,
         strip_prefix = None,
         flatten = False,
@@ -49,6 +50,7 @@ def cc_embed_data(
       srcs: List of files to embed.
       cc_file_output: The CC implementation file to output.
       h_file_output: The H header file to output.
+      testonly: If True, only testonly targets can depend on this target.
       cpp_namespace: Wraps everything in a C++ namespace.
       strip_prefix: Strips this verbatim prefix from filenames (in the TOC).
       flatten: Removes all directory components from filenames (in the TOC).
@@ -80,10 +82,12 @@ def cc_embed_data(
         ],
         tools = [generator],
         cmd = "%s $(SRCS) %s" % (generator_location, flags),
+        testonly = testonly,
     )
     native.cc_library(
         name = name,
         hdrs = [h_file_output],
         srcs = [cc_file_output],
+        testonly = testonly,
         **kwargs
     )

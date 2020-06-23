@@ -29,9 +29,9 @@ ENV CMAKE_VERSION 3.13.5
 RUN apt-get install -y clang cmake libssl-dev wget \
   && mkdir ./cmake_install \
   && cd cmake_install \
-  && wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz \
-  && tar -xzvf cmake-${CMAKE_VERSION}.tar.gz \
-  && cd cmake-${CMAKE_VERSION}/ \
+  && wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}.tar.gz" \
+  && tar -xzvf "cmake-${CMAKE_VERSION?}.tar.gz" \
+  && cd "cmake-${CMAKE_VERSION?}/" \
   && cmake . \
   && make \
   && make install

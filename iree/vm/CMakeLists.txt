@@ -20,7 +20,6 @@ iree_cc_test(
   SRCS
     "bytecode_dispatch_test.cc"
   DEPS
-    ::bytecode_dispatch_test_module_cc
     ::bytecode_module
     ::context
     ::instance
@@ -29,18 +28,7 @@ iree_cc_test(
     absl::strings
     iree::base::logging
     iree::testing::gtest_main
-)
-
-iree_bytecode_module(
-  NAME
-    bytecode_dispatch_test_module
-  SRC
-    "bytecode_dispatch_test.mlir"
-  CC_NAMESPACE
-    "iree::vm"
-  FLAGS
-    "-iree-vm-ir-to-bytecode-module"
-  PUBLIC
+    iree::vm::test::all_bytecode_modules_cc
 )
 
 iree_cc_library(

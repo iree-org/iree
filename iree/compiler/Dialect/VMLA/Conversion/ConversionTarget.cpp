@@ -46,8 +46,10 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   // Allow other ops to pass through so long as their type is valid (not a
   // tensor, basically).
   markUnknownOpDynamicallyLegal();
-  addDynamicallyLegalOp<FuncOp>(
-      [&](FuncOp op) { return typeConverter.isSignatureLegal(op.getType()); });
+  addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+    return typeConverter.isSignatureLegal(op.getType()) &&
+           typeConverter.isLegal(&op.getBody());
+  });
   addDynamicallyLegalOp<ConstantOp>(
       [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
   addLegalOp<ReturnOp>();

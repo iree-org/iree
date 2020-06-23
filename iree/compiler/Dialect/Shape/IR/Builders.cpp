@@ -126,7 +126,8 @@ LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
                                            SmallVectorImpl<Value> &outDims,
                                            OpBuilder &builder) {
   Operation *op = rsValue.getDefiningOp();
-  if (llvm::isa<MakeRankedShapeOp>(op) || llvm::isa<ConstRankedShapeOp>(op)) {
+  if (op &&
+      (llvm::isa<MakeRankedShapeOp>(op) || llvm::isa<ConstRankedShapeOp>(op))) {
     unsigned dynamicDimIndex = 0;
     auto rsType = rsValue.getType().cast<RankedShapeType>();
     for (int i = 0, e = rsType.getRank(); i < e; ++i) {

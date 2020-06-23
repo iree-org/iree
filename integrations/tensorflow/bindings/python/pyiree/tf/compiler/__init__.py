@@ -48,11 +48,11 @@ OutputFormat = binding.OutputFormat
 # for input to the IREE compiler.
 TF_IMPORT_PASS_PIPELINE = (
     # Clean up tf_executor and extraneous unused functions.
-    "tf-saved-model-mark-func-visibility",
     "symbol-dce",
     "tf-executor-graph-pruning",
     "iree-guarantee-all-funcs-one-use",
     "tf-standard-pipeline",
+    "tf-device-index-selector",
 
     # Try to get the IR in good condition.
     # In particular, because IREE doesn't handle dynamic shapes, we need to
@@ -60,6 +60,8 @@ TF_IMPORT_PASS_PIPELINE = (
     # TODO(silvasean): Add a verifier pass that enforces that.
     "inline",
     "canonicalize",
+    "tf-device-decompose-resource-ops",
+    "iree-propagate-resource-casts",
     "tf-shape-inference",
 
     # Lower to CFG.
@@ -70,12 +72,10 @@ TF_IMPORT_PASS_PIPELINE = (
     "inline",
 
     # Some further cleanups now that control flow is in better shape.
-    "tf-saved-model-mark-func-visibility",
     "symbol-dce",
     "canonicalize",
 
     # Legalize to XLA
-    "tf-device-decompose-resource-ops",
     "xla-legalize-tf{allow-partial-conversion=true}",
     "canonicalize",
 

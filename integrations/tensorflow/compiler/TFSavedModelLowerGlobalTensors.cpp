@@ -60,6 +60,10 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
   OpBuilder globalBuilder(module.getBodyRegion());
   SymbolTable symbolTable(module);
 
+  if (auto sessionInitializer = tf_saved_model::GetSessionInitializerOp(module))
+    return sessionInitializer.emitError()
+           << "Session initializer is not supported yet";
+
   DenseMap<StringRef, std::string> symNameToFlowSymName;
   for (auto globalTensor : module.getOps<tf_saved_model::GlobalTensorOp>()) {
     auto exportedNames = tf_saved_model::GetExportedNames(globalTensor);

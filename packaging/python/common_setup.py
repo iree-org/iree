@@ -123,7 +123,7 @@ def setup(**kwargs):
 
   # Need to include platform specific extensions binaries:
   #  Windows: .pyd
-  #  MacOS: .dylib
+  #  macOS: .dylib
   #  Other: .so
   # Unfortunately, bazel is imprecise and scatters .so files around, so
   # need to be specific.

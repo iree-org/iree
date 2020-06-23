@@ -76,7 +76,9 @@ static constexpr const FunctionPtrInfo kDynamicFunctionPtrInfos[] = {
                                       DEV_PFN_FUNCTION_PTR)};
 
 static const char* kVulkanLoaderSearchNames[] = {
-#if defined(IREE_PLATFORM_WINDOWS)
+#if defined(IREE_PLATFORM_ANDROID)
+    "libvulkan.so",
+#elif defined(IREE_PLATFORM_WINDOWS)
     "vulkan-1.dll",
 #else
     "libvulkan.so.1",

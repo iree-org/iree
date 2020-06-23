@@ -6,12 +6,13 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_windows_bazel.md.
+    * This document parallels getting_started_windows_bazel.md and
+      getting_started_macos_bazel.md
       Please keep them in sync.
 -->
 
 This guide walks through building the core compiler and runtime parts of IREE
-from source. Auxilary components like the Python bindings and Vulkan driver are
+from source. Auxiliary components like the Python bindings and Vulkan driver are
 documented separately, as they require further setup.
 
 ## Prerequisites
@@ -19,7 +20,7 @@ documented separately, as they require further setup.
 ### Install Bazel
 
 Install Bazel version > 2.0.0 (see
-[.bazelversion](https://github.com/google/iree/blob/master/.bazelversion) for
+[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion) for
 the specific version IREE uses) by following the
 [official docs](https://docs.bazel.build/versions/master/install.html).
 
@@ -31,11 +32,17 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
-Set environment variables:
+Set environment variables for Bazel:
 
 ```shell
 export CC=clang
 export CXX=clang++
+```
+
+### Install python3 numpy
+
+```shell
+$ python3 -m pip install numpy
 ```
 
 ## Clone and Build
@@ -76,7 +83,7 @@ level.
 You can put a user.bazelrc at the root of the repository and it will be ignored
 by git. The recommended contents for Linux are:
 
-```
+```shell
 build --disk_cache=/tmp/bazel-cache
 
 # Use --config=debug to compile iree and llvm without optimizations
@@ -109,7 +116,8 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
+    -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading

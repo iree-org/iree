@@ -112,10 +112,10 @@ features and quarterly plans. Please check out for updated information.
 
 CI System | Build System | Platform | Component       | Status
 :-------: | :----------: | :------: | :-------------: | :----:
-Kokoro    | Bazel        | Linux    | Core            | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/build_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/build_result.html)
-Kokoro    | Bazel        | Linux    | Bindings        | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/build_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/build_result.html)
-Kokoro    | Bazel        | Linux    | Integrations    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/build_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/build_result.html)
-Kokoro    | CMake        | Linux    | Core + Bindings | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/build_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/build_result.html)
+Kokoro    | Bazel        | Linux    | Core            | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/google_result.html)
+Kokoro    | Bazel        | Linux    | Bindings        | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/google_result.html)
+Kokoro    | Bazel        | Linux    | Integrations    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/google_result.html)
+Kokoro    | CMake        | Linux    | Core + Bindings | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/google_result.html)
 
 ## License
 

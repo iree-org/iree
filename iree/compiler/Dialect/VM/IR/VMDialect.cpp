@@ -95,6 +95,8 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       os << "sgte";
     } else if (isa<CmpGTEI32UOp>(op)) {
       os << "ugte";
+    } else if (isa<CmpNZI32Op>(op)) {
+      os << "nz";
     } else if (isa<CmpEQRefOp>(op)) {
       os << "req";
     } else if (isa<CmpNERefOp>(op)) {

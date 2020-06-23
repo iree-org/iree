@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -28,10 +29,70 @@ namespace Flow {
 
 namespace {
 
+static llvm::cl::opt<bool> extractPadFromConv(
+    "iree-extract-pad-from-conv",
+    llvm::cl::desc("Extract padding attributes from conv op"),
+    llvm::cl::init(false));
+
 static bool isAllZero(DenseIntElementsAttr attr) {
   if (!attr.isSplat()) return false;
   return attr.getSplatValue<IntegerAttr>().getInt() == 0;
 }
+
+class ExtractConvOpPaddingAttributes
+    : public OpRewritePattern<xla_hlo::ConvOp> {
+ public:
+  using OpRewritePattern<xla_hlo::ConvOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xla_hlo::ConvOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.padding()) return failure();
+    auto inputType = op.lhs().getType().cast<ShapedType>();
+    int rank = inputType.getRank();
+    SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
+    paddingLow.append(rank, 0);
+    paddingHigh.append(rank, 0);
+    interiorPadding.append(rank, 0);
+    for (auto iter :
+         llvm::enumerate(op.dimension_numbers().input_spatial_dimensions())) {
+      unsigned idx = iter.index();
+      unsigned dim = iter.value().getZExtValue();
+      paddingLow[dim] = op.paddingAttr().getValue<int64_t>({idx, 0});
+      paddingHigh[dim] = op.paddingAttr().getValue<int64_t>({idx, 1});
+    }
+    for (unsigned i = 0; i < rank; ++i) {
+      // xla_hlo.pad doesn't support dynamic shape.
+      if (inputType.isDynamicDim(i)) return failure();
+      int size = inputType.getShape()[i];
+      shape.push_back(size + paddingLow[i] + paddingHigh[i]);
+    }
+
+    auto toDenseAttr = [&rewriter](ArrayRef<int64_t> elements) {
+      return DenseIntElementsAttr::get(
+          RankedTensorType::get(elements.size(), rewriter.getIntegerType(64)),
+          elements);
+    };
+
+    auto loc = op.getLoc();
+    auto padResultType =
+        RankedTensorType::get(shape, inputType.getElementType());
+    Attribute zeroAttr = rewriter.getZeroAttr(
+        RankedTensorType::get({}, inputType.getElementType()));
+    auto zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    auto padOp = rewriter.create<xla_hlo::PadOp>(
+        loc, padResultType, op.lhs(), zero, toDenseAttr(paddingLow),
+        toDenseAttr(paddingHigh), toDenseAttr(interiorPadding));
+    auto resultType = op.getResult().getType();
+    auto newOp = rewriter.create<xla_hlo::ConvOp>(
+        op.getLoc(), resultType, padOp.getResult(), op.rhs(),
+        op.window_stridesAttr(), /*padding=*/nullptr, op.lhs_dilationAttr(),
+        op.rhs_dilationAttr(), op.dimension_numbersAttr(),
+        op.feature_group_countAttr(), op.batch_group_countAttr(),
+        op.precision_configAttr());
+    rewriter.replaceOp(op, newOp.getResult());
+    return success();
+  }
+};
 
 class ExtractReduceWindowOpPaddingAttributes
     : public OpRewritePattern<xla_hlo::ReduceWindowOp> {
@@ -127,6 +188,9 @@ struct HLOToHLOPreprocessing
     xla_chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape>(context);
+    if (extractPadFromConv) {
+      patterns.insert<ExtractConvOpPaddingAttributes>(context);
+    }
     applyPatternsAndFoldGreedily(getOperation(), patterns);
   }
 };

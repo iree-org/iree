@@ -59,12 +59,19 @@ if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
-if(${IREE_ENABLE_EMITC} AND NOT ${IREE_ENABLE_MLIR})
-  message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
-endif()
-
 if (${IREE_ENABLE_MLIR})
   set(IREE_MLIR_DEP_MODE "BUNDLED" CACHE STRING "One of BUNDLED (default), DISABLED, INSTALLED")
+endif()
+
+if(${IREE_ENABLE_EMITC})
+  if(NOT ${IREE_ENABLE_MLIR})
+    message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
+  endif()
+
+  string(TOUPPER "${IREE_MLIR_DEP_MODE}" uppercase_IREE_MLIR_DEP_MODE)
+  if(NOT uppercase_IREE_MLIR_DEP_MODE MATCHES "^(BUNDLED|INSTALLED)$")
+    message(FATAL_ERROR "Enabling EmitC requires IREE_MLIR_DEP_MODE set to BUNDELED or INSTALLED.")
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------

@@ -18,25 +18,21 @@ load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 
 def iree_e2e_test_suite(
         name,
-        srcs,
+        backends_to_srcs,
         reference_backend,
-        backends,
         deps = None,
         tags = None,
         python_version = "PY3",
         **kwargs):
-    """Creates a iree_py_test for each backend and file in srcs and a test suite that bundles them.
+    """Creates a iree_py_test for all of the given backends and srcs, and a test suite that bundles them.
 
     Args:
       name:
         name of the generated test suite.
-      srcs:
-        test file sources.
+      backends_to_srcs:
+        a dictionary mapping backends to a list of test files to run on them.
       reference_backend:
         the backend to use as a source of truth for the expected output results.
-      backends:
-        a list of backends to run the tests in each src on. Each test is tagged
-        with "driver=backend".
       deps:
         test dependencies.
       tags:
@@ -49,8 +45,9 @@ def iree_e2e_test_suite(
         test_suite.
     """
     tests = []
-    for src in srcs:
-        for backend in backends:
+
+    for backend, srcs in backends_to_srcs.items():
+        for src in srcs:
             test_name = "{}_{}_{}_{}".format(
                 name,
                 src[:-3],
@@ -74,6 +71,7 @@ def iree_e2e_test_suite(
                 main = src,
                 srcs = [src],
                 deps = deps,
+                args = args,
                 tags = py_test_tags,
                 python_version = python_version,
                 **kwargs

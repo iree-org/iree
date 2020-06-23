@@ -18,7 +18,9 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -141,18 +143,33 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   OwningRewritePatternList patterns;
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
+  target.addLegalOp<IREE::DoNotOptimizeOp>();
 
-  if (targetOptions.stripDebugOps) {
+  // Add all VM canonicalization patterns and mark pseudo-ops illegal.
+  auto *context = moduleOp.getContext();
+  for (auto *op : context->getRegisteredOperations()) {
+    // Non-serializable ops must be removed prior to serialization.
+    if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
+      op->getCanonicalizationPatterns(patterns, context);
+      target.setOpAction(OperationName(op->name, context),
+                         ConversionTarget::LegalizationAction::Illegal);
+    }
+
+    // Debug ops must not be present when stripping.
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
-    target.addIllegalOp<IREE::VM::TraceOp, IREE::VM::PrintOp, IREE::VM::BreakOp,
-                        IREE::VM::CondBreakOp>();
+    if (op->hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
+        targetOptions.stripDebugOps) {
+      target.setOpAction(OperationName(op->name, context),
+                         ConversionTarget::LegalizationAction::Illegal);
+    }
   }
 
   if (failed(applyFullConversion(moduleOp, target, patterns))) {
     return moduleOp.emitError() << "unable to fully apply conversion to module";
   }
 
-  PassManager passManager(moduleOp.getContext());
+  PassManager passManager(context);
+  mlir::applyPassManagerCLOptions(passManager);
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
   if (targetOptions.optimize) {
@@ -161,6 +178,8 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     modulePasses.addPass(mlir::createCSEPass());
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
+
+  modulePasses.addPass(createDropCompilerHintsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the

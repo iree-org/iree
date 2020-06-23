@@ -107,7 +107,8 @@ class LowerTensorflowToStringsPass
     target.addLegalDialect<tf_strings::TFStringsDialect>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       StringTypeConverter typeConverter;
-      return typeConverter.isSignatureLegal(op.getType());
+      return typeConverter.isSignatureLegal(op.getType()) &&
+             typeConverter.isLegal(&op.getBody());
     });
 
     target.addDynamicallyLegalOp<ReturnOp>([](ReturnOp op) {
@@ -127,8 +128,8 @@ class LowerTensorflowToStringsPass
     populateCallOpTypeConversionPattern(patterns, &getContext(), typeConverter);
     populateTFToTFStringsPatterns(&getContext(), patterns);
 
-    auto result = applyPartialConversion(module.getOperation(), target,
-                                         patterns, &typeConverter);
+    auto result =
+        applyPartialConversion(module.getOperation(), target, patterns);
 
     // Partial conversion doesn't include return types. Update in a separate
     // walk.

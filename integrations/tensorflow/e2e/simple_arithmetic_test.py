@@ -39,39 +39,17 @@ class SimpleArithmeticModule(tf.Module):
 @tf_test_utils.compile_modules(simple_arithmetic=SimpleArithmeticModule)
 class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
 
-  def test_simple_mul_explicit(self):
-    # Demonstrates simple, one by one invocation of functions against
-    # different explicit backends.
+  def test_simple_mul(self):
     a = np.array([1., 2., 3., 4.], dtype=np.float32)
     b = np.array([400., 5., 6., 7.], dtype=np.float32)
-    # Individual backends can be accessed off of the module by name ('tf,
-    # 'iree_vmla' below).
-    tf_c = self.modules.simple_arithmetic.tf.simple_mul(a, b)
-    print("TF Result:", tf_c)
-    iree_c = self.modules.simple_arithmetic.iree_vmla.simple_mul(a, b)
-    print("IREE Result:", iree_c)
-    self.assertAllClose(tf_c, iree_c)
-
-  def test_simple_mul_multi(self):
-    a = np.array([1., 2., 3., 4.], dtype=np.float32)
-    b = np.array([400., 5., 6., 7.], dtype=np.float32)
-
-    # Evaluating against multiple backends can be done with the multi() method,
-    # which takes a regex string matching backend names. This also returns a
-    # MultiResults tuple with actual results keyed by backend name. These also
-    # have convenience methods like print() and assert_all_close().
-    vmod = self.modules.simple_arithmetic.multi("tf|iree")
-    r = vmod.simple_mul(a, b)
+    r = self.modules.simple_arithmetic.all.simple_mul(a, b)
     r.print().assert_all_close()
 
-  def test_matmul(self):
+  def test_simple_matmul(self):
     np.random.seed(12345)
     # Note: scaling by a small value to increase numerical stability.
     a = np.random.random((128, 3072)).astype(np.float32) * 1e-3
     b = np.random.random((3072, 256)).astype(np.float32) * 1e-3
-    # Evaluating against all backends can be done with the special 'all'
-    # backend name. This also returns a MultiResults tuple with actual results
-    # keyed by backend name.
     r = self.modules.simple_arithmetic.all.simple_matmul(a, b)
     r.print().assert_all_close()
 

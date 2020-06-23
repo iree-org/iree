@@ -21,7 +21,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -221,8 +221,11 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     Value ptr = spirv::getElementPtr(
         SPIRVOpLowering<OpTy>::typeConverter, op.getMemRefType(),
         rewriter.getRemappedValue(op.memref()), remappedIndices, loc, rewriter);
-
-    auto stride = op.getMemRefType().getDimSize(0);
+    int64_t offset = 0;
+    SmallVector<int64_t, 2> strides;
+    getStridesAndOffset(op.getMemRefType(), strides, offset);
+    auto stride = strides[0];
+    if (BaseMemRefType::isDynamicStrideOrOffset(stride)) return failure();
     auto int32Type = rewriter.getI32Type();
     auto strideValue = rewriter.create<spirv::ConstantOp>(
         loc, int32Type, IntegerAttr::get(int32Type, stride));
@@ -409,7 +412,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   for (FuncOp fn : functions)
-    if (failed(applyFullConversion(fn, *target, patterns, &typeConverter)))
+    if (failed(applyFullConversion(fn, *target, patterns)))
       return signalPassFailure();
 
   // Collect all SPIR-V ops into a spv.module.

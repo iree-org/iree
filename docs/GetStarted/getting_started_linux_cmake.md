@@ -6,12 +6,13 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_windows_cmake.md.
+    * This document parallels getting_started_windows_cmake.md and
+      getting_started_macos_bazel.md
       Please keep them in sync.
 -->
 
 This guide walks through building the core compiler and runtime parts of IREE
-from source. Auxilary components like the Python bindings and Vulkan driver are
+from source. Auxiliary components like the Python bindings and Vulkan driver are
 documented separately, as they require further setup.
 
 ## Prerequisites
@@ -76,8 +77,9 @@ $ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;The root
-> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt) file
-> has options for configuring which parts of the project to enable.
+> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt)
+> file has options for configuring which parts of the project to enable.<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
 
 Build all targets:
 
@@ -101,7 +103,8 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
+    -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading

@@ -210,7 +210,7 @@ struct HALInterfaceToMemrefArgumentsPass
     // Allow the rest.
     target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
 
-    if (failed(applyFullConversion(getOperation(), target, patterns, nullptr)))
+    if (failed(applyFullConversion(getOperation(), target, patterns)))
       return signalPassFailure();
   }
 };

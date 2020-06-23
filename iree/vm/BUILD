@@ -12,7 +12,6 @@ cc_test(
     name = "bytecode_dispatch_test",
     srcs = ["bytecode_dispatch_test.cc"],
     deps = [
-        ":bytecode_dispatch_test_module_cc",
         ":bytecode_module",
         ":context",
         ":instance",
@@ -20,15 +19,9 @@ cc_test(
         ":module",
         "//iree/base:logging",
         "//iree/testing:gtest_main",
+        "//iree/vm/test:all_bytecode_modules_cc",
         "@com_google_absl//absl/strings",
     ],
-)
-
-iree_bytecode_module(
-    name = "bytecode_dispatch_test_module",
-    src = "bytecode_dispatch_test.mlir",
-    cc_namespace = "iree::vm",
-    flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 cc_library(
