@@ -17,10 +17,9 @@
 // Implements a pass to tile and fuse linalg operations on buffers.
 //
 //===----------------------------------------------------------------------===//
-#include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -43,6 +42,8 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
+static constexpr unsigned kMaxWorkgroupRank = 3;
+
 static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
   if (vector.empty()) return vector;
   auto numTrailingOnes = 0;
@@ -55,6 +56,62 @@ static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
   return vector.drop_back(numTrailingOnes);
 }
 
+/// Returns the number of "outer" parallel loops specified in the `linalgOp`.
+static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
+  if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
+    Optional<DenseIntElementsAttr> padding = convOp.padding();
+    if (padding) return convOp.getNumBatchDimensions();
+  }
+  return linalgOp.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) {
+        return attr.cast<StringAttr>().getValue() ==
+               getParallelIteratorTypeName();
+      })
+      .size();
+}
+
+/// Updates the workgroup size used for the dispatch region.
+static LogicalResult updateWorkGroupSize(FuncOp funcOp,
+                                         ArrayRef<int64_t> workGroupSize) {
+  // Need to update both the surrounding FuncOp that has the spv.entry_point_abi
+  // attribute, and the hal.executable.
+  Region &body = funcOp.getBody();
+  if (!llvm::hasSingleElement(body))
+    return funcOp.emitError("unhandled dispatch function with multiple blocks");
+
+  SmallVector<int32_t, 3> workGroupSizeVec = llvm::to_vector<3>(llvm::map_range(
+      workGroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
+
+  // TODO(ravishankarm, antiagainst): We should have at most one scf.parallel
+  // op, but that is not the case till the splitting of kernels lands.
+  unsigned numParallelLoops = 0;
+  auto updateNumParallelLoops = [&numParallelLoops](unsigned nPar) {
+    numParallelLoops =
+        (!numParallelLoops ? nPar : std::min(numParallelLoops, nPar));
+  };
+  for (auto parallelLoop : body.front().getOps<scf::ParallelOp>()) {
+    updateNumParallelLoops(parallelLoop.getNumLoops());
+  }
+  // If there are no parallel loops, there might be linalg ops that arent
+  // tiled. Use that to get the number of parallel loops.
+  for (auto linalgOp : body.front().getOps<linalg::LinalgOp>()) {
+    updateNumParallelLoops(getNumOuterParallelLoops(linalgOp));
+  }
+  workGroupSizeVec.resize(numParallelLoops);
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";
+    llvm::dbgs() << "# workgroup sizes at end: [";
+    interleaveComma(workGroupSizeVec, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+  MLIRContext *context = funcOp.getContext();
+  workGroupSizeVec.resize(3, 1);
+  funcOp.setAttr(spirv::getEntryPointABIAttrName(),
+                 spirv::getEntryPointABIAttr(workGroupSizeVec, context));
+  return success();
+}
+
 namespace {
 
 /// Computes tile sizes (and workgroup size) to use based on operations within
@@ -62,13 +119,7 @@ namespace {
 class TileSizeCalculator {
  public:
   TileSizeCalculator(FuncOp funcOp)
-      : resourceLimits(spirv::lookupTargetEnv(funcOp).getResourceLimits()) {
-    if (DenseIntElementsAttr attr = spirv::lookupLocalWorkGroupSize(funcOp)) {
-      for (auto val : attr.getValues<APInt>())
-        workgroupSize.push_back(val.getSExtValue());
-    }
-    workgroupSize.resize(3, 1);
-  }
+      : resourceLimits(spirv::lookupTargetEnv(funcOp).getResourceLimits()) {}
 
   /// Compute the tile sizes based on workgroup size specified.
   LogicalResult setTileSizesBasedOnWorkgroupSize(
@@ -88,10 +139,21 @@ class TileSizeCalculator {
   /// Get the current tile size computed.
   ArrayRef<int64_t> getTileSizes() const { return tileSizes; }
 
+  /// Linalg convention is to use 0 for no tiling. If any of the tile dimensions
+  /// is set to 1 make it 0.
+  SmallVector<int64_t, 3> getTileSizesForLinalg() const {
+    return llvm::to_vector<3>(llvm::map_range(
+        tileSizes, [](int64_t v) -> int64_t { return v == 1 ? 0 : v; }));
+  }
+
   /// Returns the workgroup size to use based on the tile sizes.
   ArrayRef<int64_t> getWorkGroupSize() const { return workgroupSize; }
 
  private:
+  /// Get the default tile sizes based on just number of dimensions, i.e., "x",
+  /// "y", and "z".
+  void setTileSizesBasedOnDimensions(unsigned numDims);
+
   /// Current tile size configuration.
   SmallVector<int64_t, 4> tileSizes;
 
@@ -103,72 +165,67 @@ class TileSizeCalculator {
 };
 }  // namespace
 
+void TileSizeCalculator::setTileSizesBasedOnDimensions(unsigned numDims) {
+  tileSizes.clear();
+  workgroupSize.clear();
+  tileSizes.reserve(3);
+  if (numDims == 0) {
+    // Scalar case.
+    workgroupSize = {1, 1, 1};
+    return;
+  }
+  unsigned maxWorkGroupSize =
+      resourceLimits.max_compute_workgroup_invocations().getInt();
+
+  // Make the tile size 32 along the x-dimension, and then split the remaining
+  // maxWorkGroupSize threads amongst the y-dimension or z-dimension.
+  unsigned tileSizeX = llvm::PowerOf2Floor(std::min(maxWorkGroupSize, 32u));
+  maxWorkGroupSize /= tileSizeX;
+  if (numDims == 1) {
+    tileSizes = {tileSizeX};
+    workgroupSize = {tileSizeX, 1, 1};
+    return;
+  }
+  if (numDims == 2) {
+    unsigned tileSizeY = llvm::PowerOf2Floor(maxWorkGroupSize);
+    tileSizes = {tileSizeY, tileSizeX};
+    workgroupSize = {tileSizeX, tileSizeY, 1};
+    return;
+  }
+  unsigned tileSizeYZ =
+      llvm::PowerOf2Floor(static_cast<unsigned>(std::sqrt(maxWorkGroupSize)));
+  tileSizes = {tileSizeYZ, tileSizeYZ, tileSizeX};
+  workgroupSize = {tileSizeX, tileSizeYZ, tileSizeYZ};
+}
+
 LogicalResult TileSizeCalculator::setTileSizesBasedOnOps(
     ArrayRef<linalg::LinalgOp> linalgOps) {
   tileSizes.clear();
-  if (linalgOps.empty()) {
-    tileSizes = {1, 1, 1};
-    workgroupSize = {1, 1, 1};
-    return success();
-  }
   // The tile size will be driven by operations like matmul, conv, etc. within
   // the list. So see what operation exists in the list to decide the tile size.
   // If there are two such operations in the list, return error.
-  enum OpInfo : uint32_t {
-    None = 0x0,
-    Convolution = 0x1,
-    Matmul = 0x2,
-    Pooling = 0x4,
-  };
-  uint32_t opInfo = OpInfo::None;
-  for (linalg::LinalgOp linalgOp : linalgOps) {
-    Operation *op = linalgOp.getOperation();
-    if (isa<linalg::ConvOp>(op)) opInfo |= OpInfo::Convolution;
-    if (isa<linalg::MatmulOp>(op)) opInfo |= OpInfo::Matmul;
-    if (isa<linalg::PoolingMaxOp>(op)) opInfo |= OpInfo::Pooling;
-    if (isa<linalg::PoolingMinOp>(op)) opInfo |= OpInfo::Pooling;
-    if (isa<linalg::PoolingSumOp>(op)) opInfo |= OpInfo::Pooling;
+  bool hasMatmul = false;
+  unsigned numParallelLoops = kMaxWorkgroupRank;
+  for (linalg::LinalgOp op : linalgOps) {
+    // If there is no marker on this op (i.e. a marker to prevent tile), add an
+    // explicit marker to indicate that the op is to be tiled. Makes subsequent
+    // lowering simpler.
+    if (isa<linalg::MatmulOp>(op.getOperation())) {
+      if (hasMatmul)
+        return op.emitError(
+            "unhandled multiple matmuls within dispatch region");
+      hasMatmul = true;
+    }
+    numParallelLoops = std::min(numParallelLoops, getNumOuterParallelLoops(op));
   }
-  // If there are no tilable ops, there is nothing to do here.
-  if (!opInfo) return success();
-
-  Operation *linalgOp = *(linalgOps.begin());
-  if (llvm::countPopulation(opInfo) != 1)
-    return linalgOp->getParentOfType<FuncOp>().emitError(
-        "unhandled fusion of ops in dispatch function");
-
-  // TODO(ravishanarm, antiagainst): Only the maximum workgroup size is used
-  // here for computing tile sizes. In reality we also need the maximum
-  // workgroup memory size available (per workgroup) to compute the tile sizes
-  // effectively.
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
-  if (opInfo & OpInfo::Convolution) {
-    // TODO(ravishankarm): This tiling is meant to enable promotion to workgroup
-    // memory, but doesnt actually get us to a state where we can do this. The
-    // promotion is possible only when the subviews created are constant
-    // size. For now this doesnt really matter. Revisit this later.
-    int64_t tileSizeX = 32;
-    int64_t tileSizeY = maxWorkgroupSize / 32;
-    tileSizes = {1, tileSizeY, tileSizeX};
-    workgroupSize = {tileSizeX, tileSizeY, 1};
-    return success();
-  }
-  if (opInfo & OpInfo::Matmul) {
+  if (hasMatmul) {
     // TODO: For now just hard wire this, but we can do better.
     tileSizes = {8, 8, 4};
     workgroupSize = {8, 8, 1};
     return success();
   }
-  if (opInfo & OpInfo::Pooling) {
-    int64_t tileSizeX = 32;
-    int64_t tileSizeY = maxWorkgroupSize / 32;
-    tileSizes = {tileSizeY, tileSizeX};
-    workgroupSize = {tileSizeX, tileSizeY, 1};
-    return success();
-  }
-  return linalgOp->getParentOfType<FuncOp>().emitError(
-      "unable to find tile size for ops in this dispatch function");
+  setTileSizesBasedOnDimensions(numParallelLoops);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -237,41 +294,22 @@ struct LinalgTileAndFusePass
   SmallVector<int64_t, 3> workGroupSize;
 };
 
-/// Pattern for tiling operations. Updates the workgroup size in the surrounding
-/// function operation if tiling succeeds.
-template <typename OpTy>
-struct TilingPattern : public linalg::LinalgTilingPattern<OpTy> {
-  using Base = linalg::LinalgTilingPattern<OpTy>;
-  TilingPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
-                ArrayRef<int64_t> workgroupSize,
-                linalg::LinalgMarker marker = linalg::LinalgMarker(),
-                PatternBenefit benefit = 1)
-      : Base(context, options, marker, benefit),
-        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
-
-  virtual LogicalResult matchAndRewrite(Operation *op,
-                                        PatternRewriter &rewriter) const {
-    // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
-    // erased.
-    FuncOp funcOp = op->getParentOfType<FuncOp>();
-    return failure(!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
-                   failed(updateWorkGroupSize(funcOp, workgroupSize)));
-  }
-
-  SmallVector<int64_t, 3> workgroupSize;
-};
-
-/// Pattern for tiling convolution and pooling operations. Currently is just a
-/// way to not tile when the operation has padding.
-template <typename OpTy>
-struct TileConvPoolPattern : public TilingPattern<OpTy> {
-  using Base = TilingPattern<OpTy>;
-  using Base::TilingPattern;
+/// Pattern to tile linalg operations if they have the workgroup marker.
+template <typename LinalgOp>
+struct TileLinalgOpPattern : public linalg::LinalgTilingPattern<LinalgOp> {
+  using linalg::LinalgTilingPattern<LinalgOp>::LinalgTilingPattern;
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (cast<OpTy>(op).padding()) return failure();
-    return Base::matchAndRewrite(op, rewriter);
+    if (!hasWorkGroupMarker(op)) return failure();
+    if (succeeded(linalg::LinalgTilingPattern<LinalgOp>::matchAndRewrite(
+            op, rewriter)))
+      return success();
+    // Update the marker to map to global invocation ID.
+    rewriter.startRootUpdate(op);
+    setNoTileMarker(op);
+    rewriter.finalizeRootUpdate(op);
+    return success();
   }
 };
 
@@ -310,7 +348,14 @@ void LinalgTileAndFusePass::runOnFunction() {
   auto linalgOps = block.getOps<linalg::LinalgOp>();
   if (linalgOps.empty()) return;
 
+  // Go through all the Linalg ops and set the marker to trigger tiling./
+  // TODO(ravishankarm): Move this to HLOToLinalgOnBuffers so that it is added
+  // on op-creation.
+  for (auto op : linalgOps)
+    if (!hasMarker(op)) setWorkGroupMarker(op);
+
   TileSizeCalculator tileSizeCalculator(funcOp);
+
   if (workGroupSize.empty()) {
     // Get the tile sizes to use for the lowering.
     SmallVector<int64_t, 3> tileSizes;
@@ -331,17 +376,20 @@ void LinalgTileAndFusePass::runOnFunction() {
   });
 
   OwningRewritePatternList tilingPatterns;
-  tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>,
-                        TilingPattern<linalg::MatmulOp>,
-                        TileConvPoolPattern<linalg::PoolingMaxOp>,
-                        TileConvPoolPattern<linalg::PoolingMinOp>,
-                        TileConvPoolPattern<linalg::PoolingSumOp>>(
+  tilingPatterns.insert<TileLinalgOpPattern<linalg::ConvOp>,
+                        TileLinalgOpPattern<linalg::CopyOp>,
+                        TileLinalgOpPattern<linalg::FillOp>,
+                        TileLinalgOpPattern<linalg::GenericOp>,
+                        TileLinalgOpPattern<linalg::IndexedGenericOp>,
+                        TileLinalgOpPattern<linalg::MatmulOp>,
+                        TileLinalgOpPattern<linalg::PoolingMaxOp>,
+                        TileLinalgOpPattern<linalg::PoolingMinOp>,
+                        TileLinalgOpPattern<linalg::PoolingSumOp>>(
       context,
       linalg::LinalgTilingOptions()
-          .setTileSizes(tileSizeCalculator.getTileSizes())
+          .setTileSizes(tileSizeCalculator.getTileSizesForLinalg())
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      tileSizeCalculator.getWorkGroupSize(),
-      linalg::LinalgMarker(ArrayRef<Identifier>(),
+      linalg::LinalgMarker(Identifier::get(getWorkGroupMarker(), context),
                            Identifier::get(getWorkItemMarker(), context)));
   applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
@@ -375,6 +423,15 @@ void LinalgTileAndFusePass::runOnFunction() {
       insertBarrierAfter(builder, linalgOp.getLoc(), linalgOp);
     }
   });
+
+  // Update the workgroup size to be consistent with the tile sizes used. Note
+  // the tile sizes are ordered from outer most to inner most loops. The
+  // heuristic is to map the inner loops to x, the next outer (if it exists) to
+  // y, and the next outer (if it exists) to z. So tile sizes are reversed to
+  // get the workgroup size.
+  if (failed(
+          updateWorkGroupSize(funcOp, tileSizeCalculator.getWorkGroupSize())))
+    return signalPassFailure();
 }
 
 //===----------------------------------------------------------------------===//
