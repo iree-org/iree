@@ -87,7 +87,7 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
                                        "__".join(target_backends))
     if global_debug_dir:
       mlir_path = os.path.join(global_debug_dir,
-                               "raw_%s.mlir" % flattened_target_backends)
+                               "raw__%s.mlir" % flattened_target_backends)
       logging.info("Saving raw TF input MLIR to: %s", mlir_path)
       with open(mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
@@ -97,7 +97,7 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
 
     if global_debug_dir:
       mlir_path = os.path.join(global_debug_dir,
-                               "input_%s.mlir" % flattened_target_backends)
+                               "input__%s.mlir" % flattened_target_backends)
       logging.info("Saving IREE input MLIR to: %s", mlir_path)
       with open(mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
@@ -105,7 +105,7 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
     compiled_module = compiler_module.compile(target_backends=target_backends)
     if global_debug_dir:
       compiled_path = os.path.join(
-          global_debug_dir, "compiled_%s.vmfb" % flattened_target_backends)
+          global_debug_dir, "compiled__%s.vmfb" % flattened_target_backends)
       logging.info("Saving compiled IREE module to: %s", compiled_path)
       with open(compiled_path, "wb") as f:
         f.write(compiled_module)
