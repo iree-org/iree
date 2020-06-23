@@ -83,7 +83,7 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
         pass_pipeline=())
 
     # Save the input MLIR module.
-    flattened_target_backends = re.sub("[^0-9a-zA-Z]+", "_",
+    flattened_target_backends = re.sub("[^0-9a-zA-Z_]+", "_",
                                        "__".join(target_backends))
     if global_debug_dir:
       mlir_path = os.path.join(global_debug_dir,
