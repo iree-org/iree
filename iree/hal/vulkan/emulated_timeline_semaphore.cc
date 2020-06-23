@@ -44,9 +44,9 @@ EmulatedTimelineSemaphore::EmulatedTimelineSemaphore(
     std::function<void(Semaphore*)> on_failure,
     ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value)
     : signaled_value_(initial_value),
+      logical_device_(std::move(logical_device)),
       on_signal_(std::move(on_signal)),
       on_failure_(std::move(on_failure)),
-      logical_device_(std::move(logical_device)),
       semaphore_pool_(std::move(semaphore_pool)) {}
 
 EmulatedTimelineSemaphore::~EmulatedTimelineSemaphore() {

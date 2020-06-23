@@ -243,7 +243,7 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
 
   while (!remaining_submissions.empty()) {
     deferred_submissions_.push_back(
-        std::move(remaining_submissions.take(remaining_submissions.front())));
+        remaining_submissions.take(remaining_submissions.front()));
   }
 
   return true;
@@ -323,6 +323,7 @@ Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
 }
 
 Status SerializingCommandQueue::AdvanceQueueSubmission() {
+  absl::MutexLock lock(&mutex_);
   // The returned value just indicates whether there were newly ready
   // submissions gotten submitted to the GPU. Other callers might be
   // interested in that information but for this API we just want to advance
@@ -342,9 +343,8 @@ void SerializingCommandQueue::AbortQueueSubmission() {
   fences.reserve(pending_fences_.size());
   for (const auto& fence : pending_fences_) fences.push_back(fence->value());
 
-  VkResult result =
-      syms()->vkWaitForFences(*logical_device_, fences.size(), fences.data(),
-                              /*waitAll=*/VK_TRUE, /*timeout=*/UINT64_MAX);
+  syms()->vkWaitForFences(*logical_device_, fences.size(), fences.data(),
+                          /*waitAll=*/VK_TRUE, /*timeout=*/UINT64_MAX);
   // Clear the list. Fences will be automatically returned back to the queue
   // after refcount reaches 0.
   pending_fences_.clear();
