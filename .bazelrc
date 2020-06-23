@@ -29,7 +29,7 @@ common --experimental_repo_remote_exec
 test --test_output=errors
 
 ###############################################################################
-# Options for "generic_clang" builds: these options should generally apply to 
+# Options for "generic_clang" builds: these options should generally apply to
 # either clang or gcc and are curated based on need.
 ###############################################################################
 
@@ -42,6 +42,9 @@ build:generic_clang --copt=-Wno-extern-c-compat
 # Technically UB but needed for intrusive ptrs
 build:generic_clang --copt=-Wno-invalid-offsetof
 build:generic_clang --copt=-Wno-unused-function
+
+# Enable warnings we do care about.
+build:generic_clang --copt=-Wimplicit-fallthrough
 
 # C++14 standard version is required.
 build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
