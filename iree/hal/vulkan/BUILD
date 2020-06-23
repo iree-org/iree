@@ -91,6 +91,7 @@ cc_library(
         ":pipeline_executable",
         ":status_util",
         ":vma_allocator",
+        "//iree/base:alignment",
         "//iree/base:arena",
         "//iree/base:math",
         "//iree/base:status",
