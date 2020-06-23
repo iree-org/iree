@@ -43,8 +43,6 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-static constexpr unsigned kMaxWorkgroupRank = 3;
-
 static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
   if (vector.empty()) return vector;
   auto numTrailingOnes = 0;
@@ -55,21 +53,6 @@ static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
     numTrailingOnes++;
   }
   return vector.drop_back(numTrailingOnes);
-}
-
-/// Returns the number of "outer" parallel loops specified in the `linalgOp`.
-static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
-  if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
-    Optional<DenseIntElementsAttr> padding = convOp.padding();
-    if (padding) return convOp.getNumBatchDimensions();
-  }
-  return linalgOp.iterator_types()
-      .getValue()
-      .take_while([](Attribute attr) {
-        return attr.cast<StringAttr>().getValue() ==
-               getParallelIteratorTypeName();
-      })
-      .size();
 }
 
 namespace {
