@@ -148,9 +148,6 @@ Any CI systems or other things that retrieve an arbitrary commit should invoke
 this prior to running just to make sure that their git view of the submodule
 state is consistent.
 
-TODO(laurenzo): Add a GitHub hook to auto-commit submodule updates on
-`SUBMODULE_VERSIONS` file changes.
-
 #### Updating TensorFlow and LLVM versions
 
 WARNING: These scripts have not been updated to reflect the new tooling to
