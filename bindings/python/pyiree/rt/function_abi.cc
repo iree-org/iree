@@ -164,6 +164,48 @@ void MapBufferAttrs(Py_buffer& py_view,
   }
 }
 
+void PackScalar(const RawSignatureParser::Description& desc, py::handle py_arg,
+                VmVariantList& f_args) {
+  iree_vm_value value;
+  value.type = IREE_VM_VALUE_TYPE_I32;
+  switch (desc.scalar.type) {
+    case AbiConstants::ScalarType::kUint8:
+    case AbiConstants::ScalarType::kUint16:
+    case AbiConstants::ScalarType::kUint32: {
+      value.i32 = py_arg.cast<int32_t>();
+      break;
+    }
+    case AbiConstants::ScalarType::kSint8:
+    case AbiConstants::ScalarType::kSint16:
+    case AbiConstants::ScalarType::kSint32: {
+      value.i32 = py_arg.cast<int32_t>();
+      break;
+    }
+    default:
+      throw RaisePyError(PyExc_NotImplementedError, "Unsupported scalar type");
+  }
+  CheckApiStatus(iree_vm_variant_list_append_value(f_args.raw_ptr(), value),
+                 "Could not pack scalar argument");
+}
+
+py::object UnpackScalar(const RawSignatureParser::Description& desc,
+                        iree_vm_variant_t& f_result) {
+  switch (desc.scalar.type) {
+    case AbiConstants::ScalarType::kUint8:
+    case AbiConstants::ScalarType::kUint16:
+    case AbiConstants::ScalarType::kUint32: {
+      return py::int_(static_cast<uint32_t>(f_result.i32));
+    }
+    case AbiConstants::ScalarType::kSint8:
+    case AbiConstants::ScalarType::kSint16:
+    case AbiConstants::ScalarType::kSint32: {
+      return py::int_(f_result.i32);
+    }
+    default:
+      throw RaisePyError(PyExc_NotImplementedError, "Unsupported scalar type");
+  }
+}
+
 }  // namespace
 
 //------------------------------------------------------------------------------
@@ -236,6 +278,9 @@ void FunctionAbi::RawPack(absl::Span<const Description> descs,
         throw RaisePyError(PyExc_NotImplementedError,
                            "Ref objects not yet supported");
         break;
+      case RawSignatureParser::Type::kScalar:
+        PackScalar(desc, py_args[i], f_args);
+        break;
       default:
         throw RaisePyError(PyExc_NotImplementedError,
                            "Unsupported argument type");
@@ -294,9 +339,12 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
         throw RaisePyError(PyExc_NotImplementedError,
                            "Ref objects not yet supported");
         break;
+      case RawSignatureParser::Type::kScalar:
+        py_results[i] = UnpackScalar(desc, *f_result);
+        break;
       default:
         throw RaisePyError(PyExc_NotImplementedError,
-                           "Unsupported argument type");
+                           "Unsupported result type");
     }
   }
 }
@@ -358,9 +406,11 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
         throw RaisePyError(PyExc_NotImplementedError,
                            "Ref objects not yet supported");
         break;
+      case RawSignatureParser::Type::kScalar:
+        break;
       default:
         throw RaisePyError(PyExc_NotImplementedError,
-                           "Unsupported argument type");
+                           "Unsupported allocation argument type");
     }
   }
 }
