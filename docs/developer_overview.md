@@ -68,8 +68,9 @@ translations, and other transformations step by step.
 [mlir-opt](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-opt)
 and runs sets of IREE's compiler passes on `.mlir` input files. See "conversion"
 in [MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#conversion)
-for more information. Compiler "passes" can range from isolated manipulations to
-broad pipelines that encompass a sequence of steps.
+for more information. Transformations performed by `iree-opt` can range from
+individual passes performing isolated manipulations to broad pipelines that
+encompass a sequence of steps.
 
 Test `.mlir` files that are checked in typically include a `RUN` block at the
 top of the file that specifies which passes should be performed and if
