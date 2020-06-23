@@ -173,6 +173,7 @@ void PackScalar(const RawSignatureParser::Description& desc, py::handle py_arg,
     case AbiConstants::ScalarType::kUint16:
     case AbiConstants::ScalarType::kUint32: {
       value.i32 = py_arg.cast<int32_t>();
+      break;
     }
     case AbiConstants::ScalarType::kSint8:
     case AbiConstants::ScalarType::kSint16:
@@ -199,7 +200,6 @@ py::object UnpackScalar(const RawSignatureParser::Description& desc,
     case AbiConstants::ScalarType::kSint16:
     case AbiConstants::ScalarType::kSint32: {
       return py::int_(f_result.i32);
-      break;
     }
     default:
       throw RaisePyError(PyExc_NotImplementedError, "Unsupported scalar type");
