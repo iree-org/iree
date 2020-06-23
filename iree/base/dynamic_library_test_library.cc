@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_submission_queue.h"
+#ifdef __cplusplus
+#define IREE_API_EXPORT extern "C"
+#else
+#define IREE_API_EXPORT
+#endif  // __cplusplus
 
-#include "iree/testing/gtest.h"
+#if defined(_WIN32)
+#define IREE_SYM_EXPORT __declspec(dllexport)
+#else
+#define IREE_SYM_EXPORT
+#endif  // _WIN32
 
-namespace iree {
-namespace hal {
-namespace {
-
-TEST(HostSubmissionQueueTest, TBD) {
-  // TODO(benvanik): test!
-}
-
-}  // namespace
-}  // namespace hal
-}  // namespace iree
+IREE_API_EXPORT int IREE_SYM_EXPORT times_two(int value) { return value * 2; }

@@ -711,10 +711,231 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
 }
 
 //===----------------------------------------------------------------------===//
-// ref_ptr operations
+// Lists
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): model retain/release in here?
+// TODO(benvanik): vm.list.push.i32 / vm.list.pop.i32 (variadic)
+// TODO(benvanik): vm.list.copy(src_list, src_index, dst_list, dst_index, length)
+// TODO(benvanik): vm.list.slice(list, index, length) -> list
+// TODO(benvanik): export into a rwdata buffer
+
+def VM_ListAllocOp :
+    VM_PureOp<"list.alloc", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{allocates a new empty list}];
+  let description = [{
+    Allocates a new typed list with a minimum initial_capacity.
+  }];
+
+  let arguments = (ins
+    I32:$initial_capacity
+  );
+  let results = (outs
+    VM_AnyList:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($initial_capacity) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListAlloc>,
+    VM_EncType<"result().getType().cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()">,
+    VM_EncOperand<"initial_capacity", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_ListReserveOp :
+    VM_Op<"list.reserve", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{reserves capacity for list growth}];
+  let description = [{
+    Reserves storage for at least minimum_capacity elements. If the list already
+    has at least the specified capacity the operation is ignored.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$minimum_capacity
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListReserve>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"minimum_capacity", 1>,
+  ];
+}
+
+def VM_ListSizeOp :
+    VM_Op<"list.size", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{the size of the list in elements}];
+  let description = [{
+    Returns the current size of the list in elements.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list
+  );
+  let results = (outs
+    I32:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListSize>,
+    VM_EncOperand<"list", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_ListResizeOp :
+    VM_Op<"list.resize", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{resizes the list to a new count in elements}];
+  let description = [{
+    Resizes the list to contain new_size elements. This will either truncate
+    the list if the existing size is greater than new_size or extend the list
+    with the default list value of 0 if storing primitives and null if refs.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$new_size
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($new_size) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListResize>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"new_size", 1>,
+  ];
+}
+
+class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                            list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let summary = [{primitive type element accessor}];
+  let description = [{
+    Returns the value of the element at the given index.
+  }];
+
+  let arguments = (ins
+    VM_ListOf<VM_PrimitiveType>:$list,
+    I32:$index
+  );
+  let results = (outs
+    type:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncResult<"result">,
+  ];
+}
+
+class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                            list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let summary = [{primitive type element mutator}];
+  let description = [{
+    Sets the element at the given index to the new value.
+  }];
+
+  let arguments = (ins
+    VM_ListOf<VM_PrimitiveType>:$list,
+    I32:$index,
+    type:$value
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`";
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncOperand<"value", 2>,
+  ];
+}
+
+def VM_ListGetI32Op :
+    VM_ListGetPrimitiveOp<I32, "list.get.i32", VM_OPC_ListGetI32> {}
+
+def VM_ListSetI32Op :
+    VM_ListSetPrimitiveOp<I32, "list.set.i32", VM_OPC_ListSetI32> {}
+
+def VM_ListGetRefOp :
+    VM_PureOp<"list.get.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{ref type element accessor}];
+  let description = [{
+    Returns the ref value of the element at the given index. Note that the value
+    may be null if the element is null or the type does not match.
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$index
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListGetRef>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncTypeOf<"result">,
+    VM_EncResult<"result">,
+  ];
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
+def VM_ListSetRefOp :
+    VM_Op<"list.set.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{ref type element mutator}];
+  let description = [{
+    Sets the element at the given index to the new ref value (possibly null).
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list,
+    I32:$index,
+    VM_AnyRef:$value
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListSetRef>,
+    VM_EncOperand<"list", 0>,
+    VM_EncOperand<"index", 1>,
+    VM_EncOperand<"value", 2>,
+  ];
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
 
 //===----------------------------------------------------------------------===//
 // Conditional assignment
@@ -1137,36 +1358,42 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 def VM_CmpEQI32Op :
     VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32, [Commutative]> {
   let summary = [{integer equality comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNEI32Op :
     VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32, [Commutative]> {
   let summary = [{integer inequality comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S> {
   let summary = [{signed integer less-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U> {
   let summary = [{unsigned integer less-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.lte.i32.s", VM_OPC_CmpLTEI32S> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.lte.i32.u", VM_OPC_CmpLTEI32U> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -1174,24 +1401,37 @@ def VM_CmpLTEI32UOp :
 def VM_CmpGTI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.gt.i32.s", VM_OPC_CmpGTI32S> {
   let summary = [{signed integer greater-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.gt.i32.u", VM_OPC_CmpGTI32U> {
   let summary = [{unsigned integer greater-than comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32SOp :
     VM_BinaryComparisonOp<I32, "cmp.gte.i32.s", VM_OPC_CmpGTEI32S> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.gte.i32.u", VM_OPC_CmpGTEI32U> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNZI32Op :
+    VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32> {
+  let summary = [{integer non-zero comparison operation}];
+  let description = [{
+    Compares the given integer operand for a non-zero value.
+  }];
   let hasFolder = 1;
 }
 
@@ -1277,7 +1517,7 @@ def VM_BranchOp : VM_Op<"br", [
     void eraseOperand(unsigned index);
   }];
 
-  // TODO(b/143189330): canonicalize branches to targets with one incoming edge.
+  let hasCanonicalizer = 1;
 }
 
 def VM_CondBranchOp : VM_Op<"cond_br", [
@@ -1596,6 +1836,11 @@ def VM_FailOp : VM_Op<"fail", [
     have a latency between when they are emitted and when the application can
     observe the failure. It's also possible that other work that is in-flight
     or pending when the failure occurs will complete.
+
+    ```
+    %statusCode = vm.const.i32 9 : i32
+    vm.fail %statusCode, "oh no!"
+    ```
   }];
 
   let arguments = (ins
@@ -1625,6 +1870,143 @@ def VM_FailOp : VM_Op<"fail", [
   ];
 
   let verifier = [{ return verifyFailOp(*this); }];
+}
+
+def VM_CondFailOp : VM_Op<"cond_fail", [
+    HasParent<"IREE::VM::FuncOp">,
+    VM_PseudoOp,
+  ]> {
+  let summary = [{raises a global failure if the condition is true}];
+  let description = [{
+    When the condition is true this signals a runtime failure that causes the
+    entire active invocation - and possibly *all* in-flight and pending
+    invocations - to fail with the given status. The status will be propagated
+    back via the available runtime error handling mechanisms such as semaphores
+    or synchronous invocation results.
+
+    As the IREE execution model is deeply pipelined it's possible that failures
+    have a latency between when they are emitted and when the application can
+    observe the failure. It's also possible that other work that is in-flight
+    or pending when the failure occurs will complete.
+
+    This is implemented as a pseudo-op that transforms into a vm.fail operation
+    guarded by the condition.
+
+    ```
+    %nz = vm.cmp.nz.i32 %value : i32
+    %statusCode = vm.const.i32 9 : i32
+    vm.cond_fail %nz, %statusCode, "expected non-zero"
+    ```
+  }];
+
+  let arguments = (ins
+    VM_CondValue:$condition,
+    IREE_Status:$status,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $condition `,` $status (`,` $message^)? attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value condition, Value status, StringRef message = ""
+    }], [{
+      build(
+          builder, result, condition, status,
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+  ];
+
+  let verifier = [{ return verifyFailOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+class VM_CheckOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      VM_PseudoOp,
+    ])> {
+  let summary = [{raises a global failure if the condition is true}];
+  let description = [{
+    When the condition is true this signals a runtime failure that causes the
+    entire active invocation - and possibly *all* in-flight and pending
+    invocations - to fail. The status will be propagated back via the available
+    runtime error handling mechanisms such as semaphores or synchronous
+    invocation results.
+
+    This is implemented as a pseudo-op that transforms into a vm.cond_fail
+    operation.
+
+    ```
+    vm.check.eq %a, %b, "a == b" : i32
+    vm.check.nz %ref, "!null" : !vm.ref<?>
+    ```
+  }];
+}
+
+class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_CheckOp<mnemonic, traits> {
+  let arguments = (ins
+    VM_AnyType:$value,
+    OptionalAttr<StrAttr>:$message
+  );
+
+
+  let assemblyFormat = [{
+    $value (`,` $message^)? attr-dict `:` type($value)
+  }];
+
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value value, StringRef message = ""
+    }], [{
+      build(
+          builder, result, value,
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
+class VM_BinaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_CheckOp<mnemonic, !listconcat(traits, [
+      AllTypesMatch<["lhs", "rhs"]>,
+    ])> {
+  let arguments = (ins
+    VM_AnyType:$lhs,
+    VM_AnyType:$rhs,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
+  }];
+
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value lhs, Value rhs, StringRef message = ""
+    }], [{
+      build(
+          builder, result, lhs, rhs,
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
+def VM_CheckEQOp : VM_BinaryCheckOp<"check.eq", [Commutative]> {
+  let hasCanonicalizer = 1;
+}
+
+def VM_CheckNEOp : VM_BinaryCheckOp<"check.ne", [Commutative]> {
+  let hasCanonicalizer = 1;
+}
+
+def VM_CheckNZOp : VM_UnaryCheckOp<"check.nz"> {
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1768,6 +2150,7 @@ def VM_BreakOp : VM_Op<"break", [
   let hasCanonicalizer = 1;
 }
 
+// TODO(benvanik): remove and turn into a compare + branch + vm.break.
 def VM_CondBreakOp : VM_Op<"cond_break", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,

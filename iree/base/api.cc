@@ -101,6 +101,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
                          byte_length, out_ptr);
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
+  if (!allocator.alloc) return IREE_STATUS_INVALID_ARGUMENT;
+  return allocator.alloc(allocator.self,
+                         IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING, byte_length,
+                         out_ptr);
+}
+
 IREE_API_EXPORT void IREE_API_CALL
 iree_allocator_free(iree_allocator_t allocator, void* ptr) {
   if (ptr && allocator.free) {
@@ -115,23 +123,32 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
 
   if (!out_ptr) {
     return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  *out_ptr = nullptr;
-
-  if (byte_length <= 0) {
+  } else if (byte_length <= 0) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
+  void* existing_ptr = *out_ptr;
   void* ptr = nullptr;
-  if (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS) {
-    ptr = std::calloc(1, byte_length);
+  if (existing_ptr && (mode & IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING)) {
+    ptr = std::realloc(existing_ptr, byte_length);
+    if (ptr && (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS)) {
+      std::memset(ptr, 0, byte_length);
+    }
   } else {
-    ptr = std::malloc(byte_length);
+    existing_ptr = NULL;
+    if (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS) {
+      ptr = std::calloc(1, byte_length);
+    } else {
+      ptr = std::malloc(byte_length);
+    }
   }
   if (!ptr) {
     return IREE_STATUS_RESOURCE_EXHAUSTED;
   }
 
+  if (existing_ptr) {
+    IREE_TRACE_FREE(existing_ptr);
+  }
   IREE_TRACE_ALLOC(ptr, byte_length);
 
   *out_ptr = ptr;

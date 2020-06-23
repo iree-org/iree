@@ -64,12 +64,19 @@ if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
-if(${IREE_ENABLE_EMITC} AND NOT ${IREE_ENABLE_MLIR})
-  message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
-endif()
-
 if (${IREE_ENABLE_MLIR})
   set(IREE_MLIR_DEP_MODE "BUNDLED" CACHE STRING "One of BUNDLED (default), DISABLED, INSTALLED")
+endif()
+
+if(${IREE_ENABLE_EMITC})
+  if(NOT ${IREE_ENABLE_MLIR})
+    message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
+  endif()
+
+  string(TOUPPER "${IREE_MLIR_DEP_MODE}" uppercase_IREE_MLIR_DEP_MODE)
+  if(NOT uppercase_IREE_MLIR_DEP_MODE MATCHES "^(BUNDLED|INSTALLED)$")
+    message(FATAL_ERROR "Enabling EmitC requires IREE_MLIR_DEP_MODE set to BUNDELED or INSTALLED.")
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------
@@ -253,7 +260,6 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
   endif()
 
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
-  add_bundled_mlir_dependent_projects()
 
   # Reset CMAKE_BUILD_TYPE to its previous setting
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)

@@ -113,6 +113,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(_WIN32)
+// The safe malloca that may fall back to heap in the case of stack overflows:
+// https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/malloca?view=vs-2019
+// Because that gets really annoying to deal with during error handling we just
+// go for _alloca which may generate SEH exceptions if we blow the stack.
+#include <malloc.h>
+#define iree_alloca(sz) _alloca(sz)
+#else
+#include <alloca.h>
+#define iree_alloca(sz) alloca(sz)
+#endif  // _WIN32
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -176,11 +188,17 @@ typedef struct {
   iree_host_size_t data_length;
 } iree_byte_span_t;
 
+#define iree_make_byte_span(data, data_length) \
+  { (uint8_t*)(data), (data_length) }
+
 // A span of constant bytes (ala std::span of const uint8_t).
 typedef struct {
   const uint8_t* data;
   iree_host_size_t data_length;
 } iree_const_byte_span_t;
+
+#define iree_make_const_byte_span(data, data_length) \
+  { (const uint8_t*)(data), (data_length) }
 
 //===----------------------------------------------------------------------===//
 // iree_status_t and error reporting
@@ -297,6 +315,10 @@ typedef uintptr_t iree_status_t;
   IREE_API_STATUS_MACROS_IMPL_RETURN_IF_API_ERROR_( \
       IREE_API_STATUS_MACROS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
 
+// TODO(#265): clean up the status object.
+// Ignores the status result of (expr).
+#define IREE_IGNORE_ERROR(expr) (void)(expr)
+
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Returns a NUL-terminated string constant for the given status code, such as
@@ -363,6 +385,13 @@ typedef enum {
   // fresh pages from the system. It is always safe to zero contents if the
   // behavior of the allocator is not under our control.
   IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1 << 0,
+  // Tries to reuse an existing allocation provided via |out_ptr| if possible.
+  // If the existing allocation is not reused then it is freed as if a call to
+  // iree_allocator_free had been called on it. If the allocation fails then
+  // the provided existing allocation is unmodified.
+  //
+  // This models the C realloc behavior.
+  IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING = 1 << 1,
 } iree_allocation_mode_t;
 
 // An allocator for host-memory allocations.
@@ -384,19 +413,26 @@ typedef struct {
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
-#define IREE_ALLOCATOR_SYSTEM \
-  { 0, iree_allocator_system_allocate, iree_allocator_system_free }
+#define IREE_ALLOCATOR_SYSTEM                                     \
+  iree_allocator_t {                                              \
+    0, iree_allocator_system_allocate, iree_allocator_system_free \
+  }
 
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
 #define IREE_ALLOCATOR_NULL \
-  { 0, 0, 0 }
+  iree_allocator_t { 0, 0, 0 }
 
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Allocates a block of |byte_length| bytes from the given allocator.
 // The contents of the returned memory is guaranteed to be zeroed.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
+
+// Reallocates |out_ptr| to |byte_length| bytes with the given allocator.
+// If the reallocation fails then the original |out_ptr| is unmodified.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.

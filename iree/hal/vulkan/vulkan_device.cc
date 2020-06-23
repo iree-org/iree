@@ -626,9 +626,9 @@ StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(
 
   // TODO(b/140026716): conditionally enable validation.
   auto impl = make_ref<DirectCommandBuffer>(
-      allocator(), mode, command_categories, add_ref(descriptor_pool_cache_),
+      mode, command_categories, add_ref(descriptor_pool_cache_),
       add_ref(command_pool), command_buffer);
-  return WrapCommandBufferWithValidation(std::move(impl));
+  return WrapCommandBufferWithValidation(allocator(), std::move(impl));
 }
 
 StatusOr<ref_ptr<Event>> VulkanDevice::CreateEvent() {

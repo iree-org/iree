@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "iree/hal/device_info.h"
+#include "iree/hal/host/serial_scheduling_model.h"
 #include "iree/hal/llvmjit/llvmjit_device.h"
 
 namespace iree {
@@ -53,7 +54,9 @@ StatusOr<ref_ptr<Device>> LLVMJITDriver::CreateDefaultDevice() {
 
 StatusOr<ref_ptr<Device>> LLVMJITDriver::CreateDevice(
     DriverDeviceID device_id) {
-  return LLVMJITDevice::CreateLLVMJITDevice(GetDefaultDeviceInfo());
+  auto scheduling_model = std::make_unique<SerialSchedulingModel>();
+  return make_ref<LLVMJITDevice>(GetDefaultDeviceInfo(),
+                                 std::move(scheduling_model));
 }
 
 }  // namespace llvmjit

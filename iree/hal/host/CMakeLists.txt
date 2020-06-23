@@ -22,7 +22,7 @@ iree_cc_library(
   SRCS
     "async_command_queue.cc"
   DEPS
-    ::host_submission_queue
+    ::serial_submission_queue
     absl::core_headers
     absl::synchronization
     iree::base::status
@@ -39,7 +39,7 @@ iree_cc_test(
     "async_command_queue_test.cc"
   DEPS
     ::async_command_queue
-    ::host_submission_queue
+    ::serial_submission_queue
     absl::memory
     absl::time
     iree::base::status
@@ -94,6 +94,18 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    host_executable
+  HDRS
+    "host_executable.h"
+  DEPS
+    iree::base::status
+    iree::hal::descriptor_set
+    iree::hal::executable
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     host_executable_layout
   HDRS
     "host_executable_layout.h"
@@ -126,19 +138,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    host_local_command_processor
+    host_local_device
   HDRS
-    "host_local_command_processor.h"
+    "host_local_device.h"
   SRCS
-    "host_local_command_processor.cc"
+    "host_local_device.cc"
   DEPS
     ::host_descriptor_set
     ::host_executable_layout
-    absl::inlined_vector
-    iree::base::source_location
+    ::host_local_allocator
+    ::scheduling_model
+    absl::core_headers
+    absl::memory
+    absl::span
+    iree::base::memory
     iree::base::status
     iree::base::tracing
-    iree::hal::command_buffer
+    iree::hal::allocator
+    iree::hal::command_buffer_validation
+    iree::hal::device
   PUBLIC
 )
 
@@ -175,35 +193,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    host_submission_queue
-  HDRS
-    "host_submission_queue.h"
-  SRCS
-    "host_submission_queue.cc"
-  DEPS
-    ::host_semaphore
-    absl::core_headers
-    absl::inlined_vector
-    absl::synchronization
-    iree::base::intrusive_list
-    iree::base::status
-    iree::base::tracing
-    iree::hal::command_queue
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    host_submission_queue_test
-  SRCS
-    "host_submission_queue_test.cc"
-  DEPS
-    ::host_submission_queue
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     inproc_command_buffer
   HDRS
     "inproc_command_buffer.h"
@@ -215,5 +204,76 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    scheduling_model
+  HDRS
+    "scheduling_model.h"
+  DEPS
+    iree::hal::command_queue
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    serial_command_processor
+  HDRS
+    "serial_command_processor.h"
+  SRCS
+    "serial_command_processor.cc"
+  DEPS
+    ::host_descriptor_set
+    ::host_executable
+    ::host_executable_layout
+    absl::inlined_vector
+    iree::base::source_location
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    serial_scheduling_model
+  HDRS
+    "serial_scheduling_model.h"
+  SRCS
+    "serial_scheduling_model.cc"
+  DEPS
+    ::async_command_queue
+    ::host_event
+    ::host_semaphore
+    ::inproc_command_buffer
+    ::scheduling_model
+    ::serial_command_processor
+    ::serial_submission_queue
+    absl::inlined_vector
+    iree::base::memory
+    iree::base::source_location
+    iree::base::status
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    serial_submission_queue
+  HDRS
+    "serial_submission_queue.h"
+  SRCS
+    "serial_submission_queue.cc"
+  DEPS
+    ::host_semaphore
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
+    iree::base::intrusive_list
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_queue
   PUBLIC
 )

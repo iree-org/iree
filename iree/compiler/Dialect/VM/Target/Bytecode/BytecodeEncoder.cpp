@@ -88,7 +88,11 @@ class V0BytecodeEncoder : public BytecodeEncoder {
              << "type " << value.getType()
              << " is not supported as a serialized type kind";
     }
-    int typeOrdinal = typeTable_->lookup(refPtrType.getObjectType());
+    return encodeType(refPtrType.getObjectType());
+  }
+
+  LogicalResult encodeType(Type type) override {
+    int typeOrdinal = typeTable_->lookup(type);
     return writeUint32(typeOrdinal);
   }
 
@@ -123,6 +127,9 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeStrAttr(StringAttr value) override {
+    if (!value) {
+      return writeUint16(0);
+    }
     auto stringValue = value.getValue();
     if (stringValue.size() > UINT16_MAX) {
       return currentOp_->emitOpError()

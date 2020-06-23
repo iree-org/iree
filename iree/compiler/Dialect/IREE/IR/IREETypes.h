@@ -114,6 +114,7 @@ namespace TypeKind {
 enum Kind {
   Ref = IREE::TypeKind::FIRST_VM_TYPE,
   Opaque,
+  List,
 };
 }  // namespace TypeKind
 }  // namespace VM

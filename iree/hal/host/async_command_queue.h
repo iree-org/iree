@@ -21,7 +21,7 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/host_submission_queue.h"
+#include "iree/hal/host/serial_submission_queue.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {
@@ -61,7 +61,7 @@ class AsyncCommandQueue final : public CommandQueue {
 
   // Queue that manages submission ordering.
   mutable absl::Mutex submission_mutex_;
-  HostSubmissionQueue submission_queue_ ABSL_GUARDED_BY(submission_mutex_);
+  SerialSubmissionQueue submission_queue_ ABSL_GUARDED_BY(submission_mutex_);
 };
 
 }  // namespace hal

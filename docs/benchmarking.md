@@ -53,7 +53,7 @@ Load Average: 2.21, 1.93, 3.34
 ------------------------------------------------------------------------------
 Benchmark                                    Time             CPU   Iterations
 ------------------------------------------------------------------------------
-BM_RunModule/process_time/real_time     218193 ns       231884 ns         3356
+BM_RunModule/process_time/real_time       0.22 ms         0.23 ms         3356
 ```
 
 Notice that there are a few warnings in there (you may not see all of these).
@@ -95,7 +95,7 @@ Load Average: 1.49, 3.42, 3.49
 ------------------------------------------------------------------------------
 Benchmark                                    Time             CPU   Iterations
 ------------------------------------------------------------------------------
-BM_RunModule/process_time/real_time      11416 ns        14202 ns        61654
+BM_RunModule/process_time/real_time      0.011 ms        0.014 ms        61654
 ```
 
 Remember to [restore CPU scaling](#cpu-configuration) when you're done.

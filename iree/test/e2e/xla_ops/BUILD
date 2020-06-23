@@ -46,11 +46,7 @@ iree_check_single_backend_test_suite(
         "compare.mlir",
         "convolution.mlir",
         "convert.mlir",
-
-        # TODO(#1695): Enable when xla.concat can be lowered to linalg
-        # effectively.
-        # "concatenate.mlir",
-        #
+        "concatenate.mlir",
         "constant.mlir",
 
         # TODO(#1687): Enable after casting from fp to int is handled
@@ -80,22 +76,19 @@ iree_check_single_backend_test_suite(
         "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
-        # TODO(#1699): Enable after xla_hlo.reverse can be lowered to linalg.
-        # "reverse.mlir",
+        "reverse.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
-
-        # TODO(#1698): Enable after xla_hlo.slice is lowered to linalg and can
-        # be handled effectively.
-        # "slice.mlir",
-        #
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
         "tanh.mlir",
         "torch_index_select.mlir",
         "transpose.mlir",
-        "while.mlir",
+
+        # TODO(#2022): fails on real devices.
+        # "while.mlir",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
@@ -108,9 +101,11 @@ iree_check_single_backend_test_suite(
         "add.mlir",
         "batch_norm_inference.mlir",
         "broadcast.mlir",
+        "broadcast_add.mlir",
         "broadcast_in_dim.mlir",
         "clamp.mlir",
         "compare.mlir",
+        "concatenate.mlir",
         "constant.mlir",
         "convolution.mlir",
         "cosine.mlir",
@@ -131,8 +126,10 @@ iree_check_single_backend_test_suite(
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
+        "slice.mlir",
         "sqrt.mlir",
         "subtract.mlir",
+        "tanh.mlir",
         "torch_index_select.mlir",
         "transpose.mlir",
         "while.mlir",

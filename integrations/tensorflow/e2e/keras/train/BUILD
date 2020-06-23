@@ -28,7 +28,7 @@ package(
 )
 
 iree_train_test_suite(
-    name = "keras_model_train",
+    name = "train",
     configurations = [
         # tuples of (optimizer, backends)
         ("sgd", "tf"),
@@ -45,7 +45,7 @@ iree_train_test_suite(
 )
 
 iree_train_test_suite(
-    name = "keras_model_train_failing",
+    name = "train_failing",
     configurations = [
         # tuples of (optimizer, backends)
         # TODO: Combine this suite with keras_model_train once these tests pass.

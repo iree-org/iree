@@ -33,6 +33,20 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
+namespace {
+
+// When converting to the VM, it is safe to remove any identity tie_shape
+// ops that remain.
+class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      Shape::TieShapeOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, operands[0]);
+    return success();
+  }
+};
 
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
@@ -57,6 +71,8 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
       });
   return results;
 }
+
+}  // namespace
 
 // Runs conversion with registered input dialects.
 class ConversionPass
@@ -90,6 +106,7 @@ class ConversionPass
     OwningRewritePatternList conversionPatterns;
     populateIREEToVMPatterns(context, conversionPatterns);
     populateStandardToVMPatterns(context, conversionPatterns);
+    conversionPatterns.insert<ElideTieShapeOp>(context);
 
     // Populate patterns from all used dialects, providing the imports they
     // registered earlier.
@@ -103,7 +120,7 @@ class ConversionPass
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
-                                      conversionPatterns, &typeConverter))) {
+                                      conversionPatterns))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }

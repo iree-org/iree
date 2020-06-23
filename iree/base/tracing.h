@@ -86,7 +86,7 @@
 // IREE_TRACING_MODE = 1: instrumentation and basic statistics
 // IREE_TRACING_MODE = 2: same as 1 with added allocation tracking
 // IREE_TRACING_MODE = 3: same as 2 with callstacks for allocations
-// IREE_TRACING_MODE = 3: same as 3 with callstacks for all instrumentation
+// IREE_TRACING_MODE = 4: same as 3 with callstacks for all instrumentation
 #if !defined(IREE_TRACING_FEATURES)
 #if defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 1
 #define IREE_TRACING_FEATURES (IREE_TRACING_FEATURE_INSTRUMENTATION)

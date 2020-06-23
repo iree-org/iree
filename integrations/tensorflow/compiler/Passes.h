@@ -40,6 +40,9 @@ createTFSavedModelLowerExportedFunctions();
 // Guarantee that all FuncOp's have a single use.
 std::unique_ptr<OperationPass<ModuleOp>> createGuaranteeAllFuncsOneUse();
 
+// Push resource casts forward to better propagate resource related shapes.
+std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCasts();
+
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
 void createIreeTfImportPipeline(OpPassManager &pm);

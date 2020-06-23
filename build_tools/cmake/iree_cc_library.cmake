@@ -33,6 +33,7 @@ include(CMakeParseArguments)
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
+# SHARED: If set, will compile to a shared object.
 #
 # Note:
 # By default, iree_cc_library will always create a library named iree_${NAME},
@@ -67,7 +68,7 @@ include(CMakeParseArguments)
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;ALWAYSLINK;TESTONLY"
+    "PUBLIC;ALWAYSLINK;TESTONLY;SHARED"
     "NAME"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -103,7 +104,12 @@ function(iree_cc_library)
   endif()
 
   if(NOT _RULE_IS_INTERFACE)
-    add_library(${_NAME} STATIC "")
+    if (_RULE_SHARED)
+      add_library(${_NAME} SHARED "")
+    else()
+      add_library(${_NAME} STATIC "")
+    endif()
+
     target_sources(${_NAME}
       PRIVATE
         ${_RULE_SRCS}

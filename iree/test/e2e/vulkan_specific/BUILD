@@ -28,3 +28,15 @@ iree_check_single_backend_test_suite(
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
+
+# TODO(hanchung): Merge two tests into one single file.
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv-pad-conv_vulkan",
+    srcs = [
+        "convolution1.mlir",
+        "convolution2.mlir",
+    ],
+    compiler_flags = ["-iree-extract-pad-from-conv"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)

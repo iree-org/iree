@@ -106,8 +106,8 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
   // Each required and optional function in the loader tables will expand to
   // the following member, such as for example 'vkSomeFunction':
   //   PFN_vkSomeFunction vkSomeFunction;
-#define REQUIRED_PFN(function_name) PFN_##function_name function_name
-#define OPTIONAL_PFN(function_name) PFN_##function_name function_name
+#define REQUIRED_PFN(function_name) PFN_##function_name function_name = nullptr
+#define OPTIONAL_PFN(function_name) PFN_##function_name function_name = nullptr
 #define EXCLUDED_PFN(function_name)
 #define PFN_MEMBER(requirement, function_name) requirement##_PFN(function_name);
   REQUIRED_PFN(vkGetInstanceProcAddr);

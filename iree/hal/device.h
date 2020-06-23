@@ -35,7 +35,8 @@
 #include "iree/hal/semaphore.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
-// Win32 macro name conflict:
+// Win32 macro name conflicts:
+#undef CreateEvent
 #undef CreateSemaphore
 #endif  // IREE_PLATFORM_WINDOWS
 

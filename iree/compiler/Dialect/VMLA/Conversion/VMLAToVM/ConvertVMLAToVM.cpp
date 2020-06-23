@@ -62,7 +62,7 @@ class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
   LogicalResult matchAndRewrite(
       Shape::TieShapeOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, op.operand());
+    rewriter.replaceOp(op, operands[0]);
     return success();
   }
 };
@@ -365,7 +365,7 @@ class ConvertVMLAToVMPass
     Shape::populateFoldConversionPatterns(&getContext(), conversionPatterns);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
-                                      conversionPatterns, &typeConverter))) {
+                                      conversionPatterns))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }

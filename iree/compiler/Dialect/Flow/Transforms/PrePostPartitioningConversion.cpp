@@ -65,7 +65,6 @@ class PrePartitioningConversionPass
  public:
   void runOnFunction() override {
     auto *context = &getContext();
-    FlowTypeConverter typeConverter;
     ConversionTarget conversionTarget(*context);
     OwningRewritePatternList conversionPatterns;
 
@@ -101,7 +100,7 @@ class PrePartitioningConversionPass
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      conversionPatterns, &typeConverter))) {
+                                      conversionPatterns))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }
@@ -134,7 +133,6 @@ class PostPartitioningConversionPass
   void runOnFunction() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(getContext());
-    FlowTypeConverter typeConverter;
     OwningRewritePatternList conversionPatterns;
 
     // We have completed all flow op creation at this point.
@@ -152,7 +150,7 @@ class PostPartitioningConversionPass
     populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      conversionPatterns, &typeConverter))) {
+                                      conversionPatterns))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }

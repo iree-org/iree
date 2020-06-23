@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @inc_rgn_dispatch_0
-// CHECK-SAME: (%[[INTERFACE:.+]]: !vmla.interface)
+// CHECK-SAME: (%[[INTERFACE:.+]]: !vmla.interface
 func @inc_rgn_dispatch_0() attributes {iree.module.export} {
   // CHECK-DAG: %[[C0:.+]] = constant 0
   // CHECK-DAG: %[[C4:.+]] = constant 4

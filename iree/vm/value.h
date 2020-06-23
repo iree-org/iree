@@ -37,9 +37,9 @@ typedef struct iree_vm_value {
   };
 } iree_vm_value_t;
 
-#define IREE_VM_VALUE_MAKE_I32(value)   \
-  {                                     \
-    IREE_VM_VALUE_TYPE_I32, { (value) } \
+#define IREE_VM_VALUE_MAKE_I32(value)            \
+  {                                              \
+    IREE_VM_VALUE_TYPE_I32, { (int32_t)(value) } \
   }
 
 #ifdef __cplusplus

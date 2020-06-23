@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/StandardTypes.h"
@@ -44,13 +45,20 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   addIllegalOp<DimOp>();
   addIllegalOp<RankOp>();
 
+  // Metadata ops are dynamically legal if their types are legal.
+  addDynamicallyLegalOp<Shape::TieShapeOp>([&](Shape::TieShapeOp op) {
+    return typeConverter.isLegal(op.result().getType());
+  });
+
   // We don't care about the contents of a HAL executable: it may have any kind
   // of dialect and type usage.
   addLegalOp<IREE::HAL::ExecutableOp>();
   markOpRecursivelyLegal<IREE::HAL::ExecutableOp>();
 
-  addDynamicallyLegalOp<FuncOp>(
-      [&](FuncOp op) { return typeConverter.isSignatureLegal(op.getType()); });
+  addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+    return typeConverter.isSignatureLegal(op.getType()) &&
+           typeConverter.isLegal(&op.getBody());
+  });
   addDynamicallyLegalOp<ConstantOp>(
       [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
 }
@@ -83,7 +91,11 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
       if (!operand.hasValue()) {
         return srcOp->emitOpError() << "unable to create adaptor for operand";
       }
-      state.addOperands({operand->getBufferView()});
+      auto bufferView = operand->getBufferView();
+      if (!bufferView) {
+        return srcOp->emitOpError() << "unable to get buffer view for operand";
+      }
+      state.addOperands({bufferView});
     } else {
       // Normal pass-through operand.
       state.addOperands({dstOperand});

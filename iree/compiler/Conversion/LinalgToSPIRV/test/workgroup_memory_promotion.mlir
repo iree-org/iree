@@ -5,7 +5,8 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %arg0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<96x96xf32>
     %arg1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<96x96xf32>
     %arg2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<96x96xf32>
-    linalg.matmul(%arg0, %arg1, %arg2) {__internal_linalg_transform__ = "workgroup"} : memref<96x96xf32>, memref<96x96xf32>, memref<96x96xf32>
+    linalg.matmul %arg0, %arg1, %arg2 :
+      (memref<96x96xf32>, memref<96x96xf32>, memref<96x96xf32>)
     return
   }
 
@@ -40,8 +41,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //      CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW2]])
 // CHECK-SAME:       "workitem"
 //      CHECK:     spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
-//      CHECK:     linalg.matmul(%[[SUBVIEW1]], %[[SUBVIEW2]], %[[RET0SV]])
-// CHECK-SAME:       "workitem"
+//      CHECK:     linalg.matmul {{.*}}"workitem"{{.*}} %[[SUBVIEW1]], %[[SUBVIEW2]], %[[RET0SV]]
 //      CHECK:     spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
 //  CHECK-DAG:     dealloc %[[ALLOC1]] : memref<?x?xf32, 3>
 //  CHECK-DAG:     dealloc %[[ALLOC2]] : memref<?x?xf32, 3>

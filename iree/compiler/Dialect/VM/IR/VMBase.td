@@ -82,8 +82,21 @@ def VM_OPC_ConstI32              : VM_OPC<0x09, "ConstI32">;
 def VM_OPC_ConstRefZero          : VM_OPC<0x0A, "ConstRefZero">;
 def VM_OPC_ConstRefRodata        : VM_OPC<0x0B, "ConstRefRodata">;
 
-// ref_ptr operations:
-// (none yet)
+// List operations:
+def VM_OPC_ListAlloc             : VM_OPC<0x10, "ListAlloc">;
+def VM_OPC_ListReserve           : VM_OPC<0x11, "ListReserve">;
+def VM_OPC_ListSize              : VM_OPC<0x12, "ListSize">;
+def VM_OPC_ListResize            : VM_OPC<0x13, "ListResize">;
+def VM_OPC_ListGetI32            : VM_OPC<0x14, "ListGetI32">;
+def VM_OPC_ListSetI32            : VM_OPC<0x15, "ListSetI32">;
+def VM_OPC_ListGetRef            : VM_OPC<0x16, "ListGetRef">;
+def VM_OPC_ListSetRef            : VM_OPC<0x17, "ListSetRef">;
+// RESERVED: 0x18 push.i32
+// RESERVED: 0x19 pop.i32
+// RESERVED: 0x1A copy to other list
+// RESERVED: 0x1B slice clone into new list
+// RESERVED: 0x1C read byte buffer?
+// RESERVED: 0x1D write byte buffer?
 
 // Conditional assignment:
 def VM_OPC_SelectI32             : VM_OPC<0x1E, "SelectI32">;
@@ -128,6 +141,7 @@ def VM_OPC_CmpGTI32S             : VM_OPC<0x46, "CmpGTI32S">;
 def VM_OPC_CmpGTI32U             : VM_OPC<0x47, "CmpGTI32U">;
 def VM_OPC_CmpGTEI32S            : VM_OPC<0x48, "CmpGTEI32S">;
 def VM_OPC_CmpGTEI32U            : VM_OPC<0x49, "CmpGTEI32U">;
+def VM_OPC_CmpNZI32              : VM_OPC<0x4D, "CmpNZI32">;
 def VM_OPC_CmpEQRef              : VM_OPC<0x4A, "CmpEQRef">;
 def VM_OPC_CmpNERef              : VM_OPC<0x4B, "CmpNERef">;
 def VM_OPC_CmpNZRef              : VM_OPC<0x4C, "CmpNZRef">;
@@ -163,6 +177,14 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_ConstI32,
     VM_OPC_ConstRefZero,
     VM_OPC_ConstRefRodata,
+    VM_OPC_ListAlloc,
+    VM_OPC_ListReserve,
+    VM_OPC_ListSize,
+    VM_OPC_ListResize,
+    VM_OPC_ListGetI32,
+    VM_OPC_ListSetI32,
+    VM_OPC_ListGetRef,
+    VM_OPC_ListSetRef,
     VM_OPC_SelectI32,
     VM_OPC_SelectRef,
     VM_OPC_SwitchI32,
@@ -191,6 +213,7 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_CmpGTI32U,
     VM_OPC_CmpGTEI32S,
     VM_OPC_CmpGTEI32U,
+    VM_OPC_CmpNZI32,
     VM_OPC_CmpEQRef,
     VM_OPC_CmpNERef,
     VM_OPC_CmpNZRef,
@@ -259,6 +282,8 @@ class VM_EncGlobalAttr<string name> : VM_EncEncodeExpr<
     "e.encodeSymbolOrdinal(syms, " # name # "())">;
 class VM_EncRodataAttr<string name> : VM_EncEncodeExpr<
     "e.encodeSymbolOrdinal(syms, " # name # "())">;
+class VM_EncType<string expr> : VM_EncEncodeExpr<
+    "e.encodeType(" # expr # ")">;
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
     "e.encodeType(" # name # "())">;
 class VM_EncIntAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
@@ -353,6 +378,10 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
 // VM traits
 //===----------------------------------------------------------------------===//
 
+// Operations with this trait are pseudo-ops that must be converted to other ops
+// prior to serialization. There are no runtime equivalents of the op.
+def VM_PseudoOp : NativeOpTrait<"IREE::VM::PseudoOp">;
+
 // Operations with this trait will be stripped in builds where
 // debugging-related operations are not needed (such as release builds).
 def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;
@@ -395,6 +424,34 @@ class VM_RefOf<Type type> :
 }
 
 //===----------------------------------------------------------------------===//
+// List types
+//===----------------------------------------------------------------------===//
+
+def VM_AnyList : DialectType<
+    IREE_Dialect,
+    And<[
+      CPred<"$_self.isa<IREE::VM::RefType>()">,
+      CPred<"$_self.cast<IREE::VM::RefType>().getObjectType().isa<IREE::VM::ListType>()">,
+    ]>,
+    "list"> {
+  let typeDescription = [{
+    An iree_vm_list_t/iree::vm::list<T> of some type.
+  }];
+}
+
+class VM_ListOf<Type type> :
+    Type<And<[
+      CPred<"$_self.cast<IREE::VM::RefType>().getObjectType().isa<IREE::VM::ListType>()">,
+      SubstLeaves<"$_self",
+                  "$_self.cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()",
+                  type.predicate>
+    ]>, "list<" # type.description # ">"> {
+  // Set the builder call if the base type has a builder call.
+  string builderCall = !if(!empty(type.builderCall),
+                           "", "IREE::VM::ListType::get(" # type.builderCall # ")");
+}
+
+//===----------------------------------------------------------------------===//
 // VM types
 //===----------------------------------------------------------------------===//
 
@@ -416,6 +473,11 @@ def VM_AnyType : AnyTypeOf<[
   I32,
   VM_CondValue,
   VM_AnyRef,
+]>;
+
+def VM_PrimitiveType : AnyTypeOf<[
+  AnyIntOfWidths<[8, 16, 32]>,
+  FloatOfWidths<[16, 32]>,
 ]>;
 
 class VM_ConstIntValueAttr<I type> : Attr<

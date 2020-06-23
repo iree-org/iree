@@ -63,7 +63,9 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
                                 newFuncOp.end());
     newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
                                                newResultTypes));
-    rewriter.applySignatureConversion(&newFuncOp.getBody(), newSignature);
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), converter,
+                                           &newSignature)))
+      return failure();
 
     rewriter.eraseOp(funcOp);
     return success();

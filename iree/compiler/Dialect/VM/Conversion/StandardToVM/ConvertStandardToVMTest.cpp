@@ -37,13 +37,10 @@ class ConvertStandardToVMTestPass
     OwningRewritePatternList patterns;
     populateStandardToVMPatterns(&getContext(), patterns);
 
-    VMTypeConverter typeConverter;
-
     // NOTE: we allow other dialects besides just VM during this pass as we are
     // only trying to eliminate the std ops. When used as part of a larger set
     // of rewrites a full conversion should be used instead.
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      &typeConverter))) {
+    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
       return signalPassFailure();
     }
   }

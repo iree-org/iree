@@ -24,8 +24,7 @@ namespace iree {
 namespace hal {
 namespace dylib {
 
-DyLibExecutableCache::DyLibExecutableCache(hal::Allocator* allocator)
-    : allocator_(allocator) {}
+DyLibExecutableCache::DyLibExecutableCache() = default;
 
 DyLibExecutableCache::~DyLibExecutableCache() = default;
 
@@ -45,7 +44,7 @@ StatusOr<ref_ptr<Executable>> DyLibExecutableCache::PrepareExecutable(
   //    hash data into a filename and read from / write to GetTempPath() or
   //    GetCachePath() rather than use GetTempFile().
 
-  return DyLibExecutable::Load(allocator_, spec);
+  return DyLibExecutable::Load(spec);
 }
 
 }  // namespace dylib

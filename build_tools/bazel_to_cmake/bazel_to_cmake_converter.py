@@ -137,7 +137,18 @@ class BuildFileFunctions(object):
     return self._convert_file_list_block("TEXTUAL_HDRS", textual_hdrs)
 
   def _convert_srcs_block(self, srcs):
-    return self._convert_file_list_block("SRCS", srcs)
+    if not srcs:
+      return ""
+    generated_srcs = [src for src in srcs if src.startswith(":")]
+    srcs = [src for src in srcs if src not in generated_srcs]
+    sets = []
+    if srcs:
+      sets.append(self._convert_file_list_block("SRCS", srcs))
+    if generated_srcs:
+      sets.append(
+          self._convert_file_list_block("GENERATED_SRCS",
+                                        [src[1:] for src in generated_srcs]))
+    return "\n".join(sets)
 
   def _convert_src_block(self, src):
     return f'  SRC\n    "{src}"\n'
@@ -416,6 +427,7 @@ class BuildFileFunctions(object):
                     srcs,
                     cc_file_output,
                     h_file_output,
+                    testonly=False,
                     cpp_namespace=None,
                     strip_prefix=None,
                     flatten=False,
@@ -428,6 +440,7 @@ class BuildFileFunctions(object):
     srcs_block = self._convert_srcs_block(srcs)
     cc_file_output_block = self._convert_cc_file_output_block(cc_file_output)
     h_file_output_block = self._convert_h_file_output_block(h_file_output)
+    testonly_block = self._convert_testonly_block(testonly)
     namespace_block = self._convert_cpp_namespace_block(cpp_namespace)
     flatten_block = self._convert_flatten_block(flatten)
 
@@ -436,6 +449,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{cc_file_output_block}"
                             f"{h_file_output_block}"
+                            f"{testonly_block}"
                             f"{namespace_block}"
                             f"{flatten_block}"
                             f"  PUBLIC\n)\n\n")

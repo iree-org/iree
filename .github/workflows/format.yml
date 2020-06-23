@@ -14,7 +14,7 @@
 
 name: Format
 
-on: [pull_request, push]
+on: [pull_request]
 
 jobs:
   # Run clang-format and verify there are no errors. We don't want to bother
@@ -22,6 +22,8 @@ jobs:
   format:
     name: Code Format Check
     runs-on: ubuntu-18.04
+    env:
+      BASE_REF: ${{ github.base_ref }}
     steps:
     - name: Installing dependencies
       run: |
@@ -32,10 +34,10 @@ jobs:
         chmod +x /tmp/git-clang-format
     - name: Checking out repository
       uses: actions/checkout@v2
-      # We have to explicitly fetch master as well
-    - name: Fetching master
-      run: git fetch --no-tags --prune --depth=1 origin master
+      # We have to explicitly fetch the base branch as well
+    - name: Fetching Base Branch
+      run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}"
     - name: Running clang-format on changed source files
       run: |
-        /tmp/git-clang-format origin/master --binary=clang-format-9 --style=file
+        /tmp/git-clang-format "origin/${BASE_REF?}" --binary=clang-format-9 --style=file
         git diff --exit-code
