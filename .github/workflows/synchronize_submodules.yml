@@ -20,9 +20,8 @@ on:
   push:
     branches:
       - master
-      # This branch doesn't exist yet, but may as part of shifting to a
-      # GitHub-first workflow.
       - google
+      - main
 
 jobs:
   synchronize:
