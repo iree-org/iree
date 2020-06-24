@@ -127,6 +127,10 @@ class VulkanDevice final : public Device {
   Status WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
                         absl::Time deadline, VkSemaphoreWaitFlags wait_flags);
 
+  bool emulating_timeline_semaphores() const {
+    return semaphore_pool_ != nullptr;
+  }
+
   ref_ptr<Driver> driver_;
   VkPhysicalDevice physical_device_;
   ref_ptr<VkDeviceHandle> logical_device_;

@@ -67,11 +67,13 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   // promoted to core, so we list it as optional even though we require it.
   options.instance_extensibility.optional_extensions.push_back(
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES == 0
-  // Timeline semaphore support is required.
-  options.device_extensibility.required_extensions.push_back(
+
+  // Timeline semaphore support is optional and will be emulated if necessary.
+  options.device_extensibility.optional_extensions.push_back(
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-#endif
+  // Polyfill layer - enable if present (instead of our custom emulation).
+  options.instance_extensibility.optional_layers.push_back(
+      "VK_LAYER_KHRONOS_timeline_semaphore");
 
   if (absl::GetFlag(FLAGS_vulkan_validation_layers)) {
     options.instance_extensibility.optional_layers.push_back(
@@ -91,10 +93,6 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
     options.device_extensibility.optional_extensions.push_back(
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
   }
-
-  // Polyfill layer - enable if present.
-  options.instance_extensibility.optional_layers.push_back(
-      "VK_LAYER_KHRONOS_timeline_semaphore");
 
   // Create the driver and VkInstance.
   ASSIGN_OR_RETURN(auto driver, VulkanDriver::Create(options, std::move(syms)));

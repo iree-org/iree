@@ -37,8 +37,6 @@ config_setting(
     },
 )
 
-# TODO(antiagainst): expose configuration for emulated timeline semaphore
-
 cc_library(
     name = "api",
     srcs = ["api.cc"],
