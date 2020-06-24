@@ -16,6 +16,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "iree_py_library",
+    "iree_py_test",
 )
 
 package(
@@ -36,7 +37,7 @@ iree_py_library(
     ],
 )
 
-py_test(
+iree_py_test(
     name = "tf_test_utils_test",
     srcs = [
         "tf_test_utils.py",
