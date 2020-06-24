@@ -22,7 +22,6 @@
 
 #include <cstddef>
 
-#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -612,8 +611,6 @@ LogicalResult PadOpConversion::apply(
       cond ? rewriter.create<SelectOp>(loc, cond, inputVal, paddingVal)
            : inputVal;
   rewriter.create<linalg::YieldOp>(loc, result);
-
-  setNoTileMarker(linalgOp);
   return success();
 }
 
