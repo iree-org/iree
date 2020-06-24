@@ -67,9 +67,11 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   // promoted to core, so we list it as optional even though we require it.
   options.instance_extensibility.optional_extensions.push_back(
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#if IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES == 0
   // Timeline semaphore support is required.
   options.device_extensibility.required_extensions.push_back(
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+#endif
 
   if (absl::GetFlag(FLAGS_vulkan_validation_layers)) {
     options.instance_extensibility.optional_layers.push_back(
