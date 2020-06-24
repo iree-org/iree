@@ -22,6 +22,7 @@ if(${IREE_ENABLE_EMITC})
       "CModuleTarget.h"
     SRCS
       "CModuleTarget.cpp"
+      "TranslationRegistration.cpp"
     DEPS
       iree::compiler::Dialect::VM::IR
     PUBLIC
