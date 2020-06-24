@@ -19,11 +19,14 @@ iree_cc_library(
     CodegenUtils
   HDRS
     "FunctionUtils.h"
+    "MarkerUtils.h"
   SRCS
     "FunctionUtils.cpp"
+    "MarkerUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRLinalgTransforms
     MLIRSupport
   PUBLIC
 )

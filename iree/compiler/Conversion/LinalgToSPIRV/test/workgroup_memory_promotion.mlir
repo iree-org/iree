@@ -5,7 +5,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %arg0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<96x96xf32>
     %arg1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<96x96xf32>
     %arg2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<96x96xf32>
-    linalg.matmul %arg0, %arg1, %arg2 :
+    linalg.matmul %arg0, %arg1, %arg2 {__internal_linalg_transform__ = "workgroup"} :
       (memref<96x96xf32>, memref<96x96xf32>, memref<96x96xf32>)
     return
   }

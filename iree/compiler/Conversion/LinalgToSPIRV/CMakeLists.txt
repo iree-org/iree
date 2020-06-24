@@ -19,18 +19,14 @@ iree_cc_library(
     LinalgToSPIRV
   HDRS
     "Attributes.h"
-    "MarkerUtils.h"
     "MemorySpace.h"
     "Passes.h"
-    "Utils.h"
   SRCS
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "LinalgTileAndFusePass.cpp"
-    "MarkerUtils.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
-    "Utils.cpp"
     "VectorToGPUPass.cpp"
   DEPS
     LLVMSupport
