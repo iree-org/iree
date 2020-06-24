@@ -225,12 +225,6 @@ StatusOr<bool> EmulatedTimelineSemaphore::TryToAdvanceTimeline(
   if (outstanding_semaphores_.empty()) return false;
 
   IntrusiveList<TimePointSemaphore> resolved_semaphores;
-  auto moveResolvedSemaphore = [&](TimePointSemaphore* s) {
-    s->signal_fence = nullptr;
-    s->wait_fence = nullptr;
-    outstanding_semaphores_.erase(s);
-    resolved_semaphores.push_back(s);
-  };
 
   bool keep_resolving = true;
   bool reached_desired_value = false;
@@ -264,7 +258,10 @@ StatusOr<bool> EmulatedTimelineSemaphore::TryToAdvanceTimeline(
       // submission.
       if (!semaphore->wait_fence ||
           semaphore->wait_fence->GetStatus() == VK_SUCCESS) {
-        moveResolvedSemaphore(semaphore);
+        semaphore->signal_fence = nullptr;
+        semaphore->wait_fence = nullptr;
+        outstanding_semaphores_.erase(semaphore);
+        resolved_semaphores.push_back(semaphore);
       }
 
       continue;
@@ -285,7 +282,12 @@ StatusOr<bool> EmulatedTimelineSemaphore::TryToAdvanceTimeline(
         signaled_value_.store(semaphore->value);
         semaphore->signal_fence = nullptr;
         // If no waiters, we can recycle this semaphore now.
-        if (!semaphore->wait_fence) moveResolvedSemaphore(semaphore);
+        if (!semaphore->wait_fence) {
+          semaphore->signal_fence = nullptr;
+          semaphore->wait_fence = nullptr;
+          outstanding_semaphores_.erase(semaphore);
+          resolved_semaphores.push_back(semaphore);
+        }
         break;
       case VK_NOT_READY:
         // The fence has not been signaled yet so this is the furthest time
