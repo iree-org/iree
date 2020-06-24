@@ -23,18 +23,14 @@ cc_library(
         "ConvertToGPUPass.cpp",
         "ConvertToSPIRVPass.cpp",
         "LinalgTileAndFusePass.cpp",
-        "MarkerUtils.cpp",
         "Passes.cpp",
         "SplitDispatchFunctionPass.cpp",
-        "Utils.cpp",
         "VectorToGPUPass.cpp",
     ],
     hdrs = [
         "Attributes.h",
-        "MarkerUtils.h",
         "MemorySpace.h",
         "Passes.h",
-        "Utils.h",
     ],
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",

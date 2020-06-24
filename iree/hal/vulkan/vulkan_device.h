@@ -30,6 +30,7 @@
 #include "iree/hal/semaphore.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
+#include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
 
@@ -119,6 +120,8 @@ class VulkanDevice final : public Device {
       absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
       ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
       ref_ptr<VkCommandPoolHandle> transfer_command_pool,
+      ref_ptr<TimePointSemaphorePool> semaphore_pool,
+      ref_ptr<TimePointFencePool> fence_pool,
       DebugCaptureManager* debug_capture_manager);
 
   Status WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
@@ -138,6 +141,10 @@ class VulkanDevice final : public Device {
 
   ref_ptr<VkCommandPoolHandle> dispatch_command_pool_;
   ref_ptr<VkCommandPoolHandle> transfer_command_pool_;
+
+  // Fields used for emulated timeline semaphores.
+  ref_ptr<TimePointSemaphorePool> semaphore_pool_;
+  ref_ptr<TimePointFencePool> fence_pool_;
 
   DebugCaptureManager* debug_capture_manager_ = nullptr;
 };

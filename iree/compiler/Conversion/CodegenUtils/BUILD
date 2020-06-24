@@ -23,13 +23,16 @@ cc_library(
     name = "CodegenUtils",
     srcs = [
         "FunctionUtils.cpp",
+        "MarkerUtils.cpp",
     ],
     hdrs = [
         "FunctionUtils.h",
+        "MarkerUtils.h",
     ],
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Support",
     ],
 )

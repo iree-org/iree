@@ -561,6 +561,7 @@ filegroup(
     name = "common_target_td_sources",
     srcs = glob([
         "include/llvm/CodeGen/*.td",
+        "include/llvm/Frontend/Directive/*.td",
         "include/llvm/IR/Intrinsics*.td",
         "include/llvm/TableGen/*.td",
         "include/llvm/Target/*.td",
@@ -666,6 +667,17 @@ cc_library(
     ],
 )
 
+gentbl(
+    name = "omp_gen",
+    tbl_outs = [("--gen-directive-decls", "include/llvm/Frontend/OpenMP/OMP.h.inc")],
+    tblgen = ":llvm-tblgen",
+    td_file = "include/llvm/Frontend/OpenMP/OMP.td",
+    td_srcs = glob([
+        "include/llvm/Frontend/OpenMP/*.td",
+        "include/llvm/Frontend/Directive/*.td",
+    ]),
+)
+
 ########################## Begin generated content ##########################
 cc_library(
     name = "AArch64AsmParser",
@@ -698,6 +710,7 @@ cc_library(
         "lib/Target/AArch64/*.c",
         "lib/Target/AArch64/*.cpp",
         "lib/Target/AArch64/*.inc",
+        "lib/Target/AArch64/GISel/*.cpp",
     ]),
     hdrs = glob([
         "include/llvm/Target/AArch64/*.h",
@@ -2052,6 +2065,7 @@ cc_library(
         ":Support",
         ":TransformUtils",
         ":config",
+        ":omp_gen",
     ],
 )
 

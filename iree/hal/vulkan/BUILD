@@ -37,6 +37,8 @@ config_setting(
     },
 )
 
+# TODO(antiagainst): expose configuration for emulated timeline semaphore
+
 cc_library(
     name = "api",
     srcs = ["api.cc"],
@@ -91,6 +93,7 @@ cc_library(
         ":pipeline_executable",
         ":status_util",
         ":vma_allocator",
+        "//iree/base:alignment",
         "//iree/base:arena",
         "//iree/base:math",
         "//iree/base:status",
@@ -184,6 +187,25 @@ cc_test(
         ":dynamic_symbols",
         "//iree/base:status_matchers",
     ] + PLATFORM_VULKAN_TEST_DEPS,
+)
+
+cc_library(
+    name = "emulated_timeline_semaphore",
+    srcs = ["emulated_timeline_semaphore.cc"],
+    hdrs = ["emulated_timeline_semaphore.h"],
+    deps = [
+        ":handle_util",
+        ":status_util",
+        ":timepoint_util",
+        "//iree/base:intrusive_list",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:semaphore",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
+    ],
 )
 
 cc_library(
@@ -326,11 +348,44 @@ cc_library(
 )
 
 cc_library(
+    name = "serializing_command_queue",
+    srcs = ["serializing_command_queue.cc"],
+    hdrs = ["serializing_command_queue.h"],
+    deps = [
+        ":direct_command_buffer",
+        ":emulated_timeline_semaphore",
+        ":handle_util",
+        ":status_util",
+        ":timepoint_util",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:command_queue",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_library(
     name = "status_util",
     srcs = ["status_util.cc"],
     hdrs = ["status_util.h"],
     deps = [
         "//iree/base:status",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
+    ],
+)
+
+cc_library(
+    name = "timepoint_util",
+    srcs = ["timepoint_util.cc"],
+    hdrs = ["timepoint_util.h"],
+    deps = [
+        ":handle_util",
+        "//iree/base:intrusive_list",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "@com_google_absl//absl/synchronization",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
@@ -384,6 +439,7 @@ cc_library(
         ":direct_command_buffer",
         ":direct_command_queue",
         ":dynamic_symbols",
+        ":emulated_timeline_semaphore",
         ":extensibility_util",
         ":handle_util",
         ":native_descriptor_set",
@@ -391,6 +447,7 @@ cc_library(
         ":native_timeline_semaphore",
         ":pipeline_cache",
         ":pipeline_executable_layout",
+        ":serializing_command_queue",
         ":status_util",
         ":vma_allocator",
         "//iree/base:math",

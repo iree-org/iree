@@ -54,6 +54,9 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-gnu-label-as-value"
     "-Wno-unused-local-typedef"
     "-Wno-gnu-zero-variadic-macro-arguments"
+    # Enable some warnings
+    "-Wimplicit-fallthrough"
+    "-Wthread-safety-analysis"
   CLANG_OR_GCC
     "-Wno-unused-parameter"
     "-Wno-undef"

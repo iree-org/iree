@@ -48,11 +48,6 @@ iree_check_single_backend_test_suite(
         "convert.mlir",
         "concatenate.mlir",
         "constant.mlir",
-
-        # TODO(#1687): Enable after casting from fp to int is handled
-        # on structured ops path in vulkan
-        # "convert.mlir",
-        #
         "cosine.mlir",
         "divide.mlir",
         "dot.mlir",
@@ -76,7 +71,8 @@ iree_check_single_backend_test_suite(
         "reduce_window.mlir",
         "remainder.mlir",
         "reshape.mlir",
-        "reverse.mlir",
+        # TODO(#1699): Enable after xla_hlo.reverse can be lowered to linalg.
+        # "reverse.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sine.mlir",
