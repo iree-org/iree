@@ -700,7 +700,10 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
       add_ref(logical_device_),
       // Triggers necessary processing on all queues due to new values gotten
       // signaled for the given timeline |semaphore|.
+      // Different clang-format versions disagree about the asterisk placement.
+      // clang-format off
       [this](Semaphore* /*semaphore*/) -> Status {
+        // clang-format on
         IREE_TRACE_SCOPE0("<lambda>::OnSemaphoreSignal");
         for (const auto& queue : command_queues_) {
           RETURN_IF_ERROR(static_cast<SerializingCommandQueue*>(queue.get())
