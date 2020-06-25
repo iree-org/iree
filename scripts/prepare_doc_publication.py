@@ -56,6 +56,7 @@ DOC_TITLE_DICT = {
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
     'getting_started_macos_bazel.md': 'macOS with Bazel',
     'getting_started_macos_cmake.md': 'macOS with CMake',
+    'getting_started_android_cmake.md': 'Android with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
     'getting_started_python.md': 'Python',
     'cmake_options_and_variables.md': 'CMake Options and Variables',
@@ -82,6 +83,7 @@ PERMALINK_DICT = {
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
     'getting_started_macos_cmake.md': 'GetStarted/macOSCMake',
     'getting_started_macos_vulkan.md': 'GetStarted/macOSVulkan',
+    'getting_started_android_cmake.md': 'GetStarted/AndroidCMake',
     'generic_vulkan_env_setup.md': 'GetStarted/GenericVulkanSetup',
     'getting_started_python.md': 'GetStarted/Python',
     'cmake_options_and_variables.md': 'GetStarted/CMakeOptionsVariables',
@@ -121,9 +123,10 @@ NAVI_ORDER_DICT = {
     'getting_started_windows_vulkan.md': 6,
     'getting_started_macos_cmake.md': 7,
     'getting_started_macos_bazel.md': 8,
-    'getting_started_python.md': 9,
-    'generic_vulkan_env_setup.md': 10,
-    'cmake_options_and_variables.md': 11,
+    'getting_started_android_cmake.md': 9,
+    'getting_started_python.md': 10,
+    'generic_vulkan_env_setup.md': 11,
+    'cmake_options_and_variables.md': 12,
 }
 
 # A dictionary containing source directory to section tile mappings.

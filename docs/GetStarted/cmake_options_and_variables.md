@@ -94,3 +94,42 @@ or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the variable
 
 Specifies the path where to look for the installed MLIR/LLVM packages. Required
 if `IREE_MLIR_DEP_MODE` is set to `INSTALLED`.
+
+## Cross-compilation
+
+Cross-compilation involves both a *host* platform and a *target* platform. One
+invokes compiler toolchains on the host platform to generate libraries and
+executables that can be run on the target platform.
+
+IREE uses tools to programmatically generate C/C++ source code from some
+domain-specific descriptions. For example, `flatc` is used to generate C/C++
+code from FlatBuffer schemas. These tools should be compiled for the host
+platform so that we can invoke them during build process. This requires
+cross-compilation for IREE to (conceptually) happen in two stages: first compile
+build tools under host platform, and then use these host tools together with
+cross-compiling toolchains to generate artifacts for the target platform. (The
+build system dependency graph may not have such clear two-stage separation.)
+
+CMake cannot handle multiple compiler toolchains in one CMake invocation. So
+the above conceptual two-stage compilation happens in two separate CMake
+invocations.
+
+#### `IREE_HOST_BINARY_ROOT`:FILEPATH
+
+Specifies the root directory for containing all host CMake invocation artifacts.
+This defaults to `CMAKE_BINARY_DIR/host` if missing.
+
+#### `IREE_HOST_C_COMPILER`:STRING
+
+Specifies the C compiler for host compilation.
+
+#### `IREE_HOST_CXX_COMPILER`:STRING
+
+Specifies the C++ compiler for host compilation.
+
+#### `IREE_HOST_<option>`:BOOL
+
+For each option described in "IREE-specific CMake Options and Variables", you
+can use the `IREE_HOST_<option>` counterpart to control the feature when
+compiling under host configuration. For example, `IREE_HOST_BUILD_TESTS` will
+enables all tests for the host configuration.
