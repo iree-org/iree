@@ -35,8 +35,6 @@ iree_bytecode_module(
     arithmetic_ops
   SRC
     "arithmetic_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -47,8 +45,6 @@ iree_bytecode_module(
     control_flow_ops
   SRC
     "control_flow_ops.mlir"
-  CC_NAMESPACE
-    "iree::vm::test"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
