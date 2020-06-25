@@ -26,4 +26,5 @@ rules:
   octal-values: disable
   quoted-strings: disable
   trailing-spaces: enable
-  truthy: disable # GitHub actions don't appear to respect this
+  # GitHub actions don't appear to respect this
+  truthy: disable
