@@ -101,6 +101,7 @@ if(${IREE_ENABLE_MLIR})
       iree::compiler::Dialect::VM::Tools
     LINKOPTS
       "-lpthread"
+    HOSTONLY
   )
 endif()
 
@@ -253,6 +254,31 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
+  iree_cc_library(
+    NAME
+      iree_translate_main
+    SRCS
+      "translate_main.cc"
+    DEPS
+      ::init_compiler_modules
+      ::init_iree_passes_and_dialects
+      ::init_mlir_passes_and_dialects
+      ::init_targets
+      ::init_translations
+      ::init_xla_dialects
+      LLVMSupport
+      MLIRIR
+      MLIRSCFTransforms
+      MLIRPass
+      MLIRSupport
+      MLIRTranslation
+      iree::compiler::Conversion::init_conversions
+      iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Dialect::VM::Target::init_targets
+      iree::compiler::Translation::IREEVM
+    PUBLIC
+  )
+
   iree_cc_binary(
     NAME
       iree-opt
@@ -260,6 +286,7 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       ::iree_opt_main
+    HOSTONLY
   )
 
   iree_cc_binary(
@@ -303,33 +330,14 @@ if(${IREE_BUILD_COMPILER})
       iree::vm::bytecode_module
       iree::vm::value
       ${IREE_HAL_DRIVER_MODULES}
+    HOSTONLY
   )
+endif(${IREE_BUILD_COMPILER})
 
-  iree_cc_library(
-    NAME
-      iree_translate_main
-    SRCS
-      "translate_main.cc"
-    DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
-      ::init_targets
-      ::init_translations
-      ::init_xla_dialects
-      LLVMSupport
-      MLIRIR
-      MLIRSCFTransforms
-      MLIRPass
-      MLIRSupport
-      MLIRTranslation
-      iree::compiler::Conversion::init_conversions
-      iree::compiler::Dialect::VM::Target::Bytecode
-      iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Translation::IREEVM
-    PUBLIC
-  )
-
+# If cross-compiling, we need to declare iree-translate under host configuration
+# unconditionally because we need to run it on host to generate VM modules
+# for tests.
+if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
   iree_cc_binary(
     NAME
       iree-translate
@@ -337,6 +345,7 @@ if(${IREE_BUILD_COMPILER})
       iree-translate
     DEPS
       ::iree_translate_main
+    HOSTONLY
   )
 endif()
 

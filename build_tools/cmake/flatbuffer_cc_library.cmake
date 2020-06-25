@@ -95,18 +95,24 @@ function(flatbuffer_cc_library)
     set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS ${_RULE_FLATC_ARGS})
   endif()
 
+  set(_GEN_TARGET "${_NAME}_gen")
+
   build_flatbuffers(
     "${_RULE_SRCS}"
     "${IREE_ROOT_DIR}"
-    "${_NAME}_gen"  # custom_target_name
-    "${_RULE_DEPS}" # additional_dependencies
+    "${_GEN_TARGET}" # custom_target_name
+    "${_RULE_DEPS}"  # additional_dependencies
     "${CMAKE_CURRENT_BINARY_DIR}" # generated_include_dir
     "${CMAKE_CURRENT_BINARY_DIR}" # binary_schemas_dir
     "" # copy_text_schemas_dir
   )
 
+  # Add dependency on flatc explicitly. This is needed for cross-compiling
+  # where flatc comes from another CMake invocation for host.
+  iree_add_executable_dependencies(${_GEN_TARGET} flatc)
+
   add_library(${_NAME} INTERFACE)
-  add_dependencies(${_NAME} ${_NAME}_gen)
+  add_dependencies(${_NAME} ${_GEN_TARGET})
   target_include_directories(${_NAME}
     INTERFACE
       "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"

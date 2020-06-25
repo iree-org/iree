@@ -12,7 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#-------------------------------------------------------------------------------
+# Abseil configuration
+#-------------------------------------------------------------------------------
+
 include(AbseilConfigureCopts)
+
+# By default Abseil strips string literals on mobile platforms, which means
+# we cannot run IREE binaries via command-line with proper options. Turn off
+# the stripping.
+# TODO: we might still want to strip when compiling IREE into Android Java apps.
+if(CMAKE_CROSSCOMPILING AND "${CMAKE_SYSTEM_NAME}" MATCHES "Android")
+  add_definitions(-DABSL_FLAGS_STRIP_NAMES=0)
+endif()
 
 #-------------------------------------------------------------------------------
 # C++ used within IREE
@@ -92,13 +104,19 @@ set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 #-------------------------------------------------------------------------------
 
 set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
+set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INCLUDE_DIRS
   "${PROJECT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
+
+if(CMAKE_CROSSCOMPILING)
+  set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "" FORCE)
+else()
+  set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
+endif()
+
 iree_select_compiler_opts(FLATBUFFERS_COPTS
   CLANG
     # Flatbuffers has a bunch of incorrect documentation annotations.
@@ -151,7 +169,9 @@ if(IREE_MLIR_DEP_MODE STREQUAL "BUNDLED")
 endif()
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
-set(IREE_TABLEGEN_EXE iree-tblgen)
+# iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
+# tools in LLVM.
+iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 
 #-------------------------------------------------------------------------------
 # Third party: tensorflow
