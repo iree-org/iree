@@ -18,7 +18,6 @@ on: [pull_request]
 
 jobs:
   clang-format:
-    name: Code Format Check
     runs-on: ubuntu-18.04
     env:
       BASE_REF: ${{ github.base_ref }}
@@ -41,7 +40,6 @@ jobs:
         git diff --exit-code
 
   bazel_to_cmake:
-    name: Bazel to CMake Check
     runs-on: ubuntu-18.04
     steps:
     - name: Checking out repository
