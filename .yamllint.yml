@@ -6,7 +6,7 @@ rules:
     present: false
   document-start:
     present: false
-  # GitHub actions don't appear to respect this.
+  # GitHub actions use "on" for triggers.
   truthy: disable
   # We have lots of long strings and command lines.
   line-length: disable
