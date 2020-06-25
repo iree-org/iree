@@ -1,5 +1,8 @@
 // RUN: iree-opt -split-input-file -iree-drop-compiler-hints %s | IreeFileCheck --implicit-check-not="iree.do_not_optimize" %s
 
+// This file is used as an example in docs/developer_overview.md.
+// If you move or delete it, please update the documentation accordingly.
+
 // CHECK-LABEL: @constant
 func @constant() -> i32 {
   // CHECK-NEXT: %[[C1:.+]] = constant 1

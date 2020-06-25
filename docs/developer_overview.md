@@ -68,24 +68,35 @@ translations, and other transformations step by step.
 [mlir-opt](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-opt)
 and runs sets of IREE's compiler passes on `.mlir` input files. See "conversion"
 in [MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#conversion)
-for more information.
+for more information. Transformations performed by `iree-opt` can range from
+individual passes performing isolated manipulations to broad pipelines that
+encompass a sequence of steps.
 
 Test `.mlir` files that are checked in typically include a `RUN` block at the
 top of the file that specifies which passes should be performed and if
 `FileCheck` should be used to test the generated output.
 
-For example, to run some passes on the
-[reshape.mlir](https://github.com/google/iree/blob/master/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir)
-test file:
+Here's an example of a small compiler pass running on a
+[test file](https://github.com/google/iree/blob/master/iree/compiler/Dialect/IREE/Transforms/test/drop_compiler_hints.mlir):
 
 ```shell
 $ bazel run iree/tools:iree-opt -- \
   -split-input-file \
-  -iree-index-computation \
-  -simplify-spirv-affine-exprs=false \
-  -convert-iree-to-spirv \
-  -verify-diagnostics \
-  $PWD/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir
+  -print-ir-before-all \
+  -iree-drop-compiler-hints \
+  $PWD/iree/compiler/Dialect/IREE/Transforms/test/drop_compiler_hints.mlir
+```
+
+For a more complex example, here's how to run IREE's complete transformation
+pipeline targeting the VMLA backend on the
+[fullyconnected.mlir](https://github.com/google/iree/blob/master/iree/test/e2e/models/fullyconnected.mlir)
+model file:
+
+```shell
+$ bazel run iree/tools:iree-opt -- \
+  -iree-transformation-pipeline \
+  -iree-hal-target-backends=vmla \
+  $PWD/iree/test/e2e/models/fullyconnected.mlir
 ```
 
 Custom passes may also be layered on top of `iree-opt`, see
