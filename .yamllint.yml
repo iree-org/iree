@@ -1,0 +1,15 @@
+extends: default
+
+rules:
+  # These do not appear to be conventional in GitHub actions.
+  document-end:
+    present: false
+  document-start:
+    present: false
+  # GitHub actions use "on" for triggers.
+  truthy: disable
+  # We have lots of long strings and command lines.
+  line-length: disable
+
+ignore:
+  /third_party/*

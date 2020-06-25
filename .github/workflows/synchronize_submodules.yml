@@ -50,4 +50,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           branch: ${{ github.ref }}
-
