@@ -33,16 +33,21 @@ jobs:
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules
-        run: ./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true
+        run: >
+          ./scripts/git/update_tf_llvm_submodules.py
+              --llvm_commit=KEEP
+              --update_build_files=true
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
-          # Personal token is required to trigger additional automation (e.g. presubmits).
+          # Personal token is required to trigger additional automation
+          # (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           commit-message: "Update TF submodule and LLVM BUILD files"
           title: "Update TF submodule and LLVM BUILD files"
           body: "Automated submodule bump from .github/workflows/update_submodules.yml"
-          committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
+          committer:
+            "Submodule Update Action <iree-github-actions-bot@google.com>"
           # TODO(gcmn): Figure out a way to assign this to someone dynamically.
           reviewers: gmngeoffrey
           branch: "auto_submodule_update"
