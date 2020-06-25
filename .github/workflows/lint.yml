@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Format
+name: Lint
 
 on: [pull_request]
 
 jobs:
-  # Run clang-format and verify there are no errors. We don't want to bother
-  # building until we've at least got clean code.
-  format:
+  clang-format:
     name: Code Format Check
     runs-on: ubuntu-18.04
     env:
@@ -41,3 +39,22 @@ jobs:
       run: |
         /tmp/git-clang-format "origin/${BASE_REF?}" --binary=clang-format-9 --style=file
         git diff --exit-code
+
+  bazel_to_cmake:
+    name: Bazel to CMake Check
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checking out repository
+      uses: actions/checkout@v2
+    - name: Running bazel_to_cmake
+      run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
+    - name: Checking Diff
+      run: git diff --exit-code
+
+  submodules:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Checking submodules
+        run: ./scripts/git/submodule_versions.py check
