@@ -1,7 +1,7 @@
 # TensorFlow e2e tests
 
-This is a collection of e2e tests that, in various fashion saves a TensorFlow
-model, compiles it with IREE and runs/evaluates it on all backends.
+This is a collection of e2e tests that save a TensorFlow model, compile it with
+IREE, run it on multiple backends and crosscheck the results.
 
 ## Pre-Requisites
 
