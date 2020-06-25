@@ -22,38 +22,67 @@ If you do not have your environment setup to use IREE with Vulkan (see
 
 ## Running tests
 
-NOTE: We are in the process of reworking how backend specification functions, so
-you have to specify the target name including the name of the test suite and
-using a specific backend pair even if you are overriding the backends. The
-override backends take precedence.
-
 ```shell
 # For locally running tests and iterating on backend development,
 # `bazel run` is preferred.
-bazel run :e2e_math_test_tf_tf_also -- --override_backends=iree_vulkan
+bazel run :math_test_manual -- --override_backends=iree_vmla
 
 # Same as above, but add `tf` backend to cross-check numerical correctness.
-bazel run :e2e_math_test_tf_tf_also -- --override_backends=tf,iree_vulkan
+bazel run :math_test_manual -- --override_backends=tf,iree_vmla
 
 # Run all tests with defaults and output on failure.
 bazel test ... --test_output=errors
 
 # Run an individual test interactively.
-bazel test simple_arithmetic_test --test_output=streamed
-
-# Run tests with an altered list of backends.
-bazel test ... --test_output=errors \
-    --test_arg=--override_backends=tf,iree_vmla,iree_vulkan
+bazel run :math_test_manual -- --test_output=streamed
 ```
 
 If you specify the same backend multiple times, for example
---override_backends=iree_vmla,iree_vmla. The same backends are grouped and in
-this example iree_vmla will run once. If you specify tf,iree_vmla as backends,
-then we will test both backends and compare them with each other. If you specify
-tf backend only, then we will also test tf vs tf to capture any model
-initialization/randomization issues (it is a special case for debug purpose).
-For reproducibility of the unit tests we set random seed of tf and numpy by
-calling tf_test_utils.set_random_seed() before model creation.
+`--override_backends=iree_vmla,iree_vmla`. The same backends are grouped and in
+this example `iree_vmla` will run once. If you specify `tf,iree_vmla` as
+backends, then we will test both backends and compare them with each other. If
+you specify `tf` backend only, then we will also test `tf` vs `tf` to capture
+any model initialization/randomization issues (it is a special case for debug
+purpose). For reproducibility of the unit tests we set random seed of `tf` and
+`numpy` by calling `tf_test_utils.set_random_seed()` before model creation.
+
+## Test Suites
+
+Test targets are automatically generated for each test file and for each backend
+to check numerical correctness against TensorFlow. Tests targets that pass are
+placed into the `e2e_tests` test suite. Tests that fail on particular backends
+are recorded in lists in the `BUILD` files. For example, if
+`experimental_new_test.py` fails on the `iree_llvmjit` and `iree_vulkan`
+backends then the following lines should be added to the `BUILD` file:
+
+```build
+LLVM_FAILING = [
+    ...
+    "experimental_new_test.py",
+    ...
+]
+
+VULKAN_FAILING = [
+    ...
+    "experimental_new_test.py",
+    ...
+]
+```
+
+Test targets for these backends are placed into the `e2e_tests_failing` test
+suite. Test targets in these test suites can be run as follows:
+
+```shell
+# Run all e2e tests that are expected to pass.
+bazel test :e2e_tests
+
+# Run all e2e tests that are expected to fail.
+bazel test :e2e_tests_failing
+
+# Run a specific failing e2e test target.
+# Note that generated test targets are prefixed with their test suite name.
+bazel test :e2e_tests_failing_broadcasting_test__tf__iree_vulkan
+```
 
 ## Debugging tests
 
@@ -74,15 +103,7 @@ runs on multiple backends.
 ### Limiting a test to only certain backends
 
 The BUILD file specifies which targets work on which backends and controls which
-backends tests are run on by using the `--override_backends` flag. If you add a
-new test that does not work on some backends, list it as failing on those
-backends in the BUILD file.
-
-```build
-VULKAN_FAILING = [
-    "my_experimental_new_test.py",
-]
-```
+backends tests are run on by using the `--override_backends` flag.
 
 The `@tf_test_utils.compile_modules` decorator on tests also takes a `backends=`
 keyword argument. Many tests still specify this, but it is ignored in the CI,

@@ -67,11 +67,11 @@ def iree_vision_test_suite(
             for backend in backends:
                 for dataset in datasets:
                     test_backends = [reference_backend, backend]
-                    test_name = "{}_{}_{}_{}".format(
+                    test_name = "{}_{}_{}__{}".format(
                         name,
                         model,
                         dataset,
-                        "_".join(test_backends),
+                        "__".join(test_backends),
                     )
                     tests.append(test_name)
 

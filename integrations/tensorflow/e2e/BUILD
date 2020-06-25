@@ -28,13 +28,29 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Create binaries for all test srcs to allow them to be run manually.
+[
+    py_binary(
+        name = src.replace(".py", "_manual"),
+        srcs = [src],
+        main = src,
+        python_version = "PY3",
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    for src in glob(["*_test.py"])
+]
+
 # Special cases to exclude from automatically expanding targets for all
 # backends.
+# keep sorted
 SPECIAL_CASES = [
     "explicit_backend_test.py",
     "linspace_test.py",
 ]
 
+# keep sorted
 VMLA_FAILING = [
     "fill_test.py",
     "mandelbrot_test.py",
@@ -42,6 +58,7 @@ VMLA_FAILING = [
     "strings_test.py",
 ]
 
+# keep sorted
 LLVM_FAILING = [
     "broadcasting_test.py",
     "depth_conv_test.py",
@@ -56,6 +73,7 @@ LLVM_FAILING = [
     "strings_test.py",
 ]
 
+# keep sorted
 VULKAN_FAILING = [
     "broadcasting_test.py",
     "depth_conv_test.py",
@@ -92,7 +110,7 @@ VULKAN_PASSING = glob(
 )
 
 iree_e2e_test_suite(
-    name = "e2e",
+    name = "e2e_tests",
     backends_to_srcs = {
         "tf_also": TF_PASSING,
         "iree_vmla": VMLA_PASSING,
@@ -106,7 +124,7 @@ iree_e2e_test_suite(
 )
 
 iree_e2e_test_suite(
-    name = "e2e_failing",
+    name = "e2e_tests_failing",
     backends_to_srcs = {
         "iree_vmla": VMLA_FAILING,
         "iree_llvmjit": LLVM_FAILING,
@@ -125,10 +143,11 @@ iree_e2e_test_suite(
 
 # Special cases.
 
-# linspace_test passes internally, but fails in the OSS CI.
+# linspace_test passes internally, but fails in the OSS CI, so it needs
+# a "nokokoro" tag.
 iree_e2e_test_suite(
     # TODO(#2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
-    name = "linspace",
+    name = "linspace_tests",
     backends_to_srcs = {
         "tf_also": ["linspace_test.py"],
         "iree_vmla": ["linspace_test.py"],
@@ -143,7 +162,7 @@ iree_e2e_test_suite(
 )
 
 iree_e2e_test_suite(
-    name = "linspace_failing",
+    name = "linspace_tests_failing",
     backends_to_srcs = {
         "iree_llvmjit": ["linspace_test.py"],
         "iree_vulkan": ["linspace_test.py"],
@@ -159,7 +178,8 @@ iree_e2e_test_suite(
     ],
 )
 
-# This tests explicitly writing which backends to use in Python.
+# This tests explicitly writing which backends to use in Python,
+# so overriding the backends can cause it to break.
 iree_py_test(
     name = "explicit_backend_test",
     srcs = ["explicit_backend_test.py"],
