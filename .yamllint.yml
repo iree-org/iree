@@ -1,30 +1,15 @@
----
-
-yaml-files:
-  - '*.yaml'
-  - '*.yml'
-  - '.yamllint'
+extends: default
 
 rules:
-  braces: enable
-  brackets: enable
-  colons: enable
-  commas: enable
-  comments: enable
-  comments-indentation: enable
-  document-end: disable
-  document-start: disable
-  empty-lines: enable
-  empty-values: disable
-  hyphens: enable
-  indentation: enable
-  key-duplicates: enable
-  key-ordering: disable
-  line-length: disable
-  new-line-at-end-of-file: enable
-  new-lines: enable
-  octal-values: disable
-  quoted-strings: disable
-  trailing-spaces: enable
-  # GitHub actions don't appear to respect this
+  # These do not appear to be conventional in GitHub actions.
+  document-end:
+    present: false
+  document-start:
+    present: false
+  # GitHub actions don't appear to respect this.
   truthy: disable
+  # We have lots of long strings and command lines.
+  line-length: disable
+
+ignore:
+  /third_party/*
