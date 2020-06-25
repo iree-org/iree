@@ -35,13 +35,11 @@ cc_embed_data(
 iree_bytecode_module(
     name = "arithmetic_ops",
     src = "arithmetic_ops.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 iree_bytecode_module(
     name = "control_flow_ops",
     src = "control_flow_ops.mlir",
-    cc_namespace = "iree::vm::test",
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
