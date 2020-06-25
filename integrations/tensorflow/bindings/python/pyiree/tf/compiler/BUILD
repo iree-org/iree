@@ -108,6 +108,7 @@ pybind_cc_library(
         "@llvm-project//mlir:IR",
         "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_saved_model_passes",
         "@org_tensorflow//tensorflow/core:core_cpu",
     ],
 )
