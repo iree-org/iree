@@ -1,7 +1,7 @@
 # TensorFlow e2e tests
 
-This is a collection of e2e tests that, in various fashion saves a TensorFlow
-model, compiles it with IREE and runs/evaluates it on all backends.
+This is a collection of e2e tests that save a TensorFlow model, compile it with
+IREE, run it on multiple backends and crosscheck the results.
 
 ## Pre-Requisites
 
@@ -87,7 +87,7 @@ bazel test :e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ## Debugging tests
 
 If the compiler fails to compile the program, then it will create a crash
-reproducer (see documentation [here](https://mlir.llvm.org/docs/WritingAPass/)),
+reproducer (see [MLIR documentation](https://mlir.llvm.org/docs/WritingAPass/)),
 which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
@@ -97,8 +97,7 @@ TODO(silvasean): debugging miscompiles
 
 ### Simple function tests
 
-See `simple_arithmetic_test.py` for some examples of writing a test case that
-runs on multiple backends.
+See `simple_arithmetic_test.py` for some basic examples.
 
 ### Limiting a test to only certain backends
 
@@ -126,11 +125,11 @@ The priority order for which backends are ultimately used is:
 
 1.  The backends specified in `--override_backends`.
 
-1.  The backends specified in the `IREE_OVERRIDE_BACKENDS` environment variable.
+2.  The backends specified in the `IREE_OVERRIDE_BACKENDS` environment variable.
 
-1.  The backends specified in the `tf_test_utils.compile_modules` decorator.
+3.  The backends specified in the `tf_test_utils.compile_modules` decorator.
 
-1.  All known backends.
+4.  All known backends.
 
 Additionally, the environment variable `IREE_AVAILABLE_BACKENDS` specifies which
 backends should be considered available in a particular environment. Once the

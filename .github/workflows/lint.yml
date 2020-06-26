@@ -1,0 +1,67 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Lint
+
+on: [pull_request]
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-18.04
+    env:
+      BASE_REF: ${{ github.base_ref }}
+    steps:
+      - name: Installing dependencies
+        run: |
+          sudo add-apt-repository -y "deb http://mirror.enzu.com/ubuntu/ eoan main universe"
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends clang-format-9
+          wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
+          chmod +x /tmp/git-clang-format
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        # We have to explicitly fetch the base branch as well
+      - name: Fetching Base Branch
+        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}"
+      - name: Running clang-format on changed source files
+        run: |
+          /tmp/git-clang-format "origin/${BASE_REF?}" --binary=clang-format-9 --style=file
+          git diff --exit-code
+
+  bazel_to_cmake:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Running bazel_to_cmake
+        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
+      - name: Checking Diff
+        run: git diff --exit-code
+
+  submodules:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Checking submodules
+        run: ./scripts/git/submodule_versions.py check
+
+  yamllint:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: yaml-lint
+        uses: ibiqlik/action-yamllint@v1
+        with:
+          strict: true
