@@ -102,7 +102,7 @@ using the `--test_env` flag. A user.bazelrc file using SwiftShader looks like
 this (substitute for the `{}` paths):
 
 ```
-test --test_env="VK_ICD_FILENAMES={PATH_TO_IREE}/build-swiftshader/Windows/vk_swiftshader_icd.json"
+test --test_env="VK_ICD_FILENAMES={PATH_TO_IREE}\\build-swiftshader\\Windows\\vk_swiftshader_icd.json"
 ```
 
 ## Using IREE's Vulkan Compiler Target and Runtime Driver
