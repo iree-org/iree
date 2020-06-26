@@ -46,7 +46,7 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
 // Buffers should be in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/google/iree/tree/master/iree/base/buffer_string_util.h
+// https://github.com/google/iree/tree/main/iree/base/buffer_string_util.h
 // Uses |allocator| to allocate the buffers.
 // Uses descriptors in |descs| for type information and validation.
 // The returned variant list must be freed by the caller.
@@ -61,7 +61,7 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/google/iree/tree/master/iree/base/buffer_string_util.h
+// https://github.com/google/iree/tree/main/iree/base/buffer_string_util.h
 // Uses descriptors in |descs| for type information and validation.
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_variant_list_t* variant_list,

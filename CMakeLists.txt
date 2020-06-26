@@ -52,8 +52,8 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\"." FORCE)
 # LINT.ThenChange(
-#   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
-#   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
+#   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
+#   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
 # )
 
 if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})

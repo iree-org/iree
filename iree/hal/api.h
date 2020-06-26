@@ -500,7 +500,7 @@ enum iree_hal_element_type_e {
 typedef uint32_t iree_hal_element_type_t;
 // clang-format on
 
-// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
+// LINT.ThenChange(https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
 
 // A dimension within a shape.
 typedef int32_t iree_hal_dim_t;

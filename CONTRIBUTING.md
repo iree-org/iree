@@ -56,7 +56,7 @@ intermediate state. See
 https://groups.google.com/d/msg/iree-discuss/F07vsG9Ah4o/uAIusKO-BQAJ
 
 Our documentation on
-[repository management](https://github.com/google/iree/blob/master/docs/repository_management.md)
+[repository management](https://github.com/google/iree/blob/main/docs/repository_management.md)
 has more information on some of the oddities in our repository setup and
 workflows.
 

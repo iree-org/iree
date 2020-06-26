@@ -14,7 +14,7 @@
 
 # Tests for end-to-end IREE support of specific features to prevent regression.
 # These should focus on support by IREE itself, not for issues with specific runner tools. Place
-# those tests in https://github.com/google/iree/tree/master/iree/tools/test/
+# those tests in https://github.com/google/iree/tree/main/iree/tools/test/
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 

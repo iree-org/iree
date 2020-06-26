@@ -225,7 +225,7 @@ def HAL_ExecutableCachingModeBitfieldAttr :
 }
 
 // Values are FourCC codes.
-// See https://github.com/google/iree/tree/master/iree/hal/executable_format.h for more info.
+// See https://github.com/google/iree/tree/main/iree/hal/executable_format.h for more info.
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
 // integer values for inclusion here.
 //
@@ -251,7 +251,7 @@ def HAL_ExecutableFormatAttr :
   let convertFromStorage = "static_cast<IREE::HAL::ExecutableFormat>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
-// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/hal/executable_format.h:fourcc)
+// LINT.ThenChange(https://github.com/google/iree/tree/main/iree/hal/executable_format.h:fourcc)
 
 def HAL_ExecutableFormatArrayAttr : TypedArrayAttrBase<
     HAL_ExecutableFormatAttr,
