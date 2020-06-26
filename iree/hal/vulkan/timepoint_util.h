@@ -153,7 +153,8 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
 
   absl::Mutex mutex_;
 
-  IntrusiveList<TimePointFence> free_fences_ ABSL_GUARDED_BY(mutex_);
+  IntrusiveList<std::unique_ptr<TimePointFence>> free_fences_
+      ABSL_GUARDED_BY(mutex_);
 };
 
 // A pool of `VkSemaphore`s that can be used by `EmulatedTimelineSemaphore` to
