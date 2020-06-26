@@ -26,18 +26,18 @@ iree_cc_library(
     "MarkerUtils.cpp"
     "MatmulCodegenStrategy.cpp"
   DEPS
-     LLVMSupport
-     MLIRAffineOps
-     MLIRAnalysis
-     MLIRIR
-     MLIRLinalgOps
-     MLIRLinalgTransforms
-     MLIRPass
-     MLIRSCF
-     MLIRStandardOps
-     MLIRSupport
-     MLIRTransforms
-     MLIRVector
-     MLIRVectorToSCF
+    LLVMSupport
+    MLIRAffineOps
+    MLIRAnalysis
+    MLIRIR
+    MLIRLinalgOps
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRSCF
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+    MLIRVector
+    MLIRVectorToSCF
   PUBLIC
 )
