@@ -41,7 +41,7 @@ jobs:
       - name: Committing updates
         if: env.has_diff == 'true'
         run: |
-          git config --local user.email "noreply+action@github.com"
+          git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "Submodule Synchronize Action"
           git commit -am "Synchronize submodules"
       - name: Pushing changes

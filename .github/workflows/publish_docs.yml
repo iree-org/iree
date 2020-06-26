@@ -17,7 +17,8 @@ name: Publish Documentation
 on:
   push:
     branches:
-      - master
+      # This will be switched to main after shifting to a GitHub-first workflow.
+      - google
 
 jobs:
   linux:

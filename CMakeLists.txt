@@ -33,6 +33,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Project component configuration
 #-------------------------------------------------------------------------------
 
+# LINT.IfChange(iree_options)
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
@@ -50,6 +51,10 @@ set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\"." FORCE)
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of target backends to build, or \"all\"." FORCE)
+# LINT.ThenChange(
+#   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
+#   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
+# )
 
 if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
@@ -134,6 +139,44 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
+
+#-------------------------------------------------------------------------------
+# Cross compiling configuration
+#-------------------------------------------------------------------------------
+
+if(CMAKE_CROSSCOMPILING)
+  if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+    message(FATAL_ERROR "Cross compilation with Windows host system is not supported yet")
+  endif()
+
+  message(STATUS "Detected cross compilation mode; configuring IREE on host...")
+
+  # C/C++ compilers for host compilation.
+  # Note: we need to explicitly set this because IREE does not work well with
+  # GCC at the moment: https://github.com/google/iree/issues/1269
+  set(IREE_HOST_C_COMPILER "$ENV{IREE_HOST_C_COMPILER}" CACHE FILEPATH "C compiler for host compilation")
+  set(IREE_HOST_CXX_COMPILER "$ENV{IREE_HOST_CXX_COMPILER}" CACHE FILEPATH "C++ compiler for host compilation")
+
+  # Master configuration for the binary directory containing all artifacts
+  # compiled for host.
+  if(NOT IREE_HOST_BINARY_ROOT)
+    set(IREE_HOST_BINARY_ROOT "${CMAKE_CURRENT_BINARY_DIR}/host" CACHE FILEPATH "directory containing host artifacts")
+  endif()
+
+  set(IREE_HOST_BUILD_COMPILER ON) # For iree-translate
+  set(IREE_HOST_ENABLE_LLVM ON)    # For iree-tblgen
+
+  # Set the host build directory for LLVM to our directory. Otherwise it will
+  # follow its own convention.
+  set(LLVM_NATIVE_BUILD "${IREE_HOST_BINARY_ROOT}/third_party/llvm-project/llvm")
+
+  include(iree_cross_compile)
+
+  # Use another CMake invocation to configure a build for host.
+  iree_create_configuration(HOST)
+
+  message(STATUS "Done configuring IREE on host in ${IREE_HOST_BINARY_ROOT}")
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE utility definitions
@@ -290,6 +333,24 @@ add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
+
+if(CMAKE_CROSSCOMPILING)
+  # We need flatc to generate some source code. When cross-compiling, we need
+  # to make sure the flatc binary is configured under host environment.
+  iree_declare_host_excutable(flatc BUILDONLY)
+
+  # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
+  # binary in BuildFlatBuffers().
+  iree_get_executable_path(FLATBUFFERS_FLATC_EXECUTABLE flatc)
+
+  # Add a custom target to copy the flatc to the binary directory.
+  add_custom_target(iree_host_flatc
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc" "${IREE_HOST_BINARY_ROOT}/bin"
+    DEPENDS iree_host_build_flatc
+    COMMENT "Installing host flatc..."
+  )
+endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)

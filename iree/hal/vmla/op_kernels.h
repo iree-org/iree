@@ -442,6 +442,6 @@ struct PoolingMax {
 }  // namespace iree
 
 #include "iree/hal/vmla/op_kernels_generic.h"  // IWYU pragma: export
-#include "iree/hal/vmla/op_kernels_ruy.h"      // IWYU pragma: export
+#include "iree/hal/vmla/op_kernels_ruy.h"  // IWYU pragma: export
 
 #endif  // IREE_HAL_VMLA_OP_KERNELS_H_

@@ -25,6 +25,22 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# General utilities
+#-------------------------------------------------------------------------------
+
+# iree_to_bool
+#
+# Sets `variable` to `ON` if `value` is true and `OFF` otherwise.
+function(iree_to_bool VARIABLE VALUE)
+  if(VALUE)
+    set(${VARIABLE} "ON" PARENT_SCOPE)
+  else()
+    set(${VARIABLE} "OFF" PARENT_SCOPE)
+  endif()
+endfunction()
+
+
+#-------------------------------------------------------------------------------
 # Packages and Paths
 #-------------------------------------------------------------------------------
 
@@ -70,6 +86,28 @@ function(iree_package_dir PACKAGE_DIR)
   math(EXPR _END_OFFSET "${_END_OFFSET} + 2")
   string(SUBSTRING ${_PACKAGE_NS} ${_END_OFFSET} -1 _PACKAGE_DIR)
   set(${PACKAGE_DIR} ${_PACKAGE_DIR} PARENT_SCOPE)
+endfunction()
+
+# iree_get_executable_path
+#
+# Gets the path to an executable in a cross-compilation-aware way. This
+# should be used when accessing binaries that are used as part of the build,
+# such as for generating files used for later build steps.
+#
+# Paramters:
+# - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
+# - TARGET: the target to build on host.
+function(iree_get_executable_path OUTPUT_PATH_VAR TARGET)
+  if(CMAKE_CROSSCOMPILING)
+    # The target is defined in the CMake invocation for host. We don't have
+    # access to the target; relying on the path here.
+    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${TARGET}")
+    set(${OUTPUT_PATH_VAR} "${_OUTPUT_PATH}" PARENT_SCOPE)
+  else()
+    # The target is defined in this CMake invocation. We can query the location
+    # directly from CMake.
+    set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${TARGET}>" PARENT_SCOPE)
+  endif()
 endfunction()
 
 #-------------------------------------------------------------------------------
@@ -168,4 +206,21 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_TARGET})
     endif()
   endforeach()
+endfunction()
+
+# iree_add_executable_dependencies
+#
+# Adds dependency on a target in a cross-compilation-aware way. This should
+# be used for depending on targets that are used as part of the build, such
+# as for generating files used for later build steps.
+#
+# Parameters:
+# TARGET: the target to take on dependencies
+# DEPENDENCY: additional dependencies to append to target
+function(iree_add_executable_dependencies TARGET DEPENDENCY)
+  if(CMAKE_CROSSCOMPILING)
+    add_dependencies(${TARGET} iree_host_${DEPENDENCY})
+  else()
+    add_dependencies(${TARGET} ${DEPENDENCY})
+  endif()
 endfunction()

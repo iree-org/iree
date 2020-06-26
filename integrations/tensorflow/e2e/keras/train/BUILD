@@ -27,8 +27,9 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# TODO(meadowlark): Refactor this rule to match iree_vision_test_suite.bzl
 iree_train_test_suite(
-    name = "train",
+    name = "train_tests",
     configurations = [
         # tuples of (optimizer, backends)
         ("sgd", "tf"),
@@ -45,7 +46,7 @@ iree_train_test_suite(
 )
 
 iree_train_test_suite(
-    name = "train_failing",
+    name = "train_tests_failing",
     configurations = [
         # tuples of (optimizer, backends)
         # TODO: Combine this suite with keras_model_train once these tests pass.

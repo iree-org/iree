@@ -12,13 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_executable(generate_cc_embed_data)
-target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data.cc)
-set_target_properties(generate_cc_embed_data PROPERTIES OUTPUT_NAME generate_cc_embed_data)
+if(CMAKE_CROSSCOMPILING)
+  iree_declare_host_excutable(generate_cc_embed_data)
+else()
+  add_executable(generate_cc_embed_data)
+  target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data.cc)
+  set_target_properties(generate_cc_embed_data PROPERTIES OUTPUT_NAME generate_cc_embed_data)
 
-target_link_libraries(generate_cc_embed_data
-  absl::flags
-  absl::flags_parse
-  absl::strings
-  absl::time
-)
+  target_link_libraries(generate_cc_embed_data
+    absl::flags
+    absl::flags_parse
+    absl::strings
+    absl::time
+  )
+  install(TARGETS generate_cc_embed_data
+          COMPONENT generate_cc_embed_data
+          RUNTIME DESTINATION bin)
+endif()

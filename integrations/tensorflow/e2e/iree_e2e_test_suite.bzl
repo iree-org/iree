@@ -48,7 +48,7 @@ def iree_e2e_test_suite(
 
     for backend, srcs in backends_to_srcs.items():
         for src in srcs:
-            test_name = "{}_{}_{}_{}".format(
+            test_name = "{}_{}__{}__{}".format(
                 name,
                 src[:-3],
                 reference_backend,
