@@ -34,7 +34,9 @@ namespace {
 bool isUnsupportedFusionOp(Operation *op) {
   return isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
          isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
-         isa<xla_hlo::ReduceWindowOp>(op);
+         isa<xla_hlo::ReduceWindowOp>(op) ||
+         isa<xla_hlo::TorchIndexSelectOp>(op) || isa<xla_hlo::SliceOp>(op) ||
+         isa<xla_hlo::ConcatenateOp>(op);
 }
 
 // Allowlist of ops that materialize to a an index-permuted copy of some kind

@@ -199,7 +199,8 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
       // TODO(b/144530470): replace with tablegen attributes/interfaces.
       if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::DotOp>(op) ||
           isa<xla_hlo::ConvOp>(op) || isa<xla_hlo::ReduceWindowOp>(op) ||
-          isa<xla_hlo::PadOp>(op)) {
+          isa<xla_hlo::PadOp>(op) || isa<xla_hlo::TorchIndexSelectOp>(op) ||
+          isa<xla_hlo::SliceOp>(op) || isa<xla_hlo::ConcatenateOp>(op)) {
         return false;
       }
     }
