@@ -20,6 +20,3 @@ group :jekyll_plugins do
   gem "jekyll-seo-tag"
   gem "jekyll-sitemap"
 end
-
-gem "just-the-docs", "~> 0.2.9"
-
