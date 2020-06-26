@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Bazel to CMake
+extends: default
 
-on: [pull_request, push]
+rules:
+  # These do not appear to be conventional in GitHub actions.
+  document-end:
+    present: false
+  document-start:
+    present: false
+  # GitHub actions use "on" for triggers.
+  truthy: disable
+  # We have lots of long strings and command lines.
+  line-length: disable
 
-jobs:
-  bazel_to_cmake:
-    name: Bazel to CMake Check
-    runs-on: ubuntu-18.04
-    steps:
-    - name: Checking out repository
-      uses: actions/checkout@v2
-    - name: Running bazel_to_cmake
-      run: |
-        ./build_tools/bazel_to_cmake/bazel_to_cmake.py
-        git diff --exit-code
+ignore:
+  /third_party/*
