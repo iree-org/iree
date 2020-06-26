@@ -13,7 +13,7 @@ permalink: pretty
 
 #--- Theme settings ---#
 
-remote_theme: pmarsceill/just-the-docs
+theme: just-the-docs
 # Enable or disable the site search
 search_enabled: true
 
