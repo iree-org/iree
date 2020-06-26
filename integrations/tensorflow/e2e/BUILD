@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Test coverage across backends for e2e tests is defined directly in the BUILD
+# files. A coverage table generated from this file can be viewed here:
+#   https://google.github.io/iree/TensorFlowE2ECoverage
+# Updates made to test suite names should also be reflected here:
+#   https://github.com/google/iree/blob/master/scripts/update_e2e_coverage.py
+
 load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",

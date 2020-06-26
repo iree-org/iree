@@ -51,6 +51,7 @@ cd ${ROOT_DIR?}
 
 # Update op_coverage.md
 scripts/update_op_coverage.py ${BUILD_DIR}
+scripts/update_e2e_coverage.py ${BUILD_DIR}
 
 # Copy a curated list of docs to publish. This is expected to cover all docs
 # under docs/ after they are refreshed.
