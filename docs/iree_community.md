@@ -2,7 +2,7 @@
 layout: default
 permalink: Community
 title: Community
-nav_order: 8
+nav_order: 9
 ---
 
 # IREE Community

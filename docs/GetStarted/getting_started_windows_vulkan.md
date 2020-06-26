@@ -30,13 +30,11 @@ for instructions.
 
 You must have a physical GPU with drivers supporting Vulkan. We support using
 [SwiftShader](https://swiftshader.googlesource.com/SwiftShader/) (a high
-performance CPU-based implementation of Vulkan) on platforms where the
-[Vulkan-ExtensionLayer](https://github.com/KhronosGroup/Vulkan-ExtensionLayer)
-project builds, but it does not currently
-[build on Windows](https://github.com/KhronosGroup/Vulkan-ExtensionLayer/issues/16).
+performance CPU-based implementation of Vulkan).
 
-Vulkan API version > 1.2 is recommended where available, though older versions
-with support for the `VK_KHR_timeline_semaphore` extension may also work.
+Vulkan drivers implementing API version >= 1.2 are recommended. IREE requires
+the `VK_KHR_timeline_semaphore` extension (part of Vulkan 1.2), though it is
+able to emulate it, with performance costs, as necessary.
 
 ## Vulkan Setup
 
@@ -82,23 +80,38 @@ Run the
 
 If these tests pass, you can skip down to the next section.
 
-### Setting up the Vulkan Loader
-
-IREE relies on the `VK_KHR_timeline_semaphore` extension. The minimal loader
-version supporting this extenion is `1.1.124`. So if you see failures regarding
-timeline semaphore, please also check to make sure the loader is at a proper
-version.
-
-<!--
 ### Setting up SwiftShader
 
-TODO(scotttodd): Document when SwiftShader supports `VK_KHR_timeline_semaphore`
-                 Or Vulkan-ExtensionLayer builds for Windows
+If your system lacks a physical GPU with compatible Vulkan drivers, or you just
+want to use a software driver for predictable performance, you can set up
+SwiftShader's Vulkan ICD (Installable Client Driver).
 
-### Setting up Vulkan-ExtensionLayer
+IREE has a
+[helper script](https://github.com/google/iree/blob/master/build_tools/third_party/swiftshader/build_vk_swiftshader.sh)
+for building SwiftShader from source using CMake:
 
-TODO(scotttodd): Document when Vulkan-ExtensionLayer builds for Windows
--->
+```shell
+$ bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
+```
+
+<!-- TODO(scotttodd): Steps to download prebuilt binaries when they exist -->
+
+After building, set the `VK_ICD_FILENAMES` environment variable so the Vulkan
+loader uses the ICD:
+
+```powershell
+> $env:VK_ICD_FILENAMES = Resolve-Path "build-swiftshader/Windows/vk_swiftshader_icd.json"
+```
+
+### Support in Bazel Tests
+
+Bazel tests run in a sandbox, which environment variables may be forwarded to
+using the `--test_env` flag. A user.bazelrc file using SwiftShader looks like
+this (substitute for the `{}` paths):
+
+```
+test --test_env="VK_ICD_FILENAMES={PATH_TO_IREE}\\build-swiftshader\\Windows\\vk_swiftshader_icd.json"
+```
 
 ## Using IREE's Vulkan Compiler Target and Runtime Driver
 
@@ -146,9 +159,3 @@ Install the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/), then run:
 {: .no_toc }
 > bazel run iree/samples/vulkan:vulkan_inference_gui
 ```
-
-## What's next?
-
-More documentation coming soon...
-
-<!-- TODO(scotttodd): link to Vulkan debugging, developer guides -->

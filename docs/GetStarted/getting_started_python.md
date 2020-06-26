@@ -3,7 +3,7 @@ layout: default
 permalink: GetStarted/Python
 parent: Getting Started
 title: Python
-nav_order: 9
+nav_order: 10
 ---
 
 # Getting Started with Python
