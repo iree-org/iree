@@ -12,27 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(antiagainst): We should probably always compiling the emulation in and
-# probe at runtime to enable if the device does not support native timeline
-# semaphore.
-option(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE
-       "Emulates timeline semaphore with binary semaphores and fences" OFF)
-
-# Unconditionally turn on emulated timleine semaphore for Android.
-if(CMAKE_CROSSCOMPILING AND "${CMAKE_SYSTEM_NAME}" MATCHES "Android")
-  set(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE ON CACHE BOOL "" FORCE)
-endif()
-# Unless we are not compiling Vulkan HAL backend in.
-if(NOT IREE_HAL_DRIVER_VULKAN)
-  set(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE OFF CACHE BOOL "" FORCE)
-endif()
-
-if(IREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORE)
-  set(IREE_EMULATE_TIMELINE_SEMAPHORE 1)
-else()
-  set(IREE_EMULATE_TIMELINE_SEMAPHORE 0)
-endif()
-
 set(VMA_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
 )
@@ -522,7 +501,6 @@ iree_cc_library(
   SRCS
     "vulkan_device.cc"
   COPTS
-    "-DIREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES=${IREE_EMULATE_TIMELINE_SEMAPHORE}"
     "-DVK_NO_PROTOTYPES"
   DEPS
     ::descriptor_pool_cache
@@ -592,7 +570,6 @@ iree_cc_library(
   SRCS
     "vulkan_driver_module.cc"
   COPTS
-    "-DIREE_HAL_VULKAN_EMULATE_TIMELINE_SEMAPHORES=${IREE_EMULATE_TIMELINE_SEMAPHORE}"
     "-DVK_NO_PROTOTYPES"
   DEPS
     absl::flags

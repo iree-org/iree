@@ -24,11 +24,9 @@ You may have a physical GPU with drivers supporting Vulkan. We also support
 using [SwiftShader](https://swiftshader.googlesource.com/SwiftShader/) (a high
 performance CPU-based implementation of Vulkan).
 
-Vulkan API version > 1.2 is recommended where available. The
-`VK_KHR_timeline_semaphore` extension (part of Vulkan 1.2) is required, and the
-[Vulkan-ExtensionLayer](https://github.com/KhronosGroup/Vulkan-ExtensionLayer)
-project can be used to enable it for drivers (like SwiftShader) without native
-support.
+Vulkan drivers implementing API version >= 1.2 are recommended. IREE requires
+the `VK_KHR_timeline_semaphore` extension (part of Vulkan 1.2), though it is
+able to emulate it, with performance costs, as necessary.
 
 ## Vulkan Setup
 
@@ -97,39 +95,6 @@ loader uses the ICD:
 $ export VK_ICD_FILENAMES=$PWD/build-swiftshader/Linux/vk_swiftshader_icd.json
 ```
 
-### Setting up Vulkan-ExtensionLayer
-
-If you are missing support for `VK_KHR_timeline_semaphore`, setup the extension
-layer.
-
-Build:
-
-```shell
-# -- CMake --
-$ cmake --build build/ --target vk_layer_khronos_timeline_semaphore
-
-# -- Bazel --
-$ bazel build @vulkan_extensionlayer//:libVkLayer_khronos_timeline_semaphore.so @vulkan_extensionlayer//:VkLayer_khronos_timeline_semaphore_json
-```
-
-You should then also set the `VK_LAYER_PATH` environment variable to include the
-path to the built layer:
-
-```shell
-# -- CMake --
-$ export VK_LAYER_PATH=$PWD/build/third_party/vulkan_extensionlayer/layers/:$VK_LAYER_PATH
-
-# -- Bazel --
-$ export VK_LAYER_PATH=$PWD/bazel-bin/external/vulkan_extensionlayer/:$VK_LAYER_PATH
-```
-
-### Setting up the Vulkan Loader
-
-IREE relies on the `VK_KHR_timeline_semaphore` extension. The minimal loader
-version supporting this extenion is `1.1.124`. So if you see failures regarding
-timeline semaphore, in addtion to setting up the extension layer, please also
-check to make sure the loader is at a proper version.
-
 ### Support in Bazel Tests
 
 Bazel tests run in a sandbox, which environment variables may be forwarded to
@@ -140,7 +105,6 @@ above looks like this (substitute for the `{}` paths):
 test --test_env="LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/"
 test --test_env="LD_PRELOAD=libvulkan.so.1"
 test --test_env="VK_ICD_FILENAMES={PATH_TO_IREE}/build-swiftshader/Linux/vk_swiftshader_icd.json"
-test --test_env="VK_LAYER_PATH=$VK_LAYER_PATH:{PATH_TO_IREE}/bazel-bin/external/vulkan_extensionlayer/"
 ```
 
 ## Using IREE's Vulkan Compiler Target and Runtime Driver
@@ -187,9 +151,3 @@ $ ./build/iree/samples/vulkan/vulkan_inference_gui
 # -- Bazel --
 $ bazel run iree/samples/vulkan:vulkan_inference_gui
 ```
-
-## What's next?
-
-More documentation coming soon...
-
-<!-- TODO(scotttodd): link to Vulkan debugging, developer guides -->
