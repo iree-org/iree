@@ -66,9 +66,9 @@ exports can reference the same internal function.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`function_ref` | FlatSymbolRefAttr | flat symbol reference attribute
-`workload` | IntegerAttr | size_t
+`sym_name` | ::mlir::StringAttr | string attribute
+`function_ref` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`workload` | ::mlir::IntegerAttr | size_t
 
 ### `flow.dispatch` (IREE::Flow::DispatchOp)
 
@@ -80,8 +80,8 @@ Dispatches a workload to the specified executable function.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`executable` | FlatSymbolRefAttr | flat symbol reference attribute
-`entry_point` | FlatSymbolRefAttr | flat symbol reference attribute
+`executable` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`entry_point` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 
 #### Operands:
 
@@ -169,7 +169,7 @@ target-specific backend IR representations.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
+`sym_name` | ::mlir::StringAttr | string attribute
 
 ### `flow.return` (IREE::Flow::ReturnOp)
 
@@ -462,11 +462,11 @@ Declares a persistent variable that maintains its value.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`type` | TypeAttr | any type attribute
-`is_mutable` | UnitAttr | unit attribute
-`initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | any attribute
+`sym_name` | ::mlir::StringAttr | string attribute
+`type` | ::mlir::TypeAttr | any type attribute
+`is_mutable` | ::mlir::UnitAttr | unit attribute
+`initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`initial_value` | ::mlir::Attribute | any attribute
 
 ### `flow.variable.store.indirect` (IREE::Flow::VariableStoreIndirectOp)
 

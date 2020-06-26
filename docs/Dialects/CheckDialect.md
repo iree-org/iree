@@ -70,7 +70,7 @@ check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : 
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | ElementsAttr | constant vector/tensor attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Operands:
 
@@ -130,7 +130,7 @@ check.expect_eq_const(%arg0, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | ElementsAttr | constant vector/tensor attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Operands:
 

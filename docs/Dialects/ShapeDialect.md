@@ -161,7 +161,7 @@ Consider a pretty syntax for "concat":
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`indices` | DenseIntElementsAttr | 64-bit signless integer elements attribute
+`indices` | ::mlir::DenseIntElementsAttr | 64-bit signless integer elements attribute
 
 #### Operands:
 
@@ -268,7 +268,7 @@ Usage:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`broadcast_dimensions` | DenseIntElementsAttr | 64-bit signless integer elements attribute
+`broadcast_dimensions` | ::mlir::DenseIntElementsAttr | 64-bit signless integer elements attribute
 
 #### Operands:
 
@@ -297,8 +297,8 @@ Usage:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`lhs_broadcast_dimensions` | DenseIntElementsAttr | 64-bit signless integer elements attribute
-`rhs_broadcast_dimensions` | DenseIntElementsAttr | 64-bit signless integer elements attribute
+`lhs_broadcast_dimensions` | ::mlir::DenseIntElementsAttr | 64-bit signless integer elements attribute
+`rhs_broadcast_dimensions` | ::mlir::DenseIntElementsAttr | 64-bit signless integer elements attribute
 
 #### Operands:
 
@@ -327,7 +327,7 @@ Usage:
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`index` | IntegerAttr | arbitrary integer attribute
+`index` | ::mlir::IntegerAttr | arbitrary integer attribute
 
 #### Operands:
 

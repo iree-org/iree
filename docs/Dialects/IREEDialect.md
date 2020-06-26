@@ -77,7 +77,7 @@ information should be hidden from the compiler and resolved at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | ElementsAttr | constant vector/tensor attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Results:
 
@@ -106,7 +106,7 @@ argument due to ABI or contract issues.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`purpose` | StringAttr | string attribute
+`purpose` | ::mlir::StringAttr | string attribute
 
 #### Results:
 
@@ -126,7 +126,7 @@ std.constant wrapped in an iree.do_not_optimize.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | any attribute
+`value` | ::mlir::Attribute | any attribute
 
 #### Results:
 

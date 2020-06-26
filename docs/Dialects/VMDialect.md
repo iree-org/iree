@@ -195,8 +195,8 @@ attribute.
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `callee` | FlatSymbolRefAttr | symbol reference attribute
-`segment_sizes` | DenseIntElementsAttr | 16-bit signless integer elements attribute
-`segment_types` | ArrayAttr | type array attribute
+`segment_sizes` | ::mlir::DenseIntElementsAttr | 16-bit signless integer elements attribute
+`segment_types` | ::mlir::ArrayAttr | type array attribute
 
 #### Operands:
 
@@ -239,7 +239,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`message` | StringAttr | string attribute
+`message` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -277,7 +277,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`message` | StringAttr | string attribute
+`message` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -315,7 +315,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`message` | StringAttr | string attribute
+`message` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -790,7 +790,7 @@ vm.cond_fail %nz, %statusCode, "expected non-zero"
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`message` | StringAttr | string attribute
+`message` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -809,7 +809,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_415
+`value` | Attribute | anonymous_417
 
 #### Results:
 
@@ -942,9 +942,9 @@ exports can reference the same internal functions.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`function_ref` | FlatSymbolRefAttr | flat symbol reference attribute
-`export_name` | StringAttr | string attribute
-`ordinal` | IntegerAttr | ordinal value
+`function_ref` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`export_name` | ::mlir::StringAttr | string attribute
+`ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.ext.i16.i32.s` (IREE::VM::ExtI16I32SOp)
 
@@ -1024,7 +1024,7 @@ vm.fail %statusCode, "oh no!"
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`message` | StringAttr | string attribute
+`message` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -1043,8 +1043,8 @@ All flow control is performed by VM ops.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`ordinal` | IntegerAttr | ordinal value
-`noinline` | UnitAttr | unit attribute
+`ordinal` | ::mlir::IntegerAttr | ordinal value
+`noinline` | ::mlir::UnitAttr | unit attribute
 
 ### `vm.global.address` (IREE::VM::GlobalAddressOp)
 
@@ -1084,12 +1084,12 @@ Initialized to zero unless a custom initializer function is specified.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`type` | TypeAttr | any type attribute
-`is_mutable` | UnitAttr | unit attribute
-`initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_418
-`ordinal` | IntegerAttr | ordinal value
+`sym_name` | ::mlir::StringAttr | string attribute
+`type` | ::mlir::TypeAttr | any type attribute
+`is_mutable` | ::mlir::UnitAttr | unit attribute
+`initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`initial_value` | Attribute | anonymous_420
+`ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
 
@@ -1203,12 +1203,12 @@ replaced with a store or reset.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`type` | TypeAttr | any type attribute
-`is_mutable` | UnitAttr | unit attribute
-`initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | UnitAttr | unit attribute
-`ordinal` | IntegerAttr | ordinal value
+`sym_name` | ::mlir::StringAttr | string attribute
+`type` | ::mlir::TypeAttr | any type attribute
+`is_mutable` | ::mlir::UnitAttr | unit attribute
+`initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`initial_value` | ::mlir::UnitAttr | unit attribute
+`ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.store.i32` (IREE::VM::GlobalStoreI32Op)
 
@@ -1311,7 +1311,7 @@ an external VM module.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`ordinal` | IntegerAttr | ordinal value
+`ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.list.alloc` (IREE::VM::ListAllocOp)
 
@@ -1511,8 +1511,8 @@ Top-level container for VM functions.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`ordinal_counts` | DictionaryAttr | dictionary of named attribute values
+`sym_name` | ::mlir::StringAttr | string attribute
+`ordinal_counts` | ::mlir::DictionaryAttr | dictionary of named attribute values
 
 ### `vm.module_terminator` (IREE::VM::ModuleTerminatorOp)
 
@@ -1617,7 +1617,7 @@ Prints the given string message and zero or more values.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`message` | StringAttr | string attribute
+`message` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -1717,9 +1717,9 @@ lifetime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`value` | ElementsAttr | constant vector/tensor attribute
-`ordinal` | IntegerAttr | ordinal value
+`sym_name` | ::mlir::StringAttr | string attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.select.i32` (IREE::VM::SelectI32Op)
 
@@ -1803,7 +1803,7 @@ Shifts the operand in a direction by the number of bits specified.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`amount` | IntegerAttr | 8-bit signless integer attribute within the range [0, 32] inclusive
+`amount` | ::mlir::IntegerAttr | 8-bit signless integer attribute within the range [0, 32] inclusive
 
 #### Operands:
 
@@ -1834,7 +1834,7 @@ Shifts the operand in a direction by the number of bits specified.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`amount` | IntegerAttr | 8-bit signless integer attribute within the range [0, 32] inclusive
+`amount` | ::mlir::IntegerAttr | 8-bit signless integer attribute within the range [0, 32] inclusive
 
 #### Operands:
 
@@ -1865,7 +1865,7 @@ Shifts the operand in a direction by the number of bits specified.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`amount` | IntegerAttr | 8-bit signless integer attribute within the range [0, 32] inclusive
+`amount` | ::mlir::IntegerAttr | 8-bit signless integer attribute within the range [0, 32] inclusive
 
 #### Operands:
 
@@ -1984,7 +1984,7 @@ trace verbosity setting.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`event_name` | StringAttr | string attribute
+`event_name` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 

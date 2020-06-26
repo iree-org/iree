@@ -153,9 +153,9 @@ repeatedly.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | IntegerAttr | valid MemoryType
-`buffer_usage` | IntegerAttr | valid BufferUsage
-`value` | ElementsAttr | constant vector/tensor attribute
+`memory_types` | ::mlir::IntegerAttr | valid MemoryType
+`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Operands:
 
@@ -189,8 +189,8 @@ allocator has specific alignment requirements or minimum allocation sizes.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | IntegerAttr | valid MemoryType
-`buffer_usage` | IntegerAttr | valid BufferUsage
+`memory_types` | ::mlir::IntegerAttr | valid MemoryType
+`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
 
 #### Operands:
 
@@ -224,7 +224,7 @@ This returns the same value as `hal.buffer_view.compute_offset`.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | IntegerAttr | element type attribute
+`element_type` | ::mlir::IntegerAttr | element type attribute
 
 #### Operands:
 
@@ -260,7 +260,7 @@ This returns the same value as `hal.buffer_view.compute_range`.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | IntegerAttr | element type attribute
+`element_type` | ::mlir::IntegerAttr | element type attribute
 
 #### Operands:
 
@@ -297,7 +297,7 @@ This returns the same value as `hal.buffer_view.byte_length`.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | IntegerAttr | element type attribute
+`element_type` | ::mlir::IntegerAttr | element type attribute
 
 #### Operands:
 
@@ -603,9 +603,9 @@ allocation and a buffer view wrapper.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`memory_types` | IntegerAttr | valid MemoryType
-`buffer_usage` | IntegerAttr | valid BufferUsage
-`value` | ElementsAttr | constant vector/tensor attribute
+`memory_types` | ::mlir::IntegerAttr | valid MemoryType
+`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Operands:
 
@@ -640,7 +640,7 @@ along with the contents.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | IntegerAttr | element type attribute
+`element_type` | ::mlir::IntegerAttr | element type attribute
 
 #### Operands:
 
@@ -672,7 +672,7 @@ Returns the value of the given dimension.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`index` | IntegerAttr | 32-bit signless integer attribute
+`index` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 #### Operands:
 
@@ -828,7 +828,7 @@ must not be modified once bound to a command buffer.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`set` | IntegerAttr | 32-bit signless integer attribute
+`set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 #### Operands:
 
@@ -881,8 +881,8 @@ Returns a command buffer from the device pool ready to begin recording.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`modes` | IntegerAttr | valid CommandBufferMode
-`command_categories` | IntegerAttr | valid CommandCategory
+`modes` | ::mlir::IntegerAttr | valid CommandBufferMode
+`command_categories` | ::mlir::IntegerAttr | valid CommandCategory
 
 #### Operands:
 
@@ -921,7 +921,7 @@ hal.command_buffer.dispatch.indirect %cmd, %executable,
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`entry_point` | IntegerAttr | 32-bit integer ordinal attribute
+`entry_point` | ::mlir::IntegerAttr | 32-bit integer ordinal attribute
 
 #### Operands:
 
@@ -960,7 +960,7 @@ hal.command_buffer.dispatch %cmd, %executable,
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`entry_point` | IntegerAttr | 32-bit integer ordinal attribute
+`entry_point` | ::mlir::IntegerAttr | 32-bit integer ordinal attribute
 
 #### Operands:
 
@@ -1002,8 +1002,8 @@ barrier.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`source_stage_mask` | IntegerAttr | valid ExecutionStage
-`target_stage_mask` | IntegerAttr | valid ExecutionStage
+`source_stage_mask` | ::mlir::IntegerAttr | valid ExecutionStage
+`target_stage_mask` | ::mlir::IntegerAttr | valid ExecutionStage
 
 #### Operands:
 
@@ -1067,7 +1067,7 @@ hal.command_buffer.push_constants %cmd, %exe_layout,
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`offset` | IntegerAttr | 32-bit signless integer attribute
+`offset` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 #### Operands:
 
@@ -1095,8 +1095,8 @@ hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindin
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`set` | IntegerAttr | 32-bit signless integer attribute
-`bindings` | ArrayAttr | 32-bit integer array attribute
+`set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`bindings` | ::mlir::ArrayAttr | 32-bit integer array attribute
 
 #### Operands:
 
@@ -1118,7 +1118,7 @@ Creates a DescriptorSet from the device pool.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`bindings` | ArrayAttr | 32-bit integer array attribute
+`bindings` | ::mlir::ArrayAttr | 32-bit integer array attribute
 
 #### Operands:
 
@@ -1163,8 +1163,8 @@ executables that use the same set layouts can be reduced.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`usage_type` | IntegerAttr | IREE HAL DescriptorSetLayoutType
-`bindings` | ArrayAttr | HAL descriptor set layout binding array attribute
+`usage_type` | ::mlir::IntegerAttr | IREE HAL DescriptorSetLayoutType
+`bindings` | ::mlir::ArrayAttr | HAL descriptor set layout binding array attribute
 
 #### Operands:
 
@@ -1203,8 +1203,8 @@ possibly lazy-initialized descriptor set layout.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`usage_type` | IntegerAttr | IREE HAL DescriptorSetLayoutType
-`bindings` | ArrayAttr | HAL descriptor set layout binding array attribute
+`usage_type` | ::mlir::IntegerAttr | IREE HAL DescriptorSetLayoutType
+`bindings` | ::mlir::ArrayAttr | HAL descriptor set layout binding array attribute
 
 #### Operands:
 
@@ -1268,7 +1268,7 @@ device is not known at compile-time.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`pattern` | StringAttr | string attribute
+`pattern` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -1339,7 +1339,7 @@ return the same types.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`conditions` | ArrayAttr | array attribute
+`conditions` | ::mlir::ArrayAttr | array attribute
 
 #### Operands:
 
@@ -1435,8 +1435,8 @@ executable format in `iree/hal/executable_format.h`.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`format` | IntegerAttr | IREE HAL Executable format
-`data` | DenseIntElementsAttr | 8-bit signless integer elements attribute
+`format` | ::mlir::IntegerAttr | IREE HAL Executable format
+`data` | ::mlir::DenseIntElementsAttr | 8-bit signless integer elements attribute
 
 ### `hal.executable_cache.create` (IREE::HAL::ExecutableCacheCreateOp)
 
@@ -1474,7 +1474,7 @@ the executables are ready for use.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`identifier` | StringAttr | string attribute
+`identifier` | ::mlir::StringAttr | string attribute
 
 #### Operands:
 
@@ -1520,8 +1520,8 @@ executables - and calls will block until preparation completes.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`caching_mode` | IntegerAttr | valid ExecutableCachingMode
-`executable` | FlatSymbolRefAttr | flat symbol reference attribute
+`caching_mode` | ::mlir::IntegerAttr | valid ExecutableCachingMode
+`executable` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 
 #### Operands:
 
@@ -1561,7 +1561,7 @@ or features required by the executable are not supported.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`available_formats` | ArrayAttr | HAL executable format array attribute
+`available_formats` | ::mlir::ArrayAttr | HAL executable format array attribute
 
 #### Operands:
 
@@ -1598,10 +1598,10 @@ information describing the IO interface it uses and other dispatch metadata.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`ordinal` | IntegerAttr | 32-bit integer ordinal attribute
-`interface` | FlatSymbolRefAttr | flat symbol reference attribute
-`signature` | TypeAttr | any type attribute
+`sym_name` | ::mlir::StringAttr | string attribute
+`ordinal` | ::mlir::IntegerAttr | 32-bit integer ordinal attribute
+`interface` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`signature` | ::mlir::TypeAttr | any type attribute
 
 ### `hal.executable_layout.create` (IREE::HAL::ExecutableLayoutCreateOp)
 
@@ -1636,7 +1636,7 @@ adjacent to it.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`push_constants` | IntegerAttr | 32-bit signless integer attribute
+`push_constants` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 #### Operands:
 
@@ -1680,8 +1680,8 @@ possibly lazy-initialized executable layout.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`set_layouts` | ArrayAttr | array attribute
-`push_constants` | IntegerAttr | 32-bit signless integer attribute
+`set_layouts` | ::mlir::ArrayAttr | array attribute
+`push_constants` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 #### Operands:
 
@@ -1713,7 +1713,7 @@ possibly lazy-initialized executable.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`executable` | FlatSymbolRefAttr | flat symbol reference attribute
+`executable` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 
 #### Operands:
 
@@ -1738,7 +1738,7 @@ kernel/shader/etc.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
+`sym_name` | ::mlir::StringAttr | string attribute
 
 ### `hal.executable.target_end` (IREE::HAL::ExecutableTargetEndOp)
 
@@ -1763,7 +1763,7 @@ is usually removed during transformation.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`target_backend` | StringAttr | string attribute
+`target_backend` | ::mlir::StringAttr | string attribute
 
 ### `hal.interface.binding` (IREE::HAL::InterfaceBindingOp)
 
@@ -1787,11 +1787,11 @@ the scheduler.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`set` | IntegerAttr | 32-bit signless integer attribute
-`binding` | IntegerAttr | 32-bit signless integer attribute
-`type` | IntegerAttr | IREE HAL DescriptorType
-`access` | IntegerAttr | valid MemoryAccess
+`sym_name` | ::mlir::StringAttr | string attribute
+`set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`binding` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`type` | ::mlir::IntegerAttr | IREE HAL DescriptorType
+`access` | ::mlir::IntegerAttr | valid MemoryAccess
 
 ### `hal.interface_end` (IREE::HAL::InterfaceEndOp)
 
@@ -1824,7 +1824,7 @@ bitcast (possibly with truncation or zero-extension) to the result type.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`offset` | IntegerAttr | size_t
+`offset` | ::mlir::IntegerAttr | size_t
 
 #### Results:
 
@@ -1862,7 +1862,7 @@ at least a 4 byte boundary.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`binding` | SymbolRefAttr | symbol reference attribute
+`binding` | ::mlir::SymbolRefAttr | symbol reference attribute
 
 #### Operands:
 
@@ -1903,8 +1903,8 @@ see: https://developer.nvidia.com/vulkan-shader-resource-binding
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`push_constants` | IntegerAttr | 32-bit signless integer attribute
+`sym_name` | ::mlir::StringAttr | string attribute
+`push_constants` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 ### `hal.interface.store.tensor` (IREE::HAL::InterfaceStoreTensorOp)
 
@@ -1936,7 +1936,7 @@ at least a 4 byte boundary.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`binding` | SymbolRefAttr | symbol reference attribute
+`binding` | ::mlir::SymbolRefAttr | symbol reference attribute
 
 #### Operands:
 
@@ -1964,8 +1964,8 @@ command buffer barrier operations.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`source_scope` | IntegerAttr | valid AccessScope
-`target_scope` | IntegerAttr | valid AccessScope
+`source_scope` | ::mlir::IntegerAttr | valid AccessScope
+`target_scope` | ::mlir::IntegerAttr | valid AccessScope
 
 #### Operands:
 
@@ -1999,8 +1999,8 @@ command buffer barrier operations.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`source_scope` | IntegerAttr | valid AccessScope
-`target_scope` | IntegerAttr | valid AccessScope
+`source_scope` | ::mlir::IntegerAttr | valid AccessScope
+`target_scope` | ::mlir::IntegerAttr | valid AccessScope
 
 #### Results:
 
@@ -2218,11 +2218,11 @@ contexts will have different variable storage.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`sym_name` | StringAttr | string attribute
-`type` | TypeAttr | any type attribute
-`is_mutable` | UnitAttr | unit attribute
-`initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | any attribute
+`sym_name` | ::mlir::StringAttr | string attribute
+`type` | ::mlir::TypeAttr | any type attribute
+`is_mutable` | ::mlir::UnitAttr | unit attribute
+`initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`initial_value` | ::mlir::Attribute | any attribute
 
 ### `hal.variable.store.indirect` (IREE::HAL::VariableStoreIndirectOp)
 

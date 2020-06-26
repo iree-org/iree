@@ -52,15 +52,15 @@ operation ::= `vmla.conv` $input`(`$input_shape `:` type($input_shape)`)` `:` $i
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`lhs_dilation` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`rhs_dilation` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`feature_group_count` | IntegerAttr | 32-bit signless integer attribute
-`batch_group_count` | IntegerAttr | 32-bit signless integer attribute
-`input_type` | TypeAttr | any type attribute
-`filter_type` | TypeAttr | any type attribute
-`dst_type` | TypeAttr | any type attribute
+`window_strides` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`lhs_dilation` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`rhs_dilation` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`feature_group_count` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`batch_group_count` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`input_type` | ::mlir::TypeAttr | any type attribute
+`filter_type` | ::mlir::TypeAttr | any type attribute
+`dst_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -89,8 +89,8 @@ operation ::= `vmla.abs` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -115,8 +115,8 @@ operation ::= `vmla.add` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -142,8 +142,8 @@ operation ::= `vmla.and` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -169,8 +169,8 @@ operation ::= `vmla.atan2` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_typ
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -198,9 +198,9 @@ operation ::= `vmla.batch.matmul` $lhs`(`$lhs_shape `:` type($lhs_shape)`)` `:` 
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`lhs_type` | TypeAttr | any type attribute
-`rhs_type` | TypeAttr | any type attribute
-`dst_type` | TypeAttr | any type attribute
+`lhs_type` | ::mlir::TypeAttr | any type attribute
+`rhs_type` | ::mlir::TypeAttr | any type attribute
+`dst_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -280,7 +280,7 @@ operation ::= `vmla.broadcast` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -498,8 +498,8 @@ operation ::= `vmla.ceil` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -524,8 +524,8 @@ operation ::= `vmla.clamp` $a`,` $b`,` $c`,` `out` $dst attr-dict `:` $element_t
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -552,8 +552,8 @@ operation ::= `vmla.cmp` $predicate`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` 
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`predicate` | IntegerAttr | IREE VMLA comparison op predicate
-`element_type` | TypeAttr | any type attribute
+`predicate` | ::mlir::IntegerAttr | IREE VMLA comparison op predicate
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -581,7 +581,7 @@ expanded into VM ops and the vmla.buffer.const op.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | ElementsAttr | constant vector/tensor attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 
 #### Results:
 
@@ -605,8 +605,8 @@ operation ::= `vmla.convert` $src`,` `out` $dst attr-dict `:` $src_type `->` $ds
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`src_type` | TypeAttr | any type attribute
-`dst_type` | TypeAttr | any type attribute
+`src_type` | ::mlir::TypeAttr | any type attribute
+`dst_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -635,7 +635,7 @@ operation ::= `vmla.copy` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -665,8 +665,8 @@ operation ::= `vmla.cos` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -691,8 +691,8 @@ operation ::= `vmla.div` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -718,8 +718,8 @@ operation ::= `vmla.exp` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -744,8 +744,8 @@ operation ::= `vmla.floor` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -772,9 +772,9 @@ operation ::= `vmla.gather` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`dim` | IntegerAttr | 64-bit signless integer attribute
-`batch_dims` | IntegerAttr | 64-bit signless integer attribute
-`element_type` | TypeAttr | any type attribute
+`dim` | ::mlir::IntegerAttr | 64-bit signless integer attribute
+`batch_dims` | ::mlir::IntegerAttr | 64-bit signless integer attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -803,8 +803,8 @@ operation ::= `vmla.interface.binding` $interface attr-dict `:` type($result)
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`set` | IntegerAttr | 32-bit signless integer attribute
-`binding` | IntegerAttr | 32-bit signless integer attribute
+`set` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`binding` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
 #### Operands:
 
@@ -834,7 +834,7 @@ operation ::= `vmla.interface.const` $interface attr-dict `:` type($result)
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`offset` | IntegerAttr | size_t
+`offset` | ::mlir::IntegerAttr | size_t
 
 #### Operands:
 
@@ -864,8 +864,8 @@ operation ::= `vmla.log` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -890,8 +890,8 @@ operation ::= `vmla.max` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -917,8 +917,8 @@ operation ::= `vmla.min` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -944,8 +944,8 @@ operation ::= `vmla.mul` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -971,8 +971,8 @@ operation ::= `vmla.neg` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -997,8 +997,8 @@ operation ::= `vmla.not` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1023,8 +1023,8 @@ operation ::= `vmla.or` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1052,10 +1052,10 @@ operation ::= `vmla.pad` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`edge_padding_low` | ElementsAttr | constant vector/tensor attribute
-`edge_padding_high` | ElementsAttr | constant vector/tensor attribute
-`interior_padding` | ElementsAttr | constant vector/tensor attribute
-`element_type` | TypeAttr | any type attribute
+`edge_padding_low` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`edge_padding_high` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`interior_padding` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1086,10 +1086,10 @@ operation ::= `vmla.pooling.max` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`window_dimensions` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`window_dimensions` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`window_strides` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
 
 #### Operands:
 
@@ -1120,10 +1120,10 @@ operation ::= `vmla.pooling.min` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`window_dimensions` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`window_dimensions` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`window_strides` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
 
 #### Operands:
 
@@ -1154,10 +1154,10 @@ operation ::= `vmla.pooling.sum` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`window_dimensions` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
-`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`window_dimensions` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`window_strides` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | ::mlir::DenseIntElementsAttr | 32-bit signless integer elements attribute
 
 #### Operands:
 
@@ -1186,8 +1186,8 @@ operation ::= `vmla.pow` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1215,8 +1215,8 @@ operation ::= `vmla.reduce.max` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`dimension` | IntegerAttr | 32-bit signless integer attribute
-`element_type` | TypeAttr | any type attribute
+`dimension` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1247,8 +1247,8 @@ operation ::= `vmla.reduce.min` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`dimension` | IntegerAttr | 32-bit signless integer attribute
-`element_type` | TypeAttr | any type attribute
+`dimension` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1279,8 +1279,8 @@ operation ::= `vmla.reduce.sum` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`dimension` | IntegerAttr | 32-bit signless integer attribute
-`element_type` | TypeAttr | any type attribute
+`dimension` | ::mlir::IntegerAttr | 32-bit signless integer attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1309,8 +1309,8 @@ operation ::= `vmla.rem` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1337,8 +1337,8 @@ operation ::= `vmla.reverse` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`dimensions` | ElementsAttr | constant vector/tensor attribute
-`element_type` | TypeAttr | any type attribute
+`dimensions` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1365,8 +1365,8 @@ operation ::= `vmla.rsqrt` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1391,7 +1391,7 @@ operation ::= `vmla.select` $cond`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $e
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1418,8 +1418,8 @@ operation ::= `vmla.shl` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1445,8 +1445,8 @@ operation ::= `vmla.shr` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1472,8 +1472,8 @@ operation ::= `vmla.sin` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1498,8 +1498,8 @@ operation ::= `vmla.sqrt` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1524,8 +1524,8 @@ operation ::= `vmla.sub` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1551,8 +1551,8 @@ operation ::= `vmla.tanh` $src`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
@@ -1578,7 +1578,7 @@ operation ::= `vmla.tile` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1606,8 +1606,8 @@ operation ::= `vmla.transpose` $src`(`$src_shape `:` type($src_shape)`)``,`
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`permutation` | ElementsAttr | constant vector/tensor attribute
-`element_type` | TypeAttr | any type attribute
+`permutation` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
 
 #### Operands:
 
@@ -1634,8 +1634,8 @@ operation ::= `vmla.xor` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`element_type` | TypeAttr | any type attribute
-`forceUnsigned` | UnitAttr | unit attribute
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
 
 #### Operands:
 
