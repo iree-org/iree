@@ -19,6 +19,7 @@
 
 // clang-format on
 #include <string>
+#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
@@ -156,13 +157,11 @@ void testVecAdd() {
 
 void testCooperativeMatMul() {
   const int warpSize = 32;
-  // Simple test a single warp.
-  // Hardcode types and size to what is supported in Cooperative Matrix
-  // extension
-  // Matrix of size 8x8x32 with uint8xuint8xuint32 types.
-  const int resRows = 8;
-  const int resColumns = 8;
-  const int reductionSize = 32;
+  // Pick twice the size of cooperative matrix to test that the matmul gets
+  // tiled correctly.
+  const int resRows = 8 * 2;
+  const int resColumns = 8 * 2;
+  const int reductionSize = 32 * 2;
   StringLiteral funcName = "kernel_matmul";
   MLIRContext context;
   ModelBuilder modelBuilder;
@@ -199,10 +198,23 @@ void testCooperativeMatMul() {
   CompilationOptions options;
   SmallVector<Type, 3> args = {typeA, typeB, typeC};
   options.loweringPasses = [&](mlir::PassManager &pm) {
-    mlir::OwningRewritePatternList patterns;
-    patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>>(
-        pm.getContext());
-    mlir::applyPatternsAndFoldGreedily(*modelBuilder.getModuleRef(), patterns);
+    MatmulCodegenStrategy strategy;
+    // Use hardcoded value for cooperative matrix size. Those will be pulled
+    // from device properties eventually.
+    const int cooperativeMatrixM = 8;
+    const int cooperativeMatrixK = 8;
+    const int cooperativeMatrixN = 32;
+    // TODO(thomasraoux): Use loop parallel for tiling to be able to partition
+    // the matmul on several workgroups. To be able to support this case
+    // AffineMinCanonicalizer needs to support parallel loops.
+    // TODO(thomasraooux) LICM is disabled due to limitation in SPIR-V
+    strategy
+        .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
+            {cooperativeMatrixM, cooperativeMatrixK, cooperativeMatrixN}))
+        .setHoistInvariantCode(false)
+        .vectorize<linalg::MatmulOp>();
+    modelBuilder.getModuleRef()->walk(
+        [&](FuncOp fn) { strategy.transform(fn); });
     // TODO(thomasraoux): Markers are used as a workaround, those will either
     // moved within the vectorToGPU pass only or will be replace by op
     // interface.
