@@ -1,7 +1,7 @@
 # TensorFlow e2e tests
 
-This is a collection of e2e tests that, in various fashion saves a TensorFlow
-model, compiles it with IREE and runs/evaluates it on all backends.
+This is a collection of e2e tests that save a TensorFlow model, compile it with
+IREE, run it on multiple backends and crosscheck the results.
 
 ## Pre-Requisites
 
@@ -24,8 +24,8 @@ If you do not have your environment setup to use IREE with Vulkan (see
 
 NOTE: We are in the process of reworking how backend specification functions, so
 you have to specify the target name including the name of the test suite and
-using a specific backend pair even if you are overriding the backends. The
-override backends take precedence.
+a specific backend pair even if you are overriding the backends. The override
+backends take precedence.
 
 ```shell
 # For locally running tests and iterating on backend development,
@@ -47,18 +47,18 @@ bazel test ... --test_output=errors \
 ```
 
 If you specify the same backend multiple times, for example
---override_backends=iree_vmla,iree_vmla. The same backends are grouped and in
-this example iree_vmla will run once. If you specify tf,iree_vmla as backends,
+`--override_backends=iree_vmla,iree_vmla`. The same backends are grouped and in
+this example `iree_vmla` will run once. If you specify `tf,iree_vmla` as backends,
 then we will test both backends and compare them with each other. If you specify
-tf backend only, then we will also test tf vs tf to capture any model
+the `tf` backend only, then we will also test tf vs tf to capture any model
 initialization/randomization issues (it is a special case for debug purpose).
 For reproducibility of the unit tests we set random seed of tf and numpy by
-calling tf_test_utils.set_random_seed() before model creation.
+calling `tf_test_utils.set_random_seed()` before model creation.
 
 ## Debugging tests
 
 If the compiler fails to compile the program, then it will create a crash
-reproducer (see documentation [here](https://mlir.llvm.org/docs/WritingAPass/)),
+reproducer (see [MLIR documentation](https://mlir.llvm.org/docs/WritingAPass/)),
 which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
@@ -68,8 +68,7 @@ TODO(silvasean): debugging miscompiles
 
 ### Simple function tests
 
-See `simple_arithmetic_test.py` for some examples of writing a test case that
-runs on multiple backends.
+See `simple_arithmetic_test.py` for some basic examples.
 
 ### Limiting a test to only certain backends
 
@@ -105,11 +104,11 @@ The priority order for which backends are ultimately used is:
 
 1.  The backends specified in `--override_backends`.
 
-1.  The backends specified in the `IREE_OVERRIDE_BACKENDS` environment variable.
+2.  The backends specified in the `IREE_OVERRIDE_BACKENDS` environment variable.
 
-1.  The backends specified in the `tf_test_utils.compile_modules` decorator.
+3.  The backends specified in the `tf_test_utils.compile_modules` decorator.
 
-1.  All known backends.
+4.  All known backends.
 
 Additionally, the environment variable `IREE_AVAILABLE_BACKENDS` specifies which
 backends should be considered available in a particular environment. Once the
