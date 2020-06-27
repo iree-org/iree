@@ -24,8 +24,10 @@ Changes only tweaking style are unlikely to be accepted unless they are applied
 consistently across the project. Most of the code style is derived from the
 [Google Style Guides](http://google.github.io/styleguide/) for the appropriate
 language and is generally not something we accept changes on (as clang-format
-and clang-tidy handle that for us). Improvements to code structure and clarity
-are welcome but please file issues to track such work first.
+and clang-tidy handle that for us). The compiler portion of the project follows
+[MLIR style](https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide).
+Improvements to code structure and clarity are welcome but please file issues to
+track such work first.
 
 ## Code reviews
 
@@ -39,25 +41,26 @@ information on using pull requests.
 Several of our presubmit builds will only run automatically if you are a project
 collaborator. Otherwise a collaborator must label the PR with "kokoro:run". If
 you are sending code changes to the project, please ask to be added as a
-collaborator, so that these can run automatically.
+collaborator, so that these can run automatically. It is generally expected that
+PRs will only be merged when all presubmit checks are passing. In some cases,
+pre-existing failures may be ignored.
+
+## Merging
+
+After review and presubmit checks, PRs should be merged with a "squash and
+merge". The squashed commit summary should match the PR title and the commit
+description should match the PR body. Accordingly, please write these as you
+would a helpful commit message. Please also keep PRs small (focused on a single
+issue) to streamline review and ease later culprit-finding. It is assumed that
+the PR author will authors merge their change unless they ask someone else to
+merge it for them (e.g. because they don't have write access).
 
 ## Peculiarities
-
-We use a GitHub integration to import PRs into our upstream (Google internal)
-source code management. Once it is approved internally, each PR will be merged
-into the master branch as a single commit by the same tooling. The description
-will match the PR title followed by the PR description. Accordingly, please
-write these as you would a helpful commit message. Please also keep PRs small
-(focused on a single issue) to streamline review and ease later culprit-finding.
-
-As part of a migration to make the project GitHub-first, our default branch is
-currently called `google` and all PRs should be directed there. This is an
-intermediate state. See
-https://groups.google.com/d/msg/iree-discuss/F07vsG9Ah4o/uAIusKO-BQAJ
 
 Our documentation on
 [repository management](https://github.com/google/iree/blob/master/docs/repository_management.md)
 has more information on some of the oddities in our repository setup and
+workflows. For the most part, these should be transparent to normal developer
 workflows.
 
 ## Community Guidelines
