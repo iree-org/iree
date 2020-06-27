@@ -17,6 +17,8 @@
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
 
+BENCHMARK_MAIN();
+
 using namespace mlir;  // NOLINT
 
 // Helper method to construct an affine map.

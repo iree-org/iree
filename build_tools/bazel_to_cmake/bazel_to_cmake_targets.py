@@ -48,6 +48,9 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:StandardToSPIRVConversions": [
         "MLIRStandardToSPIRVTransforms"
     ],
+    "//third_party/llvm/llvm-project/mlir:GPUToVulkanTransforms": [
+        "MLIRGPUtoVulkanTransforms"
+    ],
     "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],

@@ -31,16 +31,16 @@ iree_lit_test_suite(
     data = [
         # runtime libraries
         "@llvm-project//mlir:tools/libvulkan-runtime-wrappers.so",
-        ":runtime-support.so",
+        "//experimental/ModelBuilder/test:runtime-support.so",
         # Tests.
-        ":test-dot-prod",
-        ":test-mnist-jit",
-        ":test-simple-jit",
-        ":test-simple-jit-vulkan",
-        ":test-simple-mlir",
-        ":test-vector-transfers-jit",
-        ":test-matmul-vulkan",
-        ":test-vec-to-gpu",
+        "//experimental/ModelBuilder/test:test-dot-prod",
+        "//experimental/ModelBuilder/test:test-mnist-jit",
+        "//experimental/ModelBuilder/test:test-simple-jit",
+        "//experimental/ModelBuilder/test:test-simple-jit-vulkan",
+        "//experimental/ModelBuilder/test:test-simple-mlir",
+        "//experimental/ModelBuilder/test:test-vector-transfers-jit",
+        "//experimental/ModelBuilder/test:test-matmul-vulkan",
+        "//experimental/ModelBuilder/test:test-vec-to-gpu",
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
@@ -207,7 +207,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@com_google_benchmark//:benchmark:benchmark_main",
+        "@com_google_benchmark//:benchmark",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
@@ -221,7 +221,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@com_google_benchmark//:benchmark:benchmark_main",
+        "@com_google_benchmark//:benchmark",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
@@ -236,7 +236,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@com_google_benchmark//:benchmark:benchmark_main",
+        "@com_google_benchmark//:benchmark",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
