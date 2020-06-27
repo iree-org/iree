@@ -38,8 +38,7 @@ class MathModule(tf.Module):
     return tf.math.mod(x, 2.0)
 
 
-@tf_test_utils.compile_modules(
-    backends=["iree_vmla", "iree_vulkan"], math=MathModule)
+@tf_test_utils.compile_modules(math=MathModule)
 class MathTest(tf_test_utils.SavedModelTestCase):
 
   def test_abs(self):

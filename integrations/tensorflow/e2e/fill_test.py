@@ -30,8 +30,7 @@ class FillModule(tf.Module):
     return tf.fill(dims, value)
 
 
-# TODO(jennik): Get this test working on IREE.
-@tf_test_utils.compile_modules(backends=["tf"], fill=FillModule)
+@tf_test_utils.compile_modules(fill=FillModule)
 class FillTest(tf_test_utils.SavedModelTestCase):
 
   def test_fill(self):

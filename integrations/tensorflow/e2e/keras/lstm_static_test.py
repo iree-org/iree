@@ -39,9 +39,7 @@ def lstm_module():
   return module
 
 
-# TODO(silvasean): Get this test working on other backends.
-@tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla"], lstm=(lstm_module, ["predict"]))
+@tf_test_utils.compile_modules(lstm=(lstm_module, ["predict"]))
 class LstmTest(tf_test_utils.SavedModelTestCase):
 
   def test_lstm(self):
