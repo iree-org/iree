@@ -73,9 +73,7 @@ LLVM_FAILING = [
     "fill_test.py",
     "mandelbrot_test.py",
     "matrix_ops_test.py",
-    "resource_ops_test.py",
     "ring_buffer_test.py",
-    "sliding_window_test.py",
     "strings_test.py",
 ]
 
@@ -88,9 +86,7 @@ VULKAN_FAILING = [
     "fill_test.py",
     "mandelbrot_test.py",
     "matrix_ops_test.py",
-    "resource_ops_test.py",
     "ring_buffer_test.py",
-    "sliding_window_test.py",
     "strings_test.py",
     "tensorlist_test.py",
 ]
