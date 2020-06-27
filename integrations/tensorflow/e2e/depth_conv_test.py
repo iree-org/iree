@@ -38,8 +38,7 @@ class Conv2dModule(tf.Module):
         img, kernel, [1, 1, 1, 1], "SAME", name="result")
 
 
-@tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla"], conv2d=Conv2dModule)
+@tf_test_utils.compile_modules(conv2d=Conv2dModule)
 class ConvTest(tf_test_utils.SavedModelTestCase):
 
   def test_batched_feature_unpadded(self):

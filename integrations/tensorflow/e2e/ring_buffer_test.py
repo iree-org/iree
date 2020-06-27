@@ -177,9 +177,7 @@ class StatefulRingBufferM(tf.Module):
     return self.rb(x)
 
 
-# TODO(b/148747011)
-@tf_test_utils.compile_modules(
-    backends=["tf"], rb=(StatefulRingBufferM, ["predict"]))
+@tf_test_utils.compile_modules(rb=(StatefulRingBufferM, ["predict"]))
 class StatefulRingBufferTest(tf_test_utils.SavedModelTestCase):
 
   def test_statefulringbuffer(self):

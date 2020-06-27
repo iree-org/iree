@@ -68,9 +68,7 @@ class TensorListModule(tf.Module):
     return ta.stack()
 
 
-# TODO(b/146900329): Triage op coverage for vulkan backend.
-@tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla"], tensorlist=TensorListModule)
+@tf_test_utils.compile_modules(tensorlist=TensorListModule)
 class TensorListTest(tf_test_utils.SavedModelTestCase):
 
   def test_identity_through_tensorlist(self):
