@@ -11,7 +11,7 @@ your workflow, please reach out to us so we can prioritize a fix.
 
 The default branch is called `main`. PRs should be sent there. We also have a
 `google` branch that is synced from the Google internal source repository. This
-branch is merged from and to `main` frequently to usptream any changes coming
+branch is merged from and to `main` frequently to upstream any changes coming
 from `google` and as part of updating the internal source repository. For the
 most part this integration with `google` should have minimal effect on normal
 developer workflows.
