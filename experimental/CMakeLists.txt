@@ -15,3 +15,5 @@
 # NOTE: not all projects require a cmake build. If you are adding a directory
 # that is only expected to build with bazel (such as something depending on
 # TensorFlow) you can ignore cmake.
+#
+iree_add_all_subdirs()
