@@ -107,6 +107,56 @@ function(iree_cc_test)
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+
+  # Case for cross-compiling towards Android.
+  if(ANDROID)
+    string(REPLACE "::" "_" _PACKAGE_PREFIX ${_PACKAGE_NS})
+    set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
+    set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
+
+    # Use the test framework to push to the Android device.
+    include(AndroidTestUtilities)
+    set(_PUSH_NAME "push_${_PACKAGE_PREFIX}_${_RULE_NAME}_to_android_device")
+    android_add_test_data(
+      ${_PUSH_NAME}
+      LIBS "$<TARGET_FILE:${_NAME}>"
+      LIBS_DEST "${_ANDROID_ABS_DIR}"
+      DEVICE_TEST_DIR "${_ANDROID_ABS_DIR}"
+      DEVICE_OBJECT_STORE "${_ANDROID_ABS_DIR}"
+    )
+
+    # Define a custom target for actually running the test on Android device.
+    set(_RUN_NAME "run_${_PACKAGE_PREFIX}_${_RULE_NAME}_on_android_device")
+    add_test(
+      NAME
+        ${_RUN_NAME}
+      COMMAND
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
+        TEST_TMPDIR=${_ANDROID_ABS_DIR}
+        "${_ANDROID_REL_DIR}/${_NAME}"
+    )
+
+    set_tests_properties(${_RUN_NAME} PROPERTIES DEPENDS ${_PUSH_NAME})
+
+    if(CMAKE_HOST_SYSTEM MATCHES Windows)
+      # Unfortunately, if using Windows as the host system, the binaries pushed
+      # to Android are missing the excutable file permisson.. So we need to
+      # have another test for fixing that.. This really starts to feel like
+      # abusing ctest infrastructure. But whatever.
+      set(_PERMISSION_NAME "make_${_PACKAGE_PREFIX}_${_RULE_NAME}_runnable_on_android_device")
+      add_test(
+        NAME
+          ${_PERMISSION_NAME}
+        COMMAND
+          "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
+          "chmod +x ${_ANDROID_REL_DIR}/${_NAME}"
+      )
+      set_tests_properties(${_PERMISSION_NAME} PROPERTIES DEPENDS ${_PUSH_NAME})
+      set_tests_properties(${_RUN_NAME} PROPERTIES DEPENDS ${_PERMISSION_NAME})
+    endif()
+    return()
+  endif(ANDROID)
+
   set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
   add_test(
     NAME
