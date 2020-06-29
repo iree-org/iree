@@ -579,14 +579,14 @@ BackendInfo.add(
     iree_compiler_targets=["llvm-ir"])
 
 
-def _backend_spec_string_to_backends(backend_spec):
+def _parse_target_backends(target_backends):
   """Decodes a comma-delimited string of backends into BackendInfo objects."""
   backends = []
-  for backend_name in backend_spec.split(","):
+  for backend_name in target_backends.split(","):
     if backend_name not in BackendInfo.ALL.keys():
       raise ValueError(
           "Invalid backend specification string '{}', unexpected name '{}';"
-          " valid names are '{}'".format(backend_spec, backend_name,
+          " valid names are '{}'".format(target_backends, backend_name,
                                          BackendInfo.ALL.keys()))
     backends.append(BackendInfo.ALL[backend_name])
   return backends
@@ -604,7 +604,7 @@ def get_backends():
   """
   if FLAGS.target_backends is not None:
     logging.info("Using backends from command line: %s", FLAGS.target_backends)
-    backends = _backend_spec_string_to_backends(FLAGS.target_backends)
+    backends = _parse_target_backends(FLAGS.target_backends)
     # If tf is the only backend then we will test it itself by adding tf_also.
     if len(backends) == 1 and "tf" == backends[0].name:
       backends.append(BackendInfo.ALL["tf_also"])
