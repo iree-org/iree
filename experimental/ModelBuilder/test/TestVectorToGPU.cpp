@@ -48,7 +48,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
-#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 
 using namespace mlir;                    // NOLINT
 using namespace mlir::edsc;              // NOLINT

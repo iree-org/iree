@@ -15,11 +15,11 @@
 //===- SplitDispathFunctionPass.cpp ---------------------------------------===//
 //
 // This file implements a pass to split computation workload to multiple
-// sequential dispatch functions. This pass operates on Linalg ops and prepares
-// for lowering to GPU, where we need to tile the workload to workgroups and
-// workitems. If the workload involves computation A and B, where B is
-// dependent on A and A needs all workgroups to complete, then we need
-// to split A and B into different kernels because there is no mechanism
+// sequential dispatch functions. This pass operates on Linalg ops and
+// scf.parallel op and prepares for lowering to GPU, where we need to tile the
+// workload to workgroups and workitems. If the workload involves computation A
+// and B, where B is dependent on A and A needs all workgroups to complete, then
+// we need to split A and B into different kernels because there is no mechanism
 // to perform cross-workgroup synchronization within a single kernel.
 //
 //===----------------------------------------------------------------------===//
@@ -35,6 +35,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -51,24 +52,20 @@ namespace iree_compiler {
 
 namespace {
 
-/// Returns true if the given `block` contains 0 or 1 Linalg structured ops.
-bool hasZeroOrOneLinalgOp(Block &block) {
-  auto ops = block.getOps<linalg::LinalgOp>();
-  return std::distance(ops.begin(), ops.end()) <= 1;
-}
-
 /// Returns true if the Linalg ops can be separated to multiple kernels.
-bool canSeparateLinalgOps(MutableArrayRef<linalg::LinalgOp> linalgOps) {
-  if (llvm::any_of(linalgOps, [](linalg::LinalgOp op) {
-        return !op.hasBufferSemantics();
+bool canSeparateOps(ArrayRef<Operation *> ops) {
+  if (llvm::any_of(ops, [](Operation *op) {
+        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op))
+          return !linalgOp.hasBufferSemantics();
+        return false;
       }))
     return false;
 
   // Require no other ops interleave with Linalg structured ops for now. This is
   // the common case and it simplifies further analysis.
-  for (int i = 0, e = linalgOps.size() - 1; i < e; ++i) {
-    if (linalgOps[i].getOperation()->getNextNode() != linalgOps[i + 1])
-      return false;
+  for (auto currOp = ops.begin(), nextOp = std::next(ops.begin());
+       nextOp != ops.end(); ++currOp, ++nextOp) {
+    if ((*currOp)->getNextNode() != *nextOp) return false;
   }
 
   return true;
@@ -144,15 +141,20 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     return oldFn.emitError("expected only one block");
   }
 
-  // The dispatch function should have more than one Linalg structured ops.
-  // Otherwise there is nothing to do.
-  if (hasZeroOrOneLinalgOp(oldFn.getBlocks().front())) return success();
+  // The dispatch function should have more than one separable ops. Otherwise
+  // there is nothing to do.
+  Block &fnBody = oldFn.getBlocks().front();
 
-  // Collect all Linalg ops for distributing.
-  SmallVector<linalg::LinalgOp, 4> linalgOps =
-      llvm::to_vector<4>(oldFn.getBlocks().front().getOps<linalg::LinalgOp>());
-  if (!canSeparateLinalgOps(linalgOps)) {
-    return oldFn.emitError("cannot separate Linalg ops into multiple kernels");
+  // Collect all Linalg and scf.parallel ops for distributing.
+  SmallVector<Operation *, 4> separableOps;
+  for (Operation &op : fnBody)
+    if (isa<linalg::LinalgOp>(op) || isa<scf::ParallelOp>(op))
+      separableOps.push_back(&op);
+
+  if (separableOps.size() <= 1) return success();
+  if (!canSeparateOps(separableOps)) {
+    return oldFn.emitError(
+        "cannot separate Linalg/Parallel ops into multiple kernels");
   }
 
   ModuleOp moduleOp = cast<ModuleOp>(oldFn.getParentOp());
@@ -160,13 +162,13 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   Location loc = oldFn.getLoc();
 
   SmallVector<std::string, 4> splitKernels;
-  splitKernels.reserve(linalgOps.size());
+  splitKernels.reserve(separableOps.size());
   llvm::SmallPtrSet<Operation *, 16> closure;
 
-  for (const auto &linalgOp : llvm::enumerate(linalgOps)) {
-    // Create a new function for hosting this Linalg op.
-    splitKernels.emplace_back(
-        llvm::formatv("{0}_dispatch_{1}", oldFn.getName(), linalgOp.index()));
+  for (const auto &separableOp : llvm::enumerate(separableOps)) {
+    // Create a new function for hosting this op.
+    splitKernels.emplace_back(llvm::formatv("{0}_dispatch_{1}", oldFn.getName(),
+                                            separableOp.index()));
     StringRef newFnName = splitKernels.back();
     builder.setInsertionPointToStart(moduleOp.getBody());
     auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType(),
@@ -181,7 +183,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
 
     // Collect the closure for the current Linalg op.
     closure.clear();
-    collectAllReferencedOps(linalgOp.value(), closure);
+    collectAllReferencedOps(separableOp.value(), closure);
 
     // Clone all ops in the closure to the new function.
     Block *newFnBlock = newFn.addEntryBlock();
@@ -190,14 +192,14 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     for (Operation &op : oldFnBlock) {
       if (closure.count(&op) == 0) continue;
       builder.insert(op.clone(remapper));
-      if (&op == linalgOp.value()) break;
+      if (&op == separableOp.value()) break;
     }
     builder.insert(oldFnBlock.getTerminator()->clone(remapper));
   }
 
   // Add the entry point schedule to the module op.
   SmallVector<Attribute, 4> entryPoints;
-  entryPoints.reserve(linalgOps.size());
+  entryPoints.reserve(separableOps.size());
   for (const std::string &kernel : splitKernels) {
     entryPoints.emplace_back(builder.getStringAttr(kernel));
   }

@@ -19,8 +19,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_MARKERUTILS_H_
-#define IREE_COMPILER_CONVERSION_CODEGENUTILS_MARKERUTILS_H_
+#ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MARKERUTILS_H_
+#define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MARKERUTILS_H_
 
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
@@ -30,55 +30,34 @@ namespace mlir {
 class Operation;
 namespace iree_compiler {
 
-/// Marker to denote that do not tile the linalg operation.
-StringRef getNoTileMarker();
-
-/// Marker to denote that a linalg operation is to be partitioned to workgroups.
-StringRef getWorkGroupMarker();
-
 /// Marker to denote that a linalg operation is to be partitioned to workitems.
 StringRef getWorkItemMarker();
-
-/// Returns true if an operation has the specified `marker`. When `marker` is
-/// empty, returns true if the operation has any marker.
-bool hasMarker(Operation *, StringRef marker = "");
-
-/// Returns true if an operation has marker to denote that it is not to be
-/// tiled.
-bool hasNoTileMarker(Operation *);
-
-/// Returns true if an operation has marker to denote that it is to be
-/// partitioned to workgroups.
-bool hasWorkGroupMarker(Operation *);
-
-/// Returns true if an operation has marker to denote that it is to be
-/// partitioned to workitems.
-bool hasWorkItemMarker(Operation *);
 
 /// Returns true if an operation has a marker to denote that it will be mapped
 /// to cooperative matrix operations. Markers need to be consistent as
 /// cooperative matrices have their own type and load/store operations.
 bool hasCooperativeMatrixMarker(Operation *);
 
-/// Sets a given marker on an operation.
-void setMarker(Operation *, StringRef);
+/// Returns true if an operation has the specified `marker`. When `marker` is
+/// empty, returns true if the operation has any marker.
+bool hasMarker(Operation *, StringRef marker = "");
 
-/// Sets marker to prevent tiling of a linalg operation.
-void setNoTileMarker(Operation *);
-
-/// Sets marker to denote that a linalg operation is to be partitioned to
-/// workgroups.
-void setWorkGroupMarker(Operation *);
-
-/// Sets marker to denote that a linalg operation is to be partitioned to
-/// workitems.
-void setWorkItemMarker(Operation *);
+/// Returns true if an operation has marker to denote that it is to be
+/// partitioned to workitems.
+bool hasWorkItemMarker(Operation *);
 
 /// Sets marker to denote that a vector operation is to be execute on a
 /// cooperative matrix.
 void setCooperativeMatrixMarker(Operation *);
 
+/// Sets a given marker on an operation.
+void setMarker(Operation *, StringRef);
+
+/// Sets marker to denote that a linalg operation is to be partitioned to
+/// workitems.
+void setWorkItemMarker(Operation *);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_CODEGENUTILS_MARKERUTILS_H_
+#endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MARKERUTILS_H_
