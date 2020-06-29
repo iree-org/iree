@@ -20,13 +20,24 @@ iree_cc_library(
   HDRS
     "FunctionUtils.h"
     "MarkerUtils.h"
+    "MatmulCodegenStrategy.h"
   SRCS
     "FunctionUtils.cpp"
     "MarkerUtils.cpp"
+    "MatmulCodegenStrategy.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineOps
+    MLIRAnalysis
     MLIRIR
+    MLIRLinalgOps
     MLIRLinalgTransforms
+    MLIRPass
+    MLIRSCF
+    MLIRStandardOps
     MLIRSupport
+    MLIRTransforms
+    MLIRVector
+    MLIRVectorToSCF
   PUBLIC
 )
