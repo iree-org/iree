@@ -39,7 +39,7 @@ for generic Vulkan concepts and development environment setup.
 ### Quick Start
 
 The
-[dynamic_symbols_test](https://github.com/google/iree/blob/master/iree/hal/vulkan/dynamic_symbols_test.cc)
+[dynamic_symbols_test](https://github.com/google/iree/blob/main/iree/hal/vulkan/dynamic_symbols_test.cc)
 checks if the Vulkan loader and a valid ICD are accessible.
 
 Run the test:
@@ -58,7 +58,7 @@ Tests in IREE's HAL "Conformance Test Suite" (CTS) actually exercise the Vulkan
 HAL, which includes checking for supported layers and extensions.
 
 Run the
-[device creation test](https://github.com/google/iree/blob/master/iree/hal/cts/device_creation_test.cc):
+[device creation test](https://github.com/google/iree/blob/main/iree/hal/cts/device_creation_test.cc):
 
 ```shell
 # -- CMake --
@@ -79,7 +79,7 @@ want to use a software driver for predictable performance, you can set up
 SwiftShader's Vulkan ICD (Installable Client Driver).
 
 IREE has a
-[helper script](https://github.com/google/iree/blob/master/build_tools/third_party/swiftshader/build_vk_swiftshader.sh)
+[helper script](https://github.com/google/iree/blob/main/build_tools/third_party/swiftshader/build_vk_swiftshader.sh)
 for building SwiftShader from source using CMake:
 
 ```shell

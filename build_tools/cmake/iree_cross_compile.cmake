@@ -92,8 +92,8 @@ function(iree_create_configuration CONFIG_NAME)
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_HAL_DRIVERS_TO_BUILD "${IREE_HAL_DRIVERS_TO_BUILD}")
   string(REPLACE ";" "$<SEMICOLON>" _CONFIG_TARGET_BACKENDS_TO_BUILD "${IREE_TARGET_BACKENDS_TO_BUILD}")
   # LINT.ThenChange(
-  #   https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options,
-  #   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
+  #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,
+  #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
   # )
 
   message(STATUS "C compiler for ${CONFIG_NAME} build: ${_CONFIG_C_COMPILER}")
@@ -117,8 +117,8 @@ function(iree_create_configuration CONFIG_NAME)
         -DIREE_BUILD_PYTHON_BINDINGS=${_CONFIG_BUILD_PYTHON_BINDINGS}
         -DIREE_BUILD_EXPERIMENTAL=${_CONFIG_BUILD_EXPERIMENTAL}
         # LINT.ThenChange(
-        #   https://github.com/google/iree/tree/master/CMakeLists.txt:iree_options,
-        #   https://github.com/google/iree/tree/master/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
+        #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,
+        #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
         # )
         -DIREE_HAL_DRIVERS_TO_BUILD="${_CONFIG_HAL_DRIVERS_TO_BUILD}"
         -DIREE_TARGET_BACKENDS_TO_BUILD="${_CONFIG_TARGET_BACKENDS_TO_BUILD}"

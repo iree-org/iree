@@ -33,7 +33,7 @@ state in a special `SUBMODULE_VERSIONS` file. This file is considered the source
 of truth for the correct submodule state and is what is used by the CI. When
 updating the submodule state from Google's source repository, only this file is
 updated and another
-[GitHub Actions workflow](https://github.com/google/iree/blob/master/.github/workflows/synchronize_submodules.yml)
+[GitHub Actions workflow](https://github.com/google/iree/blob/main/.github/workflows/synchronize_submodules.yml)
 immediately commits a submodule update on top of that.
 
 Shortcut commands (read below for full documentation):

@@ -115,7 +115,7 @@ $ ./bazel-bin/iree/tools/iree-translate --help
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir)
 and execute a function in the compiled module:
 
 ```shell
