@@ -19,7 +19,7 @@
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
-# docker run -it -rm --entrypoint bash \
+# docker run -it --rm --entrypoint bash \
 #   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
 #   gcr.io/iree-oss/bazel
 
@@ -33,6 +33,7 @@ RUN apt-get update
 ENV CXX clang++
 ENV CC clang
 ENV PYTHON_BIN /usr/bin/python3
+ENV IREE_LLVMAOT_LINKER_PATH /usr/bin/ld
 
 # Install git for updating IREE's submodules.
 RUN apt-get install -y git
@@ -45,7 +46,8 @@ RUN apt-get install -y unzip zip wget \
   && chmod +x "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
   && "./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" --user \
   && rm "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh"
-ENV PATH "/root/bin:${PATH?}"
+# ENV does not allow ${variable?} syntax.
+ENV PATH "/root/bin:${PATH}"
 
 # Install core IREE dependencies.
 RUN apt-get install -y clang libsdl2-dev
