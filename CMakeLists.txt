@@ -234,7 +234,7 @@ include(iree_setup_toolchain)
 # MLIR/LLVM Dependency
 # We treat the LLVM dependency specially because we support several different
 # ways to use it:
-#   - Bundled (default): a source dependency directly on the 
+#   - Bundled (default): a source dependency directly on the
 #     third_party/llvm-project submodule.
 #   - External: An external (source or installed) dependency on LLVM.
 #   - Provided: When IREE is used as a sub-project, it is assumed that the LLVM
@@ -243,7 +243,7 @@ include(iree_setup_toolchain)
 
 
 # Adds bundled projects that must be included after the LLVM directory has
-# been added and within the scope of its settings (i.e. build type override, 
+# been added and within the scope of its settings (i.e. build type override,
 # etc).
 function(add_bundled_mlir_dependent_projects)
   if(${IREE_ENABLE_EMITC})
@@ -330,9 +330,7 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 
 if(CMAKE_CROSSCOMPILING)
   # We need flatc to generate some source code. When cross-compiling, we need

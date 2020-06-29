@@ -117,7 +117,7 @@ struct TimePointSemaphore final : public IntrusiveLinkBase<void> {
 // all the semaphores in the same submission to a `VkQueue`.
 class TimePointFencePool final : public RefObject<TimePointFencePool> {
  public:
-  static constexpr int kMaxInFlightFenceCount = 32;
+  static constexpr int kMaxInFlightFenceCount = 128;
 
   // Creates a new pool and pre-allocates `kMaxInFlightFenceCount` fences.
   static StatusOr<ref_ptr<TimePointFencePool>> Create(

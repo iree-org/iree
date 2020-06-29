@@ -82,6 +82,7 @@ external_cc_library(
     MLIRLinalgOps
     MLIRPass
     MLIRShape
+    MLIRShapeOpsTransforms
     MLIRTransformUtils
   PUBLIC
 )

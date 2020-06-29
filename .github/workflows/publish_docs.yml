@@ -26,6 +26,10 @@ jobs:
     env:
       IREE_DOC_BUILD_DIR: build-docs
     steps:
+      - name: Setup Bazel
+        uses: abhinavsingh/setup-bazel@v3
+        with:
+          version: 2.1.0
       - name: Checking out repository
         uses: actions/checkout@v2
         with:

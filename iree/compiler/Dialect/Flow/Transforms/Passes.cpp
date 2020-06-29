@@ -18,6 +18,7 @@
 
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
@@ -40,6 +41,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
   passManager.addPass(createHLOPreprocessingPass());
+
+  // Run passes to remove shape constraints. HLO lowering inserts them, but they
+  // are not desired here.
+  //
+  // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
+  passManager.addNestedPass<FuncOp>(createRemoveShapeConstraintsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Convert `shape` dialect to `shapex` dialect.
   passManager.addPass(Shape::createConvertShapeToShapexPass());

@@ -98,12 +98,12 @@ def get_test_targets(test_suite_path):
   # Check if the suite exists (which may not be true for failing suites)
   target_dir = test_suite.split(':')[0]
   query = ['bazel', 'query', f'{target_dir}/...']
-  targets = subprocess.check_output(query, stderr=subprocess.DEVNULL)
+  targets = subprocess.check_output(query)
   if test_suite_path not in targets.decode('ascii'):
     return []
 
   query = ['bazel', 'query', f'tests({test_suite_path})']
-  tests = subprocess.check_output(query, stderr=subprocess.DEVNULL)
+  tests = subprocess.check_output(query)
   tests = tests.decode('ascii').split('\n')
   tests = list(filter(lambda s: s.startswith(f'{test_suite_path}_'), tests))
   tests = [test.replace(f'{test_suite_path}_', '') for test in tests]
