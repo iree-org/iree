@@ -18,6 +18,7 @@
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
 #include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -32,6 +33,9 @@ void createIreeTfImportPipeline(OpPassManager &pm) {
   // Lowering shape-related constructs.
   ////////////////////////////////////////////////////////////////////////////
   pm.addPass(Shape::createConvertHLOToShapePass());
+  // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
+  pm.addPass(createRemoveShapeConstraintsPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(Shape::createConvertShapeToShapexPass());
   // Clean up trivial redundancies.
   pm.addPass(createCanonicalizerPass());
