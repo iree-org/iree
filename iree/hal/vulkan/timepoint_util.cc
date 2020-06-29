@@ -118,7 +118,7 @@ Status TimePointFencePool::PreallocateFences() {
       VK_RETURN_IF_ERROR(syms()->vkCreateFence(*logical_device_, &create_info,
                                                logical_device_->allocator(),
                                                &fence));
-      fences[i] = absl::MakeUnique<TimePointFence>(this, fence);
+      fences[i] = absl::make_unique<TimePointFence>(this, fence);
     }
   }
 
