@@ -190,6 +190,7 @@ iree_vision_test_suite(
         "external",
         "guitar",
         "manual",
+        "no-remote",
         "nokokoro",
         "notap",
     ],
@@ -218,6 +219,7 @@ iree_vision_test_suite(
     tags = [
         "external",
         "manual",
+        "no-remote",
         "nokokoro",
         "notap",
     ],
