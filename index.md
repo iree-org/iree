@@ -118,12 +118,12 @@ features and quarterly plans. Please check out for updated information.
 
 ## Build Status
 
-CI System | Build System | Platform | Component       | Status
-:-------: | :----------: | :------: | :-------------: | :----:
-Kokoro    | Bazel        | Linux    | Core            | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/google_result.html)
-Kokoro    | Bazel        | Linux    | Bindings        | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/google_result.html)
-Kokoro    | Bazel        | Linux    | Integrations    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/google_result.html)
-Kokoro    | CMake        | Linux    | Core + Bindings | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/google_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/google_result.html)
+CI System | Platform | Build System | Component       | Status
+:-------: | :------: | :----------: | :-------------: | :----:
+Kokoro    | Linux    | Bazel        | Core            | [![kokoro-status-linux-bazel-core](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/core/main_result.html)
+Kokoro    | Linux    | Bazel        | Bindings        | [![kokoro-status-linux-bazel-bindings](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/bindings/main_result.html)
+Kokoro    | Linux    | Bazel        | Integrations    | [![kokoro-status-linux-bazel-integrations](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/bazel/integrations/main_result.html)
+Kokoro    | Linux    | CMake        | Core + Bindings | [![kokoro-status-linux-cmake](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/linux/cmake/main_result.html)
 
 ## License
 
