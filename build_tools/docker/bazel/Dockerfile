@@ -46,7 +46,8 @@ RUN apt-get install -y unzip zip wget \
   && chmod +x "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
   && "./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" --user \
   && rm "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh"
-ENV PATH "/root/bin:${PATH?}"
+# ENV does not allow ${variable?} syntax.
+ENV PATH "/root/bin:${PATH}"
 
 # Install core IREE dependencies.
 RUN apt-get install -y clang libsdl2-dev

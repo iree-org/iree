@@ -28,6 +28,8 @@ FROM ubuntu:18.04
 WORKDIR /usr/src/iree/
 
 RUN apt-get update
+# TODO: Remove this if the `apt-get install` below works without it again.
+RUN apt update
 
 # Update cmake to v3.13+, which is ahead of apt-get's version (3.10.2).
 # Install dependencies, including an old version of cmake to bootstrap.
