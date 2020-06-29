@@ -153,6 +153,7 @@ class TimePointFencePool final : public RefObject<TimePointFencePool> {
 
   absl::Mutex mutex_;
 
+  // Track via unique_ptr, since IntrusiveList doesn't manage memory itself.
   IntrusiveList<std::unique_ptr<TimePointFence>> free_fences_
       ABSL_GUARDED_BY(mutex_);
 };

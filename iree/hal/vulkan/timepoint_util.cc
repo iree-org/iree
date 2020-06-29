@@ -74,12 +74,10 @@ StatusOr<ref_ptr<TimePointFence>> TimePointFencePool::Acquire() {
            << "Fence pool out of free fences";
   }
 
-  // While in the pool, unique_ptr is used to maintain ownership
-  //   * By default, IntrusiveList does no memory management itself
   // To acquire from the pool, we:
-  //   1) Pop from the front of the queue (reference count of 0)
-  //   2) Release the unique_ptr, since lifetime will be managed by ref counts
-  //   3) Return as a raw RefObject with a reference count of 1
+  //   1) Pop from the front of the queue (reference count of 0);
+  //   2) Release the unique_ptr, since lifetime will be managed by ref counts;
+  //   3) Return as a raw RefObject with a reference count of 1;
   // When the reference count goes back to 0, it will be returned to the pool,
   // wrapped with unique_ptr.
   // When the pool is destroyed, all free fences are freed by unique_ptr
