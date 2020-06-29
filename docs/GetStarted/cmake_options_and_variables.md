@@ -97,6 +97,9 @@ if `IREE_MLIR_DEP_MODE` is set to `INSTALLED`.
 
 ## Cross-compilation
 
+[TODO(#2111): The following explanation is developer oriented. Move it to
+the developer build doc once we've created that.]
+
 Cross-compilation involves both a *host* platform and a *target* platform. One
 invokes compiler toolchains on the host platform to generate libraries and
 executables that can be run on the target platform.
