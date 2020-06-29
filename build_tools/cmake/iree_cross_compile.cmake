@@ -131,13 +131,13 @@ endfunction()
 
 # iree_get_build_command
 #
-# Gets the CMake build command for the given `TARGET`.
+# Gets the CMake build command for the given `EXECUTABLE`.
 #
 # Parameters:
-# TARGET: the target to build.
+# EXECUTABLE: the executable to build.
 # BINDIR: root binary directory containing CMakeCache.txt.
 # CMDVAR: variable name for receiving the build command.
-function(iree_get_build_command TARGET)
+function(iree_get_build_command EXECUTABLE)
   cmake_parse_arguments(_RULE "" "BINDIR;CMDVAR;CONFIG" "" ${ARGN})
   if(NOT _RULE_CONFIG)
     set(_RULE_CONFIG "$<CONFIG>")
@@ -145,30 +145,31 @@ function(iree_get_build_command TARGET)
   if (CMAKE_GENERATOR MATCHES "Make")
     # Use special command for Makefiles to support parallelism.
     set(${_RULE_CMDVAR}
-        "$(MAKE)" "-C" "${_RULE_BINDIR}" "${TARGET}" PARENT_SCOPE)
+        "$(MAKE)" "-C" "${_RULE_BINDIR}" "${EXECUTABLE}" PARENT_SCOPE)
   else()
     set(${_RULE_CMDVAR}
         "${CMAKE_COMMAND}" --build ${_RULE_BINDIR}
-                           --target ${TARGET}
+                           --target ${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}
                            --config ${_RULE_CONFIG} PARENT_SCOPE)
   endif()
 endfunction()
 
 # iree_host_install
 #
-# Defines custom commands and targets for installing the given `target` under
-# host configuration. The custom target for install will be named as
-# `iree_host_install_${TARGET}`.
+# Defines custom commands and targets for installing the given `EXECUTABLE`
+# under host configuration. The custom target for install will be named as
+# `iree_host_install_${EXECUTABLE}`.
 #
 # Precondition:
 # iree_create_configuration(HOST) is invoked previously.
 #
 # Parameters:
+# EXECUTABLE: the executable to install.
 # COMPONENT: installation component; used for filtering installation targets.
 # PREFIX: the root installation path prefix.
 # DEPENDS: addtional dependencies for the installation.
-function(iree_host_install TARGET)
-  cmake_parse_arguments(_RULE "" "TARGET;COMPONENT;PREFIX" "DEPENDS" ${ARGN})
+function(iree_host_install EXECUTABLE)
+  cmake_parse_arguments(_RULE "" "COMPONENT;PREFIX" "DEPENDS" ${ARGN})
   if(_RULE_COMPONENT)
     set(_COMPONENT_OPTION -DCMAKE_INSTALL_COMPONENT="${_RULE_COMPONENT}")
   endif()
@@ -176,7 +177,7 @@ function(iree_host_install TARGET)
     set(_PREFIX_OPTION -DCMAKE_INSTALL_PREFIX="${_RULE_PREFIX}")
   endif()
 
-  iree_get_executable_path(_OUTPUT_PATH ${TARGET})
+  iree_get_executable_path(_OUTPUT_PATH ${EXECUTABLE})
 
   add_custom_command(
     OUTPUT ${_OUTPUT_PATH}
@@ -187,7 +188,7 @@ function(iree_host_install TARGET)
 
   # Give it a custom target so we can drive the generation manually
   # when useful.
-  add_custom_target(iree_host_install_${TARGET} DEPENDS ${_OUTPUT_PATH})
+  add_custom_target(iree_host_install_${EXECUTABLE} DEPENDS ${_OUTPUT_PATH})
 endfunction()
 
 # iree_declare_host_excutable
@@ -199,36 +200,36 @@ endfunction()
 # iree_create_configuration(HOST) is invoked previously.
 #
 # Parameters:
-# TARGET: the target to build on host.
+# EXECUTABLE: the executable to build on host.
 # BUILDONLY: only generates commands for building the target.
 # DEPENDS: any additional dependencies for the target.
-function(iree_declare_host_excutable TARGET)
+function(iree_declare_host_excutable EXECUTABLE)
   cmake_parse_arguments(_RULE "BUILDONLY" "" "DEPENDS" ${ARGN})
 
-  iree_get_executable_path(_OUTPUT_PATH ${TARGET})
+  iree_get_executable_path(_OUTPUT_PATH ${EXECUTABLE})
 
-  iree_get_build_command(${TARGET}
+  iree_get_build_command(${EXECUTABLE}
     BINDIR ${IREE_HOST_BINARY_ROOT}
     CMDVAR build_cmd)
 
-  add_custom_target(iree_host_build_${TARGET}
+  add_custom_target(iree_host_build_${EXECUTABLE}
                     COMMAND ${build_cmd}
                     DEPENDS iree_configure_HOST ${_RULE_DEPENDS}
                     WORKING_DIRECTORY "${IREE_HOST_BINARY_ROOT}"
-                    COMMENT "Building host ${TARGET}..."
+                    COMMENT "Building host ${EXECUTABLE}..."
                     USES_TERMINAL)
 
   if(_RULE_BUILDONLY)
     return()
   endif()
 
-  iree_host_install(${TARGET}
-                    COMPONENT ${TARGET}
+  iree_host_install(${EXECUTABLE}
+                    COMPONENT ${EXECUTABLE}
                     PREFIX ${IREE_HOST_BINARY_ROOT}
-                    DEPENDS iree_host_build_${TARGET})
+                    DEPENDS iree_host_build_${EXECUTABLE})
 
   # Note that this is not enabled when BUILDONLY so we can define
-  # iree_host_${TARGET} to point to another installation path to
+  # iree_host_${EXECUTABLE} to point to another installation path to
   # allow flexibility.
-  add_custom_target(iree_host_${TARGET} DEPENDS "${_OUTPUT_PATH}")
+  add_custom_target(iree_host_${EXECUTABLE} DEPENDS "${_OUTPUT_PATH}")
 endfunction()

@@ -20,8 +20,11 @@ include(CMakeParseArguments)
 
 if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
   set(IREE_HOST_SCRIPT_EXT "bat")
+  # https://gitlab.kitware.com/cmake/cmake/-/issues/17553
+  set(IREE_HOST_EXECUTABLE_SUFFIX ".exe")
 else()
   set(IREE_HOST_SCRIPT_EXT "sh")
+  set(IREE_HOST_EXECUTABLE_SUFFIX "")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -101,7 +104,7 @@ function(iree_get_executable_path OUTPUT_PATH_VAR TARGET)
   if(CMAKE_CROSSCOMPILING)
     # The target is defined in the CMake invocation for host. We don't have
     # access to the target; relying on the path here.
-    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${TARGET}")
+    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${TARGET}${IREE_HOST_EXECUTABLE_SUFFIX}")
     set(${OUTPUT_PATH_VAR} "${_OUTPUT_PATH}" PARENT_SCOPE)
   else()
     # The target is defined in this CMake invocation. We can query the location

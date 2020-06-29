@@ -145,10 +145,6 @@ list(APPEND CMAKE_MODULE_PATH
 #-------------------------------------------------------------------------------
 
 if(CMAKE_CROSSCOMPILING)
-  if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-    message(FATAL_ERROR "Cross compilation with Windows host system is not supported yet")
-  endif()
-
   message(STATUS "Detected cross compilation mode; configuring IREE on host...")
 
   # C/C++ compilers for host compilation.
@@ -344,7 +340,8 @@ if(CMAKE_CROSSCOMPILING)
   # Add a custom target to copy the flatc to the binary directory.
   add_custom_target(iree_host_flatc
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-      "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc" "${IREE_HOST_BINARY_ROOT}/bin"
+      "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc${IREE_HOST_EXECUTABLE_SUFFIX}"
+      "${IREE_HOST_BINARY_ROOT}/bin"
     DEPENDS iree_host_build_flatc
     COMMENT "Installing host flatc..."
   )
