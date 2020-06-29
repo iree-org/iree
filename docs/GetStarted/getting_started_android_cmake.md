@@ -77,7 +77,7 @@ You may also want to add the folder to the `PATH` environment variable.
 $ cmake -G Ninja -B build-android  \
     -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
     -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
-    -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF \
+    -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
     -DIREE_HOST_C_COMPILER=`which clang` -DIREE_HOST_CXX_COMPILER=`which clang++`
 ```
 
@@ -90,7 +90,7 @@ $ cmake -G Ninja -B build-android  \
     for your target device. You can also refer to Android NDK's
     [CMake documentation](https://developer.android.com/ndk/guides/cmake) for
     more toolchain arguments.
-*   Building IREE compilers, tests, and samples for Android is not supported at
+*   Building IREE compilers and samples for Android is not supported at
     the moment; they will be enabled soon.
 *   We need to define `IREE_HOST_{C|CXX}_COMPILER` to Clang here because IREE
     does [not support](https://github.com/google/iree/issues/1269) GCC well at
@@ -108,7 +108,7 @@ REM Assuming in IREE source root
 > cmake -G Ninja -B build-android  \
     -DCMAKE_TOOLCHAIN_FILE="%ANDROID_NDK%/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
-    -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF \
+    -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
     -DIREE_HOST_C_COMPILER="<cmake-style-path-to-cl.exe>" \
     -DIREE_HOST_CXX_COMPILER="<cmake-style-path-to-cl.exe>" \
     -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc" \
