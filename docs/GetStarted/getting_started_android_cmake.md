@@ -27,10 +27,10 @@ executables that can be run on the target platform.
 
 ### Set up host development environment
 
-The host platform should have been set up for developing IREE. Right now only
-Linux is supported; Windows and macOS support is coming. Please make sure you
-have followed the steps in
-[Get Started on Linux with CMake](./getting_started_linux_cmake.md).
+The host platform should have been set up for developing IREE. Right now Linux
+and Windows are supported. Please make sure you have followed the steps for
+[Linux](./getting_started_linux_cmake.md) or
+[Windows](./getting_started_windows_cmake.md).
 
 ### Install Android NDK
 
@@ -44,26 +44,37 @@ Alternatively, if you have installed
 [this guide](https://developer.android.com/studio/projects/install-ndk) to
 install Android NDK.
 
-After downloading, it is recommended to `export` the `ANDROID_NDK` environment
-variable pointing to the directory in your shell's rc file.
+After downloading, it is recommended to set the `ANDROID_NDK` environment
+variable pointing to the directory. For Linux, you can `export` in your shell's
+rc file. For Windows, you can search "environment variable" in the taskbar or
+use `Windows` + `R` to open the "Run" dialog to run
+`rundll32 sysdm.cpl,EditEnvironmentVariables`.
+
 
 ### Install Android Debug Bridge (ADB)
 
-Search your Linux distro's package manager to install `adb`. For example, on
-Ubuntu:
+For Linux, search your the distro's package manager to install `adb`.
+For example, on Ubuntu:
 
 ```shell
 $ sudo apt install adb
 ```
 
-## Build
+For Windows, it's easier to get `adb` via Android Studio. `adb` is included in
+the Android SDK Platform-Tools package. You can download this package with the
+[SDK Manager](https://developer.android.com/studio/intro/update#sdk-manager),
+which installs it at `android_sdk/platform-tools/`. Or if you want the
+standalone Android SDK Platform-Tools package, you can
+[download it here](https://developer.android.com/studio/releases/platform-tools).
+You may also want to add the folder to the `PATH` environment variable.
 
-Configure:
+## Configure and build
+
+### Configure on Linux
 
 ```shell
 # Assuming in IREE source root
-
-$ cmake -G Ninja -B build-android/  \
+$ cmake -G Ninja -B build-android  \
     -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
     -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
     -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF \
@@ -85,7 +96,31 @@ $ cmake -G Ninja -B build-android/  \
     does [not support](https://github.com/google/iree/issues/1269) GCC well at
     the moment.
 
-Build all targets:
+### Configure on Windows
+
+On Windows, we will need the full path to the `cl.exe` compiler. This can be
+obtained by [opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt) and type
+`where cl.exe`. Copy the path and substitue all `\` with `/` to get the
+CMake-style path. Then in a command prompt (`cmd.exe`):
+
+```cmd
+REM Assuming in IREE source root
+> cmake -G Ninja -B build-android  \
+    -DCMAKE_TOOLCHAIN_FILE="%ANDROID_NDK%/build/cmake/android.toolchain.cmake" \
+    -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
+    -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF \
+    -DIREE_HOST_C_COMPILER="<cmake-style-path-to-cl.exe>" \
+    -DIREE_HOST_CXX_COMPILER="<cmake-style-path-to-cl.exe>" \
+    -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc" \
+    -DCROSS_TOOLCHAIN_FLAGS_NATIVE="-DCMAKE_C_COMPILER=\"<cmake-style-path-to-cl.exe>\";-DCMAKE_CXX_COMPILER=\"<cmake-style-path-to-cl.exe>\""
+```
+
+* See the Linux section in the above for explanations of the used arguments.
+* We need to define `LLVM_HOST_TRIPLE` and `CROSS_TOOLCHAIN_FLAGS_NATIVE` in the
+  above because LLVM cannot properly detect host triple under Android CMake
+  toolchain file. This might be fixed later.
+
+### Build all targets
 
 ```shell
 $ cmake --build build-android/
@@ -113,8 +148,7 @@ Translate a source MLIR into IREE module:
 
 ```shell
 # Assuming in IREE source root
-
-$ build-android/host/bin/iree-translate -- \
+$ build-android/host/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vmla \
     iree/tools/test/simple.mlir \
@@ -124,7 +158,8 @@ $ build-android/host/bin/iree-translate -- \
 Then push the IREE runtime executable and module to the device:
 
 ```shell
-$ adb push iree/tools/iree-run-module /data/local/tmp/
+$ adb push build-android/iree/tools/iree-run-module /data/local/tmp/
+$ adb shell chmod +x /data/local/tmp/iree-run-module
 $ adb push /tmp/simple-vmla.vmfb /data/local/tmp/
 ```
 
@@ -150,8 +185,7 @@ Translate a source MLIR into IREE module:
 ```shell
 # Assuming in IREE source root
 {: .no_toc }
-
-$ build-android/host/bin/iree-translate -- \
+$ build-android/host/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
     iree/tools/test/simple.mlir \
@@ -161,7 +195,8 @@ $ build-android/host/bin/iree-translate -- \
 Then push the IREE runtime executable and module to the device:
 
 ```shell
-$ adb push iree/tools/iree-run-module /data/local/tmp/
+$ adb push build-android/iree/tools/iree-run-module /data/local/tmp/
+$ adb shell chmod +x /data/local/tmp/iree-run-module
 $ adb push /tmp/simple-vulkan.vmfb /data/local/tmp/
 ```
 
