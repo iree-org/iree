@@ -74,9 +74,17 @@ StatusOr<ref_ptr<TimePointFence>> TimePointFencePool::Acquire() {
            << "Fence pool out of free fences";
   }
 
-  auto* fence = free_fences_.front();
-  free_fences_.pop_front();
-  return add_ref(fence);
+  // To acquire from the pool, we:
+  //   1) Pop from the front of the queue (reference count of 0);
+  //   2) Release the unique_ptr, since lifetime will be managed by ref counts;
+  //   3) Return as a raw RefObject with a reference count of 1;
+  // When the reference count goes back to 0, it will be returned to the pool,
+  // wrapped with unique_ptr.
+  // When the pool is destroyed, all free fences are freed by unique_ptr
+  // automatically.
+  std::unique_ptr<TimePointFence> fence =
+      free_fences_.take(free_fences_.front());
+  return add_ref(fence.release());
 }
 
 void TimePointFencePool::ReleaseResolved(TimePointFence* fence) {
@@ -84,7 +92,7 @@ void TimePointFencePool::ReleaseResolved(TimePointFence* fence) {
   VkFence f = fence->value();
   syms()->vkResetFences(*logical_device_, 1, &f);
   absl::MutexLock lock(&mutex_);
-  free_fences_.push_back(fence);
+  free_fences_.push_back(absl::WrapUnique(fence));
 }
 
 TimePointFencePool::TimePointFencePool(ref_ptr<VkDeviceHandle> logical_device)
@@ -110,7 +118,7 @@ Status TimePointFencePool::PreallocateFences() {
       VK_RETURN_IF_ERROR(syms()->vkCreateFence(*logical_device_, &create_info,
                                                logical_device_->allocator(),
                                                &fence));
-      fences[i].reset(new TimePointFence(this, fence));
+      fences[i] = absl::make_unique<TimePointFence>(this, fence);
     }
   }
 

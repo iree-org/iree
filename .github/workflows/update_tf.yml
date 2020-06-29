@@ -15,7 +15,7 @@
 # Creates a PR to update the TF submodule to HEAD & copy the latest
 # version of the LLVM Bazel BUILD files from TF.
 
-name: Update Submodules
+name: Update TensorFlow
 
 on:
   schedule:
@@ -23,13 +23,15 @@ on:
     - cron: '0 */6 * * *'
 
 jobs:
-  update:
+  update_tf:
     # Don't run this in everyone's forks.
     if: github.repository == 'google/iree'
     runs-on: ubuntu-18.04
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
+        with:
+          - ref: "google"
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules

@@ -39,6 +39,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
+    "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],

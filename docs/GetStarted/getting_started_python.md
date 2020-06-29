@@ -61,9 +61,8 @@ $ bazel test \
 ## Using Colab
 
 See
-[start_colab_kernel.py](https://github.com/google/iree/blob/master/colab/start_colab_kernel.py)
-and
-[Using Colab](https://github.com/google/iree/blob/master/docs/using_colab.md)
+[start_colab_kernel.py](https://github.com/google/iree/blob/main/colab/start_colab_kernel.py)
+and [Using Colab](https://github.com/google/iree/blob/main/docs/using_colab.md)
 for setup instructions, then take a look through the
-[Colab directory](https://github.com/google/iree/tree/master/colab) for some
+[Colab directory](https://github.com/google/iree/tree/main/colab) for some
 sample notebooks.

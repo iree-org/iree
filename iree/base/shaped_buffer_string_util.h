@@ -14,7 +14,7 @@
 
 // Utilities for parsing and printing ShapedBuffer, mostly useful for
 // testing. The format is as described in
-// https://github.com/google/iree/tree/master/iree/base/buffer_string_util.h
+// https://github.com/google/iree/tree/main/iree/base/buffer_string_util.h
 
 #ifndef IREE_BASE_SHAPED_BUFFER_STRING_UTIL_H_
 #define IREE_BASE_SHAPED_BUFFER_STRING_UTIL_H_

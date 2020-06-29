@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRIR
     MLIRPass
+    MLIRShapeOpsTransforms
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils

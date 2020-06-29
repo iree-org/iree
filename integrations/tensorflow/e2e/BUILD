@@ -16,7 +16,7 @@
 # files. A coverage table generated from this file can be viewed here:
 #   https://google.github.io/iree/TensorFlowE2ECoverage
 # Updates made to test suite names should also be reflected here:
-#   https://github.com/google/iree/blob/master/scripts/update_e2e_coverage.py
+#   https://github.com/google/iree/blob/main/scripts/update_e2e_coverage.py
 
 load(
     "//bindings/python:build_defs.oss.bzl",
@@ -73,9 +73,7 @@ LLVM_FAILING = [
     "fill_test.py",
     "mandelbrot_test.py",
     "matrix_ops_test.py",
-    "resource_ops_test.py",
     "ring_buffer_test.py",
-    "sliding_window_test.py",
     "strings_test.py",
 ]
 
@@ -88,9 +86,7 @@ VULKAN_FAILING = [
     "fill_test.py",
     "mandelbrot_test.py",
     "matrix_ops_test.py",
-    "resource_ops_test.py",
     "ring_buffer_test.py",
-    "sliding_window_test.py",
     "strings_test.py",
     "tensorlist_test.py",
 ]

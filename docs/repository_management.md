@@ -7,12 +7,14 @@ external contributors, but they are documented here for clarity and
 transparency. If any of these things are particularly troublesome or painful for
 your workflow, please reach out to us so we can prioritize a fix.
 
-NOTE: We are currently in the process of migrating our repository to be
-GitHub-first and hide the merging complexity in a separate `google` feature
-branch so that standard development workflows don't have to bear the cost for
-every contribution. During this part of the migration period, please direct PRs
-to the `google` branch (which will be marked as the default branch). See
-https://groups.google.com/d/msg/iree-discuss/F07vsG9Ah4o/uAIusKO-BQAJ.
+## Branches
+
+The default branch is called `main`. PRs should be sent there. We also have a
+`google` branch that is synced from the Google internal source repository. This
+branch is merged from and to `main` frequently to upstream any changes coming
+from `google` and as part of updating the internal source repository. For the
+most part this integration with `google` should have minimal effect on normal
+developer workflows.
 
 ## Dependencies
 
@@ -31,7 +33,7 @@ state in a special `SUBMODULE_VERSIONS` file. This file is considered the source
 of truth for the correct submodule state and is what is used by the CI. When
 updating the submodule state from Google's source repository, only this file is
 updated and another
-[GitHub Actions workflow](https://github.com/google/iree/blob/master/.github/workflows/synchronize_submodules.yml)
+[GitHub Actions workflow](https://github.com/google/iree/blob/main/.github/workflows/synchronize_submodules.yml)
 immediately commits a submodule update on top of that.
 
 Shortcut commands (read below for full documentation):
@@ -45,6 +47,11 @@ Shortcut commands (read below for full documentation):
 ```
 
 ### The special relationship with LLVM and TensorFlow
+
+TL;DR: Dependency management with TensorFlow and LLVM are managed as part of the
+integration with Google's internal source repository and updates will be picked
+up by the `main` branch at an approximately daily cadence when merging in the
+`google` branch.
 
 Currently, the two most challenging projects to manage as dependencies are
 TensorFlow and LLVM. Both are typically pinned to specific versions that are
@@ -67,15 +74,14 @@ upstream, we will need to integrate this newer commit in the internal Google
 source of truth prior to accepting code that depends on it.
 
 LLVM is integrated into Google's source repository at a cadence up to several
-times a day. When this necessitates updating IREE to changing LLVM and MLIR
-APIs, these updates are performed atomically as part of the integration.
-Previously this did not trigger a change to the LLVM submodule version in open
-source, which would result in breakages due to version skew. We are
-transitioning to make each integration of LLVM update IREE's submodule in OSS.
-This means that API updates will have some chance of not breaking the build.
-However, it can introduce breakages as well, especially in the Bazel build where
-we still have to wait to update the BUILD files where necessary. We are
-continuing to work on improving this situation.
+times a day. The LLVM submodule version used by IREE is also updated as part of
+this integration. When this necessitates updating IREE to changing LLVM and MLIR
+APIs, these updates are performed atomically as part of the integration. However
+the changes performed here only guarantee that the internal build is not broken,
+which means that such integrations may very well break the OSS build on the
+`google` branch (in particular, it does not update teh LLVM BUILD files). The
+IREE build cop will fix the breakage on the `google` branch. We are continuing
+to work on improving this situation.
 
 ### Tasks:
 
@@ -147,31 +153,3 @@ as usual.
 Any CI systems or other things that retrieve an arbitrary commit should invoke
 this prior to running just to make sure that their git view of the submodule
 state is consistent.
-
-#### Updating TensorFlow and LLVM versions
-
-WARNING: These scripts have not been updated to reflect the new tooling to
-automatically update the LLVM hash directly from Google's source repository
-rather than through TensorFlow.
-
-```shell
-# By default, updates third_party/tensorflow to the remote head and
-# third_party/llvm-project to the commit that tensorflow references.
-# Also updates the IREE mirrors of key build files. All changes will
-# be staged for commit.
-./scripts/git/update_tf_llvm_submodules.py
-
-# You can also select various other options:
-# Don't update the tensorflow commit, just bring LLVM to the correct
-# linked commit.
-./scripts/git/update_tf_llvm_submodules.py --tensorflow_commit=KEEP
-
-# Don't update the LLVM commit.
-./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP
-
-# Update to a specific TensorFlow commit (and corresponding LLVM).
-./scripts/git/update_tf_llvm_submodules.py --tensorflow_commit=<somehash>
-
-# Update to a specific LLVM commit.
-./scripts/git/update_tf_llvm_submodules.py --llvm_commit=<somehash>
-```

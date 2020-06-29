@@ -50,30 +50,30 @@ constexpr ExecutableFormat kExecutableFormatIreeBytecode =
     MakeExecutableFormatID("IREE");
 
 // IREE VMLA executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/master/iree/schemas/vmla_executable_def.fbs
+// https://github.com/google/iree/tree/main/iree/schemas/vmla_executable_def.fbs
 // schema.
 constexpr ExecutableFormat kExecutableFormatVMLA =
     MakeExecutableFormatID("VMLA");
 
 // SPIR-V executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/master/iree/schemas/spirv_executable_def.fbs
+// https://github.com/google/iree/tree/main/iree/schemas/spirv_executable_def.fbs
 // schema.
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
 
 // LLVMIR executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/master/iree/schemas/llvmir_executable_def.fbs
+// https://github.com/google/iree/tree/main/iree/schemas/llvmir_executable_def.fbs
 // schema.
 constexpr ExecutableFormat kExecutableFormatLLVM =
     MakeExecutableFormatID("LLVM");
 
 // Dynamic Library (dylib) executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/master/iree/schemas/dylib_executable_def.fbs
+// https://github.com/google/iree/tree/main/iree/schemas/dylib_executable_def.fbs
 // schema
 constexpr ExecutableFormat kExecutableFormatDyLib =
     MakeExecutableFormatID("DLIB");
 
-// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
+// LINT.ThenChange(https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
 
 }  // namespace hal
 }  // namespace iree
