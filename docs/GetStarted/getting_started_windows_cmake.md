@@ -87,7 +87,7 @@ Configure:
 > Tip
 > {: .label .label-green }
 > The root
-> [CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt)
+> [CMakeLists.txt](https://github.com/google/iree/blob/main/CMakeLists.txt)
 > file has options for configuring which parts of the project to enable.<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
 
@@ -109,7 +109,7 @@ Check out the contents of the 'tools' build directory:
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir)
 and execute a function in the compiled module:
 
 ```powershell

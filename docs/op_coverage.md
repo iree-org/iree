@@ -9,7 +9,7 @@ js_files:
 
 # HLO Op Coverage
 {: .no_toc }
-There are three backend [targets](https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/Target) in IREE:
+There are three backend [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
 - llvm-ir
