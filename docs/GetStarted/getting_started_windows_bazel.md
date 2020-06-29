@@ -35,7 +35,7 @@ documented separately, as they require further setup.
 ### Install Bazel
 
 Install Bazel version > 2.0.0 (see
-[`.bazelversion`](https://github.com/google/iree/blob/main/.bazelversion) for
+[`.bazelversion`](https://github.com/google/iree/blob/master/.bazelversion) for
 the specific version IREE uses) by following the
 [official docs](https://docs.bazel.build/versions/master/install-windows.html).
 
@@ -119,7 +119,7 @@ Check out what was built:
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir)
+[MLIR file](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir)
 and execute a function in the compiled module:
 
 ```powershell
