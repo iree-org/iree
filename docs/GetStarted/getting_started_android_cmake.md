@@ -52,9 +52,13 @@ For example, on Ubuntu:
 $ sudo apt install adb
 ```
 
-For Windows, download Android platform tools
-[here](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
-and extract. You may want to add the folder to the `PATH` environment variable.
+For Windows, it's easier to get `adb` via Android Studio. `adb` is included in
+the Android SDK Platform-Tools package. You can download this package with the
+[SDK Manager](https://developer.android.com/studio/intro/update#sdk-manager),
+which installs it at `android_sdk/platform-tools/`. Or if you want the
+standalone Android SDK Platform-Tools package, you can
+[download it here](https://developer.android.com/studio/releases/platform-tools).
+You may also want to add the folder to the `PATH` environment variable.
 
 ## Configure and build
 
@@ -136,8 +140,7 @@ Translate a source MLIR into IREE module:
 
 ```shell
 # Assuming in IREE source root
-
-$ build-android/host/bin/iree-translate -- \
+$ build-android/host/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vmla \
     iree/tools/test/simple.mlir \
@@ -147,7 +150,8 @@ $ build-android/host/bin/iree-translate -- \
 Then push the IREE runtime executable and module to the device:
 
 ```shell
-$ adb push iree/tools/iree-run-module /data/local/tmp/
+$ adb push build-android/iree/tools/iree-run-module /data/local/tmp/
+$ adb shell chmod +x /data/local/tmp/iree-run-module
 $ adb push /tmp/simple-vmla.vmfb /data/local/tmp/
 ```
 
@@ -172,8 +176,7 @@ Translate a source MLIR into IREE module:
 
 ```shell
 # Assuming in IREE source root
-
-$ build-android/host/bin/iree-translate -- \
+$ build-android/host/bin/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
     iree/tools/test/simple.mlir \
@@ -183,7 +186,8 @@ $ build-android/host/bin/iree-translate -- \
 Then push the IREE runtime executable and module to the device:
 
 ```shell
-$ adb push iree/tools/iree-run-module /data/local/tmp/
+$ adb push build-android/iree/tools/iree-run-module /data/local/tmp/
+$ adb shell chmod +x /data/local/tmp/iree-run-module
 $ adb push /tmp/simple-vulkan.vmfb /data/local/tmp/
 ```
 
