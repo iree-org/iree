@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "ConvertToGPUPass.cpp",
         "ConvertToSPIRVPass.cpp",
+        "CooperativeMatrixAnalysis.cpp",
         "LinalgTileAndFusePass.cpp",
         "MarkerUtils.cpp",
         "Passes.cpp",
@@ -31,6 +32,7 @@ cc_library(
     ],
     hdrs = [
         "Attributes.h",
+        "CooperativeMatrixAnalysis.h",
         "MarkerUtils.h",
         "MemorySpace.h",
         "Passes.h",
