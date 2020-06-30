@@ -164,7 +164,21 @@ if(CMAKE_CROSSCOMPILING)
 
   # Set the host build directory for LLVM to our directory. Otherwise it will
   # follow its own convention.
-  set(LLVM_NATIVE_BUILD "${IREE_HOST_BINARY_ROOT}/third_party/llvm-project/llvm")
+  set(LLVM_NATIVE_BUILD
+      "${IREE_HOST_BINARY_ROOT}/third_party/llvm-project/llvm"
+      CACHE FILEPATH "directory containing host artifacts for LLVM"
+  )
+
+  # And set host C/C++ compiler for LLVM. This makes cross compilation using
+  # Windows as the host platform nicer. Because we have various development
+  # evnironments on Windows (CMD, Cygwin, MSYS, etc.), LLVM can have problems
+  # figuring out the host triple and toolchain. We are passing in the host
+  # C/C++ compiler toolchain for IREE anyway; so we can give LLVM side some
+  # help here. This hides some complexity and ugliness from the users.
+  set(CROSS_TOOLCHAIN_FLAGS_NATIVE
+      "-DCMAKE_C_COMPILER=\"${IREE_HOST_C_COMPILER}\";-DCMAKE_CXX_COMPILER=\"${IREE_HOST_CXX_COMPILER}\""
+      CACHE FILEPATH "LLVM toolchain configuration for host build"
+  )
 
   include(iree_cross_compile)
 
