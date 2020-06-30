@@ -266,13 +266,12 @@ StatusOr<std::string> PrepareModule(
 }
 
 // Returns a splitted input values from `filename` using comma as separater.
-std::vector<std::string> GetInputValues(const std::string& filename) {
+StatusOr<std::vector<std::string>> GetInputValues(const std::string& filename) {
   std::string error_message;
   auto file = mlir::openInputFile(filename, &error_message);
   if (!file) {
-    NotFoundErrorBuilder(IREE_LOC)
-        << "Unable to open input file " << filename << ": " << error_message;
-    return {};
+    return NotFoundErrorBuilder(IREE_LOC)
+           << "Unable to open input file " << filename << ": " << error_message;
   }
   llvm::SmallVector<llvm::StringRef, 8> source_buffers;
   file->getBuffer().split(source_buffers, ",");
@@ -292,7 +291,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   iree_vm_variant_list_t* input_list;
   if (!input_values_file_flag.empty()) {
-    auto input_values = GetInputValues(input_values_file_flag);
+    ASSIGN_OR_RETURN(auto input_values, GetInputValues(input_values_file_flag));
     ASSIGN_OR_RETURN(input_list, ParseToVariantList(
                                      input_descs, allocator,
                                      absl::MakeConstSpan(&input_values.front(),
