@@ -100,8 +100,7 @@ $ cmake -G Ninja -B build-android  \
 
 On Windows, we will need the full path to the `cl.exe` compiler. This can be
 obtained by [opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt) and type
-`where cl.exe`. Copy the path and substitue all `\` with `/` to get the
-CMake-style path. Then in a command prompt (`cmd.exe`):
+`where cl.exe`. Then in a command prompt (`cmd.exe`):
 
 ```cmd
 REM Assuming in IREE source root
@@ -109,16 +108,15 @@ REM Assuming in IREE source root
     -DCMAKE_TOOLCHAIN_FILE="%ANDROID_NDK%/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
     -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
-    -DIREE_HOST_C_COMPILER="<cmake-style-path-to-cl.exe>" \
-    -DIREE_HOST_CXX_COMPILER="<cmake-style-path-to-cl.exe>" \
-    -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc" \
-    -DCROSS_TOOLCHAIN_FLAGS_NATIVE="-DCMAKE_C_COMPILER=\"<cmake-style-path-to-cl.exe>\";-DCMAKE_CXX_COMPILER=\"<cmake-style-path-to-cl.exe>\""
+    -DIREE_HOST_C_COMPILER="<full-path-to-cl.exe>" \
+    -DIREE_HOST_CXX_COMPILER="<full-path-to-cl.exe>" \
+    -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc"
 ```
 
 * See the Linux section in the above for explanations of the used arguments.
-* We need to define `LLVM_HOST_TRIPLE` and `CROSS_TOOLCHAIN_FLAGS_NATIVE` in the
-  above because LLVM cannot properly detect host triple under Android CMake
-  toolchain file. This might be fixed later.
+* We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot properly
+  detect host triple under Android CMake toolchain file. This might be fixed
+  later.
 
 ### Build all targets
 
@@ -169,7 +167,10 @@ Log into Android:
 $ adb shell
 
 android $ cd /data/local/tmp/
-android $ ./iree-run-module -driver=vmla -input_file=simple-vmla.vmfb -entry_function=abs -inputs="i32=-5"
+android $ ./iree-run-module -driver=vmla \
+          -input_file=simple-vmla.vmfb \
+          -entry_function=abs \
+          -inputs="i32=-5"
 
 EXEC @abs
 i32=5
@@ -206,7 +207,10 @@ Log into Android:
 $ adb shell
 
 android $ cd /data/local/tmp/
-android $ ./iree-run-module -driver=vulkan -input_file=simple-vulkan.vmfb -entry_function=abs -inputs="i32=-5"
+android $ ./iree-run-module -driver=vulkan \
+          -input_file=simple-vulkan.vmfb \
+          -entry_function=abs \
+          -inputs="i32=-5"
 
 EXEC @abs
 i32=5
