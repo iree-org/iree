@@ -87,7 +87,7 @@ want to use a software driver for predictable performance, you can set up
 SwiftShader's Vulkan ICD (Installable Client Driver).
 
 IREE has a
-[helper script](https://github.com/google/iree/blob/master/build_tools/third_party/swiftshader/build_vk_swiftshader.sh)
+[helper script](https://github.com/google/iree/blob/main/build_tools/third_party/swiftshader/build_vk_swiftshader.sh)
 for building SwiftShader from source using CMake:
 
 ```shell
