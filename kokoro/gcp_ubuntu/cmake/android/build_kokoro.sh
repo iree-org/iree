@@ -26,7 +26,7 @@ export PS4='[$(date -u "+%T %Z")] '
 WORKDIR=${KOKORO_ARTIFACTS_DIR?}/github/iree
 
 # Mount the checked out repository, make that the working directory and run the
-# tests in the cmake image.
+# tests in the cmake-android image.
 docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the project with cmake using Kokoro.
+# Cross-compile the project towards Android with CMake using Kokoro.
 
 set -e
 set -x

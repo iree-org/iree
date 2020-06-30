@@ -18,6 +18,12 @@
 # docker build --tag gcr.io/iree-oss/cmake-android \
 #              build_tools/docker/cmake_android/
 
+# Run interactively using the following, where IREE_WORKDIR is the path to your
+# local dev environment:
+# docker run -it --rm --entrypoint bash \
+#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
+#   gcr.io/iree-oss/cmake-android
+
 # Set up the image and working directory by inheriting the base
 # CMake configuration.
 FROM gcr.io/iree-oss/cmake
@@ -27,8 +33,8 @@ FROM gcr.io/iree-oss/cmake
 
 ADD https://dl.google.com/android/repository/android-ndk-r21d-linux-x86_64.zip /usr/src/
 
-RUN apt-get install -y unzip
-RUN unzip /usr/src/android-ndk-r21d-linux-x86_64.zip -d /usr/src/
-RUN rm -f /usr/src/android-ndk-r21d-linux-x86_64.zip
+RUN apt-get install -y unzip \
+  && unzip /usr/src/android-ndk-r21d-linux-x86_64.zip -d /usr/src/ \
+  && rm -f /usr/src/android-ndk-r21d-linux-x86_64.zip
 
 ENV ANDROID_NDK /usr/src/android-ndk-r21d

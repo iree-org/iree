@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds and pushes the cmake image to gcr.io/iree-oss/
+# Builds and pushes the cmake-android image to gcr.io/iree-oss/
 
 set -x
 set -e
@@ -34,7 +34,7 @@ fi
 echo "Updating ${TAG}"
 
 
-# Build and push the cmake image.
-docker build --tag "gcr.io/iree-oss/cmake-android:${TAG}" build_tools/docker/cmake/
+# Build and push the cmake-android image.
+docker build --tag "gcr.io/iree-oss/cmake-android:${TAG}" build_tools/docker/cmake_android/
 docker push "gcr.io/iree-oss/cmake-android:${TAG}"
 
