@@ -40,7 +40,7 @@ class StringsModule(tf.Module):
     return tf.strings.reduce_join(wps, 1)
 
 
-@tf_test_utils.compile_modules(backends=["tf"], strings=StringsModule)
+@tf_test_utils.compile_modules(strings=StringsModule)
 class StringsTest(tf_test_utils.SavedModelTestCase):
 
   def test_print_ids(self):

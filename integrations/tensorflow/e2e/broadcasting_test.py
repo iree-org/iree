@@ -28,8 +28,7 @@ class BroadcastingModule(tf.Module):
     return lhs + rhs
 
 
-@tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla"], m=BroadcastingModule)
+@tf_test_utils.compile_modules(m=BroadcastingModule)
 class BroadcastingTest(tf_test_utils.SavedModelTestCase):
 
   def test_add_same_shape(self):

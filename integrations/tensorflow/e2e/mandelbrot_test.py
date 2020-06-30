@@ -94,8 +94,7 @@ class MandelbrotModule(tf.Module):
     return tf.reshape(in_the_set, shape=[view_pixels, view_pixels])
 
 
-# TODO(silvasean): Get this working on IREE.
-@tf_test_utils.compile_modules(backends=["tf"], mandelbrot=MandelbrotModule)
+@tf_test_utils.compile_modules(mandelbrot=MandelbrotModule)
 class MandelbrotTest(tf_test_utils.SavedModelTestCase):
 
   def test_mandelbrot(self):

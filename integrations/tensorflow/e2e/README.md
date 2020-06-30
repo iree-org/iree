@@ -16,29 +16,37 @@ instructions.
 ## Vulkan setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[the doc](../../../docs/vulkan_and_spirv.md)), then you can run the tests with
-`IREE_AVAILABLE_BACKENDS=tf,iree_vmla,iree_llvmjit` (that is, by omitting
-`iree_vulkan` from the list of available backends).
+[the doc](../../../docs/vulkan_and_spirv.md)), then you can run the manual test
+targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
+`iree_vulkan` from the list of backends to run the tests on).
+
+The test suites can be run excluding Vulkan by specifying
+`--test_tag_filters="-driver=vulkan"` in the `bazel test` invocation.
 
 ## Running tests
 
+For locally running tests and iterating on backend development, `bazel run` is
+preferred.
+
 ```shell
-# For locally running tests and iterating on backend development,
-# `bazel run` is preferred.
-bazel run :math_test_manual -- --override_backends=iree_vmla
+# Run math_test on all backends.
+bazel run :math_test_manual
+
+# Run math_test on the VMLA backend only.
+bazel run :math_test_manual -- --target_backends=iree_vmla
 
 # Same as above, but add `tf` backend to cross-check numerical correctness.
-bazel run :math_test_manual -- --override_backends=tf,iree_vmla
+bazel run :math_test_manual -- --target_backends=tf,iree_vmla
 
-# Run all tests with defaults and output on failure.
-bazel test ... --test_output=errors
+# Run math_test and output on failure.
+bazel test :math_test_manual --test_output=errors
 
 # Run an individual test interactively.
 bazel run :math_test_manual -- --test_output=streamed
 ```
 
 If you specify the same backend multiple times, for example
-`--override_backends=iree_vmla,iree_vmla`. The same backends are grouped and in
+`--target_backends=iree_vmla,iree_vmla`. The same backends are grouped and in
 this example `iree_vmla` will run once. If you specify `tf,iree_vmla` as
 backends, then we will test both backends and compare them with each other. If
 you specify `tf` backend only, then we will also test `tf` vs `tf` to capture
@@ -98,51 +106,3 @@ TODO(silvasean): debugging miscompiles
 ### Simple function tests
 
 See `simple_arithmetic_test.py` for some basic examples.
-
-### Limiting a test to only certain backends
-
-The BUILD file specifies which targets work on which backends and controls which
-backends tests are run on by using the `--override_backends` flag.
-
-The `@tf_test_utils.compile_modules` decorator on tests also takes a `backends=`
-keyword argument. Many tests still specify this, but it is ignored in the CI,
-which runs with `bazel test`. When running with `bazel run` this indicates the
-set of backends to use in the absence of the `--override_backends` flags (and
-accepts the same arguments).
-
-Example:
-
-```
-@tf_test_utils.compile_modules(backends=["tf"], mlp=(Mlp, ["predict"]))
-class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
-  ... the test case ...
-```
-
-Limiting backends is useful for tests that are known to fail on certain backends
-but are still useful to have checked in.
-
-The priority order for which backends are ultimately used is:
-
-1.  The backends specified in `--override_backends`.
-
-2.  The backends specified in the `IREE_OVERRIDE_BACKENDS` environment variable.
-
-3.  The backends specified in the `tf_test_utils.compile_modules` decorator.
-
-4.  All known backends.
-
-Additionally, the environment variable `IREE_AVAILABLE_BACKENDS` specifies which
-backends should be considered available in a particular environment. Once the
-list of backends above is formed, any backends not listed in
-`IREE_AVAILABLE_BACKENDS` are removed. This is the final list of backends which
-are run for the test.
-
-The default behavior if `IREE_AVAILABLE_BACKENDS` is not provided is that all
-known backends are considered available.
-
-TODO(silvasean): `IREE_AVAILABLE_BACKENDS` is mainly to allow masking off the
-Vulkan backend in environments where it is not a available. Currently, the
-behavior when all backends get masked off is to emit a warning, which can result
-in spuriously "passing" tests. This is only an issue for tests that currently
-only run on Vulkan (which should decrease over time as e.g. VMLA gets more
-coverage).

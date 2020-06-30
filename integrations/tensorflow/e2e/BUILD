@@ -58,9 +58,9 @@ SPECIAL_CASES = [
 
 # keep sorted
 VMLA_FAILING = [
-    "fill_test.py",
-    "mandelbrot_test.py",
-    "ring_buffer_test.py",
+    "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
+    "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
 ]
 
@@ -70,10 +70,10 @@ LLVM_FAILING = [
     "depth_conv_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
-    "fill_test.py",
-    "mandelbrot_test.py",
+    "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
-    "ring_buffer_test.py",
+    "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
 ]
 
@@ -83,12 +83,12 @@ VULKAN_FAILING = [
     "depth_conv_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
-    "fill_test.py",
-    "mandelbrot_test.py",
+    "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
-    "ring_buffer_test.py",
+    "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
-    "tensorlist_test.py",
+    "tensorlist_test.py",  # TODO(b/146900329): Triage op coverage for vulkan backend.
 ]
 
 TF_PASSING = glob(
@@ -163,6 +163,8 @@ iree_e2e_test_suite(
     ],
 )
 
+# TODO(laurenzo): Re-enable iree_vulkan once dynamic-slice is implemented
+# See https://github.com/google/iree/issues/1521
 iree_e2e_test_suite(
     name = "linspace_tests_failing",
     backends_to_srcs = {
@@ -186,6 +188,11 @@ iree_py_test(
     name = "explicit_backend_test",
     srcs = ["explicit_backend_test.py"],
     main = "explicit_backend_test.py",
+    tags = [
+        "driver=vmla",
+        "driver=llvmjit",
+        "driver=vulkan",
+    ],
     python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",

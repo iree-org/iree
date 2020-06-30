@@ -28,7 +28,7 @@ class ResourcesOpsModule(tf.Module):
     return self.counter.assign_add(value)
 
 
-@tf_test_utils.compile_modules(backends=[], resource_ops=ResourcesOpsModule)
+@tf_test_utils.compile_modules(resource_ops=ResourcesOpsModule)
 class ResourcesOpsTest(tf_test_utils.SavedModelTestCase):
 
   def test_add_assign(self):

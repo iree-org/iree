@@ -42,14 +42,14 @@ DOC = """
 vision_model_test_manual is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
 bazel run -c opt integrations/tensorflow/e2e/keras:vision_model_test_manual -- \
---override_backends=tf,iree_vmla,iree_llvmjit \
+--target_backends=tf,iree_vmla,iree_llvmjit \
 --data=imagenet \
 --include_top=1 \
 --url=https://storage.googleapis.com/iree_models/ \
 --model=ResNet50
 
 Command arguments description:
---override_backends: can be combination of these: tf,iree_vmla,iree_llvmjit
+--target_backends: can be combination of these: tf,iree_vmla,iree_llvmjit
 --data: can be 'imagenet' or 'cifar10'.
     imagenet - input image size (1, 224, 224, 3)
     cifar10 - input image size (1, 32, 32, 3) - it is used for quick tests
@@ -87,8 +87,9 @@ VMLA_FAILING = [
 ]
 
 LLVM_FAILING = [
-    "lstm_test.py",
-    "lstm_static_test.py",
+    # TODO(silvasean): Get this test working on IREE.
+    "lstm_test.py",  # Needs TensorList with current Keras implementation.
+    "lstm_static_test.py",  # TODO(silvasean): Get this test working on other backends.
 ]
 
 VULKAN_FAILING = [

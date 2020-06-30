@@ -32,10 +32,8 @@ from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
-flags.DEFINE_string(
-    "override_backends", None,
-    "Explicit comma-delimited list of target backends. "
-    "(Overrides environment variables and auto detection)")
+flags.DEFINE_string("target_backends", None,
+                    "Explicit comma-delimited list of target backends.")
 flags.DEFINE_string(
     "debug_dir", None,
     "Specifies a directory to dump debug artifacts to. Defaults to "
@@ -506,12 +504,10 @@ def _instantiate_modules(compiled_modules_dict):
   return tuple_class(*module_insts)
 
 
-def compile_modules(backends=None, **kwargs):
+def compile_modules(**kwargs):
   """Decorator applied to a SavedModelTestCase subclass to compile modules.
 
   Args:
-    backends: an iterable of backend names to include (or None to use
-      environment defaults).
     **kwargs: name/Module constructor mappings. Each such arg will be added to
       the classes 'compiled_modules' field.
 
@@ -532,7 +528,7 @@ def compile_modules(backends=None, **kwargs):
       exported_names = ()
       if isinstance(ctor, tuple):
         ctor, exported_names = ctor
-      cls._modules_to_compile[name] = (ctor, exported_names, backends)
+      cls._modules_to_compile[name] = (ctor, exported_names)
 
     return cls
 
@@ -583,49 +579,39 @@ BackendInfo.add(
     iree_compiler_targets=["llvm-ir"])
 
 
-def _backend_spec_string_to_backends(backend_spec):
+def _parse_target_backends(target_backends):
   """Decodes a comma-delimited string of backends into BackendInfo objects."""
   backends = []
-  for backend_name in backend_spec.split(","):
+  for backend_name in target_backends.split(","):
     if backend_name not in BackendInfo.ALL.keys():
       raise ValueError(
           "Invalid backend specification string '{}', unexpected name '{}';"
-          " valid names are '{}'".format(backend_spec, backend_name,
+          " valid names are '{}'".format(target_backends, backend_name,
                                          BackendInfo.ALL.keys()))
     backends.append(BackendInfo.ALL[backend_name])
   return backends
 
 
-def get_override_backends():
-  """Gets the BackendInfo instances to test, as overridden by the user.
+def get_backends():
+  """Gets the BackendInfo instances to test.
+
+  By default all backends in BackendInfo will be used. Specific backends to
+  run on can be specified using the `--target_backends` flag. If only "tf" is
+  provided then it will be compared against itself.
 
   Returns:
-    Sequence of BackendInfo that should be used, or None if there is no
-    override.
+    Sequence of BackendInfo that should be used.
   """
-
-  if FLAGS.override_backends is not None:
-    backends_spec = FLAGS.override_backends
-    logging.info("Using backends from command line: %s", backends_spec)
+  if FLAGS.target_backends is not None:
+    logging.info("Using backends from command line: %s", FLAGS.target_backends)
+    backends = _parse_target_backends(FLAGS.target_backends)
+    # If tf is the only backend then we will test it itself by adding tf_also.
+    if len(backends) == 1 and "tf" == backends[0].name:
+      backends.append(BackendInfo.ALL["tf_also"])
   else:
-    backends_spec = os.environ.get("IREE_OVERRIDE_BACKENDS")
-    if backends_spec is not None:
-      logging.info("Using backends from environment IREE_OVERRIDE_BACKENDS: %s",
-                   backends_spec)
-
-  if backends_spec:
-    return _backend_spec_string_to_backends(backends_spec)
-  else:
-    logging.info("No backend overrides.")
-    return None
-
-
-def get_available_backends():
-  """Gets the BackendInfo instances considered available for use."""
-  backend_spec = os.environ.get("IREE_AVAILABLE_BACKENDS")
-  if backend_spec is None:
-    return BackendInfo.ALL.values()
-  return _backend_spec_string_to_backends(backend_spec)
+    # If no backends are specified, use them all.
+    backends = list(BackendInfo.ALL.values())
+  return backends
 
 
 class SavedModelTestCase(tf.test.TestCase):
@@ -648,8 +634,7 @@ class SavedModelTestCase(tf.test.TestCase):
     super().setUpClass()
     cls.compiled_modules = {}
     if cls._modules_to_compile:
-      for name, (ctor, exported_names,
-                 backends) in cls._modules_to_compile.items():
+      for name, (ctor, exported_names) in cls._modules_to_compile.items():
 
         # Setup the debug directory.
         debug_parent_dir = FLAGS.debug_dir
@@ -672,34 +657,7 @@ class SavedModelTestCase(tf.test.TestCase):
 
         try:
           # Compile.
-          # Expand backend names to BackendInfo objects.
-          def _resolve(backend_spec):
-            if isinstance(backend_spec, BackendInfo):
-              return backend_spec
-            # Handle the string form.
-            return BackendInfo.ALL[backend_spec]
-
-          override_backends = get_override_backends()
-          if override_backends is not None:
-            backends = override_backends
-          elif backends is None:
-            backends = list(BackendInfo.ALL.keys())
-          backends = [_resolve(backend) for backend in backends]
-          # if "tf" is specified as a only backend then
-          # we will test it always against "tf" by adding "tf_also".
-          if len(backends) == 1 and "tf" == backends[0].name:
-            backends.append(BackendInfo.ALL["tf_also"])
-          available_backends = get_available_backends()
-          backends = [
-              backend for backend in backends if backend in available_backends
-          ]
-          if not backends:
-            # If no backends are available, then to avoid errors down the line,
-            # just use "tf", which should always be safe.
-            backends = [BackendInfo.ALL["tf"]]
-            logging.warning(
-                "Falling back to just `tf` backend because no other requested backends are available. Available backends '%s'",
-                [backend.name for backend in available_backends])
+          backends = get_backends()
           cls.compiled_modules[name] = dict([
               (backend.name, CompiledModule.create(ctor, exported_names,
                                                    backend))
