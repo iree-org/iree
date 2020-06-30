@@ -110,66 +110,47 @@ function(iree_cc_test)
 
   # Case for cross-compiling towards Android.
   if(ANDROID)
-    string(REPLACE "::" "_" _PACKAGE_PREFIX ${_PACKAGE_NS})
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
 
-    # Use the test framework to push to the Android device.
-    include(AndroidTestUtilities)
-    set(_PUSH_NAME "push_${_PACKAGE_PREFIX}_${_RULE_NAME}_to_android_device")
-    android_add_test_data(
-      ${_PUSH_NAME}
-      LIBS "$<TARGET_FILE:${_NAME}>"
-      LIBS_DEST "${_ANDROID_ABS_DIR}"
-      DEVICE_TEST_DIR "${_ANDROID_ABS_DIR}"
-      DEVICE_OBJECT_STORE "${_ANDROID_ABS_DIR}"
-    )
-
-    # Define a custom target for actually running the test on Android device.
-    set(_RUN_NAME "run_${_PACKAGE_PREFIX}_${_RULE_NAME}_on_android_device")
+    # Define a custom target for pushing and running the test on Android device.
+    set(_RUN_NAME "run_${_PACKAGE_NAME}_${_RULE_NAME}_on_android_device")
     add_test(
       NAME
         ${_RUN_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        TEST_TMPDIR=${_ANDROID_ABS_DIR}
         "${_ANDROID_REL_DIR}/${_NAME}"
     )
-
-    set_tests_properties(${_RUN_NAME} PROPERTIES DEPENDS ${_PUSH_NAME})
-
-    if(CMAKE_HOST_SYSTEM MATCHES Windows)
-      # Unfortunately, if using Windows as the host system, the binaries pushed
-      # to Android are missing the excutable file permisson.. So we need to
-      # have another test for fixing that.. This really starts to feel like
-      # abusing ctest infrastructure. But whatever.
-      set(_PERMISSION_NAME "make_${_PACKAGE_PREFIX}_${_RULE_NAME}_runnable_on_android_device")
-      add_test(
-        NAME
-          ${_PERMISSION_NAME}
-        COMMAND
-          "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-          "chmod +x ${_ANDROID_REL_DIR}/${_NAME}"
+    # Use environment variables to instruct the script to push artifacts
+    # onto the Android device before running the test. This needs to match
+    # with the expectation of the run_android_test.{sh|bat|ps1} script.
+    set(
+      _ENVIRONMENT_VARS
+        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
+        TEST_ARTIFACT=$<TARGET_FILE:${_NAME}>
+        TEST_ARTIFACT_IS_EXECUTABLE=1
+        TEST_ARTIFACT_NAME=$<TARGET_FILE_NAME:${_NAME}>
+        TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
+    )
+    set_property(TEST ${_RUN_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
+    set(_NAME_PATH ${_RUN_NAME})
+  else(ANDROID)
+    set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
+    add_test(
+      NAME
+        ${_NAME_PATH}
+      COMMAND
+        # We run all our tests through a custom test runner to allow temp
+        # directory cleanup upon test completion.
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+        "$<TARGET_FILE:${_NAME}>"
+      WORKING_DIRECTORY
+        "${CMAKE_BINARY_DIR}"
       )
-      set_tests_properties(${_PERMISSION_NAME} PROPERTIES DEPENDS ${_PUSH_NAME})
-      set_tests_properties(${_RUN_NAME} PROPERTIES DEPENDS ${_PERMISSION_NAME})
-    endif()
-    return()
+    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
   endif(ANDROID)
 
-  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
-  add_test(
-    NAME
-      ${_NAME_PATH}
-    COMMAND
-      # We run all our tests through a custom test runner to allow temp
-      # directory cleanup upon test completion.
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-      "$<TARGET_FILE:${_NAME}>"
-    WORKING_DIRECTORY
-      "${CMAKE_BINARY_DIR}"
-    )
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
