@@ -23,12 +23,10 @@ cc_library(
     name = "CodegenUtils",
     srcs = [
         "FunctionUtils.cpp",
-        "MarkerUtils.cpp",
         "MatmulCodegenStrategy.cpp",
     ],
     hdrs = [
         "FunctionUtils.h",
-        "MarkerUtils.h",
         "MatmulCodegenStrategy.h",
     ],
     deps = [

@@ -19,11 +19,9 @@ iree_cc_library(
     CodegenUtils
   HDRS
     "FunctionUtils.h"
-    "MarkerUtils.h"
     "MatmulCodegenStrategy.h"
   SRCS
     "FunctionUtils.cpp"
-    "MarkerUtils.cpp"
     "MatmulCodegenStrategy.cpp"
   DEPS
     LLVMSupport
