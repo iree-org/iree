@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A wrapper around a test command that performs setup and teardown. This is
-# appranetly not supported natively in ctest/cmake.
-
 set -x
 set -e
 
