@@ -70,17 +70,25 @@ function(iree_cc_binary)
     return()
   endif()
 
-  if(_RULE_HOSTONLY AND CMAKE_CROSSCOMPILING)
-    # The binary is marked as host only. We need to declare the rules for
-    # generating them under host configuration so cross-compiling towards
-    # target we can still have this binary.
-    iree_declare_host_excutable(${_RULE_NAME})
-    return()
-  endif()
-
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
+  if(_RULE_HOSTONLY AND CMAKE_CROSSCOMPILING)
+    # The binary is marked as host only. We need to declare the rules for
+    # generating them under host configuration so when cross-compiling towards
+    # target we can still have this binary.
+    iree_declare_host_excutable(${_RULE_NAME})
+
+    # Still define the package-prefixed target so we can have a consistent way
+    # to reference this binary, whether cross-compiling or not. But this time
+    # use the target to convey a property for the executable path under host
+    # configuration.
+    iree_get_executable_path(_EXE_PATH ${_RULE_NAME})
+    add_custom_target(${_NAME} DEPENDS ${_EXE_PATH})
+    set_target_properties(${_NAME} PROPERTIES HOST_TARGET_FILE "${_EXE_PATH}")
+    return()
+  endif()
 
   add_executable(${_NAME} "")
   add_executable(${_RULE_NAME} ALIAS ${_NAME})

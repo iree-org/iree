@@ -32,11 +32,21 @@ namespace {
 static llvm::cl::opt<bool> extractPadFromConv(
     "iree-extract-pad-from-conv",
     llvm::cl::desc("Extract padding attributes from conv op"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static bool isAllZero(DenseIntElementsAttr attr) {
   if (!attr.isSplat()) return false;
   return attr.getSplatValue<IntegerAttr>().getInt() == 0;
+}
+
+/// Returns true if the linalg op has padding attribute, and that it has
+/// non-zero entries.
+template <typename OpTy>
+static bool hasPadding(OpTy op) {
+  Optional<DenseIntElementsAttr> padding = op.padding();
+  if (!padding) return false;
+  return llvm::any_of(padding.getValue(),
+                      [](APInt v) -> bool { return !v.isNullValue(); });
 }
 
 class ExtractConvOpPaddingAttributes
@@ -46,7 +56,7 @@ class ExtractConvOpPaddingAttributes
 
   LogicalResult matchAndRewrite(xla_hlo::ConvOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.padding()) return failure();
+    if (!hasPadding(op)) return failure();
     auto inputType = op.lhs().getType().cast<ShapedType>();
     int rank = inputType.getRank();
     SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
