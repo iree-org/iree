@@ -43,7 +43,7 @@ def _generate_test_suite(
             "--model={}".format(model),
             "--data={}".format(dataset),
             "--include_top=1",
-            "--override_backends={},{}".format(reference_backend, backend),
+            "--target_backends={},{}".format(reference_backend, backend),
         ]
         if external_weights:
             args.append("--url={}".format(external_weights))
