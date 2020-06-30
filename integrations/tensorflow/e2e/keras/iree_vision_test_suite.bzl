@@ -84,12 +84,20 @@ def iree_vision_test_suite(
                     if external_weights:
                         args.append("--url={}".format(external_weights))
 
+                    # TODO(GH-2175): Simplify this after backend names are standardized.
+                    driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
+                    if driver == "llvmjit":
+                        driver = "llvm"
+                    py_test_tags = ["driver={}".format(driver)]
+                    if tags != None:  # `is` is not supported.
+                        py_test_tags += tags
+
                     iree_py_test(
                         name = test_name,
                         main = "vision_model_test.py",
                         srcs = ["vision_model_test.py"],
                         args = args,
-                        tags = tags,
+                        tags = py_test_tags,
                         deps = deps,
                         size = size,
                         python_version = python_version,
