@@ -15,7 +15,7 @@
 """Macro for building e2e keras vision model tests."""
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
-load("//third_party/bazel_skylib/lib:new_sets.bzl", "sets")
+load("@bazel_skylib//lib:new_sets.bzl", "sets")
 
 def _generate_test_suite(
         name,
