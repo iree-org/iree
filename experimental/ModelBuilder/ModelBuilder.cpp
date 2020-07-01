@@ -21,6 +21,7 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/InitAllDialects.h"
 
 using namespace mlir;
 using namespace mlir::edsc;
@@ -28,6 +29,18 @@ using namespace mlir::edsc::ops;
 using namespace mlir::edsc::intrinsics;
 
 thread_local MLIRContext mlir::ModelBuilder::ctx;
+
+void ModelBuilder::registerAllDialects() {
+  registerDialect<AffineDialect>();
+  registerDialect<gpu::GPUDialect>();
+  registerDialect<LLVM::LLVMDialect>();
+  registerDialect<linalg::LinalgDialect>();
+  registerDialect<scf::SCFDialect>();
+  registerDialect<omp::OpenMPDialect>();
+  registerDialect<spirv::SPIRVDialect>();
+  registerDialect<StandardOpsDialect>();
+  registerDialect<vector::VectorDialect>();
+}
 
 mlir::ModelBuilder::ModelBuilder()
     : OpBuilder(&ctx),

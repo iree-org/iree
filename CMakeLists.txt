@@ -269,6 +269,11 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
     set(CMAKE_BUILD_TYPE "Debug")
   endif()
 
+  # experimental model builder uses vulkan runner.
+  if(${IREE_BUILD_EXPERIMENTAL})
+    set(MLIR_VULKAN_RUNNER_ENABLED ON)
+  endif()
+
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting

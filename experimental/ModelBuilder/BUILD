@@ -23,6 +23,7 @@ cc_library(
     hdrs = ["ModelBuilder.h"],
     deps = [
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",

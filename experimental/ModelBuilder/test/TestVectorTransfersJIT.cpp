@@ -126,6 +126,7 @@ void TestVectorTransfers(ArrayRef<int64_t> szA, ArrayRef<int64_t> szB,
 }
 
 int main(int argc, char **argv) {
+  ModelBuilder::registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "TestVectorTransfers\n");
 
