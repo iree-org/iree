@@ -132,6 +132,18 @@ List of devices attached
 XXXXXXXXXXX     device
 ```
 
+Then you can run all device tests via
+
+```shell
+$ cd build-android
+$ ctest --output-on-failure
+```
+
+The above command will upload necessary build artifacts to the Android device's
+`/data/local/tmp` directory, run the tests there, and report status back.
+
+Alternatively, if you want to invoke a specific HAL backend on a IREE module:
+
 ### VMLA HAL backend
 
 Translate a source MLIR into IREE module:
