@@ -38,25 +38,26 @@ int32_t getRoundedElementByteWidth(Type type) {
 }
 
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
-                                         PatternRewriter &rewriter) {
+                                         OpBuilder &builder) {
   SmallVector<Value, 4> shape;
   if (shapedType.getRank() >= 1) {
     for (auto dim : shapedType.getShape()) {
-      shape.push_back(rewriter.createOrFold<mlir::ConstantIndexOp>(loc, dim));
+      shape.push_back(builder.createOrFold<mlir::ConstantIndexOp>(loc, dim));
     }
   }
   return shape;
 }
 
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(
-    Location loc, Value shapedValue, ConversionPatternRewriter &rewriter) {
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
+                                                   Value shapedValue,
+                                                   OpBuilder &builder) {
   ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
   if (shapedType.hasStaticShape()) {
-    return getStaticShapeDims(loc, shapedType, rewriter);
+    return getStaticShapeDims(loc, shapedType, builder);
   } else {
     // Dynamic shape lookup.
     Value rsValue = Shape::buildOrFindRankedShapeForValue(
-        loc, shapedValue, rewriter.getIndexType(), rewriter);
+        loc, shapedValue, builder.getIndexType(), builder);
     if (!rsValue) {
       return llvm::None;
     }
@@ -64,11 +65,8 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(
     // Note that in the following, we require that the dims resolve
     // to discrete SSA values, which in a stream, will be block args.
     if (failed(Shape::getRankedDimsFromRankedShape(
-            loc, rsValue, /*createIntermediateOps=*/true, dims, rewriter))) {
+            loc, rsValue, /*createIntermediateOps=*/true, dims, builder))) {
       return llvm::None;
-    }
-    for (auto &dim : dims) {
-      dim = rewriter.getRemappedValue(dim);
     }
     return dims;
   }
@@ -164,6 +162,10 @@ IntegerAttr TensorRewriteAdaptor::getElementTypeAttr() {
 
 llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims() {
   return IREE::HAL::getShapeDims(loc_, oldValue_, rewriter_);
+}
+llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims(
+    OpBuilder &builder) {
+  return IREE::HAL::getShapeDims(loc_, oldValue_, builder);
 }
 
 Value TensorRewriteAdaptor::getByteLength() {

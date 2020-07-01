@@ -17,6 +17,7 @@
 // Partition computation within dispatch function to workgroups/workitems.
 //
 //===----------------------------------------------------------------------===//
+#include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
@@ -36,6 +37,12 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> isWorkgroupCountConstrained(
+    "iree-codegen-constrained-workgroup-count",
+    llvm::cl::desc("Specify whether the number of workgroups can be assumed to "
+                   "be large enough to cover the entire workload"),
+    llvm::cl::init(false));
 
 // TODO(#2134): Remove this flag/set it to false always when issue with
 // convolution is resolved (see bug for more details).
@@ -271,12 +278,11 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
 /// in the distributed code.
 /// This method accounts for the case where the number of processors is not
 /// enough to execute the entire iteration space with one iteration mapped to
-/// each processor. So implements a block-cyclic distribution with each block
-/// size being equal to the number of processors.
-static LogicalResult mapToProcessors(ConversionPatternRewriter &rewriter,
-                                     scf::ParallelOp pLoopOp,
-                                     ArrayRef<Value> processorIDs,
-                                     ArrayRef<Value> numProcessors) {
+/// each processor. So implements a cyclic distribution of iterations to
+/// processors.
+static LogicalResult distributeCyclicallyToProcessors(
+    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
+    ArrayRef<Value> processorIDs, ArrayRef<Value> numProcessors) {
   unsigned numLoops = pLoopOp.getNumLoops();
   assert(numLoops == processorIDs.size() &&
          "expected as many ids as number of loops");
@@ -308,19 +314,23 @@ static LogicalResult mapToProcessors(ConversionPatternRewriter &rewriter,
 /// and number of processors along each dimension in the distributed code.  This
 /// method assumes that the number of processors is greater than or equal to the
 /// number of iterations. So just generates an if statement to mask of
-/// processors with no work.
-static LogicalResult mapToProcessorsAndGuard(
+/// processors with no work. When the number of processors is known to be
+/// exactly equal to the number of iterations, the if statement is not needed as
+/// well. In such cases, `generateGuard` can be set to `false` to avoid
+/// generating the if statement.
+static LogicalResult distributeSingleIterationPerProcessor(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    ArrayRef<Value> processorIDs) {
+    ArrayRef<Value> processorIDs, bool generateGuard = false) {
   unsigned numLoops = pLoopOp.getNumLoops();
   Location loc = pLoopOp.getLoc();
   assert(numLoops == processorIDs.size() &&
          "expected as many ids as number of loops");
-  Value cond = nullptr;
+
   TypeConverter::SignatureConversion signatureConverter(numLoops);
   auto lbs = pLoopOp.lowerBound();
   auto step = pLoopOp.step();
   auto ubs = pLoopOp.upperBound();
+  Value cond = nullptr;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
     Value iterValue = rewriter.create<AddIOp>(
         loc, lbs[i], rewriter.create<MulIOp>(loc, processorIDs[i], step[i]));
@@ -329,11 +339,43 @@ static LogicalResult mapToProcessorsAndGuard(
     cond = (cond ? rewriter.create<AndOp>(loc, cond, cmp) : cmp);
     signatureConverter.remapInput(i, iterValue);
   }
-  scf::IfOp ifOp = buildEmptyIfOp(loc, rewriter, cond);
   Region &pLoopOpRegion = pLoopOp.getLoopBody();
   rewriter.applySignatureConversion(&pLoopOpRegion, signatureConverter);
-  Region &ifOpRegion = ifOp.getRegion(0);
-  rewriter.inlineRegionBefore(pLoopOpRegion, ifOpRegion, ifOpRegion.begin());
+
+  if (generateGuard) {
+    Value cond = nullptr;
+    auto ubs = pLoopOp.upperBound();
+    for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
+      Value cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::slt,
+                                          processorIDs[i], ubs[i]);
+      cond = (cond ? rewriter.create<AndOp>(loc, cond, cmp) : cmp);
+    }
+    scf::IfOp ifOp = buildEmptyIfOp(loc, rewriter, cond);
+    Region &ifOpRegion = ifOp.getRegion(0);
+    rewriter.inlineRegionBefore(pLoopOpRegion, ifOpRegion, ifOpRegion.begin());
+  } else {
+    // The body of the scf.parallel needs to be moved into its parent
+    // operation.
+    // - Split the block just before the scf.parallel operation.
+    // - Move the only block of scf.parallel before the newly created block
+    //   (after signature conversion).
+    // - Add branch from the original block to the moved block of the
+    //   scf.parallel's region, and from the latter to the block created by the
+    //   split operation.
+    // - Canonicalization will fold these branches away.
+    Block *parentBlock = pLoopOp.getOperation()->getBlock();
+    Block *newBlock =
+        rewriter.splitBlock(parentBlock, Block::iterator(pLoopOp));
+    Block &pLoopOpBody = pLoopOpRegion.front();
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.inlineRegionBefore(pLoopOpRegion, *parentBlock->getParent(),
+                                Region::iterator(newBlock));
+    rewriter.setInsertionPointToEnd(parentBlock);
+    rewriter.create<BranchOp>(loc, &pLoopOpBody);
+    rewriter.setInsertionPointToEnd(&pLoopOpBody);
+    rewriter.replaceOpWithNewOp<BranchOp>(pLoopOpBody.getTerminator(),
+                                          newBlock);
+  }
   rewriter.eraseOp(pLoopOp);
   return success();
 }
@@ -398,8 +440,8 @@ static void getGPUProcessorIdsAndCounts(Location loc,
 /// processor ID and `DimOp` is used to get the number of processors along a
 /// dimension.
 template <typename GPUIdOp, typename GPUCountOp>
-static LogicalResult mapToProcessor(ConversionPatternRewriter &rewriter,
-                                    scf::ParallelOp pLoopOp) {
+static LogicalResult distributeCyclicallyToProcessors(
+    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp) {
   unsigned numLoops = pLoopOp.getNumLoops();
   if (numLoops > 3) {
     pLoopOp =
@@ -409,7 +451,7 @@ static LogicalResult mapToProcessor(ConversionPatternRewriter &rewriter,
   SmallVector<Value, 2> id(numLoops), count(numLoops);
   getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(pLoopOp.getLoc(), rewriter,
                                                    numLoops, id, count);
-  return mapToProcessors(rewriter, pLoopOp, id, count);
+  return distributeCyclicallyToProcessors(rewriter, pLoopOp, id, count);
 }
 
 /// Distributes scf.parallel to processors where `IdOp` is used to get the
@@ -417,8 +459,9 @@ static LogicalResult mapToProcessor(ConversionPatternRewriter &rewriter,
 /// dimension. Assumes that the number of processors will be less than equal to
 /// the number of iterations of the pLoopOp along all dimensions.
 template <typename GPUIdOp, typename GPUCountOp>
-static LogicalResult mapToProcessorsAndGuard(
-    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp) {
+static LogicalResult distributeSingleIterationPerProcessor(
+    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
+    bool generateGuard = true) {
   unsigned numLoops = pLoopOp.getNumLoops();
   if (numLoops > 3) {
     pLoopOp =
@@ -428,20 +471,27 @@ static LogicalResult mapToProcessorsAndGuard(
   SmallVector<Value, 2> id(numLoops), count(numLoops);
   getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(pLoopOp.getLoc(), rewriter,
                                                    numLoops, id, count);
-  return mapToProcessorsAndGuard(rewriter, pLoopOp, id);
+  return distributeSingleIterationPerProcessor(rewriter, pLoopOp, id,
+                                               generateGuard);
 }
 
 /// Distribute the scf.parallel to workgroups.
 static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
-                                     scf::ParallelOp pLoopOp) {
-  return mapToProcessor<gpu::BlockIdOp, gpu::GridDimOp>(rewriter, pLoopOp);
+                                     scf::ParallelOp pLoopOp,
+                                     bool useCyclicDistribution = false) {
+  if (useCyclicDistribution)
+    return distributeCyclicallyToProcessors<gpu::BlockIdOp, gpu::GridDimOp>(
+        rewriter, pLoopOp);
+  return distributeSingleIterationPerProcessor<gpu::BlockIdOp, gpu::GridDimOp>(
+      rewriter, pLoopOp, false);
 }
 
 /// Distributes scf.parallel to workitems using local invocation ID.
 static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
                                             scf::ParallelOp pLoopOp) {
-  return mapToProcessorsAndGuard<gpu::ThreadIdOp, gpu::BlockDimOp>(rewriter,
-                                                                   pLoopOp);
+  return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
+                                               gpu::BlockDimOp>(rewriter,
+                                                                pLoopOp);
 }
 
 /// Distributes scf.parallel to workitems using global invocation ID. The GPU
@@ -449,13 +499,34 @@ static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
 /// id = blockIdx * blockDim + gridIdx. count = blockDim * gridDim.
 static LogicalResult mapToGlobalInvocationId(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp) {
-  return mapToProcessorsAndGuard<GPUGlobalId, GPUGlobalCount>(rewriter,
-                                                              pLoopOp);
+  return distributeSingleIterationPerProcessor<GPUGlobalId, GPUGlobalCount>(
+      rewriter, pLoopOp);
 }
 
 //===----------------------------------------------------------------------===//
 // Pass and patterns.
 //===----------------------------------------------------------------------===//
+
+/// In some cases the iterations of the loops when partitioned to workgroups
+/// need to be distributed in a cyclic manner. The main use cases here is when
+/// the number of workgroups is constrained such that the number of iterations
+/// is greater than equal to number of processors (along any dimension). In
+/// those cases, distribute the iterations in a cyclic manner. This adds
+/// additional control flow, but isn't too detrimental to performance since they
+/// are convergent for the most part.
+// TODO(#2134): Mapping iterations to processors directly by assuming number of
+// iterations <= number of processors again seems to have an issue with
+// convolution/pooling. Needs further investigation.
+static bool useCyclicLoopDistribution(scf::ParallelOp pLoopOp) {
+  if (!useLegacyConvLowering) return false;
+  auto walkResult = pLoopOp.walk([](Operation *op) -> WalkResult {
+    if (isa<linalg::ConvOp>(op) || isa<linalg::PoolingMaxOp>(op) ||
+        isa<linalg::PoolingMinOp>(op) || isa<linalg::PoolingSumOp>(op))
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  return walkResult.wasInterrupted();
+}
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
@@ -473,7 +544,9 @@ struct PartitionPLoopToWorkgroups
   LogicalResult matchAndRewrite(
       scf::ParallelOp pLoopOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    return mapToWorkgroups(rewriter, pLoopOp);
+    return mapToWorkgroups(
+        rewriter, pLoopOp,
+        isWorkgroupCountConstrained || useCyclicLoopDistribution(pLoopOp));
   }
 };
 
@@ -516,8 +589,9 @@ struct MapConvPoolToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();
     scf::ParallelOp pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
-    if (failed(mapToProcessor<gpu::ThreadIdOp, gpu::BlockDimOp>(rewriter,
-                                                                pLoopOp)))
+    if (failed(
+            distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
+                rewriter, pLoopOp)))
       return failure();
     rewriter.eraseOp(linalgOp);
     return success();
@@ -535,6 +609,8 @@ struct MapLinalgOpToGlobalInvocationId
       ConversionPatternRewriter &rewriter) const override {
     // If marker exists do nothing.
     if (hasMarker(linalgOp)) return failure();
+    FuncOp funcOp = linalgOp.template getParentOfType<FuncOp>();
+    if (!funcOp) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();
@@ -554,8 +630,10 @@ struct MapLinalgOpToGlobalInvocationId
       }
     }
     rewriter.eraseOp(linalgOp);
-    FuncOp funcOp = linalgOp.template getParentOfType<FuncOp>();
-    if (funcOp) updateWorkGroupSize(funcOp, workgroupSize);
+    if (failed(updateWorkGroupSize(funcOp, workgroupSize))) return failure();
+    funcOp.setAttr(getWorkgroupCountAttrName(),
+                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                       WorkgroupCountMethodology::LinearizeResultShape)));
     return success();
   }
 };

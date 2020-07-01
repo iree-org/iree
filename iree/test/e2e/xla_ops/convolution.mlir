@@ -111,7 +111,7 @@ func @conv2d_1452x3221_same() attributes { iree.module.export } {
 //   return
 // }
 
-func @conv2d_no_padding() attributes { iree.module.export } {
+func @conv2d_no_padding2() attributes { iree.module.export } {
   %inputs = iree.unfoldable_constant dense<[
        [[[  1.0,   2.0,   3.0],
          [  4.0,   5.0,   6.0],
