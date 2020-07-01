@@ -104,7 +104,7 @@ def iree_vision_test_suite(
       models:
         an iterable of model names to generate targets for.
       datasets:
-        a iterable specifying the dataset on which the model is based. This
+        an iterable specifying the dataset on which the model is based. This
         controls the shape of the input images. Also indicates which weight file
         to use when loading weights from an external source.
       backends:
