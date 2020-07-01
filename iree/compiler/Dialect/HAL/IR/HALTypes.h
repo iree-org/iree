@@ -57,7 +57,7 @@ IntegerAttr getElementTypeAttr(Type type);
 // RefObject types
 //===----------------------------------------------------------------------===//
 
-class AllocatorType : public Type::TypeBase<AllocatorType, Type> {
+class AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
  public:
   using Base::Base;
   static AllocatorType get(MLIRContext *context) {
@@ -66,7 +66,7 @@ class AllocatorType : public Type::TypeBase<AllocatorType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Allocator; }
 };
 
-class BufferType : public Type::TypeBase<BufferType, Type> {
+class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage> {
  public:
   using Base::Base;
   static BufferType get(MLIRContext *context) {
@@ -75,7 +75,8 @@ class BufferType : public Type::TypeBase<BufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Buffer; }
 };
 
-class BufferViewType : public Type::TypeBase<BufferViewType, Type> {
+class BufferViewType
+    : public Type::TypeBase<BufferViewType, Type, TypeStorage> {
  public:
   using Base::Base;
   static BufferViewType get(MLIRContext *context) {
@@ -84,7 +85,8 @@ class BufferViewType : public Type::TypeBase<BufferViewType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::BufferView; }
 };
 
-class CommandBufferType : public Type::TypeBase<CommandBufferType, Type> {
+class CommandBufferType
+    : public Type::TypeBase<CommandBufferType, Type, TypeStorage> {
  public:
   using Base::Base;
   static CommandBufferType get(MLIRContext *context) {
@@ -93,7 +95,8 @@ class CommandBufferType : public Type::TypeBase<CommandBufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::CommandBuffer; }
 };
 
-class DescriptorSetType : public Type::TypeBase<DescriptorSetType, Type> {
+class DescriptorSetType
+    : public Type::TypeBase<DescriptorSetType, Type, TypeStorage> {
  public:
   using Base::Base;
   static DescriptorSetType get(MLIRContext *context) {
@@ -103,7 +106,7 @@ class DescriptorSetType : public Type::TypeBase<DescriptorSetType, Type> {
 };
 
 class DescriptorSetLayoutType
-    : public Type::TypeBase<DescriptorSetLayoutType, Type> {
+    : public Type::TypeBase<DescriptorSetLayoutType, Type, TypeStorage> {
  public:
   using Base::Base;
   static DescriptorSetLayoutType get(MLIRContext *context) {
@@ -114,7 +117,7 @@ class DescriptorSetLayoutType
   }
 };
 
-class DeviceType : public Type::TypeBase<DeviceType, Type> {
+class DeviceType : public Type::TypeBase<DeviceType, Type, TypeStorage> {
  public:
   using Base::Base;
   static DeviceType get(MLIRContext *context) {
@@ -123,7 +126,7 @@ class DeviceType : public Type::TypeBase<DeviceType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Device; }
 };
 
-class EventType : public Type::TypeBase<EventType, Type> {
+class EventType : public Type::TypeBase<EventType, Type, TypeStorage> {
  public:
   using Base::Base;
   static EventType get(MLIRContext *context) {
@@ -132,7 +135,8 @@ class EventType : public Type::TypeBase<EventType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Event; }
 };
 
-class ExecutableType : public Type::TypeBase<ExecutableType, Type> {
+class ExecutableType
+    : public Type::TypeBase<ExecutableType, Type, TypeStorage> {
  public:
   using Base::Base;
   static ExecutableType get(MLIRContext *context) {
@@ -141,7 +145,8 @@ class ExecutableType : public Type::TypeBase<ExecutableType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Executable; }
 };
 
-class ExecutableCacheType : public Type::TypeBase<ExecutableCacheType, Type> {
+class ExecutableCacheType
+    : public Type::TypeBase<ExecutableCacheType, Type, TypeStorage> {
  public:
   using Base::Base;
   static ExecutableCacheType get(MLIRContext *context) {
@@ -152,7 +157,8 @@ class ExecutableCacheType : public Type::TypeBase<ExecutableCacheType, Type> {
   }
 };
 
-class ExecutableLayoutType : public Type::TypeBase<ExecutableLayoutType, Type> {
+class ExecutableLayoutType
+    : public Type::TypeBase<ExecutableLayoutType, Type, TypeStorage> {
  public:
   using Base::Base;
   static ExecutableLayoutType get(MLIRContext *context) {
@@ -163,7 +169,8 @@ class ExecutableLayoutType : public Type::TypeBase<ExecutableLayoutType, Type> {
   }
 };
 
-class RingBufferType : public Type::TypeBase<RingBufferType, Type> {
+class RingBufferType
+    : public Type::TypeBase<RingBufferType, Type, TypeStorage> {
  public:
   using Base::Base;
   static RingBufferType get(MLIRContext *context) {
@@ -172,7 +179,7 @@ class RingBufferType : public Type::TypeBase<RingBufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::RingBuffer; }
 };
 
-class SemaphoreType : public Type::TypeBase<SemaphoreType, Type> {
+class SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
  public:
   using Base::Base;
   static SemaphoreType get(MLIRContext *context) {

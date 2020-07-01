@@ -43,7 +43,7 @@ namespace VMLA {
 // RefObject types
 //===----------------------------------------------------------------------===//
 
-class BufferType : public Type::TypeBase<BufferType, Type> {
+class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage> {
  public:
   using Base::Base;
   static BufferType get(MLIRContext *context) {
@@ -52,7 +52,7 @@ class BufferType : public Type::TypeBase<BufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Buffer; }
 };
 
-class InterfaceType : public Type::TypeBase<InterfaceType, Type> {
+class InterfaceType : public Type::TypeBase<InterfaceType, Type, TypeStorage> {
  public:
   using Base::Base;
   static InterfaceType get(MLIRContext *context) {
