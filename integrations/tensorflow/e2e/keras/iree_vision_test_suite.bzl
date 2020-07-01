@@ -143,6 +143,7 @@ def iree_vision_test_suite(
         # Parse failing configurations.
         for configuration in failing_configurations:
             # Normalize configuration input.
+            # {backend: "iree_llvmjit"} -> {backend: ["iree_llvmjit"]}
             for key, value in configuration.items():
                 if type(value) == type(""):
                     configuration[key] = [value]
