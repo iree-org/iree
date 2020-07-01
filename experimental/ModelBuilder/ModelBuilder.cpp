@@ -291,14 +291,14 @@ SmallVector<Value, 4> mlir::edsc::extensions::operator+(ValueRange a,
 }
 SmallVector<Value, 4> mlir::edsc::extensions::std_max(ValueRange a,
                                                       ValueRange b) {
-  using edsc::op::operator<;
-  auto fun = [](Value va, Value vb) { return (va < vb) ? vb : va; };
+  using edsc::op::slt;
+  auto fun = [](Value va, Value vb) { return slt(va, vb) ? vb : va; };
   return valueRangeOperatorImpl(fun, a, b);
 }
 SmallVector<Value, 4> mlir::edsc::extensions::std_min(ValueRange a,
                                                       ValueRange b) {
-  using edsc::op::operator<;
-  auto fun = [](Value va, Value vb) { return (va < vb) ? va : vb; };
+  using edsc::op::slt;
+  auto fun = [](Value va, Value vb) { return slt(va, vb) ? va : vb; };
   return valueRangeOperatorImpl(fun, a, b);
 }
 SmallVector<Value, 4> mlir::edsc::extensions::affine_max(ValueRange a,

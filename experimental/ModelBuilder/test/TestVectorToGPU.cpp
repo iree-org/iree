@@ -64,8 +64,9 @@ static llvm::cl::opt<bool> useCooperativeMatrix(
                    "supporting cooperative matrix extension"),
     llvm::cl::init(false));
 
-static void addLoweringPasses(mlir::PassManager &pm, int size,
-                              const SmallVector<Type, 3> args) {
+static void addLoweringPasses(mlir::PassManager &pm,
+                              llvm::ArrayRef<int64_t> workloadSize,
+                              llvm::ArrayRef<Type> args) {
   pm.addPass(mlir::iree_compiler::createVectorToGPUPass());
   pm.addPass(mlir::createLowerAffinePass());
   pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
@@ -81,7 +82,7 @@ static void addLoweringPasses(mlir::PassManager &pm, int size,
   spirvModulePM.addPass(
       mlir::spirv::createUpdateVersionCapabilityExtensionPass());
 
-  pm.addPass(mlir::createAddVulkanLaunchWrapperPass(size, args));
+  pm.addPass(mlir::createAddVulkanLaunchWrapperPass(workloadSize, args));
   mlir::LowerToLLVMOptions llvmOptions = {
       /*useBarePtrCallConv=*/false,
       /*emitCWrappers=*/true,
@@ -129,9 +130,8 @@ void testVecAdd() {
   ModelRunner runner(modelBuilder.getModuleRef(),
                      ModelRunner::Target::CPUTarget);
   CompilationOptions options;
-  SmallVector<Type, 3> args = {typeA, typeB, typeC};
   auto lowering = [&](mlir::PassManager &pm) {
-    addLoweringPasses(pm, width, args);
+    addLoweringPasses(pm, {warpSize, 1, 1}, {typeA, typeB, typeC});
   };
   options.loweringPasses = lowering;
   runner.compile(options, {vulkanWrapper});
@@ -196,7 +196,6 @@ void testCooperativeMatMul() {
   ModelRunner runner(modelBuilder.getModuleRef(),
                      ModelRunner::Target::GPUTarget);
   CompilationOptions options;
-  SmallVector<Type, 3> args = {typeA, typeB, typeC};
   options.loweringPasses = [&](mlir::PassManager &pm) {
     MatmulCodegenStrategy strategy;
     // Use hardcoded value for cooperative matrix size. Those will be pulled
@@ -204,13 +203,13 @@ void testCooperativeMatMul() {
     const int cooperativeMatrixM = 8;
     const int cooperativeMatrixK = 8;
     const int cooperativeMatrixN = 32;
-    // TODO(thomasraoux): Use loop parallel for tiling to be able to partition
-    // the matmul on several workgroups. To be able to support this case
-    // AffineMinCanonicalizer needs to support parallel loops.
     // TODO(thomasraooux) LICM is disabled due to limitation in SPIR-V
     strategy
-        .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
-            {cooperativeMatrixM, cooperativeMatrixK, cooperativeMatrixN}))
+        .tile<linalg::MatmulOp>(
+            linalg::LinalgTilingOptions()
+                .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+                .setTileSizes({cooperativeMatrixM, cooperativeMatrixK,
+                               cooperativeMatrixN}))
         .setHoistInvariantCode(false)
         .vectorize<linalg::MatmulOp>();
     modelBuilder.getModuleRef()->walk(
@@ -223,9 +222,8 @@ void testCooperativeMatMul() {
           isa<vector::TransferWriteOp>(op))
         iree_compiler::setCooperativeMatrixMarker(op);
     });
-    addLoweringPasses(pm, resRows * resColumns, args);
+    addLoweringPasses(pm, {resRows, resColumns, 1}, {typeA, typeB, typeC});
   };
-  ;
   runner.compile(options, {vulkanWrapper});
 
   // 3. Allocate data within data structures that interoperate with the MLIR ABI

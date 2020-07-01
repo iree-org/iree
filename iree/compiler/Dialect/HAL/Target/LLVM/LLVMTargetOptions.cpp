@@ -14,7 +14,10 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
+#include "llvm/ADT/APFloat.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Target/TargetOptions.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -33,12 +36,27 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
   targetOptions.pipelineTuningOptions.SLPVectorization = true;
   // LLVM -O3.
   targetOptions.optLevel = llvm::PassBuilder::OptimizationLevel::O3;
+  targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
   return targetOptions;
 }
 
 LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
-  // TODO(ataei): Add flags and construct options.
-  return getDefaultLLVMTargetOptions();
+  auto llvmTargetOptions = getDefaultLLVMTargetOptions();
+
+  static llvm::cl::opt<std::string> clTargetTriple(
+      "iree-llvm-target-triple", llvm::cl::desc("LLVM target machine triple"),
+      llvm::cl::init(llvmTargetOptions.targetTriple));
+  static llvm::cl::opt<bool> clSoftFloat(
+      "iree-llvm-enable-msoft-float-abi",
+      llvm::cl::desc("LLVM target codegen enables soft float abi e.g "
+                     "-mfloat-abi=softfp"),
+      llvm::cl::init(false));
+
+  llvmTargetOptions.targetTriple = clTargetTriple;
+  if (clSoftFloat) {
+    llvmTargetOptions.options.FloatABIType = llvm::FloatABI::Soft;
+  }
+  return llvmTargetOptions;
 }
 
 }  // namespace HAL

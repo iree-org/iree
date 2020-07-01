@@ -39,14 +39,13 @@ install Android NDK.
 After downloading, it is recommended to set the `ANDROID_NDK` environment
 variable pointing to the directory. For Linux, you can `export` in your shell's
 rc file. For Windows, you can search "environment variable" in the taskbar or
-use `Windows` + `R` to open the "Run" dialog to run
-`rundll32 sysdm.cpl,EditEnvironmentVariables`.
-
+use `Windows` + `R` to open the "Run" dialog to run `rundll32
+sysdm.cpl,EditEnvironmentVariables`.
 
 ### Install Android Debug Bridge (ADB)
 
-For Linux, search your the distro's package manager to install `adb`.
-For example, on Ubuntu:
+For Linux, search your the distro's package manager to install `adb`. For
+example, on Ubuntu:
 
 ```shell
 $ sudo apt install adb
@@ -82,8 +81,8 @@ $ cmake -G Ninja -B build-android  \
     for your target device. You can also refer to Android NDK's
     [CMake documentation](https://developer.android.com/ndk/guides/cmake) for
     more toolchain arguments.
-*   Building IREE compilers and samples for Android is not supported at
-    the moment; they will be enabled soon.
+*   Building IREE compilers and samples for Android is not supported at the
+    moment; they will be enabled soon.
 *   We need to define `IREE_HOST_{C|CXX}_COMPILER` to Clang here because IREE
     does [not support](https://github.com/google/iree/issues/1269) GCC well at
     the moment.
@@ -91,8 +90,9 @@ $ cmake -G Ninja -B build-android  \
 ### Configure on Windows
 
 On Windows, we will need the full path to the `cl.exe` compiler. This can be
-obtained by [opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt) and type
-`where cl.exe`. Then in a command prompt (`cmd.exe`):
+obtained by
+[opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt)
+and type `where cl.exe`. Then in a command prompt (`cmd.exe`):
 
 ```cmd
 REM Assuming in IREE source root
@@ -105,10 +105,10 @@ REM Assuming in IREE source root
     -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc"
 ```
 
-* See the Linux section in the above for explanations of the used arguments.
-* We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot properly
-  detect host triple under Android CMake toolchain file. This might be fixed
-  later.
+*   See the Linux section in the above for explanations of the used arguments.
+*   We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot
+    properly detect host triple under Android CMake toolchain file. This might
+    be fixed later.
 
 ### Build all targets
 

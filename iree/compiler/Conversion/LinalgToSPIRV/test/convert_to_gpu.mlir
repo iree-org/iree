@@ -25,6 +25,7 @@ module attributes {
 }
 // CHECK-LABEL: func @parallel_4D
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
@@ -84,6 +85,7 @@ module attributes {
 }
 // CHECK-LABEL: func @scalar_add
 //  CHECK-SAME:   local_size = dense<1> : vector<3xi32>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //  CHECK-NEXT:     load
 //  CHECK-NEXT:     load
 //  CHECK-NEXT:     addf
@@ -116,6 +118,7 @@ module {
 
 // CHECK-LABEL: func @reduce_sum
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]> : vector<3xi32>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
@@ -171,37 +174,34 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
-//   CHECK-DAG:   %[[C4:.+]] = constant 4 : index
 //   CHECK-DAG:   %[[C8:.+]] = constant 8 : index
+//   CHECK-DAG:   %[[C4:.+]] = constant 4 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[UB0:.+]] = dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[UB1:.+]] = dim %[[ARG1]], %[[C1]]
 //   CHECK-DAG:   %[[UB2:.+]] = dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[GDIMX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//   CHECK-DAG:   %[[GDIMY:.+]] = "gpu.grid_dim"() {dimension = "y"}
 //       CHECK:   %[[BOFFSETY:.+]] = muli %[[BIDY]], %[[C8]]
-//       CHECK:   %[[BSTEPY:.+]] = muli %[[GDIMY]], %[[C8]]
 //       CHECK:   %[[BOFFSETX:.+]] = muli %[[BIDX]], %[[C8]]
-//       CHECK:   %[[BSTEPX:.+]] = muli %[[GDIMX]], %[[C8]]
-//       CHECK:   scf.for %[[BIV0:.+]] = %[[BOFFSETY]] to %[[UB0]] step %[[BSTEPY]]
-//       CHECK:     scf.for %[[BIV1:.+]] = %[[BOFFSETX]] to %[[UB1]] step %[[BSTEPX]]
-//       CHECK:       scf.for %[[BIV2:.+]] = %[[C0]] to %[[UB2]] step %[[C4]]
-//   CHECK-DAG:         %[[VIEWUB0:.+]] = affine.min #{{.+}}(%[[BIV0]])[%[[UB0]]]
-//   CHECK-DAG:         %[[VIEWUB1:.+]] = affine.min #{{.+}}(%[[BIV1]])[%[[UB1]]]
-//   CHECK-DAG:         %[[VIEWUB2:.+]] = affine.min #{{.+}}(%[[BIV2]])[%[[UB2]]]
-//   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:         %[[INBOUNDY:.+]] = cmpi "slt", %[[TIDY]], %[[VIEWUB0]]
-//       CHECK:         %[[INBOUNDX:.+]] = cmpi "slt", %[[TIDX]], %[[VIEWUB1]]
-//       CHECK:         %[[COND:.+]] = and %[[INBOUNDY]], %[[INBOUNDX]]
-//       CHECK:         scf.if %[[COND]]
-//       CHECK:           scf.for %{{.+}} = %[[C0]] to %[[VIEWUB2]] step %[[C1]]
+//       CHECK:   scf.for %[[KOFFSET:.+]] = %[[C0]] to %[[UB2]] step %[[C4]]
+//       CHECK:     %[[VIEWUB0:.+]] = affine.min #{{.+}}()[%[[UB0]], %[[BOFFSETY]]]
+//       CHECK:     %[[VIEWUB2:.+]] = affine.min #{{.+}}(%[[KOFFSET]])[%[[UB2]]]
+//       CHECK:     %[[SV0:.+]] = subview %[[ARG0]][%[[BOFFSETY]], %[[KOFFSET]]]
+//       CHECK:     %[[VIEWUB1:.+]] = affine.min #{{.+}}()[%[[UB1]], %[[BOFFSETX]]]
+//       CHECK:     %[[SV1:.+]] = subview %[[ARG1]][%[[KOFFSET]], %[[BOFFSETX]]]
+//       CHECK:     %[[SV2:.+]] = subview %[[ARG2]][%[[BOFFSETY]], %[[BOFFSETX]]]
+//   CHECK-DAG:     %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//   CHECK-DAG:     %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//       CHECK:     %[[INBOUNDY:.+]] = cmpi "slt", %[[TIDY]], %[[VIEWUB0]]
+//       CHECK:     %[[INBOUNDX:.+]] = cmpi "slt", %[[TIDX]], %[[VIEWUB1]]
+//       CHECK:     %[[COND:.+]] = and %[[INBOUNDY]], %[[INBOUNDX]]
+//       CHECK:     scf.if %[[COND]]
+//       CHECK:       scf.for %{{.+}} = %[[C0]] to %[[VIEWUB2]] step %[[C1]]
+//   CHECK-NOT:         linalg.matmul
 
 // -----
-
 
 #map0 = affine_map<(d0)[s0] -> (1, -d0 + s0)>
 #map1 = affine_map<(d0)[s0, s1] -> (s0 + 4, -d0 + s1)>
@@ -262,17 +262,14 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //   CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
 //   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
 //   CHECK-DAG:   %[[NBLOCKSZ:.+]] = "gpu.grid_dim"() {dimension = "z"}
-//   CHECK-DAG:   %[[BOFFSETY:.+]] = muli %[[BIDY]], %[[C4]]
-//   CHECK-DAG:   %[[BSTEPY:.+]] = muli %[[NBLOCKSY]], %[[C4]]
-//   CHECK-DAG:   %[[BOFFSETX:.+]] = muli %[[BIDX]], %[[C32]]
-//   CHECK-DAG:   %[[BSTEPX:.+]] = muli %[[NBLOCKSX]], %[[C32]]
+//       CHECK:   %[[BOFFSETY:.+]] = muli %[[BIDY]], %[[C4]]
+//       CHECK:   %[[BSTEPY:.+]] = muli %[[NBLOCKSY]], %[[C4]]
+//       CHECK:   %[[BOFFSETX:.+]] = muli %[[BIDX]], %[[C32]]
+//       CHECK:   %[[BSTEPX:.+]] = muli %[[NBLOCKSX]], %[[C32]]
 //       CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[UB0]] step %[[NBLOCKSZ]]
 //       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[UB3]] step %[[BSTEPY]]
 //       CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[UB4]] step %[[BSTEPX]]
-//       CHECK:         %[[BOUNDSZ:.+]] = affine.min #{{.+}}(%[[IV3]])
 //       CHECK:         %[[SV1:.+]] = subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//       CHECK:         %[[BOUNDSY:.+]] = affine.min #{{.+}}(%[[IV4]])
-//       CHECK:         %[[BOUNDSX:.+]] = affine.min #{{.+}}(%[[IV5]])
 //       CHECK:         %[[SV2:.+]] = subview %[[ARG2]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
 //   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:         %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
@@ -280,14 +277,14 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //   CHECK-DAG:         %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //   CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //   CHECK-DAG:         %[[NTHREADSZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//       CHECK:         scf.for %[[IV3:.+]] = %[[TIDZ]] to %[[BOUNDSZ]] step %[[NTHREADSZ]]
-//       CHECK:           scf.for %[[IV4:.+]] = %[[TIDY]] to %[[BOUNDSY]] step %[[NTHREADSY]]
-//       CHECK:             scf.for %[[IV5:.+]] = %[[TIDX]] to %[[BOUNDSX]] step %[[NTHREADSX]]
+//       CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.+}} step %[[NTHREADSZ]]
+//       CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
+//       CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
 //       CHECK:               scf.for
 //       CHECK:                 scf.for
 //       CHECK:                   scf.for
-//       CHECK:                      scf.for
-//   CHECK-NOT:                        linalg.conv
+//       CHECK:                     scf.for
+//   CHECK-NOT:                       linalg.conv
 
 // -----
 
@@ -306,6 +303,8 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
 //   CHECK-DAG:   %[[C3:.+]] = constant 3 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
@@ -337,7 +336,6 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //       CHECK:       scf.for %[[IV4:.+]] = %[[C0]] to %[[UB0]] step %[[C1]]
 //       CHECK:         scf.for %[[IV5:.+]]= %[[C0]] to %[[UB1]] step %[[C1]]
 //   CHECK-NOT:           linalg.conv
-
 
 // -----
 
@@ -389,22 +387,20 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
-//   CHECK-DAG:   %[[BOFFSETY:.+]] = muli %[[BIDY]], %[[C4]]
-//   CHECK-DAG:   %[[BSTEPY:.+]] = muli %[[NBLOCKSY]], %[[C4]]
-//   CHECK-DAG:   %[[BOFFSETX:.+]] = muli %[[BIDX]], %[[C32]]
-//   CHECK-DAG:   %[[BSTEPX:.+]] = muli %[[NBLOCKSX]], %[[C32]]
+//       CHECK:   %[[BOFFSETY:.+]] = muli %[[BIDY]], %[[C4]]
+//       CHECK:   %[[BSTEPY:.+]] = muli %[[NBLOCKSY]], %[[C4]]
+//       CHECK:   %[[BOFFSETX:.+]] = muli %[[BIDX]], %[[C32]]
+//       CHECK:   %[[BSTEPX:.+]] = muli %[[NBLOCKSX]], %[[C32]]
 //       CHECK:   scf.for %[[IV3:.+]] = %[[BOFFSETY]] to %[[UB2]] step %[[BSTEPY]]
 //       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETX]] to %[[UB3]] step %[[BSTEPX]]
 //       CHECK:       %[[SV1:.+]] = subview %[[ARG0]][%[[IV3]], %[[IV4]]]
-//       CHECK:       %[[BOUNDSY:.+]] = affine.min #{{.+}}(%[[IV3]])
-//       CHECK:       %[[BOUNDSX:.+]] = affine.min #{{.+}}(%[[IV4]])
 //       CHECK:       %[[SV2:.+]] = subview %[[ARG2]][%[[IV3]], %[[IV4]]]
 //   CHECK-DAG:       %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:       %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:       %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:       %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//       CHECK:       scf.for %[[IV5:.+]] = %[[TIDY]] to %[[BOUNDSY]] step %[[NTHREADSY]]
-//       CHECK:         scf.for %[[IV6:.+]] = %[[TIDX]] to %[[BOUNDSX]] step %[[NTHREADSX]]
+//       CHECK:       scf.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
+//       CHECK:         scf.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
 //       CHECK:           scf.for
 //       CHECK:             scf.for
 //   CHECK-NOT:               linalg.pooling_max

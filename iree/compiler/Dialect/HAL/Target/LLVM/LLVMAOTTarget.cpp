@@ -14,7 +14,10 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
 
+#include <cstdlib>
+
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTargetLinker.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
@@ -54,6 +57,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
     auto llvmModule = mlir::translateModuleToLLVMIR(targetOp.getInnerModule());
+    if (!llvmModule) {
+      return failure();
+    }
 
     // Create invocation function an populate entry_points.
     auto executableOp = cast<ExecutableOp>(targetOp.getParentOp());
@@ -64,16 +70,55 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       std::string funcName =
           addCInterface ? "_mlir_ciface_" + std::string(entryPointOp.sym_name())
                         : std::string(entryPointOp.sym_name());
-      dyLibExecutableDef.entry_points.push_back(funcName);
+      dyLibExecutableDef.entry_points.push_back("invoke_" + funcName);
       createLLVMInvocationFunc(funcName, llvmModule.get());
     }
 
-    if (!llvmModule) {
+    // LLVMIR opt passes.
+    auto targetMachine = createTargetMachine(options_);
+    if (!targetMachine) {
+      targetOp.emitError("Can't create target machine for target triple: " +
+                         options_.targetTriple);
       return failure();
     }
 
-    // TODO(scotttodd): LLVM AOT compilation to
-    //   dyLibExecutableDef.library_embedded.assign(...)
+    llvmModule->setDataLayout(targetMachine->createDataLayout());
+    llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
+
+    if (failed(
+            runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
+      return targetOp.emitError(
+          "Can't build LLVMIR opt passes for ExecutableOp module");
+    }
+
+    std::string objData;
+    if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
+                                    &objData))) {
+      return targetOp.emitError("Can't compile LLVMIR module to an obj");
+    }
+
+    std::string sharedLibData;
+    const char* linkerToolPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
+    if (linkerToolPath != nullptr) {
+      auto sharedLibDataStatus = linkLLVMAOTObjects(linkerToolPath, objData);
+      if (!sharedLibDataStatus.ok()) {
+        return targetOp.emitError(
+            "Can't link executable and generate target dylib, using linker "
+            "toolchain: '" +
+            std::string(linkerToolPath) + "'");
+      }
+      sharedLibData = sharedLibDataStatus.value();
+    } else {
+      auto sharedLibDataStatus = linkLLVMAOTObjectsWithLLDElf(objData);
+      if (!sharedLibDataStatus.ok()) {
+        return targetOp.emitError(
+            "Can't link executable and generate target dylib using "
+            "lld::elf::link");
+      }
+      sharedLibData = sharedLibDataStatus.value();
+    }
+    dyLibExecutableDef.library_embedded = {sharedLibData.begin(),
+                                           sharedLibData.end()};
 
     ::flatbuffers::FlatBufferBuilder fbb;
     auto executableOffset =
@@ -109,8 +154,15 @@ void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
   static TargetBackendRegistration registration("dylib-llvm-aot", [=]() {
-    // Initalize registered targets.
-    llvm::InitializeNativeTarget();
+#define INIT_LLVM_TARGET(TargetName)        \
+  LLVMInitialize##TargetName##Target();     \
+  LLVMInitialize##TargetName##TargetMC();   \
+  LLVMInitialize##TargetName##TargetInfo(); \
+  LLVMInitialize##TargetName##AsmPrinter(); \
+  LLVMInitialize##TargetName##AsmParser();
+    INIT_LLVM_TARGET(X86)
+    INIT_LLVM_TARGET(ARM)
+    INIT_LLVM_TARGET(AArch64)
     return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
   });
 }

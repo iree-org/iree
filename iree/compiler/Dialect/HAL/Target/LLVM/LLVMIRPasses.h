@@ -36,8 +36,12 @@ void createLLVMInvocationFunc(const std::string& name, llvm::Module* module);
 
 // Creates and runs LLVMIR optimization passes defined in LLVMTargetOptions.
 LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
-                              std::unique_ptr<llvm::TargetMachine> machine,
+                              llvm::TargetMachine* machine,
                               llvm::Module* module);
+
+// Emits compiled module obj for the target machine.
+LogicalResult runEmitObjFilePasses(llvm::TargetMachine* machine,
+                                   llvm::Module* module, std::string* objData);
 
 }  // namespace HAL
 }  // namespace IREE

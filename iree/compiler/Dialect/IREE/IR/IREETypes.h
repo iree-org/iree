@@ -141,7 +141,8 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
 };
 
 /// A buffer of constant mapped memory.
-class ByteBufferType : public Type::TypeBase<ByteBufferType, Type> {
+class ByteBufferType
+    : public Type::TypeBase<ByteBufferType, Type, TypeStorage> {
  public:
   using Base::Base;
 
@@ -154,7 +155,7 @@ class ByteBufferType : public Type::TypeBase<ByteBufferType, Type> {
 
 /// A buffer of read-write memory.
 class MutableByteBufferType
-    : public Type::TypeBase<MutableByteBufferType, Type> {
+    : public Type::TypeBase<MutableByteBufferType, Type, TypeStorage> {
  public:
   using Base::Base;
 

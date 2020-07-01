@@ -188,12 +188,12 @@ iree_py_test(
     name = "explicit_backend_test",
     srcs = ["explicit_backend_test.py"],
     main = "explicit_backend_test.py",
+    python_version = "PY3",
     tags = [
-        "driver=vmla",
         "driver=llvmjit",
+        "driver=vmla",
         "driver=vulkan",
     ],
-    python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
