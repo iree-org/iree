@@ -51,7 +51,7 @@ def iree_train_test_suite(
 
         args = [
             "--optimizer_name={}".format(optimizer),
-            "--override_backends={}".format(backends),
+            "--target_backends={}".format(backends),
         ]
 
         iree_py_test(

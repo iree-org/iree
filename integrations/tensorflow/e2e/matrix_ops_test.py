@@ -70,8 +70,7 @@ class MatrixOpsModule(tf.Module):
     return tf.matmul(lhs, rhs)
 
 
-@tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla"], mat=MatrixOpsModule)
+@tf_test_utils.compile_modules(mat=MatrixOpsModule)
 class MatrixOpsTest(tf_test_utils.SavedModelTestCase):
 
   def test_basic_matmul(self):

@@ -20,8 +20,11 @@ include(CMakeParseArguments)
 
 if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
   set(IREE_HOST_SCRIPT_EXT "bat")
+  # https://gitlab.kitware.com/cmake/cmake/-/issues/17553
+  set(IREE_HOST_EXECUTABLE_SUFFIX ".exe")
 else()
   set(IREE_HOST_SCRIPT_EXT "sh")
+  set(IREE_HOST_EXECUTABLE_SUFFIX "")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -92,22 +95,42 @@ endfunction()
 #
 # Gets the path to an executable in a cross-compilation-aware way. This
 # should be used when accessing binaries that are used as part of the build,
-# such as for generating files used for later build steps.
+# such as for generating files used for later build steps. Those binaries
+# can come from third-party projects or another CMake invocation.
 #
 # Paramters:
 # - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
-# - TARGET: the target to build on host.
-function(iree_get_executable_path OUTPUT_PATH_VAR TARGET)
+# - EXECUTABLE: the executable to get its path.
+function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
   if(CMAKE_CROSSCOMPILING)
     # The target is defined in the CMake invocation for host. We don't have
     # access to the target; relying on the path here.
-    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${TARGET}")
+    set(_OUTPUT_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
     set(${OUTPUT_PATH_VAR} "${_OUTPUT_PATH}" PARENT_SCOPE)
   else()
     # The target is defined in this CMake invocation. We can query the location
     # directly from CMake.
-    set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${TARGET}>" PARENT_SCOPE)
+    set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
   endif()
+endfunction()
+
+# iree_get_target_path
+#
+# Gets the path to a target in a cross-compilation-aware way. This should be
+# used when accessing targets that are used as part of the build, such as for
+# generating files used for later build steps. Those targets should be defined
+# inside IREE itself.
+#
+# Paramters:
+# - OUTPUT_VAR: variable name for receiving the path to the built target.
+# - TARGET: the target to get its path.
+function(iree_get_target_path OUTPUT_VAR TARGET)
+  # If this is a host target for cross-compilation, it should have a
+  # `HOST_TARGET_FILE` property containing the artifact's path.
+  # Otherwise it must be a target defined in the current CMake invocation
+  # and we can just use `$<TARGET_FILE:${TARGET}>` on it.
+  set(${OUTPUT_VAR}
+      "$IF:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>,$<TARGET_FILE:${TARGET}>")
 endfunction()
 
 #-------------------------------------------------------------------------------
@@ -208,6 +231,10 @@ function(iree_add_data_dependencies)
   endforeach()
 endfunction()
 
+#-------------------------------------------------------------------------------
+# Executable dependencies
+#-------------------------------------------------------------------------------
+
 # iree_add_executable_dependencies
 #
 # Adds dependency on a target in a cross-compilation-aware way. This should
@@ -215,12 +242,12 @@ endfunction()
 # as for generating files used for later build steps.
 #
 # Parameters:
-# TARGET: the target to take on dependencies
+# EXECUTABLE: the executable to take on dependencies
 # DEPENDENCY: additional dependencies to append to target
-function(iree_add_executable_dependencies TARGET DEPENDENCY)
+function(iree_add_executable_dependencies EXECUTABLE DEPENDENCY)
   if(CMAKE_CROSSCOMPILING)
-    add_dependencies(${TARGET} iree_host_${DEPENDENCY})
+    add_dependencies(${EXECUTABLE} iree_host_${DEPENDENCY})
   else()
-    add_dependencies(${TARGET} ${DEPENDENCY})
+    add_dependencies(${EXECUTABLE} ${DEPENDENCY})
   endif()
 endfunction()

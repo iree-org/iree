@@ -17,11 +17,19 @@
 # Build using:
 # docker build --tag gcr.io/iree-oss/cmake build_tools/docker/cmake/
 
+# Run interactively using the following, where IREE_WORKDIR is the path to your
+# local dev environment:
+# docker run -it --rm --entrypoint bash \
+#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
+#   gcr.io/iree-oss/cmake
+
 # Set up the image and working directory.
 FROM ubuntu:18.04
 WORKDIR /usr/src/iree/
 
 RUN apt-get update
+# TODO: Remove this if the `apt-get install` below works without it again.
+RUN apt update
 
 # Update cmake to v3.13+, which is ahead of apt-get's version (3.10.2).
 # Install dependencies, including an old version of cmake to bootstrap.
@@ -50,3 +58,4 @@ RUN apt-get install -y \
 # Environment variables for IREE.
 ENV CC /usr/bin/clang
 ENV CXX /usr/bin/clang++
+ENV IREE_LLVMAOT_LINKER_PATH /usr/bin/ld

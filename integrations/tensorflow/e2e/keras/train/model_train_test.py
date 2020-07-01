@@ -79,7 +79,7 @@ class ModelTrain(tf.Module):
 
 
 @tf_test_utils.compile_modules(
-    backends=["tf"], train_module=(ModelTrain.CreateModule, ["TrainStep"]))
+    train_module=(ModelTrain.CreateModule, ["TrainStep"]))
 class ModelTrainTest(tf_test_utils.SavedModelTestCase):
 
   def generate_regression_data(self, size=8):
@@ -96,7 +96,7 @@ class ModelTrainTest(tf_test_utils.SavedModelTestCase):
     inputs = inputs / max(inputs)
     targets = targets / max(targets)
 
-    # generate plynomial features
+    # generate polynomial features
     inputs = np.expand_dims(inputs, axis=1)
     polynomial = PolynomialFeatures(_DEGREE)  # returns: [1, a, b, a^2, ab, b^2]
     inputs = polynomial.fit_transform(inputs)
