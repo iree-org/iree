@@ -107,6 +107,7 @@ function(iree_cc_test)
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+  set(_TEST_NAME "${_PACKAGE_PATH}:${_RULE_NAME}")
 
   # Case for cross-compiling towards Android.
   if(ANDROID)
@@ -114,10 +115,9 @@ function(iree_cc_test)
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
 
     # Define a custom target for pushing and running the test on Android device.
-    set(_RUN_NAME "run_${_PACKAGE_NAME}_${_RULE_NAME}_on_android_device")
     add_test(
       NAME
-        ${_RUN_NAME}
+        ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
         "${_ANDROID_REL_DIR}/${_NAME}"
@@ -133,13 +133,11 @@ function(iree_cc_test)
         TEST_ARTIFACT_NAME=$<TARGET_FILE_NAME:${_NAME}>
         TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
-    set_property(TEST ${_RUN_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-    set(_NAME_PATH ${_RUN_NAME})
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   else(ANDROID)
-    set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
     add_test(
       NAME
-        ${_NAME_PATH}
+        ${_TEST_NAME}
       COMMAND
         # We run all our tests through a custom test runner to allow temp
         # directory cleanup upon test completion.
@@ -148,9 +146,9 @@ function(iree_cc_test)
       WORKING_DIRECTORY
         "${CMAKE_BINARY_DIR}"
       )
-    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
   endif(ANDROID)
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
