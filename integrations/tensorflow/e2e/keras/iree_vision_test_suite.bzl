@@ -15,70 +15,6 @@
 """Macro for building e2e keras vision model tests."""
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
-load("@bazel_skylib//lib:new_sets.bzl", "sets")
-
-def _generate_test_suite(
-        name,
-        configurations,
-        reference_backend,
-        external_weights,
-        tags,
-        deps,
-        size,
-        python_version,
-        **kwargs):
-    """Helper for iree_vision_test_suite"""
-    tests = []
-    for model, dataset, backend in configurations:
-        test_name = "{}_{}_{}__{}__{}".format(
-            name,
-            model,
-            dataset,
-            reference_backend,
-            backend,
-        )
-        tests.append(test_name)
-
-        args = [
-            "--model={}".format(model),
-            "--data={}".format(dataset),
-            "--include_top=1",
-            "--target_backends={},{}".format(reference_backend, backend),
-        ]
-        if external_weights:
-            args.append("--url={}".format(external_weights))
-
-        # TODO(GH-2175): Simplify this after backend names are standardized.
-        driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
-        if driver == "llvmjit":
-            driver = "llvm"
-        py_test_tags = ["driver={}".format(driver)]
-        if tags != None:  # `is` is not supported.
-            py_test_tags += tags
-
-        iree_py_test(
-            name = test_name,
-            main = "vision_model_test.py",
-            srcs = ["vision_model_test.py"],
-            args = args,
-            tags = py_test_tags,
-            deps = deps,
-            size = size,
-            python_version = python_version,
-            **kwargs
-        )
-
-    native.test_suite(
-        name = name,
-        tests = tests,
-        # Note that only the manual tag really has any effect here. Others are
-        # used for test suite filtering, but all tests are passed the same tags.
-        tags = tags,
-        # If there are kwargs that need to be passed here which only apply to
-        # the generated tests and not to test_suite, they should be extracted
-        # into separate named arguments.
-        **kwargs
-    )
 
 def iree_vision_test_suite(
         name,
@@ -133,14 +69,7 @@ def iree_vision_test_suite(
         any additional arguments that will be passed to the underlying tests and
         test_suite.
     """
-    all_configurations_set = sets.make([
-        (model, dataset, backend)
-        for model in models
-        for dataset in datasets
-        for backend in backends
-    ])
-
-    failing_configurations_set = sets.make([])
+    failing_tuples = []
     if failing_configurations != None:
         # Parse failing configurations.
         for configuration in failing_configurations:
@@ -153,45 +82,87 @@ def iree_vision_test_suite(
             for model in configuration["models"]:
                 for dataset in configuration["datasets"]:
                     for backend in configuration["backends"]:
-                        sets.insert(
-                            failing_configurations_set,
-                            (model, dataset, backend),
-                        )
+                        failing_tuples.append((model, dataset, backend))
 
-        # Generate failing targets.
-        failing_tags = [
-            "manual",
-            "nokokoro",
-            "notap",
-        ]
-        if tags != None:
-            failing_tags += tags
+    tests = []
+    for model in models:
+        for dataset in datasets:
+            for backend in backends:
+                # Check if this is a failing configuration.
+                failing_target = (model, dataset, backend) in failing_tuples
 
-        _generate_test_suite(
-            "{}_failing".format(name),
-            sets.to_list(failing_configurations_set),
-            reference_backend,
-            external_weights,
-            failing_tags,
-            deps,
-            size,
-            python_version,
-            **kwargs
-        )
+                # Append "_failing" to name if this is a failing configuration.
+                test_name = name if not failing_target else name + "_failing"
+                test_name = "{}_{}_{}__{}__{}".format(
+                    test_name,
+                    model,
+                    dataset,
+                    reference_backend,
+                    backend,
+                )
+                tests.append(test_name)
 
-    # Generate passing targets.
-    passing_configurations_set = sets.difference(
-        all_configurations_set,
-        failing_configurations_set,
-    )
-    _generate_test_suite(
-        name,
-        sets.to_list(passing_configurations_set),
-        reference_backend,
-        external_weights,
-        tags,
-        deps,
-        size,
-        python_version,
+                args = [
+                    "--model={}".format(model),
+                    "--data={}".format(dataset),
+                    "--include_top=1",
+                    "--target_backends={},{}".format(reference_backend, backend),
+                ]
+                if external_weights:
+                    args.append("--url={}".format(external_weights))
+
+                # TODO(GH-2175): Simplify this after backend names are
+                # standardized.
+                # "iree_<driver>" --> "<driver>"
+                driver = backend.replace("iree_", "")
+                if driver == "llvmjit":
+                    driver = "llvm"
+                py_test_tags = ["driver={}".format(driver)]
+                if tags != None:  # `is` is not supported.
+                    py_test_tags += tags
+
+                # Add additional tags if this is a failing configuration.
+                if failing_target:
+                    py_test_tags += [
+                        "failing",  # Only used for test_suite filtering below.
+                        "manual",
+                        "nokokoro",
+                        "notap",
+                    ]
+
+                iree_py_test(
+                    name = test_name,
+                    main = "vision_model_test.py",
+                    srcs = ["vision_model_test.py"],
+                    args = args,
+                    tags = py_test_tags,
+                    deps = deps,
+                    size = size,
+                    python_version = python_version,
+                    **kwargs
+                )
+
+    native.test_suite(
+        name = name,
+        tests = tests,
+        # Add "-failing" to exclude tests in `tests` that have the "failing"
+        # tag.
+        tags = tags + ["-failing"],
+        # If there are kwargs that need to be passed here which only apply to
+        # the generated tests and not to test_suite, they should be extracted
+        # into separate named arguments.
         **kwargs
     )
+
+    if failing_configurations != None:
+        native.test_suite(
+            name = name + "_failing",
+            tests = tests,
+            # Add "+failing" to exclude tests in `tests` that have do not have
+            # the "failing" tag.
+            tags = tags + ["+failing"],
+            # If there are kwargs that need to be passed here which only apply
+            # to the generated tests and not to test_suite, they should be
+            # extracted into separate named arguments.
+            **kwargs
+        )
