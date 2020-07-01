@@ -31,7 +31,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
         with:
-          - ref: "google"
+          ref: "google"
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules
