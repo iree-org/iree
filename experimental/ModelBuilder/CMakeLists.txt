@@ -70,7 +70,7 @@ iree_cc_library(
     MLIRExecutionEngine
     MLIRGPU
     MLIRGPUToSPIRVTransforms
-    MLIRGPUtoVulkanTransforms
+    MLIRGPUToVulkanTransforms
     MLIRSPIRVTransforms
     MLIRIR
     MLIRLinalgToLLVM
