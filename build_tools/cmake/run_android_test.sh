@@ -48,7 +48,14 @@ else
   tmpdir=""
 fi
 
-adb shell "cd /data/local/tmp && $tmpdir $*"
+# Execute the command with `adb shell` under `/data/local/tmp`.
+# We set LD_LIBRARY_PATH for the command so that it can use libvulkan.so under
+# /data/local/tmp when running Vulkan tests. This is to workaround an Android
+# issue where linking to libvulkan.so is broken under /data/local/tmp.
+# See https://android.googlesource.com/platform/system/linkerconfig/+/296da5b1eb88a3527ee76352c2d987f82f3252eb.
+# This requires copying the vendor vulkan implementation under
+# /vendor/lib[64]/hw/vulkan.*.so to /data/local/tmp/libvulkan.so.
+adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=/data/local/tmp $tmpdir $*"
 
 if [ -n "$TEST_TMPDIR" ]; then
   adb shell "rm -rf $TEST_TMPDIR"

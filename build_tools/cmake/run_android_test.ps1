@@ -117,7 +117,13 @@ if ($env:TEST_TMPDIR -ne $null) {
   $tmpdir = ""
 }
 
-$adb_shell_params = Compose-AdbShellCommand $tmpdir,$test_binary,$test_args
+# We set LD_LIBRARY_PATH for the command so that it can use libvulkan.so under
+# /data/local/tmp when running Vulkan tests. This is to workaround an Android
+# issue where linking to libvulkan.so is broken under /data/local/tmp.
+# See https://android.googlesource.com/platform/system/linkerconfig/+/296da5b1eb88a3527ee76352c2d987f82f3252eb.
+# This requires copying the vendor vulkan implementation under
+# /vendor/lib[64]/hw/vulkan.*.so to /data/local/tmp/libvulkan.so.
+$adb_shell_params = Compose-AdbShellCommand "LD_LIBRARY_PATH=/data/local/tmp",$tmpdir,$test_binary,$test_args
 Invoke-Adb $adb_path $adb_shell_params
 
 if ($env:TEST_TMPDIR -ne $null) {
