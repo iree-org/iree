@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
@@ -31,15 +32,15 @@ namespace IREE {
 namespace HAL {
 
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
-    const LLVMTargetOptions& options) {
+    const LLVMTargetOptions& targetOptions) {
   std::string errorMessage;
-  auto target =
-      llvm::TargetRegistry::lookupTarget(options.targetTriple, errorMessage);
+  auto target = llvm::TargetRegistry::lookupTarget(targetOptions.targetTriple,
+                                                   errorMessage);
   if (!target) return nullptr;
   // TODO(ataei): Once we have an AOT backend pass cpu and cpu-features
   std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
-      options.targetTriple, "generic" /* cpu e.g k8*/,
-      "" /* cpu features e.g avx512fma*/, {}, {}));
+      targetOptions.targetTriple, "generic" /* cpu e.g k8*/,
+      "" /* cpu features e.g avx512fma*/, targetOptions.options, {}));
   return machine;
 }
 
@@ -82,7 +83,7 @@ void createLLVMInvocationFunc(const std::string& name, llvm::Module* module) {
 }
 
 LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
-                              std::unique_ptr<llvm::TargetMachine> machine,
+                              llvm::TargetMachine* machine,
                               llvm::Module* module) {
   llvm::LoopAnalysisManager loopAnalysisManager;
   llvm::FunctionAnalysisManager functionAnalysisManager;
@@ -93,8 +94,8 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
   llvm::StandardInstrumentations standardInstrumentations;
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 
-  llvm::PassBuilder passBuilder(machine.get(), options.pipelineTuningOptions,
-                                {}, &passInstrumentationCallbacks);
+  llvm::PassBuilder passBuilder(machine, options.pipelineTuningOptions, {},
+                                &passInstrumentationCallbacks);
   llvm::AAManager aa = passBuilder.buildDefaultAAPipeline();
   functionAnalysisManager.registerPass([&] { return std::move(aa); });
 
@@ -111,6 +112,28 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
 
   if (llvm::verifyModule(*module)) return failure();
 
+  return success();
+}
+
+LogicalResult runEmitObjFilePasses(llvm::TargetMachine* machine,
+                                   llvm::Module* module, std::string* objData) {
+  llvm::SmallVector<char, 0> stream_buffer;
+  {
+    // TODO(ataei): Use non legacy pass mamanger for this.
+    llvm::legacy::PassManager passManager;
+    passManager.add(
+        new llvm::TargetLibraryInfoWrapperPass(machine->getTargetTriple()));
+    llvm::raw_svector_ostream ostream(stream_buffer);
+    if (machine->addPassesToEmitFile(passManager, ostream,
+                                     /*DwoOut=*/nullptr,
+                                     llvm::CGFT_ObjectFile)) {
+      return failure();
+    }
+    passManager.run(*module);
+  }
+  // TODO(ataei): This is a work around stream truncation when directly write to
+  // string.
+  *objData = std::string(stream_buffer.begin(), stream_buffer.end());
   return success();
 }
 

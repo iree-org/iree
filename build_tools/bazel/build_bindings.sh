@@ -39,9 +39,11 @@ fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
   IREE_VULKAN_DISABLE=1
 fi
+
 declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
+  --test_env=IREE_LLVMAOT_LINKER_PATH
 )
 
 declare -a default_build_tag_filters=("-nokokoro")
