@@ -265,16 +265,17 @@ StatusOr<std::string> PrepareModule(
   return binary_contents;
 }
 
-// Returns a splitted input values from `filename` using comma as separater.
+// Returns a splitted input values from `filename` using newline as separater.
 StatusOr<std::vector<std::string>> GetInputValues(const std::string& filename) {
   std::string error_message;
   auto file = mlir::openInputFile(filename, &error_message);
   if (!file) {
-    return NotFoundErrorBuilder(IREE_LOC)
-           << "Unable to open input file " << filename << ": " << error_message;
+    return NotFoundErrorBuilder(IREE_LOC) << "Unable to open input file '"
+                                          << filename << "': " << error_message;
   }
   llvm::SmallVector<llvm::StringRef, 8> source_buffers;
-  file->getBuffer().split(source_buffers, ",");
+  file->getBuffer().split(source_buffers, /*Separator=*/"\n", /*MaxSplit=*/-1,
+                          /*KeepEmpty=*/false);
   std::vector<std::string> res;
   for (auto s : source_buffers) res.emplace_back(s);
   return res;
@@ -291,11 +292,14 @@ Status EvaluateFunction(iree_vm_context_t* context,
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   iree_vm_variant_list_t* input_list;
   if (!input_values_file_flag.empty()) {
+    if (!input_values_flag.empty()) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Expected only one of input_values_file_flag and "
+                "input_values_flag is set";
+    }
     ASSIGN_OR_RETURN(auto input_values, GetInputValues(input_values_file_flag));
-    ASSIGN_OR_RETURN(input_list, ParseToVariantList(
-                                     input_descs, allocator,
-                                     absl::MakeConstSpan(&input_values.front(),
-                                                         input_values.size())));
+    ASSIGN_OR_RETURN(input_list,
+                     ParseToVariantList(input_descs, allocator, input_values));
   } else {
     auto input_values_list = absl::MakeConstSpan(
         input_values_flag.empty() ? nullptr : &input_values_flag.front(),
