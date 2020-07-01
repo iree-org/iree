@@ -74,6 +74,7 @@ LLVM_FAILING = [
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
+    "scatter_update_test.py",
     "strings_test.py",
 ]
 
@@ -87,6 +88,7 @@ VULKAN_FAILING = [
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
+    "scatter_update_test.py",
     "strings_test.py",
     "tensorlist_test.py",  # TODO(b/146900329): Triage op coverage for vulkan backend.
 ]
