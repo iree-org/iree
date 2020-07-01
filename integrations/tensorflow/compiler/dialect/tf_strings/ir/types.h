@@ -47,7 +47,8 @@ class TFStringsType : public Type {
   }
 };
 
-class StringType : public Type::TypeBase<StringType, TFStringsType> {
+class StringType
+    : public Type::TypeBase<StringType, TFStringsType, TypeStorage> {
  public:
   using Base::Base;
   static StringType get(MLIRContext* context) {

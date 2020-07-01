@@ -41,7 +41,7 @@ class CustomDialect : public Dialect {
   void printType(Type type, DialectAsmPrinter &p) const override;
 };
 
-class MessageType : public Type::TypeBase<MessageType, Type> {
+class MessageType : public Type::TypeBase<MessageType, Type, TypeStorage> {
  public:
   using Base::Base;
   static MessageType get(MLIRContext *context) {
