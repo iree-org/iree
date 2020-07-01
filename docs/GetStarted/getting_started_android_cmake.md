@@ -207,14 +207,28 @@ EXEC @abs
 i32=5
 ```
 
+#### Common issues
+
+##### Vulkan function `vkCreateInstance` not available
+
+This can happen on Android devices with ARM Mali GPUs, where there is only one
+monolithic driver (`/vendor/lib[64]/libGLES_mali.so`) and the vulkan vendor
+driver (`/vendor/lib[64]/hw/vulkan.*.so`) is just a symlink to it. This causes
+problems for Vulkan device enumeration under `/data/local/tmp/`. A known
+workaround is to copy the `libGLES_mali.so` library under `/data/local/tmp/` and
+rename it as `libvulkan.so` and then prefix `LD_LIBRARY_PATH=/data/local/tmp`
+when invoking IREE executables.
+
 ### Dylib LLVM AOT backend
 
-To compile iree module for the target android device (assume aarch64, android 29) we need install standalone toolchain and setting AOT linker path environment variable:
+To compile iree module for the target android device (assume aarch64,android 29)
+we need install standalone toolchain and setting AOT linker path environment
+variable:
 ```shell
-export ANDROID_ARM64_TOOLCHAIN=<path to put new arm64 toolchain>
-$ANDROID_NDK//build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \
+$ export ANDROID_ARM64_TOOLCHAIN=<path to put new arm64 toolchain>
+$ $ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \
     --install-dir=$ANDROID_ARM64_TOOLCHAIN
-export IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld
+$ export IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld
 ```
 
 Translate a source MLIR into an IREE module:
@@ -251,15 +265,3 @@ android $ ./iree-run-module -driver=dylib \
 EXEC @abs
 i32=5
 ```
-
-#### Common issues
-
-##### Vulkan function `vkCreateInstance` not available
-
-This can happen on Android devices with ARM Mali GPUs, where there is only one
-monolithic driver (`/vendor/lib[64]/libGLES_mali.so`) and the vulkan vendor
-driver (`/vendor/lib[64]/hw/vulkan.*.so`) is just a symlink to it. This causes
-problems for Vulkan device enumeration under `/data/local/tmp/`. A known
-workaround is to copy the `libGLES_mali.so` library under `/data/local/tmp/` and
-rename it as `libvulkan.so` and then prefix `LD_LIBRARY_PATH=/data/local/tmp`
-when invoking IREE executables.
