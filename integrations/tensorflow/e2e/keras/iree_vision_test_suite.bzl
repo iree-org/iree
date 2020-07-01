@@ -93,9 +93,12 @@ def iree_vision_test_suite(
         size = "large",
         python_version = "PY3",
         **kwargs):
-    """Expands two sets of iree_py_tests from the specified models, datasets, backends and failing configurations and bundles them into a test suite.
-
-    Creates one test per dataset, backend, and model.
+    """Creates a test for each configuration and bundles a succeeding and failing test suite.
+    
+    Creates one test per dataset, backend, and model. Tests indicated in
+    `failing_configurations` are bundled into a suite suffixed with "_failing"
+    tagged to be excluded from CI and wildcard builds. All other tests are
+    bundled into a suite with the same name as the macro.
 
     Args:
       name:
