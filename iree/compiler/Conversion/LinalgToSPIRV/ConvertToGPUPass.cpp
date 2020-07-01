@@ -573,6 +573,11 @@ struct RemoveLinalgRange : public OpConversionPattern<linalg::RangeOp> {
 };
 }  // namespace
 
+void populateParallelLoopToWorkgroupPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns) {
+  patterns.insert<PartitionPLoopToWorkgroups>(context);
+}
+
 void ConvertToGPUPass::runOnFunction() {
   FuncOp funcOp = getFunction();
 

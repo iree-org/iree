@@ -22,9 +22,11 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -138,9 +140,13 @@ void ConvertVectorToGPUPass::runOnOperation() {
   OwningRewritePatternList patterns;
   patterns.insert<UnaryAndBinaryOpPattern<AddFOp>, VectorTransferReadConversion,
                   VectorTransferWriteConversion>(context);
+  populateParallelLoopToWorkgroupPatterns(context, patterns);
   std::unique_ptr<VectorToGPUConversionTarget> target =
       std::make_unique<VectorToGPUConversionTarget>(*context);
   target->addDynamicallyLegalDialect<StandardOpsDialect>();
+  target->addIllegalOp<scf::ParallelOp>();
+  target->addLegalOp<scf::YieldOp>();
+  target->addLegalOp<scf::ForOp>();
   target->addLegalDialect<gpu::GPUDialect>();
   if (failed(applyPartialConversion(funcOp, *target, patterns)))
     return signalPassFailure();

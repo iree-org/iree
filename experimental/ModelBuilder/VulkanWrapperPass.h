@@ -31,7 +31,7 @@ class OperationPass;
 /// Create a c interface function wrapping a vulkan dispatch for the existing
 /// GPU module.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createAddVulkanLaunchWrapperPass(
-    int64_t workload, llvm::ArrayRef<Type> args);
+    llvm::ArrayRef<int64_t> workloadSize, llvm::ArrayRef<Type> args);
 
 /// Set SPIRV ABI for kernel arguments. This hardcode the binding information
 /// to be able to wok with vulkan runner.
