@@ -19,6 +19,13 @@
 set -x
 set -e
 
+if [ "$#" -ne 1 ]; then
+  echo "usage: $0 <android-abi>"
+  exit 1
+fi
+
+ANDROID_ABI=$1
+
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
@@ -40,7 +47,7 @@ cd build
 # Configure towards 64-bit Android 10.
 "$CMAKE_BIN" -G Ninja .. \
   -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI="arm64-v8a" \
+  -DANDROID_ABI="$ANDROID_ABI" \
   -DANDROID_PLATFORM=android-29 \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \

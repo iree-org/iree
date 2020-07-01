@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the project within the gcr.io/iree-oss/cmake-android using Kokoro.
+# Cross-compile the project towards Android arm64-v8a with the
+# gcr.io/iree-oss/cmake-android image using Kokoro.
 
 set -e
 set -x
@@ -32,7 +33,7 @@ docker run \
   --workdir="${WORKDIR?}" \
   --rm \
   gcr.io/iree-oss/cmake-android:prod \
-  kokoro/gcp_ubuntu/cmake/android/build.sh
+  kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless. 

@@ -19,6 +19,13 @@
 set -e
 set -x
 
+if [ "$#" -ne 1 ]; then
+  echo "usage: $0 <android-abi>"
+  exit 1
+fi
+
+ANDROID_ABI=$1
+
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
@@ -34,4 +41,4 @@ echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
 echo "Cross-compiling with cmake"
-./build_tools/cmake/build_android.sh
+./build_tools/cmake/build_android.sh $ANDROID_ABI
