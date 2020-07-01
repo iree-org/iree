@@ -94,7 +94,7 @@ def iree_vision_test_suite(
         python_version = "PY3",
         **kwargs):
     """Creates a test for each configuration and bundles a succeeding and failing test suite.
-    
+
     Creates one test per dataset, backend, and model. Tests indicated in
     `failing_configurations` are bundled into a suite suffixed with "_failing"
     tagged to be excluded from CI and wildcard builds. All other tests are
@@ -107,12 +107,11 @@ def iree_vision_test_suite(
       models:
         an iterable of model names to generate targets for.
       datasets:
-        an iterable specifying the dataset on which the model is based. This
+        an iterable specifying the datasets on which the models are based. This
         controls the shape of the input images. Also indicates which weight file
         to use when loading weights from an external source.
       backends:
-        an iterable of targets backends to generate targets for, for each model
-        and for each dataset.
+        an iterable of targets backends to generate targets for.
       reference_backend:
         the backend to use as a source of truth for the expected output results.
       failing_configurations:
