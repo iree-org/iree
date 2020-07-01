@@ -20,17 +20,15 @@
 #
 # This script reads the following environment variables:
 # - TEST_ANDROID_ABS_DIR: the absolute path on Android device for the build
-#   artifact.
-# - TEST_ARTIFACT: the build artifact to push to the Android device.
-# - TEST_ARTIFACT_IS_EXECUTABLE: whether the build artifact should be marked
-#   as executable on the Android device.
-# - TEST_ARTIFACT_NAME: the build artifact's filename.
+#   artifacts.
+# - TEST_DATA: optional; the data file to push to the Android device.
+# - TEST_EXECUTABLE: the executable file to push to the Android device.
 # - TEST_TMPDIR: optional; temporary directory on the Android device for
 #   running tests.
 #
-# This script pushes $env:TEST_ARTIFACT onto the device as
-# $env:TEST_ANDROID_ABS_DIR/$env:TEST_ARTIFACT_NAME before running
-# <test-binary> with all <test-args> under /data/local/tmp.
+# This script pushes $env:TEST_EXECUTABLE and $env:TEST_DATA onto the device
+# under $env:TEST_ANDROID_ABS_DIR/ before running <test-binary> with all
+# <test-args> under /data/local/tmp.
 
 param(
   [Parameter(Position=0, Mandatory)]
@@ -49,7 +47,8 @@ param(
 function Compose-AdbPushCommand {
   param([string]$data, [string]$dest)
 
-  $adb_params = "push", $data, $dest
+  $filename = Split-Path $data -leaf
+  $adb_params = "push", $data, "$dest/$filename"
   $adb_params = $adb_params -join " "
 
   return $adb_params
@@ -98,20 +97,22 @@ Write-Host -ForegroundColor Yellow "Requested adb command: $test_binary $test_ar
 $adb_path = $(Get-Command adb -Type Application).Path
 Write-Host -ForegroundColor Yellow "Using adb executable: $adb_path"
 
-# Push the artifact needed for testing to Android device.
-$adb_push_params = Compose-AdbPushCommand $env:TEST_ARTIFACT $env:TEST_ANDROID_ABS_DIR/$env:TEST_ARTIFACT_NAME
-Invoke-Adb $adb_path $adb_push_params
-
-# Optionally mark it as executable.
-if ($env:TEST_ARTIFACT_IS_EXECUTABLE) {
-  $adb_mark_executable_params = Compose-AdbShellCommand "chmod","+x",$env:TEST_ANDROID_ABS_DIR/$env:TEST_ARTIFACT_NAME
-  Invoke-Adb $adb_path $adb_mark_executable_params
+# Push the artifacts needed for testing to Android device.
+$adb_push_exe_params = Compose-AdbPushCommand $env:TEST_EXECUTABLE $env:TEST_ANDROID_ABS_DIR
+Invoke-Adb $adb_path $adb_push_exe_params
+if ($env:TEST_DATA -ne $null) {
+  $adb_push_data_params = Compose-AdbPushCommand $env:TEST_DATA $env:TEST_ANDROID_ABS_DIR
+  Invoke-Adb $adb_path $adb_push_data_params
 }
+
+$exe_name = Split-Path $env:TEST_EXECUTABLE -leaf
+$adb_mark_executable_params = Compose-AdbShellCommand "chmod","+x",$env:TEST_ANDROID_ABS_DIR/$exe_name
+Invoke-Adb $adb_path $adb_mark_executable_params
 
 if ($env:TEST_TMPDIR -ne $null) {
   $adb_mkdir_params = Compose-AdbShellCommand "mkdir","-p",$env:TEST_TMPDIR
   Invoke-Adb $adb_path $adb_mkdir_params
-  $tmpdir = "TEST_TMPDIR=" + $tmpdir
+  $tmpdir = "TEST_TMPDIR=" + $env:TEST_TMPDIR
 } else {
   $tmpdir = ""
 }
