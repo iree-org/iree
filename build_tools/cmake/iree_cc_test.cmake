@@ -115,6 +115,7 @@ function(iree_cc_test)
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
 
     # Define a custom target for pushing and running the test on Android device.
+    set(_TEST_NAME ${_TEST_NAME}_on_android_device)
     add_test(
       NAME
         ${_TEST_NAME}
