@@ -233,11 +233,11 @@ when invoking IREE executables.
 
 ### Dylib LLVM AOT backend
 
-To compile iree module for the target android device (assume aarch64,android 29)
-we need install standalone toolchain and setting AOT linker path environment
-variable:
+To compile IREE module for the target Android device (assume Android 10 AArc64)
+we need install the corresponding standalone toolchain and setting AOT linker
+path environment variable:
 ```shell
-$ export ANDROID_ARM64_TOOLCHAIN=<path to put new arm64 toolchain>
+$ export ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain
 $ $ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \
     --install-dir=$ANDROID_ARM64_TOOLCHAIN
 $ export IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld
