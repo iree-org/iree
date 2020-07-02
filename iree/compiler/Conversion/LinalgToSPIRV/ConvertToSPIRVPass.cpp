@@ -27,6 +27,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
+#include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
@@ -385,10 +386,14 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   auto targetAttr = spirv::lookupTargetEnv(moduleOp);
   SPIRVTypeConverter typeConverter(targetAttr);
+  ScfToSPIRVContext scfToSPIRVContext;
 
   OwningRewritePatternList patterns;
   // Pull in GPU patterns to convert processor ID ops and loop ops.
   populateGPUToSPIRVPatterns(context, typeConverter, patterns);
+  // Pull in SCF patterns to convert control flow ops.
+  populateSCFToSPIRVPatterns(context, typeConverter, scfToSPIRVContext,
+                             patterns);
   // Pull in standard patterns to convert arithmetic ops and others.
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
