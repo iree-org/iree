@@ -14,7 +14,7 @@
 
 load("//iree:build_defs.oss.bzl", iree_cc_binary = "cc_binary")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@org_tensorflow//third_party/mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],

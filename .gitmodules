@@ -9,7 +9,7 @@
 	url = https://github.com/llvm/llvm-project.git
 [submodule "third_party/tensorflow"]
 	path = third_party/tensorflow
-	url = https://github.com/tensorflow/tensorflow.git
+	url = https://github.com/gmngeoffrey/tensorflow.git
 [submodule "third_party/flatbuffers"]
 	path = third_party/flatbuffers
 	url = https://github.com/google/flatbuffers.git

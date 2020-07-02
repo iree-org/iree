@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@org_tensorflow//third_party/mlir:tblgen.bzl", "gentbl")
 
 def iree_tablegen_doc(*args, **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.

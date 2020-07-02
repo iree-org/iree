@@ -14,7 +14,7 @@
 
 # Transforms specific to the IREE Strings module.
 
-load("//build_tools/bazel:tblgen.bzl", "gentbl")
+load("@org_tensorflow//third_party/mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
