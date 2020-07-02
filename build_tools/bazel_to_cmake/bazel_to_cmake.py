@@ -146,7 +146,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion):
           copyright_line,
           allow_partial_conversion=allow_partial_conversion)
       if write_allowed:
-        with open(cmakelists_file_path, "wt") as cmakelists_file:
+        with open(cmakelists_file_path, "wt", newline="\n") as cmakelists_file:
           cmakelists_file.write(converted_text)
       else:
         print(converted_text, end="")
