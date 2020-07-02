@@ -20,6 +20,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateVMToCPatterns(MLIRContext *context,
+                           OwningRewritePatternList &patterns) {}
 
-} // namespace mlir
-} // namespace iree_compiler
+}  // namespace iree_compiler
+}  // namespace mlir
