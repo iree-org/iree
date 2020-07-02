@@ -22,7 +22,6 @@ set(TF_MLIR_XLA_COPTS_BASE
 )
 
 # Create directories in the build tree for external_tablegen_library targets to use.
-file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/ir")
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/transforms")
 
 external_cc_library(

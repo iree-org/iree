@@ -33,23 +33,22 @@ external_cc_library(
   ROOT
     ${TF_MLIR_HLO_SRC_ROOT}
   SRCS
-    "lib/Dialect/mhlo/IR/infer_fusibility_op_interface.cc"
-    "lib/utils/convert_op_folder.cc"
     "lib/Dialect/mhlo/IR/chlo_ops.cc"
+    "lib/Dialect/mhlo/IR/dialect_registration.cc"
     "lib/Dialect/mhlo/IR/hlo_ops.cc"
+    "lib/Dialect/mhlo/IR/infer_fusibility_op_interface.cc"
+    "lib/Dialect/mhlo/IR/lhlo_ops.cc"
+    "lib/utils/convert_op_folder.cc"
     "lib/utils/broadcast_utils.cc"
     "lib/utils/hlo_utils.cc"
-    "lib/Dialect/mhlo/IR/lhlo_ops.cc"
-    "lib/Dialect/mhlo/IR/dialect_registration.cc"
   HDRS
-    "include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h"
-    "include/mlir-hlo/utils/convert_op_folder.h"
     "include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
     "include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+    "include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h"
+    "include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
+    "include/mlir-hlo/utils/convert_op_folder.h"
     "include/mlir-hlo/utils/broadcast_utils.h"
     "include/mlir-hlo/utils/hlo_utils.h"
-    "include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
-    "include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
   COPTS
     ${TF_MLIR_HLO_COPTS_BASE}
   INCLUDES
@@ -58,12 +57,12 @@ external_cc_library(
   DEPS
     absl::core_headers
     absl::flat_hash_set
-    tensorflow_mlir_hlo_xla_canonicalize_gen
     tensorflow_mlir_hlo_chlo_ops_gen
     tensorflow_mlir_hlo_hlo_ops_gen
     tensorflow_mlir_hlo_hlo_ops_base_gen
     tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
     tensorflow_mlir_hlo_lhlo_ops_gen
+    tensorflow_mlir_hlo_xla_canonicalize_gen
     LLVMSupport
     MLIRAnalysis
     MLIRIR
