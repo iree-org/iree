@@ -362,6 +362,7 @@ if(CMAKE_CROSSCOMPILING)
 endif()
 
 if(${IREE_BUILD_COMPILER})
+  add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
 endif()
 
