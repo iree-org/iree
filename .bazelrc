@@ -28,6 +28,11 @@ common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
 
+# TODO: Transition to the explicit init_py mechanism. See #2405
+# This is commented out while considering transition path but left as a
+# breadcrumb.
+# build --incompatible_default_to_explicit_init_py
+
 # TensorFlow always sets these in OSS which makes it impossible to build TF
 # without them...
 build --define open_source_build=true
