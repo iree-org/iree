@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_HOST_SEMAPHORE_H_
-#define IREE_HAL_HOST_HOST_SEMAPHORE_H_
+#ifndef IREE_HAL_HOST_CONDVAR_SEMAPHORE_H_
+#define IREE_HAL_HOST_CONDVAR_SEMAPHORE_H_
 
 #include <atomic>
 #include <cstdint>
@@ -27,19 +27,19 @@
 namespace iree {
 namespace hal {
 
-// TODO(b/140026716): add WaitHandle support for better multi-wait.
 // Simple host-only semaphore semaphore implemented with a mutex.
+// Uses a condition variable to track the current value.
 //
 // Thread-safe (as instances may be imported and used by others).
-class HostSemaphore final : public Semaphore {
+class CondVarSemaphore final : public Semaphore {
  public:
   // Waits for one or more (or all) semaphores to reach or exceed the given
   // values.
   static Status WaitForSemaphores(absl::Span<const SemaphoreValue> semaphores,
                                   bool wait_all, absl::Time deadline);
 
-  explicit HostSemaphore(uint64_t initial_value);
-  ~HostSemaphore() override;
+  explicit CondVarSemaphore(uint64_t initial_value);
+  ~CondVarSemaphore() override;
 
   StatusOr<uint64_t> Query() override;
 
@@ -62,4 +62,4 @@ class HostSemaphore final : public Semaphore {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_HOST_SEMAPHORE_H_
+#endif  // IREE_HAL_HOST_CONDVAR_SEMAPHORE_H_

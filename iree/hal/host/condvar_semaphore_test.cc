@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_semaphore.h"
-
 #include <cstdint>
 #include <thread>  // NOLINT
 
 #include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
+#include "iree/hal/host/condvar_semaphore.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
@@ -27,15 +26,15 @@ namespace hal {
 namespace {
 
 // Tests that a semaphore that is unused properly cleans itself up.
-TEST(HostSemaphoreTest, NoOp) {
-  HostSemaphore semaphore(123u);
+TEST(CondVarSemaphoreTest, NoOp) {
+  CondVarSemaphore semaphore(123u);
   ASSERT_OK_AND_ASSIGN(uint64_t value, semaphore.Query());
   EXPECT_EQ(123u, value);
 }
 
 // Tests that a semaphore will accept new values as it is signaled.
-TEST(HostSemaphoreTest, NormalSignaling) {
-  HostSemaphore semaphore(2u);
+TEST(CondVarSemaphoreTest, NormalSignaling) {
+  CondVarSemaphore semaphore(2u);
   EXPECT_EQ(2u, semaphore.Query().value());
   EXPECT_OK(semaphore.Signal(3u));
   EXPECT_EQ(3u, semaphore.Query().value());
@@ -44,8 +43,8 @@ TEST(HostSemaphoreTest, NormalSignaling) {
 }
 
 // Tests that a semaphore will fail to set non-increasing values.
-TEST(HostSemaphoreTest, RequireIncreasingValues) {
-  HostSemaphore semaphore(2u);
+TEST(CondVarSemaphoreTest, RequireIncreasingValues) {
+  CondVarSemaphore semaphore(2u);
   EXPECT_EQ(2u, semaphore.Query().value());
   // Same value.
   EXPECT_TRUE(IsInvalidArgument(semaphore.Signal(2u)));
@@ -54,8 +53,8 @@ TEST(HostSemaphoreTest, RequireIncreasingValues) {
 }
 
 // Tests that a semaphore that has failed will remain in a failed state.
-TEST(HostSemaphoreTest, StickyFailure) {
-  HostSemaphore semaphore(2u);
+TEST(CondVarSemaphoreTest, StickyFailure) {
+  CondVarSemaphore semaphore(2u);
   // Signal to 3.
   EXPECT_OK(semaphore.Signal(3u));
   EXPECT_EQ(3u, semaphore.Query().value());
@@ -70,70 +69,70 @@ TEST(HostSemaphoreTest, StickyFailure) {
 }
 
 // Tests waiting on no semaphores.
-TEST(HostSemaphoreTest, EmptyWait) {
-  EXPECT_OK(HostSemaphore::WaitForSemaphores({}, /*wait_all=*/true,
-                                             absl::InfiniteFuture()));
+TEST(CondVarSemaphoreTest, EmptyWait) {
+  EXPECT_OK(CondVarSemaphore::WaitForSemaphores({}, /*wait_all=*/true,
+                                                absl::InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
-TEST(HostSemaphoreTest, WaitAlreadySignaled) {
-  HostSemaphore semaphore(2u);
+TEST(CondVarSemaphoreTest, WaitAlreadySignaled) {
+  CondVarSemaphore semaphore(2u);
   // Test both previous and current values.
-  EXPECT_OK(HostSemaphore::WaitForSemaphores(
+  EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
       {{&semaphore, 1u}}, /*wait_all=*/true, absl::InfiniteFuture()));
-  EXPECT_OK(HostSemaphore::WaitForSemaphores(
+  EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
       {{&semaphore, 2u}}, /*wait_all=*/true, absl::InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has not been signaled.
-TEST(HostSemaphoreTest, WaitUnsignaled) {
-  HostSemaphore semaphore(2u);
+TEST(CondVarSemaphoreTest, WaitUnsignaled) {
+  CondVarSemaphore semaphore(2u);
   // NOTE: we don't actually block here because otherwise we'd lock up.
-  EXPECT_TRUE(IsDeadlineExceeded(HostSemaphore::WaitForSemaphores(
+  EXPECT_TRUE(IsDeadlineExceeded(CondVarSemaphore::WaitForSemaphores(
       {{&semaphore, 3u}}, /*wait_all=*/true, absl::InfinitePast())));
 }
 
 // Tests waiting on a failed semaphore (it should return the error on the
 // semaphore).
-TEST(HostSemaphoreTest, WaitAlreadyFailed) {
-  HostSemaphore semaphore(2u);
+TEST(CondVarSemaphoreTest, WaitAlreadyFailed) {
+  CondVarSemaphore semaphore(2u);
   semaphore.Fail(UnknownErrorBuilder(IREE_LOC));
-  EXPECT_TRUE(IsUnknown(HostSemaphore::WaitForSemaphores(
+  EXPECT_TRUE(IsUnknown(CondVarSemaphore::WaitForSemaphores(
       {{&semaphore, 2u}}, /*wait_all=*/true, absl::InfinitePast())));
 }
 
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
-TEST(HostSemaphoreTest, PingPong) {
-  HostSemaphore a2b(0u);
-  HostSemaphore b2a(0u);
+TEST(CondVarSemaphoreTest, PingPong) {
+  CondVarSemaphore a2b(0u);
+  CondVarSemaphore b2a(0u);
   std::thread thread([&]() {
     // Should advance right past this because the value is already set.
-    ASSERT_OK(HostSemaphore::WaitForSemaphores({{&a2b, 0u}}, /*wait_all=*/true,
-                                               absl::InfiniteFuture()));
+    ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
+        {{&a2b, 0u}}, /*wait_all=*/true, absl::InfiniteFuture()));
     ASSERT_OK(b2a.Signal(1u));
     // Jump ahead.
-    ASSERT_OK(HostSemaphore::WaitForSemaphores({{&a2b, 4u}}, /*wait_all=*/true,
-                                               absl::InfiniteFuture()));
+    ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
+        {{&a2b, 4u}}, /*wait_all=*/true, absl::InfiniteFuture()));
   });
-  ASSERT_OK(HostSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
-                                             absl::InfiniteFuture()));
+  ASSERT_OK(CondVarSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
+                                                absl::InfiniteFuture()));
   ASSERT_OK(a2b.Signal(4u));
   thread.join();
 }
 
 // Tests that failure still wakes waiters and propagates the error.
-TEST(HostSemaphoreTest, FailNotifies) {
-  HostSemaphore a2b(0u);
-  HostSemaphore b2a(0u);
+TEST(CondVarSemaphoreTest, FailNotifies) {
+  CondVarSemaphore a2b(0u);
+  CondVarSemaphore b2a(0u);
   bool got_failure = false;
   std::thread thread([&]() {
     ASSERT_OK(b2a.Signal(1u));
-    got_failure = IsUnknown(HostSemaphore::WaitForSemaphores(
+    got_failure = IsUnknown(CondVarSemaphore::WaitForSemaphores(
         {{&a2b, 1u}}, /*wait_all=*/true, absl::InfiniteFuture()));
   });
-  ASSERT_OK(HostSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
-                                             absl::InfiniteFuture()));
+  ASSERT_OK(CondVarSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
+                                                absl::InfiniteFuture()));
   a2b.Fail(UnknownErrorBuilder(IREE_LOC));
   thread.join();
   ASSERT_TRUE(got_failure);

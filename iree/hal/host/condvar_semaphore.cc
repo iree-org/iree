@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_semaphore.h"
-
 #include <atomic>
 #include <cstdint>
 
@@ -21,15 +19,17 @@
 #include "absl/synchronization/mutex.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/host/condvar_semaphore.h"
 
 namespace iree {
 namespace hal {
 
-HostSemaphore::HostSemaphore(uint64_t initial_value) : value_(initial_value) {}
+CondVarSemaphore::CondVarSemaphore(uint64_t initial_value)
+    : value_(initial_value) {}
 
-HostSemaphore::~HostSemaphore() = default;
+CondVarSemaphore::~CondVarSemaphore() = default;
 
-StatusOr<uint64_t> HostSemaphore::Query() {
+StatusOr<uint64_t> CondVarSemaphore::Query() {
   absl::MutexLock lock(&mutex_);
   if (!status_.ok()) {
     return status_;
@@ -37,7 +37,7 @@ StatusOr<uint64_t> HostSemaphore::Query() {
   return value_.load(std::memory_order_acquire);
 }
 
-Status HostSemaphore::Signal(uint64_t value) {
+Status CondVarSemaphore::Signal(uint64_t value) {
   absl::MutexLock lock(&mutex_);
   if (!status_.ok()) {
     return status_;
@@ -49,26 +49,26 @@ Status HostSemaphore::Signal(uint64_t value) {
   return OkStatus();
 }
 
-void HostSemaphore::Fail(Status status) {
+void CondVarSemaphore::Fail(Status status) {
   absl::MutexLock lock(&mutex_);
   status_ = status;
   value_.store(UINT64_MAX, std::memory_order_release);
 }
 
 // static
-Status HostSemaphore::WaitForSemaphores(
+Status CondVarSemaphore::WaitForSemaphores(
     absl::Span<const SemaphoreValue> semaphores, bool wait_all,
     absl::Time deadline) {
-  IREE_TRACE_SCOPE0("HostSemaphore::WaitForSemaphores");
+  IREE_TRACE_SCOPE0("CondVarSemaphore::WaitForSemaphores");
 
   // Some of the semaphores may already be signaled; we only need to wait for
   // those that are not yet at the expected value.
-  using HostSemaphoreValue = std::pair<HostSemaphore*, uint64_t>;
-  absl::InlinedVector<HostSemaphoreValue, 4> waitable_semaphores;
+  using CondVarSemaphoreValue = std::pair<CondVarSemaphore*, uint64_t>;
+  absl::InlinedVector<CondVarSemaphoreValue, 4> waitable_semaphores;
   waitable_semaphores.reserve(semaphores.size());
   for (auto& semaphore_value : semaphores) {
     auto* semaphore =
-        reinterpret_cast<HostSemaphore*>(semaphore_value.semaphore);
+        reinterpret_cast<CondVarSemaphore*>(semaphore_value.semaphore);
     ASSIGN_OR_RETURN(uint64_t current_value, semaphore->Query());
     if (current_value < semaphore_value.value) {
       // Semaphore has not yet hit the required value; wait for it.
@@ -86,7 +86,7 @@ Status HostSemaphore::WaitForSemaphores(
     absl::MutexLock lock(&semaphore->mutex_);
     if (!semaphore->mutex_.AwaitWithDeadline(
             absl::Condition(
-                +[](HostSemaphoreValue* semaphore_value) {
+                +[](CondVarSemaphoreValue* semaphore_value) {
                   return semaphore_value->first->value_.load(
                              std::memory_order_acquire) >=
                          semaphore_value->second;
@@ -104,7 +104,7 @@ Status HostSemaphore::WaitForSemaphores(
   return OkStatus();
 }
 
-Status HostSemaphore::Wait(uint64_t value, absl::Time deadline) {
+Status CondVarSemaphore::Wait(uint64_t value, absl::Time deadline) {
   return WaitForSemaphores({{this, value}}, /*wait_all=*/true, deadline);
 }
 

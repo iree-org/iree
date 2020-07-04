@@ -21,6 +21,33 @@ package(
 )
 
 cc_library(
+    name = "condvar_semaphore",
+    srcs = ["condvar_semaphore.cc"],
+    hdrs = ["condvar_semaphore.h"],
+    deps = [
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:semaphore",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "condvar_semaphore_test",
+    srcs = ["condvar_semaphore_test.cc"],
+    deps = [
+        ":condvar_semaphore",
+        "//iree/base:status",
+        "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+cc_library(
     name = "host_buffer",
     srcs = ["host_buffer.cc"],
     hdrs = ["host_buffer.h"],
@@ -97,33 +124,6 @@ cc_library(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "host_semaphore",
-    srcs = ["host_semaphore.cc"],
-    hdrs = ["host_semaphore.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:semaphore",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "host_semaphore_test",
-    srcs = ["host_semaphore_test.cc"],
-    deps = [
-        ":host_semaphore",
-        "//iree/base:status",
-        "//iree/base:status_matchers",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/time",
     ],
 )
 

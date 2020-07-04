@@ -21,7 +21,7 @@
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/host_semaphore.h"
+#include "iree/hal/host/condvar_semaphore.h"
 
 namespace iree {
 namespace hal {

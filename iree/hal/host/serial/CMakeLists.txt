@@ -86,7 +86,7 @@ iree_cc_library(
     iree::base::source_location
     iree::base::status
     iree::base::tracing
-    iree::hal::host::host_semaphore
+    iree::hal::host::condvar_semaphore
     iree::hal::host::inproc_command_buffer
     iree::hal::host::nop_event
     iree::hal::host::scheduling_model
@@ -108,6 +108,6 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     iree::hal::command_queue
-    iree::hal::host::host_semaphore
+    iree::hal::host::condvar_semaphore
   PUBLIC
 )

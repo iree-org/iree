@@ -71,7 +71,7 @@ TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
         CHECK_EQ(cmd_buffer.get(), batches[0].command_buffers[0]);
         return OkStatus();
       });
-  HostSemaphore semaphore(0ull);
+  CondVarSemaphore semaphore(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
   ASSERT_OK(semaphore.Wait(1ull, absl::InfiniteFuture()));
@@ -88,7 +88,7 @@ TEST_F(AsyncCommandQueueTest, PropagateSubmitFailure) {
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
         return DataLossErrorBuilder(IREE_LOC);
       });
-  HostSemaphore semaphore(0ull);
+  CondVarSemaphore semaphore(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
   EXPECT_TRUE(IsDataLoss(semaphore.Wait(1ull, absl::InfiniteFuture())));
@@ -111,7 +111,7 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
         Sleep(absl::Milliseconds(100));
         return OkStatus();
       });
-  HostSemaphore semaphore(0ull);
+  CondVarSemaphore semaphore(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
 
@@ -139,10 +139,10 @@ TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
   auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
                                                   CommandCategory::kTransfer);
 
-  HostSemaphore semaphore_0(0u);
+  CondVarSemaphore semaphore_0(0u);
   ASSERT_OK(command_queue->Submit(
       {{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1ull}}}));
-  HostSemaphore semaphore_1(0u);
+  CondVarSemaphore semaphore_1(0u);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer_1.get()}, {{&semaphore_1, 1u}}}));
 
@@ -168,7 +168,7 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
       });
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
                                                   CommandCategory::kTransfer);
-  HostSemaphore semaphore_0(0ull);
+  CondVarSemaphore semaphore_0(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1u}}}));
   EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, absl::InfiniteFuture())));
@@ -179,7 +179,7 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   // Future submits should fail asynchronously.
   auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
                                                   CommandCategory::kTransfer);
-  HostSemaphore semaphore_1(0ull);
+  CondVarSemaphore semaphore_1(0ull);
   EXPECT_TRUE(IsDataLoss(command_queue->Submit(
       {{}, {cmd_buffer_1.get()}, {{&semaphore_1, 1ull}}})));
 }
@@ -201,10 +201,10 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
   auto cmd_buffer_1 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
                                                   CommandCategory::kTransfer);
 
-  HostSemaphore semaphore_0(0ull);
+  CondVarSemaphore semaphore_0(0ull);
   ASSERT_OK(command_queue->Submit(
       {{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1ull}}}));
-  HostSemaphore semaphore_1(0ull);
+  CondVarSemaphore semaphore_1(0ull);
   ASSERT_OK(command_queue->Submit(
       {{{&semaphore_0, 1ull}}, {cmd_buffer_1.get()}, {{&semaphore_1, 1ull}}}));
 

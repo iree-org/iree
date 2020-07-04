@@ -15,7 +15,7 @@
 #include "iree/hal/host/serial/serial_scheduling_model.h"
 
 #include "iree/base/tracing.h"
-#include "iree/hal/host/host_semaphore.h"
+#include "iree/hal/host/condvar_semaphore.h"
 #include "iree/hal/host/inproc_command_buffer.h"
 #include "iree/hal/host/nop_event.h"
 #include "iree/hal/host/serial/async_command_queue.h"
@@ -105,19 +105,19 @@ StatusOr<ref_ptr<Event>> SerialSchedulingModel::CreateEvent() {
 
 StatusOr<ref_ptr<Semaphore>> SerialSchedulingModel::CreateSemaphore(
     uint64_t initial_value) {
-  return make_ref<HostSemaphore>(initial_value);
+  return make_ref<CondVarSemaphore>(initial_value);
 }
 
 Status SerialSchedulingModel::WaitAllSemaphores(
     absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
-  return HostSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/true,
-                                          deadline);
+  return CondVarSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/true,
+                                             deadline);
 }
 
 StatusOr<int> SerialSchedulingModel::WaitAnySemaphore(
     absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
-  return HostSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/false,
-                                          deadline);
+  return CondVarSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/false,
+                                             deadline);
 }
 
 Status SerialSchedulingModel::WaitIdle(absl::Time deadline) {

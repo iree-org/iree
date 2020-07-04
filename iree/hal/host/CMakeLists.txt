@@ -16,6 +16,37 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    condvar_semaphore
+  HDRS
+    "condvar_semaphore.h"
+  SRCS
+    "condvar_semaphore.cc"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::span
+    absl::synchronization
+    iree::base::status
+    iree::base::tracing
+    iree::hal::semaphore
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    condvar_semaphore_test
+  SRCS
+    "condvar_semaphore_test.cc"
+  DEPS
+    ::condvar_semaphore
+    absl::time
+    iree::base::status
+    iree::base::status_matchers
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     host_buffer
   HDRS
     "host_buffer.h"
@@ -109,37 +140,6 @@ iree_cc_library(
     iree::hal::command_buffer_validation
     iree::hal::device
   PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    host_semaphore
-  HDRS
-    "host_semaphore.h"
-  SRCS
-    "host_semaphore.cc"
-  DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::span
-    absl::synchronization
-    iree::base::status
-    iree::base::tracing
-    iree::hal::semaphore
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    host_semaphore_test
-  SRCS
-    "host_semaphore_test.cc"
-  DEPS
-    ::host_semaphore
-    absl::time
-    iree::base::status
-    iree::base::status_matchers
-    iree::testing::gtest_main
 )
 
 iree_cc_library(
