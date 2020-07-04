@@ -22,6 +22,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 SerialCommandProcessor::SerialCommandProcessor(
     CommandCategoryBitfield command_categories)
@@ -237,5 +238,6 @@ Status SerialCommandProcessor::DispatchGrid(
   return OkStatus();
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

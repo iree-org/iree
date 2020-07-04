@@ -19,6 +19,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // A no-op event that can be used when a scheduling model does not perform
 // intra-command buffer out-of-order execution. Since events must always have
@@ -30,6 +31,7 @@ class NopEvent final : public Event {
   ~NopEvent() override;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

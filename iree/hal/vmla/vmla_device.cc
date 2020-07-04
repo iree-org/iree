@@ -24,7 +24,7 @@ namespace hal {
 namespace vmla {
 
 VMLADevice::VMLADevice(DeviceInfo device_info,
-                       std::unique_ptr<SchedulingModel> scheduling_model,
+                       std::unique_ptr<host::SchedulingModel> scheduling_model,
                        iree_vm_instance_t* instance,
                        iree_vm_module_t* vmla_module)
     : HostLocalDevice(std::move(device_info), std::move(scheduling_model)),

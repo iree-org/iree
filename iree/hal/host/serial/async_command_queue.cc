@@ -20,6 +20,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 AsyncCommandQueue::AsyncCommandQueue(std::unique_ptr<CommandQueue> target_queue)
     : CommandQueue(target_queue->name(), target_queue->supported_categories()),
@@ -121,5 +122,6 @@ Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
   return submission_queue_.permanent_error();
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

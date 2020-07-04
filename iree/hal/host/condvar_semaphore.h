@@ -26,6 +26,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Simple host-only semaphore semaphore implemented with a mutex.
 // Uses a condition variable to track the current value.
@@ -59,6 +60,7 @@ class CondVarSemaphore final : public Semaphore {
   Status status_ ABSL_GUARDED_BY(mutex_);
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

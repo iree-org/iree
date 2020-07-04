@@ -613,7 +613,7 @@ iree_hal_allocator_create_host_local(iree_allocator_t allocator,
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   *out_allocator =
-      reinterpret_cast<iree_hal_allocator_t*>(new HostLocalAllocator());
+      reinterpret_cast<iree_hal_allocator_t*>(new host::HostLocalAllocator());
   return IREE_STATUS_OK;
 }
 

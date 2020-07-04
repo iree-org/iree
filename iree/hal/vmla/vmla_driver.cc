@@ -84,7 +84,7 @@ StatusOr<ref_ptr<Device>> VMLADriver::CreateDefaultDevice() {
 }
 
 StatusOr<ref_ptr<Device>> VMLADriver::CreateDevice(DriverDeviceID device_id) {
-  auto scheduling_model = std::make_unique<SerialSchedulingModel>();
+  auto scheduling_model = std::make_unique<host::SerialSchedulingModel>();
   auto device =
       make_ref<VMLADevice>(GetDefaultDeviceInfo(), std::move(scheduling_model),
                            instance_, vmla_module_);

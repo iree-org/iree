@@ -23,6 +23,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 SerialSubmissionQueue::SerialSubmissionQueue() = default;
 
@@ -186,5 +187,6 @@ void SerialSubmissionQueue::SignalShutdown() {
   has_shutdown_ = true;
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

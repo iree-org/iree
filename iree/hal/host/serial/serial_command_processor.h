@@ -21,6 +21,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Host-local command processor for dispatching transfer operations against
 // buffers allocated from the HostLocalAllocator.
@@ -102,6 +103,7 @@ class SerialCommandProcessor final : public CommandBuffer {
       descriptor_sets_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

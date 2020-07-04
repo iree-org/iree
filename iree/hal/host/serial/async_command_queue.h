@@ -26,6 +26,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Asynchronous command queue wrapper.
 // This creates a single thread to perform all CommandQueue operations. Any
@@ -64,6 +65,7 @@ class AsyncCommandQueue final : public CommandQueue {
   SerialSubmissionQueue submission_queue_ ABSL_GUARDED_BY(submission_mutex_);
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

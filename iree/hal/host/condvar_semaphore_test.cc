@@ -12,17 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/hal/host/condvar_semaphore.h"
+
 #include <cstdint>
 #include <thread>  // NOLINT
 
 #include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
-#include "iree/hal/host/condvar_semaphore.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {
+namespace host {
 namespace {
 
 // Tests that a semaphore that is unused properly cleans itself up.
@@ -139,5 +141,6 @@ TEST(CondVarSemaphoreTest, FailNotifies) {
 }
 
 }  // namespace
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

@@ -16,10 +16,12 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 NopEvent::NopEvent() = default;
 
 NopEvent::~NopEvent() = default;
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

@@ -23,8 +23,9 @@ namespace iree {
 namespace hal {
 namespace llvmjit {
 
-LLVMJITDevice::LLVMJITDevice(DeviceInfo device_info,
-                             std::unique_ptr<SchedulingModel> scheduling_model)
+LLVMJITDevice::LLVMJITDevice(
+    DeviceInfo device_info,
+    std::unique_ptr<host::SchedulingModel> scheduling_model)
     : HostLocalDevice(std::move(device_info), std::move(scheduling_model)) {}
 
 LLVMJITDevice::~LLVMJITDevice() = default;

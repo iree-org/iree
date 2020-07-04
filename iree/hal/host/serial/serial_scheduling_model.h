@@ -21,6 +21,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Performs host-local scheduling by way of a simple serial queue.
 // Submissions and commands are processed in-order one at a time on a single
@@ -58,6 +59,7 @@ class SerialSchedulingModel final : public SchedulingModel {
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

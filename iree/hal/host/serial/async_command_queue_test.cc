@@ -32,6 +32,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 namespace {
 
 using ::testing::_;
@@ -218,5 +219,6 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
 }
 
 }  // namespace
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

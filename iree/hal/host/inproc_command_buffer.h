@@ -22,6 +22,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // In-process command buffer with support for recording and playback.
 // Commands are recorded into heap-allocated arenas with pointers to used
@@ -292,6 +293,7 @@ class InProcCommandBuffer final : public CommandBuffer {
   CmdList current_cmd_list_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

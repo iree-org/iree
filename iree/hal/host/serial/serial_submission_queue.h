@@ -25,6 +25,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // A queue managing CommandQueue submissions that uses host-local
 // synchronization primitives. Evaluates submission order by respecting the
@@ -111,6 +112,7 @@ class SerialSubmissionQueue final {
   IntrusiveList<std::unique_ptr<Submission>> list_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

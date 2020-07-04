@@ -24,6 +24,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 namespace {
 
 // A CommandQueue that performs no synchronization (semaphores/fences) and just
@@ -127,5 +128,6 @@ Status SerialSchedulingModel::WaitIdle(absl::Time deadline) {
   return OkStatus();
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/hal/host/condvar_semaphore.h"
+
 #include <atomic>
 #include <cstdint>
 
@@ -19,10 +21,10 @@
 #include "absl/synchronization/mutex.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/host/condvar_semaphore.h"
 
 namespace iree {
 namespace hal {
+namespace host {
 
 CondVarSemaphore::CondVarSemaphore(uint64_t initial_value)
     : value_(initial_value) {}
@@ -108,5 +110,6 @@ Status CondVarSemaphore::Wait(uint64_t value, absl::Time deadline) {
   return WaitForSemaphores({{this, value}}, /*wait_all=*/true, deadline);
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

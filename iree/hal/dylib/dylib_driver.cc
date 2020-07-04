@@ -56,7 +56,7 @@ StatusOr<ref_ptr<Device>> DyLibDriver::CreateDefaultDevice() {
 
 StatusOr<ref_ptr<Device>> DyLibDriver::CreateDevice(DriverDeviceID device_id) {
   // Only one device, ignore device_id.
-  auto scheduling_model = std::make_unique<SerialSchedulingModel>();
+  auto scheduling_model = std::make_unique<host::SerialSchedulingModel>();
   return make_ref<DyLibDevice>(GetDefaultDeviceInfo(),
                                std::move(scheduling_model));
 }
