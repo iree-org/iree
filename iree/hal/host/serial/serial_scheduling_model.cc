@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/serial_scheduling_model.h"
+#include "iree/hal/host/serial/serial_scheduling_model.h"
 
 #include "iree/base/tracing.h"
 #include "iree/hal/host/async_command_queue.h"
 #include "iree/hal/host/host_event.h"
 #include "iree/hal/host/host_semaphore.h"
 #include "iree/hal/host/inproc_command_buffer.h"
-#include "iree/hal/host/serial_command_processor.h"
-#include "iree/hal/host/serial_submission_queue.h"
+#include "iree/hal/host/serial/serial_command_processor.h"
+#include "iree/hal/host/serial/serial_submission_queue.h"
 
 namespace iree {
 namespace hal {

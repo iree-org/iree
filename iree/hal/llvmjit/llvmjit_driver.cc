@@ -17,7 +17,7 @@
 #include <memory>
 
 #include "iree/hal/device_info.h"
-#include "iree/hal/host/serial_scheduling_model.h"
+#include "iree/hal/host/serial/serial_scheduling_model.h"
 #include "iree/hal/llvmjit/llvmjit_device.h"
 
 namespace iree {

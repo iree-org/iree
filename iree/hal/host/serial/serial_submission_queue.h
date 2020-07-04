@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_SERIAL_SUBMISSION_QUEUE_H_
-#define IREE_HAL_HOST_SERIAL_SUBMISSION_QUEUE_H_
+#ifndef IREE_HAL_HOST_SERIAL_SERIAL_SUBMISSION_QUEUE_H_
+#define IREE_HAL_HOST_SERIAL_SERIAL_SUBMISSION_QUEUE_H_
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
@@ -114,4 +114,4 @@ class SerialSubmissionQueue final {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_SERIAL_SUBMISSION_QUEUE_H_
+#endif  // IREE_HAL_HOST_SERIAL_SERIAL_SUBMISSION_QUEUE_H_

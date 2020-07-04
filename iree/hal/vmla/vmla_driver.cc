@@ -19,7 +19,7 @@
 #include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
-#include "iree/hal/host/serial_scheduling_model.h"
+#include "iree/hal/host/serial/serial_scheduling_model.h"
 #include "iree/hal/vmla/vmla_device.h"
 #include "iree/hal/vmla/vmla_module.h"
 #include "iree/vm/module.h"

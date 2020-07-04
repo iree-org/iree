@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
-#define IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
+#ifndef IREE_HAL_HOST_SERIAL_SERIAL_COMMAND_PROCESSOR_H_
+#define IREE_HAL_HOST_SERIAL_SERIAL_COMMAND_PROCESSOR_H_
 
 #include "absl/container/inlined_vector.h"
 #include "iree/hal/command_buffer.h"
@@ -105,4 +105,4 @@ class SerialCommandProcessor final : public CommandBuffer {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_SERIAL_COMMAND_PROCESSOR_H_
+#endif  // IREE_HAL_HOST_SERIAL_SERIAL_COMMAND_PROCESSOR_H_

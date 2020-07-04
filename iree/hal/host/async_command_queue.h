@@ -21,7 +21,7 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/serial_submission_queue.h"
+#include "iree/hal/host/serial/serial_submission_queue.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {

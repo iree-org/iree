@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/serial_submission_queue.h"
+#include "iree/hal/host/serial/serial_submission_queue.h"
 
 #include <atomic>
 #include <cstdint>
