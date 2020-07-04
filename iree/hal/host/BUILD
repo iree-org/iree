@@ -21,39 +21,6 @@ package(
 )
 
 cc_library(
-    name = "async_command_queue",
-    srcs = ["async_command_queue.cc"],
-    hdrs = ["async_command_queue.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:command_queue",
-        "//iree/hal/host/serial:serial_submission_queue",
-        "//iree/hal:semaphore",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-cc_test(
-    name = "async_command_queue_test",
-    srcs = ["async_command_queue_test.cc"],
-    deps = [
-        ":async_command_queue",
-        "//iree/base:status",
-        "//iree/base:status_matchers",
-        "//iree/base:time",
-        "//iree/hal:command_queue",
-        "//iree/hal/host/serial:serial_submission_queue",
-        "//iree/hal/testing:mock_command_buffer",
-        "//iree/hal/testing:mock_command_queue",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/time",
-    ],
-)
-
-cc_library(
     name = "host_buffer",
     srcs = ["host_buffer.cc"],
     hdrs = ["host_buffer.h"],

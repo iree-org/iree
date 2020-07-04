@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/async_command_queue.h"
+#include "iree/hal/host/serial/async_command_queue.h"
 
 #include <cstdint>
 #include <memory>

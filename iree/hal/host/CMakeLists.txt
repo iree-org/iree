@@ -16,43 +16,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    async_command_queue
-  HDRS
-    "async_command_queue.h"
-  SRCS
-    "async_command_queue.cc"
-  DEPS
-    absl::core_headers
-    absl::synchronization
-    iree::base::status
-    iree::base::tracing
-    iree::hal::command_queue
-    iree::hal::host::serial::serial_submission_queue
-    iree::hal::semaphore
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    async_command_queue_test
-  SRCS
-    "async_command_queue_test.cc"
-  DEPS
-    ::async_command_queue
-    absl::memory
-    absl::time
-    iree::base::status
-    iree::base::status_matchers
-    iree::base::time
-    iree::hal::command_queue
-    iree::hal::host::serial::serial_submission_queue
-    iree::hal::testing::mock_command_buffer
-    iree::hal::testing::mock_command_queue
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     host_buffer
   HDRS
     "host_buffer.h"

@@ -21,6 +21,39 @@ package(
 )
 
 cc_library(
+    name = "async_command_queue",
+    srcs = ["async_command_queue.cc"],
+    hdrs = ["async_command_queue.h"],
+    deps = [
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:command_queue",
+        "//iree/hal/host/serial:serial_submission_queue",
+        "//iree/hal:semaphore",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_test(
+    name = "async_command_queue_test",
+    srcs = ["async_command_queue_test.cc"],
+    deps = [
+        ":async_command_queue",
+        "//iree/base:status",
+        "//iree/base:status_matchers",
+        "//iree/base:time",
+        "//iree/hal:command_queue",
+        "//iree/hal/host/serial:serial_submission_queue",
+        "//iree/hal/testing:mock_command_buffer",
+        "//iree/hal/testing:mock_command_queue",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+cc_library(
     name = "serial_command_processor",
     srcs = ["serial_command_processor.cc"],
     hdrs = ["serial_command_processor.h"],
@@ -41,13 +74,13 @@ cc_library(
     srcs = ["serial_scheduling_model.cc"],
     hdrs = ["serial_scheduling_model.h"],
     deps = [
+        ":async_command_queue",
         ":serial_command_processor",
         ":serial_submission_queue",
         "//iree/base:memory",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal/host:async_command_queue",
         "//iree/hal/host:nop_event",
         "//iree/hal/host:host_semaphore",
         "//iree/hal/host:inproc_command_buffer",

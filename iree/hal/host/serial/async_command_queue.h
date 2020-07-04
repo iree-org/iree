@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_ASYNC_COMMAND_QUEUE_H_
-#define IREE_HAL_HOST_ASYNC_COMMAND_QUEUE_H_
+#ifndef IREE_HAL_HOST_SERIAL_ASYNC_COMMAND_QUEUE_H_
+#define IREE_HAL_HOST_SERIAL_ASYNC_COMMAND_QUEUE_H_
 
 #include <memory>
 #include <thread>  // NOLINT
@@ -67,4 +67,4 @@ class AsyncCommandQueue final : public CommandQueue {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_ASYNC_COMMAND_QUEUE_H_
+#endif  // IREE_HAL_HOST_SERIAL_ASYNC_COMMAND_QUEUE_H_
