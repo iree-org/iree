@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_event.h"
+#include "iree/hal/host/nop_event.h"
 
 namespace iree {
 namespace hal {
 
-HostEvent::HostEvent() = default;
+NopEvent::NopEvent() = default;
 
-HostEvent::~HostEvent() = default;
+NopEvent::~NopEvent() = default;
 
 }  // namespace hal
 }  // namespace iree

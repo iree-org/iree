@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_HOST_EVENT_H_
-#define IREE_HAL_HOST_HOST_EVENT_H_
+#ifndef IREE_HAL_HOST_NOP_EVENT_H_
+#define IREE_HAL_HOST_NOP_EVENT_H_
 
 #include "iree/hal/event.h"
 
 namespace iree {
 namespace hal {
 
-class HostEvent final : public Event {
+// A no-op event that can be used when a scheduling model does not perform
+// intra-command buffer out-of-order execution. Since events must always have
+// a signal recorded prior to recording a wait they are fine to ignore in
+// in-order command processors.
+class NopEvent final : public Event {
  public:
-  HostEvent();
-  ~HostEvent() override;
+  NopEvent();
+  ~NopEvent() override;
 };
 
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_HOST_EVENT_H_
+#endif  // IREE_HAL_HOST_NOP_EVENT_H_

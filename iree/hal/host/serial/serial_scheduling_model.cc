@@ -16,9 +16,9 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/host/async_command_queue.h"
-#include "iree/hal/host/host_event.h"
 #include "iree/hal/host/host_semaphore.h"
 #include "iree/hal/host/inproc_command_buffer.h"
+#include "iree/hal/host/nop_event.h"
 #include "iree/hal/host/serial/serial_command_processor.h"
 #include "iree/hal/host/serial/serial_submission_queue.h"
 
@@ -100,7 +100,7 @@ StatusOr<ref_ptr<CommandBuffer>> SerialSchedulingModel::CreateCommandBuffer(
 }
 
 StatusOr<ref_ptr<Event>> SerialSchedulingModel::CreateEvent() {
-  return make_ref<HostEvent>();
+  return make_ref<NopEvent>();
 }
 
 StatusOr<ref_ptr<Semaphore>> SerialSchedulingModel::CreateSemaphore(

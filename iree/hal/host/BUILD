@@ -77,15 +77,6 @@ cc_library(
 )
 
 cc_library(
-    name = "host_event",
-    srcs = ["host_event.cc"],
-    hdrs = ["host_event.h"],
-    deps = [
-        "//iree/hal:event",
-    ],
-)
-
-cc_library(
     name = "host_executable",
     hdrs = ["host_executable.h"],
     deps = [
@@ -179,6 +170,15 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
+    ],
+)
+
+cc_library(
+    name = "nop_event",
+    srcs = ["nop_event.cc"],
+    hdrs = ["nop_event.h"],
+    deps = [
+        "//iree/hal:event",
     ],
 )
 

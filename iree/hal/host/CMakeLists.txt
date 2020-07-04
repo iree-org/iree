@@ -82,18 +82,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    host_event
-  HDRS
-    "host_event.h"
-  SRCS
-    "host_event.cc"
-  DEPS
-    iree::hal::event
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     host_executable
   HDRS
     "host_executable.h"
@@ -204,6 +192,18 @@ iree_cc_library(
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    nop_event
+  HDRS
+    "nop_event.h"
+  SRCS
+    "nop_event.cc"
+  DEPS
+    iree::hal::event
   PUBLIC
 )
 

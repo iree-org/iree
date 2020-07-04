@@ -48,7 +48,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:async_command_queue",
-        "//iree/hal/host:host_event",
+        "//iree/hal/host:nop_event",
         "//iree/hal/host:host_semaphore",
         "//iree/hal/host:inproc_command_buffer",
         "//iree/hal/host:scheduling_model",
