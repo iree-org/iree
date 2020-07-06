@@ -206,10 +206,21 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   // We need to return all remaining submissions back to the queue to avoid
   // dropping work.
   auto submission_cleanup = MakeCleanup([this, &remaining_submissions]() {
+// Disable thread-safety-analysis as it doesn't understand this lambda.
+//   - This entire function is ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+//   - This Cleanup object is destroyed when it drops out of scope
+//   - The mutex is always held when executing this function
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wthread-safety-analysis"
+#endif
     while (!remaining_submissions.empty()) {
       deferred_submissions_.push_back(
           remaining_submissions.take(remaining_submissions.front()));
     }
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
   });
 
   while (!deferred_submissions_.empty()) {
