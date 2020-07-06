@@ -350,7 +350,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         return spvFuncOp.emitError("unable to find workgroup count");
 
       builder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, /*entryPointOrdinal=*/it.index(),
+          loc, commandBuffer, executable, dispatchState.entryPointOp,
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);
       if (it.index() + 1 != entryPointFns.size()) {
         recordFullExecutionBarrier(commandBuffer, loc, builder);

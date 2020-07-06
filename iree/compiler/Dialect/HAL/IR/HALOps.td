@@ -1180,7 +1180,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     %y = constant 32 : index
     %z = constant 1 : index
     hal.command_buffer.dispatch %cmd, %executable,
-                                entry_point = 0,
+                                entry_point = @executable::entry0,
                                 workgroup_xyz = [%x, %y, %z]
     ```
   }];
@@ -1188,7 +1188,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
-    HAL_OrdinalAttr:$entry_point,
+    SymbolRefAttr:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
     HAL_Dim:$workgroup_z
@@ -1207,11 +1207,6 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
       Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
       Value workgroupX, Value workgroupY, Value workgroupZ
     }]>,
-    OpBuilder<[{
-      Builder &builder, OperationState &state, Value commandBuffer,
-      Value executable, unsigned entryPointOrdinal,
-      Value workgroupX, Value workgroupY, Value workgroupZ
-    }]>,
   ];
 }
 
@@ -1223,7 +1218,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
 
     ```mlir
     hal.command_buffer.dispatch.indirect %cmd, %executable,
-                                         entry_point = 0,
+                                         entry_point = @executable::entry0,
                                          workgroups = %buffer[%offset]
     ```
   }];
@@ -1231,7 +1226,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
-    HAL_OrdinalAttr:$entry_point,
+    SymbolRefAttr:$entry_point,
     HAL_Buffer:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset
   );

@@ -30,11 +30,11 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     //  CHECK-DAG: %[[EXE:.+]] = hal.executable.lookup {{.+}}, @ex0 : !hal.executable
     //  CHECK-DAG: %[[EXE_LAYOUT:.+]] = hal.executable_layout.lookup
     //      CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %[[EXE_LAYOUT]], set=0, bindings=[0 = (%arg0, %c0, %sz_3), 1 = (%buffer_1, %c0, %sz_4)]
-    //      CHECK: hal.command_buffer.dispatch {{.+}}, entry_point = 0, workgroup_xyz
+    //      CHECK: hal.command_buffer.dispatch {{.+}}, entry_point = @ex0::@entry0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
     %1 = flow.dispatch @ex0::@entry0[%arg1 : index](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
     //      CHECK: hal.command_buffer.push_descriptor_set
-    //      CHECK: hal.command_buffer.dispatch {{.+}}, entry_point = 0, workgroup_xyz
+    //      CHECK: hal.command_buffer.dispatch {{.+}}, entry_point = @ex0::@entry0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
     %2 = flow.dispatch @ex0::@entry0[%arg1 : index](%1) : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>

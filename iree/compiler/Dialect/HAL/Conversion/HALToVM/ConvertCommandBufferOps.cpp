@@ -162,6 +162,85 @@ class CommandBufferPushDescriptorSetOpConversion
   mutable IREE::VM::ImportOp importOp;
 };
 
+class CommandBufferDispatchOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchOp> {
+ public:
+  CommandBufferDispatchOpConversion(MLIRContext *context,
+                                    SymbolTable &importSymbols,
+                                    TypeConverter &typeConverter,
+                                    StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferDispatchOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getType();
+
+    // Extract entry point ordinal from the nested symbol reference.
+    auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
+        SymbolTable::lookupNearestSymbolFrom(op, op.entry_point()));
+    auto entryPointOrdinal = rewriter.create<mlir::ConstantOp>(
+        op.getLoc(), rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                         entryPointOp.ordinalAttr().getInt())));
+
+    SmallVector<Value, 6> callOperands = {
+        op.command_buffer(), op.executable(),  entryPointOrdinal,
+        op.workgroup_x(),    op.workgroup_y(), op.workgroup_z(),
+    };
+
+    rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
+        callOperands);
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
+class CommandBufferDispatchIndirectOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferDispatchIndirectOp> {
+ public:
+  CommandBufferDispatchIndirectOpConversion(MLIRContext *context,
+                                            SymbolTable &importSymbols,
+                                            TypeConverter &typeConverter,
+                                            StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferDispatchIndirectOp op,
+      llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getType();
+
+    // Extract entry point ordinal from the nested symbol reference.
+    auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
+        SymbolTable::lookupNearestSymbolFrom(op, op.entry_point()));
+    auto entryPointOrdinal = rewriter.create<mlir::ConstantOp>(
+        op.getLoc(), rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                         entryPointOp.ordinalAttr().getInt())));
+
+    SmallVector<Value, 5> callOperands = {
+        op.command_buffer(),    op.executable(),        entryPointOrdinal,
+        op.workgroups_buffer(), op.workgroups_offset(),
+    };
+
+    rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
+        callOperands);
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 }  // namespace
 
 void populateHALCommandBufferToVMPatterns(MLIRContext *context,
@@ -194,12 +273,11 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       VMImportOpConversion<IREE::HAL::CommandBufferBindDescriptorSetOp>>(
       context, importSymbols, typeConverter,
       "hal.command_buffer.bind_descriptor_set");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchOp>>(
+  patterns.insert<CommandBufferDispatchOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
-  patterns
-      .insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchIndirectOp>>(
-          context, importSymbols, typeConverter,
-          "hal.command_buffer.dispatch.indirect");
+  patterns.insert<CommandBufferDispatchIndirectOpConversion>(
+      context, importSymbols, typeConverter,
+      "hal.command_buffer.dispatch.indirect");
 }
 
 }  // namespace iree_compiler
