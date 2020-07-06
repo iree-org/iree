@@ -1496,7 +1496,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 }
 
 def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
-    HasParent<"IREE::HAL::ExecutableOp">,
+    HasParent<["IREE::HAL::ExecutableOp"]>,
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable op}];
@@ -1520,7 +1520,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
 
 def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
     IsolatedFromAbove,
-    HasParent<"IREE::HAL::ExecutableOp">,
+    HasParent<["IREE::HAL::ExecutableOp"]>,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableTargetEndOp">,
   ]> {
   let summary = [{target executable IR}];
@@ -1555,7 +1555,7 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
 }
 
 def HAL_ExecutableTargetEndOp : HAL_Op<"executable.target_end", [
-    HasParent<"IREE::HAL::ExecutableTargetOp">,
+    HasParent<["IREE::HAL::ExecutableTargetOp"]>,
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable target op}];
@@ -1564,7 +1564,7 @@ def HAL_ExecutableTargetEndOp : HAL_Op<"executable.target_end", [
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
     IsolatedFromAbove,
-    HasParent<"IREE::HAL::ExecutableOp">,
+    HasParent<["IREE::HAL::ExecutableOp"]>,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableBinaryEndOp">,
   ]> {
   let summary = [{compiled executable binary data}];
@@ -1606,7 +1606,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 }
 
 def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
-    HasParent<"IREE::HAL::ExecutableBinaryOp">,
+    HasParent<["IREE::HAL::ExecutableBinaryOp"]>,
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable binary op}];
@@ -1651,7 +1651,7 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
 
 def HAL_InterfaceOp : HAL_Op<"interface", [
     IsolatedFromAbove,
-    // HasParent<"IREE::HAL::ExecutableOp">,
+    // HasParent<["IREE::HAL::ExecutableOp"]>,
     SingleBlockImplicitTerminator<"IREE::HAL::InterfaceEndOp">,
     Symbol,
     SymbolTable,
@@ -1703,7 +1703,7 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
 }
 
 def HAL_InterfaceEndOp : HAL_Op<"interface_end", [
-    HasParent<"IREE::HAL::InterfaceOp">,
+    HasParent<["IREE::HAL::InterfaceOp"]>,
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable interface op}];
@@ -1711,7 +1711,7 @@ def HAL_InterfaceEndOp : HAL_Op<"interface_end", [
 }
 
 def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
-    HasParent<"IREE::HAL::InterfaceOp">,
+    HasParent<["IREE::HAL::InterfaceOp"]>,
     Symbol,
   ]> {
   let summary = [{executable IO binding description}];

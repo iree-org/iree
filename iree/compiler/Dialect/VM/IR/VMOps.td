@@ -65,7 +65,7 @@ def VM_ModuleOp : VM_Op<"module", [
 }
 
 def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
-    HasParent<"IREE::VM::ModuleOp">,
+    HasParent<["IREE::VM::ModuleOp"]>,
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the module op}];
@@ -77,7 +77,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 // TODO(benvanik): attributes for function analysis: pure, etc (for imports).
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
-    HasParent<"IREE::VM::ModuleOp">,
+    HasParent<["IREE::VM::ModuleOp"]>,
     NativeOpTrait<"FunctionLike">,
     CallableOpInterface,
     Symbol,
@@ -145,7 +145,7 @@ def VM_FuncOp : VM_Op<"func", [
 }
 
 def VM_ExportOp : VM_Op<"export", [
-    HasParent<"IREE::VM::ModuleOp">,
+    HasParent<["IREE::VM::ModuleOp"]>,
   ]> {
   let summary = [{exports a function from the module}];
   let description = [{
@@ -254,7 +254,7 @@ def VM_ImportOp : VM_Op<"import", [
 class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       IsolatedFromAbove,
-      HasParent<"IREE::VM::ModuleOp">,
+      HasParent<["IREE::VM::ModuleOp"]>,
       Symbol,
     ])> {
   let arguments = (ins
@@ -641,7 +641,7 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
 
 def VM_RodataOp : VM_Op<"rodata", [
     IsolatedFromAbove,
-    HasParent<"IREE::VM::ModuleOp">,
+    HasParent<["IREE::VM::ModuleOp"]>,
     Symbol,
   ]> {
   let summary = [{read-only data definition operation}];
@@ -1786,7 +1786,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-    HasParent<"IREE::VM::FuncOp">,
+    HasParent<["IREE::VM::FuncOp"]>,
     Terminator,
   ]> {
   let summary = "return operation";
@@ -1822,7 +1822,7 @@ def VM_ReturnOp : VM_Op<"return", [
 
 def VM_FailOp : VM_Op<"fail", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-    HasParent<"IREE::VM::FuncOp">,
+    HasParent<["IREE::VM::FuncOp"]>,
     Terminator,
   ]> {
   let summary = [{raises a global failure}];
@@ -1873,7 +1873,7 @@ def VM_FailOp : VM_Op<"fail", [
 }
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
-    HasParent<"IREE::VM::FuncOp">,
+    HasParent<["IREE::VM::FuncOp"]>,
     VM_PseudoOp,
   ]> {
   let summary = [{raises a global failure if the condition is true}];
@@ -2020,7 +2020,7 @@ def VM_CheckNZOp : VM_UnaryCheckOp<"check.nz"> {
 
 def VM_YieldOp : VM_Op<"yield", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-    HasParent<"IREE::VM::FuncOp">,
+    HasParent<["IREE::VM::FuncOp"]>,
     YieldPoint,
   ]> {
   let summary = [{unconditional fiber yield operation}];

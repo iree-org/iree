@@ -307,7 +307,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 }
 
 def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
-    HasParent<"IREE::Flow::ExecutableOp">,
+    HasParent<["IREE::Flow::ExecutableOp"]>,
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable op}];
@@ -315,7 +315,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
 }
 
 def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
-    HasParent<"IREE::Flow::ExecutableOp">,
+    HasParent<["IREE::Flow::ExecutableOp"]>,
     Symbol,
   ]> {
   let summary = [{defines an executable entry point for dispatch operations}];
