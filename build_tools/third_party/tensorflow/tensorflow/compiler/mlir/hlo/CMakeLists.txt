@@ -203,5 +203,5 @@ external_tablegen_library(
   SRCS
     "lib/Dialect/mhlo/transforms/legalize_to_standard_patterns.td"
   OUTS
-    -gen-rewriters transforms/generated_legalize_to_standard.inc
+    -gen-rewriters lib/Dialect/mhlo/transforms/generated_legalize_to_standard.inc
 )
