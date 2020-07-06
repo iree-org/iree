@@ -59,6 +59,6 @@ iree_cc_library(
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Utils
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )

@@ -121,7 +121,7 @@ iree_cc_binary(
     iree::tools::init_mlir_passes_and_dialects
     iree::tools::init_targets
     iree::tools::init_xla_dialects
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
 )
 
 iree_cc_binary(

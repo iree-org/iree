@@ -40,6 +40,6 @@ iree_cc_library(
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils
     iree::schemas::spirv_executable_def_cc_fbs
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )

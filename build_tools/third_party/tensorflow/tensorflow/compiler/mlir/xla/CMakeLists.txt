@@ -32,20 +32,10 @@ external_cc_library(
   ROOT
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
-    "transforms/chlo_legalize_to_hlo.cc"
-    "transforms/cycle_detector.cc"
-    "transforms/legalize_control_flow.cc"
-    "transforms/legalize_to_standard.cc"
-    "transforms/lower_general_dot.cc"
-    "transforms/materialize_broadcasts.cc"
-    "transforms/unfuse_batch_norm.cc"
-    "transforms/xla_hlo_fusion.cc"
-    "transforms/xla_legalize_to_linalg.cc"
+
+
   HDRS
-    "transforms/cycle_detector.h"
-    "transforms/map_xla_to_scalar_op.h"
-    "transforms/passes.h"
-    "transforms/rewriters.h"
+
   COPTS
     ${TF_MLIR_XLA_COPTS_BASE}
   INCLUDES
@@ -70,19 +60,4 @@ external_cc_library(
     MLIRTransformUtils
     MLIRTransforms
   PUBLIC
-)
-
-external_tablegen_library(
-  PACKAGE
-    tensorflow
-  NAME
-    mlir_xla_legalize_to_standard_patterns_gen
-  TBLGEN
-    MLIR
-  ROOT
-    ${TF_MLIR_XLA_SRC_ROOT}
-  SRCS
-    "transforms/legalize_to_standard_patterns.td"
-  OUTS
-    -gen-rewriters transforms/generated_legalize_to_standard.inc
 )
