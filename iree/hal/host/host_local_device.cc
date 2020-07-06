@@ -25,6 +25,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 HostLocalDevice::HostLocalDevice(
     DeviceInfo device_info, std::unique_ptr<SchedulingModel> scheduling_model)
@@ -92,5 +93,6 @@ Status HostLocalDevice::WaitIdle(absl::Time deadline) {
   return scheduling_model_->WaitIdle(deadline);
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

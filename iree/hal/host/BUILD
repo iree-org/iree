@@ -21,34 +21,28 @@ package(
 )
 
 cc_library(
-    name = "async_command_queue",
-    srcs = ["async_command_queue.cc"],
-    hdrs = ["async_command_queue.h"],
+    name = "condvar_semaphore",
+    srcs = ["condvar_semaphore.cc"],
+    hdrs = ["condvar_semaphore.h"],
     deps = [
-        ":serial_submission_queue",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//iree/hal:command_queue",
         "//iree/hal:semaphore",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
 cc_test(
-    name = "async_command_queue_test",
-    srcs = ["async_command_queue_test.cc"],
+    name = "condvar_semaphore_test",
+    srcs = ["condvar_semaphore_test.cc"],
     deps = [
-        ":async_command_queue",
-        ":serial_submission_queue",
+        ":condvar_semaphore",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "//iree/base:time",
-        "//iree/hal:command_queue",
-        "//iree/hal/testing:mock_command_buffer",
-        "//iree/hal/testing:mock_command_queue",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/time",
     ],
 )
@@ -73,15 +67,6 @@ cc_library(
         "//iree/hal:descriptor_set",
         "//iree/hal:descriptor_set_layout",
         "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
-    name = "host_event",
-    srcs = ["host_event.cc"],
-    hdrs = ["host_event.h"],
-    deps = [
-        "//iree/hal:event",
     ],
 )
 
@@ -143,33 +128,6 @@ cc_library(
 )
 
 cc_library(
-    name = "host_semaphore",
-    srcs = ["host_semaphore.cc"],
-    hdrs = ["host_semaphore.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:semaphore",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "host_semaphore_test",
-    srcs = ["host_semaphore_test.cc"],
-    deps = [
-        ":host_semaphore",
-        "//iree/base:status",
-        "//iree/base:status_matchers",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/time",
-    ],
-)
-
-cc_library(
     name = "inproc_command_buffer",
     srcs = ["inproc_command_buffer.cc"],
     hdrs = ["inproc_command_buffer.h"],
@@ -183,61 +141,18 @@ cc_library(
 )
 
 cc_library(
+    name = "nop_event",
+    srcs = ["nop_event.cc"],
+    hdrs = ["nop_event.h"],
+    deps = [
+        "//iree/hal:event",
+    ],
+)
+
+cc_library(
     name = "scheduling_model",
     hdrs = ["scheduling_model.h"],
     deps = [
         "//iree/hal:command_queue",
-    ],
-)
-
-cc_library(
-    name = "serial_command_processor",
-    srcs = ["serial_command_processor.cc"],
-    hdrs = ["serial_command_processor.h"],
-    deps = [
-        ":host_descriptor_set",
-        ":host_executable",
-        ":host_executable_layout",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:command_buffer",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
-    name = "serial_scheduling_model",
-    srcs = ["serial_scheduling_model.cc"],
-    hdrs = ["serial_scheduling_model.h"],
-    deps = [
-        ":async_command_queue",
-        ":host_event",
-        ":host_semaphore",
-        ":inproc_command_buffer",
-        ":scheduling_model",
-        ":serial_command_processor",
-        ":serial_submission_queue",
-        "//iree/base:memory",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
-    name = "serial_submission_queue",
-    srcs = ["serial_submission_queue.cc"],
-    hdrs = ["serial_submission_queue.h"],
-    deps = [
-        ":host_semaphore",
-        "//iree/base:intrusive_list",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:command_queue",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/synchronization",
     ],
 )

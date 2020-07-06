@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/serial_scheduling_model.h"
+#include "iree/hal/host/serial/serial_scheduling_model.h"
 
 #include "iree/base/tracing.h"
-#include "iree/hal/host/async_command_queue.h"
-#include "iree/hal/host/host_event.h"
-#include "iree/hal/host/host_semaphore.h"
+#include "iree/hal/host/condvar_semaphore.h"
 #include "iree/hal/host/inproc_command_buffer.h"
-#include "iree/hal/host/serial_command_processor.h"
-#include "iree/hal/host/serial_submission_queue.h"
+#include "iree/hal/host/nop_event.h"
+#include "iree/hal/host/serial/async_command_queue.h"
+#include "iree/hal/host/serial/serial_command_processor.h"
+#include "iree/hal/host/serial/serial_submission_queue.h"
 
 namespace iree {
 namespace hal {
+namespace host {
 namespace {
 
 // A CommandQueue that performs no synchronization (semaphores/fences) and just
@@ -100,24 +101,24 @@ StatusOr<ref_ptr<CommandBuffer>> SerialSchedulingModel::CreateCommandBuffer(
 }
 
 StatusOr<ref_ptr<Event>> SerialSchedulingModel::CreateEvent() {
-  return make_ref<HostEvent>();
+  return make_ref<NopEvent>();
 }
 
 StatusOr<ref_ptr<Semaphore>> SerialSchedulingModel::CreateSemaphore(
     uint64_t initial_value) {
-  return make_ref<HostSemaphore>(initial_value);
+  return make_ref<CondVarSemaphore>(initial_value);
 }
 
 Status SerialSchedulingModel::WaitAllSemaphores(
     absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
-  return HostSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/true,
-                                          deadline);
+  return CondVarSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/true,
+                                             deadline);
 }
 
 StatusOr<int> SerialSchedulingModel::WaitAnySemaphore(
     absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
-  return HostSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/false,
-                                          deadline);
+  return CondVarSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/false,
+                                             deadline);
 }
 
 Status SerialSchedulingModel::WaitIdle(absl::Time deadline) {
@@ -127,5 +128,6 @@ Status SerialSchedulingModel::WaitIdle(absl::Time deadline) {
   return OkStatus();
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

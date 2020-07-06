@@ -75,7 +75,7 @@ class DawnDevice final : public Device {
   Status WaitIdle(absl::Time deadline) override;
 
  private:
-  mutable HostLocalAllocator allocator_;
+  mutable host::HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
 
   ::wgpu::Device backend_device_;

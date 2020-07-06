@@ -23,6 +23,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // A host-local device that uses host-local memory and in-process execution.
 // This implements the boilerplate needed for any device that runs on the CPU
@@ -77,6 +78,7 @@ class HostLocalDevice : public Device {
   mutable HostLocalAllocator allocator_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

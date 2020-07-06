@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/serial_submission_queue.h"
+#include "iree/hal/host/serial/serial_submission_queue.h"
 
 #include <atomic>
 #include <cstdint>
@@ -23,6 +23,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 SerialSubmissionQueue::SerialSubmissionQueue() = default;
 
@@ -31,7 +32,7 @@ SerialSubmissionQueue::~SerialSubmissionQueue() = default;
 StatusOr<bool> SerialSubmissionQueue::CheckBatchReady(
     const PendingBatch& batch) const {
   for (auto& wait_point : batch.wait_semaphores) {
-    auto* semaphore = reinterpret_cast<HostSemaphore*>(wait_point.semaphore);
+    auto* semaphore = reinterpret_cast<CondVarSemaphore*>(wait_point.semaphore);
     ASSIGN_OR_RETURN(uint64_t value, semaphore->Query());
     if (value < wait_point.value) {
       return false;
@@ -142,7 +143,8 @@ Status SerialSubmissionQueue::ProcessBatch(const PendingBatch& batch,
 
   // Signal all semaphores to allow them to unblock waiters.
   for (auto& signal_point : batch.signal_semaphores) {
-    auto* semaphore = reinterpret_cast<HostSemaphore*>(signal_point.semaphore);
+    auto* semaphore =
+        reinterpret_cast<CondVarSemaphore*>(signal_point.semaphore);
     RETURN_IF_ERROR(semaphore->Signal(signal_point.value));
   }
 
@@ -163,7 +165,7 @@ void SerialSubmissionQueue::CompleteSubmission(Submission* submission,
     for (auto& batch : submission->pending_batches) {
       for (auto& signal_point : batch.signal_semaphores) {
         auto* semaphore =
-            reinterpret_cast<HostSemaphore*>(signal_point.semaphore);
+            reinterpret_cast<CondVarSemaphore*>(signal_point.semaphore);
         semaphore->Fail(status);
       }
     }
@@ -185,5 +187,6 @@ void SerialSubmissionQueue::SignalShutdown() {
   has_shutdown_ = true;
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
