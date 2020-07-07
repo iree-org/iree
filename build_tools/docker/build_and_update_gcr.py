@@ -69,8 +69,9 @@ def parse_arguments():
 
   args = parser.parse_args()
   if args.image not in IMAGES:
-    raise parser.error(f'Expected --image to be one of:\n  {IMAGES_HELP}\nbut '
-                       f'got `{args.image}`.')
+    raise parser.error('Expected --image to be one of:\n'
+                       f'  {IMAGES_HELP}\n'
+                       f'but got `{args.image}`.')
 
   return args
 
@@ -82,7 +83,7 @@ if __name__ == '__main__':
   if args.push:
     subprocess.run(['gcloud', 'auth', 'configure-docker'])
 
-  # Check if any images depend on `args.image` and update them if so.
+  # Check if any images depend on `args.image` and update them if they do.
   images_to_update = [args.image]
   if args.image in DEPENDENCIES:
     images_to_update.extend(DEPENDENCIES[args.image])
