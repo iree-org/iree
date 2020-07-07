@@ -10,9 +10,9 @@ func @scatter_update_1D(%arg0: tensor<8xi32>, %arg1: tensor<3x1xi32>, %arg2: ten
   // CHECK-SAME: [[BUFFER]]
   // CHECK: vmla.scatter
   // CHECK-SAME: [[BUFFER]]
-  %0 = "xla_hlo.scatter"(%arg0, %arg1, %arg2) ( {
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ( {
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
-    "xla_hlo.return"(%arg4) : (tensor<i32>) -> ()
+    "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
     scatter_dimension_numbers = {
@@ -36,9 +36,9 @@ func @scatter_update_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>, %arg2: t
   // CHECK-SAME: [[BUFFER]]
   // CHECK: vmla.scatter
   // CHECK-SAME: [[BUFFER]]
-  %0 = "xla_hlo.scatter"(%arg0, %arg1, %arg2) ( {
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ( {
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
-    "xla_hlo.return"(%arg4) : (tensor<i32>) -> ()
+    "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
     scatter_dimension_numbers = {
@@ -61,9 +61,9 @@ func @scatter_update_2D_slice(%arg0: tensor<4x3xi32>, %arg1: tensor<3x1xi32>, %a
   // CHECK-SAME: [[BUFFER]]
   // CHECK: vmla.scatter
   // CHECK-SAME: [[BUFFER]]
-  %0 = "xla_hlo.scatter"(%arg0, %arg1, %arg2) ( {
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ( {
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
-    "xla_hlo.return"(%arg4) : (tensor<i32>) -> ()
+    "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
     scatter_dimension_numbers = {

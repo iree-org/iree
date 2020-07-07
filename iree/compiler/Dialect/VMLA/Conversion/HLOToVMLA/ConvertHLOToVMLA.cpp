@@ -403,12 +403,12 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
 // If attempts to handle the simplest case with updates along a single preceding
 // batch dimension and support both scattered updates per-element and per-slice.
 // It does not support swizzling / reordering slices.
-struct ScatterOpConversion : public OpConversionPattern<xla_hlo::ScatterOp> {
+struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   ScatterOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::ScatterOp scatterOp, ArrayRef<Value> operands,
+      mhlo::ScatterOp scatterOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto dimension_numbers = scatterOp.scatter_dimension_numbers();
     int rank = scatterOp.getType().cast<ShapedType>().getRank();
@@ -507,7 +507,7 @@ struct ScatterOpConversion : public OpConversionPattern<xla_hlo::ScatterOp> {
     // perform an other update.
     // TODO(suderman): Handle other numeric updates.
     auto &firstBlock = scatterOp.getRegion().front();
-    if (!isa<xla_hlo::ReturnOp>(firstBlock.front()) ||
+    if (!isa<mhlo::ReturnOp>(firstBlock.front()) ||
         firstBlock.front().getOperand(0) != firstBlock.getArgument(1)) {
       rewriter.notifyMatchFailure(scatterOp,
                                   "scatter update is not solely a write.");
