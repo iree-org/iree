@@ -37,6 +37,7 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
 // semaphore arguments should be generated. For now, it should just wrap $sync.
 // CHECK: func @staticTwoArg$async(%[[ARG0:.+]]: !hal.semaphore, %[[ARG1:.+]]: index, %[[ARG2:.+]]: !hal.buffer_view, %[[ARG3:.+]]: !hal.buffer_view, %[[ARG4:.+]]: !hal.semaphore, %[[ARG5:.+]]: index)
 // CHECK: %[[WAITRESULT:.+]] = hal.semaphore.await %[[ARG0]], min_value = %[[ARG1]] : i32
+// CHECK: hal.check_success %[[WAITRESULT]]
 // CHECK: %[[RESULT:.+]] = call @staticTwoArg$sync(%[[ARG2]], %[[ARG3]]) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
 // CHECK: hal.semaphore.signal %[[ARG4]], value = %[[ARG5]]
 // CHECK: return %[[RESULT]] : !hal.buffer_view
@@ -64,6 +65,7 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
 // semaphore arguments should be generated. For now, it should just wrap $sync.
 // CHECK: func @dynamicTwoDims$async(%[[ARG0:.+]]: !hal.semaphore, %[[ARG1:.+]]: index, %[[ARG2:.+]]: !hal.buffer_view, %[[ARG3:.+]]: !hal.semaphore, %[[ARG4:.+]]: index)
 // CHECK: %[[WAITRESULT:.+]] = hal.semaphore.await %[[ARG0]], min_value = %[[ARG1]] : i32
+// CHECK: hal.check_success %[[WAITRESULT]]
 // CHECK: %[[RESULT:.+]] = call @dynamicTwoDims$sync(%[[ARG2]]) : (!hal.buffer_view) -> !hal.buffer_view
 // CHECK: hal.semaphore.signal %[[ARG3]], value = %[[ARG4]]
 // CHECK: return %[[RESULT]] : !hal.buffer_view

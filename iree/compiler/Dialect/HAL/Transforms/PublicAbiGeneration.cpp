@@ -228,10 +228,8 @@ LogicalResult generateAsynchronousBody(FuncOp funcOp, FuncOp syncFuncOp,
   auto waitValue = entryBlock->getArgument(1);
   auto waitOp = builder.create<HAL::SemaphoreAwaitOp>(
       loc, builder.getIntegerType(32), waitSemaphore, waitValue);
-  // TODO(scotttodd): if waitOp's result is not 0 (ok), fail
-  // VM::CondFailOp (are VM ops allowed in this pass?):
-  //   %nz = vm.cmp.nz.i32 %value : i32
-  //   vm.cond_fail %nz, %waitOp, "expected non-zero"
+  auto checkSuccessOp = builder.create<HAL::CheckSuccessOp>(
+      loc, waitOp.getResult(), "semaphore wait failed");
 
   // Trim the first (wait semaphore/value) and last (signal semaphore/value)
   // two arguments.
