@@ -204,6 +204,43 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    bench-matmul-gpu
+  OUT
+    bench-matmul-gpu
+  SRCS
+    "BenchMatMulVectorGPU.cpp"
+  DEPS
+    LLVMSupport
+    MLIRAllDialects
+    MLIRExecutionEngine
+    MLIRGPU
+    MLIRGPUToVulkanTransforms
+    MLIRIR
+    MLIRLinalgOps
+    MLIRLinalgToLLVM
+    MLIRLinalgTransforms
+    MLIRParser
+    MLIRPass
+    MLIRSPIRV
+    MLIRStandardToLLVM
+    MLIRStandardToSPIRVTransforms
+    MLIRTransformUtils
+    MLIRVector
+    MLIRmlir_runner_utils
+    experimental::ModelBuilder
+    experimental::ModelBuilder::ModelRunner
+    experimental::ModelBuilder::VulkanLaunchWrapper
+    iree::base::initializer
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::LinalgToSPIRV
+    iree::hal::llvmjit::llvmjit_driver_module
+    iree::hal::vmla::vmla_driver_module
+    iree::hal::vulkan::vulkan_driver_module
+    vulkan-runtime-wrappers
+)
+
+iree_cc_binary(
+  NAME
     test-simple-mlir
   OUT
     test-simple-mlir

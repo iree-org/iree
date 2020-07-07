@@ -183,6 +183,39 @@ cc_binary(
 )
 
 cc_binary(
+    name = "bench-matmul-gpu",
+    srcs = ["BenchMatMulVectorGPU.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "//experimental/ModelBuilder:VulkanLaunchWrapper",
+        "//iree/base:initializer",
+        "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/LinalgToSPIRV",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:GPUToVulkanTransforms",
+        "@llvm-project//mlir:GPUTransforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:StandardToSPIRVConversions",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:mlir_c_runner_utils",
+        # mlir_runner_utils with iostream needed for printMemRef atm
+        "@llvm-project//mlir:mlir_runner_utils",
+    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+)
+
+cc_binary(
     name = "test-simple-mlir",
     srcs = ["TestSimpleMLIR.cpp"],
     deps = [
