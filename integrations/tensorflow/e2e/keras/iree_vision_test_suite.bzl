@@ -15,6 +15,7 @@
 """Macro for building e2e keras vision model tests."""
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
+load("@bazel_skylib//lib:new_sets.bzl", "sets")
 
 def iree_vision_test_suite(
         name,
@@ -83,16 +84,17 @@ def iree_vision_test_suite(
                 for dataset in configuration["datasets"]:
                     for backend in configuration["backends"]:
                         failing_tuples.append((model, dataset, backend))
+    failing_set = sets.make(failing_tuples)
 
     tests = []
     for model in models:
         for dataset in datasets:
             for backend in backends:
                 # Check if this is a failing configuration.
-                failing_target = (model, dataset, backend) in failing_tuples
+                failing = sets.contains(failing_set, (model, dataset, backend))
 
                 # Append "_failing" to name if this is a failing configuration.
-                test_name = name if not failing_target else name + "_failing"
+                test_name = name if not failing else name + "_failing"
                 test_name = "{}_{}_{}__{}__{}".format(
                     test_name,
                     model,
@@ -122,7 +124,7 @@ def iree_vision_test_suite(
                     py_test_tags += tags
 
                 # Add additional tags if this is a failing configuration.
-                if failing_target:
+                if failing:
                     py_test_tags += [
                         "failing",  # Only used for test_suite filtering below.
                         "manual",
