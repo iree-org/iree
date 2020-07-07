@@ -82,6 +82,7 @@ LLVM_FAILING = [
 # keep sorted
 VULKAN_FAILING = [
     "broadcasting_test.py",
+    "concat_test.py",  # TODO(b/160616675)
     "depth_conv_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
