@@ -1375,6 +1375,37 @@ operation ::= `vmla.rsqrt` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
+### `vmla.scatter` (IREE::VMLA::ScatterOp)
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.scatter` $src`(`$src_shape `:` type($src_shape)`)``,`
+              $indices`(`$indices_shape `:` type($indices_shape)`)``,`
+              `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+```
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`indices` | buffer
+`indices_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
 ### `vmla.select` (IREE::VMLA::SelectOp)
 
 
