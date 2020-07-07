@@ -460,6 +460,7 @@ cc_library(
         "//iree/hal:driver",
         "//iree/hal:semaphore",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

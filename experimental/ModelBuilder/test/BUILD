@@ -31,16 +31,16 @@ iree_lit_test_suite(
     data = [
         # runtime libraries
         "@llvm-project//mlir:tools/libvulkan-runtime-wrappers.so",
-        ":runtime-support.so",
+        "runtime-support.so",
         # Tests.
         ":test-dot-prod",
-        ":test-mnist-jit",
-        ":test-simple-jit",
-        ":test-simple-jit-vulkan",
-        ":test-simple-mlir",
-        ":test-vector-transfers-jit",
-        ":test-matmul-vulkan",
-        ":test-vec-to-gpu",
+        "test-mnist-jit",
+        "test-simple-jit",
+        "test-simple-jit-vulkan",
+        "test-simple-mlir",
+        "test-vector-transfers-jit",
+        "test-matmul-vulkan",
+        "test-vec-to-gpu",
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
@@ -53,7 +53,6 @@ cc_binary(
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFTransforms",
@@ -68,7 +67,6 @@ cc_binary(
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFTransforms",
@@ -81,7 +79,6 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFTransforms",
@@ -97,7 +94,6 @@ cc_binary(
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFTransforms",
@@ -112,7 +108,6 @@ cc_binary(
         "//experimental/ModelBuilder:ModelRunner",
         "//iree/base:initializer",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SPIRVDialect",
@@ -131,7 +126,6 @@ cc_binary(
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
@@ -169,7 +163,6 @@ cc_binary(
         "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
@@ -195,7 +188,6 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@llvm-project//mlir:AllPassesAndDialects",
     ],
 )
 
@@ -208,8 +200,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@com_google_benchmark//:benchmark:benchmark_main",
-        "@llvm-project//mlir:AllPassesAndDialects",
+        "@com_google_benchmark//:benchmark",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
     ],
@@ -222,8 +213,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@com_google_benchmark//:benchmark:benchmark_main",
-        "@llvm-project//mlir:AllPassesAndDialects",
+        "@com_google_benchmark//:benchmark",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
     ],
@@ -237,8 +227,7 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
-        "@com_google_benchmark//:benchmark:benchmark_main",
-        "@llvm-project//mlir:AllPassesAndDialects",
+        "@com_google_benchmark//:benchmark",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
     ],

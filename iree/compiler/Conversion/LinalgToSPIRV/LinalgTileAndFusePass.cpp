@@ -17,6 +17,7 @@
 // Implements a pass to tile and fuse linalg operations on buffers.
 //
 //===----------------------------------------------------------------------===//
+#include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -264,8 +265,13 @@ struct TilingPattern : public linalg::LinalgTilingPattern<OpTy> {
     // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
     // erased.
     FuncOp funcOp = op->getParentOfType<FuncOp>();
-    return failure(!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
-                   failed(updateWorkGroupSize(funcOp, workgroupSize)));
+    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
+        failed(updateWorkGroupSize(funcOp, workgroupSize)))
+      return failure();
+    funcOp.setAttr(getWorkgroupCountAttrName(),
+                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                       WorkgroupCountMethodology::ResultShape)));
+    return success();
   }
 
   SmallVector<int64_t, 3> workgroupSize;
@@ -281,7 +287,14 @@ struct TileConvPoolPattern : public TilingPattern<OpTy> {
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     if (hasPadding(cast<OpTy>(op))) return failure();
-    return Base::matchAndRewrite(op, rewriter);
+    FuncOp funcOp = op->getParentOfType<FuncOp>();
+    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
+        failed(updateWorkGroupSize(funcOp, this->workgroupSize)))
+      return failure();
+    funcOp.setAttr(getWorkgroupCountAttrName(),
+                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                       WorkgroupCountMethodology::Default)));
+    return success();
   }
 };
 

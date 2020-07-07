@@ -16,12 +16,13 @@
 
 load("@iree_native_python//:build_defs.bzl", "py_extension")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("//iree:build_defs.oss.bzl", _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS")
 
 NUMPY_DEPS = []
 PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
 PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
+PYTHON_CPP_EXTRA_DEPS = []
 
 PYBIND_COPTS = [
     "-fexceptions",
@@ -68,12 +69,14 @@ def iree_py_library(**kwargs):
     #   imports
     py_library(**kwargs)
 
+def iree_py_binary(**kwargs):
+    """Compatibility py_binary which has bazel specific args."""
+    # See: https://github.com/google/iree/issues/2405
+    py_binary(legacy_create_init = False, **kwargs)
+
 def iree_py_test(**kwargs):
     """Compatibility py_test which has bazel compatible args."""
-
-    # This is used when args are needed that are incompatible with upstream.
-    # Presently, this includes:
-    #   imports
+    # See: https://github.com/google/iree/issues/2405
     py_test(legacy_create_init = False, **kwargs)
 
 def iree_py_extension(**kwargs):

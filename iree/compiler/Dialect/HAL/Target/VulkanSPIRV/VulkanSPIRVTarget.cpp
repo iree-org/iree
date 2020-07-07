@@ -33,6 +33,7 @@
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
@@ -108,6 +109,107 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
       ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
 }
 
+/// Generates IR to compute the ceil(`numerator`, `denominator`).
+static Value computeCeilDiv(Location loc, Value one, Value numerator,
+                            Value denominator, OpBuilder &builder) {
+  Value dm1 = builder.create<SubIOp>(loc, denominator, one);
+  return builder.create<SignedDivIOp>(
+      loc, builder.create<AddIOp>(loc, numerator, dm1), denominator);
+}
+
+/// Calculates the number of workgroups to use based on the shape of the result
+/// of the dispatch region.  If the `resultShape` is {s0, s1, s2, s3, ....} and
+/// `workgroupSize` is {wx, wy, wz}, the number of workgroups is {ceil(s0/wz),
+/// ceil(s1/wy), ceil(s2/wx)}
+static std::array<Value, 3> calculateDispatchWorkgroupCountFromResultShape(
+    Location loc, ArrayRef<Value> resultShape,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  if (resultShape.size() > 3) resultShape = resultShape.take_front(3);
+  SmallVector<Value, 4> reverseResultSize(reverse(resultShape));
+  Value one = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
+  reverseResultSize.resize(3, one);
+  return {
+      computeCeilDiv(loc, one, reverseResultSize[0], workgroupSize[0], builder),
+      computeCeilDiv(loc, one, reverseResultSize[1], workgroupSize[1], builder),
+      computeCeilDiv(loc, one, reverseResultSize[2], workgroupSize[2],
+                     builder)};
+}
+
+/// Calculates the number of workgroups to use based on the linearized shape of
+/// the result of the dispatch region. The `workgroupSize` is assumed to be of
+/// the form {wx, 1, 1}.  If the `resultShape` is {s0, s1, s2, ... sn}, then the
+/// number of workgroups is {ceil(s0*s1*s2*...*sn, wx)}
+static std::array<Value, 3>
+calculateDispatchWorkgroupCountFromLinearizedResultShape(
+    Location loc, ArrayRef<Value> resultShape,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  if (!mlir::matchPattern(workgroupSize[1], m_One()) ||
+      !mlir::matchPattern(workgroupSize[2], m_One())) {
+    emitError(loc,
+              "invalid workgroup size when computing workgroup count "
+              "based linearized result shape");
+    return {nullptr, nullptr, nullptr};
+  }
+  Value one = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
+  Value linearizedSize = one;
+  for (Value dim : resultShape)
+    linearizedSize = builder.create<MulIOp>(loc, linearizedSize, dim);
+  return {computeCeilDiv(loc, one, linearizedSize, workgroupSize[0], builder),
+          one, one};
+}
+
+/// Calculates the number of workgroups to use for a dispatch region based on
+/// the value of `workgroupCountMethodAttr`. This is obtained from an attribute
+/// specified on the entry point functions that is added while lowering to
+/// SPIR-V.
+// TODO(ravishankarm): This method of using enums to specify methodology to
+// compute workgroup count is very hard to maintain. The best approach would be
+// that the lowering generates a function that is "inlined" here. Need to figure
+// out the signature of that function so that it covers all use cases.
+static std::array<Value, 3> calculateSPIRVDispatchWorkgroupCount(
+    Location loc, ArrayRef<Value> resultShape,
+    IntegerAttr workgroupCountMethodAttr,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  WorkgroupCountMethodology workgroupCountMethod =
+      static_cast<WorkgroupCountMethodology>(
+          workgroupCountMethodAttr.getValue().getZExtValue());
+  switch (workgroupCountMethod) {
+    case WorkgroupCountMethodology::Default:
+      return {nullptr, nullptr, nullptr};
+    case WorkgroupCountMethodology::LinearizeResultShape:
+      return calculateDispatchWorkgroupCountFromLinearizedResultShape(
+          loc, resultShape, workgroupSize, builder);
+    case WorkgroupCountMethodology::ResultShape:
+      return calculateDispatchWorkgroupCountFromResultShape(
+          loc, resultShape, workgroupSize, builder);
+  }
+  return {nullptr, nullptr, nullptr};
+}
+
+/// Gets the shape of the result from the dispatchState.
+static Optional<SmallVector<Value, 4>> getFirstResultShape(
+    Location loc, TargetBackend::DispatchState dispatchState,
+    OpBuilder &builder) {
+  if (dispatchState.results.empty()) return llvm::None;
+  Optional<TensorRewriteAdaptor> result = dispatchState.results[0];
+  SmallVector<Value, 4> resultShape;
+  // If the output is not a shaped type, assume it is a scalar, and return {1}.
+  if (!result) {
+    resultShape.push_back(
+        builder.create<ConstantOp>(loc, builder.getIndexAttr(1)));
+    return resultShape;
+  }
+
+  // TODO(ravishankarm): Using the result shape to get workgroup count, which
+  // involes using `getShapeDims,` results in the shape values being captured
+  // from outside of the switch statement in dynamic shape cases. This results
+  // in an error since switch statements cannot capture. For now, use the
+  // default path when the shape is dynamic.
+  if (!result->getTensorType().hasStaticShape()) return llvm::None;
+
+  return result->getShapeDims(builder);
+}
+
 class VulkanSPIRVTargetBackend : public TargetBackend {
  public:
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
@@ -151,19 +253,44 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
       if (matchPattern(executableTargetOp.target_backend(), name())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
-        if ((entryPointScheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
-                 iree_compiler::getEntryPointScheduleAttrName()))) {
-          auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
-          assert(llvm::hasSingleElement(spvModuleOps));
-          spvModuleOp = *spvModuleOps.begin();
-        }
+        auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
+        assert(llvm::hasSingleElement(spvModuleOps));
+        spvModuleOp = *spvModuleOps.begin();
+        entryPointScheduleAttr = innerModuleOp.getAttrOfType<ArrayAttr>(
+            iree_compiler::getEntryPointScheduleAttrName());
         break;
       }
     }
+    if (!spvModuleOp)
+      return executableOp.emitError("unable to find spv.module");
 
-    // If not found, then just fall back to the default dispatch recording.
+    SmallVector<spirv::FuncOp, 2> entryPointFns;
     if (!entryPointScheduleAttr) {
-      return TargetBackend::recordDispatch(loc, dispatchState, switchBuilder);
+      for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
+        if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
+            SymbolTable::Visibility::Public)
+          entryPointFns.push_back(spvFuncOp);
+      }
+      if (!llvm::hasSingleElement(entryPointFns)) {
+        return spvModuleOp.emitError(
+                   "expected a single entry point function, found ")
+               << entryPointFns.size();
+      }
+    } else {
+      llvm::StringMap<spirv::FuncOp> publicFns;
+      for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
+        if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
+            SymbolTable::Visibility::Public)
+          publicFns[spvFuncOp.sym_name()] = spvFuncOp;
+      }
+      for (Attribute entryNameAttr : entryPointScheduleAttr) {
+        StringRef entryName = entryNameAttr.cast<StringAttr>().getValue();
+        spirv::FuncOp spvFuncOp = publicFns.lookup(entryName);
+        if (!spvFuncOp)
+          return spvModuleOp.emitError("unable to find entry point function ")
+                 << entryName;
+        entryPointFns.push_back(spvFuncOp);
+      }
     }
 
     auto *region = switchBuilder.addConditionRegion(
@@ -180,19 +307,53 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto commandBuffer = entryBlock.getArgument(1);
     auto executable = entryBlock.getArgument(2);
 
-    // We have multiple entry points to dispatch. Record in the order specified
-    // by entry point schedule and insert barrier between sequential ones.
-    for (int i = 0, e = entryPointScheduleAttr.size(); i < e; ++i) {
-      StringRef entryName =
-          entryPointScheduleAttr[i].cast<StringAttr>().getValue();
+    // We have multiple entry points to dispatch. Record in the order
+    // specified by entry point schedule and insert barrier between sequential
+    // ones.
+    for (auto it : llvm::enumerate(entryPointFns)) {
+      spirv::FuncOp spvFuncOp = it.value();
       auto workgroupSize = calculateDispatchWorkgroupSize(
-          loc, spvModuleOp, entryName, workload, builder);
-      auto workgroupCount = calculateDispatchWorkgroupCount(
-          loc, workload, workgroupSize, builder);
+          loc, spvModuleOp, spvFuncOp.sym_name(), workload, builder);
+
+      StringRef workgroupCountAttrName = getWorkgroupCountAttrName();
+      IntegerAttr workgroupCountAttr =
+          spvFuncOp.getAttrOfType<IntegerAttr>(workgroupCountAttrName);
+      if (!workgroupCountAttr)
+        return spvFuncOp.emitError("missing attribute ")
+               << workgroupCountAttrName;
+
+      // Assuming here that the shape of the first result value of the dispatch
+      // region is enough to calculate the number of workgroups. Either
+      // - All results have the same shape and the `workgroupCountMethod` is set
+      //   to WorkgroupCountMethodology::ResultShape, or
+      // - All the results have the same linearized shape and the
+      //   `workgourpCountMethod` is set to
+      //   WorkgroupCountMethodology::LinearizedResultShape.
+      Optional<SmallVector<Value, 4>> resultShape =
+          getFirstResultShape(loc, dispatchState, builder);
+
+      WorkgroupCountMethodology workgroupCountMethod =
+          static_cast<WorkgroupCountMethodology>(
+              workgroupCountAttr.getValue().getZExtValue());
+
+      std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
+      if (resultShape &&
+          workgroupCountMethod != WorkgroupCountMethodology::Default) {
+        workgroupCount = calculateSPIRVDispatchWorkgroupCount(
+            loc, *resultShape, workgroupCountAttr, workgroupSize, builder);
+      } else {
+        workgroupCount = calculateDispatchWorkgroupCount(
+            loc, workload, workgroupSize, builder);
+      }
+
+      if (llvm::any_of(workgroupCount,
+                       [](Value v) -> bool { return v == nullptr; }))
+        return spvFuncOp.emitError("unable to find workgroup count");
+
       builder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, /*entryPointOrdinal=*/i,
+          loc, commandBuffer, executable, /*entryPointOrdinal=*/it.index(),
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);
-      if (i + 1 != e) {
+      if (it.index() + 1 != entryPointFns.size()) {
         recordFullExecutionBarrier(commandBuffer, loc, builder);
       }
     }

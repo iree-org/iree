@@ -45,6 +45,7 @@ module attributes {
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 0
 //       CHECK:   scf.parallel (%{{.+}}, %{{.+}}, %{{.+}})
 //       CHECK:     %[[VIEW1:.+]] = subview %[[ARG1]]
 //       CHECK:     %[[VIEW2:.+]] = subview %[[ARG2]]
@@ -74,6 +75,7 @@ module attributes {
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
 //  CHECK-SAME:   local_size = dense<[8, 8, 1]>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 2
 //       CHECK:   scf.parallel (%{{.+}}, %{{.+}}, %{{.+}})
 //       CHECK:     %[[VIEW0:.+]] = subview %[[ARG0]]
 //       CHECK:     %[[VIEW1:.+]] = subview %[[ARG1]]
@@ -103,6 +105,7 @@ module attributes {
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
+//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 0
 //       CHECK:   scf.parallel (%{{.+}}, %{{.+}})
 //       CHECK:     %[[VIEW0:.+]] = subview %[[ARG0]]
 //       CHECK:     %[[VIEW2:.+]] = subview %[[ARG2]]

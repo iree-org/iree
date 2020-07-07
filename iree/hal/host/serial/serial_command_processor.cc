@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/serial_command_processor.h"
+#include "iree/hal/host/serial/serial_command_processor.h"
 
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
@@ -22,6 +22,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 SerialCommandProcessor::SerialCommandProcessor(
     CommandCategoryBitfield command_categories)
@@ -237,5 +238,6 @@ Status SerialCommandProcessor::DispatchGrid(
   return OkStatus();
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

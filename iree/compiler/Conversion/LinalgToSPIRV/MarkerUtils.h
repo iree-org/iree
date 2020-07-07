@@ -33,11 +33,6 @@ namespace iree_compiler {
 /// Marker to denote that a linalg operation is to be partitioned to workitems.
 StringRef getWorkItemMarker();
 
-/// Returns true if an operation has a marker to denote that it will be mapped
-/// to cooperative matrix operations. Markers need to be consistent as
-/// cooperative matrices have their own type and load/store operations.
-bool hasCooperativeMatrixMarker(Operation *);
-
 /// Returns true if an operation has the specified `marker`. When `marker` is
 /// empty, returns true if the operation has any marker.
 bool hasMarker(Operation *, StringRef marker = "");
@@ -45,10 +40,6 @@ bool hasMarker(Operation *, StringRef marker = "");
 /// Returns true if an operation has marker to denote that it is to be
 /// partitioned to workitems.
 bool hasWorkItemMarker(Operation *);
-
-/// Sets marker to denote that a vector operation is to be execute on a
-/// cooperative matrix.
-void setCooperativeMatrixMarker(Operation *);
 
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);

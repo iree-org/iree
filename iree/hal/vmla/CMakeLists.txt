@@ -107,7 +107,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::device_info
     iree::hal::driver
-    iree::hal::host::serial_scheduling_model
+    iree::hal::host::serial::serial_scheduling_model
     iree::vm::instance
     iree::vm::module
   PUBLIC

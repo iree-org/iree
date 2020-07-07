@@ -69,7 +69,7 @@ class ListType
 };
 
 /// An opaque ref object that comes from an external source.
-class OpaqueType : public Type::TypeBase<OpaqueType, Type> {
+class OpaqueType : public Type::TypeBase<OpaqueType, Type, TypeStorage> {
  public:
   using Base::Base;
 

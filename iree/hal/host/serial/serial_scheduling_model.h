@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_SERIAL_SCHEDULING_MODEL_H_
-#define IREE_HAL_HOST_SERIAL_SCHEDULING_MODEL_H_
+#ifndef IREE_HAL_HOST_SERIAL_SERIAL_SCHEDULING_MODEL_H_
+#define IREE_HAL_HOST_SERIAL_SERIAL_SCHEDULING_MODEL_H_
 
 #include "absl/container/inlined_vector.h"
 #include "iree/base/memory.h"
@@ -21,6 +21,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Performs host-local scheduling by way of a simple serial queue.
 // Submissions and commands are processed in-order one at a time on a single
@@ -58,7 +59,8 @@ class SerialSchedulingModel final : public SchedulingModel {
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_SERIAL_SCHEDULING_MODEL_H_
+#endif  // IREE_HAL_HOST_SERIAL_SERIAL_SCHEDULING_MODEL_H_

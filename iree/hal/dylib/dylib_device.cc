@@ -23,8 +23,9 @@ namespace iree {
 namespace hal {
 namespace dylib {
 
-DyLibDevice::DyLibDevice(DeviceInfo device_info,
-                         std::unique_ptr<SchedulingModel> scheduling_model)
+DyLibDevice::DyLibDevice(
+    DeviceInfo device_info,
+    std::unique_ptr<host::SchedulingModel> scheduling_model)
     : HostLocalDevice(std::move(device_info), std::move(scheduling_model)) {}
 
 DyLibDevice::~DyLibDevice() = default;

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_SERIAL_SUBMISSION_QUEUE_H_
-#define IREE_HAL_HOST_SERIAL_SUBMISSION_QUEUE_H_
+#ifndef IREE_HAL_HOST_SERIAL_SERIAL_SUBMISSION_QUEUE_H_
+#define IREE_HAL_HOST_SERIAL_SERIAL_SUBMISSION_QUEUE_H_
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
@@ -21,10 +21,11 @@
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/host_semaphore.h"
+#include "iree/hal/host/condvar_semaphore.h"
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // A queue managing CommandQueue submissions that uses host-local
 // synchronization primitives. Evaluates submission order by respecting the
@@ -111,7 +112,8 @@ class SerialSubmissionQueue final {
   IntrusiveList<std::unique_ptr<Submission>> list_;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_SERIAL_SUBMISSION_QUEUE_H_
+#endif  // IREE_HAL_HOST_SERIAL_SERIAL_SUBMISSION_QUEUE_H_

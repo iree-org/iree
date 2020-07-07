@@ -24,10 +24,10 @@ namespace iree {
 namespace hal {
 namespace vmla {
 
-class VMLADevice final : public HostLocalDevice {
+class VMLADevice final : public host::HostLocalDevice {
  public:
   explicit VMLADevice(DeviceInfo device_info,
-                      std::unique_ptr<SchedulingModel> scheduling_model,
+                      std::unique_ptr<host::SchedulingModel> scheduling_model,
                       iree_vm_instance_t* instance,
                       iree_vm_module_t* vmla_module);
   ~VMLADevice() override;

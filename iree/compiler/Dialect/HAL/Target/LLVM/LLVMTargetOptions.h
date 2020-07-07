@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMTARGETOPTIONS_H_
 
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Target/TargetOptions.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -25,6 +26,7 @@ namespace HAL {
 struct LLVMTargetOptions {
   llvm::PipelineTuningOptions pipelineTuningOptions;
   llvm::PassBuilder::OptimizationLevel optLevel;
+  llvm::TargetOptions options;
   std::string targetTriple;
 };
 

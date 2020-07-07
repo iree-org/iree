@@ -42,10 +42,17 @@ iree_cc_library(
   SRCS
     "LLVMAOTTarget.cpp"
   DEPS
+    ::LLVMAOTTargetLinker
     ::LLVMIRPasses
     ::LLVMTargetOptions
+    LLVMAArch64AsmParser
+    LLVMAArch64CodeGen
+    LLVMARMAsmParser
+    LLVMARMCodeGen
     LLVMCore
     LLVMSupport
+    LLVMX86AsmParser
+    LLVMX86CodeGen
     MLIRTargetLLVMIR
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
@@ -80,5 +87,28 @@ iree_cc_library(
   DEPS
     LLVMPasses
     LLVMSupport
+    LLVMTarget
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LLVMAOTTargetLinker
+  HDRS
+    "LLVMAOTTargetLinker.h"
+  DEPS
+    iree::base::file_io
+    iree::compiler::Dialect::HAL::Target::LLVM::internal::LLVMAOTTargetLinker_internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LLVMAOTTargetLinker_hdrs
+  HDRS
+    "LLVMAOTTargetLinker.h"
+  DEPS
+    ::LLVMTargetOptions
+    iree::base::file_io
   PUBLIC
 )

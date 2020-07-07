@@ -24,7 +24,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Strings {
 
-class StringType : public Type::TypeBase<StringType, Type> {
+class StringType : public Type::TypeBase<StringType, Type, TypeStorage> {
  public:
   using Base::Base;
   static StringType get(MLIRContext *context) {
@@ -33,7 +33,8 @@ class StringType : public Type::TypeBase<StringType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::String; }
 };
 
-class StringTensorType : public Type::TypeBase<StringTensorType, Type> {
+class StringTensorType
+    : public Type::TypeBase<StringTensorType, Type, TypeStorage> {
  public:
   using Base::Base;
   static StringTensorType get(MLIRContext *context) {

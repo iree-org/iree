@@ -54,34 +54,23 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //   CHECK-DAG:   %[[UB3:.+]] = dim %[[ARG2]], %[[C1]]
 //   CHECK-DAG:   %[[UB4:.+]] = dim %[[ARG2]], %[[C2]]
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//   CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
 //   CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
-//   CHECK-DAG:   %[[NBLOCKSZ:.+]] = "gpu.grid_dim"() {dimension = "z"}
 //   CHECK-DAG:   %[[BOFFSETY:.+]] = muli %[[BIDY]], %[[C4]]
-//   CHECK-DAG:   %[[BSTEPY:.+]] = muli %[[NBLOCKSY]], %[[C4]]
 //   CHECK-DAG:   %[[BOFFSETX:.+]] = muli %[[BIDX]], %[[C32]]
-//   CHECK-DAG:   %[[BSTEPX:.+]] = muli %[[NBLOCKSX]], %[[C32]]
-//       CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[UB0]] step %[[NBLOCKSZ]]
-//       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[UB3]] step %[[BSTEPY]]
-//       CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[UB4]] step %[[BSTEPX]]
-//       CHECK:         %[[BOUNDSZ:.+]] = affine.min #{{.+}}(%[[IV3]])
-//       CHECK:         %[[SV1:.+]] = subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//       CHECK:         %[[BOUNDSY:.+]] = affine.min #{{.+}}(%[[IV4]])
-//       CHECK:         %[[BOUNDSX:.+]] = affine.min #{{.+}}(%[[IV5]])
-//       CHECK:         %[[SV2:.+]] = subview %[[ARG2]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK:         %[[INBOUNDSZ:.+]] = cmpi "slt", %[[TIDZ]], %[[BOUNDSZ]]
-//       CHECK:         %[[INBOUNDSY:.+]] = cmpi "slt", %[[TIDY]], %[[BOUNDSY]]
-//       CHECK:         %[[T35:.+]] = and %[[INBOUNDSZ]], %[[INBOUNDSY]]
-//       CHECK:         %[[INBOUNDSX:.+]] = cmpi "slt", %[[TIDX]], %[[BOUNDSX]]
-//       CHECK:         %[[INBOUNDS:.+]] = and %[[T35]], %[[INBOUNDSX]]
-//       CHECK:         scf.if %[[INBOUNDS]]
+//       CHECK:   %[[SV1:.+]] = subview %[[ARG1]][%[[BIDZ]], %[[BOFFSETY]], %[[BOFFSETX]], 0]
+//       CHECK:   %[[SV2:.+]] = subview %[[ARG2]][%[[BIDZ]], %[[BOFFSETY]], %[[BOFFSETX]], 0]
+//   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//   CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
+//       CHECK:   %[[INBOUNDSZ:.+]] = cmpi "slt", %[[TIDZ]], %{{.+}}
+//       CHECK:   %[[INBOUNDSY:.+]] = cmpi "slt", %[[TIDY]], %{{.+}}
+//       CHECK:   %[[T35:.+]] = and %[[INBOUNDSZ]], %[[INBOUNDSY]]
+//       CHECK:   %[[INBOUNDSX:.+]] = cmpi "slt", %[[TIDX]], %{{.+}}
+//       CHECK:   %[[INBOUNDS:.+]] = and %[[T35]], %[[INBOUNDSX]]
+//       CHECK:   scf.if %[[INBOUNDS]]
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//       CHECK:         scf.for
 //       CHECK:           scf.for
-//       CHECK:             scf.for
-//       CHECK:               scf.for
-//       CHECK:                 scf.for
-//   CHECK-NOT:                   linalg.conv
+//   CHECK-NOT:             linalg.conv

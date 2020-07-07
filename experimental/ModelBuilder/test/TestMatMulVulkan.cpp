@@ -93,7 +93,6 @@ void testMatMul() {
   ModelRunner runner(modelBuilder.getModuleRef(),
                      ModelRunner::Target::GPUTarget);
   CompilationOptions options;
-  const int64_t workload = width * height;
   SmallVector<Type, 3> args = {typeA, typeB, typeC};
   SmallVector<int64_t, 4> vWorkgroupSizes(workgroupSize.begin(),
                                           workgroupSize.end());
@@ -115,7 +114,8 @@ void testMatMul() {
     spirvModulePM.addPass(
         mlir::spirv::createUpdateVersionCapabilityExtensionPass());
 
-    pm.addPass(mlir::createAddVulkanLaunchWrapperPass(workload, args));
+    pm.addPass(
+        mlir::createAddVulkanLaunchWrapperPass({width, height, 1}, args));
     mlir::LowerToLLVMOptions llvmOptions = {
         /*useBarePtrCallConv =*/false,
         /*emitCWrappers = */ true,
@@ -149,6 +149,7 @@ void testMatMul() {
 }
 
 int main(int argc, char **argv) {
+  ModelBuilder::registerAllDialects();
   iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.

@@ -39,14 +39,13 @@ install Android NDK.
 After downloading, it is recommended to set the `ANDROID_NDK` environment
 variable pointing to the directory. For Linux, you can `export` in your shell's
 rc file. For Windows, you can search "environment variable" in the taskbar or
-use `Windows` + `R` to open the "Run" dialog to run
-`rundll32 sysdm.cpl,EditEnvironmentVariables`.
-
+use `Windows` + `R` to open the "Run" dialog to run `rundll32
+sysdm.cpl,EditEnvironmentVariables`.
 
 ### Install Android Debug Bridge (ADB)
 
-For Linux, search your the distro's package manager to install `adb`.
-For example, on Ubuntu:
+For Linux, search your the distro's package manager to install `adb`. For
+example, on Ubuntu:
 
 ```shell
 $ sudo apt install adb
@@ -82,8 +81,8 @@ $ cmake -G Ninja -B build-android  \
     for your target device. You can also refer to Android NDK's
     [CMake documentation](https://developer.android.com/ndk/guides/cmake) for
     more toolchain arguments.
-*   Building IREE compilers and samples for Android is not supported at
-    the moment; they will be enabled soon.
+*   Building IREE compilers and samples for Android is not supported at the
+    moment; they will be enabled soon.
 *   We need to define `IREE_HOST_{C|CXX}_COMPILER` to Clang here because IREE
     does [not support](https://github.com/google/iree/issues/1269) GCC well at
     the moment.
@@ -91,8 +90,9 @@ $ cmake -G Ninja -B build-android  \
 ### Configure on Windows
 
 On Windows, we will need the full path to the `cl.exe` compiler. This can be
-obtained by [opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt) and type
-`where cl.exe`. Then in a command prompt (`cmd.exe`):
+obtained by
+[opening a developer command prompt window](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt)
+and type `where cl.exe`. Then in a command prompt (`cmd.exe`):
 
 ```cmd
 REM Assuming in IREE source root
@@ -105,10 +105,10 @@ REM Assuming in IREE source root
     -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc"
 ```
 
-* See the Linux section in the above for explanations of the used arguments.
-* We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot properly
-  detect host triple under Android CMake toolchain file. This might be fixed
-  later.
+*   See the Linux section in the above for explanations of the used arguments.
+*   We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot
+    properly detect host triple under Android CMake toolchain file. This might
+    be fixed later.
 
 ### Build all targets
 
@@ -131,6 +131,18 @@ $ adb devices
 List of devices attached
 XXXXXXXXXXX     device
 ```
+
+Then you can run all device tests via
+
+```shell
+$ cd build-android
+$ ctest --output-on-failure
+```
+
+The above command will upload necessary build artifacts to the Android device's
+`/data/local/tmp` directory, run the tests there, and report status back.
+
+Alternatively, if you want to invoke a specific HAL backend on a IREE module:
 
 ### VMLA HAL backend
 
@@ -218,3 +230,50 @@ problems for Vulkan device enumeration under `/data/local/tmp/`. A known
 workaround is to copy the `libGLES_mali.so` library under `/data/local/tmp/` and
 rename it as `libvulkan.so` and then prefix `LD_LIBRARY_PATH=/data/local/tmp`
 when invoking IREE executables.
+
+### Dylib LLVM AOT backend
+
+To compile IREE module for the target Android device (assume Android 10 AArc64)
+we need install the corresponding standalone toolchain and setting AOT linker
+path environment variable:
+```shell
+$ export ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain
+$ $ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \
+    --install-dir=$ANDROID_ARM64_TOOLCHAIN
+$ export IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld
+```
+
+Translate a source MLIR into an IREE module:
+
+```shell
+# Assuming in IREE source root
+$ build-android/host/bin/iree-translate \
+    -iree-mlir-to-vm-bytecode-module \
+    -iree-llvm-target-triple=aarch64-linux-android \
+    -iree-hal-target-backends=dylib-llvm-aot \
+    iree/tools/test/simple.mlir \
+    -o /tmp/simple-llvm_aot.vmfb
+```
+
+Then push the IREE runtime executable and module to the device:
+
+```shell
+$ adb push build-android/iree/tools/iree-run-module /data/local/tmp/
+$ adb shell chmod +x /data/local/tmp/iree-run-module
+$ adb push /tmp/simple-llvm_aot.vmfb /data/local/tmp/
+```
+
+Log into Android:
+
+```shell
+$ adb shell
+
+android $ cd /data/local/tmp/
+android $ ./iree-run-module -driver=dylib \
+          -input_file=simple-llvm_aot.vmfb \
+          -entry_function=abs \
+          -inputs="i32=-5"
+
+EXEC @abs
+i32=5
+```

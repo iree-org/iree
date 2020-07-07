@@ -21,6 +21,7 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/InitAllDialects.h"
 
 using namespace mlir;
 using namespace mlir::edsc;
@@ -28,6 +29,18 @@ using namespace mlir::edsc::ops;
 using namespace mlir::edsc::intrinsics;
 
 thread_local MLIRContext mlir::ModelBuilder::ctx;
+
+void ModelBuilder::registerAllDialects() {
+  registerDialect<AffineDialect>();
+  registerDialect<gpu::GPUDialect>();
+  registerDialect<LLVM::LLVMDialect>();
+  registerDialect<linalg::LinalgDialect>();
+  registerDialect<scf::SCFDialect>();
+  registerDialect<omp::OpenMPDialect>();
+  registerDialect<spirv::SPIRVDialect>();
+  registerDialect<StandardOpsDialect>();
+  registerDialect<vector::VectorDialect>();
+}
 
 mlir::ModelBuilder::ModelBuilder()
     : OpBuilder(&ctx),
@@ -291,14 +304,14 @@ SmallVector<Value, 4> mlir::edsc::extensions::operator+(ValueRange a,
 }
 SmallVector<Value, 4> mlir::edsc::extensions::std_max(ValueRange a,
                                                       ValueRange b) {
-  using edsc::op::operator<;
-  auto fun = [](Value va, Value vb) { return (va < vb) ? vb : va; };
+  using edsc::op::slt;
+  auto fun = [](Value va, Value vb) { return slt(va, vb) ? vb : va; };
   return valueRangeOperatorImpl(fun, a, b);
 }
 SmallVector<Value, 4> mlir::edsc::extensions::std_min(ValueRange a,
                                                       ValueRange b) {
-  using edsc::op::operator<;
-  auto fun = [](Value va, Value vb) { return (va < vb) ? va : vb; };
+  using edsc::op::slt;
+  auto fun = [](Value va, Value vb) { return slt(va, vb) ? va : vb; };
   return valueRangeOperatorImpl(fun, a, b);
 }
 SmallVector<Value, 4> mlir::edsc::extensions::affine_max(ValueRange a,

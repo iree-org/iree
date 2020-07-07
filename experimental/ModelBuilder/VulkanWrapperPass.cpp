@@ -19,6 +19,8 @@
 //===----------------------------------------------------------------------===//
 #include "experimental/ModelBuilder/VulkanWrapperPass.h"
 
+#include <cstdint>
+
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
@@ -29,6 +31,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
 
 using namespace mlir;  // NOLINT
 
@@ -43,8 +46,9 @@ namespace {
 class AddVulkanLaunchWrapper
     : public PassWrapper<AddVulkanLaunchWrapper, OperationPass<ModuleOp>> {
  public:
-  AddVulkanLaunchWrapper(int64_t workload, ArrayRef<Type> args)
-      : workload(workload), args(args.begin(), args.end()) {}
+  AddVulkanLaunchWrapper(ArrayRef<int64_t> workloadSize, ArrayRef<Type> args)
+      : workloadSize(workloadSize.begin(), workloadSize.end()),
+        args(args.begin(), args.end()) {}
   void runOnOperation() override;
 
  private:
@@ -61,7 +65,7 @@ class AddVulkanLaunchWrapper
   LogicalResult declareVulkanLaunchFunc(Location loc);
 
  private:
-  int workload;
+  SmallVector<int64_t, 3> workloadSize;
   SmallVector<Type, 4> args;
 };
 
@@ -157,11 +161,9 @@ void AddVulkanLaunchWrapper::convertGpuLaunchFunc(
   // Calculate the number of groups to dispatch based on the workload size
   // and the workgroup size picked by the tiling pass.
   for (int i = 0; i < 3; i++) {
-    auto roundupGroupSize =
-        (workload + workgroupSize[i] - 1) / workgroupSize[i];
-    workload -= roundupGroupSize * workgroupSize[i];
-    workload = std::max(workload, 1);
-    Value numGroups = builder.create<ConstantIndexOp>(loc, roundupGroupSize);
+    auto dispatchSize =
+        std::max(int64_t(1), workloadSize[i] / workgroupSize[i]);
+    Value numGroups = builder.create<ConstantIndexOp>(loc, dispatchSize);
     arguments.push_back(numGroups);
   }
   arguments.insert(arguments.end(), function.args_begin(), function.args_end());
@@ -206,8 +208,9 @@ class SetSpirvABI
 }  // anonymous namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-mlir::createAddVulkanLaunchWrapperPass(int64_t workload, ArrayRef<Type> args) {
-  return std::make_unique<AddVulkanLaunchWrapper>(workload, args);
+mlir::createAddVulkanLaunchWrapperPass(llvm::ArrayRef<int64_t> workloadSize,
+                                       ArrayRef<Type> args) {
+  return std::make_unique<AddVulkanLaunchWrapper>(workloadSize, args);
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::spirv::FuncOp>>
