@@ -158,8 +158,8 @@ def iree_vision_test_suite(
         native.test_suite(
             name = name + "_failing",
             tests = tests,
-            # Add "+failing" to exclude tests in `tests` that have do not have
-            # the "failing" tag.
+            # Add "+failing" to only include tests in `tests` that have the
+            # "failing" tag.
             tags = tags + ["+failing"],
             # If there are kwargs that need to be passed here which only apply
             # to the generated tests and not to test_suite, they should be
