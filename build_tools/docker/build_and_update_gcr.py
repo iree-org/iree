@@ -34,7 +34,7 @@ IMAGES_HELP = [f'`{name}`' for name in IMAGES]
 IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
 
 # Map from image names to images that depend on them.
-DEPENDENCIES = {
+IMAGES_TO_DEPENDENT_IMAGES = {
     'bazel': ['bazel-bindings', 'bazel-tensorflow'],
     'cmake': ['cmake-android']
 }
@@ -85,8 +85,8 @@ if __name__ == '__main__':
 
   # Check if any images depend on `args.image` and update them if they do.
   images_to_update = [args.image]
-  if args.image in DEPENDENCIES:
-    images_to_update.extend(DEPENDENCIES[args.image])
+  if args.image in IMAGES_TO_DEPENDENT_IMAGES:
+    images_to_update.extend(IMAGES_TO_DEPENDENT_IMAGES[args.image])
 
   for image in images_to_update:
     image_url = os.path.join(IREE_GCR_URL, f'{image}:{args.tag}')
