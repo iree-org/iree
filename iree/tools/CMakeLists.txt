@@ -197,7 +197,7 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_xla_dialects.h"
     DEPS
-      tensorflow::mlir_xla
+      tensorflow::mlir_hlo
     PUBLIC
   )
 
@@ -252,7 +252,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VMLA::Transforms
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::IREEVM
-      tensorflow::mlir_xla
+      tensorflow::mlir_hlo
     PUBLIC
   )
 

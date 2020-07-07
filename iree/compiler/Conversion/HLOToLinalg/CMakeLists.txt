@@ -40,6 +40,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )

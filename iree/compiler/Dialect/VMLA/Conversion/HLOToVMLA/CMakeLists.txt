@@ -34,6 +34,6 @@ iree_cc_library(
     iree::compiler::Dialect::VMLA::Conversion
     iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::IR::VMLADialect
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )

@@ -25,6 +25,6 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )

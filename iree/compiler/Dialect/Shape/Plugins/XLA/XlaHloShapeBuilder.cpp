@@ -21,7 +21,7 @@
 #include "llvm/ADT/Optional.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
-#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 
 using llvm::None;
 using llvm::Optional;

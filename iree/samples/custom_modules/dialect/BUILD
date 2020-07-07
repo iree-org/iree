@@ -128,8 +128,8 @@ iree_cc_binary(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_legalize_control_flow",
     ],
 )
 

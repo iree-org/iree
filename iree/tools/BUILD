@@ -168,8 +168,8 @@ cc_library(
     ],
     deps = [
         "@llvm-project//mlir:IR",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:lhlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:lhlo",
     ],
 )
 
@@ -213,8 +213,8 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_legalize_control_flow",
     ],
 )
 

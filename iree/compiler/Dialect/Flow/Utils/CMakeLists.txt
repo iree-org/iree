@@ -30,6 +30,6 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )

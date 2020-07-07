@@ -44,7 +44,6 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/Passes.h"
-#include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
 namespace iree_compiler {
