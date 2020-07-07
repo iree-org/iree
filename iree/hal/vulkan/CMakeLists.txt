@@ -517,6 +517,7 @@ iree_cc_library(
     ::serializing_command_queue
     ::status_util
     ::vma_allocator
+    absl::flags
     absl::inlined_vector
     absl::memory
     absl::strings
