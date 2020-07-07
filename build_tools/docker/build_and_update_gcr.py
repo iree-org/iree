@@ -30,8 +30,8 @@ IMAGES = [
     'bazel', 'bazel-bindings', 'bazel-tensorflow', 'cmake', 'cmake-android',
     'rbe-toolchain'
 ]
-IMAGES_HELP = [f"`{name}`" for name in IMAGES]
-IMAGES_HELP = f"{', '.join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}"
+IMAGES_HELP = [f'`{name}`' for name in IMAGES]
+IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}''
 
 # Map from image names to images that depend on them.
 DEPENDENCIES = {
