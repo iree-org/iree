@@ -93,8 +93,8 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
     OpBuilder builder(func.getBody());
     SmallVector<Value, 8> typeConversionWorklist;
     for (int i = 0, e = func.getNumArguments(); i < e; i++) {
-      auto globalTensor =
-          tf_saved_model::LookupBoundInput(func, i, symbolTable);
+      auto globalTensor = tf_saved_model::LookupBoundInputOfType<
+          tf_saved_model::GlobalTensorOp>(func, i, symbolTable);
       if (!globalTensor) {
         continue;
       }
