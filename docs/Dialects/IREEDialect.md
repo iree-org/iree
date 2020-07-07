@@ -70,7 +70,7 @@ information should be hidden from the compiler and resolved at runtime.
 
 ```mlir
 %c = iree.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
-%res = "xla_hlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+%res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
 ```
 
 #### Attributes:

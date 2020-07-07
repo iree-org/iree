@@ -244,6 +244,7 @@ when invoking IREE executables.
 To compile IREE module for the target Android device (assume Android 10 AArc64)
 we need install the corresponding standalone toolchain and setting AOT linker
 path environment variable:
+
 ```shell
 $ export ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain
 $ $ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \

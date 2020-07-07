@@ -64,7 +64,7 @@ developers.
 IREE's compiler components accept programs and code fragments in several
 formats, including high level TensorFlow Python code, serialized TensorFlow
 [SavedModel](https://www.tensorflow.org/guide/saved_model) programs, and lower
-level textual MLIR files using combinations of supported dialects like `xla_hlo`
+level textual MLIR files using combinations of supported dialects like `mhlo`
 and IREE's internal dialects. While input programs are ultimately compiled down
 to modules suitable for running on some combination of IREE's target deployment
 platforms, IREE's developer tools can run individual compiler passes,
