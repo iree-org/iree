@@ -70,7 +70,7 @@ def iree_vision_test_suite(
         any additional arguments that will be passed to the underlying tests and
         test_suite.
     """
-    failing_tuples = []
+    failing_set = sets.make([])
     if failing_configurations != None:
         # Parse failing configurations.
         for configuration in failing_configurations:
@@ -83,8 +83,7 @@ def iree_vision_test_suite(
             for model in configuration["models"]:
                 for dataset in configuration["datasets"]:
                     for backend in configuration["backends"]:
-                        failing_tuples.append((model, dataset, backend))
-    failing_set = sets.make(failing_tuples)
+                        sets.insert(failing_set, (model, dataset, backend))
 
     tests = []
     for model in models:
