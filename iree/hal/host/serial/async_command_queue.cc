@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/async_command_queue.h"
+#include "iree/hal/host/serial/async_command_queue.h"
 
 #include "absl/base/thread_annotations.h"
 #include "iree/base/status.h"
@@ -20,6 +20,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 AsyncCommandQueue::AsyncCommandQueue(std::unique_ptr<CommandQueue> target_queue)
     : CommandQueue(target_queue->name(), target_queue->supported_categories()),
@@ -121,5 +122,6 @@ Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
   return submission_queue_.permanent_error();
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

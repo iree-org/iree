@@ -32,7 +32,11 @@ include(CMakeParseArguments)
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_COMPILER)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
+  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
     return()
   endif()
 
@@ -87,23 +91,53 @@ function(iree_check_test)
 
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
+  set(_TEST_NAME "${_PACKAGE_PATH}:${_RULE_NAME}")
 
-  add_test(
-    NAME
-      "${_NAME_PATH}"
-    COMMAND
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-      "$<TARGET_FILE:iree_modules_check_iree-check-module>"
-      "--driver=${_RULE_DRIVER}"
-      "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
-      ${_RULE_RUNNER_ARGS}
-  )
+  # Case for cross-compiling towards Android.
+  if(ANDROID)
+    set(_ANDROID_EXE_REL_DIR "iree/modules/check")
+    set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
+    set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
+
+    # Define a custom target for pushing and running the test on Android device.
+    set(_TEST_NAME ${_TEST_NAME}_on_android_device)
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:iree_modules_check_iree-check-module>"
+        "--driver=${_RULE_DRIVER}"
+        "${_ANDROID_REL_DIR}/${_MODULE_FILE_NAME}"
+        ${_RULE_RUNNER_ARGS}
+    )
+    # Use environment variables to instruct the script to push artifacts
+    # onto the Android device before running the test. This needs to match
+    # with the expectation of the run_android_test.{sh|bat|ps1} script.
+    set(
+      _ENVIRONMENT_VARS
+        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
+        TEST_DATA=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}
+        TEST_EXECUTABLE=$<TARGET_FILE:iree_modules_check_iree-check-module>
+    )
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
+  else(ANDROID)
+    add_test(
+      NAME
+        "${_TEST_NAME}"
+      COMMAND
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+        "$<TARGET_FILE:iree_modules_check_iree-check-module>"
+        "--driver=${_RULE_DRIVER}"
+        "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
+        ${_RULE_RUNNER_ARGS}
+    )
+    set_property(TEST "${_TEST_NAME}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
+  endif(ANDROID)
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}" "driver=${_RULE_DRIVER}")
-  set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
-  set_property(TEST "${_NAME_PATH}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-  set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
+  set_property(TEST "${_TEST_NAME}" PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
 
 

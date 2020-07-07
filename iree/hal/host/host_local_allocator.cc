@@ -25,6 +25,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 HostLocalAllocator::HostLocalAllocator() = default;
 
@@ -107,5 +108,6 @@ StatusOr<ref_ptr<Buffer>> HostLocalAllocator::Allocate(
   return buffer;
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree

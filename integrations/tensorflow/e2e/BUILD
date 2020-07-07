@@ -22,6 +22,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+    "iree_py_binary",
     "iree_py_test",
 )
 load(
@@ -36,7 +37,7 @@ package(
 
 # Create binaries for all test srcs to allow them to be run manually.
 [
-    py_binary(
+    iree_py_binary(
         name = src.replace(".py", "_manual"),
         srcs = [src],
         main = src,

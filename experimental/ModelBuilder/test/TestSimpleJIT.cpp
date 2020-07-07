@@ -179,6 +179,7 @@ void testMatmulOnVectors(StringLiteral funcName) {
 }
 
 int main(int argc, char **argv) {
+  ModelBuilder::registerAllDialects();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
   llvm::InitLLVM y(argc, argv);

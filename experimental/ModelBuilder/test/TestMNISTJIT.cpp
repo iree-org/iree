@@ -145,6 +145,7 @@ void buildMNISTOnTensors(ModelBuilder &modelBuilder, StringLiteral funcName,
 }
 
 int main() {
+  ModelBuilder::registerAllDialects();
   constexpr unsigned B = 3, W0 = 784, W1 = 256, W2 = 256, W3 = 10;
 
   ModelBuilder modelBuilder;

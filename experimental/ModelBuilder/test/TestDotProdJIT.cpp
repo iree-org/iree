@@ -100,6 +100,7 @@ void DotProdOnVectors() {
 }
 
 int main(int argc, char **argv) {
+  ModelBuilder::registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "TestDotProd\n");
   DotProdOnVectors();

@@ -24,6 +24,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // An allocator implementation that allocates buffers from host memory.
 // This can be used for drivers that do not have a memory space of their own.
@@ -54,6 +55,7 @@ class HostLocalAllocator : public Allocator {
                                      size_t allocation_size) override;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

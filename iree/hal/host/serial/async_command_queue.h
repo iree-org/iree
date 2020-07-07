@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_ASYNC_COMMAND_QUEUE_H_
-#define IREE_HAL_HOST_ASYNC_COMMAND_QUEUE_H_
+#ifndef IREE_HAL_HOST_SERIAL_ASYNC_COMMAND_QUEUE_H_
+#define IREE_HAL_HOST_SERIAL_ASYNC_COMMAND_QUEUE_H_
 
 #include <memory>
 #include <thread>  // NOLINT
@@ -21,11 +21,12 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/host/serial_submission_queue.h"
+#include "iree/hal/host/serial/serial_submission_queue.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Asynchronous command queue wrapper.
 // This creates a single thread to perform all CommandQueue operations. Any
@@ -64,7 +65,8 @@ class AsyncCommandQueue final : public CommandQueue {
   SerialSubmissionQueue submission_queue_ ABSL_GUARDED_BY(submission_mutex_);
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_ASYNC_COMMAND_QUEUE_H_
+#endif  // IREE_HAL_HOST_SERIAL_ASYNC_COMMAND_QUEUE_H_

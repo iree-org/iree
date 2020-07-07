@@ -107,19 +107,47 @@ function(iree_cc_test)
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
-  add_test(
-    NAME
-      ${_NAME_PATH}
-    COMMAND
-      # We run all our tests through a custom test runner to allow temp
-      # directory cleanup upon test completion.
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-      "$<TARGET_FILE:${_NAME}>"
-    WORKING_DIRECTORY
-      "${CMAKE_BINARY_DIR}"
+  set(_TEST_NAME "${_PACKAGE_PATH}:${_RULE_NAME}")
+
+  # Case for cross-compiling towards Android.
+  if(ANDROID)
+    set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
+    set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
+
+    # Define a custom target for pushing and running the test on Android device.
+    set(_TEST_NAME ${_TEST_NAME}_on_android_device)
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
+        "${_ANDROID_REL_DIR}/${_NAME}"
     )
+    # Use environment variables to instruct the script to push artifacts
+    # onto the Android device before running the test. This needs to match
+    # with the expectation of the run_android_test.{sh|bat|ps1} script.
+    set(
+      _ENVIRONMENT_VARS
+        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
+        TEST_EXECUTABLE=$<TARGET_FILE:${_NAME}>
+        TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
+    )
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
+  else(ANDROID)
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        # We run all our tests through a custom test runner to allow temp
+        # directory cleanup upon test completion.
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+        "$<TARGET_FILE:${_NAME}>"
+      WORKING_DIRECTORY
+        "${CMAKE_BINARY_DIR}"
+      )
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
+  endif(ANDROID)
+
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
-  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()

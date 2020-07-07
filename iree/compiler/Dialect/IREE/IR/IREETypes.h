@@ -54,6 +54,7 @@ enum class StatusCode : int32_t {
 
 namespace TypeKind {
 enum Kind {
+  // NOTE: The range is [FIRST_IREE_TYPE..FIRST_IREE_TYPE+255].
   Ptr = Type::FIRST_IREE_TYPE,
   ByteBuffer,
   MutableByteBuffer,
@@ -62,12 +63,21 @@ enum Kind {
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
   FIRST_SHAPE_TYPE = Type::FIRST_IREE_TYPE + 60,
   FIRST_STRING_TYPE = Type::FIRST_IREE_TYPE + 80,
-  FIRST_VM_TYPE = Type::FIRST_IREE_TYPE + 90,
-  FIRST_VMLA_TYPE = Type::FIRST_IREE_TYPE + 100,
-  FIRST_TENSORLIST_TYPE = Type::FIRST_IREE_TYPE + 120,
-  FIRST_TF_TENSORLIST_TYPE = Type::FIRST_IREE_TYPE + 140,
+  FIRST_VM_TYPE = Type::FIRST_IREE_TYPE + 100,
+  FIRST_VMLA_TYPE = Type::FIRST_IREE_TYPE + 120,
+  FIRST_TENSORLIST_TYPE = Type::FIRST_IREE_TYPE + 140,
+  FIRST_TF_TENSORLIST_TYPE = Type::FIRST_IREE_TYPE + 160,
+  FIRST_SEQUENCE_TYPE = Type::FIRST_IREE_TYPE + 180,
 };
 }  // namespace TypeKind
+
+namespace Sequence {
+namespace TypeKind {
+enum Kind {
+  Sequence = IREE::TypeKind::FIRST_SEQUENCE_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace Sequence
 
 namespace HAL {
 namespace TypeKind {

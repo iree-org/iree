@@ -132,6 +132,18 @@ List of devices attached
 XXXXXXXXXXX     device
 ```
 
+Then you can run all device tests via
+
+```shell
+$ cd build-android
+$ ctest --output-on-failure
+```
+
+The above command will upload necessary build artifacts to the Android device's
+`/data/local/tmp` directory, run the tests there, and report status back.
+
+Alternatively, if you want to invoke a specific HAL backend on a IREE module:
+
 ### VMLA HAL backend
 
 Translate a source MLIR into IREE module:
@@ -218,3 +230,48 @@ problems for Vulkan device enumeration under `/data/local/tmp/`. A known
 workaround is to copy the `libGLES_mali.so` library under `/data/local/tmp/` and
 rename it as `libvulkan.so` and then prefix `LD_LIBRARY_PATH=/data/local/tmp`
 when invoking IREE executables.
+
+### Dylib LLVM AOT backend
+
+To compile IREE module for the target Android device (assume Android 10 AArc64)
+we need install the corresponding standalone toolchain and setting AOT linker
+path environment variable: `shell $ export
+ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain $
+$ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64
+--platform=android-29 \ --install-dir=$ANDROID_ARM64_TOOLCHAIN $ export
+IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld`
+
+Translate a source MLIR into an IREE module:
+
+```shell
+# Assuming in IREE source root
+$ build-android/host/bin/iree-translate \
+    -iree-mlir-to-vm-bytecode-module \
+    -iree-llvm-target-triple=aarch64-linux-android \
+    -iree-hal-target-backends=dylib-llvm-aot \
+    iree/tools/test/simple.mlir \
+    -o /tmp/simple-llvm_aot.vmfb
+```
+
+Then push the IREE runtime executable and module to the device:
+
+```shell
+$ adb push build-android/iree/tools/iree-run-module /data/local/tmp/
+$ adb shell chmod +x /data/local/tmp/iree-run-module
+$ adb push /tmp/simple-llvm_aot.vmfb /data/local/tmp/
+```
+
+Log into Android:
+
+```shell
+$ adb shell
+
+android $ cd /data/local/tmp/
+android $ ./iree-run-module -driver=dylib \
+          -input_file=simple-llvm_aot.vmfb \
+          -entry_function=abs \
+          -inputs="i32=-5"
+
+EXEC @abs
+i32=5
+```

@@ -22,7 +22,7 @@ include(AbseilConfigureCopts)
 # we cannot run IREE binaries via command-line with proper options. Turn off
 # the stripping.
 # TODO: we might still want to strip when compiling IREE into Android Java apps.
-if(CMAKE_CROSSCOMPILING AND "${CMAKE_SYSTEM_NAME}" MATCHES "Android")
+if(ANDROID)
   add_definitions(-DABSL_FLAGS_STRIP_NAMES=0)
 endif()
 

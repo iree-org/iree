@@ -110,6 +110,8 @@ static unsigned mapDescriptorTypeToMemorySpace(IREE::HAL::DescriptorType type) {
     case IREE::HAL::DescriptorType::UniformBuffer:
     case IREE::HAL::DescriptorType::UniformBufferDynamic:
       return 4;
+    default:
+      llvm_unreachable("unexpected descriptor type");
   }
 }
 

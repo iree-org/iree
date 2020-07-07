@@ -134,6 +134,9 @@ class ModelBuilder : public OpBuilder {
   // SymbolTable as well as uniqued MLIR types.
   ModelBuilder();
 
+  // Register all the dialects used by ModelBuilder.
+  static void registerAllDialects();
+
   // Return a reference to the underlying module.
   OwningModuleRef &getModuleRef() { return module; }
 

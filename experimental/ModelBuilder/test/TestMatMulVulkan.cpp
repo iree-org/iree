@@ -149,6 +149,7 @@ void testMatMul() {
 }
 
 int main(int argc, char **argv) {
+  ModelBuilder::registerAllDialects();
   iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.

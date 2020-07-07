@@ -21,10 +21,10 @@ namespace iree {
 namespace hal {
 namespace llvmjit {
 
-class LLVMJITDevice final : public HostLocalDevice {
+class LLVMJITDevice final : public host::HostLocalDevice {
  public:
   LLVMJITDevice(DeviceInfo device_info,
-                std::unique_ptr<SchedulingModel> scheduling_model);
+                std::unique_ptr<host::SchedulingModel> scheduling_model);
   ~LLVMJITDevice() override;
 
   ref_ptr<ExecutableCache> CreateExecutableCache() override;

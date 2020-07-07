@@ -138,6 +138,13 @@ void BM_MxMColMajorVectors(benchmark::State &state) {
   }
 }
 
+int main(int argc, char **argv) {
+  mlir::ModelBuilder::registerAllDialects();
+  ::benchmark::Initialize(&argc, argv);
+  if (::benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;
+  ::benchmark::RunSpecifiedBenchmarks();
+}
+
 //
 // Benchmark drivers (build).
 //

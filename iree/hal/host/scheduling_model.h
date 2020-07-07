@@ -19,6 +19,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 // Host-local scheduling interface that device implementations can use to choose
 // between various scheduling strategies (such as serial/in-order,
@@ -92,6 +93,7 @@ class SchedulingModel {
   virtual Status WaitIdle(absl::Time deadline) = 0;
 };
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
 

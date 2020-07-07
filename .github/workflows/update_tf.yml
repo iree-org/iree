@@ -31,7 +31,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
         with:
-          - ref: "google"
+          ref: "google"
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules
@@ -43,7 +43,7 @@ jobs:
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           commit-message: "Update TF submodule and LLVM BUILD files"
           title: "Update TF submodule and LLVM BUILD files"
-          body: "Automated submodule bump from .github/workflows/update_submodules.yml"
+          body: "Automated submodule bump from .github/workflows/update_tf.yml"
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
           # TODO(gcmn): Figure out a way to assign this to someone dynamically.
           reviewers: gmngeoffrey

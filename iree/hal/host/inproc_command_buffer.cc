@@ -18,6 +18,7 @@
 
 namespace iree {
 namespace hal {
+namespace host {
 
 InProcCommandBuffer::InProcCommandBuffer(
     CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories)
@@ -331,5 +332,6 @@ Status InProcCommandBuffer::ProcessCmd(CmdHeader* cmd_header,
   }
 }
 
+}  // namespace host
 }  // namespace hal
 }  // namespace iree
