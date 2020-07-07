@@ -9,7 +9,7 @@ func @empty() {
 // -----
 
 func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   return %0 : tensor<4xf32>
 }
 
@@ -17,7 +17,7 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:   flow.dispatch.entry @simpleMath_ex_dispatch_0
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @simpleMath_ex_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+// CHECK-NEXT:       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
 // CHECK-NEXT:       return %0 : tensor<4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -63,9 +63,9 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+  %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
+  %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
 
@@ -73,9 +73,9 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:   flow.dispatch.entry @hloElementwiseOps_ex_dispatch_0
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @hloElementwiseOps_ex_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
+// CHECK-NEXT:       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+// CHECK-NEXT:       %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
+// CHECK-NEXT:       %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
 // CHECK-NEXT:       return %2 : tensor<4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -92,9 +92,9 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
-  %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
+  %1 = "mhlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %2 = mhlo.multiply %1, %arg0 : tensor<4x4xf32>
   return %2 : tensor<4x4xf32>
 }
 
@@ -102,7 +102,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_ex_dispatch_0
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @interleavedDot_ex_dispatch_0(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
+// CHECK-NEXT:       %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
 // CHECK-NEXT:       return %0 : tensor<4x4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -111,7 +111,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_ex_dispatch_1
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @interleavedDot_ex_dispatch_1(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-// CHECK-NEXT:       %0 = "xla_hlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+// CHECK-NEXT:       %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 // CHECK-NEXT:       return %0 : tensor<4x4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -120,7 +120,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_ex_dispatch_2
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @interleavedDot_ex_dispatch_2(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.multiply %arg0, %arg1 : tensor<4x4xf32>
+// CHECK-NEXT:       %0 = mhlo.multiply %arg0, %arg1 : tensor<4x4xf32>
 // CHECK-NEXT:       return %0 : tensor<4x4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -140,10 +140,10 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   %0 = constant dense<0.0> : tensor<f32>
-  %1 = "xla_hlo.reduce"(%arg0, %0) ( {
+  %1 = "mhlo.reduce"(%arg0, %0) ( {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):
-    %2 = xla_hlo.add %arg1, %arg2 : tensor<f32>
-    "xla_hlo.return"(%2) : (tensor<f32>) -> ()
+    %2 = mhlo.add %arg1, %arg2 : tensor<f32>
+    "mhlo.return"(%2) : (tensor<f32>) -> ()
   }) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
   return %1 : tensor<4xf32>
 }
@@ -153,10 +153,10 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:   module {
 //  CHECK-NEXT:     func @reduction_ex_dispatch_0(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:       %cst = constant dense<0.000000e+00> : tensor<f32>
-//  CHECK-NEXT:       %0 = "xla_hlo.reduce"(%arg0, %cst) ( {
+//  CHECK-NEXT:       %0 = "mhlo.reduce"(%arg0, %cst) ( {
 //  CHECK-NEXT:       ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>): // no predecessors
-//  CHECK-NEXT:         %1 = xla_hlo.add %arg1, %arg2 : tensor<f32>
-//  CHECK-NEXT:         "xla_hlo.return"(%1) : (tensor<f32>) -> ()
+//  CHECK-NEXT:         %1 = mhlo.add %arg1, %arg2 : tensor<f32>
+//  CHECK-NEXT:         "mhlo.return"(%1) : (tensor<f32>) -> ()
 //  CHECK-NEXT:       }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
 //  CHECK-NEXT:       return %0 : tensor<4xf32>
 //  CHECK-NEXT:     }
@@ -174,8 +174,8 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 // -----
 
 func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, %indices_0 : tensor<i64>, %indices_1 : tensor<i64>) -> tensor<2x4xi32> {
-  %0 = "xla_hlo.dynamic-update-slice"(%operand, %update, %indices_0, %indices_1) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i64>, tensor<i64>) -> tensor<2x4xi32>
-  %1 = xla_hlo.add %operand, %0 : tensor<2x4xi32>
+  %0 = "mhlo.dynamic-update-slice"(%operand, %update, %indices_0, %indices_1) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i64>, tensor<i64>) -> tensor<2x4xi32>
+  %1 = mhlo.add %operand, %0 : tensor<2x4xi32>
   return %1 : tensor<2x4xi32>
 }
 
@@ -183,7 +183,7 @@ func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, 
 // CHECK-NEXT: flow.dispatch.entry @dynamicUpdateSlice_ex_dispatch_0
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @dynamicUpdateSlice_ex_dispatch_0(%arg0: tensor<2x4xi32>, %arg1: tensor<2x4xi32>) -> tensor<2x4xi32> {
-// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg1 : tensor<2x4xi32>
+// CHECK-NEXT:       %0 = mhlo.add %arg0, %arg1 : tensor<2x4xi32>
 // CHECK-NEXT:       return %0 : tensor<2x4xi32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }

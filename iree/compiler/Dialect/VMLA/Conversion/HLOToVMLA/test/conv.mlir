@@ -9,7 +9,7 @@ func @conv(%arg0: tensor<1x4x5x2xf32>, %arg1: tensor<3x2x2x1xf32>) -> tensor<1x2
   // CHECK-SAME: padding = dense<[1, 2, 2, 2]> : vector<4xi32>,
   // CHECK-SAME: rhs_dilation = dense<1> : vector<2xi32>,
   // CHECK-SAME: window_strides = dense<1> : vector<2xi32>}
-  %2 = "xla_hlo.convolution"(%arg0, %arg1) {
+  %2 = "mhlo.convolution"(%arg0, %arg1) {
         batch_group_count = 1 : i64,
         dimension_numbers = {
           input_batch_dimension = 0 : i64,

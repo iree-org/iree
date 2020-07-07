@@ -3,9 +3,9 @@
 // CHECK-LABEL: @transpose
 func @transpose(%arg0: tensor<?x7x10xf32>, %arg1: !shapex.ranked_shape<[?,7,10]>) -> (tensor<7x?x10xf32>, !shapex.ranked_shape<[7,?,10]>) {
   %tied = shapex.tie_shape %arg0, %arg1 : tensor<?x7x10xf32>, !shapex.ranked_shape<[?,7,10]>
-  %0 = "xla_hlo.transpose"(%tied) {permutation = dense<[1, 0, 2]> : tensor<3xi64>} :
+  %0 = "mhlo.transpose"(%tied) {permutation = dense<[1, 0, 2]> : tensor<3xi64>} :
       (tensor<?x7x10xf32>) -> tensor<7x?x10xf32>
-  // CHECK-DAG: %[[RESULT:.+]] = "xla_hlo.transpose"
+  // CHECK-DAG: %[[RESULT:.+]] = "mhlo.transpose"
   // CHECK-DAG: %[[DIM:.+]] = shapex.ranked_dim %arg1[0]
   // CHECK-DAG: %[[SHAPE:.+]] = shapex.make_ranked_shape %[[DIM]]
   %1 = shapex.get_ranked_shape %0 : tensor<7x?x10xf32> -> !shapex.ranked_shape<[7,?,10]>
@@ -26,7 +26,7 @@ func @dot_general(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>,
   // CHECK-DAG: %[[EXTENT2:.+]] = shapex.ranked_dim %arg3[2]
   // CHECK-DAG: %[[SHAPE:.+]] = shapex.make_ranked_shape %[[EXTENT0]], %[[EXTENT1]], %[[EXTENT2]]
   // CHECK-DAG: return %[[SHAPE]]
-  %0 = "xla_hlo.dot_general"(%tie0, %tie1) { dot_dimension_numbers = {
+  %0 = "mhlo.dot_general"(%tie0, %tie1) { dot_dimension_numbers = {
     lhs_batching_dimensions = dense<0> : tensor<1xi64>,
     lhs_contracting_dimensions = dense<2> : tensor<1xi64>,
     rhs_batching_dimensions = dense<0> : tensor<1xi64>,
@@ -42,7 +42,7 @@ func @dot_general(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>,
 func @dynamic_reshape(%arg0: tensor<?xf32>, %arg1: tensor<2xindex>) -> !shapex.ranked_shape<[?,?]> {
   // CHECK-DAG: %[[SHAPE:.+]] = "shapex.from_extent_tensor"(%arg1)
   // CHECK-DAG: return %[[SHAPE]]
-  %0 = "xla_hlo.dynamic_reshape"(%arg0, %arg1) : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  %0 = "mhlo.dynamic_reshape"(%arg0, %arg1) : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
   %1 = shapex.get_ranked_shape %0 : tensor<?x?xf32> -> !shapex.ranked_shape<[?,?]>
   return %1 : !shapex.ranked_shape<[?,?]>
 }

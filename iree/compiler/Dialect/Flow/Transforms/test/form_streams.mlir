@@ -6,7 +6,7 @@ flow.executable @outerOps_ex_dispatch_0 {
   }
   module {
     func @outerOps_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -57,7 +57,7 @@ flow.executable @interleavedOuterOps_ex_dispatch_0 {
   }
   module {
     func @interleavedOuterOps_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -115,7 +115,7 @@ flow.executable @interleavedDot_ex_dispatch_0 {
   }
   module {
     func @interleavedDot_rgn_dispatch_0(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
     }
   }
@@ -126,7 +126,7 @@ flow.executable @interleavedDot_ex_dispatch_1 {
   }
   module {
     func @interleavedDot_rgn_dispatch_1(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-      %0 = "xla_hlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+      %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
     }
   }
@@ -137,7 +137,7 @@ flow.executable @interleavedDot_ex_dispatch_2 {
   }
   module {
     func @interleavedDot_rgn_dispatch_2(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-      %0 = xla_hlo.multiply %arg0, %arg1 : tensor<4x4xf32>
+      %0 = mhlo.multiply %arg0, %arg1 : tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
     }
   }
@@ -167,7 +167,7 @@ flow.executable @caller_ex_dispatch_0 {
   }
   module {
     func @caller_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -178,7 +178,7 @@ flow.executable @caller_ex_dispatch_1 {
   }
   module {
     func @caller_rgn_dispatch_1(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.multiply %arg0, %arg1 : tensor<4xf32>
+      %0 = mhlo.multiply %arg0, %arg1 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -206,7 +206,7 @@ flow.executable @callee_ex_dispatch_0 {
   flow.dispatch.entry @callee_rgn_dispatch_0
   module {
     func @callee_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.multiply %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.multiply %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }

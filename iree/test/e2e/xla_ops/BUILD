@@ -57,7 +57,7 @@ iree_check_single_backend_test_suite(
         # operation. Lowering from XLA -> linalg should be easy fix.
         # "floor.mlir",
 
-        # TODO(#1694): Enable after xla_hlo.gather can be lowered to linalg.
+        # TODO(#1694): Enable after mhlo.gather can be lowered to linalg.
         # "gather.mlir",
         # "gather_concat.mlir",
         #

@@ -55,7 +55,7 @@ Value processTuple(Type type, Location loc, Block *block, OpBuilder &builder) {
     values.push_back(processTuple(subtype, loc, block, builder));
   }
 
-  return builder.create<xla_hlo::TupleOp>(loc, tupleType, values);
+  return builder.create<mhlo::TupleOp>(loc, tupleType, values);
 }
 
 void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
@@ -84,7 +84,7 @@ bool recursiveUntuple(Value value, Location loc, OpBuilder &builder,
   for (int i = 0; i < tupleType.size(); i++) {
     auto subType = tupleType.getType(i);
 
-    auto elementOp = builder.create<xla_hlo::GetTupleElementOp>(
+    auto elementOp = builder.create<mhlo::GetTupleElementOp>(
         loc, subType, value, builder.getI32IntegerAttr(i));
     recursiveUntuple(elementOp.getResult(), loc, builder, mapping, newValues);
   }
@@ -106,8 +106,7 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
     subValues.push_back(recursiveRetuple(subtype, values, builder, loc));
   }
 
-  return builder.create<xla_hlo::TupleOp>(loc, tupleType, subValues)
-      .getResult();
+  return builder.create<mhlo::TupleOp>(loc, tupleType, subValues).getResult();
 }
 
 template <typename T>

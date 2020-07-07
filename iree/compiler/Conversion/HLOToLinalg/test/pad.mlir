@@ -7,7 +7,7 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
     // CHECK: linalg.indexed_generic
     %1 = constant dense<0.0> : tensor<f32>
-    %2 = "xla_hlo.pad"(%0, %1) {
+    %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
       edge_padding_low = dense<[4, 5]> : tensor<2xi64>,
       interior_padding = dense<0> : tensor<2xi64>
@@ -30,7 +30,7 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
     // CHECK: linalg.indexed_generic
-    %2 = "xla_hlo.pad"(%0, %1) {
+    %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
       edge_padding_low = dense<[4, 5]> : tensor<2xi64>,
       interior_padding = dense<0> : tensor<2xi64>
@@ -54,7 +54,7 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
     // CHECK: linalg.indexed_generic
     %1 = constant dense<0.0> : tensor<f32>
-    %2 = "xla_hlo.pad"(%0, %1) {
+    %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<0> : tensor<2xi64>,
       edge_padding_low = dense<0> : tensor<2xi64>,
       interior_padding = dense<0> : tensor<2xi64>

@@ -32,12 +32,12 @@ namespace Shape {
 namespace {
 
 class ConvertDynamicBroadcastInDim
-    : public OpConversionPattern<xla_hlo::DynamicBroadcastInDimOp> {
+    : public OpConversionPattern<mhlo::DynamicBroadcastInDimOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      xla_hlo::DynamicBroadcastInDimOp op, ArrayRef<Value> operands,
+      mhlo::DynamicBroadcastInDimOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    xla_hlo::DynamicBroadcastInDimOp::Adaptor adapter(operands);
+    mhlo::DynamicBroadcastInDimOp::Adaptor adapter(operands);
     Value rankedShape = rewriter.create<Shape::FromExtentTensorOp>(
         op.getLoc(), adapter.output_dimensions());
     rewriter.replaceOpWithNewOp<Shape::RankedBroadcastInDimOp>(
@@ -55,9 +55,9 @@ class ConvertHLOToShapePass
 
     conversionTarget.addLegalDialect<ShapeDialect>();
     conversionTarget.addLegalDialect<StandardOpsDialect>();
-    conversionTarget.addLegalDialect<xla_hlo::XlaHloDialect>();
+    conversionTarget.addLegalDialect<mhlo::XlaHloDialect>();
 
-    conversionTarget.addIllegalOp<xla_hlo::DynamicBroadcastInDimOp>();
+    conversionTarget.addIllegalOp<mhlo::DynamicBroadcastInDimOp>();
     conversionPatterns.insert<ConvertDynamicBroadcastInDim>(&getContext());
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,

@@ -90,8 +90,7 @@ LogicalResult convertOperation(Operation *oldOp,
     }
   }
 
-  if (llvm::isa<mlir::ConstantOp>(oldOp) ||
-      llvm::isa<xla_hlo::ConstOp>(oldOp)) {
+  if (llvm::isa<mlir::ConstantOp>(oldOp) || llvm::isa<mhlo::ConstOp>(oldOp)) {
     // Deal with all value-based constant ops generically.
     Attribute oldValue = oldOp->getAttr("value");
     auto newValue = convertAttribute(oldOp->getLoc(), oldValue, typeConverter);

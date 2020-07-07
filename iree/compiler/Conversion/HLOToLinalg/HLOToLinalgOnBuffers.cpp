@@ -15,7 +15,7 @@
 //===- HLOToLinalgOnBuffers.cpp - Pass to convert HLO to Linalg on buffers-===//
 //
 // Pass to convert from HLO to linalg on buffers. Currently only handles cases
-// where the dispatch region contains a single xla_hlo op that can be converted
+// where the dispatch region contains a single mhlo op that can be converted
 // to linalg on buffers.
 //
 //===----------------------------------------------------------------------===//
@@ -227,7 +227,7 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.dot conversion patterns.
+// mhlo.dot conversion patterns.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -239,7 +239,7 @@ enum class DotOperationType {
 };
 }
 
-static DotOperationType getDotOperationType(xla_hlo::DotOp dotOp) {
+static DotOperationType getDotOperationType(mhlo::DotOp dotOp) {
   ArrayRef<int64_t> lhsShape =
       dotOp.lhs().getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape =
@@ -261,14 +261,14 @@ static DotOperationType getDotOperationType(xla_hlo::DotOp dotOp) {
 }
 
 namespace {
-/// Converts xla_hlo.dot operation to linalg.matmul op
+/// Converts mhlo.dot operation to linalg.matmul op
 template <DotOperationType opType, typename LinalgOpTy>
 struct DotOpConversion
     : public ConvertToLinalgBufferOp<DotOpConversion<opType, LinalgOpTy>,
-                                     xla_hlo::DotOp> {
+                                     mhlo::DotOp> {
   using ConvertToLinalgBufferOp<DotOpConversion<opType, LinalgOpTy>,
-                                xla_hlo::DotOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(xla_hlo::DotOp op, ArrayRef<Value> inputBuffers,
+                                mhlo::DotOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(mhlo::DotOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const {
     if (getDotOperationType(op) == opType) {
@@ -287,23 +287,23 @@ struct DotOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.convolution conversion patterns and utility functions.
+// mhlo.convolution conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts xla_hlo.convolution operation to linalg.conv op.
+/// Converts mhlo.convolution operation to linalg.conv op.
 struct ConvOpConversion
-    : public ConvertToLinalgBufferOp<ConvOpConversion, xla_hlo::ConvOp> {
+    : public ConvertToLinalgBufferOp<ConvOpConversion, mhlo::ConvOp> {
   using ConvertToLinalgBufferOp<ConvOpConversion,
-                                xla_hlo::ConvOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(xla_hlo::ConvOp op, ArrayRef<Value> inputBuffers,
+                                mhlo::ConvOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
 }  // namespace
 
 LogicalResult ConvOpConversion::apply(
-    xla_hlo::ConvOp op, ArrayRef<Value> inputBuffers,
+    mhlo::ConvOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   if (const auto dimensionNumbers = op.dimension_numbers()) {
     const int inputSpatialRank =
@@ -388,27 +388,27 @@ LogicalResult ConvOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.concatenate conversion patterns and utility functions.
+// mhlo.concatenate conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts a xla_hlo.concatenate op to an indexed_generic op. The
+/// Converts a mhlo.concatenate op to an indexed_generic op. The
 /// implementation adds more dimensions to make the loops correct, because
 /// each dimension in indexing maps matches to exactly one range.
 class ConcatenateOpConversion
     : public ConvertToLinalgBufferOp<ConcatenateOpConversion,
-                                     xla_hlo::ConcatenateOp> {
+                                     mhlo::ConcatenateOp> {
  public:
-  using ConvertToLinalgBufferOp<
-      ConcatenateOpConversion, xla_hlo::ConcatenateOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(xla_hlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
+  using ConvertToLinalgBufferOp<ConcatenateOpConversion,
+                                mhlo::ConcatenateOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
 }  // namespace
 
 LogicalResult ConcatenateOpConversion::apply(
-    xla_hlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
+    mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   Location loc = op.getLoc();
   int dim = op.dimension().getSExtValue();
@@ -489,27 +489,27 @@ LogicalResult ConcatenateOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.pad conversion patterns and utility functions.
+// mhlo.pad conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts xla_hlo.pad operation to linalg.indexed_generic op.
+/// Converts mhlo.pad operation to linalg.indexed_generic op.
 // TODO(#1604): Lower the pad op to a Linalg named op.
 struct PadOpConversion
-    : public ConvertToLinalgBufferOp<PadOpConversion, xla_hlo::PadOp> {
+    : public ConvertToLinalgBufferOp<PadOpConversion, mhlo::PadOp> {
   using ConvertToLinalgBufferOp<PadOpConversion,
-                                xla_hlo::PadOp>::ConvertToLinalgBufferOp;
+                                mhlo::PadOp>::ConvertToLinalgBufferOp;
 
-  LogicalResult apply(xla_hlo::PadOp op, ArrayRef<Value> inputBuffers,
+  LogicalResult apply(mhlo::PadOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
 }  // namespace
 
 /// Returns an AffineMapAttr that is the indexing map to use for the input of a
-/// xla_hlo.pad `op`.
+/// mhlo.pad `op`.
 static AffineMapAttr getPadOpInputIndexingMap(
-    xla_hlo::PadOp op, int rank, ConversionPatternRewriter &rewriter) {
+    mhlo::PadOp op, int rank, ConversionPatternRewriter &rewriter) {
   const auto edgePaddingLow = convertDenseIntAttr(op.edge_padding_low());
   SmallVector<AffineExpr, 4> exprs;
   for (int i = 0; i < rank; ++i)
@@ -519,14 +519,14 @@ static AffineMapAttr getPadOpInputIndexingMap(
 }
 
 LogicalResult PadOpConversion::apply(
-    xla_hlo::PadOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
+    mhlo::PadOp op, ArrayRef<Value> inputBuffers, ArrayRef<Value> resultBuffers,
+    ConversionPatternRewriter &rewriter) const {
   if (llvm::any_of(op.interior_padding().getValues<IntegerAttr>(),
                    [](auto attr) { return attr.getInt() != 0; }))
     return op.emitError(
         "pad op with non-zero interiror_padding is not supported");
 
-  xla_hlo::PadOp::Adaptor adaptor(inputBuffers);
+  mhlo::PadOp::Adaptor adaptor(inputBuffers);
   auto loc = op.getLoc();
 
   Attribute paddingConstVal = getInitValueAsConst(adaptor.padding_value());
@@ -615,24 +615,24 @@ LogicalResult PadOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.slice conversion patterns.
+// mhlo.slice conversion patterns.
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Converts xla_hlo.slice operation to linalg.subview + linalg.copy
+/// Converts mhlo.slice operation to linalg.subview + linalg.copy
 struct SliceOpConversion
-    : public ConvertToLinalgBufferOp<SliceOpConversion, xla_hlo::SliceOp> {
+    : public ConvertToLinalgBufferOp<SliceOpConversion, mhlo::SliceOp> {
   using ConvertToLinalgBufferOp<SliceOpConversion,
-                                xla_hlo::SliceOp>::ConvertToLinalgBufferOp;
+                                mhlo::SliceOp>::ConvertToLinalgBufferOp;
 
-  LogicalResult apply(xla_hlo::SliceOp op, ArrayRef<Value> inputBuffers,
+  LogicalResult apply(mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
 }  // namespace
 
 LogicalResult SliceOpConversion::apply(
-    xla_hlo::SliceOp op, ArrayRef<Value> inputBuffers,
+    mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
   auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
@@ -658,7 +658,7 @@ LogicalResult SliceOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.torch_index_select conversion patterns.
+// mhlo.torch_index_select conversion patterns.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -670,22 +670,21 @@ namespace {
 /// graph. It is just a magic buffer outside operations.
 struct TorchIndexSelectOpConversion
     : public ConvertToLinalgBufferOp<TorchIndexSelectOpConversion,
-                                     xla_hlo::TorchIndexSelectOp> {
+                                     mhlo::TorchIndexSelectOp> {
   using ConvertToLinalgBufferOp<
       TorchIndexSelectOpConversion,
-      xla_hlo::TorchIndexSelectOp>::ConvertToLinalgBufferOp;
+      mhlo::TorchIndexSelectOp>::ConvertToLinalgBufferOp;
 
-  LogicalResult apply(xla_hlo::TorchIndexSelectOp op,
-                      ArrayRef<Value> inputBuffers,
+  LogicalResult apply(mhlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
 }  // namespace
 
 LogicalResult TorchIndexSelectOpConversion::apply(
-    xla_hlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
+    mhlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  xla_hlo::TorchIndexSelectOp::Adaptor adaptor(inputBuffers);
+  mhlo::TorchIndexSelectOp::Adaptor adaptor(inputBuffers);
   int axis = op.dim().getSExtValue();
   int batch = op.batch_dims().getSExtValue();
   auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
@@ -742,12 +741,12 @@ LogicalResult TorchIndexSelectOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.reduce_window conversion patterns and utility functions.
+// mhlo.reduce_window conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-/// xla_hlo.reduce_window is mapped to a linalg.pooling operation. The type of
+/// mhlo.reduce_window is mapped to a linalg.pooling operation. The type of
 /// the pooling is determined based on the body of the reduce window
 /// operation. This class enumerates the different variants.
 enum class PoolingType {
@@ -758,12 +757,11 @@ enum class PoolingType {
 
 struct ReduceWindowOpConversion
     : public ConvertToLinalgBufferOp<ReduceWindowOpConversion,
-                                     xla_hlo::ReduceWindowOp> {
-  using ConvertToLinalgBufferOp<
-      ReduceWindowOpConversion,
-      xla_hlo::ReduceWindowOp>::ConvertToLinalgBufferOp;
+                                     mhlo::ReduceWindowOp> {
+  using ConvertToLinalgBufferOp<ReduceWindowOpConversion,
+                                mhlo::ReduceWindowOp>::ConvertToLinalgBufferOp;
 
-  LogicalResult apply(xla_hlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
+  LogicalResult apply(mhlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 };
@@ -776,15 +774,15 @@ static PoolingType getPoolingType(Region &region) {
   assert(block.getOperations().size() == 2 &&
          "expected the block has exactlly two operations");
   auto op = block.begin();
-  if (isa<xla_hlo::MinOp>(op)) return PoolingType::kMin;
-  if (isa<xla_hlo::MaxOp>(op)) return PoolingType::kMax;
-  if (isa<xla_hlo::AddOp>(op)) return PoolingType::kAdd;
+  if (isa<mhlo::MinOp>(op)) return PoolingType::kMin;
+  if (isa<mhlo::MaxOp>(op)) return PoolingType::kMax;
+  if (isa<mhlo::AddOp>(op)) return PoolingType::kAdd;
 
   llvm_unreachable("unknown pooling type");
 }
 
 LogicalResult ReduceWindowOpConversion::apply(
-    xla_hlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
+    mhlo::ReduceWindowOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
 
@@ -843,7 +841,7 @@ LogicalResult ReduceWindowOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// xla_hlo.reduce conversion patterns and utility functions.
+// mhlo.reduce conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
 /// Returns a permutation AffineMap that puts all reduction dimensions to the
@@ -874,7 +872,7 @@ static bool isWithinReduceOpRegion(Operation *op) {
 
 namespace {
 
-/// Type converter for converting the region of an xla_hlo::reduce op.
+/// Type converter for converting the region of an mhlo::reduce op.
 class ReduceRegionTypeConverter : public TypeConverter {
  public:
   Type convertType(Type type) const {
@@ -887,15 +885,15 @@ class ReduceRegionTypeConverter : public TypeConverter {
   }
 };
 
-/// Converts the xla_hlo.reduce op on tensors to a linalg.indexed_generic op on
+/// Converts the mhlo.reduce op on tensors to a linalg.indexed_generic op on
 /// buffers. Expects that the reduce op is the only op within the dispatch
 /// function. This pattern also fuses std.constant operations which are defining
 /// ops of the init value with the linalg.indexed_generic op.
 struct ReduceOpConversion
-    : public ConvertToLinalgBufferOp<ReduceOpConversion, xla_hlo::ReduceOp> {
+    : public ConvertToLinalgBufferOp<ReduceOpConversion, mhlo::ReduceOp> {
   using ConvertToLinalgBufferOp<ReduceOpConversion,
-                                xla_hlo::ReduceOp>::ConvertToLinalgBufferOp;
-  LogicalResult apply(xla_hlo::ReduceOp reduceOp, ArrayRef<Value> inputBuffers,
+                                mhlo::ReduceOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(mhlo::ReduceOp reduceOp, ArrayRef<Value> inputBuffers,
                       ArrayRef<Value> resultBuffers,
                       ConversionPatternRewriter &rewriter) const;
 
@@ -940,13 +938,13 @@ struct ReduceRegionXLAOpConversion final
   }
 };
 
-/// Converts xla_hlo.return to within a reduce region to a linalg.yield.
+/// Converts mhlo.return to within a reduce region to a linalg.yield.
 struct ReduceRegionReturnOpConversion final
     : public ReduceRegionOpConversion<ReduceRegionReturnOpConversion,
-                                      xla_hlo::ReturnOp> {
+                                      mhlo::ReturnOp> {
   using ReduceRegionOpConversion<ReduceRegionReturnOpConversion,
-                                 xla_hlo::ReturnOp>::ReduceRegionOpConversion;
-  static Operation *apply(xla_hlo::ReturnOp op, ArrayRef<Value> operands,
+                                 mhlo::ReturnOp>::ReduceRegionOpConversion;
+  static Operation *apply(mhlo::ReturnOp op, ArrayRef<Value> operands,
                           ConversionPatternRewriter &rewriter) {
     return rewriter.create<linalg::YieldOp>(op.getLoc(), operands[0]);
   }
@@ -954,7 +952,7 @@ struct ReduceRegionReturnOpConversion final
 }  // namespace
 
 LogicalResult ReduceOpConversion::apply(
-    xla_hlo::ReduceOp reduceOp, ArrayRef<Value> inputBuffers,
+    mhlo::ReduceOp reduceOp, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   if (reduceOp.getNumOperands() != 2) return failure();
   Value src = *reduceOp.operands().begin();
@@ -1388,9 +1386,9 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       TensorReshapeOpConversion, TorchIndexSelectOpConversion>(
       context, resultTensorToBufferMap);
   // Reduce region operation conversions.
-  patterns.insert<ReduceRegionXLAOpConversion<xla_hlo::AddOp>,
-                  ReduceRegionXLAOpConversion<xla_hlo::MinOp>,
-                  ReduceRegionXLAOpConversion<xla_hlo::MaxOp>,
+  patterns.insert<ReduceRegionXLAOpConversion<mhlo::AddOp>,
+                  ReduceRegionXLAOpConversion<mhlo::MinOp>,
+                  ReduceRegionXLAOpConversion<mhlo::MaxOp>,
                   ReduceRegionReturnOpConversion>(context);
 }
 
@@ -1413,7 +1411,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
 
   ConversionTarget target(*context);
   // Make sure all XLA HLO ops are converted to Linalg ops after this pass.
-  target.addIllegalDialect<xla_hlo::XlaHloDialect>();
+  target.addIllegalDialect<mhlo::XlaHloDialect>();
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,

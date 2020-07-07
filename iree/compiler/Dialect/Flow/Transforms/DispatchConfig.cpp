@@ -32,11 +32,10 @@ namespace {
 // TODO(laurenzo): Every one of these should have better support and removed
 // from this exclusion list eventually.
 bool isUnsupportedFusionOp(Operation *op) {
-  return isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-         isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
-         isa<xla_hlo::ReduceWindowOp>(op) ||
-         isa<xla_hlo::TorchIndexSelectOp>(op) || isa<xla_hlo::SliceOp>(op) ||
-         isa<xla_hlo::ConcatenateOp>(op);
+  return isa<mhlo::DotOp>(op) || isa<mhlo::ConvOp>(op) ||
+         isa<mhlo::ReduceOp>(op) || isa<mhlo::PadOp>(op) ||
+         isa<mhlo::ReduceWindowOp>(op) || isa<mhlo::TorchIndexSelectOp>(op) ||
+         isa<mhlo::SliceOp>(op) || isa<mhlo::ConcatenateOp>(op);
 }
 
 // Allowlist of ops that materialize to a an index-permuted copy of some kind
@@ -46,11 +45,11 @@ bool isIndexOp(Operation *op) {
   // TODO(laurenzo): Curate this list more specifically (or have a better
   // mechanism for determining).
   return isa<Shape::RankedBroadcastInDimOp>(op) ||
-         isa<xla_hlo::BroadcastInDimOp>(op) ||
-         isa<xla_hlo::DynamicBroadcastInDimOp>(op) ||
-         isa<xla_hlo::DynamicReshapeOp>(op) ||
-         isa<xla_hlo::DynamicSliceOp>(op) || isa<xla_hlo::ReshapeOp>(op) ||
-         isa<xla_hlo::SliceOp>(op) || isa<xla_hlo::TransposeOp>(op);
+         isa<mhlo::BroadcastInDimOp>(op) ||
+         isa<mhlo::DynamicBroadcastInDimOp>(op) ||
+         isa<mhlo::DynamicReshapeOp>(op) || isa<mhlo::DynamicSliceOp>(op) ||
+         isa<mhlo::ReshapeOp>(op) || isa<mhlo::SliceOp>(op) ||
+         isa<mhlo::TransposeOp>(op);
 }
 }  // namespace
 
@@ -123,7 +122,7 @@ int OpDispatchPolicy::getAnchorBenefit(Operation *op) {
     // We generally do not want to form anchors around ops that just do a copy
     // (perhaps with an affine map) except as a last resort.
     return 1;
-  } else if (isa<xla_hlo::SelectOp>(op)) {
+  } else if (isa<mhlo::SelectOp>(op)) {
     // TODO(#2050): In a number of cases, this makes it less likely to split
     // a DR across a compare/select boundary. Remove this once i1 is legalized
     // properly.

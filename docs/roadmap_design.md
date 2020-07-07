@@ -77,27 +77,27 @@ It's required that IREE inputs are all in tensor form (and not in-place memref
 updates) in order to perform a large majority of the `flow` transformations.
 Recent work in the [Linalg](https://mlir.llvm.org/docs/Dialects/Linalg/) dialect
 is adding support for operating on value-semantic tensors, meaning that we can
-first apply `xla_hlo` to `linalg` lowerings and any of the transformations
+first apply `mhlo` to `linalg` lowerings and any of the transformations
 available in Linalg prior to performing our own `flow` lowerings. The advantage
 is that Linalg will have much stronger and principled code motion and nested
 loop transformation optimizations than is possible on higher-level ops. As not
 all operations can be represented as `linalg` ops IREE will be able to ingest a
-mix of `linalg`, `std`, and `xla_hlo` (or its replacement) ops.
+mix of `linalg`, `std`, and `mhlo` (or its replacement) ops.
 
 ### XLA HLO: Canonicalizations
 
 <a id="markdown-XLA%20HLO%3A%20Canonicalizations" name="XLA%20HLO%3A%20Canonicalizations"></a>
 
-Very little effort has been applied to `xla_hlo` optimizations and there are a
+Very little effort has been applied to `mhlo` optimizations and there are a
 significant number of missing folders, canonicalizers, and simple
 transformations. Many of these happen in legacy XLA C++ backends; however we
 need them in MLIR so that we can make use of dynamic shapes, mixed dialect
 inputs, etc. The `tf2xla` bridge work (converting Tensorflow models into the
-corresponding `xla_hlo` ops) is nearing its initial milestones and afterward we
+corresponding `mhlo` ops) is nearing its initial milestones and afterward we
 expect more of these missing pieces to be filled in.
 
 Examples of the optimizations that will greatly benefit IREE (and any other
-backend consuming `xla_hlo`) include:
+backend consuming `mhlo`) include:
 
 -   Eliding unneeded transpose, reshape, and broadcast operations.
 -   Inserting transpose, reshape, and broadcast operations to allow for more
@@ -113,20 +113,20 @@ backend consuming `xla_hlo`) include:
 HLO only operates on tensor values - even for simple scalars - and this presents
 a problem when attempting to determine which code should be specified to run on
 accelerators vs. what should run on the host. The canonical example is
-`xla_hlo.while`, which as seen in the example below uses scalar tensors for its
+`mhlo.while`, which as seen in the example below uses scalar tensors for its
 loop iteration counter and comparison.
 
 ```mlir
 %start = constant dense<1> : tensor<i32>
 %bound = constant dense<3> : tensor<i32>
-%res = "xla_hlo.while"(%start) ( {
+%res = "mhlo.while"(%start) ( {
 ^bb0(%count: tensor<i32>):
-  %1 = "xla_hlo.compare"(%count, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
-  "xla_hlo.return"(%1) : (tensor<i1>) -> ()
+  %1 = "mhlo.compare"(%count, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  "mhlo.return"(%1) : (tensor<i1>) -> ()
 },  {
 ^bb0(%count: tensor<i32>):
-  %1 = xla_hlo.add %count, %count : tensor<i32>
-  "xla_hlo.return"(%1) : (tensor<i32>) -> ()
+  %1 = mhlo.add %count, %count : tensor<i32>
+  "mhlo.return"(%1) : (tensor<i32>) -> ()
 }) : (tensor<i32>) -> tensor<i32>
 ```
 
@@ -168,8 +168,8 @@ accelerator.
 
 Not all source frontends have this issue (misrepresenting simple host
 computation as non-dense tensor operations), and our goal is to add a
-transformation that heuristically converts `xla_hlo` ops acting on small tensors
-to `std` ops acting on primitive values (`i32`, `index`, etc).
+transformation that heuristically converts `mhlo` ops acting on small tensors to
+`std` ops acting on primitive values (`i32`, `index`, etc).
 
 ### Quantization
 
@@ -348,24 +348,24 @@ cheap lowering of the broadcast to a simple index remapping now becomes an
 additional dispatch, materialization of an intermediate tensor, and a barrier:
 
 ```mlir
-%bcast = "xla_hlo.broadcast_in_dim"(%cst) : (tensor<f32>) -> tensor<1024x10xf32>
-%mul1 = xla_hlo.multiply %arg0, %bcast : tensor<1024x10xf32>
+%bcast = "mhlo.broadcast_in_dim"(%cst) : (tensor<f32>) -> tensor<1024x10xf32>
+%mul1 = mhlo.multiply %arg0, %bcast : tensor<1024x10xf32>
 // (pretend something here that prevents fusion)
-%mul2 = xla_hlo.multiply %arg1, %bcast : tensor<1024x10xf32>
+%mul2 = mhlo.multiply %arg1, %bcast : tensor<1024x10xf32>
 ```
 
 ```mlir
 %bcast = flow.dispatch.region(%cst : tensor<f32>) -> tensor<1024x10xf32> {
-  %0 = "xla_hlo.broadcast_in_dim"(%cst) : (tensor<f32>) -> tensor<1024x10xf32>
+  %0 = "mhlo.broadcast_in_dim"(%cst) : (tensor<f32>) -> tensor<1024x10xf32>
   return %0 : tensor<1024x10xf32>
 }
 // a barrier will be required here
 %mul1 = flow.dispatch.region(%arg0 : tensor<1024x10xf32>, %bcast : tensor<1024x10xf32>) -> tensor<1024x10xf32> {
-  %1 = xla_hlo.multiply %arg0, %bcast : tensor<1024x10xf32>
+  %1 = mhlo.multiply %arg0, %bcast : tensor<1024x10xf32>
   return %1 : tensor<1024x10xf32>
 }
 %mul2 = flow.dispatch.region(%arg1 : tensor<1024x10xf32>, %bcast : tensor<1024x10xf32>) -> tensor<1024x10xf32> {
-  %2 = xla_hlo.multiply %arg1, %bcast : tensor<1024x10xf32>
+  %2 = mhlo.multiply %arg1, %bcast : tensor<1024x10xf32>
   return %2 : tensor<1024x10xf32>
 }
 ```

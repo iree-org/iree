@@ -4,8 +4,8 @@
 // CHECK: 10xi32=9 8 7 6 5 4 3 2 1 0
 
 func @main(%arg0: tensor<?xi32>, %arg1: tensor<?xi32>, %arg2: tensor<?xi32>, %arg3: tensor<?xi32>) -> tensor<?xi32> attributes {iree.module.export} {
-    %1 = "xla_hlo.compare"(%arg0, %arg1) {comparison_direction = "LT"} : (tensor<?xi32>, tensor<?xi32>) -> tensor<?xi1>
-    %2 = "xla_hlo.select"(%1, %arg2, %arg3) : (tensor<?xi1>, tensor<?xi32>, tensor<?xi32>) -> tensor<?xi32>
+    %1 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = "LT"} : (tensor<?xi32>, tensor<?xi32>) -> tensor<?xi1>
+    %2 = "mhlo.select"(%1, %arg2, %arg3) : (tensor<?xi1>, tensor<?xi32>, tensor<?xi32>) -> tensor<?xi32>
     return %2 : tensor<?xi32>
 }
 

@@ -47,7 +47,7 @@ namespace {
 const CustomOpShapeBuilderList *getCustomOpShapeBuilder() {
   static CustomOpShapeBuilderList globalBuilders = ([]() {
     CustomOpShapeBuilderList builders;
-    xla_hlo::populateXlaHloCustomOpShapeBuilder(builders);
+    mhlo::populateXlaHloCustomOpShapeBuilder(builders);
     IREE::VMLA::populateVMLACustomOpShapeBuilder(builders);
     return builders;
   })();

@@ -8,7 +8,7 @@ func @conv2d_nopadding() attributes { iree.module.export } {
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
-  %res = "xla_hlo.convolution"(%inputs, %weights) {
+  %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
         dimension_numbers = {
           input_batch_dimension = 0 : i64,
@@ -40,7 +40,7 @@ func @conv2d_1452x3221_same() attributes { iree.module.export } {
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
-  %res = "xla_hlo.convolution"(%inputs, %weights) {
+  %res = "mhlo.convolution"(%inputs, %weights) {
        batch_group_count = 1 : i64,
        dimension_numbers = {
          input_batch_dimension = 0 : i64,
@@ -82,7 +82,7 @@ func @conv2d_1452x3221_same() attributes { iree.module.export } {
 //   %weights = iree.unfoldable_constant dense<[
 //       [[[1.0]], [[2.0]], [[3.0]]],
 //       [[[4.0]], [[5.0]], [[6.0]]]]> : tensor <2x3x1x1xf32>
-//   %res = "xla_hlo.convolution"(%inputs, %weights) {
+//   %res = "mhlo.convolution"(%inputs, %weights) {
 //        batch_group_count = 1 : i64,
 //        dimension_numbers = {
 //          input_batch_dimension = 0 : i64,
@@ -172,7 +172,7 @@ func @conv2d_no_padding2() attributes { iree.module.export } {
        [[ 91.0,  92.0,  93.0,  94.0,  95.0,  96.0],
         [ 97.0,  98.0,  99.0, 100.0, 101.0, 102.0],
         [103.0, 104.0, 105.0, 106.0, 107.0, 108.0]]]]> : tensor<2x3x3x6xf32>
-  %res = "xla_hlo.convolution"(%inputs, %weights) {
+  %res = "mhlo.convolution"(%inputs, %weights) {
        batch_group_count = 1 : i64,
        dimension_numbers = {
          input_batch_dimension = 0 : i64,

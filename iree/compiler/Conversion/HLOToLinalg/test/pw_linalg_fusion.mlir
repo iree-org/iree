@@ -10,8 +10,8 @@ func @pw_fusion_two(%arg0: tensor<4x8xi32>, %arg1: tensor<4x8xi32>, %arg2 : tens
   // CHECK: %[[TEMP:[a-zA-Z0-9$._-]+]] = muli %[[ARG0]], %[[ARG1]]
   // CHECK: addi %[[TEMP]], %[[ARG2]]
   // CHECK-NOT: linalg.generic
-  %4 = "xla_hlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %5 = "xla_hlo.add"(%4, %arg2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %4 = "mhlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %5 = "mhlo.add"(%4, %arg2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   return %5 : tensor<4x8xi32>
 }
 
@@ -29,9 +29,9 @@ func @pw_fusion_three(%arg0: tensor<4x8xi32>, %arg1: tensor<4x8xi32>, %arg2 : te
   // CHECK: %[[TEMP2:[a-zA-Z0-9$._-]+]] = addi %[[TEMP1]], %[[ARG2]]
   // CHECK: subi %[[TEMP2]], %[[ARG3]]
   // CHECK-NOT: linalg.generic
-  %4 = "xla_hlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %5 = "xla_hlo.add"(%4, %arg2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %6 = "xla_hlo.subtract"(%5, %arg3) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %4 = "mhlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %5 = "mhlo.add"(%4, %arg2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %6 = "mhlo.subtract"(%5, %arg3) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   return %6: tensor<4x8xi32>
 }
 
@@ -49,9 +49,9 @@ func @pw_fusion_dag(%arg0: tensor<4x8xi32>, %arg1: tensor<4x8xi32>, %arg2 : tens
   // CHECK-DAG: %[[TEMP2:[a-zA-Z0-9$._-]+]] = addi %[[ARG2]], %[[ARG3]]
   // CHECK: subi %[[TEMP1]], %[[TEMP2]]
   // CHECK-NOT: linalg.generic
-  %4 = "xla_hlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %5 = "xla_hlo.add"(%arg2, %arg3) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %6 = "xla_hlo.subtract"(%4, %5) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %4 = "mhlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %5 = "mhlo.add"(%arg2, %arg3) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %6 = "mhlo.subtract"(%4, %5) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   return %6: tensor<4x8xi32>
 }
 
@@ -69,8 +69,8 @@ func @pw_fusion_dag2(%arg0: tensor<4x8xi32>, %arg1: tensor<4x8xi32>, %arg2 : ten
   // CHECK-DAG: %[[TEMP2:[a-zA-Z0-9$._-]+]] = addi %[[ARG2]], %[[ARG3]]
   // CHECK: subi %[[TEMP1]], %[[TEMP2]]
   // CHECK-NOT: linalg.generic
-  %3 = "xla_hlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %4 = "xla_hlo.add"(%arg0, %arg2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
-  %5 = "xla_hlo.subtract"(%3, %4) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %3 = "mhlo.multiply"(%arg0, %arg1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %4 = "mhlo.add"(%arg0, %arg2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
+  %5 = "mhlo.subtract"(%3, %4) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   return %5: tensor<4x8xi32>
 }

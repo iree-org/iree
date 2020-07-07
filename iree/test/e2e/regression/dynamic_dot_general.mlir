@@ -7,7 +7,7 @@
 func @basic_dot(
   %lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>,
   %unused0: tensor<?x?x?xf32>, %unused1: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
-  %0 = "xla_hlo.dot_general"(%lhs, %rhs) {dot_dimension_numbers={
+  %0 = "mhlo.dot_general"(%lhs, %rhs) {dot_dimension_numbers={
     lhs_batching_dimensions = dense<[]> : tensor<0xi64>,
     lhs_contracting_dimensions = dense<1> : tensor<1xi64>,
     rhs_batching_dimensions = dense<[]> : tensor<0xi64>,
@@ -22,7 +22,7 @@ func @basic_dot(
 func @batch_dimension(
   %unused0: tensor<?x?xf32>, %unused1: tensor<?x?xf32>,
   %lhs: tensor<?x?x?xf32>, %rhs: tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
-  %0 = "xla_hlo.dot_general"(%lhs, %rhs) {dot_dimension_numbers={
+  %0 = "mhlo.dot_general"(%lhs, %rhs) {dot_dimension_numbers={
     lhs_batching_dimensions = dense<[0]> : tensor<1xi64>,
     lhs_contracting_dimensions = dense<[2]> : tensor<1xi64>,
     rhs_batching_dimensions = dense<[0]> : tensor<1xi64>,

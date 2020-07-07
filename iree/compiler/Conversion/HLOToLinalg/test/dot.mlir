@@ -7,7 +7,7 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x3xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<3x2xf32>
     // CHECK: linalg.matmul %{{.+}}, %{{.+}}, %{{.+}} : (memref<2x3xf32>, memref<3x2xf32>, memref<2x2xf32>)
-    %result = "xla_hlo.dot"(%0, %1) : (tensor<2x3xf32>, tensor<3x2xf32>) -> tensor<2x2xf32>
+    %result = "mhlo.dot"(%0, %1) : (tensor<2x3xf32>, tensor<3x2xf32>) -> tensor<2x2xf32>
     hal.interface.store.tensor %result, @legacy_io::@ret0, offset = %c0 : tensor<2x2xf32>
     return
   }

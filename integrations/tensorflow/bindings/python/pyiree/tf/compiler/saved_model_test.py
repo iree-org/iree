@@ -69,7 +69,7 @@ class RuntimeTest(tf.test.TestCase):
       input_module = compiler.tf_load_saved_model(sm_dir)
       xla_asm = input_module.to_asm()
       print("XLA ASM:", xla_asm)
-      self.assertRegex(xla_asm, "xla_hlo.tanh")
+      self.assertRegex(xla_asm, "mhlo.tanh")
 
 
 if __name__ == "__main__":

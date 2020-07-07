@@ -13,10 +13,10 @@ func @single_reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> attributes { sym
   // CHECK-SAME: %[[INIT]](%[[INIT_SHAPE]] : !shapex.ranked_shape<[]>),
   // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4]>)
   // CHECK-SaME: {dimension = 1 : i32} : f32
-  %0 = "xla_hlo.reduce"(%arg0, %cst) ( {
+  %0 = "mhlo.reduce"(%arg0, %cst) ( {
   ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
-    %1 = xla_hlo.add %arg1, %arg2 : tensor<f32>
-    "xla_hlo.return"(%1) : (tensor<f32>) -> ()
+    %1 = mhlo.add %arg1, %arg2 : tensor<f32>
+    "mhlo.return"(%1) : (tensor<f32>) -> ()
   }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
   // CHECK-NEXT: return %[[DST]] : !vmla.buffer
   return %0 : tensor<4xf32>
@@ -46,11 +46,11 @@ func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tens
   // CHECK-SAME: %[[CST1]](%[[SCALAR_SHAPE]] : !shapex.ranked_shape<[]>),
   // CHECK-SAME: out %[[RET1]](%[[RESULT_SHAPE]] : !shapex.ranked_shape<[4]>)
   // CHECK-SaME: {dimension = 1 : i32} : f32
-  %2, %3 = "xla_hlo.reduce"(%arg0, %arg1, %0, %1) ( {
+  %2, %3 = "mhlo.reduce"(%arg0, %arg1, %0, %1) ( {
   ^bb0(%arg0_lhs : tensor<f32>, %arg1_lhs : tensor<f32>, %arg0_rhs : tensor<f32>, %arg1_rhs : tensor<f32>):
-    %4 = xla_hlo.add %arg0_lhs, %arg0_rhs : tensor<f32>
-    %5 = xla_hlo.add %arg1_lhs, %arg1_rhs : tensor<f32>
-    "xla_hlo.return"(%4, %5) : (tensor<f32>, tensor<f32>) -> ()
+    %4 = mhlo.add %arg0_lhs, %arg0_rhs : tensor<f32>
+    %5 = mhlo.add %arg1_lhs, %arg1_rhs : tensor<f32>
+    "mhlo.return"(%4, %5) : (tensor<f32>, tensor<f32>) -> ()
   }) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<4x8xf32>, tensor<f32>, tensor<f32>) -> (tensor<4xf32>, tensor<4xf32>)
   // CHECK-NEXT: return %[[RET0]], %[[RET1]] : !vmla.buffer, !vmla.buffer
   return %2, %3 : tensor<4xf32>, tensor<4xf32>

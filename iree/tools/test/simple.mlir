@@ -15,7 +15,7 @@
 
 // CHECK-LABEL: EXEC @abs
 func @abs(%input : tensor<i32>) -> (tensor<i32>) attributes { iree.module.export } {
-  %result = "xla_hlo.abs"(%input) : (tensor<i32>) -> tensor<i32>
+  %result = "mhlo.abs"(%input) : (tensor<i32>) -> tensor<i32>
   return %result : tensor<i32>
 }
 // CHECK: i32=2

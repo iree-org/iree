@@ -33,7 +33,7 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   // Inline and flatten structured control flow to our CFG.
   // ---------------------------------------------------------------------------
-  passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
+  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
 
   // Perform inlining and cleanup after CFG manipulation.
   passManager.addPass(createInlinerPass());

@@ -14,7 +14,7 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
   // CHECK-SAME: src_indices = [%[[INDEX0]], %c0, %c0],
   // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[1,1,5]>),
   // CHECK-SAME: dst_indices = [%c0, %c0, %c0], lengths = [%c1, %c1, %c5] : i32
-  %0 = "xla_hlo.gather"(%input, %start_indices) {
+  %0 = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
@@ -47,7 +47,7 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
   // CHECK-SAME: src_indices = [%[[INDEX0]], %[[INDEX1]], %[[INDEX2]]],
   // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[1,2,3]>),
   // CHECK-SAME: dst_indices = [%c0, %c0, %c0], lengths = [%c1, %c2, %c3] : f32
-  %0 = "xla_hlo.gather"(%input, %start_indices) {
+  %0 = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
@@ -65,8 +65,8 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
 func @gather_not_lowered_axis_1(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
-  // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
-  %0 = "xla_hlo.gather"(%input, %start_indices) {
+  // expected-error@+1 {{failed to legalize operation 'mhlo.gather' that was explicitly marked illegal}}
+  %0 = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 1 : i64,
@@ -83,8 +83,8 @@ func @gather_not_lowered_axis_1(%input : tensor<5x2x3xf32>, %start_indices : ten
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
 func @gather_not_lowered_collapse(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
-  // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
-  %0 = "xla_hlo.gather"(%input, %start_indices) {
+  // expected-error@+1 {{failed to legalize operation 'mhlo.gather' that was explicitly marked illegal}}
+  %0 = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<1> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
@@ -101,8 +101,8 @@ func @gather_not_lowered_collapse(%input : tensor<5x2x3xf32>, %start_indices : t
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
 func @gather_not_lowered_transposes(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
-  // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
-  %0 = "xla_hlo.gather"(%input, %start_indices) {
+  // expected-error@+1 {{failed to legalize operation 'mhlo.gather' that was explicitly marked illegal}}
+  %0 = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
@@ -119,8 +119,8 @@ func @gather_not_lowered_transposes(%input : tensor<5x2x3xf32>, %start_indices :
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
 func @gather_not_lowered_batch_dims(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
-  // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
-  %0 = "xla_hlo.gather"(%input, %start_indices) {
+  // expected-error@+1 {{failed to legalize operation 'mhlo.gather' that was explicitly marked illegal}}
+  %0 = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,

@@ -14,8 +14,8 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %[[R1]] : tensor<4xf32>
@@ -50,12 +50,12 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %0 = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %2 = xla_hlo.subtract %1, %arg1 : tensor<4xf32>
-  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %3 = xla_hlo.multiply %2, %arg1 : tensor<4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %2 = mhlo.subtract %1, %arg1 : tensor<4xf32>
+  %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %3 = mhlo.multiply %2, %arg1 : tensor<4xf32>
+  %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %0 : tensor<4xf32>
@@ -74,22 +74,22 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // CHECK-NEXT:   %3 = xla_hlo.add %arg1, %arg1 : tensor<4x4xf32>
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
+  // CHECK-NEXT:   %3 = mhlo.add %arg1, %arg1 : tensor<4x4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
   // CHECK-NEXT: flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
   // CHECK: %[[R1:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD1]] : index]
   // CHECK-SAME: (%arg1 = %[[R0]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // CHECK-NEXT:   %3 = "xla_hlo.dot"(%arg1, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  // CHECK-NEXT:   %3 = "mhlo.dot"(%arg1, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %1 = "mhlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
   // CHECK: %[[R2:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD2]] : index]
   // CHECK-SAME: (%arg1 = %[[R1]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // CHECK-NEXT:   %3 = xla_hlo.multiply %arg1, %arg2 : tensor<4x4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
+  // CHECK-NEXT:   %3 = mhlo.multiply %arg1, %arg2 : tensor<4x4xf32>
+  %2 = mhlo.multiply %1, %arg0 : tensor<4x4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %[[R2]] : tensor<4x4xf32>
@@ -104,12 +104,12 @@ func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %1 = mhlo.add %arg1, %arg1 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   %2 = call @callee(%1) : (tensor<4xf32>) -> tensor<4xf32>
   %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   %3 = xla_hlo.multiply %2, %arg1 : tensor<4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %3 = mhlo.multiply %2, %arg1 : tensor<4xf32>
+  %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %[[R0]] : tensor<4xf32>
@@ -121,8 +121,8 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.multiply %arg1, %arg1 : tensor<4xf32>
-  %0 = xla_hlo.multiply %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %1 = mhlo.multiply %arg1, %arg1 : tensor<4xf32>
+  %0 = mhlo.multiply %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK: return %[[R0]] : tensor<4xf32>
@@ -139,11 +139,11 @@ func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   // CHECK: %[[RESULT:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4x8xf32>, %arg2 = %[[INITIAL]] : tensor<f32>) -> tensor<4xf32>
-  // CHECK-NEXT: = "xla_hlo.reduce"(%arg1, %arg2)
-  %1 = "xla_hlo.reduce"(%arg0, %0) ( {
+  // CHECK-NEXT: = "mhlo.reduce"(%arg1, %arg2)
+  %1 = "mhlo.reduce"(%arg0, %0) ( {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):
-    %2 = xla_hlo.add %arg1, %arg2 : tensor<f32>
-    "xla_hlo.return"(%2) : (tensor<f32>) -> ()
+    %2 = mhlo.add %arg1, %arg2 : tensor<f32>
+    "mhlo.return"(%2) : (tensor<f32>) -> ()
   }) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
   // CHECK: flow.return
   // CHECK: return %[[RESULT]] : tensor<4xf32>
@@ -162,12 +162,12 @@ func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tens
   // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
   // CHECK-SAME: (%arg2 = %arg0 : tensor<4x8xf32>, %arg3 = %arg1 : tensor<4x8xf32>, %arg4 = %[[INITIALA]] : tensor<f32>, %arg5 = %[[INITIALB]] : tensor<f32>) -> (tensor<4xf32>, tensor<4xf32>)
-  // CHECK-NEXT: = "xla_hlo.reduce"(%arg2, %arg3, %arg4, %arg5)
-  %2, %3 = "xla_hlo.reduce"(%arg0, %arg1, %0, %1) ( {
+  // CHECK-NEXT: = "mhlo.reduce"(%arg2, %arg3, %arg4, %arg5)
+  %2, %3 = "mhlo.reduce"(%arg0, %arg1, %0, %1) ( {
   ^bb0(%arg0_lhs : tensor<f32>, %arg1_lhs : tensor<f32>, %arg0_rhs : tensor<f32>, %arg1_rhs : tensor<f32>):
-    %4 = xla_hlo.add %arg0_lhs, %arg0_rhs : tensor<f32>
-    %5 = xla_hlo.add %arg1_lhs, %arg1_rhs : tensor<f32>
-    "xla_hlo.return"(%4, %5) : (tensor<f32>, tensor<f32>) -> ()
+    %4 = mhlo.add %arg0_lhs, %arg0_rhs : tensor<f32>
+    %5 = mhlo.add %arg1_lhs, %arg1_rhs : tensor<f32>
+    "mhlo.return"(%4, %5) : (tensor<f32>, tensor<f32>) -> ()
   }) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<4x8xf32>, tensor<f32>, tensor<f32>) -> (tensor<4xf32>, tensor<4xf32>)
   // CHECK: flow.return
   // CHECK: return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<4xf32>, tensor<4xf32>
@@ -190,10 +190,10 @@ func @singleDispatchWithShapes(%arg0 : tensor<?x4xf32>,
   // CHECK-SAME: %[[CA2:.+]] = %[[A2]] : !shapex.ranked_shape<[?,4]>)
     // Dispatch region should contain captured tie_shapes.
     // CHECK: %[[R1:.+]] = shapex.tie_shape %[[CA0]], %[[CA1]]
-    // CHECK: %[[R2:.+]] = xla_hlo.add %[[R1]], %[[R1]]
+    // CHECK: %[[R2:.+]] = mhlo.add %[[R1]], %[[R1]]
     // CHECK: %[[R3:.+]] = shapex.tie_shape %[[R2]], %[[CA2]]
     // CHECK: flow.return %[[R3]]
-  %1 = xla_hlo.add %0, %0 : tensor<?x4xf32>
+  %1 = mhlo.add %0, %0 : tensor<?x4xf32>
   %2 = shapex.tie_shape %1, %rs1 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
 
   // Lead-out tie_shape should be preserved outside of the dispatch region.
@@ -215,16 +215,16 @@ func @fusedDispatchWithShapes(%arg0 : tensor<?x4xf32>,
   // CHECK-SAME: %[[CA1:.+]] = %[[A1]] : !shapex.ranked_shape<[?,4]>
     // Dispatch region should contain captured tie_shapes.
     // CHECK: %[[R1:.+]] = shapex.tie_shape %[[CA0]], %[[CA1]]
-    // CHECK: %[[R2:.+]] = xla_hlo.add %[[R1]], %[[R1]]
+    // CHECK: %[[R2:.+]] = mhlo.add %[[R1]], %[[R1]]
     // CHECK: %[[R3:.+]] = shapex.tie_shape %[[R2]], %[[CA1]]
-    // CHECK: %[[R4:.+]] = xla_hlo.multiply %[[R3]], %[[R1]]
+    // CHECK: %[[R4:.+]] = mhlo.multiply %[[R3]], %[[R1]]
     // CHECK: %[[R5:.+]] = shapex.tie_shape %[[R4]], %[[CA1]]
     // CHECK: flow.return %[[R5]]
 
   %0 = shapex.tie_shape %arg0, %rs0 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
-  %1 = xla_hlo.add %0, %0 : tensor<?x4xf32>
+  %1 = mhlo.add %0, %0 : tensor<?x4xf32>
   %2 = shapex.tie_shape %1, %rs0 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
-  %3 = xla_hlo.multiply %2, %0 : tensor<?x4xf32>
+  %3 = mhlo.multiply %2, %0 : tensor<?x4xf32>
   %4 = shapex.tie_shape %3, %rs0 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
 
   // Lead-out tie_shape should be preserved outside of the dispatch region.
@@ -253,7 +253,7 @@ func @fusedDispatchRootWithShapes(%arg0 : tensor<?x4xf32>,
   // Verify that the ties are preserved (relying on outlining tested previously)
     // CHECK-DAG: %[[DTS0:.+]] = shapex.tie_shape {{.+}}: tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
     // CHECK-DAG: %[[DTS1:.+]] = shapex.tie_shape {{.+}}: tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
-    // CHECK-DAG: %[[DR0:.+]] = "xla_hlo.dot"(%[[DTS0]], %[[DTS1]])
+    // CHECK-DAG: %[[DR0:.+]] = "mhlo.dot"(%[[DTS0]], %[[DTS1]])
     // CHECK-DAG: %[[DTS1:.+]] = shapex.tie_shape %[[DR0]], {{.+}}: tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
     // CHECK: flow.return %[[DTS1]]
   // CHECK: }
@@ -262,7 +262,7 @@ func @fusedDispatchRootWithShapes(%arg0 : tensor<?x4xf32>,
   // CHECK: return %[[R1]]
   %0 = shapex.tie_shape %arg0, %rs0 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
   %1 = shapex.tie_shape %arg1, %rs1 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
-  %2 = "xla_hlo.dot"(%0, %1) : (tensor<?x4xf32>, tensor<4x?xf32>) -> tensor<?x?xf32>
+  %2 = "mhlo.dot"(%0, %1) : (tensor<?x4xf32>, tensor<4x?xf32>) -> tensor<?x?xf32>
   %3 = shapex.tie_shape %2, %rs2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
   return %3 : tensor<?x?xf32>
 }

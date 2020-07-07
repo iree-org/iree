@@ -42,13 +42,13 @@ namespace VMLA {
 
 namespace {
 
-// Convert instances of `xla_hlo.dot` to `xla_hlo.dot_general`.
+// Convert instances of `mhlo.dot` to `mhlo.dot_general`.
 //
 // TODO(silvasean): This logically is part of a future HLO client -> HLO server
-// type of pass in the xla_hlo dialect proper.
-struct LowerDotOp : public OpRewritePattern<xla_hlo::DotOp> {
+// type of pass in the mhlo dialect proper.
+struct LowerDotOp : public OpRewritePattern<mhlo::DotOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::DotOp op,
+  LogicalResult matchAndRewrite(mhlo::DotOp op,
                                 PatternRewriter &rewriter) const override {
     Value lhs = op.lhs();
     Value rhs = op.rhs();
@@ -66,13 +66,13 @@ struct LowerDotOp : public OpRewritePattern<xla_hlo::DotOp> {
                                         rewriter.getIntegerType(64));
       return DenseIntElementsAttr::get(type, integers);
     };
-    auto dimensionNumbers = xla_hlo::DotDimensionNumbers::get(
+    auto dimensionNumbers = mhlo::DotDimensionNumbers::get(
         /*lhs_batching_dimensions=*/make1DElementsAttr({}),
         /*rhs_batching_dimensions=*/make1DElementsAttr({}),
         /*lhs_contracting_dimensions=*/make1DElementsAttr({1}),
         /*rhs_contracting_dimensions=*/make1DElementsAttr({0}),
         rewriter.getContext());
-    rewriter.replaceOpWithNewOp<xla_hlo::DotGeneralOp>(
+    rewriter.replaceOpWithNewOp<mhlo::DotGeneralOp>(
         op, op.getType(), lhs, rhs, dimensionNumbers,
         op.precision_config().hasValue() ? op.precision_config().getValue()
                                          : nullptr);
@@ -95,9 +95,9 @@ struct LowerDotOp : public OpRewritePattern<xla_hlo::DotOp> {
 // VMLA::BatchMatMulPseudoOp which represents this transformation.
 //
 // TODO(silvasean): Move this to a "prepare" pass and test separately.
-struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
+struct LowerDotGeneralOp : public OpRewritePattern<mhlo::DotGeneralOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::DotGeneralOp op,
+  LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
     Value lhs = op.lhs();
     Value rhs = op.rhs();
@@ -107,7 +107,7 @@ struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
     if (!lhsType || !rhsType) {
       return rewriter.notifyMatchFailure(op, "requires ranked types");
     }
-    xla_hlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
+    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
     auto extract1DVector = [](DenseIntElementsAttr elements) {
       SmallVector<int64_t, 6> ret;
       for (const APInt &element : elements) {
@@ -181,7 +181,7 @@ struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
       }
       auto transposeType =
           RankedTensorType::get(transposeStaticShape, elementType);
-      auto transpose = rewriter.create<xla_hlo::TransposeOp>(
+      auto transpose = rewriter.create<mhlo::TransposeOp>(
           op.getLoc(), transposeType, value, make1DElementsAttr(permutation));
 
       SmallVector<Value, 6> reshapeShape;
@@ -199,7 +199,7 @@ struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
           reshapeShape);
       auto reshapeShapeExtentTensor = rewriter.create<Shape::ToExtentTensorOp>(
           op.getLoc(), reshapeRankedShape);
-      value = rewriter.create<xla_hlo::DynamicReshapeOp>(
+      value = rewriter.create<mhlo::DynamicReshapeOp>(
           op.getLoc(), reshapeType, transpose, reshapeShapeExtentTensor);
     };
     SmallVector<Value, 6> batchingDimExtents;
@@ -220,7 +220,7 @@ struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
         op.getLoc(), dstType, lhs, rhs);
     RankedTensorType transposeType = RankedTensorType::get(
         {dstStaticShape[0], dstStaticShape[2], dstStaticShape[1]}, elementType);
-    auto transpose = rewriter.create<xla_hlo::TransposeOp>(
+    auto transpose = rewriter.create<mhlo::TransposeOp>(
         op.getLoc(), transposeType, dst, make1DElementsAttr({0, 2, 1}));
     auto reshapeShape = batchingDimExtents;
     reshapeShape.append(lhsFreeDimExtents.begin(), lhsFreeDimExtents.end());
@@ -237,17 +237,16 @@ struct LowerDotGeneralOp : public OpRewritePattern<xla_hlo::DotGeneralOp> {
         reshapeShape);
     auto reshapeShapeExtentTensor = rewriter.create<Shape::ToExtentTensorOp>(
         op.getLoc(), reshapeRankedShape);
-    rewriter.replaceOpWithNewOp<xla_hlo::DynamicReshapeOp>(
+    rewriter.replaceOpWithNewOp<mhlo::DynamicReshapeOp>(
         op, op.getType(), transpose, reshapeShapeExtentTensor);
     return success();
   }
 };
 
-class LowerBroadcastInDimOp
-    : public OpRewritePattern<xla_hlo::BroadcastInDimOp> {
+class LowerBroadcastInDimOp : public OpRewritePattern<mhlo::BroadcastInDimOp> {
  public:
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::BroadcastInDimOp op,
+  LogicalResult matchAndRewrite(mhlo::BroadcastInDimOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = op.getType().cast<RankedTensorType>();
     auto shapeType =
@@ -260,17 +259,17 @@ class LowerBroadcastInDimOp
   }
 };
 
-// Lower xla_hlo::BroadcastOp via xla_hlo::BroadcastInDimOp.
-class LowerBroadcastOp : public OpRewritePattern<xla_hlo::BroadcastOp> {
+// Lower mhlo::BroadcastOp via mhlo::BroadcastInDimOp.
+class LowerBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
  public:
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::BroadcastOp op,
+  LogicalResult matchAndRewrite(mhlo::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = op.getOperand().getType().cast<RankedTensorType>();
     auto resultType = op.getType().cast<RankedTensorType>();
     auto broadcastDimensions = llvm::to_vector<6>(llvm::seq<int64_t>(
         resultType.getRank() - type.getRank(), resultType.getRank()));
-    rewriter.replaceOpWithNewOp<xla_hlo::BroadcastInDimOp>(
+    rewriter.replaceOpWithNewOp<mhlo::BroadcastInDimOp>(
         op, op.getType(), op.getOperand(),
         rewriter.getI64TensorAttr(broadcastDimensions));
     return success();
@@ -286,16 +285,16 @@ class PreConversionLoweringPass
     ConversionTarget target(*context);
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalDialect<IREE::VMLA::VMLADialect>();
-    target.addLegalDialect<xla_hlo::XlaHloDialect>();
+    target.addLegalDialect<mhlo::XlaHloDialect>();
     target.addLegalDialect<ShapeDialect>();
 
-    target.addIllegalOp<xla_hlo::DotGeneralOp>();
+    target.addIllegalOp<mhlo::DotGeneralOp>();
     patterns.insert<LowerDotGeneralOp>(context);
-    target.addIllegalOp<xla_hlo::DotOp>();
+    target.addIllegalOp<mhlo::DotOp>();
     patterns.insert<LowerDotOp>(context);
-    target.addIllegalOp<xla_hlo::BroadcastInDimOp>();
+    target.addIllegalOp<mhlo::BroadcastInDimOp>();
     patterns.insert<LowerBroadcastInDimOp>(context);
-    target.addIllegalOp<xla_hlo::BroadcastOp>();
+    target.addIllegalOp<mhlo::BroadcastOp>();
     patterns.insert<LowerBroadcastOp>(context);
 
     if (failed(applyPartialConversion(getOperation(), target, patterns))) {

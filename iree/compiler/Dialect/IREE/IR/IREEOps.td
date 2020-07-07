@@ -85,7 +85,7 @@ def IREE_DynamicShapeConstantOp : IREE_Op<"dynamic_shape_constant"> {
 
     ```mlir
     %c = iree.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
-    %res = "xla_hlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+    %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
     ```
   }];
   let arguments = (ins ElementsAttr:$value);

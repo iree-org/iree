@@ -15,7 +15,7 @@ module {
   func @inc() -> tensor<f32> {
     %0 = flow.variable.load @counter : tensor<f32>
     %c1 = constant dense<1.0> : tensor<f32>
-    %1 = xla_hlo.add %0, %c1 : tensor<f32>
+    %1 = mhlo.add %0, %c1 : tensor<f32>
     flow.variable.store %1, @counter : tensor<f32>
     %2 = flow.variable.load @counter : tensor<f32>
     return %2 : tensor<f32>

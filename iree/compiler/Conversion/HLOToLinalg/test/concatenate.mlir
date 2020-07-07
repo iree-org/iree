@@ -15,7 +15,7 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2x3xi32>
-    %2 = "xla_hlo.concatenate"(%0, %1) {
+    %2 = "mhlo.concatenate"(%0, %1) {
       dimension = 1
     } : (tensor<2x2xi32>, tensor<2x3xi32>) -> tensor<2x5xi32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<2x5xi32>
@@ -45,7 +45,7 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<3x2xi32>
-    %2 = "xla_hlo.concatenate"(%0, %1) {
+    %2 = "mhlo.concatenate"(%0, %1) {
       dimension = 0
     } : (tensor<2x2xi32>, tensor<3x2xi32>) -> tensor<5x2xi32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5x2xi32>

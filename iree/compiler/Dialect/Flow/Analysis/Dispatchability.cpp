@@ -115,11 +115,10 @@ Optional<bool> Dispatchability::computeDispatchability(FuncOp funcOp) {
         // TODO(benvanik): widen to all known terminators? sometimes they may
         // have side-effects.
         continue;
-      } else if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op)) {
+      } else if (isa<mhlo::DotOp>(op) || isa<mhlo::ConvOp>(op)) {
         // Some unfusable ops must remain on their own.
         return false;
-      } else if (isa<xla_hlo::ReduceOp>(op) ||
-                 isa<xla_hlo::ReduceWindowOp>(op)) {
+      } else if (isa<mhlo::ReduceOp>(op) || isa<mhlo::ReduceWindowOp>(op)) {
         // Reductions always become flow ops.
         return false;
 

@@ -5,7 +5,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4x3xf32>, %arg1: tensor<3x4xf32>) -> tensor<4x4xf32> {
-      %0 = "xla_hlo.dot"(%arg0, %arg1) : (tensor<4x3xf32>, tensor<3x4xf32>) -> tensor<4x4xf32>
+      %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<4x3xf32>, tensor<3x4xf32>) -> tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
     }
   }

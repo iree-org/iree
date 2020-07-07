@@ -38,13 +38,13 @@ namespace iree_compiler {
 
 namespace {
 
-struct VMLAConvOpConverter : public OpConversionPattern<xla_hlo::ConvOp> {
+struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
   using OpConversionPattern::OpConversionPattern;
   VMLAConvOpConverter(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::ConvOp op, ArrayRef<Value> operands,
+      mhlo::ConvOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (op.dimension_numbers()) {
       const auto dimensionNumbers = op.dimension_numbers();

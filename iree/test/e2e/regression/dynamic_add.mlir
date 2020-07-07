@@ -5,6 +5,6 @@
 // CHECK: 2x4xf32=[6 8 10 12][-6 -8 -10 -12]
 
 func @main(%arg0: tensor<?x4xf32>, %arg1: tensor<?x4xf32>) -> tensor<?x4xf32> attributes {iree.module.export} {
-  %0 = "xla_hlo.add"(%arg0, %arg1) : (tensor<?x4xf32>, tensor<?x4xf32>) -> tensor<?x4xf32>
+  %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x4xf32>, tensor<?x4xf32>) -> tensor<?x4xf32>
   return %0: tensor<?x4xf32>
 }

@@ -50,6 +50,6 @@ func @unfoldable_constant() -> i32 {
 func @dynamic_constant() -> tensor<?x?xf32> {
   // CHECK: vm.call @hal.buffer_view.dim
   %input = iree.dynamic_shape_constant dense<3.0> : tensor<2x3xf32> -> tensor<?x?xf32>
-  %res = "xla_hlo.abs"(%input) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+  %res = "mhlo.abs"(%input) : (tensor<?x?xf32>) -> tensor<?x?xf32>
   return %res : tensor<?x?xf32>
 }

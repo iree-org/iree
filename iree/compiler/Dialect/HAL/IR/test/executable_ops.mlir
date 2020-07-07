@@ -7,8 +7,8 @@ func @interface_io() {
   %c16 = constant 16 : index
   // CHECK: %[[ARG0:.+]] = hal.interface.load.tensor @interface::@s0b0, offset = %c16 : tensor<4xf32>
   %arg0 = hal.interface.load.tensor @interface::@s0b0, offset=%c16 : tensor<4xf32>
-  // CHECK-NEXT: %[[TEMP:.+]] = xla_hlo.add %[[ARG0]], %[[ARG0]]
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT: %[[TEMP:.+]] = mhlo.add %[[ARG0]], %[[ARG0]]
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   %c32 = constant 32 : index
   // CHECK: hal.interface.store.tensor %[[TEMP]], @interface::@s0b1, offset = %c32 : tensor<4xf32>
   hal.interface.store.tensor %0, @interface::@s0b1, offset=%c32 : tensor<4xf32>

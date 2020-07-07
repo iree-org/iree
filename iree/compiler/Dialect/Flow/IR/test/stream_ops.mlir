@@ -6,7 +6,7 @@ flow.executable @dispatch_0 {
   flow.dispatch.entry @rgn_dispatch_0
   module {
     func @rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.multiply %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.multiply %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }

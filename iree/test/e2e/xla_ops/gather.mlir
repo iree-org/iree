@@ -6,7 +6,7 @@ func @foo() attributes { iree.module.export } {
     [[16, 17, 18, 19, 20]],
     [[21, 22, 23, 24, 25]]]> : tensor<5x1x5xi32>
   %start_indices = iree.unfoldable_constant dense<2> : tensor<i64>
-  %res = "xla_hlo.gather"(%input, %start_indices) {
+  %res = "mhlo.gather"(%input, %start_indices) {
     dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,

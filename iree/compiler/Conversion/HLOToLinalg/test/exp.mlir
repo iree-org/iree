@@ -3,7 +3,7 @@
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @exp
 func @exp(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.exponential"(%operand) : (tensor<2x2xf32>) -> tensor<2x2xf32>
+  %result = "mhlo.exponential"(%operand) : (tensor<2x2xf32>) -> tensor<2x2xf32>
   return
 }
 // CHECK: linalg.generic {

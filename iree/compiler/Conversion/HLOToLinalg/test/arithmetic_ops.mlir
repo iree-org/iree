@@ -3,7 +3,7 @@
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @addf
 func @addf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.add"(%operand, %operand)
+  %result = "mhlo.add"(%operand, %operand)
       : (tensor<2x2xf32>, tensor<2x2xf32>) -> tensor<2x2xf32>
   return
 }
@@ -24,7 +24,7 @@ func @addf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @addi
 func @addi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.add"(%operand, %operand)
+  %result = "mhlo.add"(%operand, %operand)
       : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<2x2xi32>
   return
 }
@@ -46,7 +46,7 @@ func @addi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK: func @subf
 func @subf(%operand: tensor<2x2xf32>)
 attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.subtract"(%operand, %operand)
+  %result = "mhlo.subtract"(%operand, %operand)
       : (tensor<2x2xf32>, tensor<2x2xf32>) -> tensor<2x2xf32>
   return
 }
@@ -67,7 +67,7 @@ attributes {iree.dispatch_fn_name = ""} {
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @subi
 func @subi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.subtract"(%operand, %operand)
+  %result = "mhlo.subtract"(%operand, %operand)
       : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<2x2xi32>
   return
 }
@@ -88,7 +88,7 @@ func @subi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @mulf
 func @mulf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.multiply"(%operand, %operand)
+  %result = "mhlo.multiply"(%operand, %operand)
       : (tensor<2x2xf32>, tensor<2x2xf32>) -> tensor<2x2xf32>
   return
 }
@@ -109,7 +109,7 @@ func @mulf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @muli
 func @muli(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.multiply"(%operand, %operand)
+  %result = "mhlo.multiply"(%operand, %operand)
       : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<2x2xi32>
   return
 }
@@ -130,7 +130,7 @@ func @muli(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @divf
 func @divf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.divide"(%operand, %operand)
+  %result = "mhlo.divide"(%operand, %operand)
       : (tensor<2x2xf32>, tensor<2x2xf32>) -> tensor<2x2xf32>
   return
 }
@@ -151,7 +151,7 @@ func @divf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @divi
 func @divi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.divide"(%operand, %operand)
+  %result = "mhlo.divide"(%operand, %operand)
       : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<2x2xi32>
   return
 }
