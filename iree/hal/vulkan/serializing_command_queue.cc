@@ -216,15 +216,10 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
     wait_semaphores.clear();
     signal_semaphores.clear();
 
-    std::unique_ptr<FencedSubmission> submission =
-        deferred_submissions_.take(deferred_submissions_.front());
+    FencedSubmission* submission = deferred_submissions_.front();
     const SubmissionBatch& batch = submission->batch;
     ref_ptr<TimePointFence>& fence = submission->fence;
 
-    // We don't insert the current submission into remaining_submissions, so
-    // under failing cases this submission will be dropped. But that's fine
-    // given the program is gonna exit anyway and we won't push more work to
-    // the GPU.
     ASSIGN_OR_RETURN(bool ready_to_submit,
                      TryToPrepareSemaphores(batch, fence, &wait_semaphores,
                                             &signal_semaphores));
@@ -236,9 +231,10 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
 
       submit_fences.push_back(fence->value());
       pending_fences_.emplace_back(std::move(fence));
+      deferred_submissions_.pop_front();
     } else {
       // We need to defer the submission until later.
-      remaining_submissions.push_back(std::move(submission));
+      remaining_submissions.push_back(deferred_submissions_.take(submission));
     }
   }
 
