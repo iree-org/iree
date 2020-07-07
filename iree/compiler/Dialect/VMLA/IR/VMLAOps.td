@@ -317,6 +317,24 @@ def VMLA_GatherOp : VMLA_ElementTypeOp<"gather", [VMLA_IncludeShapes]> {
   }];
 }
 
+def VMLA_ScatterOp : VMLA_ElementTypeOp<"scatter", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Shape:$src_shape,
+    VMLA_Buffer:$indices,
+    VMLA_Shape:$indices_shape,
+    VMLA_Buffer:$dst,
+    VMLA_Shape:$dst_shape,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    $indices`(`$indices_shape `:` type($indices_shape)`)``,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: bit manipulation
 //===----------------------------------------------------------------------===//
