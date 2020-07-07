@@ -182,24 +182,14 @@ iree_vision_test_suite(
         # TODO(b/150244105): Compiling fails with commands targeting IREE
         # interpreter and vulkan backends for these tests.
         {
-            "models": "MobileNet",
+            "models": [
+                "MobileNet",
+                "MobileNetV2",
+            ],
             "datasets": [
                 "cifar10",
                 "imagenet",
             ],
-            "backends": [
-                "iree_llvmjit",
-                "iree_vulkan",
-            ],
-        },
-        {
-            "models": "MobileNetV2",
-            "datasets": "cifar10",
-            "backends": "iree_vulkan",
-        },
-        {
-            "models": "MobileNetV2",
-            "datasets": "imagenet",
             "backends": [
                 "iree_llvmjit",
                 "iree_vulkan",
