@@ -19,6 +19,7 @@ iree_cc_library(
     LinalgToSPIRV
   HDRS
     "Attributes.h"
+    "CooperativeMatrixAnalysis.h"
     "MarkerUtils.h"
     "MemorySpace.h"
     "Passes.h"
@@ -26,6 +27,7 @@ iree_cc_library(
   SRCS
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
+    "CooperativeMatrixAnalysis.cpp"
     "LinalgTileAndFusePass.cpp"
     "MarkerUtils.cpp"
     "Passes.cpp"

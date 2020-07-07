@@ -48,7 +48,6 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 
 using namespace mlir;                    // NOLINT
 using namespace mlir::edsc;              // NOLINT
@@ -214,14 +213,6 @@ void testCooperativeMatMul() {
         .vectorize<linalg::MatmulOp>();
     modelBuilder.getModuleRef()->walk(
         [&](FuncOp fn) { strategy.transform(fn); });
-    // TODO(thomasraoux): Markers are used as a workaround, those will either
-    // moved within the vectorToGPU pass only or will be replace by op
-    // interface.
-    modelBuilder.getModuleRef()->walk([&](Operation *op) {
-      if (isa<vector::ContractionOp>(op) || isa<vector::TransferReadOp>(op) ||
-          isa<vector::TransferWriteOp>(op))
-        iree_compiler::setCooperativeMatrixMarker(op);
-    });
     addLoweringPasses(pm, {resRows, resColumns, 1}, {typeA, typeB, typeC});
   };
   runner.compile(options, {vulkanWrapper});
