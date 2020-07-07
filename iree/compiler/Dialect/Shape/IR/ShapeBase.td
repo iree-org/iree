@@ -43,7 +43,7 @@ def Shape_RankedShape :
 // here. There seem to be two primary motivators right now, both of which are
 // not obviously ideal long-term:
 //
-// 1. xla_hlo dialect uses i64 in many places that index should be used.
+// 1. mhlo dialect uses i64 in many places that index should be used.
 //    This is understood to be a bug.
 // 2. VMLA gets these values as i32 directly.
 //

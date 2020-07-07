@@ -54,12 +54,12 @@ struct ConvertHLOToLinalgOnTensorsPass
       return isa<linalg::LinalgOp>(op.getOperation()->getParentOp());
     });
     // Don't convert the body of reduction ops.
-    target.addDynamicallyLegalDialect<xla_hlo::XlaHloDialect>(
+    target.addDynamicallyLegalDialect<mhlo::XlaHloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
             [](Operation* op) {
               auto parentOp = op->getParentRegion()->getParentOp();
-              return isa<xla_hlo::ReduceOp>(parentOp) ||
-                     isa<xla_hlo::ReduceWindowOp>(parentOp);
+              return isa<mhlo::ReduceOp>(parentOp) ||
+                     isa<mhlo::ReduceWindowOp>(parentOp);
             }));
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
@@ -74,7 +74,7 @@ struct ConvertHLOToLinalgOnTensorsPass
 
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext* context, OwningRewritePatternList& patterns) {
-  xla_hlo::populateHLOToLinalgConversionPattern(context, &patterns);
+  mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {

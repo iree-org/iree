@@ -3,7 +3,7 @@ func @slice_whole_buffer() attributes { iree.module.export } {
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
-  %result = "xla_hlo.slice"(%input) {
+  %result = "mhlo.slice"(%input) {
     start_indices = dense<[0, 0]> : tensor<2xi64>,
     limit_indices = dense<[3, 4]> : tensor<2xi64>,
     strides = dense<1> : tensor<2xi64>
@@ -20,7 +20,7 @@ func @slice_whole_stride() attributes { iree.module.export } {
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
-  %result = "xla_hlo.slice"(%input) {
+  %result = "mhlo.slice"(%input) {
     start_indices = dense<[1, 0]> : tensor<2xi64>,
     limit_indices = dense<[2, 4]> : tensor<2xi64>,
     strides = dense<1> : tensor<2xi64>
@@ -34,7 +34,7 @@ func @slice_stride_part() attributes { iree.module.export } {
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
-  %result = "xla_hlo.slice"(%input) {
+  %result = "mhlo.slice"(%input) {
     start_indices = dense<[1, 1]> : tensor<2xi64>,
     limit_indices = dense<[2, 3]> : tensor<2xi64>,
     strides = dense<1> : tensor<2xi64>
@@ -48,7 +48,7 @@ func @slice_multi_stride() attributes { iree.module.export } {
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
-  %result = "xla_hlo.slice"(%input) {
+  %result = "mhlo.slice"(%input) {
     start_indices = dense<[1, 0]> : tensor<2xi64>,
     limit_indices = dense<[3, 4]> : tensor<2xi64>,
     strides = dense<1> : tensor<2xi64>

@@ -8,9 +8,9 @@ func @fused_add_transpose_dot_tanh() attributes { iree.module.export } {
   %workload = constant 9 : index
   %dr0 = flow.dispatch.region[%workload: index](%arg0 = %term0 : tensor<4xf32>, %arg1 = %term1 : tensor<3x4xf32>) -> tensor<3x3xf32> {
     %0 = xla_chlo.broadcast_add %arg0, %arg1 : (tensor<4xf32>, tensor<3x4xf32>) -> tensor<3x4xf32>
-    %1 = "xla_hlo.transpose"(%0) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<3x4xf32>) -> tensor<4x3xf32>
-    %2 = "xla_hlo.dot"(%arg1, %1) {precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<3x4xf32>, tensor<4x3xf32>) -> tensor<3x3xf32>
-    %3 = "xla_hlo.tanh"(%2) : (tensor<3x3xf32>) -> (tensor<3x3xf32>)
+    %1 = "mhlo.transpose"(%0) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<3x4xf32>) -> tensor<4x3xf32>
+    %2 = "mhlo.dot"(%arg1, %1) {precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<3x4xf32>, tensor<4x3xf32>) -> tensor<3x3xf32>
+    %3 = "mhlo.tanh"(%2) : (tensor<3x3xf32>) -> (tensor<3x3xf32>)
     flow.return %3 : tensor<3x3xf32>
   }
   check.expect_almost_eq_const(%dr0,

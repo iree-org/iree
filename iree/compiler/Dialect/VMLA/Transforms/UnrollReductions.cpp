@@ -24,10 +24,10 @@ namespace VMLA {
 
 namespace {
 
-// Unrolls a multi-dimensional xla_hlo.reduce op into one xla_hlo.reduce op per
+// Unrolls a multi-dimensional mhlo.reduce op into one mhlo.reduce op per
 // dimension. The XLA operation semantics state that this is a valid
 // transformation.
-void unrollReduceOp(xla_hlo::ReduceOp reduceOp) {
+void unrollReduceOp(mhlo::ReduceOp reduceOp) {
   // Create one op per dimension being reduced.
   // We'll do this by chaining the original input through with the temporary
   // reduction results. The results we end up with will be the originally
@@ -44,7 +44,7 @@ void unrollReduceOp(xla_hlo::ReduceOp reduceOp) {
     // Create the new reduction using the results of the previous operation.
     auto singleAttrType =
         RankedTensorType::get({1}, builder.getIntegerType(64));
-    auto singleReduceOp = builder.create<xla_hlo::ReduceOp>(
+    auto singleReduceOp = builder.create<mhlo::ReduceOp>(
         reduceOp.getLoc(), temps, reduceOp.init_values(),
         DenseIntElementsAttr::get(singleAttrType, {dimension}));
     BlockAndValueMapping mapping;
@@ -66,7 +66,7 @@ class UnrollReductionsPass
  public:
   void runOnFunction() override {
     for (auto &block : getFunction()) {
-      auto reduceOps = llvm::to_vector<4>(block.getOps<xla_hlo::ReduceOp>());
+      auto reduceOps = llvm::to_vector<4>(block.getOps<mhlo::ReduceOp>());
       for (auto reduceOp : reduceOps) {
         if (reduceOp.dimensions().getNumElements() > 1) {
           unrollReduceOp(reduceOp);

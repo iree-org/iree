@@ -23,7 +23,7 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x1x5xi32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2xi32>
-    %2 = "xla_hlo.torch_index_select"(%0, %1) {
+    %2 = "mhlo.torch_index_select"(%0, %1) {
       dim = 0 : i64,
       batch_dims = 0 : i64
     } : (tensor<5x1x5xi32>, tensor<2xi32>) -> tensor<2x1x5xi32>
@@ -61,7 +61,7 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4x8xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<i32>
-    %2 = "xla_hlo.torch_index_select"(%0, %1) {
+    %2 = "mhlo.torch_index_select"(%0, %1) {
       batch_dims = 0 : i64,
       dim = 0 : i64
     } : (tensor<4x8xf32>, tensor<i32>) -> tensor<8xf32>
@@ -99,7 +99,7 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4x7x8x2xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<4x1xi32>
-    %2 = "xla_hlo.torch_index_select"(%0, %1) {
+    %2 = "mhlo.torch_index_select"(%0, %1) {
       dim = 2 : i64,
       batch_dims = 1 : i64
     } : (tensor<4x7x8x2xf32>, tensor<4x1xi32>) -> tensor<4x7x1x2xf32>

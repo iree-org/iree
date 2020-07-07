@@ -197,10 +197,10 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
       // TODO(b/144530470): replace with tablegen attributes/interfaces.
-      if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::DotOp>(op) ||
-          isa<xla_hlo::ConvOp>(op) || isa<xla_hlo::ReduceWindowOp>(op) ||
-          isa<xla_hlo::PadOp>(op) || isa<xla_hlo::TorchIndexSelectOp>(op) ||
-          isa<xla_hlo::SliceOp>(op) || isa<xla_hlo::ConcatenateOp>(op)) {
+      if (isa<mhlo::ReduceOp>(op) || isa<mhlo::DotOp>(op) ||
+          isa<mhlo::ConvOp>(op) || isa<mhlo::ReduceWindowOp>(op) ||
+          isa<mhlo::PadOp>(op) || isa<mhlo::TorchIndexSelectOp>(op) ||
+          isa<mhlo::SliceOp>(op) || isa<mhlo::ConcatenateOp>(op)) {
         return false;
       }
     }

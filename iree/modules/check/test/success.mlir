@@ -55,7 +55,7 @@ func @expect_almost_eq_const() attributes { iree.module.export } {
 
 func @add() attributes { iree.module.export } {
   %c5 = iree.unfoldable_constant dense<5> : tensor<i32>
-  %result = "xla_hlo.add"(%c5, %c5) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+  %result = "mhlo.add"(%c5, %c5) : (tensor<i32>, tensor<i32>) -> tensor<i32>
   %c10 = iree.unfoldable_constant dense<10> : tensor<i32>
   check.expect_eq(%result, %c10) : tensor<i32>
   return
@@ -64,15 +64,15 @@ func @add() attributes { iree.module.export } {
 func @floats() attributes { iree.module.export } {
   %cp1 = iree.unfoldable_constant dense<0.1> : tensor<f32>
   %c1 = iree.unfoldable_constant dense<1.0> : tensor<f32>
-  %p2 = "xla_hlo.add"(%cp1, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p3 = "xla_hlo.add"(%p2, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p4 = "xla_hlo.add"(%p3, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p5 = "xla_hlo.add"(%p4, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p6 = "xla_hlo.add"(%p5, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p7 = "xla_hlo.add"(%p6, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p8 = "xla_hlo.add"(%p7, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p9 = "xla_hlo.add"(%p8, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %approximately_1 = "xla_hlo.add"(%p9, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p2 = "mhlo.add"(%cp1, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p3 = "mhlo.add"(%p2, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p4 = "mhlo.add"(%p3, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p5 = "mhlo.add"(%p4, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p6 = "mhlo.add"(%p5, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p7 = "mhlo.add"(%p6, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p8 = "mhlo.add"(%p7, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p9 = "mhlo.add"(%p8, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %approximately_1 = "mhlo.add"(%p9, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
 
   check.expect_almost_eq(%approximately_1, %c1) : tensor<f32>
   return

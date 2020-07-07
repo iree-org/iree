@@ -6,10 +6,10 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
     // CHECK: linalg.pooling_min
-    %2 = "xla_hlo.reduce_window"(%0, %1) ( {
+    %2 = "mhlo.reduce_window"(%0, %1) ( {
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.minimum %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.minimum %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
         window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x18x18x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<1x8x8x64xf32>
@@ -30,10 +30,10 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
     // CHECK: linalg.pooling_max
-    %2 = "xla_hlo.reduce_window"(%0, %1) ( {
+    %2 = "mhlo.reduce_window"(%0, %1) ( {
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.maximum %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
         window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x18x18x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<1x8x8x64xf32>
@@ -54,10 +54,10 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x18x18x64xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
     // CHECK: linalg.pooling_sum
-    %2 = "xla_hlo.reduce_window"(%0, %1) ( {
+    %2 = "mhlo.reduce_window"(%0, %1) ( {
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.add %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
         window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x18x18x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<1x8x8x64xf32>

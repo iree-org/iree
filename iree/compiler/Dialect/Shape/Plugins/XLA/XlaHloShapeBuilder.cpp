@@ -30,7 +30,7 @@ using llvm::SmallVector;
 using namespace mlir::iree_compiler::Shape;
 
 namespace mlir {
-namespace xla_hlo {
+namespace mhlo {
 namespace {
 
 template <typename HloOp>
@@ -338,10 +338,9 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
       rewriteShapexRankedBroadcastInDim);
   b.insertOpRankedShapeBuilder<ReduceOp>(rewriteReduce);
   b.insertOpRankedShapeBuilder<TransposeOp>(rewriteTranspose);
-  b.insertOpRankedShapeBuilder<xla_hlo::DotGeneralOp>(rewriteDotGeneral);
-  b.insertOpRankedShapeBuilder<xla_hlo::DynamicReshapeOp>(
-      rewriteDynamicReshape);
+  b.insertOpRankedShapeBuilder<mhlo::DotGeneralOp>(rewriteDotGeneral);
+  b.insertOpRankedShapeBuilder<mhlo::DynamicReshapeOp>(rewriteDynamicReshape);
 }
 
-}  // namespace xla_hlo
+}  // namespace mhlo
 }  // namespace mlir

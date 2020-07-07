@@ -6,7 +6,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -30,10 +30,10 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
   }
   module {
     func @reduction_rgn_reduce_0_dim_0_entry(%arg0 : tensor<4x8xf32>, %arg1 : tensor<f32>) -> tensor<4xf32> {
-      %0 = "xla_hlo.reduce"(%arg0, %arg1) ( {
+      %0 = "mhlo.reduce"(%arg0, %arg1) ( {
       ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
-        %1 = xla_hlo.add %arg3, %arg4 : tensor<f32>
-        "xla_hlo.return"(%1) : (tensor<f32>) -> ()
+        %1 = mhlo.add %arg3, %arg4 : tensor<f32>
+        "mhlo.return"(%1) : (tensor<f32>) -> ()
       }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
       return %0 : tensor<4xf32>
     }

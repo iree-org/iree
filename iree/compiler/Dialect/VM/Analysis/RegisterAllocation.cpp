@@ -170,7 +170,7 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
     if (markedBlocks.count(block) > 0) return;
-    for (auto *childBlock : dominanceInfo.getNode(block)->getChildren()) {
+    for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
       visit(childBlock->getBlock());
     }
     markedBlocks.insert(block);

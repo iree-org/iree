@@ -26,7 +26,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
     // CHECK-NEXT: }
     // CHECK-NEXT: func @simpleMath_rgn_dispatch_0_impl
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
     // CHECK: hal.interface @legacy_io attributes {sym_visibility = "private"}
@@ -64,7 +64,7 @@ flow.executable @shaped_dispatch {
       %0 = shapex.make_ranked_shape %arg1 : (index) -> !shapex.ranked_shape<[?,7,10]>
       %1 = shapex.make_ranked_shape %arg2 : (index) -> !shapex.ranked_shape<[7,?,10]>
       %2 = shapex.tie_shape %arg0, %0 : tensor<?x7x10xf32>, !shapex.ranked_shape<[?,7,10]>
-      %3 = "xla_hlo.transpose"(%2) {permutation = dense<[1, 0, 2]> : tensor<3xi64>} : (tensor<?x7x10xf32>) -> tensor<7x?x10xf32>
+      %3 = "mhlo.transpose"(%2) {permutation = dense<[1, 0, 2]> : tensor<3xi64>} : (tensor<?x7x10xf32>) -> tensor<7x?x10xf32>
       %4 = shapex.tie_shape %3, %1 : tensor<7x?x10xf32>, !shapex.ranked_shape<[7,?,10]>
       return %4 : tensor<7x?x10xf32>
     }

@@ -39,7 +39,7 @@ def create_simple_static_mul_module():
   input_module = ctx.parse_asm("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
-        %0 = "xla_hlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+        %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
         return %0 : tensor<4xf32>
     }
     """)
@@ -55,7 +55,7 @@ def create_simple_dynamic_abs_module():
   input_module = ctx.parse_asm("""
     func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32>
           attributes { iree.module.export } {
-        %0 = "xla_hlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+        %0 = "mhlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
         return %0 : tensor<?x?xf32>
     }
     """)

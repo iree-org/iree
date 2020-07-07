@@ -20,12 +20,12 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-/// A pass to decompose xla_hlo.clamp ops into xla_hlo.compare and
-/// xla_hlo.select ops.
-class DecomposeClampOp : public OpRewritePattern<xla_hlo::ClampOp> {
+/// A pass to decompose mhlo.clamp ops into mhlo.compare and
+/// mhlo.select ops.
+class DecomposeClampOp : public OpRewritePattern<mhlo::ClampOp> {
  public:
-  using OpRewritePattern<xla_hlo::ClampOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::ClampOp op,
+  using OpRewritePattern<mhlo::ClampOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::ClampOp op,
                                 PatternRewriter &rewriter) const override {
     auto minType = op.min().getType().dyn_cast<RankedTensorType>();
     auto operandType = op.operand().getType().dyn_cast<RankedTensorType>();
@@ -38,14 +38,14 @@ class DecomposeClampOp : public OpRewritePattern<xla_hlo::ClampOp> {
 
     // clamp(a, x, b) = min(max(a, x), b)
     Location loc = op.getLoc();
-    Value cmpMin = rewriter.create<xla_hlo::CompareOp>(
+    Value cmpMin = rewriter.create<mhlo::CompareOp>(
         loc, op.min(), op.operand(), rewriter.getStringAttr("LT"));
-    Value selectMin = rewriter.create<xla_hlo::SelectOp>(
-        loc, operandType, cmpMin, op.operand(), op.min());
-    Value cmpMax = rewriter.create<xla_hlo::CompareOp>(
+    Value selectMin = rewriter.create<mhlo::SelectOp>(loc, operandType, cmpMin,
+                                                      op.operand(), op.min());
+    Value cmpMax = rewriter.create<mhlo::CompareOp>(
         loc, selectMin, op.max(), rewriter.getStringAttr("LT"));
-    Value selectMax = rewriter.create<xla_hlo::SelectOp>(
-        loc, operandType, cmpMax, selectMin, op.max());
+    Value selectMax = rewriter.create<mhlo::SelectOp>(loc, operandType, cmpMax,
+                                                      selectMin, op.max());
     rewriter.replaceOp(op, selectMax);
     return success();
   }

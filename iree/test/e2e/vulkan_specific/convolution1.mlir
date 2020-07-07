@@ -8,7 +8,7 @@ func @conv2d_nopadding() attributes { iree.module.export } {
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
-  %res = "xla_hlo.convolution"(%inputs, %weights) {
+  %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
         dimension_numbers = {
           input_batch_dimension = 0 : i64,
@@ -40,7 +40,7 @@ func @conv2d_1452x3221_same() attributes { iree.module.export } {
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
-  %res = "xla_hlo.convolution"(%inputs, %weights) {
+  %res = "mhlo.convolution"(%inputs, %weights) {
        batch_group_count = 1 : i64,
        dimension_numbers = {
          input_batch_dimension = 0 : i64,

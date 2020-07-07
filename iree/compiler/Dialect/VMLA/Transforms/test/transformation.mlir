@@ -8,7 +8,7 @@ func @simpleMath_rgn_dispatch_0() {
   return
 }
 func @simpleMath_rgn_dispatch_0_impl(%arg0: tensor<4xf32>) -> tensor<4xf32> attributes {sym_visibility = "private"} {
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   return %0 : tensor<4xf32>
 }
 hal.interface @legacy_io attributes {sym_visibility = "private"} {

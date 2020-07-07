@@ -44,7 +44,7 @@ external_cc_library(
     "lib/Dialect/mhlo/transforms/lower_general_dot.cc"
     "lib/Dialect/mhlo/transforms/materialize_broadcasts.cc"
     "lib/Dialect/mhlo/transforms/unfuse_batch_norm.cc"
-    "lib/Dialect/mhlo/transforms/xla_hlo_fusion.cc"
+    "lib/Dialect/mhlo/transforms/mhlo_fusion.cc"
     "lib/Dialect/mhlo/transforms/xla_legalize_to_linalg.cc"
     "lib/utils/broadcast_utils.cc"
     "lib/utils/convert_op_folder.cc"

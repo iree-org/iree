@@ -43,9 +43,9 @@ module @hal_usage {
 // CHECK: exported_functions:
 // CHECK: local_name: "hloElementwiseOps"
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes {iree.module.export} {
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
-  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
+  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+  %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
+  %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
 }

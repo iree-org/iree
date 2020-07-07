@@ -45,7 +45,7 @@ func @comp5(%arg0 : !sequence.of<tensor<1xi32>>) -> !sequence.of<tensor<1xi32>> 
 // -----
 
 func @comp6() -> tensor<1xi32> {
-  %0 = xla_hlo.constant dense<10> : tensor<1xi32>
+  %0 = mhlo.constant dense<10> : tensor<1xi32>
   return %0 : tensor<1xi32>
 }
 

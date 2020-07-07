@@ -102,9 +102,9 @@ op and one from the VMLA op to the VM import call.
 See [HLOToVMLA](/iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/) for examples
 of the former. Most ops can use the `VMLAOpConversion` helper to automatically
 convert between ops so long as they match in values and attributes (for example,
-`xla_hlo.add` can be trivially converted to `vmla.add`). Examples of more
-complex ops that may require additional IR to be emitted or attributes to be
-mapped can be seen in there as well.
+`mhlo.add` can be trivially converted to `vmla.add`). Examples of more complex
+ops that may require additional IR to be emitted or attributes to be mapped can
+be seen in there as well.
 
 You can add tests for your conversion as needed under `test/` in the appropriate
 dialect-specific conversion folder.

@@ -16,7 +16,7 @@ func @concatenate_0(%arg0 : tensor<2x2xi32>) -> (tensor<2x5xi32>) attributes { s
   // CHECK-SAME: src_indices = [%c0, %c0],
   // CHECK-SAME: out %[[DST]](%rs2_5 : !shapex.ranked_shape<[2,5]>),
   // CHECK-SAME: dst_indices = [%c0, %c2], lengths = [%c2, %c3] : i32
-  %0 = "xla_hlo.concatenate"(%arg0, %c0) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>) -> tensor<2x5xi32>
+  %0 = "mhlo.concatenate"(%arg0, %c0) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>) -> tensor<2x5xi32>
   // CHECK-NEXT: return %[[DST]]
   return %0: tensor<2x5xi32>
 }
@@ -39,7 +39,7 @@ func @concatenate_1(%arg0: tensor<2x3xi32>) -> (tensor<2x5xi32>) attributes { sy
   // CHECK-SAME: src_indices = [%c0, %c0],
   // CHECK-SAME: out %[[DST]](%rs2_5 : !shapex.ranked_shape<[2,5]>),
   // CHECK-SAME: dst_indices = [%c0, %c3], lengths = [%c2, %c2] : i32
-  %0 = "xla_hlo.concatenate"(%arg0, %c0) {dimension = 1} : (tensor<2x3xi32>, tensor<2x2xi32>) -> tensor<2x5xi32>
+  %0 = "mhlo.concatenate"(%arg0, %c0) {dimension = 1} : (tensor<2x3xi32>, tensor<2x2xi32>) -> tensor<2x5xi32>
   // CHECK-NEXT: return %[[DST]]
   return %0: tensor<2x5xi32>
 }
@@ -69,7 +69,7 @@ func @concatenate_2(%arg0: tensor<2x2xi32>) -> (tensor<2x7xi32>) attributes { sy
   // CHECK-SAME: src_indices = [%c0, %c0],
   // CHECK-SAME: out %[[DST]](%rs2_7 : !shapex.ranked_shape<[2,7]>),
   // CHECK-SAME: dst_indices = [%c0, %c5], lengths = [%c2, %c2] : i32
-  %0 = "xla_hlo.concatenate"(%arg0, %c0, %c1) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>, tensor<2x2xi32>) -> tensor<2x7xi32>
+  %0 = "mhlo.concatenate"(%arg0, %c0, %c1) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>, tensor<2x2xi32>) -> tensor<2x7xi32>
   // CHECK-NEXT: return %[[DST]]
   return %0: tensor<2x7xi32>
 }
@@ -92,7 +92,7 @@ func @concatenate_3(%arg0: tensor<2x2xi32>) -> (tensor<4x2xi32>) attributes { sy
   // CHECK-SAME: src_indices = [%c0, %c0],
   // CHECK-SAME: out %[[DST]](%rs4_2 : !shapex.ranked_shape<[4,2]>),
   // CHECK-SAME: dst_indices = [%c2, %c0], lengths = [%c2, %c2] : i32
-  %0 = "xla_hlo.concatenate"(%arg0, %c0) {dimension = 0} : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<4x2xi32>
+  %0 = "mhlo.concatenate"(%arg0, %c0) {dimension = 0} : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<4x2xi32>
   // CHECK-NEXT: return %[[DST]]
   return %0: tensor<4x2xi32>
 }

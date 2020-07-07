@@ -50,7 +50,7 @@ struct ExtractElementOpPromotion
     }
     Location loc = op.getLoc();
     auto i8Type = rewriter.getIntegerType(8);
-    auto i8Operand = rewriter.create<xla_hlo::ConvertOp>(loc, args[0], i8Type);
+    auto i8Operand = rewriter.create<mhlo::ConvertOp>(loc, args[0], i8Type);
     auto loadOp =
         rewriter.create<ExtractElementOp>(loc, i8Type, i8Operand, op.indices());
     auto i1Type = rewriter.getI1Type();
@@ -78,18 +78,16 @@ class PrePartitioningConversionPass
     conversionTarget.addLegalOp<FuncOp>();
 
     // Allow XLA HLO ops - we explicitly mark the ones we don't want below.
-    conversionTarget.addLegalDialect<xla_hlo::XlaHloDialect>();
+    conversionTarget.addLegalDialect<mhlo::XlaHloDialect>();
 
     // Control flow must be converted to standard form via
-    // xla_hlo::createLegalizeControlFlowPass() prior to conversion.
-    conversionTarget
-        .addIllegalOp<xla_hlo::IfOp, xla_hlo::CaseOp, xla_hlo::WhileOp>();
+    // mhlo::createLegalizeControlFlowPass() prior to conversion.
+    conversionTarget.addIllegalOp<mhlo::IfOp, mhlo::CaseOp, mhlo::WhileOp>();
 
     // We don't support broadcast_dimensions as part of ops, so materialize
-    // any such attributes to dedicated xla_hlo.broadcast_in_dim ops.
-    xla_hlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
-    xla_hlo::PopulateMaterializeBroadcastsPatterns(context,
-                                                   &conversionPatterns);
+    // any such attributes to dedicated mhlo.broadcast_in_dim ops.
+    mhlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
+    mhlo::PopulateMaterializeBroadcastsPatterns(context, &conversionPatterns);
 
     // Early conversion of ops that have matches we want to route through.
     // For example, DynamicUpdateSlice should end up as a stream operation.

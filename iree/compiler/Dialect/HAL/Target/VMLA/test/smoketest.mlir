@@ -6,7 +6,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -48,7 +48,7 @@ flow.executable @shaped_dispatch {
     func @entry(%arg0: tensor<4x?xf32>, %arg1 : index) -> tensor<4x?xf32> {
       %0 = shapex.make_ranked_shape %arg1 : (index) -> !shapex.ranked_shape<[4,?]>
       %1 = shapex.tie_shape %arg0, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
-      %2 = xla_hlo.add %1, %1 : tensor<4x?xf32>
+      %2 = mhlo.add %1, %1 : tensor<4x?xf32>
       %3 = shapex.tie_shape %2, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
       return %3 : tensor<4x?xf32>
     }
@@ -87,10 +87,10 @@ flow.executable @reduction_ex_dispatch_0 {
   module {
     func @reduction_ex_dispatch_0(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
       %cst = constant dense<0.000000e+00> : tensor<f32>
-      %0 = "xla_hlo.reduce"(%arg0, %cst) ( {
+      %0 = "mhlo.reduce"(%arg0, %cst) ( {
       ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):
-        %1 = xla_hlo.add %arg1, %arg2 : tensor<f32>
-        "xla_hlo.return"(%1) : (tensor<f32>) -> ()
+        %1 = mhlo.add %arg1, %arg2 : tensor<f32>
+        "mhlo.return"(%1) : (tensor<f32>) -> ()
       }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
       return %0 : tensor<4xf32>
     }

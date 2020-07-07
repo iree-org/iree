@@ -78,7 +78,7 @@ class ConversionPass
     VMLAConversionTarget conversionTarget(context, typeConverter);
 
     // Ensure all input dialects go away.
-    conversionTarget.addIllegalDialect<xla_hlo::XlaHloDialect>();
+    conversionTarget.addIllegalDialect<mhlo::XlaHloDialect>();
     conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
 
     OwningRewritePatternList conversionPatterns;
@@ -114,7 +114,7 @@ class ConversionPass
     // TODO(silvasean): Legalize ToExtentTensorOp and FromExtentTensorOp.
     conversionTarget.addIllegalOp<Shape::FromExtentTensorOp>();
     // RankedBroadcastInDimOp is an logically something that should be an
-    // xla_hlo op (or in a dialect at a similar level of abstraction), but since
+    // mhlo op (or in a dialect at a similar level of abstraction), but since
     // it isn't technically in that dialect, we need to special-case mark it as
     // illegal here.
     // TODO(silvasean): Reconcile the dialect layering here.

@@ -30,9 +30,9 @@ namespace iree_compiler {
 
 namespace {
 
-struct ConstOpLowering : public OpRewritePattern<xla_hlo::ConstOp> {
+struct ConstOpLowering : public OpRewritePattern<mhlo::ConstOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::ConstOp op,
+  LogicalResult matchAndRewrite(mhlo::ConstOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<ConstantOp>(op, op.value());
     return success();
@@ -40,9 +40,9 @@ struct ConstOpLowering : public OpRewritePattern<xla_hlo::ConstOp> {
 };
 
 struct DynamicUpdateSliceOpLowering
-    : public OpRewritePattern<xla_hlo::DynamicUpdateSliceOp> {
+    : public OpRewritePattern<mhlo::DynamicUpdateSliceOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(xla_hlo::DynamicUpdateSliceOp op,
+  LogicalResult matchAndRewrite(mhlo::DynamicUpdateSliceOp op,
                                 PatternRewriter &rewriter) const override {
     auto startIndices = llvm::to_vector<4>(
         llvm::map_range(op.start_indices(), [&](Value tensorValue) {
@@ -61,8 +61,7 @@ struct DynamicUpdateSliceOpLowering
 
 void setupDirectHLOToFlowLegality(MLIRContext *context,
                                   ConversionTarget &conversionTarget) {
-  conversionTarget
-      .addIllegalOp<xla_hlo::ConstOp, xla_hlo::DynamicUpdateSliceOp>();
+  conversionTarget.addIllegalOp<mhlo::ConstOp, mhlo::DynamicUpdateSliceOp>();
 }
 
 void populateHLOToFlowPatterns(MLIRContext *context,

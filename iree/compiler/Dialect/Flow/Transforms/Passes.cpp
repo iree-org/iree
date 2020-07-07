@@ -39,7 +39,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
 
   // Flatten structured control flow to our CFG.
-  passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
+  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
   passManager.addPass(createHLOPreprocessingPass());
 
   // Run passes to remove shape constraints. HLO lowering inserts them, but they

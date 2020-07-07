@@ -19,10 +19,10 @@ func @singleDispatchWithShapes(%arg0 : tensor<?x4xf32>,
   // CHECK-SAME: %[[CA1:.+]] = %[[A1]] : !shapex.ranked_shape<[?,4]>)
     // Dispatch region should contain captured tie_shapes.
     // CHECK: %[[R1:.+]] = shapex.tie_shape %[[CA0]], %[[CA1]]
-    // CHECK: %[[R2:.+]] = xla_hlo.add %[[R1]], %[[R1]]
+    // CHECK: %[[R2:.+]] = mhlo.add %[[R1]], %[[R1]]
     // CHECK: %[[R3:.+]] = shapex.tie_shape %[[R2]], %[[CA2]]
     // CHECK: flow.return %[[R3]]
-  %1 = xla_hlo.add %0, %0 : tensor<?x4xf32>
+  %1 = mhlo.add %0, %0 : tensor<?x4xf32>
   %2 = shapex.tie_shape %1, %arg2 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
 
   // Lead-out tie_shape should be preserved outside of the dispatch region.

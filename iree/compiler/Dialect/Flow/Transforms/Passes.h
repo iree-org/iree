@@ -60,7 +60,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 
 /// Creates XLA-HLO preprocessing transformation pass. In this pass we should
-/// have all xla_hlo -> xla_hlo transformations that are shared between all
+/// have all mhlo -> mhlo transformations that are shared between all
 /// backends.
 std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
 

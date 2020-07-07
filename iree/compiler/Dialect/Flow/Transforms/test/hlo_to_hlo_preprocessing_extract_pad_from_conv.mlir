@@ -1,13 +1,13 @@
 // RUN: iree-opt -iree-flow-hlo-to-hlo-preprocessing -iree-extract-pad-from-conv %s | IreeFileCheck %s
 
 // CHECK-LABEL: @conv
-//       CHECK: xla_hlo.pad
+//       CHECK: mhlo.pad
 //  CHECK-SAME: edge_padding_high = dense<[0, 1, 1, 0]>
 //  CHECK-SAME: edge_padding_low = dense<[0, 1, 0, 0]>
-//       CHECK: xla_hlo.convolution
+//       CHECK: mhlo.convolution
 //   CHECK-NOT: padding
 func @conv(%inputs: tensor<1x4x5x2xf32>, %weights: tensor<3x2x2x1xf32>) -> tensor<1x4x5x1xf32> {
-  %0 = "xla_hlo.convolution"(%inputs, %weights) {
+  %0 = "mhlo.convolution"(%inputs, %weights) {
   batch_group_count = 1 : i64,
   dimension_numbers = {
     input_batch_dimension = 0 : i64,

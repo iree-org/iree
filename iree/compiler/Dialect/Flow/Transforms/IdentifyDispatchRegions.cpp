@@ -116,10 +116,10 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
 // Preconditions: isDispatchableOp(op) == true.
 bool isFusionRootOp(Operation *op) {
   // TODO(b/144530470): replace with tablegen attributes/interfaces.
-  // TODO(#1605): Remove xla_hlo::PadOp from the check.
-  if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-      isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::PadOp>(op) ||
-      isa<xla_hlo::ReduceWindowOp>(op)) {
+  // TODO(#1605): Remove mhlo::PadOp from the check.
+  if (isa<mhlo::DotOp>(op) || isa<mhlo::ConvOp>(op) ||
+      isa<mhlo::ReduceOp>(op) || isa<mhlo::PadOp>(op) ||
+      isa<mhlo::ReduceWindowOp>(op)) {
     // We have hand-written kernels for these right now we want to stand alone.
     // When we do a bit more magic we should allow these ops to fold.
     LLVM_DEBUG(llvm::dbgs() << "  NOT A FUSION ROOT (Special Op): "
@@ -149,14 +149,14 @@ bool isNonFusionRootOp(Operation *op) {
 // Preconditions: isDispatchableOp(op) == true.
 bool isFusableOp(Operation *op) {
   // TODO(b/144530470): replace with tablegen attributes/interfaces.
-  if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op)) {
+  if (isa<mhlo::DotOp>(op) || isa<mhlo::ConvOp>(op)) {
     return false;
-  } else if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ReduceWindowOp>(op)) {
+  } else if (isa<mhlo::ReduceOp>(op) || isa<mhlo::ReduceWindowOp>(op)) {
     // Reduction is usually a dedicated root operation - we can shove things in
     // the front of it but not behind.
     return false;
-  } else if (isa<xla_hlo::PadOp>(op)) {
-    // TODO(#1605): Remove xla_hlo::PadOp from the check.
+  } else if (isa<mhlo::PadOp>(op)) {
+    // TODO(#1605): Remove mhlo::PadOp from the check.
     return false;
   }
   return true;

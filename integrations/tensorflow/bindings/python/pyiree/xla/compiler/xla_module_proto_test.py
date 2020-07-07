@@ -48,7 +48,7 @@ class RuntimeTest(absltest.TestCase):
     # Validate imported ASM.
     xla_asm = module.to_asm()
     print("XLA ASM: ", xla_asm)
-    self.assertRegex(xla_asm, "xla_hlo.add")
+    self.assertRegex(xla_asm, "mhlo.add")
 
 
 if __name__ == "__main__":

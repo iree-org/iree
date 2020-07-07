@@ -22,10 +22,10 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ({
+    %2 = "mhlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.add %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5xf32>
     return
@@ -46,10 +46,10 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ({
+    %2 = "mhlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.minimum %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.minimum %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5xf32>
     return
@@ -70,10 +70,10 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ({
+    %2 = "mhlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.maximum %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<5xf32>
     return
@@ -94,10 +94,10 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ({
+    %2 = "mhlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.maximum %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<4xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
     return
@@ -133,10 +133,10 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ({
+    %2 = "mhlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.add %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<4xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
     return
@@ -162,10 +162,10 @@ module {
     // CHECK: ^{{.+}}(%{{.+}}: index, %[[DIM:.+]]: index, %{{.+}}: f32, %[[OUTPUT:.+]]: f32):
     // CHECK: select %{{.+}}, %[[CST]], %[[OUTPUT]] : f32
     %cst = constant dense<0xFF800000> : tensor<f32>
-    %1 = "xla_hlo.reduce"(%0, %cst) ({
+    %1 = "mhlo.reduce"(%0, %cst) ({
     ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>): // no predecessors
-      %2 = xla_hlo.add %arg2, %arg3 {name = "maximum.21"} : tensor<f32>
-      "xla_hlo.return"(%2) : (tensor<f32>) -> ()
+      %2 = mhlo.add %arg2, %arg3 {name = "maximum.21"} : tensor<f32>
+      "mhlo.return"(%2) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
     hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<1xf32>
     return
@@ -205,10 +205,10 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4x3xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    %2 = "xla_hlo.reduce"(%0, %1) ({
+    %2 = "mhlo.reduce"(%0, %1) ({
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.add %arg3, %arg4 : tensor<f32>
-      "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+      %3 = mhlo.add %arg3, %arg4 : tensor<f32>
+      "mhlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<[0, 2]> : tensor<2xi64>} : (tensor<5x4x3xf32>, tensor<f32>) -> tensor<4xf32>
     hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
     return

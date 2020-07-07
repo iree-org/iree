@@ -36,21 +36,21 @@ namespace iree_compiler {
 
 namespace {
 
-// Converts a simple xla_hlo.reduce op that performs independent individual
-// computations into a set of xla_hlo.reduce ops. This is an intermediate
+// Converts a simple mhlo.reduce op that performs independent individual
+// computations into a set of mhlo.reduce ops. This is an intermediate
 // conversion that may make it possible to use the much faster builtin VMLA
 // reduction ops.
 //
 // Only supports single dimensional reductions and assumes that unrolling has
 // been performed prior to conversion.
 struct SplitIndependentReductionOpConversion
-    : public OpConversionPattern<xla_hlo::ReduceOp> {
+    : public OpConversionPattern<mhlo::ReduceOp> {
   SplitIndependentReductionOpConversion(MLIRContext *context,
                                         TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::ReduceOp srcOp, ArrayRef<Value> operands,
+      mhlo::ReduceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.dimensions().getNumElements() > 1) {
       srcOp.emitOpError() << "multi-dimensional reductions must be unrolled";
@@ -60,7 +60,7 @@ struct SplitIndependentReductionOpConversion
       return failure();
     }
     auto &block = srcOp.body().getBlocks().front();
-    xla_hlo::ReduceOp::Adaptor newOperands(operands);
+    mhlo::ReduceOp::Adaptor newOperands(operands);
     SmallVector<Value, 4> setResults;
     for (auto &op : block) {
       if (op.isKnownTerminator()) {
@@ -105,7 +105,7 @@ struct SplitIndependentReductionOpConversion
       // Create the new op for this set.
       Value operandArg = srcOp.operands()[opSetIndex];
       Value initArg = srcOp.init_values()[opSetIndex];
-      auto splitOp = rewriter.create<xla_hlo::ReduceOp>(
+      auto splitOp = rewriter.create<mhlo::ReduceOp>(
           op.getLoc(), ValueRange{operandArg}, ValueRange{initArg},
           srcOp.dimensionsAttr());
       auto *splitBlock = new Block();
@@ -116,7 +116,7 @@ struct SplitIndependentReductionOpConversion
         mapping.map(operand, splitBlock->addArgument(operand.getType()));
       }
       Operation *splitComputeOp = splitBuilder.clone(op, mapping);
-      splitBuilder.create<xla_hlo::ReturnOp>(
+      splitBuilder.create<mhlo::ReturnOp>(
           srcOp.getLoc(), ValueRange{*splitComputeOp->getResults().begin()});
       setResults.push_back(*splitOp.getResults().begin());
     }
@@ -128,7 +128,7 @@ struct SplitIndependentReductionOpConversion
   TypeConverter &typeConverter;
 };
 
-// Converts an xla_hlo.reduce with a single op to a builtin reduce op.
+// Converts an mhlo.reduce with a single op to a builtin reduce op.
 // This is meant to pair with the SplitIndependentReductionOpConversion that
 // tries to unfuse/divide combined reductions. If this cannot match then the
 // fallback path will be used and a VM loop will be emitted (slower, but can
@@ -136,14 +136,13 @@ struct SplitIndependentReductionOpConversion
 //
 // Only supports single dimensional reductions and assumes that unrolling has
 // been performed prior to conversion.
-struct BuiltinReduceOpConversion
-    : public OpConversionPattern<xla_hlo::ReduceOp> {
+struct BuiltinReduceOpConversion : public OpConversionPattern<mhlo::ReduceOp> {
   BuiltinReduceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context, /*benefit=*/1000),
         typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::ReduceOp srcOp, ArrayRef<Value> operands,
+      mhlo::ReduceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.dimensions().getNumElements() > 1) {
       srcOp.emitOpError() << "multi-dimensional reductions must be unrolled";
@@ -172,17 +171,17 @@ struct BuiltinReduceOpConversion
 
     auto &computeOp = *srcOp.body().front().begin();
     if (isa<mlir::AddIOp>(computeOp) || isa<mlir::AddFOp>(computeOp) ||
-        isa<xla_hlo::AddOp>(computeOp)) {
+        isa<mhlo::AddOp>(computeOp)) {
       rewriter.create<IREE::VMLA::ReduceSumOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
           rewriter.getI32IntegerAttr(dimension), dst, dstShape,
           TypeAttr::get(elementType));
-    } else if (isa<xla_hlo::MinOp>(computeOp)) {
+    } else if (isa<mhlo::MinOp>(computeOp)) {
       rewriter.create<IREE::VMLA::ReduceMinOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
           rewriter.getI32IntegerAttr(dimension), dst, dstShape,
           TypeAttr::get(elementType));
-    } else if (isa<xla_hlo::MaxOp>(computeOp)) {
+    } else if (isa<mhlo::MaxOp>(computeOp)) {
       rewriter.create<IREE::VMLA::ReduceMaxOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape,
           rewriter.getI32IntegerAttr(dimension), dst, dstShape,
@@ -199,17 +198,16 @@ struct BuiltinReduceOpConversion
   TypeConverter &typeConverter;
 };
 
-// Converts a generic xla_hlo.reduce to a VM loop.
+// Converts a generic mhlo.reduce to a VM loop.
 //
 // Only supports single dimensional reductions and assumes that unrolling has
 // been performed prior to conversion.
-struct GenericReduceOpConversion
-    : public OpConversionPattern<xla_hlo::ReduceOp> {
+struct GenericReduceOpConversion : public OpConversionPattern<mhlo::ReduceOp> {
   GenericReduceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::ReduceOp srcOp, ArrayRef<Value> operands,
+      mhlo::ReduceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.dimensions().getNumElements() > 1) {
       srcOp.emitOpError() << "multi-dimensional reductions must be unrolled";
@@ -225,13 +223,13 @@ struct GenericReduceOpConversion
 };
 
 struct BuiltinPoolingOpConversion
-    : public OpConversionPattern<xla_hlo::ReduceWindowOp> {
+    : public OpConversionPattern<mhlo::ReduceWindowOp> {
   BuiltinPoolingOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context, /*benefit=*/1000),
         typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::ReduceWindowOp srcOp, ArrayRef<Value> operands,
+      mhlo::ReduceWindowOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.body().getBlocks().size() > 1) {
       // Control flow within the computation is not supported; bail to fallback.
@@ -269,21 +267,21 @@ struct BuiltinPoolingOpConversion
 
     auto &computeOp = *srcOp.body().front().begin();
     if (isa<mlir::AddIOp>(computeOp) || isa<mlir::AddFOp>(computeOp) ||
-        isa<xla_hlo::AddOp>(computeOp)) {
+        isa<mhlo::AddOp>(computeOp)) {
       rewriter.create<IREE::VMLA::PoolingSumOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
           dstShape, TypeAttr::get(elementType),
           rewriter.getI32VectorAttr(windowDimensions),
           rewriter.getI32VectorAttr(windowStrides),
           rewriter.getI32VectorAttr(padding));
-    } else if (isa<xla_hlo::MinOp>(computeOp)) {
+    } else if (isa<mhlo::MinOp>(computeOp)) {
       rewriter.create<IREE::VMLA::PoolingMinOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
           dstShape, TypeAttr::get(elementType),
           rewriter.getI32VectorAttr(windowDimensions),
           rewriter.getI32VectorAttr(windowStrides),
           rewriter.getI32VectorAttr(padding));
-    } else if (isa<xla_hlo::MaxOp>(computeOp)) {
+    } else if (isa<mhlo::MaxOp>(computeOp)) {
       rewriter.create<IREE::VMLA::PoolingMaxOp>(
           srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
           dstShape, TypeAttr::get(elementType),

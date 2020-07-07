@@ -18,14 +18,14 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 
 namespace mlir {
-namespace xla_hlo {
+namespace mhlo {
 
 // Creates a custom op shape builder for XLA-HLO ops that are not otherwise
 // supported through traits or other declarative means.
 void populateXlaHloCustomOpShapeBuilder(
     iree_compiler::Shape::CustomOpShapeBuilderList &builders);
 
-}  // namespace xla_hlo
+}  // namespace mhlo
 }  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_SHAPE_IR_XLAHLOSHAPEBUILDER_H_

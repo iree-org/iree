@@ -71,11 +71,13 @@ def iree_py_library(**kwargs):
 
 def iree_py_binary(**kwargs):
     """Compatibility py_binary which has bazel specific args."""
+
     # See: https://github.com/google/iree/issues/2405
     py_binary(legacy_create_init = False, **kwargs)
 
 def iree_py_test(**kwargs):
     """Compatibility py_test which has bazel compatible args."""
+
     # See: https://github.com/google/iree/issues/2405
     py_test(legacy_create_init = False, **kwargs)
 
