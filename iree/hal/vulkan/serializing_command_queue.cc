@@ -203,27 +203,31 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   // A list of submissions that still needs to be deferred.
   IntrusiveList<std::unique_ptr<FencedSubmission>> remaining_submissions;
 
+  // We need to return all remaining submissions back to the queue to avoid
+  // dropping work.
+  auto submission_cleanup = MakeCleanup([this, &remaining_submissions]() {
+    while (!remaining_submissions.empty()) {
+      deferred_submissions_.push_back(
+          remaining_submissions.take(remaining_submissions.front()));
+    }
+  });
+
   while (!deferred_submissions_.empty()) {
     wait_semaphores.clear();
     signal_semaphores.clear();
 
-    FencedSubmission* submission = deferred_submissions_.front();
+    std::unique_ptr<FencedSubmission> submission =
+        deferred_submissions_.take(deferred_submissions_.front());
     const SubmissionBatch& batch = submission->batch;
     ref_ptr<TimePointFence>& fence = submission->fence;
 
-    auto prepare_result = TryToPrepareSemaphores(batch, fence, &wait_semaphores,
-                                                 &signal_semaphores);
-    if (!prepare_result.ok()) {
-      // Note: It would be nice to use MakeCleanup for this so we don't
-      // duplicate it multiple times. But sanitizers aren't happy about
-      // lambdas.
-      while (!remaining_submissions.empty()) {
-        deferred_submissions_.push_back(
-            remaining_submissions.take(remaining_submissions.front()));
-      }
-      return prepare_result;
-    }
-    bool ready_to_submit = prepare_result.value();
+    // We don't insert the current submission into remaining_submissions, so
+    // under failing cases this submission will be dropped. But that's fine
+    // given the program is gonna exit anyway and we won't push more work to
+    // the GPU.
+    ASSIGN_OR_RETURN(bool ready_to_submit,
+                     TryToPrepareSemaphores(batch, fence, &wait_semaphores,
+                                            &signal_semaphores));
 
     if (ready_to_submit) {
       submit_infos.emplace_back();
@@ -232,20 +236,13 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
 
       submit_fences.push_back(fence->value());
       pending_fences_.emplace_back(std::move(fence));
-      deferred_submissions_.pop_front();
     } else {
       // We need to defer the submission until later.
-      remaining_submissions.push_back(deferred_submissions_.take(submission));
+      remaining_submissions.push_back(std::move(submission));
     }
   }
 
-  if (submit_infos.empty()) {
-    while (!remaining_submissions.empty()) {
-      deferred_submissions_.push_back(
-          remaining_submissions.take(remaining_submissions.front()));
-    }
-    return false;
-  }
+  if (submit_infos.empty()) return false;
 
   auto infos = arena.AllocateSpan<VkSubmitInfo>(submit_infos.size());
   for (int i = 0, e = submit_infos.size(); i < e; ++i) {
@@ -259,10 +256,6 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
         queue_, /*submitCount=*/1, &submit_infos[i], submit_fences[i]));
   }
 
-  while (!remaining_submissions.empty()) {
-    deferred_submissions_.push_back(
-        remaining_submissions.take(remaining_submissions.front()));
-  }
   return true;
 }
 
