@@ -31,7 +31,7 @@ IMAGES = [
     'rbe-toolchain'
 ]
 IMAGES_HELP = [f'`{name}`' for name in IMAGES]
-IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}''
+IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
 
 # Map from image names to images that depend on them.
 DEPENDENCIES = {
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
   # Ensure the user has the correct authorization if they try to push to GCR.
   if args.push:
-    subprocess.run(['gcloud', 'auth', 'configure-docker'])
+    subprocess.check_output(['gcloud', 'auth', 'configure-docker'])
 
   # Check if any images depend on `args.image` and update them if they do.
   images_to_update = [args.image]
@@ -91,9 +91,9 @@ if __name__ == '__main__':
   for image in images_to_update:
     image_url = os.path.join(IREE_GCR_URL, f'{image}:{args.tag}')
     image_path = os.path.join(DOCKER_DIR, image.replace('-', '_'))
-    subprocess.run(['docker', 'build', '--tag', image_url, image_path])
+    subprocess.check_output(['docker', 'build', '--tag', image_url, image_path])
     if args.push:
-      subprocess.run(['docker', 'push', image_url])
+      subprocess.check_output(['docker', 'push', image_url])
 
   if 'rbe-toolchain' in images_to_update:
     print(RBE_MESSAGE)
