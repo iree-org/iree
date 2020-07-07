@@ -105,7 +105,7 @@ void BM_MxMColMajorVectors(benchmark::State &state) {
 
   vector::VectorTransformsOptions vectorTransformsOptions{
       LowerToLLVMMatrixIntrinsics ? vector::VectorContractLowering::Matmul
-                                  : vector::VectorContractLowering::FMA};
+                                  : vector::VectorContractLowering::Dot};
   CompilationOptions compilationOptions{/*llvmOptLevel=*/3, /*llcOptLevel=*/3,
                                         vectorTransformsOptions};
   if (MeasureBuild) {
