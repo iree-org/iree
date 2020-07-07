@@ -38,8 +38,6 @@ StringRef getWorkGroupMarker() { return "workgroup"; }
 
 StringRef getWorkItemMarker() { return "workitem"; }
 
-StringRef getCooperativeMatrixMarker() { return "cooperative-matrix"; }
-
 bool hasMarker(Operation *op, StringRef marker) {
   return checkMarkerValue(op, marker);
 }
@@ -52,21 +50,11 @@ bool hasWorkItemMarker(Operation *op) {
   return checkMarkerValue(op, getWorkItemMarker());
 }
 
-bool hasCooperativeMatrixMarker(Operation *op) {
-  StringAttr attr =
-      op->getAttrOfType<StringAttr>(VectorTransforms::kVectorTransformMarker);
-  return attr && attr.getValue() == getCooperativeMatrixMarker();
-}
-
 void setMarker(Operation *op, StringRef marker) {
   op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
               StringAttr::get(marker, op->getContext()));
 }
 
-void setCooperativeMatrixMarker(Operation *op) {
-  op->setAttr(VectorTransforms::kVectorTransformMarker,
-              StringAttr::get(getCooperativeMatrixMarker(), op->getContext()));
-}
 void setWorkGroupMarker(Operation *op) { setMarker(op, getWorkGroupMarker()); }
 
 void setWorkItemMarker(Operation *op) { setMarker(op, getWorkItemMarker()); }

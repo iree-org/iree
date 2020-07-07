@@ -372,6 +372,104 @@ Status Gather::Execute(absl::Span<const T> src_buffer,
   return OkStatus();
 }
 
+namespace impl {
+template <typename T>
+Status ScatterCopy(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
+                   ShapeSpan src_shape, ShapeSpan dst_shape) {
+  if (src_shape.empty()) {
+    dst_buffer[0] = src_buffer[0];
+    return OkStatus();
+  }
+
+  // Scatter cannot subscatter, it must be legal across he entire shape.
+  // Therefore if the src and dst shape match we can copy the full bytes over.
+  if (src_shape == dst_shape) {
+    memcpy(dst_buffer.data(), src_buffer.data(), src_buffer.size() * sizeof(T));
+    return OkStatus();
+  }
+
+  auto src_stride = 1;
+  for (auto size : src_shape.subspan(1)) {
+    src_stride *= size;
+  }
+
+  auto dst_stride = 1;
+  for (auto size : dst_shape.subspan(1)) {
+    dst_stride *= size;
+  }
+
+  for (int i = 0; i < src_shape[0]; i++) {
+    RETURN_IF_ERROR(ScatterCopy(src_buffer.subspan(i * src_stride, src_stride),
+                                dst_buffer.subspan(i * dst_stride, dst_stride),
+                                src_shape.subspan(1), dst_shape.subspan(1)));
+  }
+
+  return OkStatus();
+}
+
+// Scatter helper compute the offset into src buffer, removing the dependency
+// on the indices buffer.
+template <typename T>
+Status ScatterHelper(absl::Span<const T> src_buffer,
+                     absl::Span<const int32_t> indices_buffer,
+                     absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                     ShapeSpan dst_shape) {
+  size_t offset = 0;
+  for (int i = 0; i < indices_buffer.size(); i++) {
+    offset = offset * dst_shape[i] + indices_buffer[i];
+  }
+
+  for (int i = indices_buffer.size(); i < dst_shape.size(); i++) {
+    offset *= dst_shape[i];
+  }
+
+  if ((src_shape.size() + indices_buffer.size()) != dst_shape.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Attempting to scatter to differing dimensions.";
+  }
+
+  RETURN_IF_ERROR(ScatterCopy(src_buffer, dst_buffer.subspan(offset), src_shape,
+                              dst_shape.subspan(indices_buffer.size())));
+
+  return OkStatus();
+}
+}  // namespace impl
+
+template <typename T>
+Status Scatter::Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const int32_t> indices_buffer,
+                        absl::Span<T> dst_buffer, ShapeSpan src_shape,
+                        ShapeSpan indices_shape, ShapeSpan dst_shape) {
+  int indices_rank = indices_shape.size();
+
+  // First dimension of indices is the batch update.
+  int32_t batch_size = 1;
+  if (indices_rank > 0) {
+    batch_size = indices_shape[0];
+  }
+
+  // Secnd dimensions of indices is the indice offset to scatter along.
+  int32_t indices_size = 1;
+  if (indices_rank > 1) {
+    indices_size = indices_shape[1];
+  }
+
+  // Compute the source size per scatter.
+  int32_t src_size = 1;
+  for (auto val : src_shape.subspan(1)) {
+    src_size *= val;
+  }
+
+  for (int i = 0; i < batch_size; i++) {
+    RETURN_IF_ERROR(impl::ScatterHelper(
+        src_buffer.subspan(i * src_size, src_size),
+        indices_buffer.subspan(i * indices_size, indices_size), dst_buffer,
+        src_shape.subspan(1), dst_shape));
+  }
+
+  return OkStatus();
+}
+
 template <typename T>
 Status Reverse::Execute(absl::Span<const T> src_buffer,
                         absl::Span<T> dst_buffer, ShapeSpan src_shape,
