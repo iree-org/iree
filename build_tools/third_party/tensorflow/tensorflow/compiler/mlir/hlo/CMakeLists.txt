@@ -38,16 +38,29 @@ external_cc_library(
     "lib/Dialect/mhlo/IR/hlo_ops.cc"
     "lib/Dialect/mhlo/IR/infer_fusibility_op_interface.cc"
     "lib/Dialect/mhlo/IR/lhlo_ops.cc"
-    "lib/utils/convert_op_folder.cc"
+    "lib/Dialect/mhlo/transforms/chlo_legalize_to_hlo.cc"
+    "lib/Dialect/mhlo/transforms/legalize_control_flow.cc"
+    "lib/Dialect/mhlo/transforms/legalize_to_standard.cc"
+    "lib/Dialect/mhlo/transforms/lower_general_dot.cc"
+    "lib/Dialect/mhlo/transforms/materialize_broadcasts.cc"
+    "lib/Dialect/mhlo/transforms/unfuse_batch_norm.cc"
+    "lib/Dialect/mhlo/transforms/xla_hlo_fusion.cc"
+    "lib/Dialect/mhlo/transforms/xla_legalize_to_linalg.cc"
     "lib/utils/broadcast_utils.cc"
+    "lib/utils/convert_op_folder.cc"
+    "lib/utils/cycle_detector.cc"
     "lib/utils/hlo_utils.cc"
   HDRS
     "include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
     "include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
     "include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h"
     "include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
-    "include/mlir-hlo/utils/convert_op_folder.h"
+    "include/mlir-hlo/Dialect/mhlo/transforms/map_xla_to_scalar_op.h"
+    "include/mlir-hlo/Dialect/mhlo/transforms/passes.h"
+    "include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
     "include/mlir-hlo/utils/broadcast_utils.h"
+    "include/mlir-hlo/utils/convert_op_folder.h"
+    "include/mlir-hlo/utils/cycle_detector.h"
     "include/mlir-hlo/utils/hlo_utils.h"
   COPTS
     ${TF_MLIR_HLO_COPTS_BASE}
@@ -57,24 +70,25 @@ external_cc_library(
   DEPS
     absl::core_headers
     absl::flat_hash_set
-    tensorflow_mlir_hlo_chlo_ops_gen
-    tensorflow_mlir_hlo_hlo_ops_gen
-    tensorflow_mlir_hlo_hlo_ops_base_gen
-    tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
-    tensorflow_mlir_hlo_lhlo_ops_gen
-    tensorflow_mlir_hlo_xla_canonicalize_gen
     LLVMSupport
     MLIRAnalysis
-    MLIRIR
     MLIRInferTypeOpInterface
+    MLIRIR
     MLIRPass
     MLIRShape
     MLIRSideEffectInterfaces
     MLIRStandardOps
     MLIRSupport
-    MLIRTransformUtils
     MLIRTransforms
+    MLIRTransformUtils
     MLIRViewLikeInterface
+    tensorflow_mlir_hlo_chlo_ops_gen
+    tensorflow_mlir_hlo_hlo_ops_base_gen
+    tensorflow_mlir_hlo_hlo_ops_gen
+    tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
+    tensorflow_mlir_hlo_legalize_to_standard_patterns_gen
+    tensorflow_mlir_hlo_lhlo_ops_gen
+    tensorflow_mlir_hlo_xla_canonicalize_gen
   PUBLIC
 )
 
@@ -175,4 +189,19 @@ external_tablegen_library(
   OUTS
     -gen-op-interface-decls include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h.inc
     -gen-op-interface-defs include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.cc.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_hlo_legalize_to_standard_patterns_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_HLO_SRC_ROOT}
+  SRCS
+    "lib/Dialect/mhlo/transforms/legalize_to_standard_patterns.td"
+  OUTS
+    -gen-rewriters lib/Dialect/mhlo/transforms/generated_legalize_to_standard.inc
 )

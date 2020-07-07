@@ -28,6 +28,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_xla
+    tensorflow::mlir_hlo
   PUBLIC
 )
