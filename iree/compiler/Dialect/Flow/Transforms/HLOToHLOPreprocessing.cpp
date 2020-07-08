@@ -194,7 +194,7 @@ struct HLOToHLOPreprocessing
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
     // whether it was legalized away at a higher level.
-    xla_chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
+    chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape>(context);
     if (extractPadFromConv) {

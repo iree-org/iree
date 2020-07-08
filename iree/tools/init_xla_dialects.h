@@ -29,9 +29,9 @@ namespace mlir {
 // all the possible dialects to be made available to the context automatically.
 inline void registerXLADialects() {
   static bool init_once = []() {
-    registerDialect<mlir::mhlo::XlaHloDialect>();
-    registerDialect<mlir::xla_chlo::XlaHloClientDialect>();
+    registerDialect<mlir::chlo::HloClientDialect>();
     registerDialect<mlir::lmhlo::LmhloDialect>();
+    registerDialect<mlir::mhlo::XlaHloDialect>();
     return true;
   }();
   (void)init_once;
