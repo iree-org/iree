@@ -39,6 +39,27 @@ struct Transformation {
   linalg::LinalgMarker marker;
 };
 
+template <typename VectorOpType>
+struct UnrollVector : public Transformation {
+  explicit UnrollVector(ArrayRef<int64_t> targetShape)
+      : targetShape(targetShape) {}
+
+  OwningRewritePatternList buildRewritePatterns(
+      MLIRContext *ctx, linalg::LinalgMarker m) override {
+    OwningRewritePatternList vectorUnrollPatterns;
+    vectorUnrollPatterns.insert<vector::UnrollVectorPattern<VectorOpType>>(
+        targetShape, ctx);
+    vector::populateVectorToVectorCanonicalizationPatterns(vectorUnrollPatterns,
+                                                           ctx);
+    vector::populateVectorToVectorTransformationPatterns(vectorUnrollPatterns,
+                                                         ctx);
+    return vectorUnrollPatterns;
+  }
+
+ private:
+  ArrayRef<int64_t> targetShape;
+};
+
 /// Promotion transformation enqueues a particular stage-1 pattern for
 /// `Tile<LinalgOpType>`with the appropriate `options`.
 // TODO: variadic LinalgOpTypes.
@@ -176,6 +197,21 @@ struct MatmulCodegenStrategy {
   /// use different lowering.
   MatmulCodegenStrategy &setLoweringFunction(std::function<void(FuncOp)> f) {
     lowering = f;
+    return *this;
+  }
+
+  /// Append a pattern to unroll a `VectorOpType` to smaller vector operations.
+  template <typename VectorOpType>
+  MatmulCodegenStrategy &unrollVector(ArrayRef<int64_t> targetShape) {
+    transformationSequence.emplace_back(
+        new UnrollVector<VectorOpType>(targetShape));
+    return *this;
+  }
+  /// Conditionally append a pattern to rewrite `LinalgOpType` as a vector
+  /// operation.
+  template <typename VectorOpType>
+  MatmulCodegenStrategy &unrollVectorIf(bool b, ArrayRef<int64_t> targetShape) {
+    return b ? unrollVector<VectorOpType>(targetShape) : *this;
     return *this;
   }
 
