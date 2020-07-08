@@ -15,11 +15,23 @@
 #ifndef IREE_COMPILER_DIALECT_VM_TARGET_C_CMODULETARGET_H_
 #define IREE_COMPILER_DIALECT_VM_TARGET_C_CMODULETARGET_H_
 
+#include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Module.h"
+#include "mlir/Support/LogicalResult.h"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
+// Translates a vm.module to a c module.
+//
+// Exposed via the --iree-vm-ir-to-c-module translation.
+LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
+                                        llvm::raw_ostream &output);
+LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
+                                 llvm::raw_ostream &output);
 
 }  // namespace VM
 }  // namespace IREE

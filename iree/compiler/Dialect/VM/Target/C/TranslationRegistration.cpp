@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
+#include "mlir/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -20,7 +21,11 @@ namespace IREE {
 namespace VM {
 
 void registerToCTranslation() {
-  // TODO ..
+  TranslateFromMLIRRegistration toCModule(
+      "iree-vm-ir-to-c-module",
+      [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
+        return translateModuleToC(moduleOp, output);
+      });
 }
 
 }  // namespace VM

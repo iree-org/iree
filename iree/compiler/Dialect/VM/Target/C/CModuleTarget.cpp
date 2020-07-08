@@ -11,3 +11,33 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
+
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace VM {
+
+LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
+                                 llvm::raw_ostream &output) {
+    // TODO: implement translation
+    output << "// c module stub\n";
+
+    return success();
+}
+
+LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
+                                 llvm::raw_ostream &output) {
+  auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
+  if (moduleOps.empty()) {
+    return outerModuleOp.emitError()
+           << "outer module does not contain a vm.module op";
+  }
+  return translateModuleToC(*moduleOps.begin(), output);
+}
+
+}  // namespace VM
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir

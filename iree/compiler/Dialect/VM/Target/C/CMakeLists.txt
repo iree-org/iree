@@ -24,6 +24,9 @@ if(${IREE_ENABLE_EMITC})
       "CModuleTarget.cpp"
       "TranslationRegistration.cpp"
     DEPS
+      LLVMSupport
+      MLIRIR
+      MLIRSupport
       iree::compiler::Dialect::VM::IR
     PUBLIC
   )

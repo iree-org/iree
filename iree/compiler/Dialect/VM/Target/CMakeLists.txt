@@ -21,5 +21,6 @@ iree_cc_library(
     "init_targets.h"
   DEPS
     iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Target::C
   PUBLIC
 )
