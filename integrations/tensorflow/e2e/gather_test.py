@@ -48,31 +48,31 @@ class GatherModule(tf.Module):
     return tf.gather(params, indices, axis=2, batch_dims=1)
 
 
-@tf_test_utils.compile_modules(gather=GatherModule)
+@tf_test_utils.compile_module(GatherModule)
 class GatherTest(tf_test_utils.SavedModelTestCase):
 
   def test_gather_axis0_scalar(self):
     indices = np.array(2, dtype=np.int32)
     params = np.arange(32, dtype=np.float32).reshape(4, 8)
-    result = self.modules.gather.all.gather_axis0_scalar(params, indices)
+    result = self.get_module().gather_axis0_scalar(params, indices)
     result.print().assert_all_close()
 
   def test_gather_axis0_batch0(self):
     indices = np.array([2, 3], dtype=np.int32)
     params = np.arange(32, dtype=np.float32).reshape(4, 8)
-    result = self.modules.gather.all.gather_axis0_batch0(params, indices)
+    result = self.get_module().gather_axis0_batch0(params, indices)
     result.print().assert_all_close()
 
-  def test_gahter_axis1_batch0(self):
+  def test_gather_axis1_batch0(self):
     indices = np.array([2, 3], dtype=np.int32)
     params = np.arange(4 * 7 * 8, dtype=np.float32).reshape(4, 7, 8)
-    result = self.modules.gather.all.gather_axis1_batch0(params, indices)
+    result = self.get_module().gather_axis1_batch0(params, indices)
     result.print().assert_all_close()
 
-  def test_gahter_axis2_batch1(self):
+  def test_gather_axis2_batch1(self):
     indices = np.array([[2], [3], [0], [1]], dtype=np.int32)
     params = np.arange(4 * 7 * 8 * 2, dtype=np.float32).reshape(4, 7, 8, 2)
-    result = self.modules.gather.all.gather_axis2_batch1(params, indices)
+    result = self.get_module().gather_axis2_batch1(params, indices)
     result.print().assert_all_close()
 
 

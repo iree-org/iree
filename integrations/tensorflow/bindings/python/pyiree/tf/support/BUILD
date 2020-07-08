@@ -30,6 +30,7 @@ iree_py_library(
         "__init__.py",
         "tf_test_driver.py",
         "tf_test_utils.py",
+        "tf_utils.py",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python:pathsetup",  # build_cleaner: keep

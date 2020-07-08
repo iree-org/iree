@@ -40,20 +40,20 @@ class StringsModule(tf.Module):
     return tf.strings.reduce_join(wps, 1)
 
 
-@tf_test_utils.compile_modules(strings=StringsModule)
+@tf_test_utils.compile_module(StringsModule)
 class StringsTest(tf_test_utils.SavedModelTestCase):
 
   def test_print_ids(self):
     input_ids = np.asarray(
         [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
          [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-    self.modules.strings.all.print_ids(input_ids)
+    self.get_module().print_ids(input_ids)
 
   def test_strings_to_ids(self):
     input_ids = np.asarray(
         [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
          [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-    result = self.modules.strings.all.strings_to_ids(input_ids)
+    result = self.get_module().strings_to_ids(input_ids)
     result.assert_all_equal()
 
 

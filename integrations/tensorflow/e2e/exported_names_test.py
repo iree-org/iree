@@ -25,19 +25,23 @@ class DontExportEverything(tf.Module):
 
   # No input_signature, so it cannot be imported by the SavedModel importer.
   # We need to ensure that
-  @tf.function
-  def unreachable_fn(self, x):
-    return x
+  @tf.function(input_signature=[])
+  def unreachable_fn(self):
+    return tf.constant([24.])
 
 
 # To pass a set of exported names for the module, instead of passing just a
 # module ctor, instead pass a pair `(ctor, [list, of, exported, names])`.
-@tf_test_utils.compile_modules(
-    dont_export_everything=(DontExportEverything, ["exported_fn"]))
+@tf_test_utils.compile_module(
+    DontExportEverything, exported_names=["exported_fn"])
 class DontExportEverythingTest(tf_test_utils.SavedModelTestCase):
 
-  def test_dont_export_everything(self):
-    self.modules.dont_export_everything.all.exported_fn().assert_all_close()
+  def test_exported_name(self):
+    self.get_module().exported_fn().assert_all_close()
+
+  def test_unreachable_name(self):
+    with self.assertRaises(AttributeError):
+      self.get_module().unreachable_fn()
 
 
 if __name__ == "__main__":

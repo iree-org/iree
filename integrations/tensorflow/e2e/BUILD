@@ -57,6 +57,10 @@ SPECIAL_CASES = [
     "linspace_test.py",
 ]
 
+TF_FAILING = [
+    "exported_names_test.py",  # TODO(meadowlark): Figure out why this fails for tf_also.
+]
+
 # keep sorted
 VMLA_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
@@ -97,7 +101,7 @@ VULKAN_FAILING = [
 
 TF_PASSING = glob(
     ["*_test.py"],
-    exclude = SPECIAL_CASES,
+    exclude = TF_FAILING + SPECIAL_CASES,
 )
 
 VMLA_PASSING = glob(

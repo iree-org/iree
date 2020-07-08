@@ -70,58 +70,58 @@ class MatrixOpsModule(tf.Module):
     return tf.matmul(lhs, rhs)
 
 
-@tf_test_utils.compile_modules(mat=MatrixOpsModule)
+@tf_test_utils.compile_module(MatrixOpsModule)
 class MatrixOpsTest(tf_test_utils.SavedModelTestCase):
 
   def test_basic_matmul(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.basic_matmul(tf.random.uniform([4, 2]), tf.random.uniform([2, 4]))
     dst.assert_all_close()
 
   def test_matmul_lhs_batch(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_lhs_batch(
         tf.random.uniform([3, 4, 2]), tf.random.uniform([2, 4]))
     dst.assert_all_close()
 
   def test_matmul_rhs_batch(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_rhs_batch(
         tf.random.uniform([4, 2]), tf.random.uniform([3, 2, 4]))
     dst.assert_all_close()
 
   def test_matmul_broadcast_singleton_dimension(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_broadcast_singleton_dimension(
         tf.random.uniform([1, 4, 2]), tf.random.uniform([3, 2, 4]))
     dst.assert_all_close()
 
   def test_matmul_high_rank_batch(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_high_rank_batch(
         tf.random.uniform([1, 7, 4, 2]), tf.random.uniform([7, 1, 2, 4]))
     dst.assert_all_close()
 
   def test_matmul_dynamic_matching_batch(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_dynamic(
         tf.random.uniform([2, 2, 3]), tf.random.uniform([2, 3, 4]))
     dst.assert_all_close()
 
   def test_matmul_dynamic_broadcast_lhs(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_dynamic(
         tf.random.uniform([1, 2, 3]), tf.random.uniform([2, 3, 4]))
     dst.assert_all_close()
 
   def test_matmul_dynamic_broadcast_rhs(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_dynamic(
         tf.random.uniform([2, 2, 3]), tf.random.uniform([1, 3, 4]))
     dst.assert_all_close()
 
   def test_matmul_dynamic_rank_broadcasting(self):
-    m = self.modules.mat.all
+    m = self.get_module()
     dst = m.matmul_dynamic_lhs_batch(
         tf.random.uniform([7, 2, 3]), tf.random.uniform([3, 4]))
     dst.assert_all_close()

@@ -38,19 +38,19 @@ class Conv2dModule(tf.Module):
         img, kernel, [1, 1, 1, 1], "SAME", name="result")
 
 
-@tf_test_utils.compile_modules(conv2d=Conv2dModule)
+@tf_test_utils.compile_module(Conv2dModule)
 class ConvTest(tf_test_utils.SavedModelTestCase):
 
   def test_batched_feature_unpadded(self):
     i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])
     k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
-    r = self.modules.conv2d.all.conv2d_2452x2223_valid(i, k)
+    r = self.get_module().conv2d_2452x2223_valid(i, k)
     r.print().assert_all_close()
 
   def test_batched_feature_unpadded_smae(self):
     i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])
     k = np.arange(48, dtype=np.float32).reshape([2, 4, 2, 3])
-    r = self.modules.conv2d.all.conv2d_2452x2223_same(i, k)
+    r = self.get_module().conv2d_2452x2223_same(i, k)
     r.print().assert_all_close()
 
 

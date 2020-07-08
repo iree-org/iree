@@ -62,10 +62,10 @@ class SlidingWindow(tf.keras.layers.Layer):
     return dict(list(base_config.items()) + list(config.items()))
 
 
-class SlidingWindowM(tf.Module):
+class SlidingWindowModule(tf.Module):
 
   def __init__(self):
-    super(SlidingWindowM, self).__init__()
+    super(SlidingWindowModule, self).__init__()
     state_shape = [BATCH_SIZE, TIME_SIZE, FEATURE_SIZE]
     self.sw = SlidingWindow(state_shape=state_shape)
 
@@ -75,17 +75,17 @@ class SlidingWindowM(tf.Module):
     return self.sw(x)
 
 
-@tf_test_utils.compile_modules(sw=(SlidingWindowM, ["predict"]))
+@tf_test_utils.compile_module(SlidingWindowModule, exported_names=["predict"])
 class SlidingWindowTest(tf_test_utils.SavedModelTestCase):
 
   def test_slidingwindow(self):
     input1 = np.array([[1.0, 2.0]], dtype=np.float32)
-    result1 = self.modules.sw.all.predict(input1)
+    result1 = self.get_module().predict(input1)
     output1 = np.array([[0.0, 0.0], [0.0, 0.0], [1.0, 2.0]], dtype=np.float32)
     assert np.allclose(result1, output1)
 
     input2 = np.array([[3.0, 4.0]], dtype=np.float32)
-    result2 = self.modules.sw.all.predict(input2)
+    result2 = self.get_module().predict(input2)
     output2 = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
     assert np.allclose(result2, output2)
 

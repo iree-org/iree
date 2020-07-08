@@ -36,13 +36,13 @@ class SimpleArithmeticModule(tf.Module):
     return tf.matmul(a, b)
 
 
-@tf_test_utils.compile_modules(simple_arithmetic=SimpleArithmeticModule)
+@tf_test_utils.compile_module(SimpleArithmeticModule)
 class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
 
   def test_simple_mul(self):
     a = np.array([1., 2., 3., 4.], dtype=np.float32)
     b = np.array([400., 5., 6., 7.], dtype=np.float32)
-    r = self.modules.simple_arithmetic.all.simple_mul(a, b)
+    r = self.get_module().simple_mul(a, b)
     r.print().assert_all_close()
 
   def test_simple_matmul(self):
@@ -50,7 +50,7 @@ class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
     # Note: scaling by a small value to increase numerical stability.
     a = np.random.random((128, 3072)).astype(np.float32) * 1e-3
     b = np.random.random((3072, 256)).astype(np.float32) * 1e-3
-    r = self.modules.simple_arithmetic.all.simple_matmul(a, b)
+    r = self.get_module().simple_matmul(a, b)
     r.print().assert_all_close()
 
 
