@@ -32,7 +32,7 @@ bool isOpOfKnownDialect(Operation *op) {
   // TODO(benvanik): replace with op dispatchability interface to allow dialects
   // to opt into dispatch.
   auto dialectNamespace = op->getDialect()->getNamespace();
-  return dialectNamespace == mhlo::XlaHloDialect::getDialectNamespace() ||
+  return dialectNamespace == mhlo::MhloDialect::getDialectNamespace() ||
          dialectNamespace == mlir::StandardOpsDialect::getDialectNamespace() ||
          dialectNamespace == FlowDialect::getDialectNamespace() ||
          dialectNamespace == ShapeDialect::getDialectNamespace();

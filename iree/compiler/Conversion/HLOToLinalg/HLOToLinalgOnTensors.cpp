@@ -54,7 +54,7 @@ struct ConvertHLOToLinalgOnTensorsPass
       return isa<linalg::LinalgOp>(op.getOperation()->getParentOp());
     });
     // Don't convert the body of reduction ops.
-    target.addDynamicallyLegalDialect<mhlo::XlaHloDialect>(
+    target.addDynamicallyLegalDialect<mhlo::MhloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
             [](Operation* op) {
               auto parentOp = op->getParentRegion()->getParentOp();

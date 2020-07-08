@@ -285,7 +285,7 @@ class PreConversionLoweringPass
     ConversionTarget target(*context);
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalDialect<IREE::VMLA::VMLADialect>();
-    target.addLegalDialect<mhlo::XlaHloDialect>();
+    target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<ShapeDialect>();
 
     target.addIllegalOp<mhlo::DotGeneralOp>();

@@ -31,7 +31,7 @@ inline void registerXLADialects() {
   static bool init_once = []() {
     registerDialect<mlir::chlo::HloClientDialect>();
     registerDialect<mlir::lmhlo::LmhloDialect>();
-    registerDialect<mlir::mhlo::XlaHloDialect>();
+    registerDialect<mlir::mhlo::MhloDialect>();
     return true;
   }();
   (void)init_once;

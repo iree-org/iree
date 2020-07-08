@@ -78,7 +78,7 @@ class PrePartitioningConversionPass
     conversionTarget.addLegalOp<FuncOp>();
 
     // Allow XLA HLO ops - we explicitly mark the ones we don't want below.
-    conversionTarget.addLegalDialect<mhlo::XlaHloDialect>();
+    conversionTarget.addLegalDialect<mhlo::MhloDialect>();
 
     // Control flow must be converted to standard form via
     // mhlo::createLegalizeControlFlowPass() prior to conversion.
