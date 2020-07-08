@@ -235,11 +235,14 @@ when invoking IREE executables.
 
 To compile IREE module for the target Android device (assume Android 10 AArc64)
 we need install the corresponding standalone toolchain and setting AOT linker
-path environment variable: `shell $ export
-ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain $
-$ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64
---platform=android-29 \ --install-dir=$ANDROID_ARM64_TOOLCHAIN $ export
-IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld`
+path environment variable:
+
+```shell
+$ export ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain
+$ $ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \
+    --install-dir=$ANDROID_ARM64_TOOLCHAIN
+$ export IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld
+```
 
 Translate a source MLIR into an IREE module:
 

@@ -30,6 +30,26 @@ namespace cts {
 // Common setup for tests parameterized across all registered drivers.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
  protected:
+  // Per-test-suite set-up. This is called before the first test in this test
+  // suite. We use it to set up drivers that must be reused between test cases
+  // to work around issues with driver lifetimes (specifically SwiftShader for
+  // Vulkan).
+  static void SetUpTestSuite() {
+    auto driver_or = DriverRegistry::shared_registry()->Create("vulkan");
+    if (driver_or.ok()) {
+      shared_drivers_["vulkan"] = std::move(driver_or.value());
+    }
+  }
+
+  // Per-test-suite tear-down. This is called after the last test in this test
+  // suite. We use it to destruct driver handles before program exit. This
+  // avoids us to rely on static object destruction happening after main(). It
+  // can cause unexpected problems when the driver also want to perform clean up
+  // at that time.
+  static void TearDownTestSuite() { shared_drivers_.clear(); }
+
+  static std::map<std::string, ref_ptr<Driver>> shared_drivers_;
+
   virtual void SetUp() {
     const std::string& driver_name = GetParam();
 
@@ -53,11 +73,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
  private:
   // Gets a HAL driver with the provided name, if available.
-  // Drivers are reused between test cases to work around issues with driver
-  // lifetimes (specifically SwiftShader for Vulkan).
   static StatusOr<ref_ptr<Driver>> GetDriver(const std::string& driver_name) {
     static std::set<std::string> unavailable_driver_names;
-    static std::map<std::string, ref_ptr<Driver>> drivers;
 
     // If creation failed before, don't try again.
     if (unavailable_driver_names.find(driver_name) !=
@@ -66,8 +83,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     }
 
     // Reuse an existing driver if possible.
-    auto found_it = drivers.find(driver_name);
-    if (found_it != drivers.end()) {
+    auto found_it = shared_drivers_.find(driver_name);
+    if (found_it != shared_drivers_.end()) {
       LOG(INFO) << "Reusing existing driver '" << driver_name << "'...";
       return add_ref(found_it->second);
     }
@@ -79,10 +96,11 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
       unavailable_driver_names.insert(driver_name);
     }
     RETURN_IF_ERROR(driver_or.status());
-    drivers.insert(std::make_pair(driver_name, add_ref(driver_or.value())));
-    return add_ref(driver_or.value());
+    return std::move(driver_or.value());
   }
 };
+
+std::map<std::string, ref_ptr<Driver>> CtsTestBase::shared_drivers_;
 
 struct GenerateTestName {
   template <class ParamType>

@@ -21,6 +21,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -200,12 +201,17 @@ struct LinalgReshapeConverter final
 template <typename OpTy>
 class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
  public:
-  using SPIRVOpLowering<OpTy>::SPIRVOpLowering;
+  TransferToCoopMatLoadStore(
+      MLIRContext *context, SPIRVTypeConverter &converter,
+      const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
+      : SPIRVOpLowering<OpTy>(context, converter),
+        cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
 
   LogicalResult matchAndRewrite(
       OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!hasCooperativeMatrixMarker(op)) return failure();
+    if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
+      return failure();
     auto loc = op.getLoc();
     auto vecType = op.getVectorType();
     if (vecType.getRank() != 2) return failure();
@@ -237,11 +243,13 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     return success();
   }
 
+ private:
   /// Helper to generate the right load/store instruction and replace the
   /// transfer op.
   void replaceTransferOp(OpTy op, Location loc, Type matType, Value ptr,
                          Value strideValue, Value coloumnMajor,
                          ConversionPatternRewriter &rewriter) const;
+  const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis;
 };
 
 template <>
@@ -270,14 +278,17 @@ void TransferToCoopMatLoadStore<vector::TransferWriteOp>::replaceTransferOp(
 class VectorContractToCoopMatmul final
     : public SPIRVOpLowering<vector::ContractionOp> {
  public:
-  using SPIRVOpLowering<vector::ContractionOp>::SPIRVOpLowering;
+  VectorContractToCoopMatmul(
+      MLIRContext *context, SPIRVTypeConverter &converter,
+      const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
+      : SPIRVOpLowering<vector::ContractionOp>(context, converter),
+        cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
 
   LogicalResult matchAndRewrite(
       vector::ContractionOp contractOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(thomasraoux): Check that the size of the matmul is supported by the
-    // target.
-    if (!hasCooperativeMatrixMarker(contractOp)) return failure();
+    if (!cooperativeMatrixAnalysis.usesCooperativeMatrixType(contractOp))
+      return failure();
     auto loc = contractOp.getLoc();
     // Check that all the operands are cooperative matrix.
     vector::ContractionOp::Adaptor adaptor(operands);
@@ -304,6 +315,9 @@ class VectorContractToCoopMatmul final
     rewriter.replaceOp(contractOp, matmul);
     return success();
   }
+
+ private:
+  const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis;
 };
 
 /// A pass to perform the SPIR-V conversion.
@@ -372,12 +386,14 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
   return success();
 }
 
-static void populateVectorToSPIRVPatterns(MLIRContext *context,
-                                          SPIRVTypeConverter &typeConverter,
-                                          OwningRewritePatternList &patterns) {
+static void populateVectorToSPIRVPatterns(
+    MLIRContext *context, SPIRVTypeConverter &converter,
+    OwningRewritePatternList &patterns,
+    const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis) {
   patterns.insert<TransferToCoopMatLoadStore<vector::TransferReadOp>,
                   TransferToCoopMatLoadStore<vector::TransferWriteOp>,
-                  VectorContractToCoopMatmul>(context, typeConverter);
+                  VectorContractToCoopMatmul>(context, converter,
+                                              cooperativeMatrixAnalysis);
 }
 
 void ConvertToSPIRVPass::runOnOperation() {
@@ -400,7 +416,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
 
   if (useCooperativeMatrix) {
-    populateVectorToSPIRVPatterns(context, typeConverter, patterns);
+    auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
+    populateVectorToSPIRVPatterns(context, typeConverter, patterns,
+                                  cooperativeMatrixAnalysis);
   }
   patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter,
                   LinalgReshapeConverter>(context, typeConverter);

@@ -189,6 +189,21 @@ vm.import @gather.x32(
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
   %dim : i32, %batch_dims : i32
 )
+  vm.import @scatter.x8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+vm.import @scatter.x16(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+vm.import @scatter.x32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
 vm.import @broadcast.x8(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...

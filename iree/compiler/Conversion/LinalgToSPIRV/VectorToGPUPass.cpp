@@ -22,6 +22,7 @@
 #include <memory>
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -49,15 +50,32 @@ struct ConvertVectorToGPUPass
   void runOnOperation() override;
 };
 
+// Common class for all vector to GPU patterns.
+template <typename OpTy>
+class VectorToGPUPattern : public OpConversionPattern<OpTy> {
+ public:
+  VectorToGPUPattern<OpTy>(
+      MLIRContext *context,
+      const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis)
+      : OpConversionPattern<OpTy>::OpConversionPattern(context),
+        cooperativeMatrixAnalysis(cooperativeMatrixAnalysis) {}
+
+ protected:
+  const CooperativeMatrixAnalysis &cooperativeMatrixAnalysis;
+};
+
 /// Converts unary and binary standard operations using new type.
 template <typename StdOp>
-class UnaryAndBinaryOpPattern final : public OpConversionPattern<StdOp> {
+class UnaryAndBinaryOpPattern final : public VectorToGPUPattern<StdOp> {
  public:
-  using OpConversionPattern<StdOp>::OpConversionPattern;
+  using VectorToGPUPattern<StdOp>::VectorToGPUPattern;
 
   LogicalResult matchAndRewrite(
       StdOp operation, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    if (VectorToGPUPattern<StdOp>::cooperativeMatrixAnalysis
+            .usesCooperativeMatrixType(operation))
+      return failure();
     Value newOp = rewriter.create<StdOp>(
         operation.getLoc(), ValueRange(operands), ArrayRef<NamedAttribute>{});
     rewriter.replaceOp(operation, ValueRange(newOp));
@@ -66,13 +84,15 @@ class UnaryAndBinaryOpPattern final : public OpConversionPattern<StdOp> {
 };
 
 class VectorTransferReadConversion
-    : public OpConversionPattern<vector::TransferReadOp> {
+    : public VectorToGPUPattern<vector::TransferReadOp> {
  public:
-  using OpConversionPattern<vector::TransferReadOp>::OpConversionPattern;
+  using VectorToGPUPattern<vector::TransferReadOp>::VectorToGPUPattern;
 
   LogicalResult matchAndRewrite(
       vector::TransferReadOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    if (cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
+      return failure();
     // Only support identity map for now.
     if (!op.permutation_map().isIdentity()) return failure();
     if (op.getVectorType().getNumElements() != subgroupSize) return failure();
@@ -96,13 +116,15 @@ class VectorTransferReadConversion
 };
 
 class VectorTransferWriteConversion
-    : public OpConversionPattern<vector::TransferWriteOp> {
+    : public VectorToGPUPattern<vector::TransferWriteOp> {
  public:
-  using OpConversionPattern<vector::TransferWriteOp>::OpConversionPattern;
+  using VectorToGPUPattern<vector::TransferWriteOp>::VectorToGPUPattern;
 
   LogicalResult matchAndRewrite(
       vector::TransferWriteOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    if (cooperativeMatrixAnalysis.usesCooperativeMatrixType(op))
+      return failure();
     if (!op.permutation_map().isIdentity()) return failure();
     if (op.getVectorType().getNumElements() != subgroupSize) return failure();
     auto loc = op.getLoc();
@@ -136,10 +158,11 @@ class VectorToGPUConversionTarget : public ConversionTarget {
 void ConvertVectorToGPUPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getOperation();
-
+  auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
   OwningRewritePatternList patterns;
   patterns.insert<UnaryAndBinaryOpPattern<AddFOp>, VectorTransferReadConversion,
-                  VectorTransferWriteConversion>(context);
+                  VectorTransferWriteConversion>(context,
+                                                 cooperativeMatrixAnalysis);
   populateParallelLoopToWorkgroupPatterns(context, patterns);
   std::unique_ptr<VectorToGPUConversionTarget> target =
       std::make_unique<VectorToGPUConversionTarget>(*context);

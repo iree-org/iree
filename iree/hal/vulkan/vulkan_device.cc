@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "absl/container/inlined_vector.h"
+#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
@@ -40,6 +41,9 @@
 #include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_allocator.h"
+
+ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
+          "Uses timeline semaphore emulation even if native support exists.");
 
 namespace iree {
 namespace hal {
@@ -373,10 +377,10 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   }
 
   // Emulate timeline semaphores if associated functions are not defined.
-  // TODO(scotttodd): define / compiler flag to force emulation
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
-  if (syms->vkGetSemaphoreCounterValue == nullptr) {
+  if (syms->vkGetSemaphoreCounterValue == nullptr ||
+      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
     ASSIGN_OR_RETURN(semaphore_pool,
                      TimePointSemaphorePool::Create(add_ref(logical_device)));
     ASSIGN_OR_RETURN(fence_pool,
@@ -453,10 +457,10 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   }
 
   // Emulate timeline semaphores if associated functions are not defined.
-  // TODO(scotttodd): define / compiler flag to force emulation
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
-  if (syms->vkGetSemaphoreCounterValue == nullptr) {
+  if (syms->vkGetSemaphoreCounterValue == nullptr ||
+      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
     ASSIGN_OR_RETURN(semaphore_pool,
                      TimePointSemaphorePool::Create(add_ref(device_handle)));
     ASSIGN_OR_RETURN(fence_pool,

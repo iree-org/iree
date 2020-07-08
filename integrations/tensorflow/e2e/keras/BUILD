@@ -151,15 +151,14 @@ iree_e2e_test_suite(
 
 iree_vision_test_suite(
     name = "vision_internal_tests",
+    backends = [
+        "tf_also",
+        "iree_vmla",
+        "iree_llvmjit",
+        "iree_vulkan",
+    ],
     datasets = ["cifar10"],
-    models_to_backends = {
-        "ResNet50": [
-            "tf_also",
-            "iree_vmla",
-            "iree_llvmjit",
-            "iree_vulkan",
-        ],
-    },
+    models = ["ResNet50"],
     reference_backend = "tf",
     tags = ["manual"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
@@ -169,56 +168,43 @@ iree_vision_test_suite(
 
 iree_vision_test_suite(
     name = "vision_external_tests",
+    backends = [
+        "tf_also",
+        "iree_vmla",
+        "iree_llvmjit",
+        "iree_vulkan",
+    ],
     datasets = [
         "cifar10",
         "imagenet",
     ],
-    external_weights = "https://storage.googleapis.com/iree_models/",
-    models_to_backends = {
-        ("MobileNet", "MobileNetV2"): [
-            "tf_also",
-            "iree_vmla",
-        ],
-        "ResNet50": [
-            "tf_also",
-            "iree_vmla",
-            "iree_llvmjit",
-            "iree_vulkan",
-        ],
-    },
+    failing_configurations = [
+        # TODO(b/150244105): Compiling fails with commands targeting IREE
+        # interpreter and vulkan backends for these tests.
+        {
+            "models": [
+                "MobileNet",
+                "MobileNetV2",
+            ],
+            "datasets": [
+                "cifar10",
+                "imagenet",
+            ],
+            "backends": [
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+    ],
+    models = [
+        "MobileNet",
+        "MobileNetV2",
+        "ResNet50",
+    ],
     reference_backend = "tf",
     tags = [
         "external",
         "guitar",
-        "manual",
-        "no-remote",
-        "nokokoro",
-        "notap",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-iree_vision_test_suite(
-    # TODO: Combine this suite with vision_external_tests once these tests pass.
-    name = "vision_external_tests_failing",
-    datasets = [
-        "cifar10",
-        "imagenet",
-    ],
-    external_weights = "https://storage.googleapis.com/iree_models/",
-    # TODO(b/150244105): Compiling fails with commands targeting IREE
-    # interpreter and vulkan backends for these tests.
-    models_to_backends = {
-        ("MobileNet", "MobileNetV2"): [
-            "iree_llvmjit",
-            "iree_vulkan",
-        ],
-    },
-    reference_backend = "tf",
-    tags = [
-        "external",
         "manual",
         "no-remote",
         "nokokoro",

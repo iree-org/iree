@@ -16,6 +16,7 @@
 # Note that project-wide, bazel repo aliases are used:
 #   "@com_google_absl//absl/python"
 #   "@com_google_absl//absl"
+#   "@bazel_skylib//lib"
 #   "@com_google_benchmark//:benchmark"
 #   "@llvm-project//mlir"
 #   "@llvm-project//llvm"

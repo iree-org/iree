@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -398,6 +399,145 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
   TypeConverter &typeConverter;
 };
 
+// This lowering converts a subset of the XLA ScatterOp to a VMLA equivalent.
+// If attempts to handle the simplest case with updates along a single preceding
+// batch dimension and support both scattered updates per-element and per-slice.
+// It does not support swizzling / reordering slices.
+struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
+  ScatterOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      mhlo::ScatterOp scatterOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto dimension_numbers = scatterOp.scatter_dimension_numbers();
+    int rank = scatterOp.getType().cast<ShapedType>().getRank();
+
+    // We should only update along the upper most batch dimension.
+    if (dimension_numbers.index_vector_dim().getValue().getSExtValue() != 1) {
+      scatterOp.emitRemark()
+          << "couldn't lower scatter with index_vector_dim != 1";
+      return failure();
+    }
+
+    if (dimension_numbers.scatter_dims_to_operand_dims().getType().getRank() !=
+        1) {
+      rewriter.notifyMatchFailure(
+          scatterOp,
+          "couldn't lower scatter with scatter_dims_to_operand_dims with non"
+          " rank-1");
+      return failure();
+    }
+
+    // We assume the scatter to operand dims occurs in a normal order. If
+    // support for other orders is needed a transpose should be processed on
+    // the update.
+    for (auto pair : llvm::enumerate(
+             dimension_numbers.scatter_dims_to_operand_dims().getIntValues())) {
+      if (pair.index() != pair.value()) {
+        rewriter.notifyMatchFailure(
+            scatterOp,
+            "couldn't lower scatter with scatter_dims_to_operand_dims "
+            "!= [0, 1, ..., n]");
+        return failure();
+      }
+    }
+
+    if (dimension_numbers.inserted_window_dims().getType().getRank() != 1) {
+      rewriter.notifyMatchFailure(
+          scatterOp,
+          "couldn't lower scatter with inserted_window_dims with non rank-1");
+      return failure();
+    }
+
+    // Inserted window dims only occurs in normal order and all sources should
+    // only support these values.
+    for (auto pair : llvm::enumerate(
+             dimension_numbers.inserted_window_dims().getIntValues())) {
+      if (pair.index() != pair.value()) {
+        rewriter.notifyMatchFailure(
+            scatterOp,
+            "couldn't lower scatter with inserted_window_dims "
+            "!= [0, 1, ..., n]");
+        return failure();
+      }
+    }
+
+    if (dimension_numbers.update_window_dims().getType().getRank() != 1) {
+      rewriter.notifyMatchFailure(
+          scatterOp,
+          "couldn't lower scatter with update_window_dims with non rank-1");
+      return failure();
+    }
+
+    for (auto pair : llvm::enumerate(
+             dimension_numbers.update_window_dims().getIntValues())) {
+      if ((pair.index() + 1) != pair.value()) {
+        rewriter.notifyMatchFailure(
+            scatterOp,
+            "couldn't lower scatter with update_window_dims != [1, 2, ..., n]");
+        return failure();
+      }
+    }
+
+    auto src = scatterOp.operand();
+    auto indices = scatterOp.scatter_indices();
+    auto update = scatterOp.updates();
+    auto result = scatterOp.getResult();
+
+    auto srcShape = VMLAConversionTarget::getTensorShape(
+        scatterOp.getLoc(), src, typeConverter, rewriter);
+    auto indicesShape = VMLAConversionTarget::getTensorShape(
+        scatterOp.getLoc(), indices, typeConverter, rewriter);
+    auto updateShape = VMLAConversionTarget::getTensorShape(
+        scatterOp.getLoc(), update, typeConverter, rewriter);
+    auto resultShape = VMLAConversionTarget::getTensorShape(
+        scatterOp.getLoc(), result, typeConverter, rewriter);
+
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        scatterOp.getLoc(), scatterOp.getResult(), typeConverter, rewriter);
+
+    SmallVector<Value, 4> lengths(rank);
+    for (int i = 0; i < rank; ++i) {
+      lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(
+          scatterOp.getLoc(), rewriter.getIndexType(), srcShape, i);
+    }
+
+    // Verify the update computation is only a scatter write and does not
+    // perform an other update.
+    // TODO(suderman): Handle other numeric updates.
+    auto &firstBlock = scatterOp.getRegion().front();
+    if (!isa<mhlo::ReturnOp>(firstBlock.front()) ||
+        firstBlock.front().getOperand(0) != firstBlock.getArgument(1)) {
+      rewriter.notifyMatchFailure(scatterOp,
+                                  "scatter update is not solely a write.");
+      return failure();
+    }
+
+    // Copy the source contents. The copy can be optimized in the future.
+    Value zero =
+        rewriter.createOrFold<mlir::ConstantIndexOp>(scatterOp.getLoc(), 0);
+    llvm::SmallVector<Value, 4> srcOffset(rank, zero);
+    llvm::SmallVector<Value, 4> dstOffset(rank, zero);
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        scatterOp.getLoc(), scatterOp.getResult(), typeConverter, rewriter);
+    rewriter.create<IREE::VMLA::CopyOp>(
+        scatterOp.getLoc(), src, resultShape, srcOffset, dst, dstShape,
+        dstOffset, lengths,
+        TypeAttr::get(scatterOp.getType().cast<ShapedType>().getElementType()));
+
+    rewriter.create<IREE::VMLA::ScatterOp>(
+        scatterOp.getLoc(), update, updateShape, indices, indicesShape, dst,
+        dstShape,
+        TypeAttr::get(scatterOp.getType().cast<ShapedType>().getElementType()));
+
+    rewriter.replaceOp(scatterOp, {dst});
+
+    return success();
+  }
+  TypeConverter &typeConverter;
+};
+
 // Converts a dynamic slice op to a copy (if the source must be preserved).
 struct DynamicSliceOpConversion
     : public OpConversionPattern<mhlo::DynamicSliceOp> {
@@ -648,6 +788,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<BroadcastInDimOpConversion>(context, typeConverter);
   patterns.insert<ConcatenateOpConversion>(context, typeConverter);
   patterns.insert<GatherOpConversion>(context, typeConverter);
+  patterns.insert<ScatterOpConversion>(context, typeConverter);
   patterns.insert<SliceOpConversion>(context, typeConverter);
   patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
 

@@ -47,16 +47,17 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader, CooperativeMatrixNV], [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader, CooperativeMatrixNV, Int8, StorageBuffer8BitAccess], [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   // CHECK: spv.func @kernel_matmul
-  func @kernel_matmul(%arg0: memref<8x8xf32>, %arg1: memref<8x8xf32>, %arg2: memref<8x8xf32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
+  func @kernel_matmul(%arg0: memref<8x32xi8>, %arg1: memref<32x8xi8>, %arg2: memref<8x8xi32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
     %c0 = constant 0 : index
-    %cst = constant 0.000000e+00 : f32
-    %0 = vector.transfer_read %arg0[%c0, %c0], %cst {__internal_vector_transform__ = "cooperative-matrix"} : memref<8x8xf32>, vector<8x8xf32>
-    %1 = vector.transfer_read %arg1[%c0, %c0], %cst {__internal_vector_transform__ = "cooperative-matrix"} : memref<8x8xf32>, vector<8x8xf32>
-    %2 = vector.transfer_read %arg2[%c0, %c0], %cst {__internal_vector_transform__ = "cooperative-matrix"} : memref<8x8xf32>, vector<8x8xf32>
-    %3 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"], __internal_vector_transform__ = "cooperative-matrix"} %0, %1, %2 : vector<8x8xf32>, vector<8x8xf32> into vector<8x8xf32>
-    vector.transfer_write %3, %arg2[%c0, %c0] {__internal_vector_transform__ = "cooperative-matrix"} : vector<8x8xf32>, memref<8x8xf32>
+    %cst = constant 0 : i32
+    %cst_i8 = constant 0 : i8
+    %0 = vector.transfer_read %arg0[%c0, %c0], %cst_i8 : memref<8x32xi8>, vector<8x32xi8>
+    %1 = vector.transfer_read %arg1[%c0, %c0], %cst_i8 : memref<32x8xi8>, vector<32x8xi8>
+    %2 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<8x8xi32>, vector<8x8xi32>
+    %3 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} %0, %1, %2 : vector<8x32xi8>, vector<32x8xi8> into vector<8x8xi32>
+    vector.transfer_write %3, %arg2[%c0, %c0] : vector<8x8xi32>, memref<8x8xi32>
     // CHECK: %[[A:.+]] = spv.CooperativeMatrixLoadNV "StorageBuffer" %{{.*}}, %{{.*}}, %{{.*}}
     // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV "StorageBuffer" %{{.*}}, %{{.*}}, %{{.*}}
     // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV "StorageBuffer" %{{.*}}, %{{.*}}, %{{.*}}

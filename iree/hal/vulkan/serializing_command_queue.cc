@@ -203,13 +203,33 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   // A list of submissions that still needs to be deferred.
   IntrusiveList<std::unique_ptr<FencedSubmission>> remaining_submissions;
 
+  // We need to return all remaining submissions back to the queue to avoid
+  // dropping work.
+  auto submission_cleanup = MakeCleanup([this, &remaining_submissions]() {
+// Disable thread-safety-analysis as it doesn't understand this lambda.
+//   - This entire function is ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_)
+//   - This Cleanup object is destroyed when it drops out of scope
+//   - The mutex is always held when executing this function
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wthread-safety-analysis"
+#endif
+    while (!remaining_submissions.empty()) {
+      deferred_submissions_.push_back(
+          remaining_submissions.take(remaining_submissions.front()));
+    }
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+  });
+
   while (!deferred_submissions_.empty()) {
     wait_semaphores.clear();
     signal_semaphores.clear();
 
-    auto submission = deferred_submissions_.take(deferred_submissions_.front());
+    FencedSubmission* submission = deferred_submissions_.front();
     const SubmissionBatch& batch = submission->batch;
-    ref_ptr<TimePointFence> fence(std::move(submission->fence));
+    ref_ptr<TimePointFence>& fence = submission->fence;
 
     ASSIGN_OR_RETURN(bool ready_to_submit,
                      TryToPrepareSemaphores(batch, fence, &wait_semaphores,
@@ -219,11 +239,13 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
       submit_infos.emplace_back();
       PrepareSubmitInfo(wait_semaphores, batch.command_buffers,
                         signal_semaphores, &submit_infos.back(), &arena);
+
       submit_fences.push_back(fence->value());
       pending_fences_.emplace_back(std::move(fence));
+      deferred_submissions_.pop_front();
     } else {
       // We need to defer the submission until later.
-      remaining_submissions.push_back(std::move(submission));
+      remaining_submissions.push_back(deferred_submissions_.take(submission));
     }
   }
 
@@ -239,11 +261,6 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   for (int i = 0, e = submit_infos.size(); i < e; ++i) {
     VK_RETURN_IF_ERROR(syms()->vkQueueSubmit(
         queue_, /*submitCount=*/1, &submit_infos[i], submit_fences[i]));
-  }
-
-  while (!remaining_submissions.empty()) {
-    deferred_submissions_.push_back(
-        remaining_submissions.take(remaining_submissions.front()));
   }
 
   return true;
