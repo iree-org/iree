@@ -934,7 +934,7 @@ struct ReduceRegionXLAOpConversion final
                                  OpTy>::ReduceRegionOpConversion;
   static Operation *apply(OpTy op, ArrayRef<Value> operands,
                           ConversionPatternRewriter &rewriter) {
-    Value result = xla_lhlo::XlaOpToStdScalarOp::map<OpTy>(
+    Value result = lmhlo::XlaOpToStdScalarOp::map<OpTy>(
         op, operands[0].getType(), operands, &rewriter);
     return result.getDefiningOp();
   }
