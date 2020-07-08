@@ -17,6 +17,7 @@
 // We need this entry function because we want to register PassManager CLI
 // options, which is missing in MLIR's translation main entry function.
 
+#include "emitc/InitDialect.h" // TODO(marbre): Only if building EmitC
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/tools/init_compiler_modules.h"
@@ -56,12 +57,14 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
   mlir::registerMlirDialects();
+  mlir::registerEmitCDialect(); // TODO(marbre): Only if building EmitC
   mlir::registerXLADialects();
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
   mlir::registerMlirTranslations();
+  mlir::registerEmitCTranslation(); // TODO(marbre): Only if building EmitC
   mlir::iree_compiler::registerIreeTranslations();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
 

@@ -17,6 +17,7 @@
 // Based on mlir-opt but without registering passes and dialects we don't care
 // about.
 
+#include "emitc/InitDialect.h" // TODO(marbre): Only if building EmitC
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
@@ -74,6 +75,7 @@ static llvm::cl::opt<bool> showDialects(
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
   mlir::registerMlirPasses();
+  mlir::registerEmitCDialect(); // TODO(marbre): Only if building EmitC
   mlir::registerXLADialects();
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();

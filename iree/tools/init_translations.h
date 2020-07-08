@@ -38,6 +38,20 @@ inline void registerMlirTranslations() {
   (void)init_once;
 }
 
+// TODO(marbre): Only if building EmitC
+void registerMlirToCppTranslation();
+
+// This function should be called before creating any MLIRContext if one
+// expects all the possible translations to be made available to the context
+// automatically.
+inline void registerEmitCTranslation() {
+  static bool init_once = []() {
+    registerMlirToCppTranslation();
+    return true;
+    }();
+    (void)init_once;
+}
+
 namespace iree_compiler {
 
 // This function should be called before creating any MLIRContext if one
