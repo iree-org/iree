@@ -44,6 +44,7 @@
 #include <functional>
 #include <memory>
 
+#include "llvm/ADT/Optional.h"
 #include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_
@@ -152,12 +153,15 @@ inline uint32_t pow2msb(uint32_t val) {
 }
 
 // No such thing as a portable posize_memalign, roll our own.
+// [alignment] allow to specify an arbitrary alignment. It must be a power of 2
+// and greater than the size of T. By default the alignment is sizeof(T).
 template <typename T>
-std::pair<void *, void *> allocAligned(size_t nElements,
-                                       AllocFunType alloc = &::malloc) {
+std::pair<void *, void *> allocAligned(
+    size_t nElements, AllocFunType alloc = &::malloc,
+    llvm::Optional<uint64_t> alignment = llvm::Optional<uint64_t>()) {
   assert(sizeof(T) < (1ul << 32) && "Elemental type overflows");
   auto size = nElements * sizeof(T);
-  auto desiredAlignment = pow2msb(sizeof(T));
+  auto desiredAlignment = alignment.getValueOr(pow2msb(sizeof(T)));
   assert((desiredAlignment & (desiredAlignment - 1)) == 0);
   assert(desiredAlignment >= sizeof(T));
   void *data = alloc(size + desiredAlignment);
@@ -175,13 +179,13 @@ std::pair<void *, void *> allocAligned(size_t nElements,
 // functions.
 template <typename T, int N, typename FreeFunType = decltype(&::free)>
 std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>
-makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
-                                  LinearInitializer<T> init,
-                                  AllocFunType alloc = &::malloc,
-                                  FreeFunType freeFun = &::free) {
+makeInitializedUnrankedDescriptor(
+    const std::array<int64_t, N> &shape, LinearInitializer<T> init,
+    llvm::Optional<uint64_t> alignment = llvm::Optional<uint64_t>(),
+    AllocFunType alloc = &::malloc, FreeFunType freeFun = &::free) {
   int64_t nElements = 1;
   for (int64_t s : shape) nElements *= s;
-  auto allocated = allocAligned<T>(nElements, alloc);
+  auto allocated = allocAligned<T>(nElements, alloc, alignment);
   auto *data = static_cast<T *>(allocated.first);
   auto *alignedData = static_cast<T *>(allocated.second);
   for (unsigned i = 0; i < nElements; ++i) init(i, alignedData);
@@ -194,13 +198,13 @@ makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
 // functions.
 template <typename T, int N, typename FreeFunType = decltype(&::free)>
 std::unique_ptr<StridedMemRefType<T, N>, FreeFunType>
-makeInitializedStridedMemRefDescriptor(const std::array<int64_t, N> &shape,
-                                       LinearInitializer<T> init,
-                                       AllocFunType alloc = &::malloc,
-                                       FreeFunType freeFun = &::free) {
+makeInitializedStridedMemRefDescriptor(
+    const std::array<int64_t, N> &shape, LinearInitializer<T> init,
+    llvm::Optional<uint64_t> alignment = llvm::Optional<uint64_t>(),
+    AllocFunType alloc = &::malloc, FreeFunType freeFun = &::free) {
   int64_t nElements = 1;
   for (int64_t s : shape) nElements *= s;
-  auto allocated = allocAligned<T>(nElements, alloc);
+  auto allocated = allocAligned<T>(nElements, alloc, alignment);
   auto *data = static_cast<T *>(allocated.first);
   auto *alignedData = static_cast<T *>(allocated.second);
   for (unsigned i = 0; i < nElements; ++i) init(i, alignedData);
