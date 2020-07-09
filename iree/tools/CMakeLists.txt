@@ -24,6 +24,16 @@ iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
     "iree::hal::vulkan::vulkan_driver_module"
 )
 
+if(IREE_ENABLE_EMITC)
+  set(IREE_OPT_CONDITIONAL_DEPS
+    MLIREmitC
+  )
+  set(IREE_TRANSLATE_CONDITIONAL_DEPS
+    MLIREmitC
+    MLIRTargetCpp
+  )
+endif()
+
 iree_cc_binary(
   NAME
     iree-benchmark-module
@@ -231,7 +241,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRTransformUtils
       MLIRSupport
-      MLIREmitC # TODO(marbre): Only if building EmitC
       iree::compiler::Conversion::init_conversions
       iree::compiler::Conversion::HLOToLinalg
       iree::compiler::Dialect::Flow::Analysis
@@ -256,6 +265,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::IREEVM
       tensorflow::mlir_hlo
+      ${IREE_OPT_CONDITIONAL_DEPS}
     PUBLIC
   )
 
@@ -276,13 +286,12 @@ if(${IREE_BUILD_COMPILER})
       MLIRSCFTransforms
       MLIRPass
       MLIRSupport
-      MLIREmitC # TODO(marbre): Only if building EmitC
       MLIRTranslation
-      MLIRTargetCpp # TODO(marbre): Only if building EmitC
       iree::compiler::Conversion::init_conversions
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
+      ${IREE_TRANSLATE_CONDITIONAL_DEPS}
     PUBLIC
   )
 
