@@ -50,5 +50,5 @@ iree_cc_test(
     iree::vm
     iree::vm::bytecode_module
   LABELS
-    "nokokoro"
+    "driver=vulkan"
 )
