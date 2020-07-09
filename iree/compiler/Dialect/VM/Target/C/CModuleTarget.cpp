@@ -21,10 +21,10 @@ namespace VM {
 
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
                                  llvm::raw_ostream &output) {
-    // TODO: implement translation
-    output << "// c module stub\n";
+  // TODO: implement translation
+  output << "// c module stub\n";
 
-    return success();
+  return success();
 }
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,

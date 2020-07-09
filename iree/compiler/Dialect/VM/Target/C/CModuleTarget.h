@@ -29,7 +29,7 @@ namespace VM {
 //
 // Exposed via the --iree-vm-ir-to-c-module translation.
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
-                                        llvm::raw_ostream &output);
+                                 llvm::raw_ostream &output);
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  llvm::raw_ostream &output);
 
