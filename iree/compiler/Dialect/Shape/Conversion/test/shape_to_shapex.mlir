@@ -27,7 +27,7 @@ func @f(%arg0: tensor<?xf32>) {
   %0 = "shape.shape_of"(%arg0) : (tensor<?xf32>) -> !shape.shape
   %index = constant 0 : i32
   // CHECK: %[[RS:.+]] = shapex.get_ranked_shape %arg0
-  // CHECK: %[[HEAD:.+]] = "shapex.gather_extents"(%[[RS]]) {indices = dense<[]> : tensor<0xi64>} : (!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[]>
+  // CHECK: %[[HEAD:.+]] = "shapex.gather_extents"(%[[RS]]) {indices = dense<> : tensor<0xi64>} : (!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[]>
   // CHECK: %[[TAIL:.+]] = "shapex.gather_extents"(%[[RS]]) {indices = dense<0> : tensor<1xi64>} : (!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[?]>
   // CHECK: "foo.use"(%[[HEAD]], %[[TAIL]])
   %head, %tail = "shape.split_at"(%0, %index) : (!shape.shape, i32) -> (!shape.shape, !shape.shape)
