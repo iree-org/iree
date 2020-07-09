@@ -25,22 +25,43 @@ extern "C" {
 typedef enum {
   // Not a value type.
   IREE_VM_VALUE_TYPE_NONE = 0,
+  // int8_t.
+  IREE_VM_VALUE_TYPE_I8 = 1,
+  // int16_t.
+  IREE_VM_VALUE_TYPE_I16 = 2,
   // int32_t.
-  IREE_VM_VALUE_TYPE_I32 = 1,
+  IREE_VM_VALUE_TYPE_I32 = 3,
+  // int64_t.
+  IREE_VM_VALUE_TYPE_I64 = 4,
+
+  IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_I64,
+  IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,
 } iree_vm_value_type_t;
 
 // A variant value type.
 typedef struct iree_vm_value {
   iree_vm_value_type_t type;
   union {
+    int8_t i8;
+    int16_t i16;
     int32_t i32;
+    int64_t i64;
   };
 } iree_vm_value_t;
 
-#define IREE_VM_VALUE_MAKE_I32(value)            \
-  {                                              \
-    IREE_VM_VALUE_TYPE_I32, { (int32_t)(value) } \
+#ifdef __cplusplus
+inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_I32;
+  result.i32 = value;
+  return result;
+}
+#else
+#define iree_vm_value_make_i32(value)                   \
+  {                                                     \
+    IREE_VM_VALUE_TYPE_I32, { .i32 = (int32_t)(value) } \
   }
+#endif  // __cplusplus
 
 #ifdef __cplusplus
 }  // extern "C"

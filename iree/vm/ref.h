@@ -38,7 +38,11 @@ typedef enum {
   // opaque and unstable across process invocations.
 
   // Maximum type ID value. Type IDs are limited to 24-bits.
-  IREE_VM_REF_TYPE_MAX_VALUE = 0x00FFFFFFu,
+  IREE_VM_REF_TYPE_MAX_VALUE = 0x00FFFFFEu,
+
+  // Wildcard type that indicates that a value may be a ref type but of an
+  // unspecified internal type.
+  IREE_VM_REF_TYPE_ANY = 0x00FFFFFFu,
 } iree_vm_ref_type_t;
 
 // Base for iree_vm_ref_t object targets.
@@ -224,5 +228,75 @@ IREE_API_EXPORT bool IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+#ifdef __cplusplus
+namespace iree {
+namespace vm {
+template <typename T>
+struct ref_type_descriptor {
+  static const iree_vm_ref_type_descriptor_t* get();
+};
+}  // namespace vm
+}  // namespace iree
+#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)         \
+  namespace iree {                                      \
+  namespace vm {                                        \
+  template <>                                           \
+  struct ref_type_descriptor<T> {                       \
+    static const iree_vm_ref_type_descriptor_t* get() { \
+      return name##_get_descriptor();                   \
+    }                                                   \
+  };                                                    \
+  }                                                     \
+  }
+
+#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \
+  descriptor.type_name = iree_make_cstring_view(name);    \
+  descriptor.offsetof_counter = type::offsetof_counter(); \
+  descriptor.destroy = type::DirectDestroy;               \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
+#else
+#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
+#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)
+#endif  // __cplusplus
+
+// TODO(benvanik): make these macros standard/document them.
+#define IREE_VM_DECLARE_TYPE_ADAPTERS(name, T)                             \
+  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value); \
+  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value);   \
+  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref);       \
+  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL       \
+      name##_get_descriptor();                                             \
+  inline bool name##_isa(iree_vm_ref_t* ref) {                             \
+    return name##_get_descriptor()->type == ref->type;                     \
+  }                                                                        \
+  IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL name##_type_id();       \
+  IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
+
+// TODO(benvanik): make these macros standard/document them.
+#define IREE_VM_DEFINE_TYPE_ADAPTERS(name, T)                                 \
+  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value) {   \
+    iree_vm_ref_t ref = {0};                                                  \
+    iree_vm_ref_wrap_retain(value, name##_descriptor.type, &ref);             \
+    return ref;                                                               \
+  }                                                                           \
+  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value) {     \
+    iree_vm_ref_t ref = {0};                                                  \
+    iree_vm_ref_wrap_assign(value, name##_descriptor.type, &ref);             \
+    return ref;                                                               \
+  }                                                                           \
+  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref) {         \
+    if (!iree_status_is_ok(iree_vm_ref_check(ref, name##_descriptor.type))) { \
+      return NULL;                                                            \
+    }                                                                         \
+    return (T*)ref->ptr;                                                      \
+  }                                                                           \
+  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL          \
+      name##_get_descriptor() {                                               \
+    return &name##_descriptor;                                                \
+  }                                                                           \
+  IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL name##_type_id() {         \
+    return name##_descriptor.type;                                            \
+  }
 
 #endif  // IREE_VM_REF_H_
