@@ -1045,57 +1045,33 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
                                    OperationState *result) {
   // First operand is either 'condition' or 'status', both i32.
   OpAsmParser::OperandType condition;
-  if (failed(parser.parseOperand(condition)) ||
-      failed(parser.resolveOperand(condition,
-                                   IntegerType::get(32, result->getContext()),
-                                   result->operands))) {
+  if (failed(parser.parseOperand(condition))) {
     return failure();
   }
 
-  if (succeeded(parser.parseOptionalComma())) {
-    // Next operand, if any, should be either 'status' (i32) or 'message' (str).
-    OpAsmParser::OperandType status;
-
-    auto optionalResult = parser.parseOptionalOperand(status);
-    if (optionalResult.hasValue() && succeeded(optionalResult.getValue())) {
-      if (failed(parser.resolveOperand(
-              status, IntegerType::get(32, result->getContext()),
-              result->operands))) {
-        return failure();
-      }
-
-      // Found 'status' operand, next up is optional 'message'.
-      StringAttr messageAttr;
-      if (succeeded(parser.parseOptionalComma()) &&
-          failed(parser.parseAttribute(messageAttr, "message",
-                                       result->attributes))) {
-        return failure();
-      }
-    } else {
-      if (failed(parser.resolveOperand(
-              condition, IntegerType::get(32, result->getContext()),
-              result->operands))) {
-        return failure();
-      }
-
-      // No 'status' operand, but already parsed comma, so expecting 'message'.
-      StringAttr messageAttr;
-      if (failed(parser.parseAttribute(messageAttr, "message",
-                                       result->attributes))) {
-        return failure();
-      }
-    }
-  } else {
-    if (failed(parser.resolveOperand(condition,
-                                     IntegerType::get(32, result->getContext()),
-                                     result->operands))) {
-      return failure();
-    }
+  // First try looking for an operand after a comma. If no operand, keep track
+  // of the already parsed comma to avoid checking for a comma later on.
+  bool trailingComma = false;
+  OpAsmParser::OperandType status = condition;
+  if (succeeded(parser.parseComma()) &&
+      !parser.parseOptionalOperand(status).hasValue()) {
+    trailingComma = true;
   }
 
-  if (parser.parseOptionalAttrDict(result->attributes)) return failure();
+  StringAttr messageAttr;
+  if ((trailingComma || succeeded(parser.parseComma())) &&
+      failed(
+          parser.parseAttribute(messageAttr, "message", result->attributes))) {
+    return failure();
+  }
 
-  return success();
+  Type operandType = IntegerType::get(32, result->getContext());
+  if (failed(parser.resolveOperand(condition, operandType, result->operands)) ||
+      failed(parser.resolveOperand(status, operandType, result->operands))) {
+    return failure();
+  }
+
+  return parser.parseOptionalAttrDict(result->attributes);
 }
 
 static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
