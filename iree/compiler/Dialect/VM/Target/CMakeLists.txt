@@ -14,6 +14,12 @@
 
 iree_add_all_subdirs()
 
+if(IREE_ENABLE_EMITC)
+  set(IREE_VM_CONDITIONAL_TARGETS
+    iree::compiler::Dialect::VM::Target::C
+  )
+endif()
+
 iree_cc_library(
   NAME
     init_targets
@@ -21,6 +27,6 @@ iree_cc_library(
     "init_targets.h"
   DEPS
     iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Target::C
+    ${IREE_VM_CONDITIONAL_TARGETS}
   PUBLIC
 )
