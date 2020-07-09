@@ -65,9 +65,9 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo:chlo_legalize_to_hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_legalize_control_flow",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_lower",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_materialize_broadcasts",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_unfuse_batch_norm",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_control_flow",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:materialize_broadcasts",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:unfuse_batch_norm",
     ],
 )

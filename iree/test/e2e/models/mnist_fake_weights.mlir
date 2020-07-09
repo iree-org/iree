@@ -23,10 +23,10 @@ module attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, p
     %9 = flow.variable.load.indirect %0 : !iree.ptr<tensor<784x128xf32>> -> tensor<784x128xf32>
     %10 = "mhlo.reshape"(%arg0) : (tensor<1x28x28x1xf32>) -> tensor<1x784xf32>
     %11 = "mhlo.dot"(%10, %9) : (tensor<1x784xf32>, tensor<784x128xf32>) -> tensor<1x128xf32>
-    %12 = xla_chlo.broadcast_add %11, %8 {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
-    %13 = xla_chlo.broadcast_maximum %12, %5 {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xf32>
+    %12 = chlo.broadcast_add %11, %8 {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
+    %13 = chlo.broadcast_maximum %12, %5 {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xf32>
     %14 = "mhlo.dot"(%13, %7) : (tensor<1x128xf32>, tensor<128x10xf32>) -> tensor<1x10xf32>
-    %15 = xla_chlo.broadcast_add %14, %6 {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
+    %15 = chlo.broadcast_add %14, %6 {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
     %16 = "mhlo.reduce"(%15, %4) ( {
     ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
       %23 = mhlo.maximum %arg1, %arg2 : tensor<f32>

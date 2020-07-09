@@ -55,7 +55,7 @@ class ConvertHLOToShapePass
 
     conversionTarget.addLegalDialect<ShapeDialect>();
     conversionTarget.addLegalDialect<StandardOpsDialect>();
-    conversionTarget.addLegalDialect<mhlo::XlaHloDialect>();
+    conversionTarget.addLegalDialect<mhlo::MhloDialect>();
 
     conversionTarget.addIllegalOp<mhlo::DynamicBroadcastInDimOp>();
     conversionPatterns.insert<ConvertDynamicBroadcastInDim>(&getContext());

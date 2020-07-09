@@ -15,7 +15,7 @@
 //===- XLAToLinalgOnTensors.cpp - Pass to convert XLA to Linalg on tensors-===//
 //
 // Pass to convert from XLA to linalg on tensers. Uses the patterns from
-// tensorflow/compiler/mlir/xla/transforms/xla_legalize_to_linalg.cc along with
+// tensorflow/compiler/mlir/xla/transforms/legalize_to_linalg.cc along with
 // some IREE specific patterns.
 //
 //===----------------------------------------------------------------------===//
@@ -54,7 +54,7 @@ struct ConvertHLOToLinalgOnTensorsPass
       return isa<linalg::LinalgOp>(op.getOperation()->getParentOp());
     });
     // Don't convert the body of reduction ops.
-    target.addDynamicallyLegalDialect<mhlo::XlaHloDialect>(
+    target.addDynamicallyLegalDialect<mhlo::MhloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
             [](Operation* op) {
               auto parentOp = op->getParentRegion()->getParentOp();

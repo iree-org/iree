@@ -78,7 +78,7 @@ class ConversionPass
     VMLAConversionTarget conversionTarget(context, typeConverter);
 
     // Ensure all input dialects go away.
-    conversionTarget.addIllegalDialect<mhlo::XlaHloDialect>();
+    conversionTarget.addIllegalDialect<mhlo::MhloDialect>();
     conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
 
     OwningRewritePatternList conversionPatterns;

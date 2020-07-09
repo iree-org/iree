@@ -214,7 +214,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_legalize_control_flow",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_control_flow",
     ],
 )
 

@@ -23,6 +23,7 @@ namespace iree_compiler {
 
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
   pm.addPass(createHLOToLinalgOnTensorsPass());
+  pm.addPass(createLinalgFusionOfTensorOpsPass());
   pm.addPass(createLinalgFoldUnitExtentDimsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createLinalgFusionOfTensorOpsPass());
