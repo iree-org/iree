@@ -110,13 +110,14 @@ def compile_tf_module(tf_module,
     return compiled_module
 
   options = tf.saved_model.SaveOptions(save_debug_info=True)
-  if not keep_saved_model or artifacts_dir is None:
-    # Round-trip through a temporary directory.
-    with tempfile.TemporaryDirectory() as sm_path:
-      tf.saved_model.save(tf_module, sm_path, options=options)
-      return _compile_from_path(sm_path)
-  else:
-    # Use the supplied directory.
+  if artifacts_dir is not None and keep_saved_model:
+    # Save the saved model alongside the other compilation artifacts.
     sm_path = os.path.join(artifacts_dir, "saved_model")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
+  else:
+    # Round-trip the saved model through a temporary directory, but still save
+    # the other compilation artifacts iff artifacts_dir is not None.
+    with tempfile.TemporaryDirectory() as sm_path:
+      tf.saved_model.save(tf_module, sm_path, options=options)
+      return _compile_from_path(sm_path)
