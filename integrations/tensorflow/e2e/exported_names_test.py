@@ -17,31 +17,31 @@ from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 
-class DontExportEverything(tf.Module):
+class DontExportEverythingModule(tf.Module):
 
   @tf.function(input_signature=[])
-  def exported_fn(self):
+  def valid_fn(self):
     return tf.constant([42.])
 
-  # No input_signature, so it cannot be imported by the SavedModel importer.
-  # We need to ensure that
-  @tf.function(input_signature=[])
-  def unreachable_fn(self):
+  # Here an input_signature is elided so that the SavedModel importer will raise
+  # an error if it attempts to compile this function.
+  def invalid_fn(self):
     return tf.constant([24.])
 
 
-# To pass a set of exported names for the module, instead of passing just a
-# module ctor, instead pass a pair `(ctor, [list, of, exported, names])`.
 @tf_test_utils.compile_module(
-    DontExportEverything, exported_names=["exported_fn"])
+    DontExportEverythingModule, exported_names=["exported_fn"])
 class DontExportEverythingTest(tf_test_utils.SavedModelTestCase):
 
   def test_exported_name(self):
-    self.get_module().exported_fn().assert_all_close()
+    # This implicitly tests that invalid_fn is not exported because
+    # DontExportEverythingModule is compiled to run this test.
+    self.get_module().valid_fn().assert_all_close()
 
   def test_unreachable_name(self):
+    # Additionally check that the function name is unreachable.
     with self.assertRaises(AttributeError):
-      self.get_module().unreachable_fn()
+      self.get_module().invalid_fn()
 
 
 if __name__ == "__main__":
