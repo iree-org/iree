@@ -211,7 +211,6 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       iree::compiler::Translation::IREEVM
       MLIRSPIRVSerialization
-      MLIRTargetCpp # TODO(marbre): Only if building EmitC
   )
 
   iree_cc_library(
@@ -279,7 +278,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRSupport
       MLIREmitC # TODO(marbre): Only if building EmitC
       MLIRTranslation
-      MLIRTargetCppRegistration # TODO(marbre): Only if building EmitC
       MLIRTargetCpp # TODO(marbre): Only if building EmitC
       iree::compiler::Conversion::init_conversions
       iree::compiler::Dialect::VM::Target::Bytecode

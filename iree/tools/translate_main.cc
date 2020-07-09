@@ -18,6 +18,7 @@
 // options, which is missing in MLIR's translation main entry function.
 
 #include "emitc/InitDialect.h" // TODO(marbre): Only if building EmitC
+#include "emitc/InitTranslation.h" // TODO(marbre): Only if building EmitC
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/tools/init_compiler_modules.h"
