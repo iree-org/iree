@@ -39,6 +39,6 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_legalize_to_standard",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_standard",
     ],
 )

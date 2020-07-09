@@ -65,6 +65,6 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:xla_legalize_to_linalg",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
     ],
 )

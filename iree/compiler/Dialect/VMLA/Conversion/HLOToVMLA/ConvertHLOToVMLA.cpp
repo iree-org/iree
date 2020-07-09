@@ -692,7 +692,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // We rely on some additional HLO->std patterns and assume they
   // have been run already. In case they haven't we provide them here (useful
   // for standalone conversion testing).
-  mhlo::PopulateXlaToStdPatterns(&patterns, context);
+  mhlo::PopulateMhloToStdPatterns(&patterns, context);
 
   // mhlo.convolution.
   populateHLOConvToVMLAPatterns(context, patterns, typeConverter);

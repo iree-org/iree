@@ -41,7 +41,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/map_xla_to_scalar_op.h"
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -934,7 +934,7 @@ struct ReduceRegionXLAOpConversion final
                                  OpTy>::ReduceRegionOpConversion;
   static Operation *apply(OpTy op, ArrayRef<Value> operands,
                           ConversionPatternRewriter &rewriter) {
-    Value result = lmhlo::XlaOpToStdScalarOp::map<OpTy>(
+    Value result = lmhlo::HloOpToStdScalarOp::map<OpTy>(
         op, operands[0].getType(), operands, &rewriter);
     return result.getDefiningOp();
   }
