@@ -23,6 +23,56 @@ targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 The test suites can be run excluding Vulkan by specifying
 `--test_tag_filters="-driver=vulkan"` in the `bazel test` invocation.
 
+
+## Compiling `tf.Module`s
+
+Compatible TensorFlow modules can be compiled to specific IREE backends using
+`tf_utils.compile_tf_module`. This also optionally saves compilation artifacts
+to a specified directory. These artifacts include: MLIR across various
+lowerings, a SavedModel, and the compiled VM FlatBuffer.
+
+A minimal example of this is the following:
+
+```python
+import tensorflow as tf
+from pyiree import rt
+from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
+
+class IdentityModule(tf.Module):
+
+  # input_signature must be provided on exported functions for compilation.
+  @tf.function(input_signature=[tf.TensorSpec([None], tf.float32)])
+  def vector_identity(self, x):
+    """Returns an inputted vector with an arbitrary number of elements."""
+    return x
+
+# TODO(meadowlark): Simplify this API and remove dependence on tf_test_utils.
+backend_info = tf_test_utils.BackendInfo.ALL['iree_vmla']
+vmla_module_blob = tf_utils.compile_tf_module(
+    tf_module=IdentityModule(),
+    target_backends=backend_info.iree_compiler_targets,
+    artifacts_dir='/tmp/')
+
+vmla_module = rt.VmModule.from_flatbuffer(vmla_module_blob)
+vmla_identity_module = tf_test_utils._IreeModuleInstance(
+    backend_info, vmla_module_blob, vmla_module)
+
+ones = vmla_identity_module.vector_identity(tf.ones(3))
+```
+
+When using Keras models, `exported_names` should be specified. For example:
+
+```python
+backend_info = tf_test_utils.BackendInfo.ALL['iree_vmla']
+vmla_module_blob = tf_utils.compile_tf_module(
+    tf_module=SomeKerasModelModule(),
+    target_backends=backend_info.iree_compiler_targets,
+    exported_names=['predict'],
+    artifacts_dir='/tmp/')
+```
+
+
 ## Running tests
 
 For locally running tests and iterating on backend development, `bazel run` is

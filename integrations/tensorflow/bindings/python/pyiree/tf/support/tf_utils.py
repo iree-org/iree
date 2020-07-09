@@ -14,11 +14,6 @@
 # limitations under the License.
 """Test utilities interop with TensorFlow."""
 
-# pylint: disable=not-callable
-# pylint: disable=invalid-name
-# pylint: disable=missing-docstring
-# pylint: disable=protected-access
-
 import os
 import random
 import re
@@ -41,17 +36,29 @@ def set_random_seed(seed=0):
 
 
 def compile_tf_module(tf_module,
-                      exported_names=(),
                       target_backends=(),
+                      exported_names=(),
                       artifacts_dir=None,
                       keep_saved_model=False):
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
+  If artifacts_dir is provided then the following artifacts will be saved:
+    saved_model:
+      A directory containing the TF SavedModel used translate the tf.Module into
+      an IREE module.
+    tf_input__backends.mlir:
+      MLIR for the module in TF's input dialect.
+    iree_input__backends.mlir:
+      The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
+    compiled__backends.vmfb:
+      A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
+  Here 'backends' is a '__' delimited list of iree backends (e.g. vmla__llvm_ir)
+
   Args:
     tf_module: A tf.Module.
+    target_backends: Iterable of string backend names to compile for.
     exported_names: Iterable of dotted function names to consider for
       compilation.
-    target_backends: Iterable of string backend names to compile for.
     artifacts_dir: An optional string pointing to where compilation artifacts
       should be saved.
     keep_saved_model: An optional boolean controlling whether or not to keep the
@@ -59,7 +66,7 @@ def compile_tf_module(tf_module,
       specified artifacts_dir.
 
   Returns:
-    An _IreeCompiledModule.
+    A compiled IREE module blob.
   """
 
   def _compile_from_path(sm_path):
