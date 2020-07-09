@@ -211,7 +211,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       iree::compiler::Translation::IREEVM
       MLIRSPIRVSerialization
-      MLIRTargetCpp // TODO(marbre): Only if building EmitC
+      MLIRTargetCpp # TODO(marbre): Only if building EmitC
   )
 
   iree_cc_library(
@@ -232,7 +232,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRTransformUtils
       MLIRSupport
-      MLIREmitC // TODO(marbre): Only if building EmitC
+      MLIREmitC # TODO(marbre): Only if building EmitC
       iree::compiler::Conversion::init_conversions
       iree::compiler::Conversion::HLOToLinalg
       iree::compiler::Dialect::Flow::Analysis
@@ -277,10 +277,10 @@ if(${IREE_BUILD_COMPILER})
       MLIRSCFTransforms
       MLIRPass
       MLIRSupport
-      MLIREmitC // TODO(marbre): Only if building EmitC
+      MLIREmitC # TODO(marbre): Only if building EmitC
       MLIRTranslation
-      MLIRTargetCppRegistration // TODO(marbre): Only if building EmitC
-      MLIRTargetCpp // TODO(marbre): Only if building EmitC
+      MLIRTargetCppRegistration # TODO(marbre): Only if building EmitC
+      MLIRTargetCpp # TODO(marbre): Only if building EmitC
       iree::compiler::Conversion::init_conversions
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
