@@ -39,7 +39,7 @@ ls -1a "${KOKORO_ARTIFACTS_DIR?}/"
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
-rm -rf ${KOKORO_ARTIFACTS_DIR?}/*
+sudo rm -rf ${KOKORO_ARTIFACTS_DIR?}/*
 
 # Print out artifacts dir contents after deleting them.
 ls -1a "${KOKORO_ARTIFACTS_DIR?}/"
