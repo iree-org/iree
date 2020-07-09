@@ -260,4 +260,5 @@ if(IREE_ENABLE_EMITC)
     ${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include
     ${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include
   )
+  add_definitions(-DIREE_BUILD_EMITC)
 endif()
