@@ -4,7 +4,7 @@
 func @check_success() {
     // CHECK: %[[CODE:.+]] =
     %statusCode = constant 1 : i32
-    // CHECK: vm.cond_fail %[[CODE]], %[[CODE]]
+    // CHECK: vm.cond_fail %[[CODE]]
     hal.check_success %statusCode
     return
 }
@@ -15,7 +15,7 @@ func @check_success() {
 func @check_success_with_message() {
     // CHECK: %[[CODE:.+]] =
     %statusCode = constant 1 : i32
-    // CHECK: vm.cond_fail %[[CODE]], %[[CODE]], "failure message"
+    // CHECK: vm.cond_fail %[[CODE]], "failure message"
     hal.check_success %statusCode, "failure message"
     return
 }

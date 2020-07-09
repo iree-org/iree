@@ -1041,6 +1041,75 @@ static LogicalResult verifyFailOp(T op) {
   return success();
 }
 
+static ParseResult parseCondFailOp(OpAsmParser &parser,
+                                   OperationState *result) {
+  // First operand is either 'condition' or 'status', both i32.
+  OpAsmParser::OperandType condition;
+  if (failed(parser.parseOperand(condition)) ||
+      failed(parser.resolveOperand(condition,
+                                   IntegerType::get(32, result->getContext()),
+                                   result->operands))) {
+    return failure();
+  }
+
+  if (succeeded(parser.parseOptionalComma())) {
+    // Next operand, if any, should be either 'status' (i32) or 'message' (str).
+    OpAsmParser::OperandType status;
+
+    auto optionalResult = parser.parseOptionalOperand(status);
+    if (optionalResult.hasValue() && succeeded(optionalResult.getValue())) {
+      if (failed(parser.resolveOperand(
+              status, IntegerType::get(32, result->getContext()),
+              result->operands))) {
+        return failure();
+      }
+
+      // Found 'status' operand, next up is optional 'message'.
+      StringAttr messageAttr;
+      if (succeeded(parser.parseOptionalComma()) &&
+          failed(parser.parseAttribute(messageAttr, "message",
+                                       result->attributes))) {
+        return failure();
+      }
+    } else {
+      if (failed(parser.resolveOperand(
+              condition, IntegerType::get(32, result->getContext()),
+              result->operands))) {
+        return failure();
+      }
+
+      // No 'status' operand, but already parsed comma, so expecting 'message'.
+      StringAttr messageAttr;
+      if (failed(parser.parseAttribute(messageAttr, "message",
+                                       result->attributes))) {
+        return failure();
+      }
+    }
+  } else {
+    if (failed(parser.resolveOperand(condition,
+                                     IntegerType::get(32, result->getContext()),
+                                     result->operands))) {
+      return failure();
+    }
+  }
+
+  if (parser.parseOptionalAttrDict(result->attributes)) return failure();
+
+  return success();
+}
+
+static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
+  p << op.getOperationName() << ' ';
+  if (op.condition() != op.status()) {
+    p << op.condition() << ", ";
+  }
+  p << op.status();
+  if (op.message().hasValue()) {
+    p << ", \"" << op.message().getValue() << "\"";
+  }
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"message"});
+}
+
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//

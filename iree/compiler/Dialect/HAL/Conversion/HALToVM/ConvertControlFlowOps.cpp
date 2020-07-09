@@ -31,7 +31,7 @@ class CheckSuccessOpConversion
       ConversionPatternRewriter &rewriter) const override {
     // If status value is non-zero, fail.
     rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
-        op, op.status(), op.status(), op.messageAttr());
+        op, op.status(), op.message().getValueOr(""));
     return success();
   }
 };
