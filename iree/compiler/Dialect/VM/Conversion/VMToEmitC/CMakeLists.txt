@@ -23,8 +23,10 @@ if(${IREE_ENABLE_EMITC})
     SRCS
       "ConvertVMToEmitC.cpp"
     DEPS
+      MLIRIR
       MLIRPass
       MLIREmitC
+      MLIRTransforms
       iree::compiler::Dialect::VM::IR
     PUBLIC
   )

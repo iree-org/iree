@@ -16,9 +16,34 @@
 
 #include "emitc/Dialect/EmitC/EmitCDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/Module.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+namespace {
+
+// Taken over from StandartToVM.
+// We need to replace the Op depending on the operand.
+// We could start with a conversion for IREE::VM::AddI32Op
+template <typename SrcOpTy, typename DstOpTy>
+class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      SrcOpTy srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    typename SrcOpTy::Adaptor srcAdapter(operands);
+
+    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
+                                         srcAdapter.lhs(), srcAdapter.rhs());
+    return success();
+  }
+};
+
+}  // namespace
 
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns) {}
