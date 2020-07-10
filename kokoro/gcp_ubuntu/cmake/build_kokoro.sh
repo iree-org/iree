@@ -31,7 +31,8 @@ docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/cmake:prod \
+  --gpus all \
+  gcr.io/iree-oss/cmake-nvidia:prod \
   kokoro/gcp_ubuntu/cmake/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
