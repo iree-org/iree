@@ -405,7 +405,6 @@ struct ResultPack<opaque_ref> {
     }
     uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
     auto* reg_ptr = &packer->registers->ref[reg & packer->registers->ref_mask];
-    std::memset(reg_ptr, 0, sizeof(*reg_ptr));
     iree_vm_ref_move(value.get(), reg_ptr);
   }
 };
@@ -421,7 +420,6 @@ struct ResultPack<ref<T>> {
     }
     uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
     auto* reg_ptr = &packer->registers->ref[reg & packer->registers->ref_mask];
-    std::memset(reg_ptr, 0, sizeof(*reg_ptr));
     iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
   }
 };
@@ -436,7 +434,6 @@ struct ResultPack<absl::optional<ref<T>>> {
   static void Store(Packer* packer, absl::optional<ref<T>> value) {
     uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
     auto* reg_ptr = &packer->registers->ref[reg & packer->registers->ref_mask];
-    std::memset(reg_ptr, 0, sizeof(*reg_ptr));
     if (value.has_value()) {
       iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
     }
