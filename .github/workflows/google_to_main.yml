@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: "google"
-        # We have to explicitly fetch the main branch as well
+      # We have to explicitly fetch the main branch as well
       - name: Fetching Base Branch
         run: git fetch --no-tags --prune --depth=1 origin main
       - name: Checking for a diff
