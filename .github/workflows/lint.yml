@@ -65,3 +65,11 @@ jobs:
         uses: ibiqlik/action-yamllint@v1
         with:
           strict: true
+
+  pr-title-lint:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: deepakputhraya/action-pr-title@master
+        with:
+          min_length: 5
+          max_length: 80
