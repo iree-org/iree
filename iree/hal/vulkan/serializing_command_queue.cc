@@ -35,21 +35,19 @@ namespace vulkan {
 namespace {
 
 // Tries to prepare all necessary binary `VKSemaphore`s for emulating the time
-// points as specified in the given submission |batch_wait_semaphores| and
-// |batch_signal_semaphores|, then returns true if possible so that the
-// batch is ready to be submitted to GPU.
+// points as specified in the given submission |batch| and returns true if
+// possible so that the |batch| is ready to be submitted to GPU.
 // |wait_semaphores| and |signal_semaphores| will be filled with the binary
-// `VkSemaphores` on success.
+// `VkSemaphores` on success. |fence| is the fence associated with the
+// submission |batch|.
 StatusOr<bool> TryToPrepareSemaphores(
-    const absl::InlinedVector<SemaphoreValue, 4>& batch_wait_semaphores,
-    const absl::InlinedVector<SemaphoreValue, 4>& batch_signal_semaphores,
-    const ref_ptr<TimePointFence>& batch_fence,
+    const SubmissionBatch& batch, const ref_ptr<TimePointFence>& fence,
     absl::InlinedVector<VkSemaphore, 4>* wait_semaphores,
     absl::InlinedVector<VkSemaphore, 4>* signal_semaphores) {
   IREE_TRACE_SCOPE0("TryToPrepareSemaphores");
 
   wait_semaphores->clear();
-  for (const auto& timeline_semaphore : batch_wait_semaphores) {
+  for (const auto& timeline_semaphore : batch.wait_semaphores) {
     // Query first to progress this timeline semaphore to the furthest.
     ASSIGN_OR_RETURN(auto signaled_value,
                      timeline_semaphore.semaphore->Query());
@@ -64,8 +62,8 @@ StatusOr<bool> TryToPrepareSemaphores(
 
     // Otherwise try to get a binary semaphore for this time point so that
     // we can wait on.
-    VkSemaphore binary_semaphore = emulated_semaphore->GetWaitSemaphore(
-        timeline_semaphore.value, batch_fence);
+    VkSemaphore binary_semaphore =
+        emulated_semaphore->GetWaitSemaphore(timeline_semaphore.value, fence);
 
     if (binary_semaphore == VK_NULL_HANDLE) {
       // We cannot wait on this time point yet: there are no previous semaphores
@@ -87,14 +85,14 @@ StatusOr<bool> TryToPrepareSemaphores(
   // We've collected all necessary binary semaphores for each timeline we need
   // to wait on. Now prepare binary semaphores for signaling.
   signal_semaphores->clear();
-  for (const auto& timeline_semaphore : batch_signal_semaphores) {
+  for (const auto& timeline_semaphore : batch.signal_semaphores) {
     // SerializingCommandQueue only works with EmulatedTimelineSemaphore.
     auto* emulated_semaphore =
         static_cast<EmulatedTimelineSemaphore*>(timeline_semaphore.semaphore);
 
     ASSIGN_OR_RETURN(auto binary_semaphore,
                      emulated_semaphore->GetSignalSemaphore(
-                         timeline_semaphore.value, batch_fence));
+                         timeline_semaphore.value, fence));
     signal_semaphores->push_back(binary_semaphore);
   }
 
@@ -176,17 +174,12 @@ Status SerializingCommandQueue::Submit(
   IREE_TRACE_SCOPE0("SerializingCommandQueue::Submit");
 
   absl::MutexLock lock(&mutex_);
-  for (int i = 0; i < batches.size(); ++i) {
+  for (const auto& batch : batches) {
     // Grab a fence for this submission first. This will be used to check the
     // progress of emulated timeline semaphores later.
     ASSIGN_OR_RETURN(auto fence, fence_pool_->Acquire());
-    auto submission = std::make_unique<FencedSubmission>();
-    submission->batch = PendingBatch{
-        {batches[i].wait_semaphores.begin(), batches[i].wait_semaphores.end()},
-        {batches[i].command_buffers.begin(), batches[i].command_buffers.end()},
-        {batches[i].signal_semaphores.begin(),
-         batches[i].signal_semaphores.end()}};
-    submission->fence = std::move(fence);
+    deferred_submissions_.push_back(
+        std::make_unique<FencedSubmission>(batch, std::move(fence)));
   }
 
   return ProcessDeferredSubmissions().status();
@@ -235,13 +228,12 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
     signal_semaphores.clear();
 
     FencedSubmission* submission = deferred_submissions_.front();
-    const PendingBatch& batch = submission->batch;
+    const SubmissionBatch& batch = submission->batch;
     ref_ptr<TimePointFence>& fence = submission->fence;
 
-    ASSIGN_OR_RETURN(
-        bool ready_to_submit,
-        TryToPrepareSemaphores(batch.wait_semaphores, batch.signal_semaphores,
-                               fence, &wait_semaphores, &signal_semaphores));
+    ASSIGN_OR_RETURN(bool ready_to_submit,
+                     TryToPrepareSemaphores(batch, fence, &wait_semaphores,
+                                            &signal_semaphores));
 
     if (ready_to_submit) {
       submit_infos.emplace_back();
