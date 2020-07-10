@@ -106,7 +106,7 @@ static iree_status_t iree_vm_context_resolve_module_imports(
       for (size_t i = 0; i < full_name.size; i++) {
         fputc(full_name.data[i], stderr);
       }
-      fprintf(stderr, "'. Are all necessary modules registered?\n");
+      fprintf(stderr, "'. Ensure modules are registered with the context.\n");
       return status;
     }
     IREE_RETURN_IF_ERROR(
