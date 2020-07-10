@@ -47,8 +47,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       iree_compiled_module = tf_utils.compile_tf_module(
           tf_module,
           target_backends=target_backends,
-          artifacts_dir=artifacts_dir,
-          keep_saved_model=True)
+          artifacts_dir=artifacts_dir)
 
       artifacts_to_check = [
           'saved_model',

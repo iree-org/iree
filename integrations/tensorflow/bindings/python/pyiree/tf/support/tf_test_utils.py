@@ -134,8 +134,7 @@ class IreeCompiledModule(CompiledModule):
         ctor(),
         exported_names=exported_names,
         target_backends=backend.iree_compiler_targets,
-        artifacts_dir=global_debug_dir,
-        keep_saved_model=True)
+        artifacts_dir=global_debug_dir)
     self._iree_module = rt.VmModule.from_flatbuffer(self._iree_module_blob)
 
   def instantiate(self):

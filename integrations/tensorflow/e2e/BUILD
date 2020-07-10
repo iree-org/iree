@@ -54,7 +54,6 @@ package(
 # keep sorted
 SPECIAL_CASES = [
     "explicit_backend_test.py",
-    "exported_names_test.py",
     "linspace_test.py",
 ]
 
@@ -182,21 +181,6 @@ iree_e2e_test_suite(
         "nokokoro",
         "notap",
     ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-# It doesn't make sense to test the TensorFlow backend here since we do not run
-# it through the pyiree compiler (which handles exported_names).
-iree_e2e_test_suite(
-    name = "exported_names_tests",
-    backends_to_srcs = {
-        "iree_vmla": ["exported_names_test.py"],
-        "iree_llvmjit": ["exported_names_test.py"],
-        "iree_vulkan": ["exported_names_test.py"],
-    },
-    reference_backend = "iree_vmla",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

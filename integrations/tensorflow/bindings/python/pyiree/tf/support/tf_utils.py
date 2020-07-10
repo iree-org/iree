@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test utilities interop with TensorFlow."""
+"""Utilities interop with TensorFlow."""
 
 import os
 import random
@@ -38,14 +38,13 @@ def set_random_seed(seed=0):
 def compile_tf_module(tf_module,
                       target_backends=(),
                       exported_names=(),
-                      artifacts_dir=None,
-                      keep_saved_model=False):
+                      artifacts_dir=None):
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
   If artifacts_dir is provided then the following artifacts will be saved:
     saved_model:
-      A directory containing the TF SavedModel used translate the tf.Module into
-      an IREE module.
+      A TF SavedModel directory containing the files used translate the
+      tf.Module into an IREE module.
     tf_input__backends.mlir:
       MLIR for the module in TF's input dialect.
     iree_input__backends.mlir:
@@ -61,9 +60,6 @@ def compile_tf_module(tf_module,
       compilation.
     artifacts_dir: An optional string pointing to where compilation artifacts
       should be saved.
-    keep_saved_model: An optional boolean controlling whether or not to keep the
-      saved model used for translating the tf_module to a compiler_module in the
-      specified artifacts_dir.
 
   Returns:
     A compiled IREE module blob.
@@ -117,14 +113,13 @@ def compile_tf_module(tf_module,
     return compiled_module
 
   options = tf.saved_model.SaveOptions(save_debug_info=True)
-  if artifacts_dir is not None and keep_saved_model:
+  if artifacts_dir is not None:
     # Save the saved model alongside the other compilation artifacts.
     sm_path = os.path.join(artifacts_dir, "saved_model")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
-    # Round-trip the saved model through a temporary directory, but still save
-    # the other compilation artifacts iff artifacts_dir is not None.
+    # Round-trip the saved model through a temporary directory.
     with tempfile.TemporaryDirectory() as sm_path:
       tf.saved_model.save(tf_module, sm_path, options=options)
       return _compile_from_path(sm_path)
