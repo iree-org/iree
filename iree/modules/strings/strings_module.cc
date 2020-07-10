@@ -32,7 +32,6 @@
 #include "iree/vm/module_abi_cc.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
-#include "iree/vm/types.h"
 
 static iree_vm_ref_type_descriptor_t strings_string_descriptor = {0};
 static iree_vm_ref_type_descriptor_t strings_string_tensor_descriptor = {0};

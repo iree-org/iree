@@ -62,6 +62,19 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    command_queue_test
+  SRCS
+    "command_queue_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::base::status
+    iree::base::status_matchers
+    iree::hal::driver_registry
+    iree::testing::gtest
+)
+
+iree_cc_test(
+  NAME
     device_creation_test
   SRCS
     "device_creation_test.cc"

@@ -68,6 +68,18 @@ cc_test(
 )
 
 cc_test(
+    name = "command_queue_test",
+    srcs = ["command_queue_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/base:status",
+        "//iree/base:status_matchers",
+        "//iree/hal:driver_registry",
+        "//iree/testing:gtest",
+    ],
+)
+
+cc_test(
     name = "device_creation_test",
     srcs = ["device_creation_test.cc"],
     deps = [

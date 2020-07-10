@@ -19,6 +19,7 @@
 #include "iree/base/target_platform.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/bytecode_op_table.h"
+#include "iree/vm/list.h"
 
 // Enable to get some verbose logging; better than nothing until we have some
 // better tooling.
@@ -415,14 +416,123 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Lists
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(ListAlloc, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListReserve, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListSize, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListResize, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListGetI32, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListSetI32, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListGetRef, { return IREE_STATUS_UNIMPLEMENTED; });
-    DISPATCH_OP(ListSetRef, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(ListAlloc, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_ListAlloc>,
+      //   VM_EncType<"{{element_type}}">,
+      //   VM_EncOperand<"initial_capacity", 0>,
+      //   VM_EncResult<"result">,
+      // ];
+      int element_type_id = OP_I32(0);
+      element_type_id =
+          element_type_id >= module->type_count ? 0 : element_type_id;
+      const iree_vm_type_def_t* element_type_def =
+          &module->type_table[element_type_id];
+      iree_host_size_t initial_capacity = (iree_host_size_t)OP_R_I32(4);
+      iree_vm_list_t* list = NULL;
+      IREE_RETURN_IF_ERROR(iree_vm_list_create(
+          element_type_def, initial_capacity, module_state->allocator, &list));
+      iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), &OP_R_REF(6));
+      pc += 4 + kRegSize + kRegSize;
+    });
+
+    DISPATCH_OP(ListReserve, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_ListReserve>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncOperand<"minimum_capacity", 1>,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, OP_R_I32(2)));
+      pc += kRegSize + kRegSize;
+    });
+
+    DISPATCH_OP(ListSize, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_ListSize>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncResult<"result">,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      OP_R_I32(2) = (int32_t)iree_vm_list_size(list);
+      pc += kRegSize + kRegSize;
+    });
+
+    DISPATCH_OP(ListResize, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_ListResize>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncOperand<"new_size", 1>,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, OP_R_I32(2)));
+      pc += kRegSize + kRegSize;
+    });
+
+    DISPATCH_OP(ListGetI32, {
+      // let encoding = [
+      //   VM_EncOpcode<opcode>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncOperand<"index", 1>,
+      //   VM_EncResult<"result">,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      iree_vm_value_t value;
+      IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+          list, OP_R_I32(2), IREE_VM_VALUE_TYPE_I32, &value));
+      OP_R_I32(4) = value.i32;
+      pc += kRegSize + kRegSize + kRegSize;
+    });
+
+    DISPATCH_OP(ListSetI32, {
+      // let encoding = [
+      //   VM_EncOpcode<opcode>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncOperand<"index", 1>,
+      //   VM_EncOperand<"value", 2>,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      iree_vm_value_t value = iree_vm_value_make_i32(OP_R_I32(4));
+      IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, OP_R_I32(2), &value));
+      pc += kRegSize + kRegSize + kRegSize;
+    });
+
+    DISPATCH_OP(ListGetRef, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_ListGetRef>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncOperand<"index", 1>,
+      //   VM_EncTypeOf<"result">,
+      //   VM_EncResult<"result">,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      return IREE_STATUS_UNIMPLEMENTED;
+    });
+
+    DISPATCH_OP(ListSetRef, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_ListSetRef>,
+      //   VM_EncOperand<"list", 0>,
+      //   VM_EncOperand<"index", 1>,
+      //   VM_EncOperand<"value", 2>,
+      // ];
+      iree_vm_ref_t* list_ref = &OP_R_REF(0);
+      iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      return IREE_STATUS_UNIMPLEMENTED;
+    });
 
     //===------------------------------------------------------------------===//
     // Conditional assignment

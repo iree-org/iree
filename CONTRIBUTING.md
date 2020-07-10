@@ -52,8 +52,8 @@ merge". The squashed commit summary should match the PR title and the commit
 description should match the PR body. Accordingly, please write these as you
 would a helpful commit message. Please also keep PRs small (focused on a single
 issue) to streamline review and ease later culprit-finding. It is assumed that
-the PR author will authors merge their change unless they ask someone else to
-merge it for them (e.g. because they don't have write access).
+the PR author will merge their change unless they ask someone else to merge it
+for them (e.g. because they don't have write access).
 
 ## Peculiarities
 

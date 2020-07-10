@@ -102,11 +102,11 @@ static iree_status_t iree_vm_context_resolve_module_imports(
         iree_vm_context_resolve_function(context, full_name, &import_function);
     if (!iree_status_is_ok(status)) {
       // iree_string_view_t is not NUL-terminated, so this is a bit awkward.
-      fprintf(stderr, "unable to resolve VM function '");
+      fprintf(stderr, "Unable to resolve VM function '");
       for (size_t i = 0; i < full_name.size; i++) {
         fputc(full_name.data[i], stderr);
       }
-      fprintf(stderr, "'\n");
+      fprintf(stderr, "'. Ensure modules are registered with the context.\n");
       return status;
     }
     IREE_RETURN_IF_ERROR(

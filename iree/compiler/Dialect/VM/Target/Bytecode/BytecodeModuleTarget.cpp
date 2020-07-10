@@ -100,15 +100,22 @@ static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
 // the vector to the type represented by the type ordinal.
 static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   llvm::DenseMap<Type, std::string> typeMap;
-  auto tryInsertType = [&](Type type) {
+  std::function<void(Type)> tryInsertType;
+  tryInsertType = [&](Type type) {
     if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
       type = refPtrType.getObjectType();
     }
+    if (typeMap.count(type)) return;
     std::string str;
     llvm::raw_string_ostream sstream(str);
     type.print(sstream);
     sstream.flush();
     typeMap.try_emplace(type, str);
+    if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
+      if (listType.getElementType()) {
+        tryInsertType(listType.getElementType());
+      }
+    }
   };
   for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
     funcOp.walk([&](Operation *op) {

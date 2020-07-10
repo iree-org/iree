@@ -33,7 +33,6 @@
 #include "iree/vm/ref.h"
 #include "iree/vm/ref_cc.h"
 #include "iree/vm/stack.h"
-#include "iree/vm/types.h"
 
 using testing::internal::CaptureStdout;
 using testing::internal::GetCapturedStdout;
@@ -353,7 +352,7 @@ TEST_F(StringsModuleTest, Prototype) {
   IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
 
   // Add the value parameter.
-  iree_vm_value_t value = IREE_VM_VALUE_MAKE_I32(input);
+  iree_vm_value_t value = iree_vm_value_make_i32(input);
   IREE_ASSERT_OK(iree_vm_variant_list_append_value(inputs, value));
 
   // Prepare outputs list to accept the results from the invocation.

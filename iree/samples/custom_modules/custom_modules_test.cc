@@ -100,7 +100,7 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
   IREE_ASSERT_OK(
       iree_custom_message_wrap(iree_make_cstring_view("hello world!"),
                                IREE_ALLOCATOR_SYSTEM, &input_message));
-  iree_vm_value_t count = IREE_VM_VALUE_MAKE_I32(5);
+  iree_vm_value_t count = iree_vm_value_make_i32(5);
 
   // Pass in the message and number of times to print it.
   // TODO(benvanik): make a macro/magic.
