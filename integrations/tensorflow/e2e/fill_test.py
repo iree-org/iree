@@ -30,14 +30,14 @@ class FillModule(tf.Module):
     return tf.fill(dims, value)
 
 
-@tf_test_utils.compile_modules(fill=FillModule)
+@tf_test_utils.compile_module(FillModule)
 class FillTest(tf_test_utils.SavedModelTestCase):
 
   def test_fill(self):
     dims = np.array([2, 3], dtype=np.int32)
     value = np.array(9., dtype=np.float32)
 
-    result = self.modules.fill.all.fill(dims, value)
+    result = self.get_module().fill(dims, value)
     result.assert_all_close()
 
 

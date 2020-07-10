@@ -28,23 +28,23 @@ class BroadcastingModule(tf.Module):
     return lhs + rhs
 
 
-@tf_test_utils.compile_modules(m=BroadcastingModule)
+@tf_test_utils.compile_module(BroadcastingModule)
 class BroadcastingTest(tf_test_utils.SavedModelTestCase):
 
   def test_add_same_shape(self):
-    m = self.modules.m.all
+    m = self.get_module()
     dst = m.add(tf.random.uniform([4]), tf.random.uniform([4]))
     dst.print().assert_all_close()
 
 
 # TODO(silvasean): Make these work.
 #   def test_add_broadcast_lhs(self):
-#     m = self.modules.m.all
+#     m = self.get_module()
 #     dst = m.add(tf.random.uniform([1]), tf.random.uniform([4]))
 #     dst.print().assert_all_close()
 #
 #   def test_add_broadcast_rhs(self):
-#     m = self.modules.m.all
+#     m = self.get_module()
 #     dst = m.add(tf.random.uniform([4]), tf.random.uniform([1]))
 #     dst.print().assert_all_close()
 

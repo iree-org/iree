@@ -15,6 +15,7 @@
 
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 HIDDEN_1_DIM = 256
@@ -31,7 +32,7 @@ class Mlp(tf.Module):
                input_dim=28 * 28,
                classes=10):
     super().__init__()
-    tf_test_utils.set_random_seed()
+    tf_utils.set_random_seed()
     self.hidden_1_dim = hidden_1_dim
     self.hidden_2_dim = hidden_2_dim
     self.input_dim = input_dim
@@ -60,11 +61,11 @@ class Mlp(tf.Module):
     return tf.nn.softmax(self.mlp(x))
 
 
-@tf_test_utils.compile_modules(mlp=(Mlp, ["predict"]))
+@tf_test_utils.compile_module(Mlp, exported_names=["predict"])
 class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
 
   def test_dynamic_batch(self):
-    m = self.modules.mlp.all
+    m = self.get_module()
     np.random.seed(12345)
     x = np.random.random([3, 28 * 28]).astype(np.float32) * 1e-3
     m.predict(x).print().assert_all_close()

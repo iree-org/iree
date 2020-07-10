@@ -68,27 +68,27 @@ class TensorListModule(tf.Module):
     return ta.stack()
 
 
-@tf_test_utils.compile_modules(tensorlist=TensorListModule)
+@tf_test_utils.compile_module(TensorListModule)
 class TensorListTest(tf_test_utils.SavedModelTestCase):
 
   def test_identity_through_tensorlist(self):
-    m = self.modules.tensorlist.all
+    m = self.get_module()
     result = m.identity_through_tensorlist(tf.constant(42.))
     result.print().assert_all_close()
 
   def test_add_through_tensorlist(self):
-    m = self.modules.tensorlist.all
+    m = self.get_module()
     result = m.add_through_tensorlist(tf.constant(42.), tf.constant(43.))
     result.print().assert_all_close()
 
   def test_slice_first_element_with_from_tensor(self):
-    m = self.modules.tensorlist.all
+    m = self.get_module()
     result = m.slice_first_element_with_from_tensor(
         tf.range(STATIC_SIZE, dtype=tf.float32))
     result.print().assert_all_close()
 
   def test_slice_first_element_with_from_tensor_high_rank(self):
-    m = self.modules.tensorlist.all
+    m = self.get_module()
     result = m.slice_first_element_with_from_tensor_high_rank(
         tf.broadcast_to(
             tf.range(STATIC_SIZE, dtype=tf.float32),
@@ -96,7 +96,7 @@ class TensorListTest(tf_test_utils.SavedModelTestCase):
     result.print().assert_all_close()
 
   def test_concat_with_tensorlist_stack(self):
-    m = self.modules.tensorlist.all
+    m = self.get_module()
     result = m.concat_with_tensorlist_stack(tf.constant(42.), tf.constant(43.))
     result.print().assert_all_close()
 

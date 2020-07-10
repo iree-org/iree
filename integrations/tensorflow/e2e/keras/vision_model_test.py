@@ -17,6 +17,7 @@ import os
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS
@@ -88,7 +89,7 @@ def get_input_shape(data, model):
 
 def models():
   tf.keras.backend.set_learning_phase(False)
-  tf_test_utils.set_random_seed()
+  tf_utils.set_random_seed()
 
   input_shape = get_input_shape(FLAGS.data, FLAGS.model)
   # keras model receives images size as input,
@@ -127,7 +128,7 @@ def models():
   return module
 
 
-@tf_test_utils.compile_modules(applications=(models, ['predict']))
+@tf_test_utils.compile_module(models, exported_names=['predict'])
 class AppTest(tf_test_utils.SavedModelTestCase):
 
   def test_application(self):
@@ -135,8 +136,7 @@ class AppTest(tf_test_utils.SavedModelTestCase):
     input_data = np.random.rand(np.prod(np.array(input_shape))).astype(
         np.float32)
     input_data = input_data.reshape(input_shape)
-    self.modules.applications.all.predict(input_data).print().assert_all_close(
-        atol=1e-6)
+    self.get_module().predict(input_data).print().assert_all_close(atol=1e-6)
 
 
 if __name__ == '__main__':

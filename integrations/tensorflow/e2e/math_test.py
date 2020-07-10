@@ -38,27 +38,27 @@ class MathModule(tf.Module):
     return tf.math.mod(x, 2.0)
 
 
-@tf_test_utils.compile_modules(math=MathModule)
+@tf_test_utils.compile_module(MathModule)
 class MathTest(tf_test_utils.SavedModelTestCase):
 
   def test_abs(self):
     a = np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32)
-    r = self.modules.math.all.abs(a)
+    r = self.get_module().abs(a)
     r.print().assert_all_close()
 
   def test_cos(self):
     a = np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32)
-    r = self.modules.math.all.cos(a)
+    r = self.get_module().cos(a)
     r.print().assert_all_close()
 
   def test_log(self):
     a = np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32)
-    r = self.modules.math.all.log(a)
+    r = self.get_module().log(a)
     r.print().assert_all_close()
 
   def test_mod(self):
     a = np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32)
-    r = self.modules.math.all.mod(a)
+    r = self.get_module().mod(a)
     r.print().assert_all_close()
 
 

@@ -38,7 +38,7 @@ class BatchNormModule(tf.Module):
         variance_epsilon=1e-4)
 
 
-@tf_test_utils.compile_modules(bn=BatchNormModule)
+@tf_test_utils.compile_module(BatchNormModule)
 class BatchNormTest(tf_test_utils.SavedModelTestCase):
 
   def test_batch_norm_inference(self):
@@ -49,8 +49,7 @@ class BatchNormTest(tf_test_utils.SavedModelTestCase):
     variance = np.random.random((16,)).astype(np.float32) * 1e-3
     offset = np.random.random((16,)).astype(np.float32) * 1e-3
     scale = np.random.random((16,)).astype(np.float32) * 1e-3
-    r = self.modules.bn.all.batch_norm_inference(x, mean, variance, offset,
-                                                 scale)
+    r = self.get_module().batch_norm_inference(x, mean, variance, offset, scale)
     r.print().assert_all_close()
 
 
