@@ -28,5 +28,7 @@ Status ModuleWrapper::Create(const uint8_t* flatbuffer_data,
       IREE_LOC);
 }
 
+ModuleWrapper::~ModuleWrapper() { iree_vm_module_release(module_); }
+
 }  // namespace java
 }  // namespace iree

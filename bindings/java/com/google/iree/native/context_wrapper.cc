@@ -28,5 +28,7 @@ Status ContextWrapper::Create(InstanceWrapper instance_wrapper) {
 
 int ContextWrapper::id() const { return iree_vm_context_id(context_); }
 
+ContextWrapper::~ContextWrapper() { iree_vm_context_release(context_); }
+
 }  // namespace java
 }  // namespace iree

@@ -27,6 +27,8 @@ class InstanceWrapper {
 
   iree_vm_instance_t* instance() const;
 
+  ~InstanceWrapper();
+
  private:
   iree_vm_instance_t* instance_ = nullptr;
 };
