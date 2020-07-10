@@ -194,6 +194,7 @@ iree_cc_test(
   SRCS
     "list_test.cc"
   DEPS
+    ::builtin_types
     ::list
     iree::base::api
     iree::base::ref_ptr

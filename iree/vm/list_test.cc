@@ -17,6 +17,7 @@
 #include "iree/base/api.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
+#include "iree/vm/builtin_types.h"
 
 class A : public iree::RefObject<A> {
  public:
@@ -69,9 +70,17 @@ static iree_vm_ref_t MakeRef(V value) {
   return ref;
 }
 
+class VMListTest : public ::testing::Test {
+ protected:
+  static void SetUpTestSuite() {
+    IREE_CHECK_OK(iree_vm_register_builtin_types());
+    RegisterRefTypes();
+  }
+};
+
 // Tests simple primitive value list usage, mainly just for demonstration.
 // Stores only i32 element types, equivalent to `!vm.list<i32>`.
-TEST(VMListTest, UsageI32) {
+TEST_F(VMListTest, UsageI32) {
   iree_vm_type_def_t element_type =
       iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
   iree_host_size_t initial_capacity = 123;
@@ -108,9 +117,7 @@ TEST(VMListTest, UsageI32) {
 
 // Tests simple ref object list usage, mainly just for demonstration.
 // Stores ref object type A elements only, equivalent to `!vm.list<!vm.ref<A>>`.
-TEST(VMListTest, UsageRef) {
-  RegisterRefTypes();
-
+TEST_F(VMListTest, UsageRef) {
   iree_vm_type_def_t element_type =
       iree_vm_type_def_make_ref_type(test_a_type_id());
   iree_host_size_t initial_capacity = 123;
@@ -148,9 +155,7 @@ TEST(VMListTest, UsageRef) {
 
 // Tests simple variant list usage, mainly just for demonstration.
 // Stores any heterogeneous element type, equivalent to `!vm.list<?>`.
-TEST(VMListTest, UsageVariant) {
-  RegisterRefTypes();
-
+TEST_F(VMListTest, UsageVariant) {
   iree_vm_type_def_t element_type = iree_vm_type_def_make_variant_type();
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
@@ -195,7 +200,7 @@ TEST(VMListTest, UsageVariant) {
 }
 
 // Tests capacity reservation.
-TEST(VMListTest, Reserve) {
+TEST_F(VMListTest, Reserve) {
   // Allocate with 0 initial capacity (which may get rounded up).
   iree_vm_type_def_t element_type = iree_vm_type_def_make_variant_type();
   iree_host_size_t initial_capacity = 0;

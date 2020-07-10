@@ -172,6 +172,7 @@ cc_test(
     name = "list_test",
     srcs = ["list_test.cc"],
     deps = [
+        ":builtin_types",
         ":list",
         "//iree/base:api",
         "//iree/base:ref_ptr",
