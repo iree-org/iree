@@ -66,7 +66,7 @@ jobs:
         with:
           strict: true
 
-  pr-title-lint:
+  pr-title-length:
     runs-on: ubuntu-18.04
     steps:
       - uses: deepakputhraya/action-pr-title@v1.0.0
