@@ -22,6 +22,7 @@
 # local dev environment:
 # docker run -it --rm --entrypoint bash \
 #   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
+#   --gpus all \
 #   gcr.io/iree-oss/cmake-nvidia
 
 # Set up the image and working directory by inheriting the base
