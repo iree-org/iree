@@ -76,3 +76,6 @@ jobs:
         uses: thompsonja/bazel-buildifier@v0.2.1
         with:
           excludes: "*/third_party/*"
+          # For compatibility with Google's internal source repository, we still
+          # use this.
+          warnings: "-native-cc"
