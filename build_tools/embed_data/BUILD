@@ -35,8 +35,8 @@ cc_binary(
 cc_embed_data(
     name = "testembed1",
     srcs = [
-        "file1.txt",
         "data/file2.txt",
+        "file1.txt",
     ],
     cc_file_output = "testembed1.cc",
     cpp_namespace = "foobar",
