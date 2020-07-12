@@ -50,7 +50,7 @@ test --define open_source_build=true
 # See https://docs.bazel.build/versions/master/user-manual.html#flag--per_file_copt
 build:generic_clang --per_file_copt=+^//@-Werror
 # ...and silence them outside of the workspace.
-build:generic_clang --per_file_copt=-^//@-w
+build:generic_clang --per_file_copt=+.-^//@-w
 
 # Disable warnings we don't care about.
 build:generic_clang --copt=-Wno-unused-local-typedef
