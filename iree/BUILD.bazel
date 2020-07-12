@@ -64,3 +64,9 @@ config_setting(
         "iree_is_msvc": "true",
     },
 )
+
+cc_library(
+    name = "test",
+    srcs = ["test.cc"],
+    deps = ["@zlib"],
+)
