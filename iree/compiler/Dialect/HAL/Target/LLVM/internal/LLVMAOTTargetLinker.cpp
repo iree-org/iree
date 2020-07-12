@@ -14,6 +14,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTargetLinker.h"
 
+#include "iree/base/status.h"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -27,7 +29,11 @@ iree::StatusOr<std::string> linkLLVMAOTObjects(
   ASSIGN_OR_RETURN(sharedLibFile, iree::file_io::GetTempFile("dylibfile"));
   std::string linkingCmd =
       linkerToolPath + " -shared " + archiveFile + " -o " + sharedLibFile;
-  system(linkingCmd.c_str());
+  int systemRet = system(linkingCmd.c_str());
+  if (systemRet != 0) {
+    return iree::InternalErrorBuilder(IREE_LOC)
+           << linkingCmd << " failed with exit code " << systemRet;
+  }
   return iree::file_io::GetFileContents(sharedLibFile);
 }
 
