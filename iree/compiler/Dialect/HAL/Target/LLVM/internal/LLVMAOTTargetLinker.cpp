@@ -31,7 +31,7 @@ iree::StatusOr<std::string> linkLLVMAOTObjects(
       linkerToolPath + " -shared " + archiveFile + " -o " + sharedLibFile;
   int systemRet = system(linkingCmd.c_str());
   if (systemRet != 0) {
-    return InternalErrorBuilder(IREE_LOC)
+    return iree::InternalErrorBuilder(IREE_LOC)
            << linkingCmd << " failed with exit code " << systemRet;
   }
   return iree::file_io::GetFileContents(sharedLibFile);
