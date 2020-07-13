@@ -347,10 +347,6 @@ class SavedModelTestCase(tf.test.TestCase):
   # {backend_name: CompiledModule}.
   _compiled_backends_dict = None
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.modules = None
-
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
