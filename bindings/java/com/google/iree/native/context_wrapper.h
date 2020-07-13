@@ -28,6 +28,8 @@ class ContextWrapper {
 
   int id() const;
 
+  ~ContextWrapper();
+
  private:
   iree_vm_context_t* context_ = nullptr;
 };

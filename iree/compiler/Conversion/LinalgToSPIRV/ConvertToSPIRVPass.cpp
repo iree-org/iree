@@ -218,7 +218,12 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     // TODO(thomasraoux): use coloumn major operand when TransfertRead +
     // TransposeOp.
     if (!op.permutation_map().isIdentity()) return failure();
-    if (op.masked()) return failure();
+    if (op.masked() &&
+        llvm::any_of(op.masked()->template cast<ArrayAttr>(),
+                     [](mlir::Attribute maskedDim) {
+                       return maskedDim.cast<BoolAttr>().getValue();
+                     }))
+      return failure();
     auto matType = spirv::CooperativeMatrixNVType::get(
         vecType.getElementType(), spirv::Scope::Subgroup, vecType.getDimSize(0),
         vecType.getDimSize(1));
