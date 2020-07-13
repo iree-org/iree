@@ -57,11 +57,11 @@ iree_py_test(
         "tf_utils.py",
         "tf_utils_test.py",
     ],
-    tags = [
-      "driver=vmla",
-      "driver=llvm",
-    ],
     python_version = "PY3",
+    tags = [
+        "driver=llvm",
+        "driver=vmla",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
