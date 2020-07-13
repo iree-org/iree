@@ -49,7 +49,7 @@ RUN apt-get install -y unzip zip wget \
 # Install a newer version of Bazel. We don't need the full installation now.
 # Just need to provide a different version for the version-identification
 # wrapper script to find in /root/.bazel/bin
-ARG NEW_BAZEL_VERSION=3.1.0
+ARG NEW_BAZEL_VERSION=3.3.1
 RUN cd "/root/.bazel/bin" \
   && wget "https://releases.bazel.build/${NEW_BAZEL_VERSION?}/release/bazel-${NEW_BAZEL_VERSION?}-linux-x86_64" \
   && chmod +x "bazel-${NEW_BAZEL_VERSION?}-linux-x86_64"
