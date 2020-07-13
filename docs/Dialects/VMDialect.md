@@ -759,13 +759,6 @@ attached) execution will continue at the target block.
 
 raises a global failure if the condition is true
 
-Syntax:
-
-```
-operation ::= `vm.cond_fail` $condition `,` $status (`,` $message^)? attr-dict
-```
-
-
 When the condition is true this signals a runtime failure that causes the
 entire active invocation - and possibly *all* in-flight and pending
 invocations - to fail with the given status. The status will be propagated

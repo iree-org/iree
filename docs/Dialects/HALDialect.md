@@ -788,6 +788,40 @@ Writes a block of byte data into the resource at the given offset.
 `target_offset` | index
 `length` | index
 
+### `hal.check_success` (IREE::HAL::CheckSuccessOp)
+
+raises a global failure if a status is not 'ok'
+
+Syntax:
+
+```
+operation ::= `hal.check_success` $status (`,` $message^)? attr-dict
+```
+
+
+When the status is not 'ok' this signals a runtime failure that causes the
+entire active invocation - and possibly *all* in-flight and pending
+invocations - to fail with the given status. The status will be propagated
+back via the available runtime error handling mechanisms such as semaphores
+or synchronous invocation results.
+
+As the IREE execution model is deeply pipelined it's possible that failures
+have a latency between when they are emitted and when the application can
+observe the failure. It's also possible that other work that is in-flight
+or pending when the failure occurs will complete.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | ::mlir::StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`status` | 32-bit signless integer
+
 ### `hal.command_buffer.begin` (IREE::HAL::CommandBufferBeginOp)
 
 command buffer recording begin operation
