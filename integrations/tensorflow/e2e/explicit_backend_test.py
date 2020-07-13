@@ -29,7 +29,7 @@ class SimpleArithmeticModule(tf.Module):
     return a * b
 
 
-@tf_test_utils.compile_modules(simple_arithmetic=SimpleArithmeticModule)
+@tf_test_utils.compile_module(SimpleArithmeticModule)
 class ExplicitBackendTest(tf_test_utils.SavedModelTestCase):
 
   def test_explicit(self):
@@ -39,9 +39,9 @@ class ExplicitBackendTest(tf_test_utils.SavedModelTestCase):
     # Demonstrates simple, one by one invocation of functions against
     # different explicit backends. Individual backends can be accessed off of
     # the module by name ('tf', 'iree_vmla' below).
-    tf_c = self.modules.simple_arithmetic.tf.simple_mul(a, b)
+    tf_c = self.compiled_modules.tf.simple_mul(a, b)
     print("TF Result:", tf_c)
-    iree_c = self.modules.simple_arithmetic.iree_vmla.simple_mul(a, b)
+    iree_c = self.compiled_modules.iree_vmla.simple_mul(a, b)
     print("IREE Result:", iree_c)
     self.assertAllClose(tf_c, iree_c)
 
@@ -53,18 +53,18 @@ class ExplicitBackendTest(tf_test_utils.SavedModelTestCase):
     # which takes a regex string matching backend names. This also returns a
     # MultiResults tuple with actual results keyed by backend name. These also
     # have convenience methods like print() and assert_all_close().
-    vmod = self.modules.simple_arithmetic.multi("tf|iree")
+    vmod = self.compiled_modules.multi("tf|iree")
     r = vmod.simple_mul(a, b)
     r.print().assert_all_close()
 
-  def test_all(self):
+  def test_get_module(self):
     a = np.array([1., 2., 3., 4.], dtype=np.float32)
     b = np.array([400., 5., 6., 7.], dtype=np.float32)
 
-    # Evaluating against all backends can be done with the special 'all'
-    # backend name. This also returns a MultiResults tuple with actual results
-    # keyed by backend name.
-    r = self.modules.simple_arithmetic.all.simple_mul(a, b)
+    # Evaluating against all backends can be done with self.get_module(). This
+    # also returns a MultiResults tuple with actual results keyed by backend
+    # name.
+    r = self.get_module().simple_mul(a, b)
     r.print().assert_all_close()
 
 

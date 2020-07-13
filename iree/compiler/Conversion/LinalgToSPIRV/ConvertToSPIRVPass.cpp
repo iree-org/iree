@@ -335,11 +335,6 @@ struct ConvertToSPIRVPass
   void runOnOperation() override;
   ConvertToSPIRVPass() {}
   ConvertToSPIRVPass(const ConvertToSPIRVPass &pass) {}
-  Option<bool> useCooperativeMatrix{
-      *this, "use-cooperative-matrix",
-      llvm::cl::desc("Experimental: Lower vector contract to cooperative "
-                     "matrix operations"),
-      llvm::cl::init(false)};
 };
 }  // namespace
 
@@ -419,12 +414,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
-
-  if (useCooperativeMatrix) {
-    auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
-    populateVectorToSPIRVPatterns(context, typeConverter, patterns,
-                                  cooperativeMatrixAnalysis);
-  }
+  auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
+  populateVectorToSPIRVPatterns(context, typeConverter, patterns,
+                                cooperativeMatrixAnalysis);
   patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter,
                   LinalgReshapeConverter>(context, typeConverter);
 

@@ -34,6 +34,7 @@ cc_binary(
 
 cc_embed_data(
     name = "testembed1",
+    # do not sort
     srcs = [
         "file1.txt",
         "data/file2.txt",

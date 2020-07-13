@@ -30,6 +30,7 @@ iree_py_library(
         "__init__.py",
         "tf_test_driver.py",
         "tf_test_utils.py",
+        "tf_utils.py",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python:pathsetup",  # build_cleaner: keep
@@ -43,6 +44,18 @@ iree_py_test(
     srcs = [
         "tf_test_utils.py",
         "tf_test_utils_test.py",
+    ],
+    python_version = "PY3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_py_test(
+    name = "tf_utils_test",
+    srcs = [
+        "tf_utils.py",
+        "tf_utils_test.py",
     ],
     python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + [

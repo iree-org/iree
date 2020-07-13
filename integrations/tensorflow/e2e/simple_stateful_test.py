@@ -32,11 +32,11 @@ class Stateful(tf.Module):
     return self.counter
 
 
-@tf_test_utils.compile_modules(stateful=Stateful)
+@tf_test_utils.compile_module(Stateful)
 class StatefulTest(tf_test_utils.SavedModelTestCase):
 
   def test_stateful(self):
-    m = self.modules.stateful.all
+    m = self.get_module()
     m.inc_by(tf.constant(1.))
     m.get_state().print().assert_all_close()
 

@@ -14,13 +14,10 @@
 # limitations under the License.
 """Test keras Model training."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 from sklearn.preprocessing import PolynomialFeatures
 import tensorflow as tf
 
@@ -51,7 +48,7 @@ class ModelTrain(tf.Module):
       model for linear regression
     """
 
-    tf_test_utils.set_random_seed()
+    tf_utils.set_random_seed()
 
     # build a single layer model
     inputs = tf.keras.layers.Input((input_dim))
@@ -78,8 +75,8 @@ class ModelTrain(tf.Module):
     return loss_value
 
 
-@tf_test_utils.compile_modules(
-    train_module=(ModelTrain.CreateModule, ["TrainStep"]))
+@tf_test_utils.compile_module(
+    ModelTrain.CreateModule, exported_names=["TrainStep"])
 class ModelTrainTest(tf_test_utils.SavedModelTestCase):
 
   def generate_regression_data(self, size=8):
@@ -103,7 +100,7 @@ class ModelTrainTest(tf_test_utils.SavedModelTestCase):
 
     targets = np.expand_dims(targets, axis=1)
     # run one iteration of training step
-    result = self.modules.train_module.all.TrainStep(inputs, targets)
+    result = self.get_module().TrainStep(inputs, targets)
     result.print().assert_all_close()
 
 

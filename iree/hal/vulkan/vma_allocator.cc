@@ -135,6 +135,11 @@ StatusOr<ref_ptr<VmaBuffer>> VmaAllocator::AllocateInternal(
     VmaAllocationCreateFlags flags) {
   IREE_TRACE_SCOPE0("VmaAllocator::AllocateInternal");
 
+  // Guard against the corner case where the requested buffer size is 0. The
+  // application is unlikely to do anything when requesting a 0-byte buffer; but
+  // it can happen in real world use cases. So we should at least not crash.
+  if (allocation_size == 0) allocation_size = 4;
+
   VkBufferCreateInfo buffer_create_info;
   buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_create_info.pNext = nullptr;

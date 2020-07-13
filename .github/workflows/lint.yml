@@ -65,3 +65,17 @@ jobs:
         uses: ibiqlik/action-yamllint@v1
         with:
           strict: true
+
+  buildifier:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Running Buildifier
+        # TODO(gcmn): Look into only running on changed files.
+        uses: thompsonja/bazel-buildifier@v0.2.1
+        with:
+          excludes: "*/third_party/*"
+          # For compatibility with Google's internal source repository, we still
+          # use this.
+          warnings: "-native-cc"

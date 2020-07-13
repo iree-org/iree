@@ -161,8 +161,7 @@ void AddVulkanLaunchWrapper::convertGpuLaunchFunc(
   // Calculate the number of groups to dispatch based on the workload size
   // and the workgroup size picked by the tiling pass.
   for (int i = 0; i < 3; i++) {
-    auto dispatchSize =
-        std::max(int64_t(1), workloadSize[i] / workgroupSize[i]);
+    auto dispatchSize = std::max(int64_t(1), workloadSize[i]);
     Value numGroups = builder.create<ConstantIndexOp>(loc, dispatchSize);
     arguments.push_back(numGroups);
   }
