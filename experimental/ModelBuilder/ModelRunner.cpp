@@ -81,8 +81,10 @@ void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
   if (target == Target::CPUTarget) {
     // TODO(ntv): Looking up the pass by name fails quite surprisingly. Just
     // build the pass to get its ID to look up the PassInfo.
+    std::unique_ptr<llvm::Pass> owningLowerMatrixIntrinsicsPass(
+        llvm::createLowerMatrixIntrinsicsPass());
     const llvm::PassInfo* lowerMatrixIntrinsics = llvm::Pass::lookupPassInfo(
-        llvm::createLowerMatrixIntrinsicsPass()->getPassID());
+        owningLowerMatrixIntrinsicsPass->getPassID());
     assert(lowerMatrixIntrinsics);
     llvmPasses.push_back(lowerMatrixIntrinsics);
   }
