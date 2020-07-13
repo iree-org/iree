@@ -124,8 +124,8 @@ static llvm::cl::list<std::string> input_values_flag{
 
 static llvm::cl::opt<std::string> input_values_file_flag{
     "input-value-file",
-    llvm::cl::desc(
-        "<input value file>, see run_module_main.cc for input format"),
+    llvm::cl::desc("Provides a file for input shapes and optional values (see "
+                   "run_module_main.cc for details)"),
     llvm::cl::init(""),
 };
 
@@ -277,6 +277,7 @@ StatusOr<std::vector<std::string>> GetInputValues(const std::string& filename) {
   file->getBuffer().split(source_buffers, /*Separator=*/"\n", /*MaxSplit=*/-1,
                           /*KeepEmpty=*/false);
   std::vector<std::string> res;
+  res.reserve(source_buffers.size());
   for (auto s : source_buffers) res.emplace_back(s);
   return res;
 }
