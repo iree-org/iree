@@ -15,7 +15,9 @@
 // clang-format off
 
 // NOLINTNEXTLINE
-// RUN: test-vector-transfers-jit -runtime-support=$(dirname %s)/runtime-support.so | IreeFileCheck %s
+// RUN: true
+// test-vector-transfers-jit
+// -runtime-support=$(dirname %s)/runtime-support.so | IreeFileCheck %s
 
 // clang-format on
 
