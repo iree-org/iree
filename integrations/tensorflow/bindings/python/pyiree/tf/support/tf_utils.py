@@ -45,6 +45,9 @@ def compile_tf_module(tf_module,
                       artifacts_dir=None):
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
+  The artifact this creates is not callable. See IreeCompiledModule.compile(...)
+  for an API that returns a module that can be called without any further steps.
+
   If artifacts_dir is provided then the following artifacts will be saved:
     saved_model:
       A TF SavedModel directory containing the files used translate the
