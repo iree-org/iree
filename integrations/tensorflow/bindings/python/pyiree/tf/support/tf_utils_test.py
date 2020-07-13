@@ -29,6 +29,20 @@ class ConstantModule(tf.Module):
     return tf.constant([42.])
 
 
+class StatefulCountingModule(tf.Module):
+
+  def __init__(self):
+    self.count = tf.Variable([0.])
+
+  @tf.function(input_signature=[])
+  def increment(self):
+    self.count.assign_add(tf.constant([1.]))
+
+  @tf.function(input_signature=[])
+  def get_count(self):
+    return self.count
+
+
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters([
@@ -57,6 +71,31 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       ]
       for artifact in artifacts_to_check:
         self.assertTrue(os.path.exists(os.path.join(artifacts_dir, artifact)))
+
+  @parameterized.named_parameters([
+      {
+          'testcase_name': 'tensorflow',
+          'backend_name': 'tf',
+      },
+      {
+          'testcase_name': 'vmla',
+          'backend_name': 'iree_vmla',
+      },
+  ])
+  def test_unaltered_state(self, backend_name):
+    info = tf_utils.BackendInfo.ALL[backend_name]
+    module = tf_utils.CompiledModule.compile(StatefulCountingModule, info)
+
+    # Test that incrementing works properly.
+    self.assertEqual([0.], module.get_count())
+    module.increment()
+    self.assertEqual([1.], module.get_count())
+
+    reinitialized_module = tf_utils.CompiledModule.from_existing(module)
+    # Test reinitialization.
+    self.assertEqual([0.], reinitialized_module.get_count())
+    # Test independent state.
+    self.assertEqual([1.], module.get_count())
 
 
 if __name__ == '__main__':
