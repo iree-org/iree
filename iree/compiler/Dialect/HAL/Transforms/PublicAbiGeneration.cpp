@@ -218,7 +218,6 @@ LogicalResult generateSynchronousBody(
 
 LogicalResult generateAsynchronousBody(FuncOp funcOp, FuncOp syncFuncOp,
                                        OpBuilder moduleBuilder) {
-  auto *ctx = funcOp.getContext();
   auto loc = funcOp.getLoc();
   Block *entryBlock = funcOp.addEntryBlock();
   OpBuilder builder = OpBuilder::atBlockEnd(entryBlock);
@@ -228,8 +227,8 @@ LogicalResult generateAsynchronousBody(FuncOp funcOp, FuncOp syncFuncOp,
   auto waitValue = entryBlock->getArgument(1);
   auto waitOp = builder.create<HAL::SemaphoreAwaitOp>(
       loc, builder.getIntegerType(32), waitSemaphore, waitValue);
-  auto checkSuccessOp = builder.create<HAL::CheckSuccessOp>(
-      loc, waitOp.getResult(), "semaphore wait failed");
+  builder.create<HAL::CheckSuccessOp>(loc, waitOp.getResult(),
+                                      "semaphore wait failed");
 
   // Trim the first (wait semaphore/value) and last (signal semaphore/value)
   // two arguments.
