@@ -71,12 +71,37 @@ build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 build:generic_clang --copt=-UNDEBUG
 
 ###############################################################################
+# Options for building with address sanitizer.
+# https://github.com/google/sanitizers/wiki/AddressSanitizer
+###############################################################################
+
+# Turn on asan. Some toolchains make use of the asan feature and we'll directly
+# set the appropriate opts.
+build:asan --features=asan
+build:asan --copt=-fsanitize=address
+build:asan --linkopt=-fsanitize=address
+
+# Don't strip debug info
+build:asan --strip=never
+# Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
+# We don't use this in IREE (that's what linkstatic is for), but it could show
+# up in dependencies.
+build:asan --force_ignore_dash_static
+# asan tests tend to take longer, so increase the timeouts
+build:asan --test_timeout=120,600,1800,-1
+# Make the outputs easy to find
+build:asan --cc_output_directory_tag=asan
+# Get better stack traces
+build:asan --copt=-fno-omit-frame-pointer
+# This macro define is used by absl
+build:asan --copt=-DADDRESS_SANITIZER
+
+###############################################################################
 # Architecture specific options
 ###############################################################################
 
 # Enable some default cpu flags for x86 optimization.
 build:x86opt --copt=-mavx2
-
 
 ###############################################################################
 
