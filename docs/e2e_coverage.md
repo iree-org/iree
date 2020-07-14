@@ -41,7 +41,7 @@ target | tensorflow | vmla | llvm-ir | vulkan-spirv
 [simple_stateful_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/simple_stateful_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [sliding_window_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/sliding_window_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [strings_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/strings_test.py) | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
-[tensorlist_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/tensorlist_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span>
+[tensorlist_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/tensorlist_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 
 ## End to end tests written using tf.keras
 
