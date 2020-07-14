@@ -14,7 +14,6 @@
 
 #include "experimental/ModelBuilder/ModelRunner.h"
 
-#include "experimental/ModelBuilder/ModelBuilder.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
