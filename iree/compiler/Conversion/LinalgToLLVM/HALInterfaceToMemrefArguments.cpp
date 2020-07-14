@@ -136,8 +136,7 @@ struct ProcessFuncInterfacePattern : public OpConversionPattern<FuncOp> {
     auto newFuncOp = rewriter.create<FuncOp>(
         loc, funcOp.getName(),
         rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
-                                 llvm::None),
-        ArrayRef<NamedAttribute>());
+                                 llvm::None));
     newFuncOp.setAttr("llvm.emit_c_interface",
                       mlir::UnitAttr::get(funcOp.getContext()));
 

@@ -171,8 +171,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
                                             separableOp.index()));
     StringRef newFnName = splitKernels.back();
     builder.setInsertionPointToStart(moduleOp.getBody());
-    auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType(),
-                                        /*attrs=*/ArrayRef<NamedAttribute>());
+    auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType());
 
     // Copy over all attributes except type and name.
     for (const auto &namedAttr : oldFn.getAttrs()) {
