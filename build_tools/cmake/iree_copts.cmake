@@ -57,6 +57,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # Enable some warnings
     "-Wimplicit-fallthrough"
     "-Wthread-safety-analysis"
+    "-Wunused-variable"
   CLANG_OR_GCC
     "-Wno-unused-parameter"
     "-Wno-undef"

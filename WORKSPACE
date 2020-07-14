@@ -50,11 +50,11 @@ http_archive(
     name = "bazel_toolchains",
     # Workaround for b/150158570. This patch needs to be updated if the bazel_toolchains version is updated.
     patches = ["//build_tools/bazel:bazel_toolchains.patch"],
-    sha256 = "4d348abfaddbcee0c077fc51bb1177065c3663191588ab3d958f027cbfe1818b",
-    strip_prefix = "bazel-toolchains-2.1.0",
+    sha256 = "6d54b26a58457f9fca2e54f053402061ffe73e3b909b8f6bf6dedb2a3db093ea",
+    strip_prefix = "bazel-toolchains-3.3.2",
     urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.1.0/bazel-toolchains-2.1.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.1.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.3.2/bazel-toolchains-3.3.2.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/releases/download/3.3.2/bazel-toolchains-3.3.2.tar.gz",
     ],
 )
 
@@ -62,10 +62,11 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 
 rbe_autoconfig(
     name = "rbe_default",
-    base_container_digest = "sha256:ac36d37616b044ee77813fc7cd36607a6dc43c65357f3e2ca39f3ad723e426f6",
-    digest = "sha256:61fd698572dc8b5fc9db11cb4ba4f138a915517b80617259bcaef8e1e4ffd3fb",
+    base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
+    digest = "sha256:b59d8cc422b03524394d4d05e443bf38d4fe96fab06197b34174de01572e8161",
     registry = "gcr.io",
     repository = "iree-oss/rbe-toolchain",
+    use_checked_in_confs = "Force",
 )
 
 ###############################################################################

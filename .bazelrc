@@ -18,9 +18,7 @@
 ###############################################################################
 # Prevent invalid caching if input files are modified during a build.
 build --experimental_guard_against_concurrent_changes
-# Disable visibility checks (works around some private deps in TensorFlow that
-# are being unbundled soon anyway).
-build --nocheck_visibility
+# Default to optimized builds
 # Override via: "-c dbg" or --compilation_mode=dbg
 build --compilation_mode=opt
 # Used in TensorFlow, so we have to enable it here as well.
@@ -36,7 +34,6 @@ test --test_output=errors
 # TensorFlow always sets these in OSS which makes it impossible to build TF
 # without them...
 build --define open_source_build=true
-test --define open_source_build=true
 
 ###############################################################################
 # Options for "generic_clang" builds: these options should generally apply to
@@ -61,13 +58,40 @@ build:generic_clang --copt=-Wno-unused-function
 # Enable warnings we do care about.
 build:generic_clang --copt=-Wimplicit-fallthrough
 build:generic_clang --copt=-Wthread-safety-analysis
+build:generic_clang --copt=-Wunused-variable
 
 # C++14 standard version is required.
 build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 
-# Default to an optimized build with asserts.
+# Default to adding back asserts in optimized builds.
 # This is a good compromise between runtime and debugability.
 build:generic_clang --copt=-UNDEBUG
+
+###############################################################################
+# Options for building with address sanitizer.
+# https://github.com/google/sanitizers/wiki/AddressSanitizer
+###############################################################################
+
+# Turn on asan. Some toolchains make use of the asan feature and we'll directly
+# set the appropriate opts.
+build:asan --features=asan
+build:asan --copt=-fsanitize=address
+build:asan --linkopt=-fsanitize=address
+
+# Don't strip debug info
+build:asan --strip=never
+# Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
+# We don't use this in IREE (that's what linkstatic is for), but it could show
+# up in dependencies.
+build:asan --force_ignore_dash_static
+# asan tests tend to take longer, so increase the timeouts
+build:asan --test_timeout=120,600,1800,-1
+# Make the outputs easy to find
+build:asan --cc_output_directory_tag=asan
+# Get better stack traces
+build:asan --copt=-fno-omit-frame-pointer
+# This macro define is used by absl
+build:asan --copt=-DADDRESS_SANITIZER
 
 ###############################################################################
 # Architecture specific options
@@ -76,27 +100,23 @@ build:generic_clang --copt=-UNDEBUG
 # Enable some default cpu flags for x86 optimization.
 build:x86opt --copt=-mavx2
 
-
 ###############################################################################
-
-# Options for connecting to the IREE GCP remote build project.
-
-# Enable authentication. This will pick up application default credentials by
-# default. You can use --google_credentials=some_file.json to use a service
-# account credential instead.
-build:gcp --google_default_credentials=true
-# Point to the remote instance constructed in the iree-oss project
-build:gcp --remote_instance_name=projects/iree-oss/instances/default_instance
-
-###############################################################################
-
 # Configuration for building remotely using Remote Build Execution (RBE)
 # https://cloud.google.com/remote-build-execution/
 # Based on https://github.com/bazelbuild/bazel-toolchains/blob/master/bazelrc/bazel-1.0.0.bazelrc
 # Currently in development only usable by CI.
+###############################################################################
 
-# Set up connections to GCP project.
-build:rbe --config=gcp
+# Options for connecting to the IREE GCP remote build project. These are
+# repeated separately in each config to avoid warnings about configs being
+# expanded more than once.
+
+# Enable authentication. This will pick up application default credentials by
+# default. You can use --google_credentials=some_file.json to use a service
+# account credential instead.
+build:rbe --google_default_credentials=true
+# Point to the remote instance constructed in the iree-oss project
+build:rbe --remote_instance_name=projects/iree-oss/instances/default_instance
 
 # Depending on how many machines are in the remote execution instance, setting
 # this higher can make builds faster by allowing more jobs to run in parallel.
@@ -105,8 +125,10 @@ build:rbe --config=gcp
 build:rbe --jobs=50
 
 # Flags related to specifying the platform, toolchain and java properties.
-# These flags must be adapted to work with toolchain containers other than rbe-ubuntu16-04
-# References to "rbe_default" matches rbe_autoconfig(name="rbe_default") in WORKSPACE
+# These flags must be adapted to work with toolchain containers other than
+# rbe-ubuntu16-04
+# References to "rbe_default" matches rbe_autoconfig(name="rbe_default") in
+# WORKSPACE
 build:rbe --host_javabase=@rbe_default//java:jdk
 build:rbe --javabase=@rbe_default//java:jdk
 build:rbe --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
@@ -139,12 +161,22 @@ build:rbe --remote_timeout=3600
 build:rbe --disk_cache=""
 
 ###############################################################################
-
 # Configuration for uploading build results to Result Store UI
 # https://cloud.google.com/remote-build-execution/docs/results-ui/getting-started-results-ui
 # Can be used either with or without --config=rbe.
+###############################################################################
 
-build:rs --config=gcp
+# Options for connecting to the IREE GCP remote build project. These are
+# repeated separately in each config to avoid warnings about configs being
+# expanded more than once.
+
+# Enable authentication. This will pick up application default credentials by
+# default. You can use --google_credentials=some_file.json to use a service
+# account credential instead.
+build:rs --google_default_credentials=true
+# Point to the remote instance constructed in the iree-oss project
+build:rs --remote_instance_name=projects/iree-oss/instances/default_instance
+
 build:rs --bes_backend="buildeventservice.googleapis.com"
 build:rs --bes_results_url="https://source.cloud.google.com/results/invocations/"
 build:rs --project_id=iree-oss
