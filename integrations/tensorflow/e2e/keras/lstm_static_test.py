@@ -18,6 +18,7 @@
 
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 NUM_UNITS = 10
@@ -27,7 +28,7 @@ INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 
 
 def lstm_module():
-  tf_test_utils.set_random_seed()
+  tf_utils.set_random_seed()
   inputs = tf.keras.layers.Input(batch_size=NUM_BATCH, shape=INPUT_SHAPE[1:])
   outputs = tf.keras.layers.LSTM(units=NUM_UNITS, return_sequences=True)(inputs)
   model = tf.keras.Model(inputs, outputs)
@@ -39,11 +40,11 @@ def lstm_module():
   return module
 
 
-@tf_test_utils.compile_modules(lstm=(lstm_module, ["predict"]))
+@tf_test_utils.compile_module(lstm_module, exported_names=["predict"])
 class LstmTest(tf_test_utils.SavedModelTestCase):
 
   def test_lstm(self):
-    m = self.modules.lstm.all
+    m = self.get_module()
     m.predict(
         tf.constant(
             np.arange(NUM_BATCH * NUM_TIMESTEPS * NUM_UNITS,

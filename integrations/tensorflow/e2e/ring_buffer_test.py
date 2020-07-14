@@ -164,10 +164,10 @@ class StatefulRingBuffer(tf.keras.layers.Layer):
     return dict(list(base_config.items()) + list(config.items()))
 
 
-class StatefulRingBufferM(tf.Module):
+class StatefulRingBufferModule(tf.Module):
 
   def __init__(self):
-    super(StatefulRingBufferM, self).__init__()
+    super(StatefulRingBufferModule, self).__init__()
     state_shape = [BATCH_SIZE, TIME_SIZE, FEATURE_SIZE]
     self.rb = StatefulRingBuffer(state_shape=state_shape)
 
@@ -177,26 +177,27 @@ class StatefulRingBufferM(tf.Module):
     return self.rb(x)
 
 
-@tf_test_utils.compile_modules(rb=(StatefulRingBufferM, ["predict"]))
+@tf_test_utils.compile_module(
+    StatefulRingBufferModule, exported_names=["predict"])
 class StatefulRingBufferTest(tf_test_utils.SavedModelTestCase):
 
-  def test_statefulringbuffer(self):
+  def test_stateful_ringbuffer(self):
     input1 = np.array([[1.0, 2.0]], dtype=np.float32)
-    result1 = self.modules.rb.all.predict(input1)
+    result1 = self.get_module().predict(input1)
     output1 = np.array([[1.0, 2.0]], dtype=np.float32)
     assert np.allclose(result1, output1)
 
     # ring buffer is not filled yet,
     # so data from first cycle will be returned
     input2 = np.array([[3.0, 4.0]], dtype=np.float32)
-    result2 = self.modules.rb.all.predict(input2)
+    result2 = self.get_module().predict(input2)
     output2 = np.array([[1.0, 2.0]], dtype=np.float32)
     assert np.allclose(result2, output2)
 
     # on 3rd cycle we overwrite oldest data
     # and return data from 2nd cycle
     input3 = np.array([[5.0, 6.0]], dtype=np.float32)
-    result3 = self.modules.rb.all.predict(input3)
+    result3 = self.get_module().predict(input3)
     output3 = np.array([[3.0, 4.0]], dtype=np.float32)
     assert np.allclose(result3, output3)
 

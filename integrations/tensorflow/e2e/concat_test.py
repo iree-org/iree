@@ -15,6 +15,7 @@
 """Test concat op."""
 
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -49,36 +50,36 @@ class ConcatOpsModule(tf.Module):
     return tf.concat([a, b], axis=2)
 
 
-@tf_test_utils.compile_modules(mat=ConcatOpsModule)
+@tf_test_utils.compile_module(ConcatOpsModule)
 class ConcatOpsTest(tf_test_utils.SavedModelTestCase):
 
   def test_concat_zero_dim(self):
-    tf_test_utils.set_random_seed()
-    m = self.modules.mat.all
+    tf_utils.set_random_seed()
+    m = self.get_module()
     a = tf.random.uniform([1, 5, 0], dtype=tf.float32)
     b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     dst = m.concat_zero_dim(a, b)
     dst.assert_all_close()
 
   def concat0axis(self):
-    tf_test_utils.set_random_seed()
-    m = self.modules.mat.all
+    tf_utils.set_random_seed()
+    m = self.get_module()
     a = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     dst = m.concat_zero_dim(a, b)
     dst.assert_all_close()
 
   def concat1axis(self):
-    tf_test_utils.set_random_seed()
-    m = self.modules.mat.all
+    tf_utils.set_random_seed()
+    m = self.get_module()
     a = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     dst = m.concat_zero_dim(a, b)
     dst.assert_all_close()
 
   def concat2axis(self):
-    tf_test_utils.set_random_seed()
-    m = self.modules.mat.all
+    tf_utils.set_random_seed()
+    m = self.get_module()
     a = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
     dst = m.concat_zero_dim(a, b)

@@ -38,17 +38,17 @@ class ControlFlowModule(tf.Module):
     return i
 
 
-@tf_test_utils.compile_modules(control_flow=ControlFlowModule)
+@tf_test_utils.compile_module(ControlFlowModule)
 class ControlFlowTest(tf_test_utils.SavedModelTestCase):
 
   def test_short_sequence(self):
     input_array = numpy.array(9., dtype=numpy.float32)
-    result = self.modules.control_flow.all.collatz(input_array)
+    result = self.get_module().collatz(input_array)
     result.print().assert_all_close()
 
   def test_long_sequence(self):
     input_array = numpy.array(178., dtype=numpy.float32)
-    result = self.modules.control_flow.all.collatz(input_array)
+    result = self.get_module().collatz(input_array)
     result.print().assert_all_close()
 
 

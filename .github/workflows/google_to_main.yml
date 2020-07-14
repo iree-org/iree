@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Creates a PR to update the TF submodule to HEAD & copy the latest
-# version of the LLVM Bazel BUILD files from TF.
+# Creates a PR to merge the `google` branch into the `main` branch.
 
-name: Update TensorFlow
+name: google -> main
 
 on:
   schedule:
-    # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
-    - cron: '0 */6 * * *'
+    # Every 6 hours at 45 minutes past the hour (to be a bit behind the TF submodule update)
+    # 00:45, 06:45, 12:45, 18:45 UTC (04:45, 10:45, 16:45, 22:45 PST)
+    - cron: '45 */6 * * *'
 
 jobs:
-  update_tf:
+  google_to_main:
     # Don't run this in everyone's forks.
     if: github.repository == 'google/iree'
     runs-on: ubuntu-18.04
@@ -32,24 +32,31 @@ jobs:
         uses: actions/checkout@v2
         with:
           ref: "google"
+      # We have to explicitly fetch the main branch as well
+      - name: Fetching Base Branch
+        run: git fetch --no-tags --prune --depth=1 origin main
+      - name: Checking for a diff
+        run: |
+          echo "::set-env name=has_diff::false"
+          git diff main --exit-code || echo "::set-env name=has_diff::true"
+      - name: Calculating PR body
+        if: env.has_diff == 'true'
+        run: |
+          echo "::set-env name=pr_body::$(git log main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
       - name: Initializing submodules
+        if: env.has_diff == 'true'
         run: ./scripts/git/submodule_versions.py init
-      - name: Updating submodules
-        run: ./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true
-      - name: Calculating TF SHA
-        run: echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | cut -c -12)"
       - name: Creating Pull Request
+        if: env.has_diff == 'true'
         uses: peter-evans/create-pull-request@v2
         with:
           # Personal token is required to trigger additional automation (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          commit-message: "Update TF submodule and LLVM BUILD files"
-          title: "Integrate TF at https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }}"
-          body: |
-            "Updates TF to current HEAD and copies latest version of LLVM BUILD files.
-
-            Automated submodule bump from .github/workflows/update_tf.yml"
-          committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
+          commit-message: "Merge google -> main"
+          title: "Merge google -> main"
+          body: "${{ env.pr_body }}"
+          committer: "Integrate Action <iree-github-actions-bot@google.com>"
           # TODO(gcmn): Figure out a way to assign this to someone dynamically.
           reviewers: gmngeoffrey
-          branch: "auto_submodule_update"
+          branch: "google-to-main"
+          base: "main"

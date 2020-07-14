@@ -19,7 +19,7 @@
 # gcloud auth configure-docker
 # docker build --tag gcr.io/iree-oss/rbe-toolchain build_tools/docker/rbe_toolchain/
 
-FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:ac36d37616b044ee77813fc7cd36607a6dc43c65357f3e2ca39f3ad723e426f6
+FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61
 
 RUN apt-get update
 RUN apt-get install -y python3 python3-pip

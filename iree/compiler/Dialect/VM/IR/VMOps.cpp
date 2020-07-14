@@ -1041,6 +1041,51 @@ static LogicalResult verifyFailOp(T op) {
   return success();
 }
 
+static ParseResult parseCondFailOp(OpAsmParser &parser,
+                                   OperationState *result) {
+  // First operand is either 'condition' or 'status', both i32.
+  OpAsmParser::OperandType condition;
+  if (failed(parser.parseOperand(condition))) {
+    return failure();
+  }
+
+  // First try looking for an operand after a comma. If no operand, keep track
+  // of the already parsed comma to avoid checking for a comma later on.
+  bool trailingComma = false;
+  OpAsmParser::OperandType status = condition;
+  if (succeeded(parser.parseComma()) &&
+      !parser.parseOptionalOperand(status).hasValue()) {
+    trailingComma = true;
+  }
+
+  StringAttr messageAttr;
+  if ((trailingComma || succeeded(parser.parseComma())) &&
+      failed(
+          parser.parseAttribute(messageAttr, "message", result->attributes))) {
+    return failure();
+  }
+
+  Type operandType = IntegerType::get(32, result->getContext());
+  if (failed(parser.resolveOperand(condition, operandType, result->operands)) ||
+      failed(parser.resolveOperand(status, operandType, result->operands))) {
+    return failure();
+  }
+
+  return parser.parseOptionalAttrDict(result->attributes);
+}
+
+static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
+  p << op.getOperationName() << ' ';
+  if (op.condition() != op.status()) {
+    p << op.condition() << ", ";
+  }
+  p << op.status();
+  if (op.message().hasValue()) {
+    p << ", \"" << op.message().getValue() << "\"";
+  }
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"message"});
+}
+
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//

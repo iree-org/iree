@@ -40,12 +40,19 @@ RUN apt-get install -y git
 
 # Install Bazel.
 # https://docs.bazel.build/versions/master/install-ubuntu.html
-ENV BAZEL_VERSION 2.1.0
+ARG BAZEL_VERSION=2.1.0
 RUN apt-get install -y unzip zip wget \
   && wget "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
   && chmod +x "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" \
   && "./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh" --user \
   && rm "bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh"
+# Install a newer version of Bazel. We don't need the full installation now.
+# Just need to provide a different version for the version-identification
+# wrapper script to find in /root/.bazel/bin
+ARG NEW_BAZEL_VERSION=3.3.1
+RUN cd "/root/.bazel/bin" \
+  && wget "https://releases.bazel.build/${NEW_BAZEL_VERSION?}/release/bazel-${NEW_BAZEL_VERSION?}-linux-x86_64" \
+  && chmod +x "bazel-${NEW_BAZEL_VERSION?}-linux-x86_64"
 # ENV does not allow ${variable?} syntax.
 ENV PATH "/root/bin:${PATH}"
 

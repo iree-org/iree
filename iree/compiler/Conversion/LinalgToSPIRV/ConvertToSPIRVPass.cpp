@@ -218,7 +218,12 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     // TODO(thomasraoux): use coloumn major operand when TransfertRead +
     // TransposeOp.
     if (!op.permutation_map().isIdentity()) return failure();
-    if (op.masked()) return failure();
+    if (op.masked() &&
+        llvm::any_of(op.masked()->template cast<ArrayAttr>(),
+                     [](mlir::Attribute maskedDim) {
+                       return maskedDim.cast<BoolAttr>().getValue();
+                     }))
+      return failure();
     auto matType = spirv::CooperativeMatrixNVType::get(
         vecType.getElementType(), spirv::Scope::Subgroup, vecType.getDimSize(0),
         vecType.getDimSize(1));
@@ -330,11 +335,6 @@ struct ConvertToSPIRVPass
   void runOnOperation() override;
   ConvertToSPIRVPass() {}
   ConvertToSPIRVPass(const ConvertToSPIRVPass &pass) {}
-  Option<bool> useCooperativeMatrix{
-      *this, "use-cooperative-matrix",
-      llvm::cl::desc("Experimental: Lower vector contract to cooperative "
-                     "matrix operations"),
-      llvm::cl::init(false)};
 };
 }  // namespace
 
@@ -414,12 +414,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
-
-  if (useCooperativeMatrix) {
-    auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
-    populateVectorToSPIRVPatterns(context, typeConverter, patterns,
-                                  cooperativeMatrixAnalysis);
-  }
+  auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
+  populateVectorToSPIRVPatterns(context, typeConverter, patterns,
+                                cooperativeMatrixAnalysis);
   patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter,
                   LinalgReshapeConverter>(context, typeConverter);
 

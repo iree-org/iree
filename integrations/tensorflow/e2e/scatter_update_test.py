@@ -48,30 +48,28 @@ class ScatterUpdateModule(tf.Module):
     return tf.tensor_scatter_nd_update(tensor, indices, updates)
 
 
-@tf_test_utils.compile_modules(scatter_update=ScatterUpdateModule)
+@tf_test_utils.compile_module(ScatterUpdateModule)
 class ScatterUpdateTest(tf_test_utils.SavedModelTestCase):
 
   def test_scatter_update_1D(self):
     tensor = tf.ones([8], dtype=tf.int32)
     indices = tf.constant([[4], [5], [6]])
     updates = tf.constant([9, 10, 11])
-    result = self.modules.scatter_update.all.scatter_update_1D(
-        tensor, indices, updates)
+    result = self.get_module().scatter_update_1D(tensor, indices, updates)
     result.assert_all_close()
 
   def test_scatter_update_2D(self):
     tensor = tf.ones([4, 3], dtype=tf.int32)
     indices = tf.constant([[1, 0], [2, 1], [3, 2]])
     updates = tf.constant([2, 5, 8])
-    result = self.modules.scatter_update.all.scatter_update_2D(
-        tensor, indices, updates)
+    result = self.get_module().scatter_update_2D(tensor, indices, updates)
     result.assert_all_close()
 
   def test_scatter_update_2D_slice(self):
     tensor = tf.ones([4, 3], dtype=tf.int32)
     indices = tf.constant([[1]])
     updates = tf.constant([[2, 3, 4]])
-    result = self.modules.scatter_update.all.scatter_update_2D_slice(
+    result = self.get_module().scatter_update_2D_slice(
         tensor, indices, updates)
     result.assert_all_close()
 

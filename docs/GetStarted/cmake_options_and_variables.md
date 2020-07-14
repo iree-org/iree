@@ -143,8 +143,8 @@ the artifact output names are just used for naming the build artifacts. When
 cross-compiling, it's the artifact names being load-bearing. The artifact names
 are used to express dependencies across CMake invocation boundary (remember that
 we cannot access targets defined in another CMake invocation); the
-package-prefixed CMake target names are just cutom targets depending on the host
-artfact.
+package-prefixed CMake target names are just custom targets depending on the host
+artifact.
 
 #### `IREE_HOST_BINARY_ROOT`:FILEPATH
 

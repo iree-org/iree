@@ -22,6 +22,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+    "iree_py_binary",
 )
 load(
     "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.bzl",
@@ -66,7 +67,7 @@ Command arguments description:
 """
 
 [
-    py_binary(
+    iree_py_binary(
         name = src.replace(".py", "_manual"),
         srcs = [src],
         main = src,
@@ -219,7 +220,7 @@ iree_vision_test_suite(
 # 32x32. These models are not optimized for accuracy or latency (they are for
 # debugging only). They have the same neural net topology with keras vision
 # models trained on imagenet data sets
-py_binary(
+iree_py_binary(
     name = "train_vision_models_on_cifar",
     srcs = ["train_vision_models_on_cifar.py"],
     python_version = "PY3",

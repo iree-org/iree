@@ -89,6 +89,7 @@ if __name__ == '__main__':
     images_to_update.extend(IMAGES_TO_DEPENDENT_IMAGES[args.image])
 
   for image in images_to_update:
+    print(f'Updating image {image}')
     image_url = os.path.join(IREE_GCR_URL, f'{image}:{args.tag}')
     image_path = os.path.join(DOCKER_DIR, image.replace('-', '_'))
     subprocess.check_output(['docker', 'build', '--tag', image_url, image_path])

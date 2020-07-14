@@ -43,6 +43,11 @@ test --define open_source_build=true
 # either clang or gcc and are curated based on need.
 ###############################################################################
 
+# Treat warnings in-workspace as errors.
+build:generic_clang --per_file_copt=-external/.*-Werror
+# ...and silence them outside of the workspace.
+build:generic_clang --per_file_copt=external/.*@-w
+
 # Disable warnings we don't care about.
 build:generic_clang --copt=-Wno-unused-local-typedef
 build:generic_clang --copt=-Wno-unused-private-field

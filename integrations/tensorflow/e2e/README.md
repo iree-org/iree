@@ -23,6 +23,30 @@ targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 The test suites can be run excluding Vulkan by specifying
 `--test_tag_filters="-driver=vulkan"` in the `bazel test` invocation.
 
+
+## Compiling `tf.Module`s
+
+Compatible TensorFlow modules can be compiled to specific IREE backends using
+`IreeCompiledModule.compile(...)`. This also optionally saves
+compilation artifacts to a specified directory. These artifacts include: MLIR
+across various lowerings, a TensorFlow SavedModel, and the compiled VM
+FlatBuffer. A basic example of creating and calling an `IreeCompiledModule` can
+be found in
+[`tf_utils_test.py`](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/pyiree/tf/support/tf_utils_test.py)
+
+When using Keras models or tf.Modules with functions that IREE can't compile,
+`exported_names` should be specified. For example:
+
+```python
+from pyiree.tf.support import tf_utils
+vmla_module = tf_utils.IreeCompiledModule(
+    constructor=KerasTFModuleClass,
+    backend_info=tf_utils.BackendInfo.ALL['iree_vmla'],
+    exported_names=['predict'])
+vmla_module.predict(...)
+```
+
+
 ## Running tests
 
 For locally running tests and iterating on backend development, `bazel run` is
@@ -52,7 +76,7 @@ backends, then we will test both backends and compare them with each other. If
 you specify `tf` backend only, then we will also test `tf` vs `tf` to capture
 any model initialization/randomization issues (it is a special case for debug
 purpose). For reproducibility of the unit tests we set random seed of `tf` and
-`numpy` by calling `tf_test_utils.set_random_seed()` before model creation.
+`numpy` by calling `tf_utils.set_random_seed()` before model creation.
 
 ## Test Suites
 

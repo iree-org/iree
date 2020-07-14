@@ -196,6 +196,22 @@ vm.module @my_module {
     vm.cond_fail %cond, %code2, "message"
     vm.return
   }
+  // CHECK-LABEL: @cond_fail_no_condition
+  vm.func @cond_fail_no_condition() {
+    // CHECK-DAG: %[[CODE3:.+]] = constant 3
+    %code3 = constant 3 : i32
+    // CHECK: vm.cond_fail %[[CODE3]]
+    vm.cond_fail %code3
+    vm.return
+  }
+  // CHECK-LABEL: @cond_fail_no_condition_with_message
+  vm.func @cond_fail_no_condition_with_message() {
+    // CHECK-DAG: %[[CODE4:.+]] = constant 4
+    %code4 = constant 4 : i32
+    // CHECK: vm.cond_fail %[[CODE4]]
+    vm.cond_fail %code4, "message"
+    vm.return
+  }
 }
 
 // -----

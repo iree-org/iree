@@ -28,12 +28,11 @@ class ResourcesOpsModule(tf.Module):
     return self.counter.assign_add(value)
 
 
-@tf_test_utils.compile_modules(resource_ops=ResourcesOpsModule)
+@tf_test_utils.compile_module(ResourcesOpsModule)
 class ResourcesOpsTest(tf_test_utils.SavedModelTestCase):
 
   def test_add_assign(self):
-    result = self.modules.resource_ops.all.add_assign(
-        np.array(9., dtype=np.float32))
+    result = self.get_module().add_assign(np.array(9., dtype=np.float32))
     result.assert_all_close()
 
 
