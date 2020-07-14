@@ -14,10 +14,9 @@
 # limitations under the License.
 """Test utilities interop with TensorFlow."""
 
-# pylint: disable=not-callable
-# pylint: disable=invalid-name
 # pylint: disable=missing-docstring
 # pylint: disable=protected-access
+# pylint: disable=unsupported-assignment-operation
 
 import collections
 import os
@@ -26,7 +25,6 @@ import re
 from absl import flags
 from absl import logging
 import numpy as np
-from pyiree import rt
 from pyiree.tf import compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
@@ -53,124 +51,6 @@ def _setup_test_debug_dir(test_name):
     os.makedirs(global_debug_dir)
   except IOError:
     logging.exception("Error creating debug dir for: %s", global_debug_dir)
-
-
-class CompiledModule(object):
-  """Base class for per-backend compiled module facade."""
-
-  def __init__(self, ctor, exported_names, backend):
-    self._ctor = ctor
-    self._exported_names = exported_names
-    self._backend = backend
-
-  @staticmethod
-  def create(ctor, exported_names, backend):
-    compiled_module_class = backend.CompiledModule
-    return compiled_module_class(ctor, exported_names, backend)
-
-  @property
-  def ctor(self):
-    return self._ctor
-
-  def instantiate(self):
-    raise NotImplementedError()
-
-
-class TfCompiledModule(CompiledModule):
-  """TensorFlow 'compiled' module.
-
-  This just wraps the constructor.
-  """
-
-  def instantiate(self):
-    tf_module = self.ctor()
-    return _TfModuleInstance(tf_module)
-
-
-class _TfModuleInstance(object):
-  """Instance of a TF module."""
-
-  def __init__(self, tf_module):
-    self._tf_module = tf_module
-
-  def __getattr__(self, attr):
-    # Try to resolve it as a function.
-    if not hasattr(self._tf_module, attr):
-      raise AttributeError("The TensorFlow module does not have attr '%s'" %
-                           (attr,))
-    f = getattr(self._tf_module, attr)
-    if not f or not hasattr(f, "__call__"):
-      raise AttributeError(
-          "The TensorFlow module does not have a callable attr '%s'" % (attr,))
-    return _TfFunctionWrapper(f)
-
-
-class _TfFunctionWrapper(object):
-  """Wraps a TF function, normalizing it to numpy."""
-
-  def __init__(self, f):
-    self._f = f
-
-  def __call__(self, *args, **kwargs):
-    # TensorFlow will auto-convert all inbound args.
-    results = self._f(*args, **kwargs)
-    # Then unmarshal them to numpy in the same way that the other backends do.
-    # Handle single result (technically ambiguous with return of a tuple,
-    # which is sad).
-    if not isinstance(results, tuple):
-      results = (results,)
-    return tf.nest.map_structure(
-        lambda t: t.numpy() if isinstance(t, tf.Tensor) else t,
-        *results,
-        check_types=False)
-
-
-class IreeCompiledModule(CompiledModule):
-  """Iree compiled module."""
-
-  def __init__(self, ctor, exported_names, backend):
-    super().__init__(ctor, exported_names, backend)
-    self._iree_module_blob = tf_utils.compile_tf_module(
-        ctor(),
-        exported_names=exported_names,
-        target_backends=backend.iree_compiler_targets,
-        artifacts_dir=global_debug_dir)
-    self._iree_module = rt.VmModule.from_flatbuffer(self._iree_module_blob)
-
-  def instantiate(self):
-    return _IreeModuleInstance(self._backend, self._iree_module_blob,
-                               self._iree_module)
-
-
-class _IreeModuleInstance(object):
-  """An instance of an IREE module."""
-
-  def __init__(self, backend, iree_module_blob, iree_module):
-    self._backend = backend
-    self._iree_module_blob = iree_module_blob
-    self._iree_module = iree_module
-    self._iree_module_name = self._iree_module.name
-
-    self._system_config = rt.Config(driver_name=backend.iree_driver)
-    self._context = rt.SystemContext(
-        modules=[self._iree_module], config=self._system_config)
-
-  def __getattr__(self, attr):
-    # Try to resolve it as a function.
-    m = self._context.modules[self._iree_module_name]
-    f = m[attr]
-    return _IreeFunctionWrapper(self._context, f)
-
-
-class _IreeFunctionWrapper(object):
-  """Wraps an IREE function, making it callable."""
-
-  def __init__(self, context, f):
-    self._context = context
-    self._f = f
-
-  def __call__(self, *args):
-    return self._f(*args)
 
 
 class _VirtualModuleInstance(object):
@@ -383,8 +263,11 @@ def _instantiate_backends(compiled_backends):
       """Shorthand for multi() which selects all backends."""
       return self.multi()
 
-  return VirtualBackendsClass(
-      *[m.instantiate() for m in compiled_backends.values()])
+  reinitialized_modules = [
+      tf_utils.CompiledModule.from_existing(module)
+      for module in compiled_backends.values()
+  ]
+  return VirtualBackendsClass(*reinitialized_modules)
 
 
 def compile_module(module_ctor, exported_names=()):
@@ -397,8 +280,9 @@ def compile_module(module_ctor, exported_names=()):
   Args:
     module_ctor: tf.Module subclass or function which returns a tf.Module
       subclass instance.
-    exported_names: optional iterable of strings representing the exported names
-      to keep. Used primarily for Keras models (e.g. exported_names=["predict"])
+    exported_names: optional iterable of strings representing which of
+      module_ctor's functions to compile. If exported_names is empty all
+      functions will be compiled.
 
   Returns:
     Class decorator function.
@@ -417,60 +301,16 @@ def compile_module(module_ctor, exported_names=()):
   return decorator
 
 
-class BackendInfo(
-    collections.namedtuple(
-        "BackendInfo",
-        ["name", "CompiledModule", "iree_driver", "iree_compiler_targets"])):
-  """Info object describing a backend."""
-
-  # All BackendInfo entries by name.
-  ALL = {}
-
-  @classmethod
-  def add(cls, **kwargs):
-    backend_info = cls(**kwargs)
-    cls.ALL[backend_info.name] = backend_info
-
-
-BackendInfo.add(
-    name="tf",
-    CompiledModule=TfCompiledModule,
-    iree_driver=None,
-    iree_compiler_targets=None)
-# tf_also is used for checking test consistency
-# to catch any initialization/randomization issues between model runs
-BackendInfo.add(
-    name="tf_also",
-    CompiledModule=TfCompiledModule,
-    iree_driver=None,
-    iree_compiler_targets=None)
-BackendInfo.add(
-    name="iree_vmla",
-    CompiledModule=IreeCompiledModule,
-    iree_driver="vmla",
-    iree_compiler_targets=["vmla"])
-BackendInfo.add(
-    name="iree_vulkan",
-    CompiledModule=IreeCompiledModule,
-    iree_driver="vulkan",
-    iree_compiler_targets=["vulkan-*"])
-BackendInfo.add(
-    name="iree_llvmjit",
-    CompiledModule=IreeCompiledModule,
-    iree_driver="llvm",
-    iree_compiler_targets=["llvm-ir"])
-
-
 def _parse_target_backends(target_backends):
   """Decodes a comma-delimited string of backends into BackendInfo objects."""
   backends = []
   for backend_name in target_backends.split(","):
-    if backend_name not in BackendInfo.ALL.keys():
+    if backend_name not in tf_utils.BackendInfo.ALL.keys():
       raise ValueError(
           "Invalid backend specification string '{}', unexpected name '{}';"
           " valid names are '{}'".format(target_backends, backend_name,
-                                         BackendInfo.ALL.keys()))
-    backends.append(BackendInfo.ALL[backend_name])
+                                         tf_utils.BackendInfo.ALL.keys()))
+    backends.append(tf_utils.BackendInfo.ALL[backend_name])
   return backends
 
 
@@ -489,10 +329,10 @@ def get_backends():
     backends = _parse_target_backends(FLAGS.target_backends)
     # If tf is the only backend then we will test it itself by adding tf_also.
     if len(backends) == 1 and "tf" == backends[0].name:
-      backends.append(BackendInfo.ALL["tf_also"])
+      backends.append(tf_utils.BackendInfo.ALL["tf_also"])
   else:
     # If no backends are specified, use them all.
-    backends = list(BackendInfo.ALL.values())
+    backends = list(tf_utils.BackendInfo.ALL.values())
   return backends
 
 
@@ -506,10 +346,6 @@ class SavedModelTestCase(tf.test.TestCase):
   # Will be initialized in setUpClass to a dict of
   # {backend_name: CompiledModule}.
   _compiled_backends_dict = None
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.modules = None
 
   @classmethod
   def setUpClass(cls):
@@ -528,9 +364,9 @@ class SavedModelTestCase(tf.test.TestCase):
         backends = get_backends()
         cls._compiled_backends_dict = {}
         for backend in backends:
-          cls._compiled_backends_dict[backend.name] = CompiledModule.create(
-              cls._module_ctor, cls._exported_names, backend)
-
+          compiled_backend = tf_utils.CompiledModule.compile(
+              cls._module_ctor, backend, cls._exported_names, global_debug_dir)
+          cls._compiled_backends_dict[backend.name] = compiled_backend
       finally:
         # Disable crash reproducer (to avoid inadvertently overwriting this
         # path on a subsequent interaction).

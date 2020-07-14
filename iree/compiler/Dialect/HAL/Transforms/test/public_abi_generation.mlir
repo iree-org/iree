@@ -33,6 +33,14 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
   // CHECK: return %[[VIEW]]
   return %arg1 : !hal.buffer
 }
+// A new function with $async suffix based on buffer_view with wait and signal
+// semaphore arguments should be generated. For now, it should just wrap $sync.
+// CHECK: func @staticTwoArg$async(%[[ARG0:.+]]: !hal.semaphore, %[[ARG1:.+]]: index, %[[ARG2:.+]]: !hal.buffer_view, %[[ARG3:.+]]: !hal.buffer_view, %[[ARG4:.+]]: !hal.semaphore, %[[ARG5:.+]]: index)
+// CHECK: %[[WAITRESULT:.+]] = hal.semaphore.await %[[ARG0]], min_value = %[[ARG1]] : i32
+// CHECK: hal.check_success %[[WAITRESULT]]
+// CHECK: %[[RESULT:.+]] = call @staticTwoArg$sync(%[[ARG2]], %[[ARG3]]) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+// CHECK: hal.semaphore.signal %[[ARG4]], value = %[[ARG5]]
+// CHECK: return %[[RESULT]] : !hal.buffer_view
 
 // -----
 // CHECK-LABEL: @dynamicTwoDims
@@ -53,6 +61,14 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
 // CHECK-DAG: %[[RESULT:.+]]:3 = call @dynamicTwoDims(%[[BUFFER]], %[[DIM0]], %[[DIM1]])
 // CHECK-DAG: %[[RESULT_VIEW:.+]] = hal.buffer_view.create %[[RESULT]]#0, shape = [%[[RESULT]]#1, %[[RESULT]]#2], element_type = 50331680 : !hal.buffer_view
 // CHECK: return %[[RESULT_VIEW]]
+// A new function with $async suffix based on buffer_view with wait and signal
+// semaphore arguments should be generated. For now, it should just wrap $sync.
+// CHECK: func @dynamicTwoDims$async(%[[ARG0:.+]]: !hal.semaphore, %[[ARG1:.+]]: index, %[[ARG2:.+]]: !hal.buffer_view, %[[ARG3:.+]]: !hal.semaphore, %[[ARG4:.+]]: index)
+// CHECK: %[[WAITRESULT:.+]] = hal.semaphore.await %[[ARG0]], min_value = %[[ARG1]] : i32
+// CHECK: hal.check_success %[[WAITRESULT]]
+// CHECK: %[[RESULT:.+]] = call @dynamicTwoDims$sync(%[[ARG2]]) : (!hal.buffer_view) -> !hal.buffer_view
+// CHECK: hal.semaphore.signal %[[ARG3]], value = %[[ARG4]]
+// CHECK: return %[[RESULT]] : !hal.buffer_view
 func @dynamicTwoDims(%arg0 : !hal.buffer, %arg1 : index, %arg2 : index) -> (!hal.buffer, index, index)
     attributes {iree.module.export,
       iree.reflection = {f = "I10!B7!d-1d-1R10!B7!d-1d-1", fv = "1"}}

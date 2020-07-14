@@ -1905,10 +1905,6 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
     OptionalAttr<StrAttr>:$message
   );
 
-  let assemblyFormat = [{
-    $condition `,` $status (`,` $message^)? attr-dict
-  }];
-
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &result,
@@ -1917,6 +1913,12 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
       build(
           builder, result, condition, status,
           message.empty() ? StringAttr{} : builder.getStringAttr(message));
+    }]>,
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &result,
+      Value status, StringRef message = ""
+    }], [{
+      build(builder, result, status, status, message);
     }]>,
   ];
 
