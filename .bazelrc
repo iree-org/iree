@@ -61,6 +61,7 @@ build:generic_clang --copt=-Wno-unused-function
 # Enable warnings we do care about.
 build:generic_clang --copt=-Wimplicit-fallthrough
 build:generic_clang --copt=-Wthread-safety-analysis
+build:generic_clang --copt=-Wunused-variable
 
 # C++14 standard version is required.
 build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14

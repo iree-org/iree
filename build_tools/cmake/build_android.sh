@@ -50,9 +50,10 @@ cd build
   -DANDROID_ABI="$ANDROID_ABI" \
   -DANDROID_PLATFORM=android-29 \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_HOST_C_COMPILER=$(which clang) \
   -DIREE_HOST_CXX_COMPILER=$(which clang++)
 
-"$CMAKE_BIN" --build .
+# TODO(#2494): Invoke once after fixing the flaky build failure in GCP.
+"$CMAKE_BIN" --build . || "$CMAKE_BIN" --build .
