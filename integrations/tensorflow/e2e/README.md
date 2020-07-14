@@ -23,7 +23,6 @@ targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 The test suites can be run excluding Vulkan by specifying
 `--test_tag_filters="-driver=vulkan"` in the `bazel test` invocation.
 
-
 ## Compiling `tf.Module`s
 
 Compatible TensorFlow modules can be compiled to specific IREE backends using
@@ -45,7 +44,6 @@ vmla_module = tf_utils.IreeCompiledModule(
     exported_names=['predict'])
 vmla_module.predict(...)
 ```
-
 
 ## Running tests
 
