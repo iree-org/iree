@@ -24,6 +24,14 @@ namespace iree_compiler {
 void populateVMToCPatterns(MLIRContext *context,
                            OwningRewritePatternList &patterns);
 
+namespace IREE {
+namespace VM {
+
+std::unique_ptr<OperationPass<IREE::VM::FuncOp>> createConvertVMToEmitCPass();
+
+}  // namespace VM
+}  // namespace IREE
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

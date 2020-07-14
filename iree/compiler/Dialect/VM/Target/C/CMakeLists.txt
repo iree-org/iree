@@ -26,8 +26,10 @@ if(${IREE_ENABLE_EMITC})
     DEPS
       LLVMSupport
       MLIRIR
+      MLIRPass # TODO(simon-camp) remove this after moving the pass manager
       MLIRSupport
       iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Conversion::VMToEmitC # TODO(simon-camp) remove this after moving the pass manager
     PUBLIC
   )
 endif()

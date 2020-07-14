@@ -14,6 +14,9 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
+#include "mlir/Pass/PassManager.h"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -24,11 +27,18 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   // TODO: implement translation
   output << "// c module stub\n";
 
+  // TODO(simon-camp) remove debug print and refactor this into a test in ConvertVMToEmitC
+  output << moduleOp << "\n";
+
   return success();
 }
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  llvm::raw_ostream &output) {
+  if (failed(convertVMtoEmitC(outerModuleOp))) {
+    return failure();
+  };
+
   auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {
     return outerModuleOp.emitError()
@@ -37,7 +47,18 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   return translateModuleToC(*moduleOps.begin(), output);
 }
 
+LogicalResult convertVMtoEmitC(mlir::ModuleOp &moduleOp) {
+  PassManager pm(moduleOp.getContext());
+
+  OpPassManager &vmModulePM = pm.nest<IREE::VM::ModuleOp>();
+  OpPassManager &vmFuncPM = vmModulePM.nest<IREE::VM::FuncOp>();
+
+  vmFuncPM.addPass(createConvertVMToEmitCPass());
+
+  return pm.run(moduleOp);
+}
 }  // namespace VM
 }  // namespace IREE
+
 }  // namespace iree_compiler
 }  // namespace mlir

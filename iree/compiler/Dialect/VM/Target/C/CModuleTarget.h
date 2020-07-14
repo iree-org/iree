@@ -33,6 +33,10 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  llvm::raw_ostream &output);
 
+// convert some VM Ops to EmitC calls
+// TODO(simon-camp) Move pass manager to IREEVM 
+LogicalResult convertVMtoEmitC(mlir::ModuleOp &moduleOp);
+
 }  // namespace VM
 }  // namespace IREE
 }  // namespace iree_compiler
