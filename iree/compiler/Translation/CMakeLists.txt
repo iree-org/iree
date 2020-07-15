@@ -14,6 +14,12 @@
 
 iree_add_all_subdirs()
 
+if(IREE_ENABLE_EMITC)
+  set(IREE_VM_CONDITIONAL_TARGETS
+    iree::compiler::Dialect::VM::Target::C
+  )
+endif()
+
 iree_cc_library(
   NAME
     IREEVM
@@ -35,7 +41,7 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Transforms
+    ${IREE_VM_CONDITIONAL_TARGETS}
   PUBLIC
 )
