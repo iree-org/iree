@@ -65,7 +65,6 @@ cc_library(
         "-ldl",
     ],
     deps = [
-        ":ModelBuilder",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
