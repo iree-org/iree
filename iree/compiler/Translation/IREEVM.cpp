@@ -17,7 +17,6 @@
 #ifdef IREE_HAVE_EMITC_DIALECT
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 #endif  // IREE_HAVE_EMITC_DIALECT
-
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
