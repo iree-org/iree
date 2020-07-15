@@ -130,7 +130,8 @@ function(iree_get_target_path OUTPUT_VAR TARGET)
   # Otherwise it must be a target defined in the current CMake invocation
   # and we can just use `$<TARGET_FILE:${TARGET}>` on it.
   set(${OUTPUT_VAR}
-      "$IF:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>,$<TARGET_FILE:${TARGET}>")
+    "$<IF:$<BOOL:$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>>,$<TARGET_FILE:${TARGET}>,$<TARGET_PROPERTY:${TARGET},HOST_TARGET_FILE>>"
+    PARENT_SCOPE)
 endfunction()
 
 #-------------------------------------------------------------------------------
