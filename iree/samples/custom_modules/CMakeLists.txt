@@ -59,9 +59,6 @@ iree_cc_library(
   DEPS
     iree::base::api
     iree::base::api_util
-    iree::base::buffer_string_util
-    iree::base::shape
-    iree::base::shaped_buffer_string_util
     iree::hal::api
     iree::modules::hal
     iree::vm
