@@ -12,30 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_
-#define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_
-
-#include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-void populateVMToCPatterns(MLIRContext *context,
-                           OwningRewritePatternList &patterns);
-
-namespace IREE {
-namespace VM {
-
-class ConvertVMToEmitCPass
-    : public PassWrapper<ConvertVMToEmitCPass, OperationPass<mlir::ModuleOp>> {
-  void runOnOperation() override;
-};
-
-}  // namespace VM
-}  // namespace IREE
+static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass(
+    "test-iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC VM dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_CONVERTVMTOEMITC_H_

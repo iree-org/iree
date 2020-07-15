@@ -27,7 +27,8 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   // TODO: implement translation
   output << "// c module stub\n";
 
-  // TODO(simon-camp) remove debug print and refactor this into a test in ConvertVMToEmitC
+  // TODO(simon-camp) remove debug print and refactor this into a test in
+  // ConvertVMToEmitC
   output << moduleOp << "\n";
 
   return success();
@@ -50,10 +51,7 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
 LogicalResult convertVMtoEmitC(mlir::ModuleOp &moduleOp) {
   PassManager pm(moduleOp.getContext());
 
-  OpPassManager &vmModulePM = pm.nest<IREE::VM::ModuleOp>();
-  OpPassManager &vmFuncPM = vmModulePM.nest<IREE::VM::FuncOp>();
-
-  vmFuncPM.addPass(createConvertVMToEmitCPass());
+  pm.addPass(std::make_unique<ConvertVMToEmitCPass>());
 
   return pm.run(moduleOp);
 }
