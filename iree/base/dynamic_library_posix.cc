@@ -45,9 +45,8 @@ class DynamicLibraryPosix : public DynamicLibrary {
             new DynamicLibraryPosix(search_file_names[i], library));
       }
     }
-
     return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open dynamic library, not found on search paths";
+           << "Unable to open dynamic library:'" << dlerror() << "'";
   }
 
   void* GetSymbol(const char* symbol_name) const override {
