@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
+#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
@@ -103,10 +104,40 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
                                              bytecodeTargetOptions, output);
 }
 
+LogicalResult translateFromMLIRToVMCModule(
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    llvm::raw_ostream &output) {
+  // Convert from our source to a vm.module in canonical form.
+  // After this completes we have a non-bytecode-specific vm.module that we
+  // could lower to other forms (LLVM IR, C, etc).
+  PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
+  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+  IREE::VM::buildVMTransformPassPipeline(passManager);
+  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+  if (failed(passManager.run(moduleOp))) {
+    return moduleOp.emitError() << "conversion from source -> vm failed";
+  }
+
+  // Serialize to c code.
+  return mlir::iree_compiler::IREE::VM::translateModuleToC(moduleOp, output);
+}
+
+static LogicalResult translateFromMLIRToVMCModuleWithFlags(
+    ModuleOp moduleOp, llvm::raw_ostream &output) {
+  mlir::registerPassManagerCLOptions();
+  auto TargetOptions = IREE::HAL::getTargetOptionsFromFlags();
+  return translateFromMLIRToVMCModule(moduleOp, TargetOptions, output);
+}
+
 void registerIREEVMTranslation() {
   TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
       "iree-mlir-to-vm-bytecode-module",
       translateFromMLIRToVMBytecodeModuleWithFlags);
+
+  TranslateFromMLIRRegistration toVMCModuleWithFlags(
+      "iree-mlir-to-vm-c-module", translateFromMLIRToVMCModuleWithFlags);
 }
 
 }  // namespace iree_compiler

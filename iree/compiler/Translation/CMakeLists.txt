@@ -35,6 +35,7 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Transforms
   PUBLIC
 )

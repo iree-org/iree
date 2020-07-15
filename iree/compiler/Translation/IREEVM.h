@@ -53,6 +53,14 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
     IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
 
+// Translates an MLIR module containing a set of supported IREE input dialects
+// to an IREE VM C module.
+//
+// Exposed via the --iree-mlir-to-vm-c-module translation.
+LogicalResult translateFromMLIRToVMCModule(
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
+
 // TODO(benvanik): versions with multiple targets, etc.
 
 void registerIREEVMTransformPassPipeline();
