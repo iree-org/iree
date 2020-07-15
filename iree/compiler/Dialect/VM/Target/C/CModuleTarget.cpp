@@ -27,18 +27,18 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   // TODO: implement translation
   output << "// c module stub\n";
 
-  // TODO(simon-camp) remove debug print and refactor this into a test in
-  // ConvertVMToEmitC
-  output << moduleOp << "\n";
-
   return success();
 }
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  llvm::raw_ostream &output) {
-  if (failed(convertVMtoEmitC(outerModuleOp))) {
+  PassManager pm(outerModuleOp.getContext());
+
+  pm.addPass(std::make_unique<ConvertVMToEmitCPass>());
+
+  if (failed(pm.run(outerModuleOp))) {
     return failure();
-  };
+  }
 
   auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
   if (moduleOps.empty()) {
@@ -48,15 +48,7 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   return translateModuleToC(*moduleOps.begin(), output);
 }
 
-LogicalResult convertVMtoEmitC(mlir::ModuleOp &moduleOp) {
-  PassManager pm(moduleOp.getContext());
-
-  pm.addPass(std::make_unique<ConvertVMToEmitCPass>());
-
-  return pm.run(moduleOp);
-}
 }  // namespace VM
 }  // namespace IREE
-
 }  // namespace iree_compiler
 }  // namespace mlir
