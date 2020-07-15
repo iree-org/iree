@@ -34,7 +34,6 @@ PR_BRANCH="bazel-to-cmake-fix"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 FORK_REMOTE="${FORK_REMOTE:-fork}"
 
-
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working directory not clean. Aborting"
   git status
