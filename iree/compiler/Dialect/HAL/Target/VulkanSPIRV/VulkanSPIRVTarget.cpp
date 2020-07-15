@@ -28,6 +28,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
@@ -260,35 +261,62 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         break;
       }
     }
-    if (!spvModuleOp)
+    if (!spvModuleOp) {
       return executableOp.emitError("unable to find spv.module");
+    }
 
-    SmallVector<spirv::FuncOp, 2> entryPointFns;
+    SmallVector<spirv::FuncOp, 2> spvEntryPointFns;
     if (!entryPointScheduleAttr) {
       for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
         if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
-            SymbolTable::Visibility::Public)
-          entryPointFns.push_back(spvFuncOp);
+            SymbolTable::Visibility::Public) {
+          spvEntryPointFns.push_back(spvFuncOp);
+        }
       }
-      if (!llvm::hasSingleElement(entryPointFns)) {
+      if (!llvm::hasSingleElement(spvEntryPointFns)) {
         return spvModuleOp.emitError(
                    "expected a single entry point function, found ")
-               << entryPointFns.size();
+               << spvEntryPointFns.size();
       }
     } else {
       llvm::StringMap<spirv::FuncOp> publicFns;
       for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
         if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
-            SymbolTable::Visibility::Public)
+            SymbolTable::Visibility::Public) {
           publicFns[spvFuncOp.sym_name()] = spvFuncOp;
+        }
       }
       for (Attribute entryNameAttr : entryPointScheduleAttr) {
         StringRef entryName = entryNameAttr.cast<StringAttr>().getValue();
         spirv::FuncOp spvFuncOp = publicFns.lookup(entryName);
-        if (!spvFuncOp)
+        if (!spvFuncOp) {
           return spvModuleOp.emitError("unable to find entry point function ")
                  << entryName;
-        entryPointFns.push_back(spvFuncOp);
+        }
+        spvEntryPointFns.push_back(spvFuncOp);
+      }
+
+      // Insert new hal.executable.entry_point ops corresponding to each
+      // distinct spv.EntryPoint op, with names formatted as
+      // {baseName}_entry_0, {baseName}_entry_1, etc.
+      //
+      // Note: this assumes that `dispatchState.entryPointOp.ordinal() == 0`
+      // and there is only one `hal.executable.entry_point` op on this
+      // execuctable initially.
+      std::string baseName = dispatchState.entryPointOp.sym_name().str();
+      dispatchState.entryPointOp.setName(
+          llvm::StringRef(llvm::formatv("{0}_entry_0", baseName)));
+      auto executableBuilder =
+          OpBuilder::atBlockBegin(&dispatchState.executableOp.getBlock());
+      executableBuilder.setInsertionPointAfter(dispatchState.entryPointOp);
+      for (int i = 1; i < spvEntryPointFns.size(); ++i) {
+        std::string symName = llvm::formatv("{0}_entry_{1}", baseName, i);
+        executableBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
+            dispatchState.entryPointOp.getLoc(),
+            executableBuilder.getStringAttr(symName),
+            IntegerAttr::get(executableBuilder.getI32Type(), i),
+            dispatchState.entryPointOp.interfaceAttr(),
+            dispatchState.entryPointOp.signatureAttr());
       }
     }
 
@@ -306,10 +334,18 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto commandBuffer = entryBlock.getArgument(1);
     auto executable = entryBlock.getArgument(2);
 
+    auto halEntryPointOps =
+        dispatchState.executableOp.getOps<IREE::HAL::ExecutableEntryPointOp>();
+    SmallVector<IREE::HAL::ExecutableEntryPointOp, 2> halEntryPointOpsVec(
+        halEntryPointOps.begin(), halEntryPointOps.end());
+    if (spvEntryPointFns.size() != halEntryPointOpsVec.size()) {
+      return executableOp.emitError("hal/spv entry points sizes mismatch");
+    }
+
     // We have multiple entry points to dispatch. Record in the order
     // specified by entry point schedule and insert barrier between sequential
     // ones.
-    for (auto it : llvm::enumerate(entryPointFns)) {
+    for (auto it : llvm::enumerate(spvEntryPointFns)) {
       spirv::FuncOp spvFuncOp = it.value();
       auto workgroupSize = calculateDispatchWorkgroupSize(
           loc, spvModuleOp, spvFuncOp.sym_name(), workload, builder);
@@ -350,9 +386,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         return spvFuncOp.emitError("unable to find workgroup count");
 
       builder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, dispatchState.entryPointOp,
+          loc, commandBuffer, executable, halEntryPointOpsVec[it.index()],
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);
-      if (it.index() + 1 != entryPointFns.size()) {
+      if (it.index() + 1 != spvEntryPointFns.size()) {
         recordFullExecutionBarrier(commandBuffer, loc, builder);
       }
     }
