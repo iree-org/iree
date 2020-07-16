@@ -345,6 +345,7 @@ cc_library(
     deps = [
         "//iree/base:api_util",
         "//iree/base:buffer_string_util",
+        "//iree/base:file_io",
         "//iree/base:shape",
         "//iree/base:shaped_buffer",
         "//iree/base:shaped_buffer_string_util",

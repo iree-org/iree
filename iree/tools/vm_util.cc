@@ -17,8 +17,8 @@
 #include <ostream>
 
 #include "absl/strings/numbers.h"
-#include "absl/strings/string_view.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api_util.h"
