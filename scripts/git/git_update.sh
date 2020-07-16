@@ -25,13 +25,12 @@ set -e
 set -o pipefail
 
 BRANCH="$1"
-
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 
 if [[ -z "$BRANCH" ]]; then
   echo "Must specify a branch to update for git_update.sh"
   exit 1
-do
+fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
     echo "Working directory not clean. Aborting"

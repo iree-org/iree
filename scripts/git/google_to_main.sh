@@ -25,7 +25,6 @@
 #   (default "upstream").
 # - Requires that the working directory be clean. Will abort otherwise.
 
-set -x
 set -e
 set -o pipefail
 
@@ -35,21 +34,27 @@ export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 PR_BRANCH="${PR_BRANCH:-google-to-main}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 
-./scripts/git/git_update.sh main
 ./scripts/git/git_update.sh google
 if [[ "${GREEN_COMMIT}" != "google" ]]; then
   git checkout "${GREEN_COMMIT?}"
   git submodule update
 fi
+
 git checkout -B "${PR_BRANCH?}"
 git push -f "${FORK_REMOTE?}" "${PR_BRANCH?}"
+
+git fetch "${UPSTREAM_REMOTE?}" main
+PR_BODY="$(git log ${UPSTREAM_REMOTE?}/main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
+
 if [[ -z "$(which gh)" ]]; then
   echo "gh not found on path."
   echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
-  echo "Cannot create PR. Branch ${BRANCH?} pushed, but aborting."
+  echo "Cannot create PR. Branch ${PR_BRANCH?} pushed, but aborting."
+  echo "You can manually create a PR using the generated body:"
+  echo "${PR_BODY?}"
   exit 1
 fi
 gh pr create \
     --base main \
     --title="Merge google -> main" \
-    --body="$(git log main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
+    --body="${PR_BODY?}"
