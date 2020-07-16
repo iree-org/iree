@@ -103,7 +103,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wunused-comparison"
     "-Wunused-variable"
     "-Wvla"
-    # LINT.ThenChange(https://github.com/google/iree/blob/main/.bazelrc:clang_diagnostics)
+    # LINT.ThenChange(https://github.com/google/iree/tree/main/.bazelrc:clang_diagnostics)
 
     # Turn off some additional warnings (CMake only)
     "-Wno-strict-prototypes"
