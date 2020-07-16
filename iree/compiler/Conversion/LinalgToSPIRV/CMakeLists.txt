@@ -38,6 +38,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineOps
     MLIRAffineToStandard
+    MLIRAnalysis
     MLIRGPU
     MLIRGPUToSPIRVTransforms
     MLIRIR
@@ -46,6 +47,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCF
     MLIRSCFToGPU
+    MLIRSCFToSPIRV
     MLIRSPIRV
     MLIRSPIRVTransforms
     MLIRStandardOps

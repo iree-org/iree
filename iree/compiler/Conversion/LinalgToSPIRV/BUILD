@@ -14,6 +14,7 @@
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -48,6 +49,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
@@ -57,6 +59,7 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToGPUPass",
+        "@llvm-project//mlir:SCFToSPIRV",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:StandardOps",

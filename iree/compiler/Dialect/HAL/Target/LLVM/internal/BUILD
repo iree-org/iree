@@ -14,6 +14,7 @@
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -21,7 +22,7 @@ cc_library(
     name = "LLVMAOTTargetLinker_internal",
     srcs = ["LLVMAOTTargetLinker.cpp"],
     deps = [
-        "//iree/base:file_io",
+        "//iree/base:status",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMAOTTargetLinker_hdrs",
     ],
 )

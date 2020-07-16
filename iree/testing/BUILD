@@ -18,6 +18,7 @@ load("//iree:build_defs.oss.bzl", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 

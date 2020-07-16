@@ -14,6 +14,7 @@
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -65,7 +66,6 @@ cc_library(
         "-ldl",
     ],
     deps = [
-        ":ModelBuilder",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
