@@ -40,32 +40,82 @@ build --define open_source_build=true
 # either clang or gcc and are curated based on need.
 ###############################################################################
 
-# Treat warnings in-workspace as errors.
-build:generic_clang --per_file_copt=-external/.*-Werror
-# ...and silence them outside of the workspace.
-build:generic_clang --per_file_copt=external/.*@-w
-
-# Disable warnings we don't care about.
-build:generic_clang --copt=-Wno-unused-local-typedef
-build:generic_clang --copt=-Wno-unused-private-field
-build:generic_clang --copt=-Wno-unused-const-variable
-# Matches upstream. Cannot impact due to extern C inclusion method.
-build:generic_clang --copt=-Wno-extern-c-compat
-# Technically UB but needed for intrusive ptrs
-build:generic_clang --copt=-Wno-invalid-offsetof
-build:generic_clang --copt=-Wno-unused-function
-
-# Enable warnings we do care about.
-build:generic_clang --copt=-Wimplicit-fallthrough
-build:generic_clang --copt=-Wthread-safety-analysis
-build:generic_clang --copt=-Wunused-variable
-
 # C++14 standard version is required.
 build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 
 # Default to adding back asserts in optimized builds.
 # This is a good compromise between runtime and debugability.
 build:generic_clang --copt=-UNDEBUG
+
+
+# Treat warnings in-workspace as errors.
+build:generic_clang --per_file_copt=-external/.*-Werror
+# ...and silence them outside of the workspace.
+build:generic_clang --per_file_copt=external/.*@-w
+
+
+# Set clang diagnostics. These largely match the set of warnings used within
+# Google. They have not been audited super carefully but are generally thought
+# to be a good set and consistency with those is very useful when importing.
+# If you feel hat some of these should be different, please raise an issue!
+
+build:generic_clang --copt=-Wall
+
+# Disable warnings we don't care about or that generally have a low signal/noise
+# ratio.
+build:generic_clang --copt=-no-canonical-prefixes
+build:generic_clang --copt=-Wno-ambiguous-member-template
+build:generic_clang --copt=-Wno-char-subscripts
+build:generic_clang --copt=-Wno-error=deprecated-declarations
+build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impact due to extern C inclusion method.
+build:generic_clang --copt=-Wno-gnu-alignof-expression
+build:generic_clang --copt=-Wno-gnu-variable-sized-type-not-at-end
+build:generic_clang --copt=-Wno-ignored-optimization-argument
+build:generic_clang --copt=-Wno-invalid-offsetof # Technically UB but needed for intrusive ptrs
+build:generic_clang --copt=-Wno-invalid-source-encoding,
+build:generic_clang --copt=-Wno-mismatched-tags
+build:generic_clang --copt=-Wno-pointer-sign
+build:generic_clang --copt=-Wno-reserved-user-defined-literal
+build:generic_clang --copt=-Wno-return-type-c-linkage
+build:generic_clang --copt=-Wno-self-assign-overloaded
+build:generic_clang --copt=-Wno-sign-compare
+build:generic_clang --copt=-Wno-signed-unsigned-wchar
+build:generic_clang --copt=-Wno-strict-overflow
+build:generic_clang --copt=-Wno-trigraphs
+build:generic_clang --copt=-Wno-unknown-pragmas
+build:generic_clang --copt=-Wno-unknown-warning-option
+build:generic_clang --copt=-Wno-unused-command-line-argument
+build:generic_clang --copt=-Wno-unused-const-variable
+build:generic_clang --copt=-Wno-unused-const-variable
+build:generic_clang --copt=-Wno-unused-function
+build:generic_clang --copt=-Wno-unused-function
+build:generic_clang --copt=-Wno-unused-local-typedef
+build:generic_clang --copt=-Wno-unused-private-field
+build:generic_clang --copt=-Wno-unused-private-field
+build:generic_clang --copt=-Wno-user-defined-warnings
+
+# Explicitly enable some additional warnings.
+# Some of these aren't on by default, or under -Wall, or are subsets of warnings
+# turned off above.
+build:generic_clang --copt=-Wctad-maybe-unsupported
+build:generic_clang --copt=-Wfloat-overflow-conversion
+build:generic_clang --copt=-Wfloat-zero-conversion
+build:generic_clang --copt=-Wfor-loop-analysis
+build:generic_clang --copt=-Wformat-security
+build:generic_clang --copt=-Wgnu-redeclared-enum
+build:generic_clang --copt=-Wimplicit-fallthrough
+build:generic_clang --copt=-Winfinite-recursion
+build:generic_clang --copt=-Wliteral-conversion
+build:generic_clang --copt=-Wnon-virtual-dtor
+build:generic_clang --copt=-Woverloaded-virtual
+build:generic_clang --copt=-Wself-assign
+build:generic_clang --copt=-Wstring-conversion
+build:generic_clang --copt=-Wtautological-overlap-compare
+build:generic_clang --copt=-Wthread-safety
+build:generic_clang --copt=-Wthread-safety-beta
+build:generic_clang --copt=-Wunused-comparison
+build:generic_clang --copt=-Wunused-variable
+build:generic_clang --copt=-Wvla
 
 ###############################################################################
 # Options for building with address sanitizer.
