@@ -108,8 +108,8 @@ Status Run(::benchmark::State& state) {
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
   iree_vm_variant_list_t* inputs;
-  if (absl::GetFlag(FLAGS_inputs_file).empty()) {
-    if (absl::GetFlag(FLAGS_inputs).empty()) {
+  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_inputs).empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Expected only one of inputs and inputs_flag is set";
     }
