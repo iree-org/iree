@@ -29,7 +29,7 @@ export CMAKE_BIN="$(which cmake)"
 "$CXX" --version
 python3 --version
 
-# Print Vulkan related information: SDK version and GPU information
+# Print Vulkan related information: SDK version and GPU ICD version
 vulkaninfo 2>/dev/null | grep "Vulkan Instance"
 vulkaninfo 2>/dev/null | grep -A7 "VkPhysicalDeviceProperties"
 

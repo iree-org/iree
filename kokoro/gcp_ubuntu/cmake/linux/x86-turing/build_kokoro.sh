@@ -34,7 +34,7 @@ docker run \
   --env IREE_VULKAN_DISABLE=0 \
   --gpus all \
   gcr.io/iree-oss/cmake-nvidia:prod \
-  kokoro/gcp_ubuntu/cmake/build.sh
+  kokoro/gcp_ubuntu/cmake/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
