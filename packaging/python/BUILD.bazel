@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
 # This is a dummy binary that has the side-effect of building all of the TF
 # python bindings. It is used to build wheel files.
 py_binary(

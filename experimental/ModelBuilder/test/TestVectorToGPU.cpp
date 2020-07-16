@@ -57,14 +57,8 @@ static llvm::cl::opt<std::string> vulkanWrapper(
     "vulkan-wrapper", llvm::cl::desc("Vulkan wrapper library"),
     llvm::cl::value_desc("filename"), llvm::cl::init("-"));
 
-static llvm::cl::opt<bool> useCooperativeMatrix(
-    "cooperative-matrix",
-    llvm::cl::desc("Run cooperative matrix tests, this requires hardware "
-                   "supporting cooperative matrix extension"),
-    llvm::cl::init(false));
-
 static void addLoweringPasses(mlir::PassManager &pm,
-                              llvm::ArrayRef<int64_t> workloadSize,
+                              llvm::ArrayRef<int64_t> workgroupSize,
                               llvm::ArrayRef<Type> args) {
   pm.addPass(mlir::iree_compiler::createVectorToGPUPass());
   pm.addPass(mlir::createLowerAffinePass());
@@ -81,7 +75,7 @@ static void addLoweringPasses(mlir::PassManager &pm,
   spirvModulePM.addPass(
       mlir::spirv::createUpdateVersionCapabilityExtensionPass());
 
-  pm.addPass(mlir::createAddVulkanLaunchWrapperPass(workloadSize, args));
+  pm.addPass(mlir::createAddVulkanLaunchWrapperPass(workgroupSize, args));
   mlir::LowerToLLVMOptions llvmOptions = {
       /*useBarePtrCallConv=*/false,
       /*emitCWrappers=*/true,
@@ -130,7 +124,7 @@ void testVecAdd() {
                      ModelRunner::Target::CPUTarget);
   CompilationOptions options;
   auto lowering = [&](mlir::PassManager &pm) {
-    addLoweringPasses(pm, {warpSize, 1, 1}, {typeA, typeB, typeC});
+    addLoweringPasses(pm, {1, 1, 1}, {typeA, typeB, typeC});
   };
   options.loweringPasses = lowering;
   runner.compile(options, {vulkanWrapper});
@@ -143,91 +137,6 @@ void testVecAdd() {
   auto A = makeInitializedStridedMemRefDescriptor<float, 1>({width}, oneInit);
   auto B = makeInitializedStridedMemRefDescriptor<float, 1>({width}, incInit);
   auto C = makeInitializedStridedMemRefDescriptor<float, 1>({width}, zeroInit);
-
-  // 4. Call the funcOp named `funcName`.
-  auto err = runner.invoke(std::string(funcName) + "_wrapper", A, B, C);
-  if (err) llvm_unreachable("Error running function.");
-
-  // 5. Dump content of input and output buffer for testing with FileCheck.
-  ::impl::printMemRef(*A);
-  ::impl::printMemRef(*B);
-  ::impl::printMemRef(*C);
-}
-
-void testCooperativeMatMul() {
-  const int warpSize = 32;
-  // Pick twice the size of cooperative matrix to test that the matmul gets
-  // tiled correctly.
-  const int resRows = 8 * 2;
-  const int resColumns = 8 * 2;
-  const int reductionSize = 32 * 2;
-  StringLiteral funcName = "kernel_matmul";
-  MLIRContext context;
-  ModelBuilder modelBuilder;
-
-  auto typeA =
-      modelBuilder.getMemRefType({resRows, reductionSize}, modelBuilder.i8);
-  auto typeB =
-      modelBuilder.getMemRefType({reductionSize, resColumns}, modelBuilder.i8);
-  auto typeC = modelBuilder.getMemRefType({resRows, resColumns},
-                                          modelBuilder.getI32Type());
-  // 1. Build the kernel.
-  {
-    modelBuilder.addGPUAttr();
-    FuncOp kernelFunc = modelBuilder.makeFunction(
-        funcName, {}, {typeA, typeB, typeC}, MLIRFuncOpConfig());
-    // Right now we map one workgroup to one warp.
-    kernelFunc.setAttr(spirv::getEntryPointABIAttrName(),
-                       spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
-    OpBuilder b(&kernelFunc.getBody());
-    ScopedContext scope(b, kernelFunc.getLoc());
-
-    auto A = kernelFunc.getArgument(0);
-    auto B = kernelFunc.getArgument(1);
-    auto C = kernelFunc.getArgument(2);
-
-    linalg_matmul(TypeRange{}, ValueRange{A, B, C});
-    std_ret();
-  }
-
-  // 2. Compile the function, pass in runtime support library to the execution
-  // engine for vector.print.
-  ModelRunner runner(modelBuilder.getModuleRef(),
-                     ModelRunner::Target::GPUTarget);
-  CompilationOptions options;
-  options.loweringPasses = [&](mlir::PassManager &pm) {
-    MatmulCodegenStrategy strategy;
-    // Use hardcoded value for cooperative matrix size. Those will be pulled
-    // from device properties eventually.
-    const int cooperativeMatrixM = 8;
-    const int cooperativeMatrixK = 8;
-    const int cooperativeMatrixN = 32;
-    // TODO(thomasraooux) LICM is disabled due to limitation in SPIR-V
-    strategy
-        .tile<linalg::MatmulOp>(
-            linalg::LinalgTilingOptions()
-                .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-                .setTileSizes({cooperativeMatrixM, cooperativeMatrixK,
-                               cooperativeMatrixN}))
-        .setHoistInvariantCode(false)
-        .vectorize<linalg::MatmulOp>();
-    modelBuilder.getModuleRef()->walk(
-        [&](FuncOp fn) { strategy.transform(fn); });
-    addLoweringPasses(pm, {resRows, resColumns, 1}, {typeA, typeB, typeC});
-  };
-  runner.compile(options, {vulkanWrapper});
-
-  // 3. Allocate data within data structures that interoperate with the MLIR ABI
-  // conventions used by codegen.
-  auto oneInit = [](unsigned idx, uint8_t *ptr) { ptr[idx] = 2 * idx + 1; };
-  auto incInit = [](unsigned idx, uint8_t *ptr) { ptr[idx] = idx; };
-  auto zeroInit = [](unsigned idx, uint32_t *ptr) { ptr[idx] = 0; };
-  auto A = makeInitializedStridedMemRefDescriptor<uint8_t, 2>(
-      {resRows, reductionSize}, oneInit);
-  auto B = makeInitializedStridedMemRefDescriptor<uint8_t, 2>(
-      {reductionSize, resColumns}, incInit);
-  auto C = makeInitializedStridedMemRefDescriptor<uint32_t, 2>(
-      {resRows, resColumns}, zeroInit);
 
   // 4. Call the funcOp named `funcName`.
   auto err = runner.invoke(std::string(funcName) + "_wrapper", A, B, C);
@@ -261,7 +170,4 @@ int main(int argc, char **argv) {
   // CHECK: 59,  63,  67,  71,  75,  79,  83,  87,  91,  95,  99,  103,  107,
   // CHECK: 111,  115,  119,  123,  127]
   testVecAdd();
-
-  if (useCooperativeMatrix)
-    testCooperativeMatMul();
 }

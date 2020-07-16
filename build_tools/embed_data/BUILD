@@ -18,6 +18,7 @@ load(":build_defs.bzl", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -34,6 +35,7 @@ cc_binary(
 
 cc_embed_data(
     name = "testembed1",
+    # do not sort
     srcs = [
         "file1.txt",
         "data/file2.txt",

@@ -27,17 +27,19 @@ http_archive(
     sha256 = "cf3b76a90c86c0554c5b10f4b160f05af71d252026b71362c4674e2fb9936cf9",
     strip_prefix = "rules_cc-01d4a48911d5e7591ecb1c06d3b8af47fe872371",
     urls = [
-      "https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
-      "https://github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
+        "https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
+        "https://github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
     ],
 )
 
 http_archive(
     name = "rules_python",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz",
     sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz",
 )
+
 load("@rules_python//python:repositories.bzl", "py_repositories")
+
 py_repositories()
 
 ###############################################################################
@@ -46,24 +48,25 @@ py_repositories()
 # bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "4d348abfaddbcee0c077fc51bb1177065c3663191588ab3d958f027cbfe1818b",
-    strip_prefix = "bazel-toolchains-2.1.0",
-    urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.1.0/bazel-toolchains-2.1.0.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.1.0.tar.gz",
-    ],
     # Workaround for b/150158570. This patch needs to be updated if the bazel_toolchains version is updated.
     patches = ["//build_tools/bazel:bazel_toolchains.patch"],
+    sha256 = "6d54b26a58457f9fca2e54f053402061ffe73e3b909b8f6bf6dedb2a3db093ea",
+    strip_prefix = "bazel-toolchains-3.3.2",
+    urls = [
+        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.3.2/bazel-toolchains-3.3.2.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/releases/download/3.3.2/bazel-toolchains-3.3.2.tar.gz",
+    ],
 )
 
 load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 
 rbe_autoconfig(
     name = "rbe_default",
-    base_container_digest = 'sha256:ac36d37616b044ee77813fc7cd36607a6dc43c65357f3e2ca39f3ad723e426f6',
-    digest = "sha256:61fd698572dc8b5fc9db11cb4ba4f138a915517b80617259bcaef8e1e4ffd3fb",
+    base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
+    digest = "sha256:b59d8cc422b03524394d4d05e443bf38d4fe96fab06197b34174de01572e8161",
     registry = "gcr.io",
-    repository = "iree-oss/rbe-toolchain"
+    repository = "iree-oss/rbe-toolchain",
+    use_checked_in_confs = "Force",
 )
 
 ###############################################################################
@@ -90,23 +93,27 @@ http_archive(
 #   TensorFlow
 http_archive(
     name = "bazel_skylib",
+    sha256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44",
     urls = [
         "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
         "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
     ],
-    sha256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44",
 )
+
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
 bazel_skylib_workspace()
 ###############################################################################
 
 ###############################################################################
 # llvm-project
 load("@iree_core//build_tools/bazel/third_party_import/llvm-project:configure.bzl", "llvm_configure")
-maybe(llvm_configure,
+
+maybe(
+    llvm_configure,
     name = "llvm-project",
-    workspace = "@iree_core//:WORKSPACE",
     path = "third_party/llvm-project",
+    workspace = "@iree_core//:WORKSPACE",
 )
 ###############################################################################
 
@@ -118,7 +125,8 @@ maybe(llvm_configure,
 # TODO(laurenzo): Come up with a way to make this optional. Also, see if we can
 # get the TensorFlow tf_repositories() rule to use maybe() so we can provide
 # local overrides safely.
-maybe(local_repository,
+maybe(
+    local_repository,
     name = "org_tensorflow",
     path = "third_party/tensorflow",
 )
@@ -133,7 +141,8 @@ load("//bindings/python/build_tools/python:configure.bzl", "python_configure")
 
 # TODO(laurenzo): Scoping to "iree" to avoid conflicts with other things that
 # take an opinion until we can isolate.
-maybe(python_configure,
+maybe(
+    python_configure,
     name = "iree_native_python",
 )
 ###############################################################################
@@ -141,100 +150,118 @@ maybe(python_configure,
 ###############################################################################
 # Find and configure the Vulkan SDK, if installed.
 load("//build_tools/third_party/vulkan_sdk:repo.bzl", "vulkan_sdk_setup")
-maybe(vulkan_sdk_setup,
+
+maybe(
+    vulkan_sdk_setup,
     name = "vulkan_sdk",
 )
 ###############################################################################
 
-maybe(local_repository,
-     name = "com_google_absl",
-     path = "third_party/abseil-cpp",
+maybe(
+    local_repository,
+    name = "com_google_absl",
+    path = "third_party/abseil-cpp",
 )
 
-maybe(local_repository,
-     name = "com_google_ruy",
-     path = "third_party/ruy",
+maybe(
+    local_repository,
+    name = "com_google_ruy",
+    path = "third_party/ruy",
 )
 
-maybe(local_repository,
-     name = "com_google_googletest",
-     path = "third_party/googletest",
+maybe(
+    local_repository,
+    name = "com_google_googletest",
+    path = "third_party/googletest",
 )
 
 # Note that TensorFlow provides this as "flatbuffers" which is wrong.
 # It is only used for TFLite and may cause ODR issues if not fixed.
-maybe(local_repository,
+maybe(
+    local_repository,
     name = "com_github_google_flatbuffers",
     path = "third_party/flatbuffers",
 )
 
 # TODO(scotttodd): TensorFlow is squatting on the vulkan_headers repo name, so
 # we use a temporary one until resolved. Theirs is set to an outdated version.
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
     name = "iree_vulkan_headers",
-    path = "third_party/vulkan_headers",
     build_file = "build_tools/third_party/vulkan_headers/BUILD.overlay",
+    path = "third_party/vulkan_headers",
 )
 
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
     name = "vulkan_memory_allocator",
-    path = "third_party/vulkan_memory_allocator",
     build_file = "build_tools/third_party/vulkan_memory_allocator/BUILD.overlay",
+    path = "third_party/vulkan_memory_allocator",
 )
 
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
     name = "glslang",
-    path = "third_party/glslang",
     build_file = "build_tools/third_party/glslang/BUILD.overlay",
+    path = "third_party/glslang",
 )
 
-maybe(local_repository,
+maybe(
+    local_repository,
     name = "spirv_tools",
     path = "third_party/spirv_tools",
 )
 
-maybe(local_repository,
+maybe(
+    local_repository,
     name = "spirv_headers",
     path = "third_party/spirv_headers",
 )
 
 # TODO(laurenzo): TensorFlow is squatting on the pybind11 repo name, so
 # we use a temporary one until resolved. Theirs pulls in a bunch of stuff.
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
     name = "iree_pybind11",
-    path = "third_party/pybind11",
     build_file = "build_tools/third_party/pybind11/BUILD.overlay",
+    path = "third_party/pybind11",
 )
 
-maybe(local_repository,
+maybe(
+    local_repository,
     name = "com_google_benchmark",
-    path = "third_party/benchmark")
-
-maybe(new_local_repository,
-    name = "sdl2",
-    path = "third_party/sdl2",
-    build_file = "build_tools/third_party/sdl2/BUILD.overlay",
+    path = "third_party/benchmark",
 )
 
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
+    name = "sdl2",
+    build_file = "build_tools/third_party/sdl2/BUILD.overlay",
+    path = "third_party/sdl2",
+)
+
+maybe(
+    new_local_repository,
     name = "sdl2_config",
-    path = "build_tools/third_party/sdl2",
     build_file_content = """
 package(default_visibility = ["//visibility:public"])
 cc_library(name = "headers", srcs = glob(["*.h"]))
 """,
+    path = "build_tools/third_party/sdl2",
 )
 
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
     name = "dear_imgui",
-    path = "third_party/dear_imgui",
     build_file = "build_tools/third_party/dear_imgui/BUILD.overlay",
+    path = "third_party/dear_imgui",
 )
 
-maybe(new_local_repository,
+maybe(
+    new_local_repository,
     name = "renderdoc_api",
-    path = "third_party/renderdoc_api",
     build_file = "build_tools/third_party/renderdoc_api/BUILD.overlay",
+    path = "third_party/renderdoc_api",
 )
 
 # Bootstrap TensorFlow deps last so that ours can take precedence.

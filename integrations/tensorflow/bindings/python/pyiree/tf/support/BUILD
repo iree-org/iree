@@ -21,6 +21,7 @@ load(
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -58,6 +59,10 @@ iree_py_test(
         "tf_utils_test.py",
     ],
     python_version = "PY3",
+    tags = [
+        "driver=llvm",
+        "driver=vmla",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

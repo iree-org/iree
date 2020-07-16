@@ -36,6 +36,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRParser
+    MLIRSupport
     iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

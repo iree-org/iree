@@ -43,5 +43,7 @@ Status InstanceWrapper::Create() {
 
 iree_vm_instance_t* InstanceWrapper::instance() const { return instance_; }
 
+InstanceWrapper::~InstanceWrapper() { iree_vm_instance_release(instance_); }
+
 }  // namespace java
 }  // namespace iree

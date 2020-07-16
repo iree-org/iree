@@ -14,6 +14,7 @@
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -24,6 +25,7 @@ cc_library(
         "ConvertBufferOps.cpp",
         "ConvertBufferViewOps.cpp",
         "ConvertCommandBufferOps.cpp",
+        "ConvertControlFlowOps.cpp",
         "ConvertDeviceOps.cpp",
         "ConvertExecutableOps.cpp",
         "ConvertExperimentalOps.cpp",

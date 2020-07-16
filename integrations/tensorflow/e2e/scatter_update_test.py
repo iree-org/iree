@@ -69,8 +69,7 @@ class ScatterUpdateTest(tf_test_utils.SavedModelTestCase):
     tensor = tf.ones([4, 3], dtype=tf.int32)
     indices = tf.constant([[1]])
     updates = tf.constant([[2, 3, 4]])
-    result = self.get_module().scatter_update_2D_slice(
-        tensor, indices, updates)
+    result = self.get_module().scatter_update_2D_slice(tensor, indices, updates)
     result.assert_all_close()
 
 
