@@ -37,16 +37,20 @@ jobs:
       - name: Updating submodules
         run: ./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true
       - name: Calculating TF SHA
-        run: echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | cut -c -12)"
+        run: echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
           # Personal token is required to trigger additional automation (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          commit-message: "Update TF submodule and LLVM BUILD files"
-          title: "Integrate TF at https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }}"
+          commit-message: "Integrate TF at tensorflow/tensorflow@${{ env.TF_SHA }}"
+          title: "Integrate TF at tensorflow/tensorflow@${{ env.TF_SHA }}"
           body: |
-            "Updates TF to current HEAD and copies latest version of LLVM BUILD files.
+            "Updates TF to
+            [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
+            and copies over the LLVM BUILD files.
+
+            `./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true`
 
             Automated submodule bump from .github/workflows/update_tf.yml"
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
