@@ -19,6 +19,7 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api_util.h"
@@ -32,6 +33,13 @@
 #include "iree/vm/variant_list.h"
 
 namespace iree {
+namespace {
+
+// Returns a splitted input values from `filename` using newline as separater.
+StatusOr<std::vector<std::string>> GetInputValues(const std::string& filename) {
+}
+
+}  // namespace
 
 Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   iree_string_view_t sig_fv =
