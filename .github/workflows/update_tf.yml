@@ -46,13 +46,13 @@ jobs:
           commit-message: "Integrate TF at tensorflow/tensorflow@${{ env.TF_SHA }}"
           title: "Integrate TF at tensorflow/tensorflow@${{ env.TF_SHA }}"
           body: |
-            "Updates TF to
+            Updates TF to
             [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
             and copies over the LLVM BUILD files.
 
             `./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true`
 
-            Automated submodule bump from .github/workflows/update_tf.yml"
+            Automated submodule bump from .github/workflows/update_tf.yml
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
           # TODO(gcmn): Figure out a way to assign this to someone dynamically.
           reviewers: gmngeoffrey
