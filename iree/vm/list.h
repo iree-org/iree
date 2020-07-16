@@ -70,6 +70,9 @@ iree_vm_list_deinitialize(iree_vm_list_t* list);
 // storing ref types the list may either store a specific iree_vm_ref_type_t
 // and ensure that all elements set match the type or IREE_VM_REF_TYPE_ANY to
 // indicate that any ref type is allowed.
+//
+// |element_type| can be set to iree_vm_type_def_make_variant_type (or null) to
+// indicate that the list stores variants (each element can differ in type).
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_create(
     const iree_vm_type_def_t* element_type, iree_host_size_t initial_capacity,
     iree_allocator_t allocator, iree_vm_list_t** out_list);
@@ -130,6 +133,18 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_value(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_push_value(iree_vm_list_t* list, const iree_vm_value_t* value);
 
+// Returns a dereferenced pointer to the given type if the element at the given
+// index matches the type. Returns NULL on error.
+IREE_API_EXPORT void* iree_vm_list_get_ref_deref(
+    const iree_vm_list_t* list, iree_host_size_t i,
+    const iree_vm_ref_type_descriptor_t* type_descriptor);
+
+// Returns the ref value of the element at the given index.
+// The ref will not be retained and must be retained by the caller to extend
+// its lifetime.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_assign(
+    const iree_vm_list_t* list, iree_host_size_t i, iree_vm_ref_t* out_value);
+
 // Returns the ref value of the element at the given index.
 // The ref will be retained and must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_retain(
@@ -156,7 +171,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_push_ref_move(iree_vm_list_t* list, iree_vm_ref_t* value);
 
 // Returns the value of the element at the given index. If the element contains
-// a ref then it will be retained and must be released by the caller.
+// a ref it will *not* be retained and the caller must retain it to extend its
+// lifetime.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
                          iree_vm_variant2_t* out_value);
