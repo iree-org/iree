@@ -1,4 +1,4 @@
-# Maintainer Tips
+# Contributor Tips
 
 This is an opinionated guide documenting workflows that some members of the team
 have found useful. It is focused on meta-tooling, not on IREE code specifically
@@ -10,37 +10,56 @@ of `git` and GitHub and suggests some specific ways of using it.
 
 ## Git Structure
 
-Work primarily from a clone of the repository on your development machine. Any
-local branches named the same as persistent branches from the
+We tend to use the "triangular" or "forking" workflow. Develop primarily on a
+clone of the repository on your development machine. Any local branches named
+the same as persistent branches from the
 [main repository](https://github.com/google/iree) (currently `main`, `google`,
 and `stable`) are pristine (though potentially stale) copies. You only
 fastforward these to match upstream and otherwise do development on other
-branches. When sending PRs, you push to a different branch on your fork and
-create the PR from there.
+branches. When sending PRs, you push to a different branch on your public fork
+and create the PR from there.
 
 ### Setup
 
 1. Create a fork of the main repository.
-2. Clone from this repository or the main repository.
-3. Rename your remotes to `upstream` and `fork`, so that it's abundantly clear
-   which is which. This is especially important for maintainers who have write
-   access (so can push directly to the main repository) and admins who have
-   elevated privileges (so can push directly to protected branches). These names
-   are just suggestions, but you might find some scripts that assume the remotes
-   are named like this.
 
-   TODO(gcmn): These are just the names I use. We could poll the team to
-   establish a convention here for the scripts.
+2. Create a local git repository with remotes `upstream` (the main repository)
+   and `origin` (your personal fork). To list your current remotes
+   `git remote -v`.
 
-4. Create git aliases to easily synchronize your persistent branches with
-   `upstream`.
+    a. If you already cloned from the main repository (e.g. by following the
+    getting started guide):
+
+    ```shell
+    # From your existing git repo
+    git remote rename origin upstream
+    git add remote origin git@github.com:<github_username>/iree.git
+    ```
+
+    b. If you haven't already cloned:
+
+    ```shell
+    # From whatever directory under which you want to nest your repo
+    git clone git@github.com:<github_username>/iree.git
+    cd iree
+    git remote add upstream git@github.com:google/iree.git
+    ```
+
+    This is especially important for maintainers who have write access (so can
+    push directly to the main repository) and admins who have elevated
+    privileges (so can push directly to protected branches). These names are
+    just suggestions, but you might find some scripts where the defaults are for
+    remotes named like this. For extra safety, you can make it difficult to push
+    directly to upstream by setting the push url to something invalid:
+    `git remote set-url --push upstream DISABLE`, which requires re-enabling the
+    push URL explicitly before pushing.
+
+4. Create a git alias to easily synchronize `main` with `upstream`. Submodules
+   make this is a little trickier than it should be.
 
     ```
     [alias]
-        update = "!f() { \
-          git checkout ${1?} && git pull upstream ${1?} --ff-only && git submodule update --init && git status; \
-        }; f"
-        sync = ! ([[ -z "$(git status --porcelain)" ]] && git update google && git update main) || (echo "Sync failed" && git status && false)
+        sync = ! ([[ -z "$(git status --porcelain)" ]] && git checkout main && git pull upstream main --ff-only && git submodule update --init && [[ -z "$(git status --porcelain)" ]]) || (echo "Sync failed" && git status && false)
     ```
 
 ## Useful Tools
