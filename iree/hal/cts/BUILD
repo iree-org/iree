@@ -40,7 +40,6 @@ cc_library(
         "//iree/hal/llvmjit:llvmjit_driver_module",  # build-cleaner: keep
         "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-        # "//iree/hal/dawn:dawn_driver_module",  # build-cleaner: keep
     ] + PLATFORM_VULKAN_TEST_DEPS,
 )
 

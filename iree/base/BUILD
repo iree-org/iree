@@ -112,35 +112,6 @@ cc_test(
 )
 
 cc_library(
-    name = "buffer_string_util",
-    srcs = ["buffer_string_util.cc"],
-    hdrs = ["buffer_string_util.h"],
-    deps = [
-        ":memory",
-        ":shape",
-        ":source_location",
-        ":status",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "buffer_string_util_test",
-    srcs = ["buffer_string_util_test.cc"],
-    deps = [
-        ":buffer_string_util",
-        ":memory",
-        ":status",
-        ":status_matchers",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
     name = "dynamic_library",
     srcs = [
         "dynamic_library_posix.cc",
@@ -394,76 +365,6 @@ cc_test(
     deps = [
         ":ref_ptr",
         "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "shape",
-    srcs = ["shape.cc"],
-    hdrs = ["shape.h"],
-    deps = [
-        ":logging",
-        ":source_location",
-        ":status",
-        "@com_google_absl//absl/meta:type_traits",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "shape_test",
-    srcs = ["shape_test.cc"],
-    deps = [
-        ":shape",
-        ":status",
-        ":status_matchers",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "shaped_buffer",
-    hdrs = ["shaped_buffer.h"],
-    deps = [
-        ":logging",
-        ":memory",
-        ":shape",
-        "@com_google_absl//absl/container:fixed_array",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "shaped_buffer_string_util",
-    srcs = ["shaped_buffer_string_util.cc"],
-    hdrs = ["shaped_buffer_string_util.h"],
-    deps = [
-        ":buffer_string_util",
-        ":memory",
-        ":shape",
-        ":shaped_buffer",
-        ":source_location",
-        ":status",
-        "@com_google_absl//absl/container:fixed_array",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "shaped_buffer_string_util_test",
-    srcs = ["shaped_buffer_string_util_test.cc"],
-    deps = [
-        ":buffer_string_util",
-        ":memory",
-        ":shaped_buffer",
-        ":shaped_buffer_string_util",
-        ":status",
-        ":status_matchers",
-        "//iree/testing:gtest_main",
-        "@com_google_absl//absl/strings",
     ],
 )
 

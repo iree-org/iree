@@ -391,11 +391,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
       LOG(ERROR) << "Unimplemented parser for element format FLOAT_16";
       return IREE_STATUS_UNIMPLEMENTED;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%F",
+      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                         *reinterpret_cast<const float*>(data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%E",
+      n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                         *reinterpret_cast<const double*>(data.data));
       break;
     default: {
