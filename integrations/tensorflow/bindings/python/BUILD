@@ -16,6 +16,7 @@ load("//bindings/python:build_defs.oss.bzl", "iree_py_library")
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
