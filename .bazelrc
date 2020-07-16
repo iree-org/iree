@@ -89,6 +89,7 @@ build:generic_clang --copt=-Wno-unused-function
 build:generic_clang --copt=-Wno-unused-local-typedef
 build:generic_clang --copt=-Wno-unused-private-field
 build:generic_clang --copt=-Wno-user-defined-warnings
+build:generic_clang --copt=-Wno-macro-redefined # IREE and TensorFlow define some of the same macros
 
 # Explicitly enable some additional warnings.
 # Some of these aren't on by default, or under -Wall, or are subsets of warnings
