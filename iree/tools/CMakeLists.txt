@@ -362,6 +362,7 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api_util
+    iree::base::file_io
     iree::base::buffer_string_util
     iree::base::shape
     iree::base::shaped_buffer
