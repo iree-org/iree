@@ -43,18 +43,17 @@ fi
 git checkout -B "${PR_BRANCH?}"
 git push -f "${FORK_REMOTE?}" "${PR_BRANCH?}"
 
+TITLE="Merge google -> main"
+
 git fetch "${UPSTREAM_REMOTE?}" main
-PR_BODY="$(git log ${UPSTREAM_REMOTE?}/main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
+BODY="$(git log ${UPSTREAM_REMOTE?}/main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
 
 if [[ -z "$(which gh)" ]]; then
   echo "gh not found on path."
   echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
   echo "Cannot create PR. Branch ${PR_BRANCH?} pushed, but aborting."
   echo "You can manually create a PR using the generated body:"
-  echo "${PR_BODY?}"
+  echo "${BODY?}"
   exit 1
 fi
-gh pr create \
-    --base main \
-    --title="Merge google -> main" \
-    --body="${PR_BODY?}"
+gh pr create --base main --title="${TITLE?}" --body="${BODY?}"
