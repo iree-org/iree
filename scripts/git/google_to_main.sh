@@ -31,28 +31,12 @@ set -o pipefail
 
 GREEN_COMMIT="${1:-google}"
 
+export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 PR_BRANCH="${PR_BRANCH:-google-to-main}"
-UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean. Aborting"
-  git status
-  exit 1
-fi
-if ! git symbolic-ref -q HEAD; then
-  echo "In a detached HEAD state. Aborting"
-  git status
-  exit 1
-fi
-git checkout google
-git pull "${UPSTREAM_REMOTE?}" google --ff-only
-git submodule update --init
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean after sync. Aborting"
-  git status
-  exit 1
-fi
+./scripts/git/git_update.sh main
+./scripts/git/git_update.sh google
 if [[ "${GREEN_COMMIT}" != "google" ]]; then
   git checkout "${GREEN_COMMIT?}"
   git submodule update
