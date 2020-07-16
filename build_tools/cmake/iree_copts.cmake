@@ -62,7 +62,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-gnu-variable-sized-type-not-at-end"
     "-Wno-ignored-optimization-argument"
     "-Wno-invalid-offsetof" # Technically UB but needed for intrusive ptrs
-    "-Wno-invalid-source-encoding,"
+    "-Wno-invalid-source-encoding"
     "-Wno-mismatched-tags"
     "-Wno-pointer-sign"
     "-Wno-reserved-user-defined-literal"
