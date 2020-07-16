@@ -25,6 +25,8 @@ class ModuleWrapper {
  public:
   Status Create(const uint8_t* flatbuffer_data, iree_host_size_t length);
 
+  iree_vm_module_t* module() const;
+
   ~ModuleWrapper();
 
  private:

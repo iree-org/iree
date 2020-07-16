@@ -145,8 +145,8 @@ class CompiledModule(object):
       backend_info: an element of BackendInfo corresponding to the backend to
         compile to. If a TF 'backend' is provided then the module is wrapped in
         a TfCompiledModule.
-      exported_names: an optional iterable of strings representing which of
-        the tf.Module's functions to compile. If exported_names is empty all
+      exported_names: an optional iterable of strings representing which of the
+        tf.Module's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
     """
@@ -180,8 +180,8 @@ class IreeCompiledModule(CompiledModule):
         subclass instance.
       backend_info: an element of BackendInfo corresponding to the IREE backend
         to compile to.
-      exported_names: an optional iterable of strings representing which of
-        the tf.Module's functions to compile. If exported_names is empty all
+      exported_names: an optional iterable of strings representing which of the
+        tf.Module's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
     """

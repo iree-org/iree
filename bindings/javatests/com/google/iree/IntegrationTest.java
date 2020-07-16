@@ -26,6 +26,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,7 +44,29 @@ public final class IntegrationTest {
   }
 
   @Test
-  public void simpleMul() throws Exception {
+  public void simpleMulWithStaticContext() throws Exception {
+    Instance.loadNativeLibrary();
+    Instance instance = new Instance();
+
+    Context context = ApplicationProvider.getApplicationContext();
+    Resources resources = context.getResources();
+    InputStream moduleInputStream = resources.openRawResource(R.raw.simple_mul_bytecode_module);
+    ByteBuffer moduleByteBuffer = convertInputStreamToByteBuffer(moduleInputStream);
+    Module module = new Module(moduleByteBuffer);
+
+    List<Module> modules = new ArrayList<>();
+    modules.add(module);
+    com.google.iree.Context ireeContext = new com.google.iree.Context(instance, modules);
+
+    assertNotEquals(ireeContext.getId(), -1);
+
+    module.free();
+    ireeContext.free();
+    instance.free();
+  }
+
+  @Test
+  public void simpleMulWithDynamicContext() throws Exception {
     Instance.loadNativeLibrary();
     Instance instance = new Instance();
     com.google.iree.Context ireeContext = new com.google.iree.Context(instance);
@@ -54,7 +78,10 @@ public final class IntegrationTest {
     InputStream moduleInputStream = resources.openRawResource(R.raw.simple_mul_bytecode_module);
     ByteBuffer moduleByteBuffer = convertInputStreamToByteBuffer(moduleInputStream);
     Module module = new Module(moduleByteBuffer);
-    // TODO(jennik): Register modules with the context.
+
+    List<Module> modules = new ArrayList<>();
+    modules.add(module);
+    ireeContext.registerModules(modules);
 
     module.free();
     ireeContext.free();
