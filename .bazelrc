@@ -112,7 +112,7 @@ build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wunused-variable
 build:generic_clang --copt=-Wvla
-# LINT.ThenChange(https://github.com/google/iree/blob/main/build_tools/cmake/iree_copts.cmake:clang_diagnostics)
+# LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/cmake/iree_copts.cmake:clang_diagnostics)
 
 ###############################################################################
 # Options for building with address sanitizer.
