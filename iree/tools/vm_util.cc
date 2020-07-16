@@ -18,10 +18,12 @@
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api_util.h"
 #include "iree/base/buffer_string_util.h"
+#include "iree/base/file_io.h"
 #include "iree/base/shape.h"
 #include "iree/base/shaped_buffer.h"
 #include "iree/base/shaped_buffer_string_util.h"
@@ -34,6 +36,13 @@
 #include "iree/vm/variant_list.h"
 
 namespace iree {
+namespace {
+
+// Returns a splitted input values from `filename` using newline as separater.
+StatusOr<std::vector<std::string>> GetInputValues(const std::string& filename) {
+}
+
+}  // namespace
 
 Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   iree_string_view_t sig_fv =
@@ -82,6 +91,15 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
            << "' failed getting results";
   }
   return output_descs;
+}
+
+StatusOr<iree_vm_variant_list_t*> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename) {
+  ASSIGN_OR_RETURN(auto s, file_io::GetFileContents(filename));
+  std::vector<std::string> input_strings =
+      absl::StrSplit(s, '\n', absl::SkipEmpty());
+  return ParseToVariantList(descs, allocator, input_strings);
 }
 
 StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
