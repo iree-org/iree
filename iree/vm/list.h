@@ -33,6 +33,10 @@ extern "C" {
 // ABI. It is not designed for efficiency: if you are performing large amounts
 // of work on the list type you should instead be representing that using the
 // HAL types so that you can get acceleration.
+//
+// This type the same performance characteristics as std::vector; pushes may
+// grow the capacity of the list and to ensure minimal wastage it is always
+// better to reserve the exact desired element count first.
 typedef struct iree_vm_list iree_vm_list_t;
 
 #ifndef IREE_API_NO_PROTOTYPES
@@ -95,6 +99,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_value_as(
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_value(
     iree_vm_list_t* list, iree_host_size_t i, const iree_vm_value_t* value);
 
+// Pushes the value of the element to the end of the list.
+// If the specified |value| type differs from the list storage type the value
+// will be converted using the value type semantics (such as sign/zero extend,
+// etc).
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_list_push_value(iree_vm_list_t* list, const iree_vm_value_t* value);
+
 // Returns the ref value of the element at the given index.
 // The ref will be retained and must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_retain(
@@ -105,10 +116,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_retain(
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_ref_retain(
     iree_vm_list_t* list, iree_host_size_t i, const iree_vm_ref_t* value);
 
+// Pushes the ref value of the element to the end of the list, retaining a
+// reference in the list until the element is cleared or the list is disposed.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_list_push_ref_retain(iree_vm_list_t* list, const iree_vm_ref_t* value);
+
 // Sets the ref value of the element at the given index, moving ownership of the
 // |value| reference to the list.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_ref_move(
     iree_vm_list_t* list, iree_host_size_t i, iree_vm_ref_t* value);
+
+// Pushes the ref value of the element to the end of the list, moving ownership
+// of the |value| reference to the list.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_list_push_ref_move(iree_vm_list_t* list, iree_vm_ref_t* value);
 
 // Returns the value of the element at the given index. If the element contains
 // a ref then it will be retained and must be released by the caller.
@@ -122,6 +143,13 @@ iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
 // then it will be retained.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_variant(
     iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant2_t* value);
+
+// Pushes the value of the element to the end of the list. If the specified
+// |value| type differs from the list storage type the value will be converted
+// using the value type semantics (such as sign/zero extend, etc). If the
+// variant is a ref then it will be retained.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_push_variant(
+    iree_vm_list_t* list, const iree_vm_variant2_t* value);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
