@@ -66,6 +66,88 @@ static iree_vm_ref_type_descriptor_t iree_vm_list_descriptor = {0};
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_list, iree_vm_list_t);
 
+static void iree_vm_list_reset_range(iree_vm_list_t* list,
+                                     iree_host_size_t offset,
+                                     iree_host_size_t length) {
+  switch (list->storage_mode) {
+    case IREE_VM_LIST_STORAGE_MODE_VALUE:
+      // Nothing special, freeing the storage is all we need.
+      break;
+    case IREE_VM_LIST_STORAGE_MODE_REF: {
+      iree_vm_ref_t* ref_storage = (iree_vm_ref_t*)list->storage;
+      for (iree_host_size_t i = offset; i < length; ++i) {
+        iree_vm_ref_release(&ref_storage[i]);
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
+      iree_vm_variant2_t* variant_storage = (iree_vm_variant2_t*)list->storage;
+      for (iree_host_size_t i = offset; i < length; ++i) {
+        if (iree_vm_type_def_is_ref(&variant_storage[i].type)) {
+          iree_vm_ref_release(&variant_storage[i].ref);
+        }
+      }
+      break;
+    }
+  }
+}
+
+IREE_API_EXPORT iree_host_size_t iree_vm_list_storage_size(
+    const iree_vm_type_def_t* element_type, iree_host_size_t capacity) {
+  iree_host_size_t element_size;
+  if (iree_vm_type_def_is_value(element_type)) {
+    element_size = kValueTypeSizes[element_type->value_type];
+  } else if (iree_vm_type_def_is_ref(element_type)) {
+    element_size = sizeof(iree_vm_ref_t);
+  } else {
+    element_size = sizeof(iree_vm_variant2_t);
+  }
+  return iree_align(sizeof(iree_vm_list_t), 8) +
+         iree_align(capacity * element_size, 8);
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
+    iree_byte_span_t storage, const iree_vm_type_def_t* element_type,
+    iree_host_size_t capacity, iree_vm_list_t** out_list) {
+  iree_host_size_t element_size;
+  iree_vm_list_storage_mode_t storage_mode;
+  if (iree_vm_type_def_is_value(element_type)) {
+    storage_mode = IREE_VM_LIST_STORAGE_MODE_VALUE;
+    element_size = kValueTypeSizes[element_type->value_type];
+  } else if (iree_vm_type_def_is_ref(element_type)) {
+    storage_mode = IREE_VM_LIST_STORAGE_MODE_REF;
+    element_size = sizeof(iree_vm_ref_t);
+  } else {
+    storage_mode = IREE_VM_LIST_STORAGE_MODE_VARIANT;
+    element_size = sizeof(iree_vm_variant2_t);
+  }
+
+  iree_host_size_t storage_offset = iree_align(sizeof(iree_vm_list_t), 8);
+  iree_host_size_t required_storage_size =
+      storage_offset + iree_align(capacity * element_size, 8);
+  if (storage.data_length < required_storage_size) {
+    return IREE_STATUS_OUT_OF_RANGE;
+  }
+
+  iree_vm_list_t* list = (iree_vm_list_t*)storage.data;
+  memset(list, 0, sizeof(*list));
+  iree_atomic_store(&list->ref_object.counter, 1);
+  list->element_type = *element_type;
+  list->element_size = element_size;
+  list->storage_mode = storage_mode;
+  list->capacity = capacity;
+  list->storage = storage.data + storage_offset;
+
+  *out_list = list;
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT void IREE_API_CALL
+iree_vm_list_deinitialize(iree_vm_list_t* list) {
+  iree_vm_list_reset_range(list, 0, list->count);
+  list->count = 0;
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_create(
     const iree_vm_type_def_t* element_type, iree_host_size_t initial_capacity,
     iree_allocator_t allocator, iree_vm_list_t** out_list) {
@@ -96,32 +178,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_create(
 
   *out_list = list;
   return IREE_STATUS_OK;
-}
-
-static void iree_vm_list_reset_range(iree_vm_list_t* list,
-                                     iree_host_size_t offset,
-                                     iree_host_size_t length) {
-  switch (list->storage_mode) {
-    case IREE_VM_LIST_STORAGE_MODE_VALUE:
-      // Nothing special, freeing the storage is all we need.
-      break;
-    case IREE_VM_LIST_STORAGE_MODE_REF: {
-      iree_vm_ref_t* ref_storage = (iree_vm_ref_t*)list->storage;
-      for (iree_host_size_t i = offset; i < length; ++i) {
-        iree_vm_ref_release(&ref_storage[i]);
-      }
-      break;
-    }
-    case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
-      iree_vm_variant2_t* variant_storage = (iree_vm_variant2_t*)list->storage;
-      for (iree_host_size_t i = offset; i < length; ++i) {
-        if (iree_vm_type_def_is_ref(&variant_storage[i].type)) {
-          iree_vm_ref_release(&variant_storage[i].ref);
-        }
-      }
-      break;
-    }
-  }
 }
 
 static void iree_vm_list_destroy(void* ptr) {

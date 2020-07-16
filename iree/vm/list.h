@@ -41,6 +41,30 @@ typedef struct iree_vm_list iree_vm_list_t;
 
 #ifndef IREE_API_NO_PROTOTYPES
 
+// Returns the size in bytes required to store a list with the given element
+// type and capacity. This storage size can be used to stack allocate or reserve
+// memory that is then used by iree_vm_list_initialize to avoid dynamic
+// allocations.
+IREE_API_EXPORT iree_host_size_t iree_vm_list_storage_size(
+    const iree_vm_type_def_t* element_type, iree_host_size_t capacity);
+
+// Initializes a statically-allocated list in the |storage| memory.
+// The storage capacity must be large enough to hold the list internals and
+// its contents which may vary across compilers/platforms/etc; use
+// iree_vm_list_storage_size to query the required capacity.
+//
+// Statically-allocated lists have their lifetime controlled by the caller and
+// must be deinitialized with iree_vm_list_deinitialize only when there are no
+// more users of the list.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
+    iree_byte_span_t storage, const iree_vm_type_def_t* element_type,
+    iree_host_size_t capacity, iree_vm_list_t** out_list);
+
+// Deinitializes a statically-allocated |list| previously initialized with
+// iree_vm_list_initialize.
+IREE_API_EXPORT void IREE_API_CALL
+iree_vm_list_deinitialize(iree_vm_list_t* list);
+
 // Creates a growable list containing the given |element_type|, which may either
 // be a primitive iree_vm_value_type_t value (like i32) or a ref type. When
 // storing ref types the list may either store a specific iree_vm_ref_type_t
