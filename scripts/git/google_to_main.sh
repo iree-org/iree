@@ -19,7 +19,7 @@
 #
 # - Requries the gh CLI (https://github.com/cli/cli) to create a PR.
 # - Will force push to the configured PR_BRANCH (default "google-to-main") on
-#   the configured FORK_REMOTE (default "fork")
+#   the configured FORK_REMOTE (default "origin")
 # - Requires that local "google" branch is a pristine (potentially stale) copy
 #   of the "google" branch on the configured UPSTREAM_REMOTE
 #   (default "upstream").
@@ -33,7 +33,7 @@ GREEN_COMMIT="${1:-google}"
 
 PR_BRANCH="${PR_BRANCH:-google-to-main}"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
-FORK_REMOTE="${FORK_REMOTE:-fork}"
+FORK_REMOTE="${FORK_REMOTE:-origin}"
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working directory not clean. Aborting"

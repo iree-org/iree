@@ -20,7 +20,7 @@
 #
 # - Requries the gh CLI (https://github.com/cli/cli) to create a PR.
 # - Will force push to the configured PR_BRANCH (default "tf-submodule-update")
-#   on the configured FORK_REMOTE (default "fork")
+#   on the configured FORK_REMOTE (default "origin")
 # - Requires that local BASE_BRANCH branch is a pristine (potentially stale)
 #   copy of the same branch on the configured UPSTREAM_REMOTE
 #   (default "upstream").
@@ -37,7 +37,7 @@ TENSORFLOW_COMMIT="${1:-REMOTE}"
 PR_BRANCH="tf-submodule-update"
 BASE_BRANCH="${1:-google}"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
-FORK_REMOTE="${FORK_REMOTE:-fork}"
+FORK_REMOTE="${FORK_REMOTE:-origin}"
 TF_COMMIT_NICKNAME=""
 
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -82,5 +82,5 @@ EOF
 )"
 
 git commit -am "${TITLE?}"
-git push -f fork "${PR_BRANCH?}"
+git push -f "${FORK_REMOTE?}" "${PR_BRANCH?}"
 gh pr create --title="${TITLE?}" --body="${BODY?}" --base="${BASE_BRANCH?}"
