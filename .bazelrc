@@ -47,17 +47,17 @@ build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 # This is a good compromise between runtime and debugability.
 build:generic_clang --copt=-UNDEBUG
 
-
 # Treat warnings in-workspace as errors.
 build:generic_clang --per_file_copt=-external/.*-Werror
 # ...and silence them outside of the workspace.
 build:generic_clang --per_file_copt=external/.*@-w
 
-
+# LINT.IfChange(clang_diagnostics)
 # Set clang diagnostics. These largely match the set of warnings used within
-# Google. They have not been audited super carefully but are generally thought
-# to be a good set and consistency with those is very useful when importing.
-# If you feel hat some of these should be different, please raise an issue!
+# Google. They have not been audited super carefully by the IREE team but are
+# generally thought to be a good set and consistency with those used internally
+# is very useful when importing. If you feel hat some of these should be
+# different, please raise an issue!
 
 build:generic_clang --copt=-Wall
 
@@ -112,6 +112,7 @@ build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wunused-variable
 build:generic_clang --copt=-Wvla
+# LINT.ThenChange(https://github.com/google/iree/blob/main/build_tools/cmake/iree_copts.cmake:clang_diagnostics)
 
 ###############################################################################
 # Options for building with address sanitizer.
