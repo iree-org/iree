@@ -19,7 +19,7 @@
 #
 # - Requries the gh CLI (https://github.com/cli/cli) to create a PR.
 # - Will force push to the configured PR_BRANCH (default "bazel-to-cmake-fix")
-#   on the configured FORK_REMOTE (default "fork")
+#   on the configured FORK_REMOTE (default "origin")
 # - Requires that local BASE_BRANCH branch is a pristine (potentially stale)
 #   copy of the same branch on the configured UPSTREAM_REMOTE
 #   (default "upstream").
@@ -32,7 +32,7 @@ set -o pipefail
 BASE_BRANCH="${1:-google}"
 PR_BRANCH="bazel-to-cmake-fix"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
-FORK_REMOTE="${FORK_REMOTE:-fork}"
+FORK_REMOTE="${FORK_REMOTE:-origin}"
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working directory not clean. Aborting"
