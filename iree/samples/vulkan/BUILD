@@ -18,6 +18,9 @@ load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
+    features = [
+        "-layering_check",  # buildozer: disable=no-layering-check, TODO(b/153880171): Enable when Bazel supports layering_check
+    ],
     licenses = ["notice"],  # Apache 2.0
 )
 

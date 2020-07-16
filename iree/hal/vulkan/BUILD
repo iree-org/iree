@@ -18,6 +18,7 @@ load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -189,16 +190,20 @@ cc_library(
     srcs = ["emulated_timeline_semaphore.cc"],
     hdrs = ["emulated_timeline_semaphore.h"],
     deps = [
+        ":dynamic_symbols",
         ":handle_util",
         ":status_util",
         ":timepoint_util",
         "//iree/base:intrusive_list",
+        "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:semaphore",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/utility",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
@@ -348,15 +353,25 @@ cc_library(
     hdrs = ["serializing_command_queue.h"],
     deps = [
         ":direct_command_buffer",
+        ":dynamic_symbols",
         ":emulated_timeline_semaphore",
         ":handle_util",
         ":status_util",
         ":timepoint_util",
+        "//iree/base:intrusive_list",
+        "//iree/base:memory",
+        "//iree/base:ref_ptr",
+        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
+        "//iree/hal:command_buffer",
         "//iree/hal:command_queue",
+        "//iree/hal:semaphore",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -375,12 +390,17 @@ cc_library(
     srcs = ["timepoint_util.cc"],
     hdrs = ["timepoint_util.h"],
     deps = [
+        ":dynamic_symbols",
         ":handle_util",
+        ":status_util",
         "//iree/base:intrusive_list",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:tracing",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/utility",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
