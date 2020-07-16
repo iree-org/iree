@@ -63,7 +63,6 @@ build:generic_clang --copt=-Wall
 
 # Disable warnings we don't care about or that generally have a low signal/noise
 # ratio.
-build:generic_clang --copt=-no-canonical-prefixes
 build:generic_clang --copt=-Wno-ambiguous-member-template
 build:generic_clang --copt=-Wno-char-subscripts
 build:generic_clang --copt=-Wno-error=deprecated-declarations
@@ -86,11 +85,8 @@ build:generic_clang --copt=-Wno-unknown-pragmas
 build:generic_clang --copt=-Wno-unknown-warning-option
 build:generic_clang --copt=-Wno-unused-command-line-argument
 build:generic_clang --copt=-Wno-unused-const-variable
-build:generic_clang --copt=-Wno-unused-const-variable
-build:generic_clang --copt=-Wno-unused-function
 build:generic_clang --copt=-Wno-unused-function
 build:generic_clang --copt=-Wno-unused-local-typedef
-build:generic_clang --copt=-Wno-unused-private-field
 build:generic_clang --copt=-Wno-unused-private-field
 build:generic_clang --copt=-Wno-user-defined-warnings
 
