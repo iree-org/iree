@@ -98,8 +98,6 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     auto input_string = input_strings[i];
     auto desc = descs[i];
     std::string desc_str;
-    // TODO(laurenzo): Parse real element type once bindings code enforces it.
-    iree_hal_element_type_t hal_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
     desc.ToString(desc_str);
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {

@@ -48,7 +48,7 @@ build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 build:generic_clang --copt=-UNDEBUG
 
 # Treat warnings in-workspace as errors.
-build:generic_clang --per_file_copt=-external/.*-Werror
+build:generic_clang --per_file_copt=-external/.*@-Werror
 # ...and silence them outside of the workspace.
 build:generic_clang --per_file_copt=external/.*@-w
 
