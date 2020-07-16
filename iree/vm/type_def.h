@@ -84,6 +84,9 @@ typedef struct {
     int32_t i32;
     int64_t i64;
     iree_vm_ref_t ref;
+
+    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
+                                                        // types
   };
 } iree_vm_variant2_t;
 
