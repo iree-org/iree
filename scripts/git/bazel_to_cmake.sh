@@ -26,32 +26,14 @@
 # - Requires that the working directory be clean. Will abort otherwise.
 
 set -e
-set -x
 set -o pipefail
 
+export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 BASE_BRANCH="${1:-google}"
 PR_BRANCH="bazel-to-cmake-fix"
-UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean. Aborting"
-  git status
-  exit 1
-fi
-if ! git symbolic-ref -q HEAD; then
-  echo "In a detached HEAD state. Aborting"
-  git status
-  exit 1
-fi
-git checkout "${BASE_BRANCH?}"
-git pull "${UPSTREAM_REMOTE?}" "${BASE_BRANCH?}" --ff-only
-git submodule update --init
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean after sync. Aborting"
-  git status
-  exit 1
-fi
+./scripts/git/git_update.sh "${BASE_BRANCH?}"
 git checkout -B "${PR_BRANCH?}"
 ./build_tools/bazel_to_cmake/bazel_to_cmake.py
 
@@ -63,4 +45,14 @@ BODY='Updates CMake files to match Bazel BUILD
 
 git commit -am "${TITLE?}"
 git push -f "${FORK_REMOTE}" "${PR_BRANCH?}"
+
+if [[ -z "$(which gh)" ]]; then
+  echo "gh not found on path."
+  echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
+  echo "Cannot create PR. Branch ${PR_BRANCH?} pushed, but aborting."
+  echo "You can manually create a PR using the generated body:"
+  echo "${BODY?}"
+  exit 1
+fi
+
 gh pr create --title="${TITLE?}" --body="${BODY?}" --base="${BASE_BRANCH?}"

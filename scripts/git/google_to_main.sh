@@ -25,47 +25,35 @@
 #   (default "upstream").
 # - Requires that the working directory be clean. Will abort otherwise.
 
-set -x
 set -e
 set -o pipefail
 
 GREEN_COMMIT="${1:-google}"
 
+export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 PR_BRANCH="${PR_BRANCH:-google-to-main}"
-UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean. Aborting"
-  git status
-  exit 1
-fi
-if ! git symbolic-ref -q HEAD; then
-  echo "In a detached HEAD state. Aborting"
-  git status
-  exit 1
-fi
-git checkout google
-git pull "${UPSTREAM_REMOTE?}" google --ff-only
-git submodule update --init
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean after sync. Aborting"
-  git status
-  exit 1
-fi
+./scripts/git/git_update.sh google
 if [[ "${GREEN_COMMIT}" != "google" ]]; then
   git checkout "${GREEN_COMMIT?}"
   git submodule update
 fi
+
 git checkout -B "${PR_BRANCH?}"
 git push -f "${FORK_REMOTE?}" "${PR_BRANCH?}"
+
+TITLE="Merge google -> main"
+
+git fetch "${UPSTREAM_REMOTE?}" main
+BODY="$(git log ${UPSTREAM_REMOTE?}/main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
+
 if [[ -z "$(which gh)" ]]; then
   echo "gh not found on path."
   echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
-  echo "Cannot create PR. Branch ${BRANCH?} pushed, but aborting."
+  echo "Cannot create PR. Branch ${PR_BRANCH?} pushed, but aborting."
+  echo "You can manually create a PR using the generated body:"
+  echo "${BODY?}"
   exit 1
 fi
-gh pr create \
-    --base main \
-    --title="Merge google -> main" \
-    --body="$(git log main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
+gh pr create --base main --title="${TITLE?}" --body="${BODY?}"

@@ -30,34 +30,16 @@
 #   TENSORFLOW_COMMIT is REMOTE and the trimmed commit sha otherwise.
 
 set -e
-set -x
 set -o pipefail
 
+export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 TENSORFLOW_COMMIT="${1:-REMOTE}"
 PR_BRANCH="tf-submodule-update"
 BASE_BRANCH="${1:-google}"
-UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 TF_COMMIT_NICKNAME=""
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean. Aborting"
-  git status
-  exit 1
-fi
-if ! git symbolic-ref -q HEAD; then
-  echo "In a detached HEAD state. Aborting"
-  git status
-  exit 1
-fi
-git checkout "${BASE_BRANCH?}"
-git pull "${UPSTREAM_REMOTE?}" "${BASE_BRANCH?}" --ff-only
-git submodule update --init
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working directory not clean after sync. Aborting"
-  git status
-  exit 1
-fi
+./scripts/git/git_update.sh "${BASE_BRANCH?}"
 git checkout -B "${PR_BRANCH?}"
 
 CMD="./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true --tensorflow_commit=${TENSORFLOW_COMMIT?}"
@@ -83,4 +65,13 @@ EOF
 
 git commit -am "${TITLE?}"
 git push -f "${FORK_REMOTE?}" "${PR_BRANCH?}"
+
+if [[ -z "$(which gh)" ]]; then
+  echo "gh not found on path."
+  echo "Have you installed the GitHub CLI (https://github.com/cli/cli)?"
+  echo "Cannot create PR. Branch ${PR_BRANCH?} pushed, but aborting."
+  echo "You can manually create a PR using the generated body:"
+  echo "${BODY?}"
+  exit 1
+fi
 gh pr create --title="${TITLE?}" --body="${BODY?}" --base="${BASE_BRANCH?}"

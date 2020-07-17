@@ -54,37 +54,10 @@ and create the PR from there.
     `git remote set-url --push upstream DISABLE`, which requires re-enabling the
     push URL explicitly before pushing.
 
-4. Create a script to easily synchronize `main` with `upstream`. Submodules
-   make this is a little trickier than it should be.
-
-    ```bash
-    #!/bin/bash
-    # git-update.sh
-
-    set -e
-    set -o pipefail
-
-    if [[ -n "$(git status --porcelain)" ]]; then
-      echo "Working directory not clean. Aborting"
-      git status
-      exit 1
-    fi
-    if ! git symbolic-ref -q HEAD; then
-      echo "In a detached HEAD state. Aborting"
-      git status
-      exit 1
-    fi
-    git checkout "${1?}"
-    git pull upstream "${1?}" --ff-only
-    git submodule update --init
-    if [[ -n "$(git status --porcelain)" ]]; then
-      echo "Working directory not clean after update"
-      git status
-      exit 1
-    fi
-    ```
-
-    You can also add this as a git alias.
+4. Use a script like
+   [git_update.sh](https://github.com/google/iree/blob/main/scripts/git/git_update.sh)
+   to easily synchronize `main` with `upstream`. Submodules make this is a
+   little trickier than it should be. You can also add this as a git alias.
 
     ```shell
     git config alias.update "! /path/to/git-update"
