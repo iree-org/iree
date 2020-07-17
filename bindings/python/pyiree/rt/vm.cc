@@ -197,8 +197,12 @@ std::string VmVariantList::DebugString() const {
   absl::StrAppend(&s, "<VmVariantList(", size(), "): [");
 
   for (iree_host_size_t i = 0, e = size(); i < e; ++i) {
-    iree_vm_variant_t* variant =
-        iree_vm_variant_list_get(mutable_this->raw_ptr(), i);
+    iree_vm_variant2_t variant = {0};
+    if (iree_status_is_ok(
+            iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant))) {
+      absl::StrAppend(&s, "Error");
+      continue;
+    }
     if (i > 0) absl::StrAppend(&s, ", ");
 
     if (IREE_VM_VARIANT_IS_VALUE(variant)) {

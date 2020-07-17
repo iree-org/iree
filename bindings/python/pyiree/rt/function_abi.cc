@@ -24,8 +24,8 @@
 #include "iree/base/signature_mangle.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
+#include "iree/vm/list.h"
 #include "iree/vm/ref.h"
-#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace python {
@@ -184,7 +184,7 @@ void PackScalar(const RawSignatureParser::Description& desc, py::handle py_arg,
     default:
       throw RaisePyError(PyExc_NotImplementedError, "Unsupported scalar type");
   }
-  CheckApiStatus(iree_vm_variant_list_append_value(f_args.raw_ptr(), value),
+  CheckApiStatus(iree_vm_list_push_value(f_args.raw_ptr(), &value),
                  "Could not pack scalar argument");
 }
 
@@ -296,8 +296,11 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
   }
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];
-    iree_vm_variant_t* f_result =
-        iree_vm_variant_list_get(f_results.raw_ptr(), i);
+    iree_vm_variant2_t f_result = {0};
+    if (!iree_status_is_ok(
+            iree_vm_list_get_variant(f_results.raw_ptr(), i, &f_result))) {
+      throw RaiseValueError("Could not get result from list");
+    }
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
         iree_hal_buffer_view_t* buffer_view =
@@ -397,9 +400,9 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
         iree_hal_buffer_release(raw_buffer);
         iree_vm_ref_t buffer_view_ref =
             iree_hal_buffer_view_move_ref(buffer_view);
-        CheckApiStatus(iree_vm_variant_list_append_ref_move(f_results.raw_ptr(),
-                                                            &buffer_view_ref),
-                       "Error moving buffer");
+        CheckApiStatus(
+            iree_vm_list_push_ref_move(f_results.raw_ptr(), &buffer_view_ref),
+            "Error moving buffer");
         break;
       }
       case RawSignatureParser::Type::kRefObject:
@@ -484,9 +487,8 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
                  "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-  CheckApiStatus(
-      iree_vm_variant_list_append_ref_move(f_args.raw_ptr(), &buffer_view_ref),
-      "Error moving buffer view");
+  CheckApiStatus(iree_vm_list_push_ref_move(f_args.raw_ptr(), &buffer_view_ref),
+                 "Error moving buffer view");
 }
 
 void SetupFunctionAbiBindings(pybind11::module m) {

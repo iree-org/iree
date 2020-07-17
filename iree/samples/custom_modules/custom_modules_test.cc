@@ -25,7 +25,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/ref.h"
+#include "iree/vm/ref_cc.h"
 
 namespace {
 
@@ -104,34 +104,32 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
 
   // Pass in the message and number of times to print it.
   // TODO(benvanik): make a macro/magic.
-  iree_vm_variant_list_t* inputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
+  iree::vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
+                                     IREE_ALLOCATOR_SYSTEM, &inputs));
   iree_vm_ref_t input_message_ref = iree_custom_message_move_ref(input_message);
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_append_ref_move(inputs, &input_message_ref));
-  IREE_ASSERT_OK(iree_vm_variant_list_append_value(inputs, count));
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_message_ref));
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &count));
 
   // Prepare outputs list to accept the results from the invocation.
-  iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  iree::vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &outputs));
 
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("reverseAndPrint"),
-                                /*policy=*/nullptr, inputs, outputs,
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
                                 IREE_ALLOCATOR_SYSTEM));
-  iree_vm_variant_list_free(inputs);
 
   // Read back the message that we reversed inside of the module.
   iree_custom_message_t* reversed_message =
-      iree_custom_message_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+      (iree_custom_message_t*)iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_custom_message_get_descriptor());
   ASSERT_NE(nullptr, reversed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(reversed_message, result_buffer,
                                                 ABSL_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("!dlrow olleh", result_buffer);
-
-  iree_vm_variant_list_free(outputs);
 }
 
 TEST_F(CustomModulesTest, PrintTensor) {
@@ -147,33 +145,31 @@ TEST_F(CustomModulesTest, PrintTensor) {
       IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
-  iree_vm_variant_list_t* inputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+  iree::vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &inputs));
   iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_append_ref_move(inputs, &input_buffer_ref));
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_buffer_ref));
 
   // Prepare outputs list to accept the results from the invocation.
-  iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  iree::vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &outputs));
 
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("printTensor"),
-                                /*policy=*/nullptr, inputs, outputs,
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
                                 IREE_ALLOCATOR_SYSTEM));
-  iree_vm_variant_list_free(inputs);
 
   // Read back the message that we printed inside of the module.
   iree_custom_message_t* printed_message =
-      iree_custom_message_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+      (iree_custom_message_t*)iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_custom_message_get_descriptor());
   ASSERT_NE(nullptr, printed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(printed_message, result_buffer,
                                                 ABSL_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("2x4xf32=[0 1 2 3][4 5 6 7]", result_buffer);
-
-  iree_vm_variant_list_free(outputs);
 }
 
 TEST_F(CustomModulesTest, RoundTripTensor) {
@@ -189,33 +185,31 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
       IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
-  iree_vm_variant_list_t* inputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+  iree::vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &inputs));
   iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_append_ref_move(inputs, &input_buffer_ref));
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_buffer_ref));
 
   // Prepare outputs list to accept the results from the invocation.
-  iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  iree::vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &outputs));
 
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("roundTripTensor"),
-                                /*policy=*/nullptr, inputs, outputs,
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
                                 IREE_ALLOCATOR_SYSTEM));
-  iree_vm_variant_list_free(inputs);
 
   // Read back the message that's been moved around.
   iree_custom_message_t* printed_message =
-      iree_custom_message_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+      (iree_custom_message_t*)iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_custom_message_get_descriptor());
   ASSERT_NE(nullptr, printed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(printed_message, result_buffer,
                                                 ABSL_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("2x4xf32=[0 1 2 3][4 5 6 7]", result_buffer);
-
-  iree_vm_variant_list_free(outputs);
 }
 
 }  // namespace

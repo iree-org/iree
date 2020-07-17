@@ -49,8 +49,9 @@ cc_test(
         "//iree/base:logging",
         "//iree/hal:api",
         "//iree/modules/hal",
-        "//iree/vm:bytecode_module",
         "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:ref_cc",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.

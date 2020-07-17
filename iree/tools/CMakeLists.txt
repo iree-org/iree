@@ -44,6 +44,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::modules::hal
     iree::testing::benchmark_main
+    iree::vm
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
@@ -84,6 +85,7 @@ iree_cc_binary(
     iree::base::status
     iree::base::tracing
     iree::modules::hal
+    iree::vm
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
 )
@@ -330,7 +332,6 @@ if(${IREE_BUILD_COMPILER})
       iree::modules::hal
       iree::vm
       iree::vm::bytecode_module
-      iree::vm::value
       ${IREE_HAL_DRIVER_MODULES}
     HOSTONLY
   )
@@ -367,9 +368,9 @@ iree_cc_library(
     iree::base::status
     iree::hal::api
     iree::modules::hal
+    iree::vm
     iree::vm::bytecode_module
-    iree::vm::module
-    iree::vm::variant_list
+    iree::vm::ref_cc
   PUBLIC
 )
 
@@ -386,8 +387,7 @@ iree_cc_test(
     iree::hal::vmla::vmla_driver_module
     iree::modules::hal
     iree::testing::gtest_main
-    iree::vm::value
-    iree::vm::variant_list
+    iree::vm
 )
 
 if(${IREE_ENABLE_MLIR})

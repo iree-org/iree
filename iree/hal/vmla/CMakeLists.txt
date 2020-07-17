@@ -150,8 +150,8 @@ iree_cc_library(
     iree::vm::context
     iree::vm::instance
     iree::vm::invocation
+    iree::vm::list
     iree::vm::module
-    iree::vm::variant_list
   PUBLIC
 )
 

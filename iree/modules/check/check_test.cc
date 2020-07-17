@@ -27,7 +27,6 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/ref.h"
 #include "iree/vm/ref_cc.h"
 
 namespace iree {
@@ -71,8 +70,8 @@ class CheckTest : public ::testing::Test {
   }
 
   void TearDown() override {
+    inputs_.reset();
     iree_vm_context_release(context_);
-    if (inputs_) iree_vm_variant_list_free(inputs_);
   }
 
   void CreateInt32BufferView(absl::Span<const int32_t> contents,
@@ -173,7 +172,7 @@ class CheckTest : public ::testing::Test {
     // TODO(#2075): don't directly invoke native functions like this.
     return FromApiStatus(
         iree_vm_invoke(context_, function,
-                       /*policy=*/nullptr, inputs_,
+                       /*policy=*/nullptr, inputs_.get(),
                        /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
         IREE_LOC);
   }
@@ -181,12 +180,12 @@ class CheckTest : public ::testing::Test {
   Status Invoke(absl::string_view function_name,
                 std::vector<iree_vm_value> args) {
     RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_variant_list_alloc(
-                          args.size(), IREE_ALLOCATOR_SYSTEM, &inputs_),
+        FromApiStatus(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+                                          IREE_ALLOCATOR_SYSTEM, &inputs_),
                       IREE_LOC));
     for (iree_vm_value& arg : args) {
       RETURN_IF_ERROR(FromApiStatus(
-          iree_vm_variant_list_append_value(inputs_, arg), IREE_LOC));
+          iree_vm_list_push_value(inputs_.get(), &arg), IREE_LOC));
     }
     return Invoke(function_name);
   }
@@ -194,13 +193,13 @@ class CheckTest : public ::testing::Test {
   Status Invoke(absl::string_view function_name,
                 std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_variant_list_alloc(
-                          args.size(), IREE_ALLOCATOR_SYSTEM, &inputs_),
+        FromApiStatus(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+                                          IREE_ALLOCATOR_SYSTEM, &inputs_),
                       IREE_LOC));
     for (auto& arg : args) {
       iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());
       RETURN_IF_ERROR(FromApiStatus(
-          iree_vm_variant_list_append_ref_retain(inputs_, &arg_ref), IREE_LOC));
+          iree_vm_list_push_ref_retain(inputs_.get(), &arg_ref), IREE_LOC));
     }
     return Invoke(function_name);
   }
@@ -212,7 +211,7 @@ class CheckTest : public ::testing::Test {
   static iree_vm_module_t* hal_module_;
 
   iree_vm_context_t* context_ = nullptr;
-  iree_vm_variant_list_t* inputs_ = nullptr;
+  vm::ref<iree_vm_list_t> inputs_;
   iree_hal_allocator_t* allocator_ = nullptr;
 };
 iree_hal_device_t* CheckTest::device_ = nullptr;

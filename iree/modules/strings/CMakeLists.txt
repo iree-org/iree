@@ -38,7 +38,6 @@ iree_cc_library(
     iree::vm::module
     iree::vm::module_abi_cc
     iree::vm::ref
-    iree::vm::ref_cc
     iree::vm::stack
   PUBLIC
 )
@@ -60,13 +59,10 @@ iree_cc_test(
     iree::hal::vmla::vmla_driver_module
     iree::modules::hal
     iree::testing::gtest_main
+    iree::vm
     iree::vm::bytecode_module
-    iree::vm::context
-    iree::vm::instance
-    iree::vm::module
-    iree::vm::ref
+    iree::vm::module_abi_cc
     iree::vm::ref_cc
-    iree::vm::stack
 )
 
 iree_bytecode_module(
