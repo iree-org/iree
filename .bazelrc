@@ -48,7 +48,7 @@ build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 build:generic_clang --copt=-UNDEBUG
 
 # Treat warnings in-workspace as errors.
-build:generic_clang --per_file_copt=-external/.*-Werror
+build:generic_clang --per_file_copt=-external/.*@-Werror
 # ...and silence them outside of the workspace.
 build:generic_clang --per_file_copt=external/.*@-w
 
@@ -89,6 +89,7 @@ build:generic_clang --copt=-Wno-unused-function
 build:generic_clang --copt=-Wno-unused-local-typedef
 build:generic_clang --copt=-Wno-unused-private-field
 build:generic_clang --copt=-Wno-user-defined-warnings
+build:generic_clang --copt=-Wno-macro-redefined # TODO(GH-2556): Re-enable (IREE and TF both define LOG)
 
 # Explicitly enable some additional warnings.
 # Some of these aren't on by default, or under -Wall, or are subsets of warnings

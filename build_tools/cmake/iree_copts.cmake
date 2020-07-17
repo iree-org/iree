@@ -80,6 +80,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unused-local-typedef"
     "-Wno-unused-private-field"
     "-Wno-user-defined-warnings"
+    "-Wno-macro-redefined" # TODO(GH-2556): Re-enable (IREE and TF both define LOG)
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
     # warnings turned off above.
