@@ -27,7 +27,6 @@
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
 namespace iree {
@@ -170,7 +169,7 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantListFromFile(
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_list_t* variant_list, std::ostream* os) {
   for (int i = 0; i < iree_vm_list_size(variant_list); ++i) {
-    iree_vm_variant2_t variant = {nullptr};
+    iree_vm_variant_t variant = iree_vm_variant_empty();
     RETURN_IF_ERROR(FromApiStatus(
         iree_vm_list_get_variant(variant_list, i, &variant), IREE_LOC))
         << "variant " << i << "not present";

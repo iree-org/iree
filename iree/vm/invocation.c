@@ -31,7 +31,7 @@ static iree_status_t iree_vm_stack_frame_marshal_inputs(
   uint16_t ref_reg = 0;
   out_dst_reg_list->size = (uint16_t)count;
   for (iree_host_size_t i = 0; i < count; ++i) {
-    iree_vm_variant2_t variant = {0};
+    iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(inputs, i, &variant));
     if (iree_vm_type_def_is_ref(&variant.type)) {
       out_dst_reg_list->registers[i] =

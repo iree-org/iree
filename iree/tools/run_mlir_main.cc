@@ -66,7 +66,6 @@
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/value.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"

@@ -175,21 +175,21 @@ iree_vm_list_push_ref_move(iree_vm_list_t* list, iree_vm_ref_t* value);
 // lifetime.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
-                         iree_vm_variant2_t* out_value);
+                         iree_vm_variant_t* out_value);
 
 // Sets the value of the element at the given index. If the specified |value|
 // type differs from the list storage type the value will be converted using the
 // value type semantics (such as sign/zero extend, etc). If the variant is a ref
 // then it will be retained.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_variant(
-    iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant2_t* value);
+    iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant_t* value);
 
 // Pushes the value of the element to the end of the list. If the specified
 // |value| type differs from the list storage type the value will be converted
 // using the value type semantics (such as sign/zero extend, etc). If the
 // variant is a ref then it will be retained.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_push_variant(
-    iree_vm_list_t* list, const iree_vm_variant2_t* value);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_list_push_variant(iree_vm_list_t* list, const iree_vm_variant_t* value);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

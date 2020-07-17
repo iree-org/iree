@@ -189,7 +189,7 @@ void PackScalar(const RawSignatureParser::Description& desc, py::handle py_arg,
 }
 
 py::object UnpackScalar(const RawSignatureParser::Description& desc,
-                        iree_vm_variant_t& f_result) {
+                        const iree_vm_variant_t& f_result) {
   switch (desc.scalar.type) {
     case AbiConstants::ScalarType::kUint8:
     case AbiConstants::ScalarType::kUint16:
@@ -296,7 +296,7 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
   }
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];
-    iree_vm_variant2_t f_result = {0};
+    iree_vm_variant_t f_result = iree_vm_variant_empty();
     if (!iree_status_is_ok(
             iree_vm_list_get_variant(f_results.raw_ptr(), i, &f_result))) {
       throw RaiseValueError("Could not get result from list");
@@ -304,7 +304,7 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
         iree_hal_buffer_view_t* buffer_view =
-            iree_hal_buffer_view_deref(&f_result->ref);
+            iree_hal_buffer_view_deref(&f_result.ref);
         if (!buffer_view) {
           throw RaiseValueError(
               "Could not deref result buffer view (wrong type?)");
@@ -343,7 +343,7 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
                            "Ref objects not yet supported");
         break;
       case RawSignatureParser::Type::kScalar:
-        py_results[i] = UnpackScalar(desc, *f_result);
+        py_results[i] = UnpackScalar(desc, f_result);
         break;
       default:
         throw RaisePyError(PyExc_NotImplementedError,
