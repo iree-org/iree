@@ -44,20 +44,76 @@ endif()
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG
+    # LINT.IfChange(clang_diagnostics)
+    # Set clang diagnostics. These largely match the set of warnings used within
+    # Google. They have not been audited super carefully by the IREE team but
+    # are generally thought to be a good set and consistency with those used
+    # internally is very useful when importing. If you feel hat some of these
+    # should be different, please raise an issue!
+    "-Wall"
+
+    # Disable warnings we don't care about or that generally have a low
+    # signal/noise ratio.
+    "-Wno-ambiguous-member-template"
+    "-Wno-char-subscripts"
+    "-Wno-error=deprecated-declarations"
+    "-Wno-extern-c-compat" # Matches upstream. Cannot impact due to extern C inclusion method.
+    "-Wno-gnu-alignof-expression"
+    "-Wno-gnu-variable-sized-type-not-at-end"
+    "-Wno-ignored-optimization-argument"
+    "-Wno-invalid-offsetof" # Technically UB but needed for intrusive ptrs
+    "-Wno-invalid-source-encoding"
+    "-Wno-mismatched-tags"
+    "-Wno-pointer-sign"
+    "-Wno-reserved-user-defined-literal"
+    "-Wno-return-type-c-linkage"
+    "-Wno-self-assign-overloaded"
+    "-Wno-sign-compare"
+    "-Wno-signed-unsigned-wchar"
+    "-Wno-strict-overflow"
+    "-Wno-trigraphs"
+    "-Wno-unknown-pragmas"
+    "-Wno-unknown-warning-option"
+    "-Wno-unused-command-line-argument"
+    "-Wno-unused-const-variable"
+    "-Wno-unused-function"
+    "-Wno-unused-local-typedef"
+    "-Wno-unused-private-field"
+    "-Wno-user-defined-warnings"
+    "-Wno-macro-redefined" # TODO(GH-2556): Re-enable (IREE and TF both define LOG)
+    # Explicitly enable some additional warnings.
+    # Some of these aren't on by default, or under -Wall, or are subsets of
+    # warnings turned off above.
+    "-Wno-ambiguous-member-template"
+    "-Wctad-maybe-unsupported"
+    "-Wfloat-overflow-conversion"
+    "-Wfloat-zero-conversion"
+    "-Wfor-loop-analysis"
+    "-Wformat-security"
+    "-Wgnu-redeclared-enum"
+    "-Wimplicit-fallthrough"
+    "-Winfinite-recursion"
+    "-Wliteral-conversion"
+    "-Wnon-virtual-dtor"
+    "-Woverloaded-virtual"
+    "-Wself-assign"
+    "-Wstring-conversion"
+    "-Wtautological-overlap-compare"
+    "-Wthread-safety"
+    "-Wthread-safety-beta"
+    "-Wunused-comparison"
+    "-Wunused-variable"
+    "-Wvla"
+    # LINT.ThenChange(https://github.com/google/iree/tree/main/.bazelrc:clang_diagnostics)
+
+    # Turn off some additional warnings (CMake only)
     "-Wno-strict-prototypes"
     "-Wno-shadow-uncaptured-local"
     "-Wno-gnu-zero-variadic-macro-arguments"
     "-Wno-shadow-field-in-constructor"
     "-Wno-unreachable-code-return"
-    "-Wno-unused-private-field"
     "-Wno-missing-variable-declarations"
     "-Wno-gnu-label-as-value"
-    "-Wno-unused-local-typedef"
-    "-Wno-gnu-zero-variadic-macro-arguments"
-    # Enable some warnings
-    "-Wimplicit-fallthrough"
-    "-Wthread-safety-analysis"
-    "-Wunused-variable"
   CLANG_OR_GCC
     "-Wno-unused-parameter"
     "-Wno-undef"
