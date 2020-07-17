@@ -92,6 +92,24 @@ iree_bytecode_module(
 )
 
 cc_test(
+    name = "bytecode_module_size_benchmark",
+    srcs = ["bytecode_module_size_benchmark.cc"],
+    deps = [
+        ":bytecode_module",
+        ":bytecode_module_size_benchmark_module_cc",
+        ":vm",
+        "//iree/base:api",
+    ],
+)
+
+iree_bytecode_module(
+    name = "bytecode_module_size_benchmark_module",
+    src = "bytecode_module_size_benchmark.mlir",
+    cc_namespace = "iree::vm",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+cc_test(
     name = "bytecode_module_test",
     srcs = ["bytecode_module_test.cc"],
     deps = [

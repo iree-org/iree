@@ -106,6 +106,30 @@ iree_bytecode_module(
 
 iree_cc_test(
   NAME
+    bytecode_module_size_benchmark
+  SRCS
+    "bytecode_module_size_benchmark.cc"
+  DEPS
+    ::bytecode_module
+    ::bytecode_module_size_benchmark_module_cc
+    ::vm
+    iree::base::api
+)
+
+iree_bytecode_module(
+  NAME
+    bytecode_module_size_benchmark_module
+  SRC
+    "bytecode_module_size_benchmark.mlir"
+  CC_NAMESPACE
+    "iree::vm"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
     bytecode_module_test
   SRCS
     "bytecode_module_test.cc"
