@@ -27,13 +27,14 @@ WORKDIR=${KOKORO_ARTIFACTS_DIR?}/github/iree
 
 # Mount the checked out repository, make that the working directory and run the
 # tests in the cmake image.
+# DO NOT SUBMIT: Switch Docker label back to "prod"
 docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
   --env IREE_VULKAN_DISABLE=0 \
   --gpus all \
-  gcr.io/iree-oss/cmake-nvidia:prod \
+  gcr.io/iree-oss/cmake-nvidia:latest \
   kokoro/gcp_ubuntu/cmake/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
