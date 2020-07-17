@@ -80,7 +80,6 @@ iree_cc_library(
     absl::strings
     iree::base::api
     iree::base::api_util
-    iree::base::buffer_string_util
     iree::base::status
     iree::hal::api
     iree::modules::hal

@@ -16,7 +16,10 @@
 #define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
 
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
+#include "bindings/java/com/google/iree/native/module_wrapper.h"
 #include "iree/base/status.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/hal_module.h"
 #include "iree/vm/context.h"
 
 namespace iree {
@@ -24,14 +27,25 @@ namespace java {
 
 class ContextWrapper {
  public:
-  Status Create(InstanceWrapper instance_wrapper);
+  Status Create(const InstanceWrapper& instance_wrapper);
+
+  Status CreateWithModules(const InstanceWrapper& instance_wrapper,
+                           const std::vector<ModuleWrapper*>& module_wrappers);
+
+  Status RegisterModules(const std::vector<ModuleWrapper*>& module_wrappers);
 
   int id() const;
 
   ~ContextWrapper();
 
  private:
+  Status CreateDefaultModules();
+
   iree_vm_context_t* context_ = nullptr;
+  // TODO(jennik): These need to be configurable on the java side.
+  iree_hal_driver_t* driver_ = nullptr;
+  iree_hal_device_t* device_ = nullptr;
+  iree_vm_module_t* hal_module_ = nullptr;
 };
 
 }  // namespace java

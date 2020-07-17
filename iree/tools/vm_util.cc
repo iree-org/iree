@@ -17,14 +17,12 @@
 #include <ostream>
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api_util.h"
-#include "iree/base/buffer_string_util.h"
-#include "iree/base/shape.h"
-#include "iree/base/shaped_buffer.h"
-#include "iree/base/shaped_buffer_string_util.h"
+#include "iree/base/file_io.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
@@ -84,6 +82,15 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
   return output_descs;
 }
 
+StatusOr<iree_vm_variant_list_t*> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename) {
+  ASSIGN_OR_RETURN(auto s, file_io::GetFileContents(filename));
+  std::vector<std::string> input_strings =
+      absl::StrSplit(s, '\n', absl::SkipEmpty());
+  return ParseToVariantList(descs, allocator, input_strings);
+}
+
 StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
@@ -102,8 +109,6 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     auto input_string = input_strings[i];
     auto desc = descs[i];
     std::string desc_str;
-    // TODO(laurenzo): Parse real element type once bindings code enforces it.
-    iree_hal_element_type_t hal_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
     desc.ToString(desc_str);
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {
@@ -130,51 +135,14 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
         break;
       }
       case RawSignatureParser::Type::kBuffer: {
-        ASSIGN_OR_RETURN(auto shaped_buffer,
-                         ParseShapedBufferFromString(input_string),
-                         _ << "Parsing value '" << input_string << "'");
-        // Allocate the buffer.
-        iree_hal_buffer_t* buf = nullptr;
-        // TODO(benvanik): combined function for linear to optimal upload.
-        iree_device_size_t allocation_size =
-            shaped_buffer.shape().element_count() *
-            shaped_buffer.element_size();
-        RETURN_IF_ERROR(FromApiStatus(
-            iree_hal_allocator_allocate_buffer(
-                allocator,
-                static_cast<iree_hal_memory_type_t>(
-                    IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-                static_cast<iree_hal_buffer_usage_t>(
-                    IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT),
-                allocation_size, &buf),
-            IREE_LOC))
-            << "Allocating buffer";
-        RETURN_IF_ERROR(FromApiStatus(
-            iree_hal_buffer_write_data(buf, 0, shaped_buffer.contents().data(),
-                                       shaped_buffer.contents().size()),
-            IREE_LOC))
-            << "Populating buffer contents ";
-
-        absl::InlinedVector<iree_hal_dim_t, 5> dims(
-            shaped_buffer.shape().size());
-        // TODO(laurenzo): The following should work but Shape iterators
-        // cause access violations.
-        // std::copy(shaped_buffer.shape().begin(), shaped_buffer.shape().end(),
-        //           dims.begin());
-        for (size_t i = 0; i < dims.size(); ++i) {
-          dims[i] = shaped_buffer.shape()[i];
-        }
-
-        // Wrap in buffer view.
         iree_hal_buffer_view_t* buffer_view = nullptr;
-        RETURN_IF_ERROR(FromApiStatus(
-            iree_hal_buffer_view_create(buf, dims.data(), dims.size(),
-                                        hal_element_type, IREE_ALLOCATOR_SYSTEM,
-                                        &buffer_view),
-            IREE_LOC))
-            << "Creating buffer view";
-        iree_hal_buffer_release(buf);
+        iree_status_t status = iree_hal_buffer_view_parse(
+            iree_string_view_t{input_string.data(), input_string.size()},
+            allocator, IREE_ALLOCATOR_SYSTEM, &buffer_view);
+        if (!iree_status_is_ok(status)) {
+          return FromApiStatus(status, IREE_LOC)
+                 << "Parsing value '" << input_string << "'";
+        }
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
         RETURN_IF_ERROR(FromApiStatus(iree_vm_variant_list_append_ref_move(
                                           variant_list, &buffer_view_ref),
@@ -231,63 +199,20 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
           return InvalidArgumentErrorBuilder(IREE_LOC)
                  << "failed dereferencing variant " << i;
         }
-        auto* buffer = iree_hal_buffer_view_buffer(buffer_view);
-        if (!buffer) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "failed to get buffer for variant " << i;
+
+        std::string result_str(4096, '\0');
+        iree_status_t status;
+        do {
+          iree_host_size_t actual_length = 0;
+          status = iree_hal_buffer_view_format(
+              buffer_view, /*max_element_count=*/1024, result_str.size() + 1,
+              &result_str[0], &actual_length);
+          result_str.resize(actual_length);
+        } while (iree_status_is_out_of_range(status));
+        if (!iree_status_is_ok(status)) {
+          return FromApiStatus(status, IREE_LOC);
         }
 
-        auto print_mode = BufferDataPrintMode::kFloatingPoint;
-        int8_t element_size = 4;
-
-        // Copy the dims out of the buffer view.
-        absl::InlinedVector<iree_hal_dim_t, 5> dims32(
-            iree_hal_buffer_view_shape_rank(buffer_view));
-        iree_hal_buffer_view_shape(buffer_view, dims32.size(), dims32.data(),
-                                   nullptr);
-        absl::InlinedVector<int, 5> dims(dims32.size());
-        std::copy(dims32.begin(), dims32.end(), dims.begin());
-        Shape shape{dims};
-
-        switch (desc.buffer.scalar_type) {
-          case AbiConstants::ScalarType::kIeeeFloat16:
-          case AbiConstants::ScalarType::kIeeeFloat32:
-          case AbiConstants::ScalarType::kIeeeFloat64:
-            print_mode = BufferDataPrintMode::kFloatingPoint;
-            break;
-          case AbiConstants::ScalarType::kSint8:
-          case AbiConstants::ScalarType::kSint16:
-          case AbiConstants::ScalarType::kSint32:
-          case AbiConstants::ScalarType::kSint64:
-            print_mode = BufferDataPrintMode::kSignedInteger;
-            break;
-          case AbiConstants::ScalarType::kUint8:
-          case AbiConstants::ScalarType::kUint16:
-          case AbiConstants::ScalarType::kUint32:
-          case AbiConstants::ScalarType::kUint64:
-            print_mode = BufferDataPrintMode::kUnsignedInteger;
-            break;
-          default:
-            print_mode = BufferDataPrintMode::kBinary;
-            break;
-        }
-        element_size = AbiConstants::kScalarTypeSize[static_cast<unsigned>(
-            desc.buffer.scalar_type)];
-
-        iree_hal_mapped_memory_t mapped_memory;
-        RETURN_IF_ERROR(FromApiStatus(
-            iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                IREE_WHOLE_BUFFER, &mapped_memory),
-            IREE_LOC))
-            << "mapping hal buffer";
-        auto contents = absl::MakeConstSpan(mapped_memory.contents.data,
-                                            mapped_memory.contents.data_length);
-        ShapedBuffer shaped_buffer(
-            element_size, shape,
-            std::vector<uint8_t>(contents.begin(), contents.end()));
-        ASSIGN_OR_RETURN(auto result_str, PrintShapedBufferToString(
-                                              shaped_buffer, print_mode, 1024));
-        iree_hal_buffer_unmap(buffer, &mapped_memory);
         *os << result_str << "\n";
         break;
       }

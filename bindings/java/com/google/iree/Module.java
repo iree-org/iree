@@ -19,6 +19,7 @@ package com.google.iree;
 import java.nio.ByteBuffer;
 
 /** A VM module. */
+// TODO(jennik): Add BytecodeModule and HALModule classes.
 final class Module {
   /**
    * Creates a VM module from a flatbuffer. The input ByteBuffer must be direct, and acceptable
@@ -32,6 +33,10 @@ final class Module {
     if (!status.isOk()) {
       throw status.toException("Could not create Module");
     }
+  }
+
+  public long getNativeAddress() {
+    return nativeAddress;
   }
 
   public void free() {

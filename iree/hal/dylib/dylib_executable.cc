@@ -133,6 +133,12 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
     }
   }
 
+  auto push_constants_descriptor = allocUnrankedDescriptor<uint32_t>(
+      const_cast<uint32_t*>(params.push_constants->values.data()),
+      {static_cast<int64_t>(params.push_constants->values.size())});
+  dispatch_state->descriptors.push_back(push_constants_descriptor);
+  dispatch_state->args.push_back(&push_constants_descriptor->descriptor);
+
   return std::move(dispatch_state);
 }
 

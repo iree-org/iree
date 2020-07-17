@@ -15,6 +15,7 @@
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
 
 #include "iree/base/api_util.h"
+#include "iree/base/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
 #include "iree/modules/tensorlist/native_module.h"
@@ -25,6 +26,13 @@ namespace java {
 namespace {
 
 void SetupVm() {
+  // TODO(jennik): Pass flags through from java.
+  char binname[] = "libiree.so";
+  char* argv[] = {binname};
+  char** aargv = argv;
+  int argc = 1;
+  InitializeEnvironment(&argc, &aargv);
+
   CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
   CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
   CHECK_EQ(IREE_STATUS_OK, iree_tensorlist_module_register_types());

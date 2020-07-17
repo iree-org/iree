@@ -48,6 +48,10 @@ ABSL_FLAG(std::vector<std::string>, inputs, {},
           "values:\n"
           "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
 
+ABSL_FLAG(std::string, inputs_file, "",
+          "Provides a file for input shapes and optional values (see "
+          "ParseToVariantListFromFile in vm_util.h for details)");
+
 namespace iree {
 namespace {
 
@@ -105,10 +109,20 @@ Status Run() {
   RETURN_IF_ERROR(ValidateFunctionAbi(function));
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
-  ASSIGN_OR_RETURN(
-      iree_vm_variant_list_t * inputs,
-      ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                         absl::GetFlag(FLAGS_inputs)));
+  iree_vm_variant_list_t* inputs;
+  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_inputs).empty()) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Expected only one of inputs and inputs_flag to be set";
+    }
+    ASSIGN_OR_RETURN(inputs, ParseToVariantListFromFile(
+                                 input_descs, iree_hal_device_allocator(device),
+                                 absl::GetFlag(FLAGS_inputs_file)));
+  } else {
+    ASSIGN_OR_RETURN(inputs, ParseToVariantList(
+                                 input_descs, iree_hal_device_allocator(device),
+                                 absl::GetFlag(FLAGS_inputs)));
+  }
 
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   iree_vm_variant_list_t* outputs = nullptr;

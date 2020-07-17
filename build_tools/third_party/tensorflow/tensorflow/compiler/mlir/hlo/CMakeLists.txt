@@ -85,6 +85,7 @@ external_cc_library(
     tensorflow_mlir_hlo_chlo_ops_gen
     tensorflow_mlir_hlo_hlo_ops_base_gen
     tensorflow_mlir_hlo_hlo_ops_gen
+    tensorflow_mlir_hlo_hlo_ops_pattern_gen
     tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
     tensorflow_mlir_hlo_legalize_to_standard_patterns_gen
     tensorflow_mlir_hlo_lhlo_ops_gen
@@ -140,6 +141,21 @@ external_tablegen_library(
   OUTS
     -gen-op-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base.h.inc
     -gen-op-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base.cc.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_hlo_hlo_ops_pattern_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_HLO_SRC_ROOT}
+  SRCS
+    "lib/Dialect/mhlo/IR/hlo_patterns.td"
+  OUTS
+    -gen-rewriters include/mlir-hlo/Dialect/mhlo/IR/hlo_patterns.cc.inc
 )
 
 external_tablegen_library(

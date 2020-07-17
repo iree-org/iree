@@ -66,14 +66,6 @@ jobs:
         with:
           strict: true
 
-  pr-title-length:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: deepakputhraya/action-pr-title@v1.0.0
-        with:
-          min_length: 5
-          max_length: 80
-
   buildifier:
     runs-on: ubuntu-18.04
     steps:

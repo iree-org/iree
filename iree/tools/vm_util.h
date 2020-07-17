@@ -40,13 +40,20 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseInputSignature(
 StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
     const iree_vm_function_t& function);
 
+// Parses the content in |filename| into a variant list of VM scalars and
+// buffers. See ParseToVariantList for the format of scalars and buffers. The
+// inputs are expected to be newline-separated.
+StatusOr<iree_vm_variant_list_t*> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename);
+
 // Parses |input_strings| into a variant list of VM scalars and buffers.
 // Scalars should be in the format:
 //   type=value
 // Buffers should be in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/google/iree/tree/main/iree/base/buffer_string_util.h
+// https://github.com/google/iree/tree/main/iree/hal/api.h
 // Uses |allocator| to allocate the buffers.
 // Uses descriptors in |descs| for type information and validation.
 // The returned variant list must be freed by the caller.
@@ -61,7 +68,7 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/google/iree/tree/main/iree/base/buffer_string_util.h
+// https://github.com/google/iree/tree/main/iree/hal/api.h
 // Uses descriptors in |descs| for type information and validation.
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_variant_list_t* variant_list,
