@@ -2,11 +2,11 @@
 
 This is an opinionated guide documenting workflows that some members of the team
 have found useful. It is focused on meta-tooling, not on IREE code specifically
-(you will find the latter in the
-[Developer Overview](../developer_overview.md)) It is certainly possible to use
-workflows other than these, but some common tasks, especially for maintainers
-will likely be made easier if you use these flows. It assumes a basic knowledge
-of `git` and GitHub and suggests some specific ways of using it.
+(you will find the latter in the [Developer Overview](../developer_overview.md))
+It is certainly possible to use workflows other than these, but some common
+tasks, especially for maintainers will likely be made easier if you use these
+flows. It assumes a basic knowledge of `git` and GitHub and suggests some
+specific ways of using it.
 
 ## Git Structure
 
@@ -21,11 +21,11 @@ and create the PR from there.
 
 ### Setup
 
-1. Create a fork of the main repository.
+1.  Create a fork of the main repository.
 
-2. Create a local git repository with remotes `upstream` (the main repository)
-   and `origin` (your personal fork). To list your current remotes
-   `git remote -v`.
+2.  Create a local git repository with remotes `upstream` (the main repository)
+    and `origin` (your personal fork). To list your current remotes `git remote
+    -v`.
 
     a. If you already cloned from the main repository (e.g. by following the
     getting started guide):
@@ -50,14 +50,14 @@ and create the PR from there.
     privileges (so can push directly to protected branches). These names are
     just suggestions, but you might find some scripts where the defaults are for
     remotes named like this. For extra safety, you can make it difficult to push
-    directly to upstream by setting the push url to something invalid:
-    `git remote set-url --push upstream DISABLE`, which requires re-enabling the
-    push URL explicitly before pushing.
+    directly to upstream by setting the push url to something invalid: `git
+    remote set-url --push upstream DISABLE`, which requires re-enabling the push
+    URL explicitly before pushing.
 
-4. Use a script like
-   [git_update.sh](https://github.com/google/iree/blob/main/scripts/git/git_update.sh)
-   to easily synchronize `main` with `upstream`. Submodules make this is a
-   little trickier than it should be. You can also add this as a git alias.
+3.  Use a script like
+    [git_update.sh](https://github.com/google/iree/blob/main/scripts/git/git_update.sh)
+    to easily synchronize `main` with `upstream`. Submodules make this is a
+    little trickier than it should be. You can also add this as a git alias.
 
     ```shell
     git config alias.update "! /path/to/git-update"
