@@ -113,7 +113,7 @@ Status Run() {
   if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
     if (!absl::GetFlag(FLAGS_inputs).empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of inputs and inputs_flag is set";
+             << "Expected only one of inputs and inputs_flag to be set";
     }
     ASSIGN_OR_RETURN(inputs, ParseToVariantListFromFile(
                                  input_descs, iree_hal_device_allocator(device),

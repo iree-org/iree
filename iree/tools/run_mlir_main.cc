@@ -279,7 +279,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
     if (!input_values_flag.empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Expected only one of input_values_file_flag and "
-                "input_values_flag is set";
+                "input_values_flag to be set";
     }
     ASSIGN_OR_RETURN(input_list,
                      ParseToVariantListFromFile(input_descs, allocator,
