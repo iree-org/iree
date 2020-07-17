@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE with tensorflow integrations using bazel.
+# An image for building IREE's tensorflow integrations using bazel and vulkan.
 
 # Build using:
-# docker build --tag gcr.io/iree-oss/bazel-tensorflow \
-#   build_tools/docker/bazel_tensorflow/
+# docker build --tag gcr.io/iree-oss/bazel-nvidia \
+#   build_tools/docker/bazel_nvidia/
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
 # docker run -it --rm --entrypoint bash --volume ${IREE_WORKDIR}:/usr/src/iree/ \
-#   gcr.io/iree-oss/bazel-tensorflow
+#   gcr.io/iree-oss/bazel-nvidia
 
 # Set up the image and working directory.
-# We start from bazel-tensorflow so this image can be used to testing TensorFlow
+# We start from bazel-nvidia so this image can be used to testing TensorFlow
 # integrations.
 FROM gcr.io/iree-oss/bazel-tensorflow
 
