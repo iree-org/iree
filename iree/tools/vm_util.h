@@ -40,6 +40,13 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseInputSignature(
 StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
     const iree_vm_function_t& function);
 
+// Parses the content in |filename| into a variant list of VM scalars and
+// buffers. See ParseToVariantList for the format of scalars and buffers. The
+// inputs are expected to be newline-separated.
+StatusOr<iree_vm_variant_list_t*> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename);
+
 // Parses |input_strings| into a variant list of VM scalars and buffers.
 // Scalars should be in the format:
 //   type=value

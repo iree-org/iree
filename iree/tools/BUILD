@@ -344,6 +344,7 @@ cc_library(
     hdrs = ["vm_util.h"],
     deps = [
         "//iree/base:api_util",
+        "//iree/base:file_io",
         "//iree/base:signature_mangle",
         "//iree/base:status",
         "//iree/hal:api",

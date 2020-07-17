@@ -17,10 +17,12 @@
 #include <ostream>
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api_util.h"
+#include "iree/base/file_io.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
@@ -78,6 +80,15 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
            << "' failed getting results";
   }
   return output_descs;
+}
+
+StatusOr<iree_vm_variant_list_t*> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename) {
+  ASSIGN_OR_RETURN(auto s, file_io::GetFileContents(filename));
+  std::vector<std::string> input_strings =
+      absl::StrSplit(s, '\n', absl::SkipEmpty());
+  return ParseToVariantList(descs, allocator, input_strings);
 }
 
 StatusOr<iree_vm_variant_list_t*> ParseToVariantList(

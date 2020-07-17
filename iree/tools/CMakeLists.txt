@@ -362,6 +362,7 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api_util
+    iree::base::file_io
     iree::base::signature_mangle
     iree::base::status
     iree::hal::api
