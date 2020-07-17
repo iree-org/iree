@@ -24,7 +24,6 @@
 #include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
-#include "iree/base/buffer_string_util.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
@@ -45,6 +44,22 @@ template <typename T>
 absl::Span<const T> AbslSpan(iree_byte_span_t bytes) {
   return absl::Span<T>(reinterpret_cast<T*>(bytes.data),
                        bytes.data_length / sizeof(T));
+}
+
+StatusOr<std::string> BufferViewToString(iree_hal_buffer_view_t* buffer_view) {
+  std::string result_str(4096, '\0');
+  iree_status_t status;
+  do {
+    iree_host_size_t actual_length = 0;
+    status = iree_hal_buffer_view_format(
+        buffer_view, /*max_element_count=*/1024, result_str.size() + 1,
+        &result_str[0], &actual_length);
+    result_str.resize(actual_length);
+  } while (iree_status_is_out_of_range(status));
+  if (!iree_status_is_ok(status)) {
+    return FromApiStatus(status, IREE_LOC);
+  }
+  return std::move(result_str);
 }
 
 template <typename T>
@@ -225,6 +240,9 @@ class CheckModuleState final {
     bool shape_eq = lhs_shape == rhs_shape;
     bool contents_eq =
         EqByteSpan(lhs_mapped_memory.contents, rhs_mapped_memory.contents);
+    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
+    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
+
     if (!element_types_eq || !shape_eq || !contents_eq) {
       std::ostringstream os;
       os << "Expected equality of these values.";
@@ -241,43 +259,18 @@ class CheckModuleState final {
       os << "\n"
             "  lhs:\n"
             "    ";
-      char lhs_element_type_str[16];
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_format_element_type(iree_hal_buffer_view_element_type(lhs),
-                                       sizeof(lhs_element_type_str),
-                                       lhs_element_type_str, nullptr),
-          IREE_LOC));
-      // TODO(b/146898896): Remove dependence on Shape.
-      PrintShapedTypeToStream(Shape{lhs_shape}, lhs_element_type_str, &os);
-      os << "=";
-      RETURN_IF_ERROR(
-          PrintNumericalDataToStream(Shape{lhs_shape}, lhs_element_type_str,
-                                     {lhs_mapped_memory.contents.data,
-                                      lhs_mapped_memory.contents.data_length},
-                                     /*max_entries=*/1024, &os));
+      ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
+      os << lhs_str;
 
       os << "\n"
             "  rhs:\n"
             "    ";
-      char rhs_element_type_str[16];
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_format_element_type(iree_hal_buffer_view_element_type(rhs),
-                                       sizeof(rhs_element_type_str),
-                                       rhs_element_type_str, nullptr),
-          IREE_LOC));
-      PrintShapedTypeToStream(Shape{rhs_shape}, rhs_element_type_str, &os);
-      os << "=";
-      RETURN_IF_ERROR(
-          PrintNumericalDataToStream(Shape{rhs_shape}, rhs_element_type_str,
-                                     {rhs_mapped_memory.contents.data,
-                                      rhs_mapped_memory.contents.data_length},
-                                     /*max_entries=*/1024, &os));
+      ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
+      os << rhs_str;
 
       // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
       ADD_FAILURE() << os.str();
     }
-    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
-    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
 
     return OkStatus();
   }
@@ -328,6 +321,9 @@ class CheckModuleState final {
           AlmostEqByteSpan(lhs_mapped_memory.contents,
                            rhs_mapped_memory.contents, lhs_element_type));
     }
+    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
+    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
+
     if (!element_types_eq || !shape_eq || !contents_could_be_almost_eq) {
       std::ostringstream os;
       os << "Expected near equality of these values.";
@@ -344,43 +340,18 @@ class CheckModuleState final {
       os << "\n"
             "  lhs:\n"
             "    ";
-      char lhs_element_type_str[16];
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_format_element_type(iree_hal_buffer_view_element_type(lhs),
-                                       sizeof(lhs_element_type_str),
-                                       lhs_element_type_str, nullptr),
-          IREE_LOC));
-      // TODO(b/146898896): Remove dependence on Shape.
-      PrintShapedTypeToStream(Shape{lhs_shape}, lhs_element_type_str, &os);
-      os << "=";
-      RETURN_IF_ERROR(
-          PrintNumericalDataToStream(Shape{lhs_shape}, lhs_element_type_str,
-                                     {lhs_mapped_memory.contents.data,
-                                      lhs_mapped_memory.contents.data_length},
-                                     /*max_entries=*/1024, &os));
+      ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
+      os << lhs_str;
 
       os << "\n"
             "  rhs:\n"
             "    ";
-      char rhs_element_type_str[16];
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_format_element_type(iree_hal_buffer_view_element_type(rhs),
-                                       sizeof(rhs_element_type_str),
-                                       rhs_element_type_str, nullptr),
-          IREE_LOC));
-      PrintShapedTypeToStream(Shape{rhs_shape}, rhs_element_type_str, &os);
-      os << "=";
-      RETURN_IF_ERROR(
-          PrintNumericalDataToStream(Shape{rhs_shape}, rhs_element_type_str,
-                                     {rhs_mapped_memory.contents.data,
-                                      rhs_mapped_memory.contents.data_length},
-                                     /*max_entries=*/1024, &os));
+      ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
+      os << rhs_str;
 
       // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
       ADD_FAILURE() << os.str();
     }
-    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
-    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
 
     return OkStatus();
   }

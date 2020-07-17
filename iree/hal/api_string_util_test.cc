@@ -762,11 +762,10 @@ TEST(ElementStringUtilTest, FormatElement) {
               IsOkAndHolds(Eq("9223372036854775807")));
   EXPECT_THAT(FormatElement<uint64_t>(UINT64_MAX),
               IsOkAndHolds(Eq("18446744073709551615")));
-  EXPECT_THAT(FormatElement<float>(1.5f), IsOkAndHolds(Eq("1.500000")));
+  EXPECT_THAT(FormatElement<float>(1.5f), IsOkAndHolds(Eq("1.5")));
   EXPECT_THAT(FormatElement<double>(1123.56789456789),
-              IsOkAndHolds(Eq("1.123568E+03")));
-  EXPECT_THAT(FormatElement<double>(-1.5e-10),
-              IsOkAndHolds(Eq("-1.500000E-10")));
+              IsOkAndHolds(Eq("1123.57")));
+  EXPECT_THAT(FormatElement<double>(-1.5e-10), IsOkAndHolds(Eq("-1.5E-10")));
 }
 
 TEST(ElementStringUtilTest, FormatOpaqueElement) {
@@ -1029,9 +1028,8 @@ TEST(BufferViewStringUtilTest, RoundTrip) {
   expect_round_trip("4xi16=0 -1 2 3");
   expect_round_trip("4xu16=0 1 2 3");
   expect_round_trip("2x2xi32=[0 1][2 3]");
-  expect_round_trip("4xf32=0.000000 1.100000 2.000000 3.000000");
-  expect_round_trip(
-      "4xf64=0.000000E+00 1.100000E+00 2.000000E+00 3.000000E+00");
+  expect_round_trip("4xf32=0 1.1 2 3");
+  expect_round_trip("4xf64=0 1.1 2 3");
   expect_round_trip("1x2x3xi8=[[0 1 2][3 4 5]]");
   expect_round_trip("2x*16=AABB CCDD");
   expect_round_trip(

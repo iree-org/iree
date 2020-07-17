@@ -120,39 +120,6 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
-  NAME
-    buffer_string_util
-  HDRS
-    "buffer_string_util.h"
-  SRCS
-    "buffer_string_util.cc"
-  DEPS
-    ::memory
-    ::shape
-    ::source_location
-    ::status
-    absl::flat_hash_map
-    absl::optional
-    absl::span
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    buffer_string_util_test
-  SRCS
-    "buffer_string_util_test.cc"
-  DEPS
-    ::buffer_string_util
-    ::memory
-    ::status
-    ::status_matchers
-    absl::strings
-    iree::testing::gtest_main
-)
-
 iree_select_compiler_opts(_DYNAMIC_LIBRARY_LINKOPTS
   CLANG_OR_GCC
     "-ldl"
@@ -465,86 +432,6 @@ iree_cc_test(
     "ref_ptr_test.cc"
   DEPS
     ::ref_ptr
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    shape
-  HDRS
-    "shape.h"
-  SRCS
-    "shape.cc"
-  DEPS
-    ::logging
-    ::source_location
-    ::status
-    absl::span
-    absl::strings
-    absl::type_traits
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    shape_test
-  SRCS
-    "shape_test.cc"
-  DEPS
-    ::shape
-    ::status
-    ::status_matchers
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    shaped_buffer
-  HDRS
-    "shaped_buffer.h"
-  DEPS
-    ::logging
-    ::memory
-    ::shape
-    absl::fixed_array
-    absl::span
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    shaped_buffer_string_util
-  HDRS
-    "shaped_buffer_string_util.h"
-  SRCS
-    "shaped_buffer_string_util.cc"
-  DEPS
-    ::buffer_string_util
-    ::memory
-    ::shape
-    ::shaped_buffer
-    ::source_location
-    ::status
-    absl::fixed_array
-    absl::optional
-    absl::span
-    absl::strings
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    shaped_buffer_string_util_test
-  SRCS
-    "shaped_buffer_string_util_test.cc"
-  DEPS
-    ::buffer_string_util
-    ::memory
-    ::shaped_buffer
-    ::shaped_buffer_string_util
-    ::status
-    ::status_matchers
-    absl::strings
     iree::testing::gtest_main
 )
 
