@@ -499,8 +499,8 @@ static void iree_vm_stack_frame_remap_registers(
     const iree_vm_register_list_t* src_reg_list,
     const iree_vm_registers_t dst_regs,
     const iree_vm_register_list_t* dst_reg_list) {
-  VMCHECK(src_reg_list->size == dst_reg_list->size);
-  if (src_reg_list->size != dst_reg_list->size) return;
+  VMCHECK(src_reg_list->size <= dst_reg_list->size);
+  if (src_reg_list->size > dst_reg_list->size) return;
   for (int i = 0; i < src_reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
@@ -637,6 +637,7 @@ static void iree_vm_stack_populate_external_result_list(
   VMCHECK(external_registers->size >= callee_registers->size);
   uint16_t i32_reg_ordinal = 0;
   uint16_t ref_reg_ordinal = 0;
+  ((iree_vm_register_list_t*)external_registers)->size = callee_registers->size;
   uint16_t* dst_reg_list = (uint16_t*)external_registers->registers;
   for (int i = 0; i < callee_registers->size; ++i) {
     uint16_t src_reg = callee_registers->registers[i];
