@@ -95,7 +95,7 @@ class MandelbrotModule(tf.Module):
 
 
 @tf_test_utils.compile_module(MandelbrotModule)
-class MandelbrotTest(tf_test_utils.SavedModelTestCase):
+class MandelbrotTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_mandelbrot(self):
     mandelbrot = self.get_module()

@@ -76,7 +76,7 @@ class SlidingWindowModule(tf.Module):
 
 
 @tf_test_utils.compile_module(SlidingWindowModule, exported_names=["predict"])
-class SlidingWindowTest(tf_test_utils.SavedModelTestCase):
+class SlidingWindowTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_slidingwindow(self):
     input1 = np.array([[1.0, 2.0]], dtype=np.float32)

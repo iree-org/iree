@@ -43,7 +43,7 @@ class LstmStatic(tf.Module):
 
 
 @tf_test_utils.compile_module(LstmStatic, exported_names=["predict"])
-class LstmTest(tf_test_utils.SavedModelTestCase):
+class LstmTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_lstm(self):
     m = self.get_module()

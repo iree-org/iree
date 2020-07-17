@@ -271,7 +271,7 @@ def _instantiate_backends(compiled_backends):
 
 
 def compile_module(module_class, exported_names=()):
-  """SavedModelTestCase decorator that compiles a tf.Module.
+  """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
   be accessed individually via self.compiled_modules.backend_name or as a union
@@ -289,10 +289,10 @@ def compile_module(module_class, exported_names=()):
 
   def decorator(cls):
     """Decorator Function."""
-    if not issubclass(cls, SavedModelTestCase):
+    if not issubclass(cls, CompiledModuleTestCase):
       logging.exception(
           "The 'compile_module' decorator must be applied to a "
-          "SavedModelTestCase derived class, which %s is not.", cls)
+          "CompiledModuleTestCase derived class, which %s is not.", cls)
     cls._module_class = module_class
     cls._exported_names = exported_names
     return cls
@@ -335,8 +335,8 @@ def get_backends():
   return backends
 
 
-class SavedModelTestCase(tf.test.TestCase):
-  """Tests against a SavedModel."""
+class CompiledModuleTestCase(tf.test.TestCase):
+  """Compiles a tf.Module to multiple backends to test their correctness."""
 
   # Will be initialized by the @compile_module decorator.
   _module_class = None

@@ -29,7 +29,7 @@ class BroadcastingModule(tf.Module):
 
 
 @tf_test_utils.compile_module(BroadcastingModule)
-class BroadcastingTest(tf_test_utils.SavedModelTestCase):
+class BroadcastingTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_add_same_shape(self):
     m = self.get_module()

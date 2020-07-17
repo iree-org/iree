@@ -76,8 +76,7 @@ APP_MODELS = {
 
 def get_input_shape():
   if FLAGS.data == 'imagenet':
-    if (FLAGS.model == 'InceptionV3' or FLAGS.model == 'Xception' or
-        FLAGS.model == 'InceptionResNetV2'):
+    if FLAGS.model in ['InceptionV3', 'Xception', 'InceptionResNetV2']:
       return (1, 299, 299, 3)
     elif FLAGS.model == 'NASNetLarge':
       return (1, 331, 331, 3)
@@ -101,8 +100,8 @@ def load_cifar10_weights(model):
 
 
 def initialize_model():
-  tf.keras.backend.set_learning_phase(False)
   tf_utils.set_random_seed()
+  tf.keras.backend.set_learning_phase(False)
 
   # Keras applications models receive input shapes without a batch dimension, as
   # the batch size is dynamic by default. This selects just the image size.
@@ -134,7 +133,7 @@ class VisionModule(tf.Module):
 
 
 @tf_test_utils.compile_module(VisionModule, exported_names=['predict'])
-class AppTest(tf_test_utils.SavedModelTestCase):
+class AppTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_application(self):
     input_data = np.random.rand(*get_input_shape()).astype(np.float32)

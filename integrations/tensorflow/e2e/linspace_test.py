@@ -34,7 +34,7 @@ class LinSpaceModule(tf.Module):
 
 
 @tf_test_utils.compile_module(LinSpaceModule)
-class LinspaceTest(tf_test_utils.SavedModelTestCase):
+class LinspaceTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_linspace(self):
     start = np.array(10., dtype=np.float32)
