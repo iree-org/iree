@@ -49,7 +49,7 @@ class ScatterUpdateModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ScatterUpdateModule)
-class ScatterUpdateTest(tf_test_utils.SavedModelTestCase):
+class ScatterUpdateTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_scatter_update_1D(self):
     tensor = tf.ones([8], dtype=tf.int32)

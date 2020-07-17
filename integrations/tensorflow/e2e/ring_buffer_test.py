@@ -179,7 +179,7 @@ class StatefulRingBufferModule(tf.Module):
 
 @tf_test_utils.compile_module(
     StatefulRingBufferModule, exported_names=["predict"])
-class StatefulRingBufferTest(tf_test_utils.SavedModelTestCase):
+class StatefulRingBufferTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_stateful_ringbuffer(self):
     input1 = np.array([[1.0, 2.0]], dtype=np.float32)

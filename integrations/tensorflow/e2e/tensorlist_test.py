@@ -69,7 +69,7 @@ class TensorListModule(tf.Module):
 
 
 @tf_test_utils.compile_module(TensorListModule)
-class TensorListTest(tf_test_utils.SavedModelTestCase):
+class TensorListTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_identity_through_tensorlist(self):
     m = self.get_module()

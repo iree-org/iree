@@ -37,7 +37,7 @@ class SimpleArithmeticModule(tf.Module):
 
 
 @tf_test_utils.compile_module(SimpleArithmeticModule)
-class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
+class SimpleArithmeticTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_simple_mul(self):
     a = np.array([1., 2., 3., 4.], dtype=np.float32)

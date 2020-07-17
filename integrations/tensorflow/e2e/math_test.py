@@ -39,7 +39,7 @@ class MathModule(tf.Module):
 
 
 @tf_test_utils.compile_module(MathModule)
-class MathTest(tf_test_utils.SavedModelTestCase):
+class MathTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_abs(self):
     a = np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32)

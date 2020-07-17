@@ -39,7 +39,7 @@ class ControlFlowModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ControlFlowModule)
-class ControlFlowTest(tf_test_utils.SavedModelTestCase):
+class ControlFlowTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_short_sequence(self):
     input_array = numpy.array(9., dtype=numpy.float32)

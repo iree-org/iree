@@ -33,7 +33,7 @@ class Stateful(tf.Module):
 
 
 @tf_test_utils.compile_module(Stateful)
-class StatefulTest(tf_test_utils.SavedModelTestCase):
+class StatefulTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_stateful(self):
     m = self.get_module()
