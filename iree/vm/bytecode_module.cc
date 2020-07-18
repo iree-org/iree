@@ -24,6 +24,11 @@
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 
+// NOTE: include order matters:
+#include "flatcc/reflection/flatbuffers_common_reader.h"
+#include "iree/schemas/bytecode_module_def_reader.h"
+#include "iree/schemas/bytecode_module_def_verifier.h"
+
 // TODO(benvanik): replace with flatcc version so this file can be pure C.
 #include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/bytecode_module_def_generated.h"

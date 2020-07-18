@@ -66,10 +66,12 @@ iree_cc_library(
     ::value
     absl::strings
     flatbuffers
+    flatcc::runtime
     iree::base::alignment
     iree::base::api
     iree::base::flatbuffer_util
     iree::base::target_platform
+    iree::schemas::bytecode_module_def_c_fbs
     iree::schemas::bytecode_module_def_cc_fbs
   PUBLIC
 )
