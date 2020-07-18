@@ -117,6 +117,7 @@ struct FunctionDescriptor {
   // Offset and length within the larger bytecode data block.
   bytecode_offset:int32;
   bytecode_length:int32;
+  // TODO(benvanik): remove counts and embed directly in bytecode.
   // Total number of i32 registers used by the function.
   i32_register_count:int16;
   // Total number of ref_ptr registers used by the function.

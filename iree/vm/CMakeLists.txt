@@ -64,15 +64,12 @@ iree_cc_library(
     ::stack
     ::type_def
     ::value
-    absl::strings
-    flatbuffers
     flatcc::runtime
     iree::base::alignment
     iree::base::api
-    iree::base::flatbuffer_util
+    iree::base::logging
     iree::base::target_platform
     iree::schemas::bytecode_module_def_c_fbs
-    iree::schemas::bytecode_module_def_cc_fbs
   PUBLIC
 )
 

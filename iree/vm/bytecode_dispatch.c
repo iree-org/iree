@@ -745,7 +745,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         target_function.module = &module->interface;
         target_function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
         target_function.ordinal = function_ordinal;
-        const iree_vm_function_descriptor_t* target_descriptor =
+        const iree_vm_FunctionDescriptor_t* target_descriptor =
             &module->function_descriptor_table[function_ordinal];
         target_function.i32_register_count =
             target_descriptor->i32_register_count;
