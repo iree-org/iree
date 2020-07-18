@@ -38,6 +38,7 @@ iree_cc_library(
     ::file_mapping
     ::init
     ::tracing
+    absl::time
   PUBLIC
 )
 
