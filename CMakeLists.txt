@@ -333,6 +333,7 @@ list(APPEND CMAKE_MODULE_PATH
 )
 
 include(external_cc_library)
+include(flatbuffer_c_library)
 include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)

@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include(BuildFlatBuffers)
 include(CMakeParseArguments)
 
-# flatbuffer_cc_library()
+# flatbuffer_c_library()
 #
-# CMake function to imitate Bazel's flatbuffer_cc_library rule.
+# CMake function to invoke the flatcc compiler.
 #
 # Parameters:
 # NAME: name of target (see Note)
@@ -26,27 +25,25 @@ include(CMakeParseArguments)
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
-# FLATC_ARGS: List of flattbuffers arguments. Default:
-#             "--keep-prefix"
-#             "--scoped-enums"
-#             "--reflect-names"
-#             "--gen-object-api"
+# FLATCC_ARGS: List of flattbuffers arguments. Default:
+#             "--common"
+#             "--reader"
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
-# By default, flatbuffer_cc_library will always create a library named ${NAME},
+# By default, flatbuffer_c_library will always create a library named ${NAME},
 # and alias target iree::${NAME}. The iree:: form should always be used.
 # This is to reduce namespace pollution.
 #
-# flatbuffer_cc_library(
+# flatbuffer_c_library(
 #   NAME
 #     base_schema
 #   SRCS
 #     "a.fbs"
 # )
-# flatbuffer_cc_library(
+# flatbuffer_c_library(
 #   NAME
 #     other_schemas
 #   SRCS
@@ -63,11 +60,11 @@ include(CMakeParseArguments)
 #   DEPS
 #     iree::schemas::other_schemas
 # )
-function(flatbuffer_cc_library)
+function(flatbuffer_c_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS;FLATC_ARGS"
+    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS;FLATCC_ARGS"
     ${ARGN}
   )
 
@@ -79,37 +76,57 @@ function(flatbuffer_cc_library)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  if(NOT DEFINED _RULE_FLATC_ARGS)
-    set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS
-      # Preserve root-relative include paths in generated code.
-      "--keep-prefix"
-      # Use C++11 'enum class' for enums.
-      "--scoped-enums"
-      # Include reflection tables used for dumping debug representations.
-      "--reflect-names"
-      # Generate FooT types for unpack/pack support. Note that this should only
-      # be used in tooling as the code size/runtime overhead is non-trivial.
-      "--gen-object-api"
+  if(NOT DEFINED _RULE_FLATCC_ARGS)
+    set(_RULE_FLATCC_ARGS
+      "--common"
+      "--reader"
     )
   else()
-    set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS ${_RULE_FLATC_ARGS})
+    set(_RULE_FLATCC_ARGS ${_RULE_FLATCC_ARGS})
   endif()
 
-  set(_GEN_TARGET "${_NAME}_gen")
+  set(_OUTS "")
+  foreach(_SRC ${_RULE_SRCS})
+    get_filename_component(_SRC_FILENAME ${_SRC} NAME_WE)
+    foreach(_ARG ${_RULE_FLATCC_ARGS})
+      if(_ARG STREQUAL "--reader")
+        list(APPEND _OUTS "${_SRC_FILENAME}_reader.h")
+      elseif(_ARG STREQUAL "--builder")
+        list(APPEND _OUTS "${_SRC_FILENAME}_builder.h")
+      elseif(_ARG STREQUAL "--verifier")
+        list(APPEND _OUTS "${_SRC_FILENAME}_verifier.h")
+      endif()
+    endforeach()
+  endforeach()
+  list(TRANSFORM _OUTS PREPEND "${CMAKE_CURRENT_BINARY_DIR}/")
 
-  build_flatbuffers(
-    "${_RULE_SRCS}"
-    "${IREE_ROOT_DIR}"
-    "${_GEN_TARGET}" # custom_target_name
-    "${_RULE_DEPS}"  # additional_dependencies
-    "${CMAKE_CURRENT_BINARY_DIR}" # generated_include_dir
-    "${CMAKE_CURRENT_BINARY_DIR}" # binary_schemas_dir
-    "" # copy_text_schemas_dir
+  iree_get_executable_path(_FLATCC_BIN flatcc)
+  add_custom_command(
+    OUTPUT
+      ${_OUTS}
+    COMMAND
+      "${_FLATCC_BIN}"
+          -o "${CMAKE_CURRENT_BINARY_DIR}"
+          -I "${IREE_ROOT_DIR}"
+          ${_RULE_FLATCC_ARGS}
+          "${_RULE_SRCS}"
+    WORKING_DIRECTORY
+      "${CMAKE_CURRENT_SOURCE_DIR}"
+    MAIN_DEPENDENCY
+      ${_RULE_SRCS}
+    DEPENDS
+      ${_FLATCC_BIN}
+      ${_RULE_SRCS}
+    COMMAND_EXPAND_LISTS
   )
 
-  # Add dependency on flatc explicitly. This is needed for cross-compiling
-  # where flatc comes from another CMake invocation for host.
-  iree_add_executable_dependencies(${_GEN_TARGET} flatc)
+  set(_GEN_TARGET "${_NAME}_gen")
+  add_custom_target(
+    ${_GEN_TARGET}
+    DEPENDS
+      ${_OUTS}
+      ${_RULE_DEPS}
+  )
 
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_GEN_TARGET})
@@ -120,13 +137,17 @@ function(flatbuffer_cc_library)
     )
   target_link_libraries(${_NAME}
     INTERFACE
-      flatbuffers
+      flatcc::runtime
       ${_RULE_LINKOPTS}
       ${IREE_DEFAULT_LINKOPTS}
   )
   target_compile_definitions(${_NAME}
     INTERFACE
       ${_RULE_DEFINES}
+  )
+  target_compile_options(${_NAME}
+    INTERFACE
+      "-I${IREE_ROOT_DIR}/third_party/flatcc/include/flatcc/reflection/"
   )
 
   # Alias the iree_package_name library to iree::package::name.
