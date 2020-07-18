@@ -93,7 +93,7 @@ table RodataSegmentDef {
   compression_type:CompressionTypeDef;
 
   // Contents in a format defined by CompressionTypeDef.
-  data:[uint8] (force_align: 16);
+  data:[uint8];
 }
 
 // Read-write data segment.
@@ -175,7 +175,7 @@ table BytecodeModuleDef {
   function_descriptors:[FunctionDescriptor];
 
   // Bytecode contents. One large buffer containing all of the function op data.
-  bytecode_data:[uint8] (force_align: 4);
+  bytecode_data:[uint8];
 }
 
 root_type BytecodeModuleDef;
