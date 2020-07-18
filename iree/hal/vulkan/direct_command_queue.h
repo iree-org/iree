@@ -22,9 +22,9 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/time/time.h"
 #include "iree/base/arena.h"
 #include "iree/base/status.h"
+#include "iree/base/time.h"
 #include "iree/hal/command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
@@ -48,7 +48,7 @@ class DirectCommandQueue final : public CommandQueue {
 
   Status Submit(absl::Span<const SubmissionBatch> batches) override;
 
-  Status WaitIdle(absl::Time deadline) override;
+  Status WaitIdle(Time deadline_ns) override;
 
  private:
   Status TranslateBatchInfo(const SubmissionBatch& batch,

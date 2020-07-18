@@ -32,7 +32,7 @@ class MockCommandQueue : public ::testing::StrictMock<CommandQueue> {
   MOCK_METHOD(Status, Submit, (absl::Span<const SubmissionBatch> batches),
               (override));
 
-  MOCK_METHOD(Status, WaitIdle, (absl::Time deadline), (override));
+  MOCK_METHOD(Status, WaitIdle, (Time deadline_ns), (override));
 };
 
 }  // namespace testing

@@ -44,7 +44,7 @@ class NativeTimelineSemaphore final : public Semaphore {
 
   Status Signal(uint64_t value) override;
   void Fail(Status status) override;
-  Status Wait(uint64_t value, absl::Time deadline) override;
+  Status Wait(uint64_t value, Time deadline_ns) override;
 
  private:
   ref_ptr<VkDeviceHandle> logical_device_;

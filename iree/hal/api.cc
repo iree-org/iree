@@ -1795,11 +1795,11 @@ iree_hal_device_wait_semaphores_with_deadline(
   switch (wait_mode) {
     case IREE_HAL_WAIT_MODE_ALL:
       wait_status =
-          handle->WaitAllSemaphores(semaphore_values, ToAbslTime(deadline_ns));
+          handle->WaitAllSemaphores(semaphore_values, Time(deadline_ns));
       break;
     case IREE_HAL_WAIT_MODE_ANY:
       wait_status = std::move(handle->WaitAnySemaphore(semaphore_values,
-                                                       ToAbslTime(deadline_ns)))
+                                                       Time(deadline_ns)))
                         .status();
       break;
     default:
@@ -1819,8 +1819,7 @@ iree_hal_device_wait_semaphores_with_timeout(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list,
     iree_duration_t timeout_ns) {
-  iree_time_t deadline_ns =
-      FromAbslTime(iree::RelativeTimeoutToDeadline(ToAbslDuration(timeout_ns)));
+  iree_time_t deadline_ns = iree_relative_timeout_to_deadline_ns(timeout_ns);
   return iree_hal_device_wait_semaphores_with_deadline(
       device, wait_mode, semaphore_list, deadline_ns);
 }
@@ -2161,7 +2160,7 @@ iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
   IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_deadline");
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
   if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  return ToApiStatus(handle->Wait(value, ToAbslTime(deadline_ns)));
+  return ToApiStatus(handle->Wait(value, Time(deadline_ns)));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -2171,7 +2170,7 @@ iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
   IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_timeout");
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
   if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  return ToApiStatus(handle->Wait(value, ToAbslDuration(timeout_ns)));
+  return ToApiStatus(handle->Wait(value, Duration(timeout_ns)));
 }
 
 }  // namespace hal

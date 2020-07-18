@@ -20,8 +20,6 @@
 #include <string>
 #include <utility>
 
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
@@ -42,7 +40,7 @@ namespace iree {
 //    }
 //   private:
 //    StatusOr<std::pair<FdType, int>> AcquireFdForWait(
-//        absl::Time deadline) override {
+//        Time deadline_ns) override {
 //      // If blocking traditionally do so now and then return this:
 //      return std::make_pair(FdType::kPermanent, kSignaledFd);
 //      // Otherwise, see ManualResetEvent for an example using fds.
@@ -112,14 +110,14 @@ class WaitableObject : public RefObject<WaitableObject> {
   //
   // In cases where the file descriptor may not be available the call may block
   // until either it is available or the |deadline| has elapsed. Use
-  // absl::InfinitePast() to prevent blocking.
+  // InfinitePast() to prevent blocking.
   //
   // Returns a valid file descriptor or kInvalidFd as an indication that the
   // object should not be waited on (already signaled, etc). Can return
   // kSignaledFd to indicate that it's already known that the handle has been
   // signaled and the caller should resolve as if it caused a wake normally.
   virtual StatusOr<std::pair<FdType, int>> AcquireFdForWait(
-      absl::Time deadline) = 0;
+      Time deadline_ns) = 0;
 
   // Tries to resolve the object with the given |fd|.
   // In many cases this will no-op, however some types may require additional
@@ -159,12 +157,12 @@ class WaitHandle {
   // Returns DEADLINE_EXCEEDED if the |deadline| elapses without all handles
   // having been signaled. Note that a subset of the |wait_handles| may have
   // been signaled and each can be queried to see which one.
-  static Status WaitAll(WaitHandleSpan wait_handles, absl::Time deadline);
-  static Status WaitAll(WaitHandleSpan wait_handles, absl::Duration timeout) {
-    return WaitAll(wait_handles, RelativeTimeoutToDeadline(timeout));
+  static Status WaitAll(WaitHandleSpan wait_handles, Time deadline_ns);
+  static Status WaitAll(WaitHandleSpan wait_handles, Duration timeout_ns) {
+    return WaitAll(wait_handles, RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
   static Status WaitAll(WaitHandleSpan wait_handles) {
-    return WaitAll(wait_handles, absl::InfiniteFuture());
+    return WaitAll(wait_handles, InfiniteFuture());
   }
 
   // Tries waiting on the handles and returns immediately if it would have
@@ -184,14 +182,13 @@ class WaitHandle {
   //
   // Returns DEADLINE_EXCEEDED if the |deadline| elapses without any handles
   // having been signaled.
+  static StatusOr<int> WaitAny(WaitHandleSpan wait_handles, Time deadline_ns);
   static StatusOr<int> WaitAny(WaitHandleSpan wait_handles,
-                               absl::Time deadline);
-  static StatusOr<int> WaitAny(WaitHandleSpan wait_handles,
-                               absl::Duration timeout) {
-    return WaitAny(wait_handles, RelativeTimeoutToDeadline(timeout));
+                               Duration timeout_ns) {
+    return WaitAny(wait_handles, RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
   static StatusOr<int> WaitAny(WaitHandleSpan wait_handles) {
-    return WaitAny(wait_handles, absl::InfiniteFuture());
+    return WaitAny(wait_handles, InfiniteFuture());
   }
 
   // Tries waiting for at least one handle to complete and returns immediately
@@ -242,11 +239,11 @@ class WaitHandle {
   // Returns success if the wait is successful and the |wait_handle| was
   // signaled. Returns DEADLINE_EXCEEDED if the timeout elapses without the
   // handle having been signaled.
-  Status Wait(absl::Time deadline) { return WaitAll({this}, deadline); }
-  Status Wait(absl::Duration timeout) {
-    return WaitAll({this}, RelativeTimeoutToDeadline(timeout));
+  Status Wait(Time deadline_ns) { return WaitAll({this}, deadline); }
+  Status Wait(Duration timeout_ns) {
+    return WaitAll({this}, RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
-  Status Wait() { return WaitAll({this}, absl::InfiniteFuture()); }
+  Status Wait() { return WaitAll({this}, InfiniteFuture()); }
 
   // Tries waiting on the handle and returns immediately if it would have
   // waited. The caller will not be blocked even if the handle has not yet been
@@ -304,8 +301,7 @@ class ManualResetEvent : public WaitableObject {
   void Initialize();
   void Dispose();
 
-  StatusOr<std::pair<FdType, int>> AcquireFdForWait(
-      absl::Time deadline) override {
+  StatusOr<std::pair<FdType, int>> AcquireFdForWait(Time deadline_ns) override {
     return std::make_pair(fd_type_, fd_);
   }
   StatusOr<bool> TryResolveWakeOnFd(int fd) override { return true; }

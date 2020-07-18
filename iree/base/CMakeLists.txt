@@ -520,7 +520,7 @@ iree_cc_library(
   HDRS
     "time.h"
   DEPS
-    absl::time
+    ::api
   PUBLIC
 )
 

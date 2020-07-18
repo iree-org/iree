@@ -76,7 +76,7 @@ StatusOr<typename std::result_of<SyscallT(ParamsT...)>::type> Syscall(
 // ppoll is preferred as it has a much better timing mechanism; poll can have a
 // large slop on the deadline.
 // Documentation: https://linux.die.net/man/2/poll
-StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
+StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, Time deadline_ns) {
   // Convert the deadline into a tmo_p struct for ppoll that controls whether
   // the call is blocking or non-blocking. Note that we must do this every
   // iteration of the loop as a previous ppoll may have taken some of the
@@ -86,16 +86,16 @@ StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
   // http://man7.org/linux/man-pages/man2/poll.2.html
   timespec timeout_spec;
   timespec* tmo_p;
-  if (deadline == absl::InfinitePast()) {
+  if (deadline == InfinitePast()) {
     // 0 for non-blocking.
     timeout_spec = {0};
     tmo_p = &timeout_spec;
-  } else if (deadline == absl::InfiniteFuture()) {
+  } else if (deadline == InfiniteFuture()) {
     // nullptr to ppoll() to block forever.
     tmo_p = nullptr;
   } else {
     // Wait only for as much time as we have before the deadline is exceeded.
-    absl::Duration remaining_time = deadline - absl::Now();
+    absl::Duration remaining_time = deadline - Now();
     if (remaining_time < absl::ZeroDuration()) {
       // Note: we likely have already bailed before getting here with a negative
       // duration.
@@ -111,16 +111,16 @@ StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
 
 // poll(), present pretty much everywhere.
 // Documentation: https://linux.die.net/man/2/poll
-StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
+StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, Time deadline_ns) {
   int timeout;
-  if (deadline == absl::InfinitePast()) {
+  if (deadline == InfinitePast()) {
     // Don't block.
     timeout = 0;
-  } else if (deadline == absl::InfiniteFuture()) {
+  } else if (deadline == InfiniteFuture()) {
     // Block forever.
     timeout = -1;
   } else {
-    absl::Duration remaining_time = deadline - absl::Now();
+    absl::Duration remaining_time = deadline - Now();
     if (remaining_time < absl::ZeroDuration()) {
       return DeadlineExceededErrorBuilder(IREE_LOC);
     }
@@ -139,7 +139,7 @@ StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
 // The provided deadline will be observed if any of the wait handles needs to
 // block for acquiring an fd.
 StatusOr<absl::FixedArray<pollfd>> AcquireWaitHandles(
-    WaitHandle::WaitHandleSpan wait_handles, absl::Time deadline) {
+    WaitHandle::WaitHandleSpan wait_handles, Time deadline_ns) {
   absl::FixedArray<pollfd> poll_fds{wait_handles.size()};
   for (int i = 0; i < wait_handles.size(); ++i) {
     poll_fds[i].events = POLLIN | POLLPRI | POLLERR | POLLHUP | POLLNVAL;
@@ -160,7 +160,7 @@ StatusOr<absl::FixedArray<pollfd>> AcquireWaitHandles(
     poll_fds[i].fd = fd_info.second;
 
     // Abort if deadline exceeded.
-    if (deadline != absl::InfinitePast() && deadline < absl::Now()) {
+    if (deadline != InfinitePast() && deadline < Now()) {
       return DeadlineExceededErrorBuilder(IREE_LOC)
              << "Deadline exceeded acquiring for fds";
     }
@@ -204,7 +204,7 @@ Status ClearFd(WaitableObject::FdType fd_type, int fd) {
 // Performs a single poll on multiple fds and returns information about the
 // signaled fds, if any.
 Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
-                 absl::Span<pollfd> poll_fds, absl::Time deadline,
+                 absl::Span<pollfd> poll_fds, Time deadline_ns,
                  int* out_any_signaled_index, int* out_unsignaled_count) {
   *out_any_signaled_index = -1;
   *out_unsignaled_count = 0;
@@ -293,7 +293,7 @@ WaitHandle WaitHandle::AlwaysSignaling() {
    public:
     std::string DebugString() const override { return "signal"; }
     StatusOr<std::pair<FdType, int>> AcquireFdForWait(
-        absl::Time deadline) override {
+        Time deadline_ns) override {
       return std::make_pair(FdType::kPermanent, kSignaledFd);
     }
     StatusOr<bool> TryResolveWakeOnFd(int fd) override { return true; }
@@ -308,7 +308,7 @@ WaitHandle WaitHandle::AlwaysFailing() {
    public:
     std::string DebugString() const override { return "fail"; }
     StatusOr<std::pair<FdType, int>> AcquireFdForWait(
-        absl::Time deadline) override {
+        Time deadline_ns) override {
       return InternalErrorBuilder(IREE_LOC) << "AlwaysFailingObject";
     }
     StatusOr<bool> TryResolveWakeOnFd(int fd) override {
@@ -320,7 +320,7 @@ WaitHandle WaitHandle::AlwaysFailing() {
 }
 
 // static
-Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, absl::Time deadline) {
+Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, Time deadline_ns) {
   if (wait_handles.empty()) return OkStatus();
 
   // Build the list of pollfds to wait on.
@@ -332,7 +332,7 @@ Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, absl::Time deadline) {
     int any_signaled_index = 0;
     RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
                               &any_signaled_index, &unsignaled_count));
-  } while (unsignaled_count > 0 && absl::Now() < deadline);
+  } while (unsignaled_count > 0 && Now() < deadline);
 
   if (unsignaled_count == 0) {
     // All waits resolved.
@@ -345,7 +345,7 @@ Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, absl::Time deadline) {
 
 // static
 StatusOr<bool> WaitHandle::TryWaitAll(WaitHandleSpan wait_handles) {
-  auto status = WaitAll(wait_handles, absl::InfinitePast());
+  auto status = WaitAll(wait_handles, InfinitePast());
   if (status.ok()) {
     return true;
   } else if (IsDeadlineExceeded(status)) {
@@ -356,7 +356,7 @@ StatusOr<bool> WaitHandle::TryWaitAll(WaitHandleSpan wait_handles) {
 
 // static
 StatusOr<int> WaitHandle::WaitAny(WaitHandleSpan wait_handles,
-                                  absl::Time deadline) {
+                                  Time deadline_ns) {
   if (wait_handles.empty()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "At least one wait handle is required for WaitAny";
@@ -379,7 +379,7 @@ StatusOr<int> WaitHandle::WaitAny(WaitHandleSpan wait_handles,
 
 // static
 StatusOr<int> WaitHandle::TryWaitAny(WaitHandleSpan wait_handles) {
-  auto status_or = WaitAny(wait_handles, absl::InfinitePast());
+  auto status_or = WaitAny(wait_handles, InfinitePast());
   return IsDeadlineExceeded(status_or.status()) ? -1 : status_or;
 }
 
@@ -418,7 +418,7 @@ std::string WaitHandle::DebugString() const {
 }
 
 StatusOr<bool> WaitHandle::TryWait() {
-  auto status = WaitAll({this}, absl::InfinitePast());
+  auto status = WaitAll({this}, InfinitePast());
   if (status.ok()) {
     return true;
   } else if (IsDeadlineExceeded(status)) {

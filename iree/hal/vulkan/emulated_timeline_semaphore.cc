@@ -16,8 +16,8 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/time/time.h"
 #include "absl/utility/utility.h"
+#include "iree/base/time.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -82,7 +82,7 @@ Status EmulatedTimelineSemaphore::Signal(uint64_t value) {
   return OkStatus();
 }
 
-Status EmulatedTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
+Status EmulatedTimelineSemaphore::Wait(uint64_t value, Time deadline_ns) {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Wait");
 
   VkFence fence = VK_NULL_HANDLE;
@@ -112,26 +112,18 @@ Status EmulatedTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
       break;
     }
     // TODO(antiagainst): figure out a better way instead of the busy loop here.
-  } while (absl::Now() < deadline);
+  } while (Now() < deadline_ns);
 
   if (fence == VK_NULL_HANDLE) {
     return DeadlineExceededErrorBuilder(IREE_LOC)
            << "Deadline reached when waiting timeline semaphore";
   }
 
-  uint64_t timeout_nanos;
-  if (deadline == absl::InfiniteFuture()) {
-    timeout_nanos = UINT64_MAX;
-  } else if (deadline == absl::InfinitePast()) {
-    timeout_nanos = 0;
-  } else {
-    auto relative_nanos = absl::ToInt64Nanoseconds(deadline - absl::Now());
-    timeout_nanos = relative_nanos < 0 ? 0 : relative_nanos;
-  }
-
+  uint64_t timeout_ns =
+      static_cast<uint64_t>(DeadlineToRelativeTimeoutNanos(deadline_ns));
   VK_RETURN_IF_ERROR(logical_device_->syms()->vkWaitForFences(
       *logical_device_, /*fenceCount=*/1, &fence, /*waitAll=*/true,
-      timeout_nanos));
+      timeout_ns));
 
   RETURN_IF_ERROR(TryToAdvanceTimeline(value).status());
   return OkStatus();

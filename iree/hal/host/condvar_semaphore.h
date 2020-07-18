@@ -37,7 +37,7 @@ class CondVarSemaphore final : public Semaphore {
   // Waits for one or more (or all) semaphores to reach or exceed the given
   // values.
   static Status WaitForSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                                  bool wait_all, absl::Time deadline);
+                                  bool wait_all, Time deadline_ns);
 
   explicit CondVarSemaphore(uint64_t initial_value);
   ~CondVarSemaphore() override;
@@ -46,7 +46,7 @@ class CondVarSemaphore final : public Semaphore {
 
   Status Signal(uint64_t value) override;
   void Fail(Status status) override;
-  Status Wait(uint64_t value, absl::Time deadline) override;
+  Status Wait(uint64_t value, Time deadline_ns) override;
 
  private:
   // The mutex is not required to query the value; this lets us quickly check if

@@ -60,7 +60,7 @@ void CondVarSemaphore::Fail(Status status) {
 // static
 Status CondVarSemaphore::WaitForSemaphores(
     absl::Span<const SemaphoreValue> semaphores, bool wait_all,
-    absl::Time deadline) {
+    Time deadline_ns) {
   IREE_TRACE_SCOPE0("CondVarSemaphore::WaitForSemaphores");
 
   // Some of the semaphores may already be signaled; we only need to wait for
@@ -94,7 +94,7 @@ Status CondVarSemaphore::WaitForSemaphores(
                          semaphore_value->second;
                 },
                 &semaphore_value),
-            deadline)) {
+            absl::FromUnixNanos(static_cast<int64_t>(deadline_ns)))) {
       return DeadlineExceededErrorBuilder(IREE_LOC)
              << "Deadline exceeded waiting for semaphores";
     }
@@ -106,8 +106,8 @@ Status CondVarSemaphore::WaitForSemaphores(
   return OkStatus();
 }
 
-Status CondVarSemaphore::Wait(uint64_t value, absl::Time deadline) {
-  return WaitForSemaphores({{this, value}}, /*wait_all=*/true, deadline);
+Status CondVarSemaphore::Wait(uint64_t value, Time deadline_ns) {
+  return WaitForSemaphores({{this, value}}, /*wait_all=*/true, deadline_ns);
 }
 
 }  // namespace host
