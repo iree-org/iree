@@ -17,6 +17,9 @@
 // Partition computation within dispatch function to workgroups/workitems.
 //
 //===----------------------------------------------------------------------===//
+
+#include <array>
+
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -425,7 +428,7 @@ static void getGPUProcessorIdsAndCounts(Location loc,
                                         unsigned numDims,
                                         MutableArrayRef<Value> id,
                                         MutableArrayRef<Value> count) {
-  ArrayRef<StringRef> dims = {"x", "y", "z"};
+  std::array<StringRef, 3> dims{"x", "y", "z"};
   assert(id.size() == numDims);
   assert(count.size() == numDims);
   for (unsigned i = 0; i < numDims; ++i) {
