@@ -44,7 +44,7 @@ iree_pyext_library(
   COPTS
     ${PYBIND_REGISTER_MLIR_PASSES}
   DEPS
-    # Transforms. Adopted from the Bazel variable COMPILER_DEPS.
+    # Transforms. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::HAL::Target
