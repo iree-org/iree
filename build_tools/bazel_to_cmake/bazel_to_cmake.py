@@ -103,11 +103,12 @@ def convert_directory(directory_path, write_files, allow_partial_conversion):
   if not os.path.isdir(directory_path):
     raise FileNotFoundError(f"Cannot find directory '{directory_path}'")
 
+  skip_file_path = os.path.join(directory_path, ".skip_bazel_to_cmake")
   build_file_path = os.path.join(directory_path, "BUILD")
   cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
 
-  if not os.path.isfile(build_file_path):
-    # No Bazel BUILD file in this directory to convert, skip.
+  if os.path.isfile(skip_file_path) or not os.path.isfile(build_file_path):
+    # No Bazel BUILD file in this directory or explicit skip.
     return
 
   global repo_root

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO: Remove this one once migrated.
 iree_pybind_cc_library(
   NAME
     common
@@ -25,4 +26,16 @@ iree_pybind_cc_library(
     iree::base::status
     absl::strings
     absl::optional
+)
+
+iree_add_pyext_library(IREEBindingsPythonCommonLib
+  SRCS
+    "binding.h"
+    "status_utils.h"
+    "status_utils.cc"
+  DEPS
+    iree_base_api
+    iree_base_status
+    absl_strings
+    absl_optional
 )

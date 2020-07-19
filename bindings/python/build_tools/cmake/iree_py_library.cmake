@@ -44,7 +44,7 @@ function(iree_py_library)
   list(TRANSFORM _RULE_SRCS PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
 
   add_custom_target(${_NAME} ALL
-    COMMAND ${CMAKE_COMMAND} -E copy "${_RULE_SRCS}" "${CMAKE_CURRENT_BINARY_DIR}/"
+    COMMAND ${CMAKE_COMMAND} -E copy ${_RULE_SRCS} "${CMAKE_CURRENT_BINARY_DIR}/"
     DEPENDS ${_RULE_DEPS}
   )
 

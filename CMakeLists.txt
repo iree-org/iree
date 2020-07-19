@@ -201,6 +201,7 @@ include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
+include(iree_multipy)
 include(iree_pybind_cc_library)
 include(iree_py_extension)
 include(iree_py_library)
@@ -387,7 +388,10 @@ if(${IREE_BUILD_TESTS})
 endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
+  # NOTE: The multipy defaults come from pybind's configuration and must come
+  # after. This should be pulled in locally at some point.
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  iree_multipy_configure()
 endif()
 
 #-------------------------------------------------------------------------------

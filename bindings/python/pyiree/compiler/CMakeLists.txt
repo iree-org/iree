@@ -18,60 +18,51 @@ iree_py_library(
   SRCS
     "__init__.py"
   DEPS
-    ::binding
+    IREEBindingsPythonCompiler
 )
 
-iree_py_extension(
-  NAME
+iree_add_pyext_module(IREEBindingsPythonCompiler
+  MODULE_NAME
     binding
   SRCS
     "initialize_module.cc"
-  DEPS
-    ::compiler_library
-    bindings::python::pyiree::common
-  COPTS
-    ${PYBIND_COPTS}
-    ${PYBIND_EXTENSION_COPTS}
-  TYPE
-    SHARED
+  PYEXT_DEPS
+    IREEBindingsPythonCommonLib
+    IREEBindingsPythonCompilerLib
 )
 
-iree_pybind_cc_library(
-  NAME
-    compiler_library
-  HDRS
-    "compiler.h"
+iree_add_pyext_library(IREEBindingsPythonCompilerLib
   SRCS
+    "compiler.h"
     "compiler.cc"
+  PYEXT_DEPS
+    IREEBindingsPythonCommonLib
+  COPTS
+    ${PYBIND_REGISTER_MLIR_PASSES}
   DEPS
     # Transforms. Adopted from the Bazel variable COMPILER_DEPS.
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::VM::Transforms
+    iree_compiler_Dialect_Flow_Transforms_Transforms
+    iree_compiler_Dialect_HAL_Transforms_Transforms
+    iree_compiler_Dialect_HAL_Target_Target
+    iree_compiler_Dialect_Shape_IR_IR
+    iree_compiler_Dialect_Shape_Transforms_Transforms
+    iree_compiler_Dialect_VM_Transforms_Transforms
     # Targets. Adopted from the Bazel variable COMPILER_DEPS.
-    iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
-    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Target::init_targets
-    iree::tools::init_compiler_modules
-    iree::tools::init_iree_passes_and_dialects
-    iree::tools::init_mlir_passes_and_dialects
-    iree::tools::init_targets
-    bindings::python::pyiree::common
+    iree_compiler_Dialect_HAL_Target_VMLA_VMLA
+    iree_compiler_Dialect_HAL_Target_LLVM_LLVMAOT
+    iree_compiler_Dialect_HAL_Target_LLVM_LLVMIR
+    iree_compiler_Dialect_HAL_Target_VulkanSPIRV_VulkanSPIRV
+    iree_compiler_Dialect_VM_Target_Bytecode_Bytecode
+    iree_compiler_Dialect_VM_Target_init_targets
+    iree_tools_init_compiler_modules
+    iree_tools_init_iree_passes_and_dialects
+    iree_tools_init_mlir_passes_and_dialects
+    iree_tools_init_targets
     LLVMSupport
     MLIRIR
     MLIRSCFTransforms
     MLIRParser
     MLIRPass
-  COPTS
-    ${PYBIND_REGISTER_MLIR_PASSES}
-  TYPE
-    STATIC
 )
 
 iree_py_test(
