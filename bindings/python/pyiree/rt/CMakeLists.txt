@@ -67,9 +67,8 @@ iree_py_library(
   SRCS
     "__init__.py"
     "system_api.py"
-  DEPS
-    # Aliases not supported for deps on iree_pyext_module.
-    bindings_python_pyiree_rt_PyExtRt
+  PYEXT_DEPS
+    ::PyExtRt
 )
 
 iree_py_test(

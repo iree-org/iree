@@ -65,11 +65,21 @@ macro(_alias_iree_pyext_library declared_name version target)
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
-  message(STATUS "ALIAS ${_PACKAGE_NS}::${declared_name}__${version} -> ${target}")
   add_library(${_PACKAGE_NS}::${ARG_NAME}__${version} ALIAS ${target})
   iree_package_dir(_PACKAGE_DIR)
 endmacro()
 
+# iree_pyext_module()
+#
+# Builds a native python module (.so/.dylib/.pyd).
+#
+# Parameters:
+# NAME: name of target
+# MODULE_NAME: Base-name of the module.
+# SRCS: List of source files for the library
+# COPTS: C options
+# DEPS: List of other targets the test python libraries require
+# PYEXT_DEPS: List of deps of extensions built with iree_pyext_(library|module)
 function(iree_pyext_module)
   cmake_parse_arguments(ARG
     ""
@@ -122,6 +132,16 @@ function(iree_pyext_module)
   endforeach()
 endfunction()
 
+# iree_pyext_library()
+#
+# Builds a C++ library to be included in an iree_pyext_module.
+#
+# Parameters:
+# NAME: name of target
+# SRCS: List of source files for the library
+# COPTS: C options
+# DEPS: List of other targets the test python libraries require
+# PYEXT_DEPS: List of deps of extensions built with iree_pyext_(library|module)
 function(iree_pyext_library)
   cmake_parse_arguments(ARG
     ""
@@ -155,6 +175,48 @@ function(iree_pyext_library)
     )
     _alias_iree_pyext_library("${ARG_NAME}" "${V}" ${VER_NAME})
   endforeach()
+endfunction()
+
+# iree_py_library()
+#
+# CMake function to imitate Bazel's iree_py_library rule.
+#
+# Parameters:
+# NAME: name of target
+# SRCS: List of source files for the library
+# DEPS: List of other targets the test python libraries require
+# PYEXT_DEPS: List of deps of extensions built with iree_pyext_module
+function(iree_py_library)
+  cmake_parse_arguments(
+    ARG
+    ""
+    "NAME"
+    "SRCS;DEPS;PYEXT_DEPS"
+    ${ARGN}
+  )
+
+  iree_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::iree::package::name
+  list(TRANSFORM ARG_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${ARG_NAME}")
+
+  # Add path to each source file
+  list(TRANSFORM _RULE_SRCS PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+
+  add_custom_target(${_NAME} ALL
+    COMMAND ${CMAKE_COMMAND} -E copy ${ARG_SRCS} "${CMAKE_CURRENT_BINARY_DIR}/"
+    DEPENDS ${ARG_DEPS}
+  )
+
+  # Add PYEXT_DEPS.
+  if(${ARG_PYEXT_DEPS})
+    foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
+      list(TRANSFORM ARG_PYEXT_DEPS APPEND "__${V}")
+      add_dependencies(${_NAME} ${ARG_PYEXT_DEPS})
+    endforeach()
+  endif()
 endfunction()
 
 function(iree_pyext_pybind11_options name)

@@ -17,9 +17,8 @@ iree_py_library(
     compiler
   SRCS
     "__init__.py"
-  DEPS
-    # Aliases not supported for deps on iree_pyext_module.
-    bindings_python_pyiree_compiler_PyExtCompiler
+  PYEXT_DEPS
+    ::PyExtCompiler
 )
 
 iree_pyext_module(
