@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_pyext_library(IREEBindingsPythonRtLib
+iree_pyext_library(
+  NAME
+    PyExtRtLib
   SRCS
     "function_abi.h"
     "hal.h"
@@ -23,38 +25,40 @@ iree_add_pyext_library(IREEBindingsPythonRtLib
     "host_types.cc"
     "vm.cc"
   PYEXT_DEPS
-    IREEBindingsPythonCommonLib
+    bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    iree_base_api
-    iree_base_signature_mangle
-    iree_hal_api
-    iree_modules_hal_hal
-    iree_modules_strings_strings_module
-    iree_modules_tensorlist_native_module
-    iree_vm_vm
-    iree_vm_bytecode_module
-    iree_vm_invocation
-    iree_vm_ref
-    iree_vm_variant_list
-    absl_inlined_vector
-    absl_memory
-    absl_strings
-    absl_optional
-    absl_span
+    iree::base::api
+    iree::base::signature_mangle
+    iree::hal::api
+    iree::modules::hal
+    iree::modules::strings::strings_module
+    iree::modules::tensorlist::native_module
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::invocation
+    iree::vm::ref
+    iree::vm::variant_list
+    absl::inlined_vector
+    absl::memory
+    absl::strings
+    absl::optional
+    absl::span
 )
 
-iree_add_pyext_module(IREEBindingsPythonRt
+iree_pyext_module(
+  NAME
+    PyExtRt
   MODULE_NAME binding
   SRCS
     "initialize_module.cc"
   PYEXT_DEPS
-    IREEBindingsPythonCommonLib
-    IREEBindingsPythonRtLib
+    ::PyExtRtLib
+    bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    iree_hal_vulkan_vulkan_driver_module
-    iree_hal_llvmjit_llvmjit_driver_module
-    iree_hal_vmla_vmla_driver_module
-    iree_base_initializer
+    iree::hal::vulkan::vulkan_driver_module
+    iree::hal::llvmjit::llvmjit_driver_module
+    iree::hal::vmla::vmla_driver_module
+    iree::base::initializer
 )
 
 iree_py_library(
@@ -64,7 +68,8 @@ iree_py_library(
     "__init__.py"
     "system_api.py"
   DEPS
-    IREEBindingsPythonRt
+    # Aliases not supported for deps on iree_pyext_module.
+    bindings_python_pyiree_rt_PyExtRt
 )
 
 iree_py_test(

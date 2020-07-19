@@ -51,18 +51,39 @@ function(iree_multipy_configure)
   endforeach()
 endfunction()
 
-function(iree_add_pyext_module name)
+macro(_setup_iree_pyext_names)
+  iree_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::iree::package::name
+  list(TRANSFORM ARG_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM ARG_PYEXT_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  # Prefix the library with the package name, so we get: iree_package_name.
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${ARG_NAME}")
+endmacro()
+
+macro(_alias_iree_pyext_library declared_name version target)
+  # Alias the iree_package_name library to iree::package::name.
+  # This lets us more clearly map to Bazel and makes it possible to
+  # disambiguate the underscores in paths vs. the separators.
+  message(STATUS "ALIAS ${_PACKAGE_NS}::${declared_name}__${version} -> ${target}")
+  add_library(${_PACKAGE_NS}::${ARG_NAME}__${version} ALIAS ${target})
+  iree_package_dir(_PACKAGE_DIR)
+endmacro()
+
+function(iree_pyext_module)
   cmake_parse_arguments(ARG
     ""
-    "MODULE_NAME"
+    "NAME;MODULE_NAME"
     "SRCS;COPTS;DEPS;PYEXT_DEPS"
     ${ARGN})
+  _setup_iree_pyext_names()
 
-  add_custom_target(${name})
+  add_custom_target(${_NAME})
+
   foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
-    set(VER_NAME "${name}__${V}")
+    set(VER_NAME "${_NAME}__${V}")
     add_library(${VER_NAME} SHARED ${ARG_SRCS})
-    add_dependencies(${name} ${VER_NAME})
+    add_dependencies(${_NAME} ${VER_NAME})
     set_target_properties(
       ${VER_NAME} PROPERTIES
         OUTPUT_NAME "${ARG_MODULE_NAME}"
@@ -96,18 +117,21 @@ function(iree_add_pyext_module name)
     list(TRANSFORM ARG_PYEXT_DEPS APPEND "__${V}")
     set_property(GLOBAL APPEND PROPERTY _IREE_PY_EXTENSION_NAMES "${VER_NAME}")
     set_property(TARGET ${VER_NAME} PROPERTY DIRECT_DEPS ${ARG_DEPS} ${ARG_PYEXT_DEPS})
+
+    _alias_iree_pyext_library("${ARG_NAME}" "${V}" ${VER_NAME})
   endforeach()
 endfunction()
 
-function(iree_add_pyext_library name)
+function(iree_pyext_library)
   cmake_parse_arguments(ARG
     ""
-    ""
+    "NAME"
     "SRCS;COPTS;DEPS;PYEXT_DEPS"
     ${ARGN})
+  _setup_iree_pyext_names()
 
   foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
-    set(VER_NAME "${name}__${V}")
+    set(VER_NAME "${_NAME}__${V}")
     add_library(${VER_NAME} STATIC ${ARG_SRCS})
     iree_pyext_pybind11_options(${VER_NAME})
     target_include_directories(${VER_NAME}
@@ -129,6 +153,7 @@ function(iree_add_pyext_library name)
       PRIVATE
         ${ARG_COPTS}
     )
+    _alias_iree_pyext_library("${ARG_NAME}" "${V}" ${VER_NAME})
   endforeach()
 endfunction()
 

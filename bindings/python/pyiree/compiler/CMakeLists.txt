@@ -18,46 +18,51 @@ iree_py_library(
   SRCS
     "__init__.py"
   DEPS
-    IREEBindingsPythonCompiler
+    # Aliases not supported for deps on iree_pyext_module.
+    bindings_python_pyiree_compiler_PyExtCompiler
 )
 
-iree_add_pyext_module(IREEBindingsPythonCompiler
+iree_pyext_module(
+  NAME
+    PyExtCompiler
   MODULE_NAME
     binding
   SRCS
     "initialize_module.cc"
   PYEXT_DEPS
-    IREEBindingsPythonCommonLib
-    IREEBindingsPythonCompilerLib
+    ::PyExtCompilerLib
+    bindings::python::pyiree::common::PyextCommonLib
 )
 
-iree_add_pyext_library(IREEBindingsPythonCompilerLib
+iree_pyext_library(
+  NAME
+    PyExtCompilerLib
   SRCS
     "compiler.h"
     "compiler.cc"
   PYEXT_DEPS
-    IREEBindingsPythonCommonLib
+    bindings::python::pyiree::common::PyextCommonLib
   COPTS
     ${PYBIND_REGISTER_MLIR_PASSES}
   DEPS
     # Transforms. Adopted from the Bazel variable COMPILER_DEPS.
-    iree_compiler_Dialect_Flow_Transforms_Transforms
-    iree_compiler_Dialect_HAL_Transforms_Transforms
-    iree_compiler_Dialect_HAL_Target_Target
-    iree_compiler_Dialect_Shape_IR_IR
-    iree_compiler_Dialect_Shape_Transforms_Transforms
-    iree_compiler_Dialect_VM_Transforms_Transforms
-    # Targets. Adopted from the Bazel variable COMPILER_DEPS.
-    iree_compiler_Dialect_HAL_Target_VMLA_VMLA
-    iree_compiler_Dialect_HAL_Target_LLVM_LLVMAOT
-    iree_compiler_Dialect_HAL_Target_LLVM_LLVMIR
-    iree_compiler_Dialect_HAL_Target_VulkanSPIRV_VulkanSPIRV
-    iree_compiler_Dialect_VM_Target_Bytecode_Bytecode
-    iree_compiler_Dialect_VM_Target_init_targets
-    iree_tools_init_compiler_modules
-    iree_tools_init_iree_passes_and_dialects
-    iree_tools_init_mlir_passes_and_dialects
-    iree_tools_init_targets
+    iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
+    iree::compiler::Dialect::VM::Transforms
+    # Targets. Adopted from the Bazel variable COMPILER::DEPS.
+    iree::compiler::Dialect::HAL::Target::VMLA
+    iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
+    iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
+    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+    iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Target::init_targets
+    iree::tools::init_compiler_modules
+    iree::tools::init_iree_passes_and_dialects
+    iree::tools::init_mlir_passes_and_dialects
+    iree::tools::init_targets
     LLVMSupport
     MLIRIR
     MLIRSCFTransforms
