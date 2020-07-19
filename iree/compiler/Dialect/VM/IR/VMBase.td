@@ -493,13 +493,16 @@ def VM_CondValue : I<32> {
 
 def VM_AnyType : AnyTypeOf<[
   I32,
+  I64,
+  F32,
+  F64,
   VM_CondValue,
   VM_AnyRef,
 ]>;
 
 def VM_PrimitiveType : AnyTypeOf<[
-  AnyIntOfWidths<[8, 16, 32]>,
-  FloatOfWidths<[16, 32]>,
+  AnyIntOfWidths<[8, 16, 32, 64]>,
+  FloatOfWidths<[16, 32, 64]>,
 ]>;
 
 class VM_ConstIntValueAttr<I type> : Attr<
