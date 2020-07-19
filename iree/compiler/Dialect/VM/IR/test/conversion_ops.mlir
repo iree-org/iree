@@ -5,10 +5,10 @@
 // CHECK-LABEL: @trunc
 vm.module @my_module {
   vm.func @trunc(%arg0 : i32) -> i32 {
-    // CHECK: %0 = vm.trunc.i8 %arg0 : i32
-    %0 = vm.trunc.i8 %arg0 : i32
-    // CHECK-NEXT: %1 = vm.trunc.i16 %0 : i32
-    %1 = vm.trunc.i16 %0 : i32
+    // CHECK: %0 = vm.trunc.i32.i8 %arg0 : i32
+    %0 = vm.trunc.i32.i8 %arg0 : i32
+    // CHECK-NEXT: %1 = vm.trunc.i32.i16 %0 : i32
+    %1 = vm.trunc.i32.i16 %0 : i32
     vm.return %1 : i32
   }
 }

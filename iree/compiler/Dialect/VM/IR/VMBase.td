@@ -123,8 +123,8 @@ def VM_OPC_ShrI32S               : VM_OPC<0x2E, "ShrI32S">;
 def VM_OPC_ShrI32U               : VM_OPC<0x2F, "ShrI32U">;
 
 // Casting and type conversion/emulation:
-def VM_OPC_TruncI8               : VM_OPC<0x31, "TruncI8">;
-def VM_OPC_TruncI16              : VM_OPC<0x32, "TruncI16">;
+def VM_OPC_TruncI32I8            : VM_OPC<0x31, "TruncI32I8">;
+def VM_OPC_TruncI32I16           : VM_OPC<0x32, "TruncI32I16">;
 def VM_OPC_ExtI8I32S             : VM_OPC<0x33, "ExtI8I32S">;
 def VM_OPC_ExtI16I32S            : VM_OPC<0x34, "ExtI16I32S">;
 
@@ -203,6 +203,10 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_ShlI32,
     VM_OPC_ShrI32S,
     VM_OPC_ShrI32U,
+    VM_OPC_TruncI32I8,
+    VM_OPC_TruncI32I16,
+    VM_OPC_ExtI8I32S,
+    VM_OPC_ExtI16I32S,
     VM_OPC_CmpEQI32,
     VM_OPC_CmpNEI32,
     VM_OPC_CmpLTI32S,

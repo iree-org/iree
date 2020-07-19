@@ -1272,12 +1272,12 @@ def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
 // Casting and type conversion/emulation
 //===----------------------------------------------------------------------===//
 
-def VM_TruncI8Op : VM_UnaryArithmeticOp<I32, "trunc.i8", VM_OPC_TruncI8> {
+def VM_TruncI32I8Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
   let summary = [{integer truncate to 8 bits}];
   let hasFolder = 1;
 }
 
-def VM_TruncI16Op : VM_UnaryArithmeticOp<I32, "trunc.i16", VM_OPC_TruncI16> {
+def VM_TruncI32I16Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i16", VM_OPC_TruncI32I16> {
   let summary = [{integer truncate to 16 bits}];
   let hasFolder = 1;
 }
