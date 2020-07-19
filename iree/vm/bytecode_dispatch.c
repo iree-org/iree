@@ -696,13 +696,13 @@ iree_status_t iree_vm_bytecode_dispatch(
     // let encoding = [
     //   VM_EncOpcode<opcode>,
     //   VM_EncOperand<"operand", 0>,
-    //   VM_EncIntAttr<"amount", type.bitwidth>,
+    //   VM_EncIntAttr<"amount", 8>,
     //   VM_EncResult<"result">,
     // ];
 #define DISPATCH_OP_SHIFT_I32(op_name, type, op)             \
   DISPATCH_OP(op_name, {                                     \
-    OP_R_I32(4) = (int32_t)(((type)OP_R_I32(0))op OP_I8(2)); \
-    pc += kRegSize + kRegSize + kRegSize;                    \
+    OP_R_I32(3) = (int32_t)(((type)OP_R_I32(0))op OP_I8(2)); \
+    pc += kRegSize + 1 + kRegSize;                           \
   });
 
     DISPATCH_OP_SHIFT_I32(ShlI32, int32_t, <<);

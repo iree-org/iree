@@ -1248,7 +1248,7 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
-    VM_EncIntAttr<"amount", type.bitwidth>,
+    VM_EncIntAttr<"amount", 8>,
     VM_EncResult<"result">,
   ];
 }
