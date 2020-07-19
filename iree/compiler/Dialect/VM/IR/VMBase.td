@@ -63,6 +63,11 @@ def VM_Dialect : Dialect {
 // and should only be done when breaking changes are acceptable. We could add a
 // versioning system here to automatically switch between different encodings
 // but we are a long way out to stabilizing this format :)
+//
+// Some opcodes require an extension prefix to indicate that runtime support
+// is optional. An op with the ExtI64 trait will require VM_OPC_ExtI64, for
+// example. Ops that bridge extension sets have a canonical form that may
+// require multiple prefix codes.
 
 class VM_OPC<int opcode, string name> : I32EnumAttrCase<name, opcode>;
 
@@ -163,6 +168,10 @@ def VM_OPC_Print                 : VM_OPC<0x7D, "Print">;
 def VM_OPC_CondBreak             : VM_OPC<0x7E, "CondBreak">;
 def VM_OPC_Break                 : VM_OPC<0x7F, "Break">;
 
+// Extension prefixes:
+def VM_OPC_ExtI64                : VM_OPC<0x80, "ExtI64">;
+def VM_OPC_ExtF32                : VM_OPC<0x81, "ExtF32">;
+def VM_OPC_ExtF64                : VM_OPC<0x82, "ExtF64">;
 def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     // Core VM opcodes (0x00-0x7F):
     VM_OPC_GlobalLoadI32,
@@ -234,7 +243,9 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_Break,
 
     // Extension opcodes (0x80-0xFF):
-    // TODO(benvanik): SIMD dialect.
+    VM_OPC_ExtI64,
+    VM_OPC_ExtF32,
+    VM_OPC_ExtF64,
   ]> {
   let cppNamespace = "IREE::VM";
 }
@@ -393,6 +404,13 @@ def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;
 // Operations with this trait will disallow code motion across them to ensure
 // that execution order before and after the barrier op remains the same.
 def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
+
+// Operations with this trait require the VM i64 extension.
+def VM_ExtI64 : NativeOpTrait<"IREE::VM::ExtI64">;
+// Operations with this trait require the VM f32 extension.
+def VM_ExtF32 : NativeOpTrait<"IREE::VM::ExtF32">;
+// Operations with this trait require the VM f64 extension.
+def VM_ExtF64 : NativeOpTrait<"IREE::VM::ExtF64">;
 
 //===----------------------------------------------------------------------===//
 // ref<T> types
