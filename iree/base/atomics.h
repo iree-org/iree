@@ -39,7 +39,7 @@ extern "C" {
 #endif
 
 #if defined(IREE_COMPILER_CLANG)
-
+// Emulate C11 atomics with builtins.
 typedef _Atomic intptr_t iree_atomic_intptr_t;
 #define IREE_ATOMIC_VAR_INIT(value) (value)
 #define iree_atomic_load(object) __c11_atomic_load(object, __ATOMIC_SEQ_CST)
@@ -51,7 +51,7 @@ typedef _Atomic intptr_t iree_atomic_intptr_t;
   __c11_atomic_fetch_sub(object, operand, __ATOMIC_SEQ_CST)
 
 #elif defined(IREE_COMPILER_MSVC)
-
+// Emulate C11 atomics with Interlocked win32 APIs.
 // NOTE: currently assumes sizeof(intptr_t) == 8.
 typedef struct {
   intptr_t __val;
@@ -68,19 +68,27 @@ typedef struct {
   InterlockedExchangeAdd64((volatile LONGLONG*)object, -(operand))
 
 #elif defined(IREE_COMPILER_GCC)
-
-typedef _Atomic __INTPTR_TYPE__ iree_atomic_intptr_t;
+// Emulate atomics for GCC in a way that is compatible for inclusion in
+// both C and C++ modes.
+#ifdef __cplusplus
+// Equiv to C++ auto keyword in C++ mode.
+#define __iree_auto_type auto
+#else
+// Only defined in C mode.
+#define __iree_auto_type __auto_type
+#endif
+typedef __INTPTR_TYPE__ iree_atomic_intptr_t;
 #define IREE_ATOMIC_VAR_INIT(value) (value)
 #define iree_atomic_load(object)                                              \
   __atomic_load_ptr(object, __ATOMIC_SEQ_CST) __extension__({                 \
-    __auto_type __atomic_load_ptr = (object);                                 \
+    __iree_auto_type __atomic_load_ptr = (object);                            \
     __typeof__(*__atomic_load_ptr) __atomic_load_tmp;                         \
     __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (__ATOMIC_SEQ_CST)); \
     __atomic_load_tmp;                                                        \
   })
 #define iree_atomic_store(object, desired)                          \
   __extension__({                                                   \
-    __auto_type __atomic_store_ptr = (object);                      \
+    __iree_auto_type __atomic_store_ptr = (object);                 \
     __typeof__(*__atomic_store_ptr) __atomic_store_tmp = (desired); \
     __atomic_store(__atomic_store_ptr, &__atomic_store_tmp,         \
                    (__ATOMIC_SEQ_CST));                             \
