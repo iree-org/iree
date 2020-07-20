@@ -49,9 +49,9 @@ class OrdinalAllocationPass
     int nextFuncOrdinal = 0;
     int nextImportOrdinal = 0;
     int nextExportOrdinal = 0;
-    int nextGlobalBytesOrdinal = 0;
     int nextGlobalRefOrdinal = 0;
     int nextRodataOrdinal = 0;
+    SmallVector<SmallVector<VMGlobalOp, 4>, 8> primitiveGlobalOps(8);
     for (auto &op : getOperation().getBlock().getOperations()) {
       Optional<int> ordinal = llvm::None;
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
@@ -60,16 +60,33 @@ class OrdinalAllocationPass
         ordinal = nextExportOrdinal++;
       } else if (isa<ImportOp>(op)) {
         ordinal = nextImportOrdinal++;
-      } else if (isa<GlobalI32Op>(op)) {
-        ordinal = nextGlobalBytesOrdinal;
-        nextGlobalBytesOrdinal += 4;
-      } else if (isa<GlobalRefOp>(op)) {
-        ordinal = nextGlobalRefOrdinal++;
       } else if (isa<RodataOp>(op)) {
         ordinal = nextRodataOrdinal++;
+      } else if (isa<GlobalRefOp>(op)) {
+        ordinal = nextGlobalRefOrdinal++;
+      } else if (auto globalOp = dyn_cast<VMGlobalOp>(op)) {
+        // Bucket the primitive global ops (like vm.global.i32) so we can
+        // run over all of them below.
+        primitiveGlobalOps[globalOp.getStorageSize()].push_back(globalOp);
+        continue;
       }
       if (ordinal.hasValue()) {
         op.setAttr("ordinal", builder.getI32IntegerAttr(ordinal.getValue()));
+      }
+    }
+
+    // Assign byte offset values to primitive globals, ensuring that we meet
+    // natural alignment requirements on each size type.
+    int nextGlobalBytesOrdinal = 0;
+    for (auto sizeGlobalOps : llvm::enumerate(primitiveGlobalOps)) {
+      size_t storageSize = sizeGlobalOps.index();
+      if (sizeGlobalOps.value().empty()) continue;
+      nextGlobalBytesOrdinal =
+          llvm::alignTo(nextGlobalBytesOrdinal, storageSize);
+      for (auto &globalOp : sizeGlobalOps.value()) {
+        globalOp.setAttr("ordinal",
+                         builder.getI32IntegerAttr(nextGlobalBytesOrdinal));
+        nextGlobalBytesOrdinal += storageSize;
       }
     }
 

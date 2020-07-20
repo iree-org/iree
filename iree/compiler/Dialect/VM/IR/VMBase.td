@@ -312,6 +312,40 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
   list<VM_EncEncodeExpr> encoding = ?;
 }
 
+def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
+  let description = [{
+    Interface used for VM ops that declare global values.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the storage type of this global such as i32.
+    }],
+    "Type", "getStorageType", (ins)>,
+    InterfaceMethod<[{
+      Returns the size in bytes of the global when stored in rwdata. Valid only
+      for globals using primitive storage.
+    }],
+    "size_t", "getStorageSize", (ins), [{
+      auto storageType = $_self.getStorageType();
+      assert(storageType.isIntOrFloat());
+      assert(storageType.getIntOrFloatBitWidth() % 8 == 0);
+      return storageType.getIntOrFloatBitWidth() / 8;
+    }]>,
+    InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
+    InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
+    InterfaceMethod<[{}], "Optional<StringRef>", "getInitializerAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<IntegerAttr>", "getOrdinalAttr", (ins)>,
+    InterfaceMethod<[{}], "int", "getOrdinal", (ins), [{
+      return $_self.getOrdinalAttr().getValue().template cast<IntegerAttr>().getInt();
+    }]>,
+    InterfaceMethod<[{}], "void", "makeMutable", (ins)>,
+    InterfaceMethod<[{}], "void", "clearInitializer", (ins)>,
+    InterfaceMethod<[{}], "void", "clearInitialValue", (ins)>,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // VM traits
 //===----------------------------------------------------------------------===//
