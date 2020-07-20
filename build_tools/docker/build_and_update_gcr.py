@@ -23,22 +23,28 @@ import argparse
 import functools
 import os
 import subprocess
+import sys
 
 IREE_GCR_URL = 'gcr.io/iree-oss/'
 DOCKER_DIR = 'build_tools/docker/'
 
-# Map from image names to images that depend on them.
-IMAGES_TO_DEPENDENT_IMAGES = {
-    'bazel': ['bazel-bindings'],
-    'bazel-bindings': ['bazel-tensorflow'],
-    'bazel-tensorflow': [],
-    'cmake': ['cmake-android', 'cmake-nvidia'],
-    'cmake-android': [],
-    'cmake-nvidia': [],
+# Map from image names to images that they depend on.
+IMAGES_TO_DEPENDENCIES = {
+    'bazel': [],
+    'bazel-bindings': ['bazel'],
+    'bazel-tensorflow': ['bazel-bindings'],
+    'cmake': [],
+    'cmake-android': ['cmake'],
+    'cmake-nvidia': ['cmake'],
     'rbe-toolchain': [],
 }
 
-IMAGES_HELP = [f'`{name}`' for name in IMAGES_TO_DEPENDENT_IMAGES.keys()]
+IMAGES_TO_DEPENDENT_IMAGES = {
+    v: k
+    for v in dependencies
+    for k, dependencies in IMAGES_TO_DEPENDENCIES.items()}
+
+IMAGES_HELP = [f'`{name}`' for name in IMAGES_TO_DEPENDENCIES.keys()]
 IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
 
 RBE_MESSAGE = """
@@ -74,8 +80,8 @@ def parse_arguments():
   args = parser.parse_args()
   for image in args.images:
     if image == "all":
-      args.images = IMAGES_TO_DEPENDENT_IMAGES.keys()
-    elif image not in IMAGES_TO_DEPENDENT_IMAGES.keys():
+      args.images = IMAGES_TO_DEPENDENCIES.keys()
+    elif image not in IMAGES_TO_DEPENDENCIES.keys():
       raise parser.error('Expected --image to be one of:\n'
                          f'  {IMAGES_HELP}\n'
                          f'but got `{image}`.')
@@ -88,6 +94,27 @@ def cmp_images_by_dependency(image1, image2):
   if image1 in IMAGES_TO_DEPENDENT_IMAGES[image2]:
     return 1
   return (image1 > image2) - (image1 < image2)
+
+
+def run_command(command):
+  print(f'Running: {" ".join(command)}')
+  process = subprocess.Popen(
+      command,
+      bufsize=1,
+      stderr=subprocess.STDOUT,
+      stdout=subprocess.PIPE,
+      text=True)
+  for line in process.stdout:
+    print(line, end='')
+
+  return process.poll()
+
+
+def check_command(command):
+  exit_code = run_command(command)
+  if exit_code != 0:
+    print(f'Command failed: {" ".join(command)}')
+    sys.exit(exit_code)
 
 
 if __name__ == '__main__':
@@ -110,10 +137,9 @@ if __name__ == '__main__':
     print(f'Updating image {image}')
     image_url = os.path.join(IREE_GCR_URL, f'{image}:{args.tag}')
     image_path = os.path.join(DOCKER_DIR, image.replace('-', '_'))
-    subprocess.check_output(
-        ['docker', 'build', '--tag', image_url, image_path])
+    check_command(['docker', 'build', '--tag', image_url, image_path])
     if args.push:
-      subprocess.check_output(['docker', 'push', image_url])
+      check_command(['docker', 'push', image_url])
 
   if 'rbe-toolchain' in images_to_update:
     print(RBE_MESSAGE)
