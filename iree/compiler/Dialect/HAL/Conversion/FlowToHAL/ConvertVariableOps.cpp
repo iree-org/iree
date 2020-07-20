@@ -42,8 +42,7 @@ static FuncOp createInitializerFromImmediate(
   // provided symbols and it seems like it shouldn't be.
   auto uniqueName = (Twine("__") + variableOp.getName() + "_initializer").str();
   auto initializerFuncOp =
-      rewriter.create<FuncOp>(variableOp.getLoc(), uniqueName, initializerType,
-                              ArrayRef<NamedAttribute>{});
+      rewriter.create<FuncOp>(variableOp.getLoc(), uniqueName, initializerType);
   auto *entryBlock = initializerFuncOp.addEntryBlock();
   rewriter.setInsertionPointToEnd(entryBlock);
 

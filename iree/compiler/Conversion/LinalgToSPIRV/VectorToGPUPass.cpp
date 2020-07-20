@@ -76,8 +76,8 @@ class UnaryAndBinaryOpPattern final : public VectorToGPUPattern<StdOp> {
     if (VectorToGPUPattern<StdOp>::cooperativeMatrixAnalysis
             .usesCooperativeMatrixType(operation))
       return failure();
-    Value newOp = rewriter.create<StdOp>(
-        operation.getLoc(), ValueRange(operands), ArrayRef<NamedAttribute>{});
+    Value newOp =
+        rewriter.create<StdOp>(operation.getLoc(), ValueRange(operands));
     rewriter.replaceOp(operation, ValueRange(newOp));
     return success();
   }
