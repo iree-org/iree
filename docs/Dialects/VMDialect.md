@@ -114,7 +114,7 @@ operation ::= `vm.br` $dest (`(` $destOperands^ `:` type($destOperands) `)`)? at
 
 | Operand | Description |
 | :-----: | ----------- |
-`destOperands` | 32-bit signless integer or 32-bit signless integer or ref
+`destOperands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 #### Successors:
 
@@ -141,7 +141,7 @@ target block.
 
 | Operand | Description |
 | :-----: | ----------- |
-`destOperands` | 32-bit signless integer or 32-bit signless integer or ref
+`destOperands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 #### Successors:
 
@@ -172,13 +172,13 @@ Calls an internal VM function with the given arguments.
 
 | Operand | Description |
 | :-----: | ----------- |
-`operands` | 32-bit signless integer or 32-bit signless integer or ref
+`operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-`results` | 32-bit signless integer or 32-bit signless integer or ref
+`results` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.call.variadic` (IREE::VM::CallVariadicOp)
 
@@ -202,13 +202,13 @@ attribute.
 
 | Operand | Description |
 | :-----: | ----------- |
-`operands` | 32-bit signless integer or 32-bit signless integer or ref
+`operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
-`results` | 32-bit signless integer or 32-bit signless integer or ref
+`results` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.check.eq` (IREE::VM::CheckEQOp)
 
@@ -245,8 +245,8 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 | Operand | Description |
 | :-----: | ----------- |
-`lhs` | 32-bit signless integer or 32-bit signless integer or ref
-`rhs` | 32-bit signless integer or 32-bit signless integer or ref
+`lhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
+`rhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.check.ne` (IREE::VM::CheckNEOp)
 
@@ -283,8 +283,8 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 | Operand | Description |
 | :-----: | ----------- |
-`lhs` | 32-bit signless integer or 32-bit signless integer or ref
-`rhs` | 32-bit signless integer or 32-bit signless integer or ref
+`lhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
+`rhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.check.nz` (IREE::VM::CheckNZOp)
 
@@ -321,7 +321,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 | Operand | Description |
 | :-----: | ----------- |
-`value` | 32-bit signless integer or 32-bit signless integer or ref
+`value` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.cmp.eq.i32` (IREE::VM::CmpEQI32Op)
 
@@ -716,8 +716,8 @@ operation ::= `vm.cond_br` $condition `,`
 | Operand | Description |
 | :-----: | ----------- |
 `condition` | 32-bit signless integer
-`trueDestOperands` | 32-bit signless integer or 32-bit signless integer or ref
-`falseDestOperands` | 32-bit signless integer or 32-bit signless integer or ref
+`trueDestOperands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
+`falseDestOperands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 #### Successors:
 
@@ -747,7 +747,7 @@ attached) execution will continue at the target block.
 | Operand | Description |
 | :-----: | ----------- |
 `condition` | 32-bit signless integer
-`destOperands` | 32-bit signless integer or 32-bit signless integer or ref
+`destOperands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 #### Successors:
 
@@ -802,7 +802,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_417
+`value` | Attribute | anonymous_431
 
 #### Results:
 
@@ -1081,7 +1081,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_420
+`initial_value` | Attribute | anonymous_434
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
@@ -1348,7 +1348,7 @@ Returns the value of the element at the given index.
 
 | Operand | Description |
 | :-----: | ----------- |
-`list` | list<8/16/32-bit integer or 16/32-bit float>
+`list` | list<8/16/32/64-bit integer or 16/32/64-bit float>
 `index` | 32-bit signless integer
 
 #### Results:
@@ -1444,7 +1444,7 @@ Sets the element at the given index to the new value.
 
 | Operand | Description |
 | :-----: | ----------- |
-`list` | list<8/16/32-bit integer or 16/32-bit float>
+`list` | list<8/16/32/64-bit integer or 16/32/64-bit float>
 `index` | 32-bit signless integer
 `value` | 32-bit signless integer
 
@@ -1616,7 +1616,7 @@ Prints the given string message and zero or more values.
 
 | Operand | Description |
 | :-----: | ----------- |
-`operands` | 32-bit signless integer or 32-bit signless integer or ref
+`operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.rem.i32.s` (IREE::VM::RemI32SOp)
 
@@ -1691,7 +1691,7 @@ vm.func @foo(%0, %1) : (i32, f8) {
 
 | Operand | Description |
 | :-----: | ----------- |
-`operands` | 32-bit signless integer or 32-bit signless integer or ref
+`operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
 ### `vm.rodata` (IREE::VM::RodataOp)
 
@@ -1983,16 +1983,16 @@ trace verbosity setting.
 
 | Operand | Description |
 | :-----: | ----------- |
-`operands` | 32-bit signless integer or 32-bit signless integer or ref
+`operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.trunc.i16` (IREE::VM::TruncI16Op)
+### `vm.trunc.i32.i16` (IREE::VM::TruncI32I16Op)
 
 integer truncate to 16 bits
 
 Syntax:
 
 ```
-operation ::= `vm.trunc.i16` $operand attr-dict `:` type($result)
+operation ::= `vm.trunc.i32.i16` $operand attr-dict `:` type($result)
 ```
 
 
@@ -2009,14 +2009,14 @@ operation ::= `vm.trunc.i16` $operand attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.trunc.i8` (IREE::VM::TruncI8Op)
+### `vm.trunc.i32.i8` (IREE::VM::TruncI32I8Op)
 
 integer truncate to 8 bits
 
 Syntax:
 
 ```
-operation ::= `vm.trunc.i8` $operand attr-dict `:` type($result)
+operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($result)
 ```
 
 
