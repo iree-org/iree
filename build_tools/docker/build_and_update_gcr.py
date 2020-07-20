@@ -20,29 +20,26 @@ Example usage:
 """
 
 import argparse
+import functools
 import os
 import subprocess
 
 IREE_GCR_URL = 'gcr.io/iree-oss/'
 DOCKER_DIR = 'build_tools/docker/'
 
-IMAGES = [
-    'bazel',
-    'bazel-bindings',
-    'bazel-tensorflow',
-    'cmake',
-    'cmake-android',
-    'cmake-nvidia',
-    'rbe-toolchain',
-]
-IMAGES_HELP = [f'`{name}`' for name in IMAGES]
-IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
-
 # Map from image names to images that depend on them.
 IMAGES_TO_DEPENDENT_IMAGES = {
-    'bazel': ['bazel-bindings', 'bazel-tensorflow'],
+    'bazel': ['bazel-bindings'],
+    'bazel-bindings': ['bazel-tensorflow'],
+    'bazel-tensorflow': [],
     'cmake': ['cmake-android', 'cmake-nvidia'],
+    'cmake-android': [],
+    'cmake-nvidia': [],
+    'rbe-toolchain': [],
 }
+
+IMAGES_HELP = [f'`{name}`' for name in IMAGES_TO_DEPENDENT_IMAGES.keys()]
+IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
 
 RBE_MESSAGE = """
 Remember to update the `rbe_default` digest in the `WORKSPACE` file to reflect
@@ -57,8 +54,10 @@ def parse_arguments():
       description="Build IREE's Docker images and optionally push them to GCR.")
   parser.add_argument(
       '--image',
+      dest='images',
       type=str,
       required=True,
+      action='append',
       help=f'Name of the image to build: {IMAGES_HELP}.')
   parser.add_argument(
       '--tag',
@@ -73,12 +72,22 @@ def parse_arguments():
       help='Push the built images to GCR. Requires gcloud authorization.')
 
   args = parser.parse_args()
-  if args.image not in IMAGES:
-    raise parser.error('Expected --image to be one of:\n'
-                       f'  {IMAGES_HELP}\n'
-                       f'but got `{args.image}`.')
-
+  for image in args.images:
+    if image == "all":
+      args.images = IMAGES_TO_DEPENDENT_IMAGES.keys()
+    elif image not in IMAGES_TO_DEPENDENT_IMAGES.keys():
+      raise parser.error('Expected --image to be one of:\n'
+                         f'  {IMAGES_HELP}\n'
+                         f'but got `{image}`.')
   return args
+
+
+def cmp_images_by_dependency(image1, image2):
+  if image2 in IMAGES_TO_DEPENDENT_IMAGES[image1]:
+    return -1
+  if image1 in IMAGES_TO_DEPENDENT_IMAGES[image2]:
+    return 1
+  return (image1 > image2) - (image1 < image2)
 
 
 if __name__ == '__main__':
@@ -88,10 +97,14 @@ if __name__ == '__main__':
   if args.push:
     subprocess.check_output(['gcloud', 'auth', 'configure-docker'])
 
-  # Check if any images depend on `args.image` and update them if they do.
-  images_to_update = [args.image]
-  if args.image in IMAGES_TO_DEPENDENT_IMAGES:
-    images_to_update.extend(IMAGES_TO_DEPENDENT_IMAGES[args.image])
+  # Check if any images depend on `args.images` and update them if they do.
+  images_to_update_set = set(args.images)
+  for image in args.images:
+    images_to_update_set.update(IMAGES_TO_DEPENDENT_IMAGES[image])
+
+  # Topo sort by image dependency
+  images_to_update = sorted(
+      images_to_update_set, key=functools.cmp_to_key(cmp_images_by_dependency))
 
   for image in images_to_update:
     print(f'Updating image {image}')

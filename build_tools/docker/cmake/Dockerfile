@@ -27,14 +27,25 @@
 FROM ubuntu:18.04
 WORKDIR /usr/src/iree/
 
-RUN apt-get update
-# TODO: Remove this if the `apt-get install` below works without it again.
-RUN apt update
+RUN apt-get update \
+  && apt-get install -y \
+    # git for updating IREE's submodules.
+    git \
+    # For later installations
+    wget \
+    # For building with ninja
+    ninja-build \
+    # For bootstrapping the cmake installation
+    cmake \
+    # core IREE dependencies.
+    clang \
+    libsdl2-dev \
+    libssl-dev
 
 # Update cmake to v3.13+, which is ahead of apt-get's version (3.10.2).
 # Install dependencies, including an old version of cmake to bootstrap.
 ENV CMAKE_VERSION 3.13.5
-RUN apt-get install -y clang cmake libssl-dev wget \
+RUN apt-get update \
   && mkdir ./cmake_install \
   && cd cmake_install \
   && wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}.tar.gz" \
@@ -44,14 +55,12 @@ RUN apt-get install -y clang cmake libssl-dev wget \
   && make \
   && make install
 
-# Install dependencies.
-RUN apt-get install -y \
-  git \
-  ninja-build \
-  python3 \
-  python3-pip \
-  python3-setuptools \
-  # Install dependencies for the python bindings tests.
+# Dependencies for the python bindings tests.
+RUN apt-get update \
+  && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-setuptools \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install numpy absl-py
 

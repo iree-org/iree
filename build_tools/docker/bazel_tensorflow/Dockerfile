@@ -24,9 +24,7 @@
 #   gcr.io/iree-oss/bazel-tensorflow
 
 # Set up the image and working directory.
-FROM gcr.io/iree-oss/bazel
+FROM gcr.io/iree-oss/bazel-bindings
 
-# Install python3, tensorflow and numpy.
-RUN apt-get install -y python3 python3-dev python3-pip python3-setuptools \
-  && python3 -m pip install --upgrade pip \
-  && python3 -m pip install numpy tf-nightly
+# Install tensorflow.
+RUN python3 -m pip install tf-nightly
