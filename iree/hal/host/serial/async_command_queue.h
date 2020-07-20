@@ -47,7 +47,7 @@ class AsyncCommandQueue final : public CommandQueue {
 
   Status Submit(absl::Span<const SubmissionBatch> batches) override;
 
-  Status WaitIdle(absl::Time deadline) override;
+  Status WaitIdle(Time deadline_ns) override;
 
  private:
   // Thread entry point for the async worker thread.

@@ -14,13 +14,13 @@
 
 #include "iree/hal/host/serial/async_command_queue.h"
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
+#include <thread>
 #include <utility>
 
 #include "absl/memory/memory.h"
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/base/time.h"
@@ -39,6 +39,13 @@ using ::testing::_;
 
 using testing::MockCommandBuffer;
 using testing::MockCommandQueue;
+
+// Suspends execution of the calling thread for the given |duration_ms|.
+// Depending on platform this may have an extremely coarse resolution (upwards
+// of several to dozens of milliseconds).
+inline void Sleep(std::chrono::milliseconds duration_ms) {
+  std::this_thread::sleep_for(duration_ms);
+}
 
 struct AsyncCommandQueueTest : public ::testing::Test {
   MockCommandQueue* mock_target_queue;
@@ -75,7 +82,7 @@ TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
   CondVarSemaphore semaphore(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
-  ASSERT_OK(semaphore.Wait(1ull, absl::InfiniteFuture()));
+  ASSERT_OK(semaphore.Wait(1ull, InfiniteFuture()));
 }
 
 // Tests that failure is propagated along the fence from the target queue.
@@ -92,7 +99,7 @@ TEST_F(AsyncCommandQueueTest, PropagateSubmitFailure) {
   CondVarSemaphore semaphore(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
-  EXPECT_TRUE(IsDataLoss(semaphore.Wait(1ull, absl::InfiniteFuture())));
+  EXPECT_TRUE(IsDataLoss(semaphore.Wait(1ull, InfiniteFuture())));
 }
 
 // Tests that waiting for idle is a no-op when nothing is queued.
@@ -109,7 +116,7 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
-        Sleep(absl::Milliseconds(100));
+        Sleep(std::chrono::milliseconds(100));
         return OkStatus();
       });
   CondVarSemaphore semaphore(0ull);
@@ -131,7 +138,7 @@ TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillRepeatedly([](absl::Span<const SubmissionBatch> batches) {
-        Sleep(absl::Milliseconds(100));
+        Sleep(std::chrono::milliseconds(100));
         return OkStatus();
       });
 
@@ -164,7 +171,7 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   // Fail.
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
-        Sleep(absl::Milliseconds(100));
+        Sleep(std::chrono::milliseconds(100));
         return DataLossErrorBuilder(IREE_LOC);
       });
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(CommandBufferMode::kOneShot,
@@ -172,7 +179,7 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   CondVarSemaphore semaphore_0(0ull);
   ASSERT_OK(
       command_queue->Submit({{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1u}}}));
-  EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, absl::InfiniteFuture())));
+  EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, InfiniteFuture())));
 
   // Future flushes/waits/etc should also fail.
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
@@ -193,7 +200,7 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
   // Fail.
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([](absl::Span<const SubmissionBatch> batches) {
-        Sleep(absl::Milliseconds(100));
+        Sleep(std::chrono::milliseconds(100));
         return DataLossErrorBuilder(IREE_LOC);
       });
 
@@ -211,8 +218,8 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
 
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
 
-  EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, absl::InfiniteFuture())));
-  EXPECT_TRUE(IsDataLoss(semaphore_1.Wait(1ull, absl::InfiniteFuture())));
+  EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, InfiniteFuture())));
+  EXPECT_TRUE(IsDataLoss(semaphore_1.Wait(1ull, InfiniteFuture())));
 
   // Future flushes/waits/etc should also fail.
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));

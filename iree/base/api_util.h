@@ -17,7 +17,6 @@
 
 #include "absl/base/macros.h"
 #include "absl/container/inlined_vector.h"
-#include "absl/time/time.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
@@ -99,39 +98,6 @@ class StatusAdaptorForApiMacros {
     return ::iree::ToApiStatus(std::move(statusor).status());               \
   }                                                                         \
   lhs = std::move(statusor).value()
-
-// Converts an iree_duration_t to its equivalent absl::Duration.
-inline absl::Duration ToAbslDuration(iree_duration_t duration) {
-  if (duration == IREE_DURATION_ZERO) {
-    return absl::ZeroDuration();
-  } else if (duration == IREE_DURATION_INFINITE) {
-    return absl::InfiniteDuration();
-  } else {
-    return absl::Nanoseconds(duration);
-  }
-}
-
-// Converts an iree_time_t to its equivalent absl::Time.
-inline absl::Time ToAbslTime(iree_time_t time) {
-  if (time == IREE_TIME_INFINITE_PAST) {
-    return absl::InfinitePast();
-  } else if (time == IREE_TIME_INFINITE_FUTURE) {
-    return absl::InfiniteFuture();
-  } else {
-    return absl::FromUnixNanos(time);
-  }
-}
-
-// Converts an absl::Time to an iree_time_t.
-inline iree_time_t FromAbslTime(absl::Time time) {
-  if (time == absl::InfinitePast()) {
-    return IREE_TIME_INFINITE_PAST;
-  } else if (time == absl::InfiniteFuture()) {
-    return IREE_TIME_INFINITE_FUTURE;
-  } else {
-    return absl::ToUnixNanos(time);
-  }
-}
 
 // Returns a vector initialized with the contents of a C-style list query.
 // For functions of the form (..., capacity, out_values, out_count) this will

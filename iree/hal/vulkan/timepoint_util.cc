@@ -17,8 +17,8 @@
 #include <memory>
 
 #include "absl/synchronization/mutex.h"
-#include "absl/time/time.h"
 #include "absl/utility/utility.h"
+#include "iree/base/time.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"

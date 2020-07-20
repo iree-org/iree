@@ -38,6 +38,7 @@ iree_cc_library(
     ::file_mapping
     ::init
     ::tracing
+    absl::time
   PUBLIC
 )
 
@@ -519,7 +520,7 @@ iree_cc_library(
   HDRS
     "time.h"
   DEPS
-    absl::time
+    ::api
   PUBLIC
 )
 

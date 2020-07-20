@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <thread>
+
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
@@ -60,17 +62,17 @@ TEST_P(SemaphoreTest, Failure) {
 
 // Tests waiting on no semaphores.
 TEST_P(SemaphoreTest, EmptyWait) {
-  EXPECT_OK(device_->WaitAllSemaphores({}, absl::InfiniteFuture()));
+  EXPECT_OK(device_->WaitAllSemaphores({}, InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
 TEST_P(SemaphoreTest, WaitAlreadySignaled) {
   ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(2u));
   // Test both previous and current values.
-  EXPECT_OK(device_->WaitAllSemaphores({{semaphore.get(), 1u}},
-                                       absl::InfiniteFuture()));
-  EXPECT_OK(device_->WaitAllSemaphores({{semaphore.get(), 2u}},
-                                       absl::InfiniteFuture()));
+  EXPECT_OK(
+      device_->WaitAllSemaphores({{semaphore.get(), 1u}}, InfiniteFuture()));
+  EXPECT_OK(
+      device_->WaitAllSemaphores({{semaphore.get(), 2u}}, InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has not been signaled.
@@ -79,7 +81,7 @@ TEST_P(SemaphoreTest, WaitUnsignaled) {
   // NOTE: we don't actually block here because otherwise we'd lock up.
   // Result status is undefined - some backends may return DeadlineExceededError
   // while others may return success.
-  device_->WaitAllSemaphores({{semaphore.get(), 3u}}, absl::InfinitePast())
+  device_->WaitAllSemaphores({{semaphore.get(), 3u}}, InfinitePast())
       .IgnoreError();
 }
 
@@ -93,15 +95,12 @@ TEST_P(SemaphoreTest, PingPong) {
   ASSERT_OK_AND_ASSIGN(auto b2a, device_->CreateSemaphore(0u));
   std::thread thread([&]() {
     // Should advance right past this because the value is already set.
-    ASSERT_OK(
-        device_->WaitAllSemaphores({{a2b.get(), 0u}}, absl::InfiniteFuture()));
+    ASSERT_OK(device_->WaitAllSemaphores({{a2b.get(), 0u}}, InfiniteFuture()));
     ASSERT_OK(b2a->Signal(1u));
     // Jump ahead.
-    ASSERT_OK(
-        device_->WaitAllSemaphores({{a2b.get(), 4u}}, absl::InfiniteFuture()));
+    ASSERT_OK(device_->WaitAllSemaphores({{a2b.get(), 4u}}, InfiniteFuture()));
   });
-  ASSERT_OK(
-      device_->WaitAllSemaphores({{b2a.get(), 1u}}, absl::InfiniteFuture()));
+  ASSERT_OK(device_->WaitAllSemaphores({{b2a.get(), 1u}}, InfiniteFuture()));
   ASSERT_OK(a2b->Signal(4u));
   thread.join();
 }

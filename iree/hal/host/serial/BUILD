@@ -50,7 +50,6 @@ cc_test(
         "//iree/hal/testing:mock_command_queue",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/time",
     ],
 )
 

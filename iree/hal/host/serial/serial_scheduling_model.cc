@@ -58,7 +58,7 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
     return OkStatus();
   }
 
-  Status WaitIdle(absl::Time deadline) override {
+  Status WaitIdle(Time deadline_ns) override {
     // No-op.
     return OkStatus();
   }
@@ -110,20 +110,20 @@ StatusOr<ref_ptr<Semaphore>> SerialSchedulingModel::CreateSemaphore(
 }
 
 Status SerialSchedulingModel::WaitAllSemaphores(
-    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+    absl::Span<const SemaphoreValue> semaphores, Time deadline_ns) {
   return CondVarSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/true,
-                                             deadline);
+                                             deadline_ns);
 }
 
 StatusOr<int> SerialSchedulingModel::WaitAnySemaphore(
-    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+    absl::Span<const SemaphoreValue> semaphores, Time deadline_ns) {
   return CondVarSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/false,
-                                             deadline);
+                                             deadline_ns);
 }
 
-Status SerialSchedulingModel::WaitIdle(absl::Time deadline) {
+Status SerialSchedulingModel::WaitIdle(Time deadline_ns) {
   for (auto& command_queue : command_queues_) {
-    RETURN_IF_ERROR(command_queue->WaitIdle(deadline));
+    RETURN_IF_ERROR(command_queue->WaitIdle(deadline_ns));
   }
   return OkStatus();
 }

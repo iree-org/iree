@@ -163,7 +163,6 @@ iree_cc_library(
     ::command_buffer
     ::semaphore
     absl::span
-    absl::time
     iree::base::bitfield
     iree::base::status
     iree::base::time
@@ -247,7 +246,6 @@ iree_cc_library(
     ::executable_cache
     ::executable_layout
     ::semaphore
-    absl::time
     iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
@@ -284,7 +282,6 @@ iree_cc_library(
     ::semaphore
     absl::span
     absl::synchronization
-    absl::time
     iree::base::source_location
     iree::base::status
     iree::base::time
@@ -432,7 +429,6 @@ iree_cc_library(
     "semaphore.h"
   DEPS
     ::resource
-    absl::time
     iree::base::status
     iree::base::time
   PUBLIC

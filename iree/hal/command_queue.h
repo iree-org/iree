@@ -18,8 +18,6 @@
 #include <cstdint>
 #include <string>
 
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "iree/base/bitfield.h"
 #include "iree/base/status.h"
@@ -91,11 +89,11 @@ class CommandQueue {
   //
   // If the command queue has encountered an error during submission at any
   // point it will be returned here (repeatedly).
-  virtual Status WaitIdle(absl::Time deadline) = 0;
-  inline Status WaitIdle(absl::Duration timeout) {
-    return WaitIdle(RelativeTimeoutToDeadline(timeout));
+  virtual Status WaitIdle(Time deadline_ns) = 0;
+  inline Status WaitIdle(Duration timeout_ns) {
+    return WaitIdle(RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
-  inline Status WaitIdle() { return WaitIdle(absl::InfiniteFuture()); }
+  inline Status WaitIdle() { return WaitIdle(InfiniteFuture()); }
 
  protected:
   CommandQueue(std::string name, CommandCategoryBitfield supported_categories)
