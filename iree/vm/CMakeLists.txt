@@ -189,8 +189,8 @@ iree_cc_library(
     "invocation.c"
   DEPS
     ::context
+    ::list
     ::module
-    ::variant_list
     iree::base::api
     iree::base::tracing
   PUBLIC
@@ -307,7 +307,6 @@ iree_cc_library(
   DEPS
     ::module
     ::ref
-    ::variant_list
     iree::base::alignment
     iree::base::api
     iree::base::tracing
@@ -348,19 +347,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    variant_list
-  HDRS
-    "variant_list.h"
-  SRCS
-    "variant_list.c"
-  DEPS
-    ::ref
-    ::value
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     vm
   HDRS
     "api.h"
@@ -375,7 +361,6 @@ iree_cc_library(
     ::stack
     ::type_def
     ::value
-    ::variant_list
     iree::base::api
   PUBLIC
 )

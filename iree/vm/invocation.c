@@ -22,45 +22,45 @@
 
 // Marshals a variant list of values into callee registers.
 // The |out_dst_reg_list| will be populated with the register ordinals and must
-// be preallocated to store iree_vm_variant_list_size inputs.
-static void iree_vm_stack_frame_marshal_inputs(
-    iree_vm_variant_list_t* inputs, const iree_vm_registers_t dst_regs,
+// be preallocated to store iree_vm_list_size inputs.
+static iree_status_t iree_vm_stack_frame_marshal_inputs(
+    iree_vm_list_t* inputs, const iree_vm_registers_t dst_regs,
     iree_vm_register_list_t* out_dst_reg_list) {
-  iree_host_size_t count = iree_vm_variant_list_size(inputs);
+  iree_host_size_t count = iree_vm_list_size(inputs);
   uint16_t i32_reg = 0;
   uint16_t ref_reg = 0;
   out_dst_reg_list->size = (uint16_t)count;
   for (iree_host_size_t i = 0; i < count; ++i) {
-    iree_vm_variant_t* variant = iree_vm_variant_list_get(inputs, i);
-    if (IREE_VM_VARIANT_IS_REF(variant)) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(inputs, i, &variant));
+    if (iree_vm_type_def_is_ref(&variant.type)) {
       out_dst_reg_list->registers[i] =
           ref_reg | IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT;
       iree_vm_ref_t* reg_ref = &dst_regs.ref[ref_reg++];
       memset(reg_ref, 0, sizeof(*reg_ref));
-      iree_vm_ref_retain(&variant->ref, reg_ref);
+      iree_vm_ref_retain(&variant.ref, reg_ref);
     } else {
       out_dst_reg_list->registers[i] = i32_reg;
-      dst_regs.i32[i32_reg++] = variant->i32;
+      dst_regs.i32[i32_reg++] = variant.i32;
     }
   }
+  return IREE_STATUS_OK;
 }
 
 // Marshals callee return registers into a variant list.
 static iree_status_t iree_vm_stack_frame_marshal_outputs(
     const iree_vm_registers_t src_regs,
-    const iree_vm_register_list_t* src_reg_list,
-    iree_vm_variant_list_t* outputs) {
+    const iree_vm_register_list_t* src_reg_list, iree_vm_list_t* outputs) {
   for (int i = 0; i < src_reg_list->size; ++i) {
     uint16_t reg = src_reg_list->registers[i];
     if (reg & IREE_REF_REGISTER_TYPE_BIT) {
       iree_vm_ref_t* value = &src_regs.ref[reg & src_regs.ref_mask];
-      IREE_RETURN_IF_ERROR(
-          iree_vm_variant_list_append_ref_move(outputs, value));
+      IREE_RETURN_IF_ERROR(iree_vm_list_push_ref_move(outputs, value));
     } else {
       iree_vm_value_t value;
       value.type = IREE_VM_VALUE_TYPE_I32;
       value.i32 = src_regs.i32[reg & src_regs.i32_mask];
-      IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_value(outputs, value));
+      IREE_RETURN_IF_ERROR(iree_vm_list_push_value(outputs, &value));
     }
   }
   return IREE_STATUS_OK;
@@ -70,13 +70,12 @@ static iree_status_t iree_vm_stack_frame_marshal_outputs(
 static iree_status_t iree_vm_invoke_within(
     iree_vm_context_t* context, iree_vm_stack_t* stack,
     iree_vm_function_t function, const iree_vm_invocation_policy_t* policy,
-    iree_vm_variant_list_t* inputs, iree_vm_variant_list_t* outputs) {
+    iree_vm_list_t* inputs, iree_vm_list_t* outputs) {
   // TODO(#2075): disabled because check_test is invoking native methods.
   // These checks should be nice and simple as we don't support variadic
   // args/results in bytecode.
-  iree_host_size_t input_count = inputs ? iree_vm_variant_list_size(inputs) : 0;
-  iree_host_size_t output_count =
-      outputs ? iree_vm_variant_list_capacity(outputs) : 0;
+  iree_host_size_t input_count = inputs ? iree_vm_list_size(inputs) : 0;
+  iree_host_size_t output_count = outputs ? iree_vm_list_capacity(outputs) : 0;
   // iree_vm_function_signature_t signature =
   //     iree_vm_function_signature(&function);
   // if (input_count != signature.argument_count) {
@@ -112,8 +111,8 @@ static iree_status_t iree_vm_invoke_within(
 
   // Marshal inputs into the external stack frame registers.
   if (inputs) {
-    iree_vm_stack_frame_marshal_inputs(inputs, external_frame->registers,
-                                       argument_registers);
+    IREE_RETURN_IF_ERROR(iree_vm_stack_frame_marshal_inputs(
+        inputs, external_frame->registers, argument_registers));
   }
 
   // Perform execution. Note that for synchronous execution we expect this to
@@ -139,8 +138,8 @@ static iree_status_t iree_vm_invoke_within(
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
     iree_vm_context_t* context, iree_vm_function_t function,
-    const iree_vm_invocation_policy_t* policy, iree_vm_variant_list_t* inputs,
-    iree_vm_variant_list_t* outputs, iree_allocator_t allocator) {
+    const iree_vm_invocation_policy_t* policy, iree_vm_list_t* inputs,
+    iree_vm_list_t* outputs, iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Allocate a VM stack on the host stack and initialize it.

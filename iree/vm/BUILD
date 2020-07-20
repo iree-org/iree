@@ -167,8 +167,8 @@ cc_library(
     hdrs = ["invocation.h"],
     deps = [
         ":context",
+        ":list",
         ":module",
-        ":variant_list",
         "//iree/base:api",
         "//iree/base:tracing",
     ],
@@ -269,7 +269,6 @@ cc_library(
     deps = [
         ":module",
         ":ref",
-        ":variant_list",
         "//iree/base:alignment",
         "//iree/base:api",
         "//iree/base:tracing",
@@ -303,16 +302,6 @@ cc_library(
 )
 
 cc_library(
-    name = "variant_list",
-    srcs = ["variant_list.c"],
-    hdrs = ["variant_list.h"],
-    deps = [
-        ":ref",
-        ":value",
-    ],
-)
-
-cc_library(
     name = "vm",
     hdrs = [
         "api.h",
@@ -328,7 +317,6 @@ cc_library(
         ":stack",
         ":type_def",
         ":value",
-        ":variant_list",
         "//iree/base:api",
     ],
 )

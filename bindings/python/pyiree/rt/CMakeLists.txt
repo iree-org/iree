@@ -66,7 +66,6 @@ iree_pybind_cc_library(
     iree::vm::bytecode_module
     iree::vm::invocation
     iree::vm::ref
-    iree::vm::variant_list
     absl::inlined_vector
     absl::memory
     absl::strings

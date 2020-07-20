@@ -107,39 +107,55 @@ class ref {
     return ref_type_descriptor<T>::get()->type;
   }
 
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref() noexcept = default;
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept {}  // NOLINT
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept : px_(p) {}
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept {
-    if (px_) ref_type_release<T>(px_);
-  }
+  ABSL_ATTRIBUTE_ALWAYS_INLINE ref() noexcept
+      : ref_({
+            0,
+            ref_type_descriptor<T>::get()->offsetof_counter,
+            ref_type_descriptor<T>::get()->type,
+        }) {}
+  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept
+      : ref_({
+            0,
+            ref_type_descriptor<T>::get()->offsetof_counter,
+            ref_type_descriptor<T>::get()->type,
+        }) {}
+  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept
+      : ref_({
+            p,
+            ref_type_descriptor<T>::get()->offsetof_counter,
+            ref_type_descriptor<T>::get()->type,
+        }) {}
+  ABSL_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept { ref_type_release<T>(get()); }
 
   // Don't use implicit ref copying; use retain_ref instead to make things more
   // readable. We can't delete the ctor (or, I couldn't find a way not to)
   // because the templated parameter packing magic needs it.
-  ref(const ref& rhs) noexcept : px_(rhs.get()) {
-    if (px_) ref_type_retain<T>(px_);
-  }
+  ref(const ref& rhs) noexcept : ref_(rhs.ref_) { ref_type_retain<T>(get()); }
   ref& operator=(const ref&) noexcept = delete;
 
   // Move support to transfer ownership from one ref to another.
-  ref(ref&& rhs) noexcept : px_(rhs.release()) {}
+  ref(ref&& rhs) noexcept : ref_(rhs.ref_) { rhs.release(); }
   ref& operator=(ref&& rhs) noexcept {
-    if (px_ != rhs.px_) {
-      if (px_) ref_type_release<T>(px_);
-      px_ = rhs.release();
+    if (get() != rhs.get()) {
+      ref_type_release<T>(get());
+      ref_ = rhs.ref_;
+      rhs.release();
     }
     return *this;
   }
 
   // Move support from another compatible type.
   template <typename U>
-  ref(ref<U>&& rhs) noexcept : px_(rhs.release()) {}  // NOLINT
+  ref(ref<U>&& rhs) noexcept {
+    ref_.ptr = static_cast<T*>(rhs.release());
+    ref_.offsetof_counter = rhs.ref_.offsetof_counter;
+    ref_.type = rhs.ref_.type;
+  }
   template <typename U>
   ref& operator=(ref<U>&& rhs) noexcept {
-    if (px_ != rhs.get()) {
-      if (px_) ref_type_release<T>(px_);
-      px_ = rhs.release();
+    if (get() != rhs.get()) {
+      ref_type_release<T>(get());
+      ref_.ptr = static_cast<T*>(rhs.release());
     }
     return *this;
   }
@@ -147,10 +163,8 @@ class ref {
   // Resets the object to nullptr and decrements the reference count, possibly
   // deleting it.
   void reset() noexcept {
-    if (px_) {
-      ref_type_release<T>(px_);
-      px_ = nullptr;
-    }
+    ref_type_release<T>(get());
+    ref_.ptr = nullptr;
   }
 
   // Releases a pointer.
@@ -159,8 +173,8 @@ class ref {
   // Returns nullptr if the ref holds no value.
   // To re-wrap in a ref use either ref<T>(value) or assign().
   ABSL_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {
-    T* p = px_;
-    px_ = nullptr;
+    T* p = get();
+    ref_.ptr = nullptr;
     return p;
   }
 
@@ -169,33 +183,42 @@ class ref {
   // not be incremented.
   ABSL_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
     reset();
-    px_ = value;
+    ref_.ptr = value;
   }
 
   // Gets the pointer referenced by this instance.
   // operator* and operator-> will assert() if there is no current object.
-  constexpr T* get() const noexcept { return px_; }
-  constexpr T& operator*() const noexcept { return *px_; }
-  constexpr T* operator->() const noexcept { return px_; }
+  constexpr T* get() const noexcept { return reinterpret_cast<T*>(ref_.ptr); }
+  constexpr T& operator*() const noexcept { return *get(); }
+  constexpr T* operator->() const noexcept { return get(); }
 
   // Returns a pointer to the inner pointer storage.
   // This allows passing a pointer to the ref as an output argument to C-style
   // creation functions.
-  constexpr T** operator&() noexcept { return &px_; }  // NOLINT
+  constexpr T** operator&() noexcept {
+    return reinterpret_cast<T**>(&ref_.ptr);
+  }
 
   // Support boolean expression evaluation ala unique_ptr/shared_ptr:
   // https://en.cppreference.com/w/cpp/memory/shared_ptr/operator_bool
   constexpr operator unspecified_bool_type() const noexcept {
-    return px_ ? &this_type::px_ : nullptr;
+    return get() ? reinterpret_cast<unspecified_bool_type>(&this_type::ref_.ptr)
+                 : nullptr;
   }
   // Supports unary expression evaluation.
-  constexpr bool operator!() const noexcept { return !px_; }
+  constexpr bool operator!() const noexcept { return !get(); }
 
   // Swap support.
-  void swap(ref& rhs) { std::swap(px_, rhs.px_); }
+  void swap(ref& rhs) { std::swap(ref_.ptr, rhs.ref_.ptr); }
+
+  // Allows directly passing the ref to a C-API function for creation.
+  // Example:
+  //    iree::vm::ref<my_type_t> value;
+  //    my_type_create(..., &value);
+  constexpr operator iree_vm_ref_t*() const noexcept { return &ref_; }
 
  private:
-  T* px_ = nullptr;
+  mutable iree_vm_ref_t ref_;
 };
 
 // Adds a reference to the given ref and returns the same ref.
@@ -206,7 +229,7 @@ class ref {
 //  retain_ref(b);  // ref count + 1
 template <typename T>
 inline ref<T> retain_ref(const ref<T>& value) {
-  if (value) ref_type_retain<T>(value.get());
+  ref_type_retain<T>(value.get());
   return ref<T>(value.get());
 }
 
@@ -217,7 +240,7 @@ inline ref<T> retain_ref(const ref<T>& value) {
 //  ref<MyType> p = retain_ref(raw_ptr);  // ref count + 1
 template <typename T>
 inline ref<T> retain_ref(T* value) {
-  if (value) ref_type_retain<T>(value);
+  ref_type_retain<T>(value);
   return ref<T>(value);
 }
 

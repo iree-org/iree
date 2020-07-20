@@ -22,7 +22,6 @@
 #include "iree/base/api.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
-#include "iree/vm/variant_list.h"
 
 #ifdef __cplusplus
 extern "C" {

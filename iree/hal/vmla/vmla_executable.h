@@ -25,7 +25,6 @@
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
-#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace hal {

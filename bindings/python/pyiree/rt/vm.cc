@@ -197,21 +197,25 @@ std::string VmVariantList::DebugString() const {
   absl::StrAppend(&s, "<VmVariantList(", size(), "): [");
 
   for (iree_host_size_t i = 0, e = size(); i < e; ++i) {
-    iree_vm_variant_t* variant =
-        iree_vm_variant_list_get(mutable_this->raw_ptr(), i);
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    if (iree_status_is_ok(
+            iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant))) {
+      absl::StrAppend(&s, "Error");
+      continue;
+    }
     if (i > 0) absl::StrAppend(&s, ", ");
 
-    if (IREE_VM_VARIANT_IS_VALUE(variant)) {
-      absl::StrAppend(&s, variant->i32);
-    } else if (IREE_VM_VARIANT_IS_REF(variant)) {
+    if (iree_vm_variant_is_value(variant)) {
+      absl::StrAppend(&s, variant.i32);
+    } else if (iree_vm_variant_is_ref(variant)) {
       // Pretty print a subset of ABI impacting known types.
-      if (iree_hal_buffer_isa(&variant->ref)) {
-        auto* hal_buffer = iree_hal_buffer_deref(&variant->ref);
+      if (iree_hal_buffer_isa(&variant.ref)) {
+        auto* hal_buffer = iree_hal_buffer_deref(&variant.ref);
         assert(hal_buffer);
         absl::StrAppend(&s, "HalBuffer(",
                         iree_hal_buffer_byte_length(hal_buffer), ")");
-      } else if (iree_hal_buffer_view_isa(&variant->ref)) {
-        auto hal_bv = iree_hal_buffer_view_deref(&variant->ref);
+      } else if (iree_hal_buffer_view_isa(&variant.ref)) {
+        auto hal_bv = iree_hal_buffer_view_deref(&variant.ref);
         absl::StrAppend(&s, "HalBufferView(");
         absl::InlinedVector<int32_t, 5> shape(
             iree_hal_buffer_view_shape_rank(hal_bv));
@@ -221,7 +225,7 @@ std::string VmVariantList::DebugString() const {
                             iree_hal_buffer_view_element_type(hal_bv))),
                         ")");
       } else {
-        absl::StrAppend(&s, "Unknown(", variant->ref_type, ")");
+        absl::StrAppend(&s, "Unknown(", variant.type.ref_type, ")");
       }
     } else {
       absl::StrAppend(&s, "None");

@@ -20,10 +20,11 @@
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/invocation.h"
+#include "iree/vm/list.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
+#include "iree/vm/type_def.h"
 #include "iree/vm/value.h"
-#include "iree/vm/variant_list.h"
 
 #endif  // IREE_VM_API_H_

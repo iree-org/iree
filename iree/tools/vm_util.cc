@@ -28,8 +28,6 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/module.h"
-#include "iree/vm/variant_list.h"
 
 namespace iree {
 
@@ -82,28 +80,19 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
   return output_descs;
 }
 
-StatusOr<iree_vm_variant_list_t*> ParseToVariantListFromFile(
-    absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator, const std::string& filename) {
-  ASSIGN_OR_RETURN(auto s, file_io::GetFileContents(filename));
-  std::vector<std::string> input_strings =
-      absl::StrSplit(s, '\n', absl::SkipEmpty());
-  return ParseToVariantList(descs, allocator, input_strings);
-}
-
-StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
+StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
-    absl::Span<const std::string> input_strings) {
+    absl::Span<const absl::string_view> input_strings) {
   if (input_strings.size() != descs.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Signature mismatch; expected " << descs.size()
            << " buffer strings but received " << input_strings.size();
   }
-  iree_vm_variant_list_t* variant_list = nullptr;
+  vm::ref<iree_vm_list_t> variant_list;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_alloc(input_strings.size(), IREE_ALLOCATOR_SYSTEM,
-                                 &variant_list),
+      iree_vm_list_create(/*element_type=*/nullptr, input_strings.size(),
+                          IREE_ALLOCATOR_SYSTEM, &variant_list),
       IREE_LOC));
   for (int i = 0; i < input_strings.size(); ++i) {
     auto input_string = input_strings[i];
@@ -124,14 +113,14 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
                  << "Parsing '" << input_string
                  << "'. Has i32 descriptor but does not start with 'i32='";
         }
-        int32_t val;
-        if (!absl::SimpleAtoi(input_view, &val)) {
+        iree_vm_value_t val = iree_vm_value_make_i32(0);
+        if (!absl::SimpleAtoi(input_view, &val.i32)) {
           return InvalidArgumentErrorBuilder(IREE_LOC)
                  << "Converting '" << input_view << "' to i32 when parsing '"
                  << input_string << "'";
         }
-        iree_vm_variant_list_append_value(variant_list,
-                                          iree_vm_value_make_i32(val));
+        RETURN_IF_ERROR(FromApiStatus(
+            iree_vm_list_push_value(variant_list.get(), &val), IREE_LOC));
         break;
       }
       case RawSignatureParser::Type::kBuffer: {
@@ -144,9 +133,9 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
                  << "Parsing value '" << input_string << "'";
         }
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-        RETURN_IF_ERROR(FromApiStatus(iree_vm_variant_list_append_ref_move(
-                                          variant_list, &buffer_view_ref),
-                                      IREE_LOC));
+        RETURN_IF_ERROR(FromApiStatus(
+            iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref),
+            IREE_LOC));
         break;
       }
       default:
@@ -154,18 +143,36 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
                << "Unsupported signature type: " << desc_str;
     }
   }
-  return variant_list;
+  return variant_list.release();
+}
+
+StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator,
+    absl::Span<const std::string> input_strings) {
+  absl::InlinedVector<absl::string_view, 4> input_views(input_strings.size());
+  for (int i = 0; i < input_strings.size(); ++i) {
+    input_views[i] = input_strings[i];
+  }
+  return ParseToVariantList(descs, allocator, input_views);
+}
+
+StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename) {
+  ASSIGN_OR_RETURN(auto file_string, file_io::GetFileContents(filename));
+  absl::InlinedVector<absl::string_view, 4> input_views(
+      absl::StrSplit(file_string, '\n', absl::SkipEmpty()));
+  return ParseToVariantList(descs, allocator, input_views);
 }
 
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
-                        iree_vm_variant_list_t* variant_list,
-                        std::ostream* os) {
-  for (int i = 0; i < iree_vm_variant_list_size(variant_list); ++i) {
-    iree_vm_variant_t* variant = iree_vm_variant_list_get(variant_list, i);
-    if (!variant) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "variant " << i << "not present";
-    }
+                        iree_vm_list_t* variant_list, std::ostream* os) {
+  for (int i = 0; i < iree_vm_list_size(variant_list); ++i) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_vm_list_get_variant(variant_list, i, &variant), IREE_LOC))
+        << "variant " << i << "not present";
 
     const auto& desc = descs[i];
     std::string desc_str;
@@ -174,27 +181,27 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
 
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {
-        if (variant->value_type != IREE_VM_VALUE_TYPE_I32) {
+        if (variant.type.value_type != IREE_VM_VALUE_TYPE_I32) {
           return InvalidArgumentErrorBuilder(IREE_LOC)
                  << "variant " << i << " has value type "
-                 << static_cast<int>(variant->value_type)
+                 << static_cast<int>(variant.type.value_type)
                  << " but descriptor information " << desc_str;
         }
         if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
           return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unsupported signature scalar type: " << desc_str;
         }
-        *os << "i32=" << variant->i32 << "\n";
+        *os << "i32=" << variant.i32 << "\n";
         break;
       }
       case RawSignatureParser::Type::kBuffer: {
-        if (variant->value_type != IREE_VM_VALUE_TYPE_NONE) {
+        if (!iree_vm_type_def_is_ref(&variant.type)) {
           return InvalidArgumentErrorBuilder(IREE_LOC)
                  << "variant " << i << " has value type "
-                 << static_cast<int>(variant->value_type)
+                 << static_cast<int>(variant.type.value_type)
                  << " but descriptor information " << desc_str;
         }
-        auto* buffer_view = iree_hal_buffer_view_deref(&variant->ref);
+        auto* buffer_view = iree_hal_buffer_view_deref(&variant.ref);
         if (!buffer_view) {
           return InvalidArgumentErrorBuilder(IREE_LOC)
                  << "failed dereferencing variant " << i;
