@@ -256,6 +256,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
       Symbol,
+      VM_GlobalOpInterface,
     ])> {
   let arguments = (ins
     StrAttr:$sym_name,
@@ -291,9 +292,15 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
   ];
 
   let extraClassDeclaration = [{
+    StringRef getSymbolName() { return sym_name(); }
+    Type getStorageType() { return type(); }
+    bool isMutable() { return is_mutable(); }
     void makeMutable() { setAttr("is_mutable", UnitAttr::get(getContext())); }
+    Optional<StringRef> getInitializerAttr() { return initializer(); }
     void clearInitializer() { removeAttr("initializer"); }
+    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { removeAttr("initial_value"); }
+    Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
   }];
 
   let parser = [{ return parseGlobalOp(parser, &result); }];
@@ -1248,7 +1255,7 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
-    VM_EncIntAttr<"amount", type.bitwidth>,
+    VM_EncIntAttr<"amount", 8>,
     VM_EncResult<"result">,
   ];
 }
@@ -1272,12 +1279,12 @@ def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
 // Casting and type conversion/emulation
 //===----------------------------------------------------------------------===//
 
-def VM_TruncI8Op : VM_UnaryArithmeticOp<I32, "trunc.i8", VM_OPC_TruncI8> {
+def VM_TruncI32I8Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
   let summary = [{integer truncate to 8 bits}];
   let hasFolder = 1;
 }
 
-def VM_TruncI16Op : VM_UnaryArithmeticOp<I32, "trunc.i16", VM_OPC_TruncI16> {
+def VM_TruncI32I16Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i16", VM_OPC_TruncI32I16> {
   let summary = [{integer truncate to 16 bits}];
   let hasFolder = 1;
 }

@@ -65,13 +65,13 @@ class GlobalInitializationPass
     // could gather the ops, sort them (by some rule), and then build the
     // initialization function.
     for (auto &op : getOperation().getBlock().getOperations()) {
-      if (auto globalOp = dyn_cast<GlobalI32Op>(op)) {
-        if (failed(appendInitialization(globalOp, initBuilder))) {
+      if (auto globalOp = dyn_cast<GlobalRefOp>(op)) {
+        if (failed(appendRefInitialization(globalOp, initBuilder))) {
           globalOp.emitOpError() << "unable to be initialized";
           return signalPassFailure();
         }
-      } else if (auto globalOp = dyn_cast<GlobalRefOp>(op)) {
-        if (failed(appendInitialization(globalOp, initBuilder))) {
+      } else if (auto globalOp = dyn_cast<VMGlobalOp>(op)) {
+        if (failed(appendPrimitiveInitialization(globalOp, initBuilder))) {
           globalOp.emitOpError() << "unable to be initialized";
           return signalPassFailure();
         }
@@ -96,27 +96,72 @@ class GlobalInitializationPass
   }
 
  private:
-  LogicalResult appendInitialization(GlobalI32Op globalOp, OpBuilder &builder) {
-    if (globalOp.initial_value().hasValue()) {
-      auto constOp = builder.create<ConstI32Op>(globalOp.getLoc(),
-                                                globalOp.initial_valueAttr());
-      builder.create<GlobalStoreI32Op>(globalOp.getLoc(), constOp.getResult(),
-                                       globalOp.sym_name());
+  LogicalResult appendPrimitiveInitialization(VMGlobalOp globalOp,
+                                              OpBuilder &builder) {
+    auto initialValue =
+        globalOp.getInitialValueAttr().getValueOr<Attribute>({});
+    Value value = {};
+    if (initialValue) {
+      LogicalResult constResult = success();
+      std::tie(constResult, value) =
+          createConst(globalOp.getLoc(), initialValue, builder);
+      if (failed(constResult)) {
+        return globalOp.emitOpError()
+               << "unable to create initializer constant for global";
+      }
       globalOp.clearInitialValue();
-      globalOp.makeMutable();
-    } else if (globalOp.initializer().hasValue()) {
+    } else if (globalOp.getInitializerAttr().hasValue()) {
       auto callOp = builder.create<CallOp>(
-          globalOp.getLoc(), globalOp.initializerAttr(),
-          ArrayRef<Type>{globalOp.type()}, ArrayRef<Value>{});
-      builder.create<GlobalStoreI32Op>(globalOp.getLoc(), callOp.getResult(0),
-                                       globalOp.sym_name());
+          globalOp.getLoc(), globalOp.getInitializerAttr().getValue(),
+          ArrayRef<Type>{globalOp.getStorageType()}, ArrayRef<Value>{});
+      value = callOp.getResult(0);
       globalOp.clearInitializer();
-      globalOp.makeMutable();
     }
-    return success();
+    if (!value) {
+      // Globals are zero-initialized by default so we can just strip the
+      // initial value/initializer and avoid the work entirely.
+      return success();
+    }
+    globalOp.makeMutable();
+    return storePrimitiveGlobal(globalOp.getLoc(), globalOp.getSymbolName(),
+                                value, builder);
   }
 
-  LogicalResult appendInitialization(GlobalRefOp globalOp, OpBuilder &builder) {
+  // Returns {} if the constant is zero.
+  std::pair<LogicalResult, Value> createConst(Location loc, Attribute value,
+                                              OpBuilder &builder) {
+    if (auto intValue = value.dyn_cast<IntegerAttr>()) {
+      if (intValue.getValue().isNullValue()) {
+        // Globals are zero-initialized by default.
+        return {success(), {}};
+      }
+      switch (intValue.getValue().getBitWidth()) {
+        case 32:
+          return {success(), builder.createOrFold<ConstI32Op>(loc, intValue)};
+        default:
+          return {failure(), {}};
+      }
+    }
+    return {failure(), {}};
+  }
+
+  // Stores a value to a global; the global must be mutable.
+  LogicalResult storePrimitiveGlobal(Location loc, StringRef symName,
+                                     Value value, OpBuilder &builder) {
+    if (auto intType = value.getType().dyn_cast<IntegerType>()) {
+      switch (intType.getIntOrFloatBitWidth()) {
+        case 32:
+          builder.create<GlobalStoreI32Op>(loc, value, symName);
+          return success();
+        default:
+          return failure();
+      }
+    }
+    return failure();
+  }
+
+  LogicalResult appendRefInitialization(GlobalRefOp globalOp,
+                                        OpBuilder &builder) {
     if (globalOp.initializer().hasValue()) {
       auto callOp = builder.create<CallOp>(
           globalOp.getLoc(), globalOp.initializerAttr(),

@@ -56,7 +56,7 @@ struct ModuleCounts {
   int importFuncs = 0;
   int exportFuncs = 0;
   int internalFuncs = 0;
-  int globalBytes = 0;
+  size_t globalBytes = 0;
   int globalRefs = 0;
   int rodatas = 0;
   int rwdatas = 0;
@@ -85,12 +85,14 @@ static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
       ++counts.exportFuncs;
     } else if (isa<IREE::VM::ImportOp>(op)) {
       ++counts.importFuncs;
-    } else if (isa<IREE::VM::GlobalI32Op>(op)) {
-      counts.globalBytes += 4;
-    } else if (isa<IREE::VM::GlobalRefOp>(op)) {
-      ++counts.globalRefs;
     } else if (isa<IREE::VM::RodataOp>(op)) {
       ++counts.rodatas;
+    } else if (isa<IREE::VM::GlobalRefOp>(op)) {
+      ++counts.globalRefs;
+    } else if (auto globalOp = dyn_cast<VMGlobalOp>(op)) {
+      counts.globalBytes =
+          std::max(counts.globalBytes,
+                   globalOp.getOrdinal() + globalOp.getStorageSize());
     }
   }
   return counts;

@@ -49,6 +49,33 @@ class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
   }
 };
 
+template <typename ConcreteType>
+class ExtI64 : public OpTrait::TraitBase<ConcreteType, ExtI64> {
+ public:
+  static LogicalResult verifyTrait(Operation *op) {
+    // TODO(benvanik): verify i64 ext is supported.
+    return success();
+  }
+};
+
+template <typename ConcreteType>
+class ExtF32 : public OpTrait::TraitBase<ConcreteType, ExtF32> {
+ public:
+  static LogicalResult verifyTrait(Operation *op) {
+    // TODO(benvanik): verify f32 ext is supported.
+    return success();
+  }
+};
+
+template <typename ConcreteType>
+class ExtF64 : public OpTrait::TraitBase<ConcreteType, ExtF64> {
+ public:
+  static LogicalResult verifyTrait(Operation *op) {
+    // TODO(benvanik): verify f64 ext is supported.
+    return success();
+  }
+};
+
 }  // namespace VM
 }  // namespace IREE
 }  // namespace OpTrait

@@ -63,6 +63,11 @@ def VM_Dialect : Dialect {
 // and should only be done when breaking changes are acceptable. We could add a
 // versioning system here to automatically switch between different encodings
 // but we are a long way out to stabilizing this format :)
+//
+// Some opcodes require an extension prefix to indicate that runtime support
+// is optional. An op with the ExtI64 trait will require VM_OPC_ExtI64, for
+// example. Ops that bridge extension sets have a canonical form that may
+// require multiple prefix codes.
 
 class VM_OPC<int opcode, string name> : I32EnumAttrCase<name, opcode>;
 
@@ -123,8 +128,8 @@ def VM_OPC_ShrI32S               : VM_OPC<0x2E, "ShrI32S">;
 def VM_OPC_ShrI32U               : VM_OPC<0x2F, "ShrI32U">;
 
 // Casting and type conversion/emulation:
-def VM_OPC_TruncI8               : VM_OPC<0x31, "TruncI8">;
-def VM_OPC_TruncI16              : VM_OPC<0x32, "TruncI16">;
+def VM_OPC_TruncI32I8            : VM_OPC<0x31, "TruncI32I8">;
+def VM_OPC_TruncI32I16           : VM_OPC<0x32, "TruncI32I16">;
 def VM_OPC_ExtI8I32S             : VM_OPC<0x33, "ExtI8I32S">;
 def VM_OPC_ExtI16I32S            : VM_OPC<0x34, "ExtI16I32S">;
 
@@ -163,77 +168,10 @@ def VM_OPC_Print                 : VM_OPC<0x7D, "Print">;
 def VM_OPC_CondBreak             : VM_OPC<0x7E, "CondBreak">;
 def VM_OPC_Break                 : VM_OPC<0x7F, "Break">;
 
-def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
-    // Core VM opcodes (0x00-0x7F):
-    VM_OPC_GlobalLoadI32,
-    VM_OPC_GlobalStoreI32,
-    VM_OPC_GlobalLoadIndirectI32,
-    VM_OPC_GlobalStoreIndirectI32,
-    VM_OPC_GlobalLoadRef,
-    VM_OPC_GlobalStoreRef,
-    VM_OPC_GlobalLoadIndirectRef,
-    VM_OPC_GlobalStoreIndirectRef,
-    VM_OPC_ConstI32Zero,
-    VM_OPC_ConstI32,
-    VM_OPC_ConstRefZero,
-    VM_OPC_ConstRefRodata,
-    VM_OPC_ListAlloc,
-    VM_OPC_ListReserve,
-    VM_OPC_ListSize,
-    VM_OPC_ListResize,
-    VM_OPC_ListGetI32,
-    VM_OPC_ListSetI32,
-    VM_OPC_ListGetRef,
-    VM_OPC_ListSetRef,
-    VM_OPC_SelectI32,
-    VM_OPC_SelectRef,
-    VM_OPC_SwitchI32,
-    VM_OPC_SwitchRef,
-    VM_OPC_AddI32,
-    VM_OPC_SubI32,
-    VM_OPC_MulI32,
-    VM_OPC_DivI32S,
-    VM_OPC_DivI32U,
-    VM_OPC_RemI32S,
-    VM_OPC_RemI32U,
-    VM_OPC_NotI32,
-    VM_OPC_AndI32,
-    VM_OPC_OrI32,
-    VM_OPC_XorI32,
-    VM_OPC_ShlI32,
-    VM_OPC_ShrI32S,
-    VM_OPC_ShrI32U,
-    VM_OPC_CmpEQI32,
-    VM_OPC_CmpNEI32,
-    VM_OPC_CmpLTI32S,
-    VM_OPC_CmpLTI32U,
-    VM_OPC_CmpLTEI32S,
-    VM_OPC_CmpLTEI32U,
-    VM_OPC_CmpGTI32S,
-    VM_OPC_CmpGTI32U,
-    VM_OPC_CmpGTEI32S,
-    VM_OPC_CmpGTEI32U,
-    VM_OPC_CmpNZI32,
-    VM_OPC_CmpEQRef,
-    VM_OPC_CmpNERef,
-    VM_OPC_CmpNZRef,
-    VM_OPC_Branch,
-    VM_OPC_CondBranch,
-    VM_OPC_Call,
-    VM_OPC_CallVariadic,
-    VM_OPC_Return,
-    VM_OPC_Fail,
-    VM_OPC_Yield,
-    VM_OPC_Trace,
-    VM_OPC_Print,
-    VM_OPC_CondBreak,
-    VM_OPC_Break,
-
-    // Extension opcodes (0x80-0xFF):
-    // TODO(benvanik): SIMD dialect.
-  ]> {
-  let cppNamespace = "IREE::VM";
-}
+// Extension prefixes:
+def VM_OPC_ExtI64                : VM_OPC<0x80, "ExtI64">;
+def VM_OPC_ExtF32                : VM_OPC<0x81, "ExtF32">;
+def VM_OPC_ExtF64                : VM_OPC<0x82, "ExtF64">;
 
 //===----------------------------------------------------------------------===//
 // Declarative encoding framework
@@ -374,6 +312,40 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
   list<VM_EncEncodeExpr> encoding = ?;
 }
 
+def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
+  let description = [{
+    Interface used for VM ops that declare global values.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the storage type of this global such as i32.
+    }],
+    "Type", "getStorageType", (ins)>,
+    InterfaceMethod<[{
+      Returns the size in bytes of the global when stored in rwdata. Valid only
+      for globals using primitive storage.
+    }],
+    "size_t", "getStorageSize", (ins), [{
+      auto storageType = $_self.getStorageType();
+      assert(storageType.isIntOrFloat());
+      assert(storageType.getIntOrFloatBitWidth() % 8 == 0);
+      return storageType.getIntOrFloatBitWidth() / 8;
+    }]>,
+    InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
+    InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
+    InterfaceMethod<[{}], "Optional<StringRef>", "getInitializerAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<IntegerAttr>", "getOrdinalAttr", (ins)>,
+    InterfaceMethod<[{}], "int", "getOrdinal", (ins), [{
+      return $_self.getOrdinalAttr().getValue().template cast<IntegerAttr>().getInt();
+    }]>,
+    InterfaceMethod<[{}], "void", "makeMutable", (ins)>,
+    InterfaceMethod<[{}], "void", "clearInitializer", (ins)>,
+    InterfaceMethod<[{}], "void", "clearInitialValue", (ins)>,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // VM traits
 //===----------------------------------------------------------------------===//
@@ -389,6 +361,13 @@ def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;
 // Operations with this trait will disallow code motion across them to ensure
 // that execution order before and after the barrier op remains the same.
 def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
+
+// Operations with this trait require the VM i64 extension.
+def VM_ExtI64 : NativeOpTrait<"IREE::VM::ExtI64">;
+// Operations with this trait require the VM f32 extension.
+def VM_ExtF32 : NativeOpTrait<"IREE::VM::ExtF32">;
+// Operations with this trait require the VM f64 extension.
+def VM_ExtF64 : NativeOpTrait<"IREE::VM::ExtF64">;
 
 //===----------------------------------------------------------------------===//
 // ref<T> types
@@ -471,13 +450,16 @@ def VM_CondValue : I<32> {
 
 def VM_AnyType : AnyTypeOf<[
   I32,
+  I64,
+  F32,
+  F64,
   VM_CondValue,
   VM_AnyRef,
 ]>;
 
 def VM_PrimitiveType : AnyTypeOf<[
-  AnyIntOfWidths<[8, 16, 32]>,
-  FloatOfWidths<[16, 32]>,
+  AnyIntOfWidths<[8, 16, 32, 64]>,
+  FloatOfWidths<[16, 32, 64]>,
 ]>;
 
 class VM_ConstIntValueAttr<I type> : Attr<
