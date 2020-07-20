@@ -444,7 +444,7 @@ LogicalResult ConcatenateOpConversion::apply(
       rewriter.getI64IntegerAttr(1),                    // args_out
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, nloops, nonParallelLoops),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
@@ -559,7 +559,7 @@ LogicalResult PadOpConversion::apply(
       rewriter.getI64IntegerAttr(1),                        // args_out
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
@@ -715,7 +715,7 @@ LogicalResult TorchIndexSelectOpConversion::apply(
       rewriter.getI64IntegerAttr(1),  // args_out
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
@@ -1019,7 +1019,7 @@ LogicalResult ReduceOpConversion::apply(
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, nInputRank,
                                        reductionDims.size()),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   linalgOp.region().takeBody(reduceOp.body());
   {
@@ -1095,7 +1095,8 @@ struct LinalgOpOnTensorConversion
         op.getLoc(), ArrayRef<Type>(), opArgs, op.args_in(), op.args_out(),
         op.indexing_maps(), op.iterator_types(),
         /*doc=*/nullptr,
-        /*library_call=*/nullptr);
+        /*library_call=*/nullptr,
+        /*symbol_source=*/nullptr);
     // Move the region from the replaced op into the new op.
     unsigned numTensorOperands = op.getNumOperands();
     // indexed_generic op has arguments for each index. In the case of generic
