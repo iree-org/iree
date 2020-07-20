@@ -31,7 +31,7 @@ docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/cmake:prod \
+  gcr.io/iree-oss/cmake:latest \
   kokoro/gcp_ubuntu/cmake/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
