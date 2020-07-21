@@ -877,13 +877,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     *result = (dst_type)((src_type)operand);                      \
   });
 
-      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I8, uint64_t, uint8_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I16, uint64_t, uint16_t);
       DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I32, uint64_t, uint32_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI8I64S, int8_t, int64_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI8I64U, uint8_t, uint64_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI16I64S, int16_t, int64_t);
-      DISPATCH_OP_EXT_I64_CAST_I64(ExtI16I64U, uint16_t, uint64_t);
       DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64S, int32_t, int64_t);
       DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64U, uint32_t, uint64_t);
 

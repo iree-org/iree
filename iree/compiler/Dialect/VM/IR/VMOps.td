@@ -274,20 +274,45 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
       bool isMutable, Type type,
       Optional<StringRef> initializer, Optional<Attribute> initialValue,
       ArrayRef<NamedAttribute> attrs = {}
+    }], [{
+      result.addAttribute(SymbolTable::getSymbolAttrName(),
+                          builder.getStringAttr(name));
+      if (isMutable) {
+        result.addAttribute("is_mutable", builder.getUnitAttr());
+      }
+      if (initializer.hasValue()) {
+        result.addAttribute("initializer",
+                            builder.getSymbolRefAttr(initializer.getValue()));
+      } else if (initialValue.hasValue() &&
+                 initialValue.getValue().isa<IntegerAttr>()) {
+        result.addAttribute("initial_value", initialValue.getValue());
+      }
+      result.addAttribute("type", TypeAttr::get(type));
+      result.attributes.append(attrs.begin(), attrs.end());
     }]>,
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       bool isMutable, IREE::VM::FuncOp initializer,
       ArrayRef<NamedAttribute> attrs = {}
+    }], [{
+      build(builder, result, name, isMutable,
+            initializer.getType().getResult(0), initializer.getName(),
+            llvm::None, attrs);
     }]>,
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       bool isMutable, Type type, Attribute initialValue,
       ArrayRef<NamedAttribute> attrs = {}
+    }], [{
+      build(builder, result, name, isMutable, type, llvm::None, initialValue,
+            attrs);
     }]>,
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       bool isMutable, Type type, ArrayRef<NamedAttribute> attrs = {}
+    }], [{
+      build(builder, result, name, isMutable, type, llvm::None, llvm::None,
+            attrs);
     }]>,
   ];
 
@@ -310,6 +335,17 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
 
 def VM_GlobalI32Op : VM_GlobalOp<"global.i32", VM_ConstIntValueAttr<I32>> {
   let summary = [{32-bit integer global declaration}];
+  let description = [{
+    Defines a global value that is treated as a scalar literal at runtime.
+    Initialized to zero unless a custom initializer function is specified.
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def VM_GlobalI64Op : VM_GlobalOp<"global.i64", VM_ConstIntValueAttr<I64>,
+                                 [VM_ExtI64]> {
+  let summary = [{64-bit integer global declaration}];
   let description = [{
     Defines a global value that is treated as a scalar literal at runtime.
     Initialized to zero unless a custom initializer function is specified.
@@ -365,6 +401,20 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verifyGlobalLoadOp(*this); }];
 }
 
+class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                               list<OpTrait> traits = []> :
+    VM_GlobalLoadOp<type, mnemonic, traits> {
+  let description = [{
+    Loads the value of a global containing an primitive value.
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncGlobalAttr<"global">,
+    VM_EncResult<"value">,
+  ];
+}
+
 class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -379,7 +429,22 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verifyGlobalStoreOp(*this); }];
 }
 
-class VM_GlobalLoadIndirectOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+class VM_GlobalStorePrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                                list<OpTrait> traits = []> :
+    VM_GlobalStoreOp<type, mnemonic, traits> {
+  let description = [{
+    Stores a primitive value value to a global.
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncGlobalAttr<"global">,
+    VM_EncOperand<"value", 0>,
+  ];
+}
+
+class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
+                              list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -393,7 +458,23 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic, list<OpTrait> traits =
   let assemblyFormat = "$global attr-dict `:` type($global) `->` type($value)";
 }
 
-class VM_GlobalStoreIndirectOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+class VM_GlobalLoadIndirectPrimitiveOp<Type type, string mnemonic,
+                                       VM_OPC opcode,
+                                       list<OpTrait> traits = []> :
+    VM_GlobalLoadIndirectOp<type, mnemonic, traits> {
+  let description = [{
+    Loads the value of a global containing a primitive value.
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"global", 0>,
+    VM_EncResult<"value">,
+  ];
+}
+
+class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
+                               list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -405,63 +486,72 @@ class VM_GlobalStoreIndirectOp<Type type, string mnemonic, list<OpTrait> traits 
   let assemblyFormat = "$value `,` $global attr-dict `:` type($value) `->` type($global)";
 }
 
-def VM_GlobalLoadI32Op : VM_GlobalLoadOp<I32, "global.load.i32"> {
-  let summary = [{global 32-bit integer load operation}];
+class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
+                                        VM_OPC opcode,
+                                        list<OpTrait> traits = []> :
+    VM_GlobalStoreIndirectOp<type, mnemonic, traits> {
   let description = [{
-    Loads the value of a global containing a 32-bit integer.
+    Stores a primitive value to a global.
   }];
 
   let encoding = [
-    VM_EncOpcode<VM_OPC_GlobalLoadI32>,
-    VM_EncGlobalAttr<"global">,
-    VM_EncResult<"value">,
+    VM_EncOpcode<VM_OPC_GlobalStoreIndirectI64>,
+    VM_EncOperand<"global", 0>,
+    VM_EncOperand<"value", 1>,
   ];
+}
 
+def VM_GlobalLoadI32Op :
+    VM_GlobalLoadPrimitiveOp<I32, "global.load.i32", VM_OPC_GlobalLoadI32> {
+  let summary = [{global 32-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalStoreI32Op : VM_GlobalStoreOp<I32, "global.store.i32"> {
-  let summary = [{global 32-bit integer store operation}];
-  let description = [{
-    Stores the 32-bit integer value to a global.
-  }];
+def VM_GlobalLoadI64Op :
+    VM_GlobalLoadPrimitiveOp<I64, "global.load.i64", VM_OPC_GlobalLoadI64,
+                             [VM_ExtI64]> {
+  let summary = [{global 64-bit integer load operation}];
+  let hasCanonicalizer = 1;
+}
 
-  let encoding = [
-    VM_EncOpcode<VM_OPC_GlobalStoreI32>,
-    VM_EncGlobalAttr<"global">,
-    VM_EncOperand<"value", 0>,
-  ];
+def VM_GlobalStoreI32Op :
+    VM_GlobalStorePrimitiveOp<I32, "global.store.i32", VM_OPC_GlobalStoreI32> {
+  let summary = [{global 32-bit integer store operation}];
+}
+
+def VM_GlobalStoreI64Op :
+    VM_GlobalStorePrimitiveOp<I64, "global.store.i64", VM_OPC_GlobalStoreI64,
+                              [VM_ExtI64]> {
+  let summary = [{global 64-bit integer store operation}];
 }
 
 def VM_GlobalLoadIndirectI32Op :
-    VM_GlobalLoadIndirectOp<I32, "global.load.indirect.i32"> {
+    VM_GlobalLoadIndirectPrimitiveOp<I32, "global.load.indirect.i32",
+                                     VM_OPC_GlobalLoadIndirectI32> {
   let summary = [{global 32-bit integer load operation}];
-  let description = [{
-    Loads the value of a global containing a 32-bit integer.
-  }];
+  let hasCanonicalizer = 1;
+}
 
-  let encoding = [
-    VM_EncOpcode<VM_OPC_GlobalLoadIndirectI32>,
-    VM_EncOperand<"global", 0>,
-    VM_EncResult<"value">,
-  ];
-
+def VM_GlobalLoadIndirectI64Op :
+    VM_GlobalLoadIndirectPrimitiveOp<I64, "global.load.indirect.i64",
+                                     VM_OPC_GlobalLoadIndirectI64,
+                                     [VM_ExtI64]> {
+  let summary = [{global 64-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalStoreIndirectI32Op :
-    VM_GlobalStoreIndirectOp<I32, "global.store.indirect.i32"> {
+    VM_GlobalStoreIndirectPrimitiveOp<I32, "global.store.indirect.i32",
+                                      VM_OPC_GlobalStoreIndirectI32> {
   let summary = [{global 32-bit integer store operation}];
-  let description = [{
-    Stores the 32-bit integer value to a global.
-  }];
+  let hasCanonicalizer = 1;
+}
 
-  let encoding = [
-    VM_EncOpcode<VM_OPC_GlobalStoreIndirectI32>,
-    VM_EncOperand<"global", 0>,
-    VM_EncOperand<"value", 1>,
-  ];
-
+def VM_GlobalStoreIndirectI64Op :
+    VM_GlobalStoreIndirectPrimitiveOp<I64, "global.store.indirect.i64",
+                                      VM_OPC_GlobalStoreIndirectI64,
+                                      [VM_ExtI64]> {
+  let summary = [{global 64-bit integer store operation}];
   let hasCanonicalizer = 1;
 }
 
@@ -577,6 +667,9 @@ class VM_ConstIntegerOp<I type, string mnemonic, VM_OPC opcode, string ctype,
     VM_EncIntAttr<"value", type.bitwidth>,
     VM_EncResult<"result">,
   ];
+
+  let parser = [{ return parseConstIntegerOp<$cppClass>(parser, &result); }];
+  let printer = [{ return printConstIntegerOp<$cppClass>(p, *this); }];
 }
 
 def VM_ConstI32Op :
@@ -585,23 +678,28 @@ def VM_ConstI32Op :
   let hasFolder = 1;
 }
 
-def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
-    ConstantLike,
-    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-  ]> {
-  let summary = [{32-bit integer constant zero operation}];
+def VM_ConstI64Op :
+    VM_ConstIntegerOp<I64, "const.i64", VM_OPC_ConstI64, "int64_t",
+                      [VM_ExtI64]> {
+  let summary = [{64-bit integer constant operation}];
+  let hasFolder = 1;
+}
+
+class VM_ConstIntegerZeroOp<I type, string mnemonic, VM_OPC opcode,
+                            string ctype, list<OpTrait> traits = []> :
+    VM_ConstOp<mnemonic, ctype, traits> {
   let description = [{
-    Defines a constant zero 32-bit integer.
+    Defines a constant zero integer.
   }];
 
   let results = (outs
-    I32:$result
+    type:$result
   );
 
   let assemblyFormat = "`:` type($result) attr-dict";
 
   let encoding = [
-    VM_EncOpcode<VM_OPC_ConstI32Zero>,
+    VM_EncOpcode<opcode>,
     VM_EncResult<"result">,
   ];
 
@@ -611,7 +709,19 @@ def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
       OpBuilder &builder, OperationState &result
     }]>,
   ];
+}
 
+def VM_ConstI32ZeroOp :
+    VM_ConstIntegerZeroOp<I32, "const.i32.zero", VM_OPC_ConstI32Zero,
+                          "int32_t"> {
+  let summary = [{32-bit integer constant zero operation}];
+  let hasFolder = 1;
+}
+
+def VM_ConstI64ZeroOp :
+    VM_ConstIntegerZeroOp<I64, "const.i64.zero", VM_OPC_ConstI64Zero,
+                          "int64_t", [VM_ExtI64]> {
+  let summary = [{64-bit integer constant zero operation}];
   let hasFolder = 1;
 }
 
@@ -881,10 +991,16 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 def VM_ListGetI32Op :
-    VM_ListGetPrimitiveOp<I32, "list.get.i32", VM_OPC_ListGetI32> {}
+    VM_ListGetPrimitiveOp<I32, "list.get.i32", VM_OPC_ListGetI32>;
+
+def VM_ListGetI64Op :
+    VM_ListGetPrimitiveOp<I64, "list.get.i64", VM_OPC_ListGetI64, [VM_ExtI64]>;
 
 def VM_ListSetI32Op :
-    VM_ListSetPrimitiveOp<I32, "list.set.i32", VM_OPC_ListSetI32> {}
+    VM_ListSetPrimitiveOp<I32, "list.set.i32", VM_OPC_ListSetI32>;
+
+def VM_ListSetI64Op :
+    VM_ListSetPrimitiveOp<I64, "list.set.i64", VM_OPC_ListSetI64, [VM_ExtI64]>;
 
 def VM_ListGetRefOp :
     VM_PureOp<"list.get.ref", [
@@ -992,6 +1108,12 @@ def VM_SelectI32Op : VM_SelectPrimitiveOp<I32, "select.i32", VM_OPC_SelectI32> {
   let hasFolder = 1;
 }
 
+def VM_SelectI64Op : VM_SelectPrimitiveOp<I64, "select.i64", VM_OPC_SelectI64,
+                                          [VM_ExtI64]> {
+  let summary = [{integer select operation}];
+  let hasFolder = 1;
+}
+
 def VM_SelectRefOp : VM_PureOp<"select.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     AllTypesMatch<["true_value", "false_value", "result"]>,
@@ -1026,7 +1148,7 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
   let hasFolder = 1;
 }
 
-class VM_SwitchPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+class VM_SwitchPrimitiveOp<I type, string mnemonic, VM_OPC opcode,
                            list<OpTrait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -1045,7 +1167,7 @@ class VM_SwitchPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     I32:$index,
-    I32:$default_value,
+    type:$default_value,
     Variadic<type>:$values
   );
   let results = (outs
@@ -1059,13 +1181,19 @@ class VM_SwitchPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncIntAttr<"default_value", 32>,
+    VM_EncIntAttr<"default_value", type.bitwidth>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
 }
 
 def VM_SwitchI32Op : VM_SwitchPrimitiveOp<I32, "switch.i32", VM_OPC_SwitchI32> {
+  let summary = [{integer switch operation}];
+  let hasFolder = 1;
+}
+
+def VM_SwitchI64Op : VM_SwitchPrimitiveOp<I64, "switch.i64", VM_OPC_SwitchI64,
+                                          [VM_ExtI64]> {
   let summary = [{integer switch operation}];
   let hasFolder = 1;
 }
@@ -1168,8 +1296,21 @@ def VM_AddI32Op :
   let hasFolder = 1;
 }
 
+def VM_AddI64Op :
+    VM_BinaryArithmeticOp<I64, "add.i64", VM_OPC_AddI64,
+                          [VM_ExtI64, Commutative]> {
+  let summary = [{integer add operation}];
+  let hasFolder = 1;
+}
+
 def VM_SubI32Op :
     VM_BinaryArithmeticOp<I32, "sub.i32", VM_OPC_SubI32> {
+  let summary = [{integer subtract operation}];
+  let hasFolder = 1;
+}
+
+def VM_SubI64Op :
+    VM_BinaryArithmeticOp<I64, "sub.i64", VM_OPC_SubI64, [VM_ExtI64]> {
   let summary = [{integer subtract operation}];
   let hasFolder = 1;
 }
@@ -1180,8 +1321,21 @@ def VM_MulI32Op :
   let hasFolder = 1;
 }
 
+def VM_MulI64Op :
+    VM_BinaryArithmeticOp<I64, "mul.i64", VM_OPC_MulI64,
+                          [VM_ExtI64, Commutative]> {
+  let summary = [{integer multiplication operation}];
+  let hasFolder = 1;
+}
+
 def VM_DivI32SOp :
     VM_BinaryArithmeticOp<I32, "div.i32.s", VM_OPC_DivI32S> {
+  let summary = [{signed integer division operation}];
+  let hasFolder = 1;
+}
+
+def VM_DivI64SOp :
+    VM_BinaryArithmeticOp<I64, "div.i64.s", VM_OPC_DivI64S, [VM_ExtI64]> {
   let summary = [{signed integer division operation}];
   let hasFolder = 1;
 }
@@ -1192,8 +1346,20 @@ def VM_DivI32UOp :
   let hasFolder = 1;
 }
 
+def VM_DivI64UOp :
+    VM_BinaryArithmeticOp<I64, "div.i64.u", VM_OPC_DivI64U, [VM_ExtI64]> {
+  let summary = [{unsigned integer division operation}];
+  let hasFolder = 1;
+}
+
 def VM_RemI32SOp :
     VM_BinaryArithmeticOp<I32, "rem.i32.s", VM_OPC_RemI32S> {
+  let summary = [{signed integer division remainder operation}];
+  let hasFolder = 1;
+}
+
+def VM_RemI64SOp :
+    VM_BinaryArithmeticOp<I64, "rem.i64.s", VM_OPC_RemI64S, [VM_ExtI64]> {
   let summary = [{signed integer division remainder operation}];
   let hasFolder = 1;
 }
@@ -1204,8 +1370,20 @@ def VM_RemI32UOp :
   let hasFolder = 1;
 }
 
+def VM_RemI64UOp :
+    VM_BinaryArithmeticOp<I64, "rem.i64.u", VM_OPC_RemI64U, [VM_ExtI64]> {
+  let summary = [{unsigned integer division remainder operation}];
+  let hasFolder = 1;
+}
+
 def VM_NotI32Op :
     VM_UnaryArithmeticOp<I32, "not.i32", VM_OPC_NotI32> {
+  let summary = [{integer binary not operation}];
+  let hasFolder = 1;
+}
+
+def VM_NotI64Op :
+    VM_UnaryArithmeticOp<I64, "not.i64", VM_OPC_NotI64, [VM_ExtI64]> {
   let summary = [{integer binary not operation}];
   let hasFolder = 1;
 }
@@ -1216,14 +1394,35 @@ def VM_AndI32Op :
   let hasFolder = 1;
 }
 
+def VM_AndI64Op :
+    VM_BinaryArithmeticOp<I64, "and.i64", VM_OPC_AndI64,
+                          [VM_ExtI64, Commutative]> {
+  let summary = [{integer binary and operation}];
+  let hasFolder = 1;
+}
+
 def VM_OrI32Op :
     VM_BinaryArithmeticOp<I32, "or.i32", VM_OPC_OrI32, [Commutative]> {
   let summary = [{integer binary or operation}];
   let hasFolder = 1;
 }
 
+def VM_OrI64Op :
+    VM_BinaryArithmeticOp<I64, "or.i64", VM_OPC_OrI64,
+                          [VM_ExtI64, Commutative]> {
+  let summary = [{integer binary or operation}];
+  let hasFolder = 1;
+}
+
 def VM_XorI32Op :
     VM_BinaryArithmeticOp<I32, "xor.i32", VM_OPC_XorI32, [Commutative]> {
+  let summary = [{integer binary exclusive-or operation}];
+  let hasFolder = 1;
+}
+
+def VM_XorI64Op :
+    VM_BinaryArithmeticOp<I64, "xor.i64", VM_OPC_XorI64,
+                          [VM_ExtI64, Commutative]> {
   let summary = [{integer binary exclusive-or operation}];
   let hasFolder = 1;
 }
@@ -1265,7 +1464,19 @@ def VM_ShlI32Op : VM_ShiftArithmeticOp<I32, "shl.i32", VM_OPC_ShlI32> {
   let hasFolder = 1;
 }
 
+def VM_ShlI64Op : VM_ShiftArithmeticOp<I64, "shl.i64", VM_OPC_ShlI64,
+                                       [VM_ExtI64]> {
+  let summary = [{integer shift left operation}];
+  let hasFolder = 1;
+}
+
 def VM_ShrI32SOp : VM_ShiftArithmeticOp<I32, "shr.i32.s", VM_OPC_ShrI32S> {
+  let summary = [{signed integer (arithmetic) shift right operation}];
+  let hasFolder = 1;
+}
+
+def VM_ShrI64SOp : VM_ShiftArithmeticOp<I64, "shr.i64.s", VM_OPC_ShrI64S,
+                                        [VM_ExtI64]> {
   let summary = [{signed integer (arithmetic) shift right operation}];
   let hasFolder = 1;
 }
@@ -1275,37 +1486,140 @@ def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
   let hasFolder = 1;
 }
 
+def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U,
+                                        [VM_ExtI64]> {
+  let summary = [{unsigned integer (logical) shift right operation}];
+  let hasFolder = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Casting and type conversion/emulation
 //===----------------------------------------------------------------------===//
 
-def VM_TruncI32I8Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
+class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
+                      VM_OPC opcode, list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let arguments = (ins
+    src_type:$operand
+  );
+  let results = (outs
+    dst_type:$result
+  );
+
+  let assemblyFormat = "$operand attr-dict `:` type($operand) `->` type($result)";
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"operand", 0>,
+    VM_EncResult<"result">,
+  ];
+}
+
+class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
+                            list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, traits> {
+  let arguments = (ins
+    src_type:$operand
+  );
+  let results = (outs
+    dst_type:$result
+  );
+
+  let assemblyFormat = "$operand attr-dict `:` type($operand) `->` type($result)";
+
+  let hasCanonicalizer = 1;
+}
+
+def VM_TruncI32I8Op :
+    VM_ConversionOp<I32, I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
   let summary = [{integer truncate to 8 bits}];
   let hasFolder = 1;
 }
 
-def VM_TruncI32I16Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i16", VM_OPC_TruncI32I16> {
+def VM_TruncI32I16Op :
+    VM_ConversionOp<I32, I32, "trunc.i32.i16", VM_OPC_TruncI32I16> {
   let summary = [{integer truncate to 16 bits}];
   let hasFolder = 1;
 }
 
-def VM_ExtI8I32SOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.s", VM_OPC_ExtI8I32S> {
+def VM_TruncI64I8Op :
+    VM_ConversionPseudoOp<I64, I32, "trunc.i64.i8", [VM_ExtI64]> {
+  let summary = [{integer truncate to 8 bits}];
+  let hasFolder = 1;
+}
+
+def VM_TruncI64I16Op :
+    VM_ConversionPseudoOp<I64, I32, "trunc.i64.i16", [VM_ExtI64]> {
+  let summary = [{integer truncate to 16 bits}];
+  let hasFolder = 1;
+}
+
+def VM_TruncI64I32Op :
+    VM_ConversionOp<I64, I32, "trunc.i64.i32", VM_OPC_TruncI64I32,
+                    [VM_ExtI64]> {
+  let summary = [{integer truncate to 32 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI8I32SOp :
+    VM_ConversionOp<I32, I32, "ext.i8.i32.s", VM_OPC_ExtI8I32S> {
   let summary = [{integer sign extend 8 bits to 32 bits}];
   let hasFolder = 1;
 }
 
-def VM_ExtI8I32UOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.u", VM_OPC_ExtI8I32U> {
+def VM_ExtI8I32UOp :
+    VM_ConversionOp<I32, I32, "ext.i8.i32.u", VM_OPC_ExtI8I32U> {
   let summary = [{integer zero extend 8 bits to 32 bits}];
   let hasFolder = 1;
 }
 
-def VM_ExtI16I32SOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.s", VM_OPC_ExtI16I32S> {
+def VM_ExtI16I32SOp :
+    VM_ConversionOp<I32, I32, "ext.i16.i32.s", VM_OPC_ExtI16I32S> {
   let summary = [{integer sign extend 16 bits to 32 bits}];
   let hasFolder = 1;
 }
 
-def VM_ExtI16I32UOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.u", VM_OPC_ExtI16I32U> {
+def VM_ExtI16I32UOp :
+    VM_ConversionOp<I32, I32, "ext.i16.i32.u", VM_OPC_ExtI16I32U> {
   let summary = [{integer zero extend 16 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI8I64SOp :
+    VM_ConversionPseudoOp<I32, I64, "ext.i8.i64.s", [VM_ExtI64]> {
+  let summary = [{integer sign extend 8 bits to 64 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI8I64UOp :
+    VM_ConversionPseudoOp<I32, I64, "ext.i8.i64.u", [VM_ExtI64]> {
+  let summary = [{integer zero extend 8 bits to 64 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI16I64SOp :
+    VM_ConversionPseudoOp<I32, I64, "ext.i16.i64.s", [VM_ExtI64]> {
+  let summary = [{integer sign extend 16 bits to 64 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI16I64UOp :
+    VM_ConversionPseudoOp<I32, I64, "ext.i16.i64.u", [VM_ExtI64]> {
+  let summary = [{integer zero extend 16 bits to 64 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI32I64SOp :
+    VM_ConversionOp<I32, I64, "ext.i32.i64.s", VM_OPC_ExtI32I64S, [VM_ExtI64]> {
+  let summary = [{integer sign extend 32 bits to 64 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI32I64UOp :
+    VM_ConversionOp<I32, I64, "ext.i32.i64.u", VM_OPC_ExtI32I64U, [VM_ExtI64]> {
+  let summary = [{integer zero extend 32 bits to 64 bits}];
   let hasFolder = 1;
 }
 
@@ -1400,8 +1714,24 @@ def VM_CmpEQI32Op :
   let hasFolder = 1;
 }
 
+def VM_CmpEQI64Op :
+    VM_BinaryComparisonOp<I64, "cmp.eq.i64", VM_OPC_CmpEQI64,
+                          [VM_ExtI64, Commutative]> {
+  let summary = [{integer equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpNEI32Op :
     VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32, [Commutative]> {
+  let summary = [{integer inequality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpNEI64Op :
+    VM_BinaryComparisonOp<I64, "cmp.ne.i64", VM_OPC_CmpNEI64,
+                          [VM_ExtI64, Commutative]> {
   let summary = [{integer inequality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1414,8 +1744,22 @@ def VM_CmpLTI32SOp :
   let hasFolder = 1;
 }
 
+def VM_CmpLTI64SOp :
+    VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S, [VM_ExtI64]> {
+  let summary = [{signed integer less-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpLTI32UOp :
     VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U> {
+  let summary = [{unsigned integer less-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTI64UOp :
+    VM_BinaryComparisonOp<I64, "cmp.lt.i64.u", VM_OPC_CmpLTI64U, [VM_ExtI64]> {
   let summary = [{unsigned integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1428,8 +1772,22 @@ def VM_CmpLTEI32SOp :
   let hasFolder = 1;
 }
 
+def VM_CmpLTEI64SOp :
+    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.s", [VM_ExtI64]> {
+  let summary = [{signed integer less-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpLTEI32UOp :
     VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.u"> {
+  let summary = [{unsigned integer less-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpLTEI64UOp :
+    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.u", [VM_ExtI64]> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1442,8 +1800,22 @@ def VM_CmpGTI32SOp :
   let hasFolder = 1;
 }
 
+def VM_CmpGTI64SOp :
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.s", [VM_ExtI64]> {
+  let summary = [{signed integer greater-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpGTI32UOp :
     VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.u"> {
+  let summary = [{unsigned integer greater-than comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpGTI64UOp :
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u", [VM_ExtI64]> {
   let summary = [{unsigned integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1456,6 +1828,13 @@ def VM_CmpGTEI32SOp :
   let hasFolder = 1;
 }
 
+def VM_CmpGTEI64SOp :
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.s", [VM_ExtI64]> {
+  let summary = [{signed integer greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpGTEI32UOp :
     VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.u"> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
@@ -1463,8 +1842,24 @@ def VM_CmpGTEI32UOp :
   let hasFolder = 1;
 }
 
+def VM_CmpGTEI64UOp :
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.u", [VM_ExtI64]> {
+  let summary = [{unsigned integer greater-than-or-equal comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpNZI32Op :
     VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32> {
+  let summary = [{integer non-zero comparison operation}];
+  let description = [{
+    Compares the given integer operand for a non-zero value.
+  }];
+  let hasFolder = 1;
+}
+
+def VM_CmpNZI64Op :
+    VM_UnaryComparisonOp<I64, "cmp.nz.i64", VM_OPC_CmpNZI64, [VM_ExtI64]> {
   let summary = [{integer non-zero comparison operation}];
   let description = [{
     Compares the given integer operand for a non-zero value.

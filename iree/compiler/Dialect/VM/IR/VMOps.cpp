@@ -421,88 +421,6 @@ static LogicalResult verifyGlobalOp(Operation *op) {
   return success();
 }
 
-void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable, Type type,
-                        Optional<StringRef> initializer,
-                        Optional<Attribute> initialValue,
-                        ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder.getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder.getUnitAttr());
-  }
-  if (initializer.hasValue()) {
-    result.addAttribute("initializer",
-                        builder.getSymbolRefAttr(initializer.getValue()));
-  } else if (initialValue.hasValue()) {
-    result.addAttribute("initial_value", initialValue.getValue());
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
-}
-
-void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable,
-                        IREE::VM::FuncOp initializer,
-                        ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, initializer.getType().getResult(0),
-        initializer.getName(), llvm::None, attrs);
-}
-
-void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable, Type type,
-                        Attribute initialValue,
-                        ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, initialValue,
-        attrs);
-}
-
-void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable, Type type,
-                        ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
-}
-
-void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable, Type type,
-                        Optional<StringRef> initializer,
-                        Optional<Attribute> initialValue,
-                        ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder.getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder.getUnitAttr());
-  }
-  if (initializer.hasValue()) {
-    result.addAttribute("initializer",
-                        builder.getSymbolRefAttr(initializer.getValue()));
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
-}
-
-void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable,
-                        IREE::VM::FuncOp initializer,
-                        ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, initializer.getType().getResult(0),
-        initializer.getName(), llvm::None, attrs);
-}
-
-void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable, Type type,
-                        Attribute initialValue,
-                        ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, initialValue,
-        attrs);
-}
-
-void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
-                        StringRef name, bool isMutable, Type type,
-                        ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
-}
-
 static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
   auto *globalOp = op.getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
   if (!globalOp) {
@@ -553,19 +471,20 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
 // Constants
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseConstI32Op(OpAsmParser &parser,
-                                   OperationState *result) {
+template <typename T>
+static ParseResult parseConstIntegerOp(OpAsmParser &parser,
+                                       OperationState *result) {
   Attribute valueAttr;
   NamedAttrList dummyAttrs;
   if (failed(parser.parseAttribute(valueAttr, "value", dummyAttrs))) {
     return parser.emitError(parser.getCurrentLocation())
            << "Invalid attribute encoding";
   }
-  if (!ConstI32Op::isBuildableWith(valueAttr, valueAttr.getType())) {
+  if (!T::isBuildableWith(valueAttr, valueAttr.getType())) {
     return parser.emitError(parser.getCurrentLocation())
            << "Incompatible type or invalid type value formatting";
   }
-  valueAttr = ConstI32Op::convertConstValue(valueAttr);
+  valueAttr = T::convertConstValue(valueAttr);
   result->addAttribute("value", valueAttr);
   if (failed(parser.parseOptionalAttrDict(result->attributes))) {
     return parser.emitError(parser.getCurrentLocation())
@@ -574,14 +493,15 @@ static ParseResult parseConstI32Op(OpAsmParser &parser,
   return parser.addTypeToList(valueAttr.getType(), result->types);
 }
 
-static void printConstI32Op(OpAsmPrinter &p, ConstI32Op &op) {
+template <typename T>
+static void printConstIntegerOp(OpAsmPrinter &p, T &op) {
   p << op.getOperationName() << ' ';
   p.printAttribute(op.value());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
 }
 
-// static
-bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
+template <int SZ>
+static bool isConstIntegerBuildableWith(Attribute value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
   if (value.isa<FlatSymbolRefAttr>()) {
     return false;
@@ -598,22 +518,22 @@ bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
                                            .isSignlessInteger());
 }
 
-// static
-Attribute ConstI32Op::convertConstValue(Attribute value) {
-  assert(isBuildableWith(value, value.getType()));
+template <int SZ>
+static Attribute convertConstIntegerValue(Attribute value) {
+  assert(isConstIntegerBuildableWith<SZ>(value, value.getType()));
   Builder builder(value.getContext());
+  auto integerType = builder.getIntegerType(SZ);
   int32_t dims = 1;
   if (value.isa<UnitAttr>()) {
-    return builder.getI32IntegerAttr(1);
+    return IntegerAttr::get(integerType, APInt(SZ, 1));
   } else if (auto v = value.dyn_cast<BoolAttr>()) {
-    return builder.getI32IntegerAttr(v.getValue() ? 1 : 0);
+    return IntegerAttr::get(integerType, APInt(SZ, v.getValue() ? 1 : 0));
   } else if (auto v = value.dyn_cast<IntegerAttr>()) {
-    return builder.getI32IntegerAttr(
-        static_cast<int32_t>(v.getValue().getLimitedValue()));
+    return IntegerAttr::get(integerType,
+                            APInt(SZ, v.getValue().getLimitedValue()));
   } else if (auto v = value.dyn_cast<ElementsAttr>()) {
     dims = v.getNumElements();
-    ShapedType adjustedType =
-        VectorType::get({dims}, builder.getIntegerType(32));
+    ShapedType adjustedType = VectorType::get({dims}, integerType);
     if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
       return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
     } else {
@@ -623,6 +543,16 @@ Attribute ConstI32Op::convertConstValue(Attribute value) {
   }
   llvm_unreachable("unexpected attribute type");
   return Attribute();
+}
+
+// static
+bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
+  return isConstIntegerBuildableWith<32>(value, type);
+}
+
+// static
+Attribute ConstI32Op::convertConstValue(Attribute value) {
+  return convertConstIntegerValue<32>(value);
 }
 
 void ConstI32Op::build(OpBuilder &builder, OperationState &result,
@@ -637,8 +567,34 @@ void ConstI32Op::build(OpBuilder &builder, OperationState &result,
   return build(builder, result, builder.getI32IntegerAttr(value));
 }
 
+// static
+bool ConstI64Op::isBuildableWith(Attribute value, Type type) {
+  return isConstIntegerBuildableWith<64>(value, type);
+}
+
+// static
+Attribute ConstI64Op::convertConstValue(Attribute value) {
+  return convertConstIntegerValue<64>(value);
+}
+
+void ConstI64Op::build(OpBuilder &builder, OperationState &result,
+                       Attribute value) {
+  Attribute newValue = convertConstValue(value);
+  result.addAttribute("value", newValue);
+  result.addTypes(newValue.getType());
+}
+
+void ConstI64Op::build(OpBuilder &builder, OperationState &result,
+                       int64_t value) {
+  return build(builder, result, builder.getI64IntegerAttr(value));
+}
+
 void ConstI32ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getIntegerType(32));
+}
+
+void ConstI64ZeroOp::build(OpBuilder &builder, OperationState &result) {
+  result.addTypes(builder.getIntegerType(64));
 }
 
 void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
