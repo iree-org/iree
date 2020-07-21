@@ -12,63 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <assert.h>
 #include <string.h>
 
-#include "iree/base/alignment.h"
-#include "iree/base/target_platform.h"
-#include "iree/vm/bytecode_module_impl.h"
-#include "iree/vm/bytecode_op_table.h"
+#include "iree/vm/bytecode_dispatch_util.h"
 #include "iree/vm/list.h"
-
-// Enable to get some verbose logging; better than nothing until we have some
-// better tooling.
-#define IREE_DISPATCH_LOGGING 0
-
-#if IREE_DISPATCH_LOGGING
-#include <stdio.h>
-#define IREE_DISPATCH_LOG_OPCODE(op_name) \
-  fprintf(stderr, "DISPATCH %d %s\n", (int)pc, op_name)
-#define IREE_DISPATCH_LOG_CALL(target_function) \
-  fprintf(stderr, "CALL -> %s\n", iree_vm_function_name(&target_function).data);
-#else
-#define IREE_DISPATCH_LOG_OPCODE(...)
-#define IREE_DISPATCH_LOG_CALL(...)
-#endif  // IREE_DISPATCH_LOGGING
-
-#if defined(IREE_COMPILER_MSVC) && !defined(IREE_COMPILER_CLANG)
-#define IREE_DISPATCH_MODE_SWITCH 1
-#else
-#define IREE_DISPATCH_MODE_COMPUTED_GOTO 1
-#endif  // MSVC
-
-#ifndef NDEBUG
-#define VMCHECK(expr) assert(expr)
-#else
-#define VMCHECK(expr)
-#endif  // NDEBUG
-
-// Interleaved src-dst register sets for branch register remapping.
-// This structure is an overlay for the bytecode that is serialized in a
-// matching format.
-typedef struct {
-  uint16_t size;
-  struct pair {
-    uint16_t src_reg;
-    uint16_t dst_reg;
-  } pairs[];
-} iree_vm_register_remap_list_t;
-static_assert(iree_alignof(iree_vm_register_remap_list_t) == 2,
-              "Expecting byte alignment (to avoid padding)");
-static_assert(offsetof(iree_vm_register_remap_list_t, pairs) == 2,
-              "Expect no padding in the struct");
-
-// Maps a type ID to a type def with clamping for out of bounds values.
-static inline const iree_vm_type_def_t* iree_vm_map_type(
-    iree_vm_bytecode_module_t* module, int32_t type_id) {
-  type_id = type_id >= module->type_count ? 0 : type_id;
-  return &module->type_table[type_id];
-}
 
 // Remaps registers from a source set to a destination set within the same stack
 // frame. This is a way to perform a conditional multi-mov sequence instead of
@@ -110,140 +57,14 @@ static void iree_vm_bytecode_dispatch_discard_registers(
   }
 }
 
-static const int kRegSize = sizeof(uint16_t);
-
-// Bytecode data access macros for reading values of a given type from a byte
-// offset within the current function.
-#if defined(IREE_IS_LITTLE_ENDIAN)
-#define OP_I8(i) bytecode_data[pc + i]
-#define OP_I16(i) *((uint16_t*)&bytecode_data[pc + i])
-#define OP_I32(i) *((uint32_t*)&bytecode_data[pc + i])
-#else
-#define OP_I8(i) bytecode_data[pc + i]
-#define OP_I16(i)                         \
-  ((uint16_t)bytecode_data[pc + 0 + i]) | \
-      ((uint16_t)bytecode_data[pc + 1 + i] << 8)
-#define OP_I32(i)                                   \
-  ((uint32_t)bytecode_data[pc + 0 + i]) |           \
-      ((uint32_t)bytecode_data[pc + 1 + i] << 8) |  \
-      ((uint32_t)bytecode_data[pc + 2 + i] << 16) | \
-      ((uint32_t)bytecode_data[pc + 3 + i] << 24)
-#endif  // IREE_IS_LITTLE_ENDIAN
-
-// These utilities match the VM_Enc* statements in VMBase.td 1:1, allowing us
-// to have the inverse of the encoding which make things easier to read.
-//
-// Each macro will increment the pc by the number of bytes read and as such must
-// be called in the same order the values are encoded.
-#define VM_DecConstI8(name) \
-  OP_I8(0);                 \
-  ++pc;
-#define VM_DecConstI32(name) \
-  OP_I32(0);                 \
-  pc += 4;
-#define VM_DecOpcode(opcode) VM_DecConstI8(#opcode)
-#define VM_DecFuncAttr(name) VM_DecConstI32(name)
-#define VM_DecGlobalAttr(name) VM_DecConstI32(name)
-#define VM_DecRodataAttr(name) VM_DecConstI32(name)
-#define VM_DecType(name)               \
-  iree_vm_map_type(module, OP_I32(0)); \
-  pc += 4;
-#define VM_DecTypeOf(name) VM_DecType(name)
-#define VM_DecIntAttr32(name) VM_DecConstI32(name)
-#define VM_DecStrAttr(name, out_str)                     \
-  (out_str)->size = (iree_host_size_t)OP_I16(0);         \
-  (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
-  pc += 2 + (out_str)->size;
-#define VM_DecBranchTarget(block_name) VM_DecConstI32(name)
-#define VM_DecBranchOperands(operands_name)                                   \
-  (const iree_vm_register_remap_list_t*)&bytecode_data[pc];                   \
-  pc +=                                                                       \
-      kRegSize + ((const iree_vm_register_list_t*)&bytecode_data[pc])->size * \
-                     2 * kRegSize;
-#define VM_DecOperandRegI32(name)      \
-  regs.i32[OP_I16(0) & regs.i32_mask]; \
-  pc += kRegSize;
-#define VM_DecOperandRegRef(name, out_is_move)             \
-  &regs.ref[OP_I16(0) & regs.ref_mask];                    \
-  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
-  pc += kRegSize;
-#define VM_DecVariadicOperands(name)                  \
-  (const iree_vm_register_list_t*)&bytecode_data[pc]; \
-  pc += kRegSize +                                    \
-        ((const iree_vm_register_list_t*)&bytecode_data[pc])->size * kRegSize;
-#define VM_DecResultRegI32(name)        \
-  &regs.i32[OP_I16(0) & regs.i32_mask]; \
-  pc += kRegSize;
-#define VM_DecResultRegRef(name, out_is_move)              \
-  &regs.ref[OP_I16(0) & regs.ref_mask];                    \
-  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
-  pc += kRegSize;
-#define VM_DecVariadicResults(name) VM_DecVariadicOperands(name)
-
 iree_status_t iree_vm_bytecode_dispatch(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, iree_vm_stack_t* stack,
     iree_vm_stack_frame_t* entry_frame,
     iree_vm_execution_result_t* out_result) {
-#if defined(IREE_DISPATCH_MODE_COMPUTED_GOTO)
-
-// Dispatch table mapping 1:1 with bytecode ops.
-// Each entry is a label within this function that can be used for computed
-// goto. You can find more information on computed goto here:
-// https://eli.thegreenplace.net/2012/07/12/computed-goto-for-efficient-dispatch-tables
-//
-// Note that we ensure the table is 256 elements long exactly to make sure
-// that unused opcodes are handled gracefully.
-//
-// Computed gotos are pretty much the best way to dispatch interpreters but are
-// not part of the C standard; GCC and clang support them but MSVC does not.
-// Because the performance difference is significant we support both here but
-// prefer the computed goto path where available. Empirical data shows them to
-// still be a win in 2019 on x64 desktops and arm32/arm64 mobile devices.
-#define BEGIN_DISPATCH()                     \
-  goto* kDispatchTable[bytecode_data[pc++]]; \
-  while (1)
-
-#define END_DISPATCH()
-
-#define DECLARE_DISPATCH_OPC(ordinal, name) &&_dispatch_##name,
-#define DECLARE_DISPATCH_RSV(ordinal) &&_dispatch_unhandled,
-  static const void* kDispatchTable[256] = {
-      IREE_VM_OP_CORE_TABLE(DECLARE_DISPATCH_OPC, DECLARE_DISPATCH_RSV)};
-
-#define DISPATCH_UNHANDLED() \
-  _dispatch_unhandled:       \
-  VMCHECK(0);                \
-  return IREE_STATUS_UNIMPLEMENTED;
-
-#define DISPATCH_OP(op_name, body)                          \
-  _dispatch_##op_name : IREE_DISPATCH_LOG_OPCODE(#op_name); \
-  body;                                                     \
-  goto* kDispatchTable[bytecode_data[pc++]];
-
-#else
-
-  // Switch-based dispatch. This is strictly less efficient than the computed
-  // goto approach above but is universally supported.
-
-#define BEGIN_DISPATCH() \
-  while (1) {            \
-    switch (bytecode_data[pc++])
-
-#define END_DISPATCH() }
-
-#define DISPATCH_UNHANDLED() \
-  default:                   \
-    VMCHECK(0);              \
-    return IREE_STATUS_UNIMPLEMENTED;
-
-#define DISPATCH_OP(op_name, body)      \
-  case IREE_VM_OP_CORE_##op_name:       \
-    IREE_DISPATCH_LOG_OPCODE(#op_name); \
-    body;                               \
-    break;
-
-#endif  // IREE_DISPATCH_MODE_COMPUTED_GOTO
+  // When required emit the dispatch tables here referencing the labels we are
+  // defining below.
+  DEFINE_DISPATCH_TABLES();
 
   // Primary dispatch state. This is our 'native stack frame' and really
   // just enough to make dereferencing common addresses (like the current
@@ -263,12 +84,12 @@ iree_status_t iree_vm_bytecode_dispatch(
 
   memset(out_result, 0, sizeof(*out_result));
 
-  BEGIN_DISPATCH() {
+  BEGIN_DISPATCH_CORE() {
     //===------------------------------------------------------------------===//
     // Globals
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(GlobalLoadI32, {
+    DISPATCH_OP(CORE, GlobalLoadI32, {
       int32_t byte_offset = VM_DecGlobalAttr("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
@@ -280,7 +101,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *value = *global_ptr;
     });
 
-    DISPATCH_OP(GlobalStoreI32, {
+    DISPATCH_OP(CORE, GlobalStoreI32, {
       int32_t byte_offset = VM_DecGlobalAttr("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
@@ -292,7 +113,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *global_ptr = value;
     });
 
-    DISPATCH_OP(GlobalLoadIndirectI32, {
+    DISPATCH_OP(CORE, GlobalLoadIndirectI32, {
       int32_t byte_offset = VM_DecOperandRegI32("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
@@ -304,7 +125,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *value = *global_ptr;
     });
 
-    DISPATCH_OP(GlobalStoreIndirectI32, {
+    DISPATCH_OP(CORE, GlobalStoreIndirectI32, {
       int32_t byte_offset = VM_DecOperandRegI32("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
@@ -316,7 +137,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *global_ptr = value;
     });
 
-    DISPATCH_OP(GlobalLoadRef, {
+    DISPATCH_OP(CORE, GlobalLoadRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
         return IREE_STATUS_OUT_OF_RANGE;
@@ -329,7 +150,7 @@ iree_status_t iree_vm_bytecode_dispatch(
                                          type_def->ref_type, result);
     });
 
-    DISPATCH_OP(GlobalStoreRef, {
+    DISPATCH_OP(CORE, GlobalStoreRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
         return IREE_STATUS_OUT_OF_RANGE;
@@ -342,7 +163,7 @@ iree_status_t iree_vm_bytecode_dispatch(
                                          type_def->ref_type, global_ref);
     });
 
-    DISPATCH_OP(GlobalLoadIndirectRef, {
+    DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
         return IREE_STATUS_OUT_OF_RANGE;
@@ -355,7 +176,7 @@ iree_status_t iree_vm_bytecode_dispatch(
                                          type_def->ref_type, result);
     });
 
-    DISPATCH_OP(GlobalStoreIndirectRef, {
+    DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
         return IREE_STATUS_OUT_OF_RANGE;
@@ -372,24 +193,24 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Constants
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(ConstI32, {
+    DISPATCH_OP(CORE, ConstI32, {
       int32_t value = VM_DecIntAttr32("value");
       int32_t* result = VM_DecResultRegI32("result");
       *result = value;
     });
 
-    DISPATCH_OP(ConstI32Zero, {
+    DISPATCH_OP(CORE, ConstI32Zero, {
       int32_t* result = VM_DecResultRegI32("result");
       *result = 0;
     });
 
-    DISPATCH_OP(ConstRefZero, {
+    DISPATCH_OP(CORE, ConstRefZero, {
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
       iree_vm_ref_release(result);
     });
 
-    DISPATCH_OP(ConstRefRodata, {
+    DISPATCH_OP(CORE, ConstRefRodata, {
       int32_t rodata_ordinal = VM_DecRodataAttr("rodata");
       if (rodata_ordinal < 0 ||
           rodata_ordinal >= module_state->rodata_ref_count) {
@@ -405,7 +226,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Lists
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(ListAlloc, {
+    DISPATCH_OP(CORE, ListAlloc, {
       const iree_vm_type_def_t* element_type_def = VM_DecTypeOf("element_type");
       iree_host_size_t initial_capacity =
           VM_DecOperandRegI32("initial_capacity");
@@ -417,7 +238,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), result);
     });
 
-    DISPATCH_OP(ListReserve, {
+    DISPATCH_OP(CORE, ListReserve, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -426,7 +247,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, minimum_capacity));
     });
 
-    DISPATCH_OP(ListSize, {
+    DISPATCH_OP(CORE, ListSize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -435,7 +256,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *result = (int32_t)iree_vm_list_size(list);
     });
 
-    DISPATCH_OP(ListResize, {
+    DISPATCH_OP(CORE, ListResize, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -444,7 +265,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, new_size));
     });
 
-    DISPATCH_OP(ListGetI32, {
+    DISPATCH_OP(CORE, ListGetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -457,7 +278,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *result = value.i32;
     });
 
-    DISPATCH_OP(ListSetI32, {
+    DISPATCH_OP(CORE, ListSetI32, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -468,7 +289,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
     });
 
-    DISPATCH_OP(ListGetRef, {
+    DISPATCH_OP(CORE, ListGetRef, {
       // bool list_is_move;
       // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -478,7 +299,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       return IREE_STATUS_UNIMPLEMENTED;
     });
 
-    DISPATCH_OP(ListSetRef, {
+    DISPATCH_OP(CORE, ListSetRef, {
       // bool list_is_move;
       // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
@@ -493,7 +314,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Conditional assignment
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(SelectI32, {
+    DISPATCH_OP(CORE, SelectI32, {
       int32_t condition = VM_DecOperandRegI32("condition");
       int32_t true_value = VM_DecOperandRegI32("true_value");
       int32_t false_value = VM_DecOperandRegI32("false_value");
@@ -501,7 +322,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       *result = condition ? true_value : false_value;
     });
 
-    DISPATCH_OP(SelectRef, {
+    DISPATCH_OP(CORE, SelectRef, {
       int32_t condition = VM_DecOperandRegI32("condition");
       // TODO(benvanik): remove the type_id and use either LHS/RHS (if both are
       // null then output is always null so no need to know the type).
@@ -527,7 +348,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(SwitchI32, {
+    DISPATCH_OP(CORE, SwitchI32, {
       int32_t index = VM_DecOperandRegI32("index");
       int32_t default_value = VM_DecIntAttr32("default_value");
       const iree_vm_register_list_t* value_reg_list =
@@ -540,7 +361,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(SwitchRef, {
+    DISPATCH_OP(CORE, SwitchRef, {
       int32_t index = VM_DecOperandRegI32("index");
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("result");
       bool default_is_move;
@@ -567,90 +388,90 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_UNARY_ALU_I32(op_name, type, op)  \
-  DISPATCH_OP(op_name, {                              \
-    int32_t operand = VM_DecOperandRegI32("operand"); \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = (int32_t)(op((type)operand));           \
+#define DISPATCH_OP_CORE_UNARY_ALU_I32(op_name, type, op) \
+  DISPATCH_OP(CORE, op_name, {                            \
+    int32_t operand = VM_DecOperandRegI32("operand");     \
+    int32_t* result = VM_DecResultRegI32("result");       \
+    *result = (int32_t)(op((type)operand));               \
   });
 
-#define DISPATCH_OP_BINARY_ALU_I32(op_name, type, op) \
-  DISPATCH_OP(op_name, {                              \
-    int32_t lhs = VM_DecOperandRegI32("lhs");         \
-    int32_t rhs = VM_DecOperandRegI32("rhs");         \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = (int32_t)(((type)lhs)op((type)rhs));    \
+#define DISPATCH_OP_CORE_BINARY_ALU_I32(op_name, type, op) \
+  DISPATCH_OP(CORE, op_name, {                             \
+    int32_t lhs = VM_DecOperandRegI32("lhs");              \
+    int32_t rhs = VM_DecOperandRegI32("rhs");              \
+    int32_t* result = VM_DecResultRegI32("result");        \
+    *result = (int32_t)(((type)lhs)op((type)rhs));         \
   });
 
-    DISPATCH_OP_BINARY_ALU_I32(AddI32, int32_t, +);
-    DISPATCH_OP_BINARY_ALU_I32(SubI32, int32_t, -);
-    DISPATCH_OP_BINARY_ALU_I32(MulI32, int32_t, *);
-    DISPATCH_OP_BINARY_ALU_I32(DivI32S, int32_t, /);
-    DISPATCH_OP_BINARY_ALU_I32(DivI32U, uint32_t, /);
-    DISPATCH_OP_BINARY_ALU_I32(RemI32S, int32_t, %);
-    DISPATCH_OP_BINARY_ALU_I32(RemI32U, uint32_t, %);
-    DISPATCH_OP_UNARY_ALU_I32(NotI32, uint32_t, ~);
-    DISPATCH_OP_BINARY_ALU_I32(AndI32, uint32_t, &);
-    DISPATCH_OP_BINARY_ALU_I32(OrI32, uint32_t, |);
-    DISPATCH_OP_BINARY_ALU_I32(XorI32, uint32_t, ^);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(AddI32, int32_t, +);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(SubI32, int32_t, -);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(MulI32, int32_t, *);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32S, int32_t, /);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(DivI32U, uint32_t, /);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32S, int32_t, %);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(RemI32U, uint32_t, %);
+    DISPATCH_OP_CORE_UNARY_ALU_I32(NotI32, uint32_t, ~);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(AndI32, uint32_t, &);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(OrI32, uint32_t, |);
+    DISPATCH_OP_CORE_BINARY_ALU_I32(XorI32, uint32_t, ^);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CAST_I32(op_name, src_type, dst_type) \
-  DISPATCH_OP(op_name, {                                  \
-    int32_t operand = VM_DecOperandRegI32("operand");     \
-    int32_t* result = VM_DecResultRegI32("result");       \
-    *result = (dst_type)((src_type)operand);              \
+#define DISPATCH_OP_CORE_CAST_I32(op_name, src_type, dst_type) \
+  DISPATCH_OP(CORE, op_name, {                                 \
+    int32_t operand = VM_DecOperandRegI32("operand");          \
+    int32_t* result = VM_DecResultRegI32("result");            \
+    *result = (dst_type)((src_type)operand);                   \
   });
 
-    DISPATCH_OP_CAST_I32(TruncI32I8, uint8_t, uint32_t);
-    DISPATCH_OP_CAST_I32(TruncI32I16, uint16_t, uint32_t);
-    DISPATCH_OP_CAST_I32(ExtI8I32S, int8_t, int32_t);
-    DISPATCH_OP_CAST_I32(ExtI8I32U, uint8_t, uint32_t);
-    DISPATCH_OP_CAST_I32(ExtI16I32S, int16_t, int32_t);
-    DISPATCH_OP_CAST_I32(ExtI16I32U, uint16_t, uint32_t);
+    DISPATCH_OP_CORE_CAST_I32(TruncI32I8, uint32_t, uint8_t);
+    DISPATCH_OP_CORE_CAST_I32(TruncI32I16, uint32_t, uint16_t);
+    DISPATCH_OP_CORE_CAST_I32(ExtI8I32S, int8_t, int32_t);
+    DISPATCH_OP_CORE_CAST_I32(ExtI8I32U, uint8_t, uint32_t);
+    DISPATCH_OP_CORE_CAST_I32(ExtI16I32S, int16_t, int32_t);
+    DISPATCH_OP_CORE_CAST_I32(ExtI16I32U, uint16_t, uint32_t);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_SHIFT_I32(op_name, type, op)      \
-  DISPATCH_OP(op_name, {                              \
+#define DISPATCH_OP_CORE_SHIFT_I32(op_name, type, op) \
+  DISPATCH_OP(CORE, op_name, {                        \
     int32_t operand = VM_DecOperandRegI32("operand"); \
-    int32_t amount = VM_DecConstI8("amount");         \
+    int8_t amount = VM_DecConstI8("amount");          \
     int32_t* result = VM_DecResultRegI32("result");   \
     *result = (int32_t)(((type)operand)op amount);    \
   });
 
-    DISPATCH_OP_SHIFT_I32(ShlI32, int32_t, <<);
-    DISPATCH_OP_SHIFT_I32(ShrI32S, int32_t, >>);
-    DISPATCH_OP_SHIFT_I32(ShrI32U, uint32_t, >>);
+    DISPATCH_OP_CORE_SHIFT_I32(ShlI32, int32_t, <<);
+    DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, int32_t, >>);
+    DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, uint32_t, >>);
 
     //===------------------------------------------------------------------===//
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CMP_I32(op_name, type, op)      \
-  DISPATCH_OP(op_name, {                            \
+#define DISPATCH_OP_CORE_CMP_I32(op_name, type, op) \
+  DISPATCH_OP(CORE, op_name, {                      \
     int32_t lhs = VM_DecOperandRegI32("lhs");       \
     int32_t rhs = VM_DecOperandRegI32("rhs");       \
     int32_t* result = VM_DecResultRegI32("result"); \
     *result = (((type)lhs)op((type)rhs)) ? 1 : 0;   \
   });
 
-    DISPATCH_OP_CMP_I32(CmpEQI32, int32_t, ==);
-    DISPATCH_OP_CMP_I32(CmpNEI32, int32_t, !=);
-    DISPATCH_OP_CMP_I32(CmpLTI32S, int32_t, <);
-    DISPATCH_OP_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP(CmpNZI32, {
+    DISPATCH_OP_CORE_CMP_I32(CmpEQI32, int32_t, ==);
+    DISPATCH_OP_CORE_CMP_I32(CmpNEI32, int32_t, !=);
+    DISPATCH_OP_CORE_CMP_I32(CmpLTI32S, int32_t, <);
+    DISPATCH_OP_CORE_CMP_I32(CmpLTI32U, uint32_t, <);
+    DISPATCH_OP(CORE, CmpNZI32, {
       int32_t operand = VM_DecOperandRegI32("operand");
       int32_t* result = VM_DecResultRegI32("result");
       *result = (operand != 0) ? 1 : 0;
     });
 
-    DISPATCH_OP(CmpEQRef, {
+    DISPATCH_OP(CORE, CmpEQRef, {
       bool lhs_is_move;
       iree_vm_ref_t* lhs = VM_DecOperandRegRef("lhs", &lhs_is_move);
       bool rhs_is_move;
@@ -660,7 +481,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (lhs_is_move) iree_vm_ref_release(lhs);
       if (rhs_is_move) iree_vm_ref_release(rhs);
     });
-    DISPATCH_OP(CmpNERef, {
+    DISPATCH_OP(CORE, CmpNERef, {
       bool lhs_is_move;
       iree_vm_ref_t* lhs = VM_DecOperandRegRef("lhs", &lhs_is_move);
       bool rhs_is_move;
@@ -670,7 +491,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (lhs_is_move) iree_vm_ref_release(lhs);
       if (rhs_is_move) iree_vm_ref_release(rhs);
     });
-    DISPATCH_OP(CmpNZRef, {
+    DISPATCH_OP(CORE, CmpNZRef, {
       bool operand_is_move;
       iree_vm_ref_t* operand = VM_DecOperandRegRef("operand", &operand_is_move);
       int32_t* result = VM_DecResultRegI32("result");
@@ -682,7 +503,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Control flow
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(Branch, {
+    DISPATCH_OP(CORE, Branch, {
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =
           VM_DecBranchOperands("operands");
@@ -690,7 +511,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
     });
 
-    DISPATCH_OP(CondBranch, {
+    DISPATCH_OP(CORE, CondBranch, {
       int32_t condition = VM_DecOperandRegI32("condition");
       int32_t true_block_pc = VM_DecBranchTarget("true_dest");
       const iree_vm_register_remap_list_t* true_remap_list =
@@ -708,7 +529,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(Call, {
+    DISPATCH_OP(CORE, Call, {
       int32_t function_ordinal = VM_DecFuncAttr("callee");
       const iree_vm_register_list_t* src_reg_list =
           VM_DecVariadicOperands("operands");
@@ -761,7 +582,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(CallVariadic, {
+    DISPATCH_OP(CORE, CallVariadic, {
       // TODO(benvanik): dedupe with above or merge and always have the seg size
       // list be present (but empty) for non-variadic calls.
       int32_t function_ordinal = VM_DecFuncAttr("callee");
@@ -800,7 +621,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(Return, {
+    DISPATCH_OP(CORE, Return, {
       const iree_vm_register_list_t* src_reg_list =
           VM_DecVariadicOperands("operands");
       current_frame->pc = pc;
@@ -823,7 +644,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       pc = current_frame->pc;
     });
 
-    DISPATCH_OP(Fail, {
+    DISPATCH_OP(CORE, Fail, {
       uint32_t status_code = VM_DecOperandRegI32("status");
       iree_string_view_t message;
       VM_DecStrAttr("message", &message);
@@ -839,7 +660,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Async/fiber ops
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(Yield, {
+    DISPATCH_OP(CORE, Yield, {
       // TODO(benvanik): yield with execution results.
       return IREE_STATUS_OK;
     });
@@ -848,7 +669,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Debugging
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(Trace, {
+    DISPATCH_OP(CORE, Trace, {
       iree_string_view_t event_name;
       VM_DecStrAttr("event_name", &event_name);
       const iree_vm_register_list_t* src_reg_list =
@@ -857,7 +678,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_bytecode_dispatch_discard_registers(regs, src_reg_list);
     });
 
-    DISPATCH_OP(Print, {
+    DISPATCH_OP(CORE, Print, {
       iree_string_view_t event_name;
       VM_DecStrAttr("event_name", &event_name);
       const iree_vm_register_list_t* src_reg_list =
@@ -866,7 +687,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_bytecode_dispatch_discard_registers(regs, src_reg_list);
     });
 
-    DISPATCH_OP(Break, {
+    DISPATCH_OP(CORE, Break, {
       // TODO(benvanik): break unconditionally.
       int32_t block_pc = VM_DecBranchTarget("dest");
       const iree_vm_register_remap_list_t* remap_list =
@@ -875,7 +696,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       pc = block_pc;
     });
 
-    DISPATCH_OP(CondBreak, {
+    DISPATCH_OP(CORE, CondBreak, {
       int32_t condition = VM_DecOperandRegI32("condition");
       if (condition) {
         // TODO(benvanik): cond break.
@@ -891,14 +712,230 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Extension trampolines
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(PrefixExtI64, { return IREE_STATUS_UNIMPLEMENTED; });
+    BEGIN_DISPATCH_PREFIX(PrefixExtI64, EXT_I64) {
+#if IREE_VM_EXT_I64_ENABLE
+      //===----------------------------------------------------------------===//
+      // ExtI64: Globals
+      //===----------------------------------------------------------------===//
 
-    DISPATCH_OP(PrefixExtF32, { return IREE_STATUS_UNIMPLEMENTED; });
+      DISPATCH_OP(EXT_I64, GlobalLoadI64, {
+        int32_t byte_offset = VM_DecGlobalAttr("global");
+        if (byte_offset < 0 ||
+            byte_offset >= module_state->rwdata_storage.data_length) {
+          return IREE_STATUS_OUT_OF_RANGE;
+        }
+        int64_t* value = VM_DecResultRegI64("value");
+        const int64_t* global_ptr =
+            (const int64_t*)(module_state->rwdata_storage.data + byte_offset);
+        *value = *global_ptr;
+      });
 
-    DISPATCH_OP(PrefixExtF64, { return IREE_STATUS_UNIMPLEMENTED; });
+      DISPATCH_OP(EXT_I64, GlobalStoreI64, {
+        int32_t byte_offset = VM_DecGlobalAttr("global");
+        if (byte_offset < 0 ||
+            byte_offset >= module_state->rwdata_storage.data_length) {
+          return IREE_STATUS_OUT_OF_RANGE;
+        }
+        int64_t value = VM_DecOperandRegI64("value");
+        int64_t* global_ptr =
+            (int64_t*)(module_state->rwdata_storage.data + byte_offset);
+        *global_ptr = value;
+      });
+
+      DISPATCH_OP(EXT_I64, GlobalLoadIndirectI64, {
+        int32_t byte_offset = VM_DecOperandRegI32("global");
+        if (byte_offset < 0 ||
+            byte_offset >= module_state->rwdata_storage.data_length) {
+          return IREE_STATUS_OUT_OF_RANGE;
+        }
+        int64_t* value = VM_DecResultRegI64("value");
+        const int64_t* global_ptr =
+            (const int64_t*)(module_state->rwdata_storage.data + byte_offset);
+        *value = *global_ptr;
+      });
+
+      DISPATCH_OP(EXT_I64, GlobalStoreIndirectI64, {
+        int32_t byte_offset = VM_DecOperandRegI32("global");
+        if (byte_offset < 0 ||
+            byte_offset >= module_state->rwdata_storage.data_length) {
+          return IREE_STATUS_OUT_OF_RANGE;
+        }
+        int64_t value = VM_DecOperandRegI64("value");
+        int64_t* global_ptr =
+            (int64_t*)(module_state->rwdata_storage.data + byte_offset);
+        *global_ptr = value;
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Constants
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_I64, ConstI64, {
+        int64_t value = VM_DecIntAttr64("value");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = value;
+      });
+
+      DISPATCH_OP(EXT_I64, ConstI64Zero, {
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = 0;
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Lists
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_I64, ListGetI64, {
+        bool list_is_move;
+        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+        int32_t index = VM_DecOperandRegI32("index");
+        int64_t* result = VM_DecResultRegI64("result");
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            list, index, IREE_VM_VALUE_TYPE_I64, &value));
+        *result = value.i32;
+      });
+
+      DISPATCH_OP(EXT_I64, ListSetI64, {
+        bool list_is_move;
+        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+        iree_vm_list_t* list = iree_vm_list_deref(list_ref);
+        if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+        int32_t index = VM_DecOperandRegI32("index");
+        int64_t raw_value = VM_DecOperandRegI64("value");
+        iree_vm_value_t value = iree_vm_value_make_i64(raw_value);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Conditional assignment
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_I64, SelectI64, {
+        int32_t condition = VM_DecOperandRegI32("condition");
+        int64_t true_value = VM_DecOperandRegI64("true_value");
+        int64_t false_value = VM_DecOperandRegI64("false_value");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = condition ? true_value : false_value;
+      });
+
+      DISPATCH_OP(EXT_I64, SwitchI64, {
+        int32_t index = VM_DecOperandRegI32("index");
+        int64_t default_value = VM_DecIntAttr64("default_value");
+        const iree_vm_register_list_t* value_reg_list =
+            VM_DecVariadicOperands("values");
+        int64_t* result = VM_DecResultRegI64("result");
+        if (index >= 0 && index < value_reg_list->size) {
+          *result =
+              regs.i32[value_reg_list->registers[index] & (regs.i32_mask & ~1)];
+        } else {
+          *result = default_value;
+        }
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Native integer arithmetic
+      //===----------------------------------------------------------------===//
+
+#define DISPATCH_OP_EXT_I64_UNARY_ALU_I64(op_name, type, op) \
+  DISPATCH_OP(EXT_I64, op_name, {                            \
+    int64_t operand = VM_DecOperandRegI64("operand");        \
+    int64_t* result = VM_DecResultRegI64("result");          \
+    *result = (int64_t)(op((type)operand));                  \
+  });
+
+#define DISPATCH_OP_EXT_I64_BINARY_ALU_I64(op_name, type, op) \
+  DISPATCH_OP(EXT_I64, op_name, {                             \
+    int64_t lhs = VM_DecOperandRegI64("lhs");                 \
+    int64_t rhs = VM_DecOperandRegI64("rhs");                 \
+    int64_t* result = VM_DecResultRegI64("result");           \
+    *result = (int64_t)(((type)lhs)op((type)rhs));            \
+  });
+
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(AddI64, int64_t, +);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(SubI64, int64_t, -);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(MulI64, int64_t, *);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(DivI64S, int64_t, /);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(DivI64U, uint64_t, /);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(RemI64S, int64_t, %);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(RemI64U, uint64_t, %);
+      DISPATCH_OP_EXT_I64_UNARY_ALU_I64(NotI64, uint64_t, ~);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(AndI64, uint64_t, &);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(OrI64, uint64_t, |);
+      DISPATCH_OP_EXT_I64_BINARY_ALU_I64(XorI64, uint64_t, ^);
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Casting and type conversion/emulation
+      //===----------------------------------------------------------------===//
+
+#define DISPATCH_OP_EXT_I64_CAST_I64(op_name, src_type, dst_type) \
+  DISPATCH_OP(EXT_I64, op_name, {                                 \
+    int64_t operand = VM_DecOperandRegI64("operand");             \
+    int64_t* result = VM_DecResultRegI64("result");               \
+    *result = (dst_type)((src_type)operand);                      \
+  });
+
+      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I8, uint64_t, uint8_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I16, uint64_t, uint16_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(TruncI64I32, uint64_t, uint32_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(ExtI8I64S, int8_t, int64_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(ExtI8I64U, uint8_t, uint64_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(ExtI16I64S, int16_t, int64_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(ExtI16I64U, uint16_t, uint64_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64S, int32_t, int64_t);
+      DISPATCH_OP_EXT_I64_CAST_I64(ExtI32I64U, uint32_t, uint64_t);
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Native bitwise shifts and rotates
+      //===----------------------------------------------------------------===//
+
+#define DISPATCH_OP_EXT_I64_SHIFT_I64(op_name, type, op) \
+  DISPATCH_OP(EXT_I64, op_name, {                        \
+    int64_t operand = VM_DecOperandRegI64("operand");    \
+    int8_t amount = VM_DecConstI8("amount");             \
+    int64_t* result = VM_DecResultRegI64("result");      \
+    *result = (int64_t)(((type)operand)op amount);       \
+  });
+
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShlI64, int64_t, <<);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64S, int64_t, >>);
+      DISPATCH_OP_EXT_I64_SHIFT_I64(ShrI64U, uint64_t, >>);
+
+      //===----------------------------------------------------------------===//
+      // ExtI64: Comparison ops
+      //===----------------------------------------------------------------===//
+
+#define DISPATCH_OP_EXT_I64_CMP_I64(op_name, type, op) \
+  DISPATCH_OP(EXT_I64, op_name, {                      \
+    int64_t lhs = VM_DecOperandRegI64("lhs");          \
+    int64_t rhs = VM_DecOperandRegI64("rhs");          \
+    int32_t* result = VM_DecResultRegI32("result");    \
+    *result = (((type)lhs)op((type)rhs)) ? 1 : 0;      \
+  });
+
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpEQI64, int64_t, ==);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpNEI64, int64_t, !=);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64S, int64_t, <);
+      DISPATCH_OP_EXT_I64_CMP_I64(CmpLTI64U, uint64_t, <);
+      DISPATCH_OP(EXT_I64, CmpNZI64, {
+        int64_t operand = VM_DecOperandRegI64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = (operand != 0) ? 1 : 0;
+      });
+#else
+      return IREE_STATUS_UNIMPLEMENTED;
+#endif  // IREE_VM_EXT_I64_ENABLE
+    }
+    END_DISPATCH_PREFIX();
+
+    DISPATCH_OP(CORE, PrefixExtF32, { return IREE_STATUS_UNIMPLEMENTED; });
+
+    DISPATCH_OP(CORE, PrefixExtF64, { return IREE_STATUS_UNIMPLEMENTED; });
 
     // NOLINTNEXTLINE(misc-static-assert)
-    DISPATCH_UNHANDLED();
+    DISPATCH_UNHANDLED_CORE();
   }
-  END_DISPATCH();
+  END_DISPATCH_CORE();
 }
