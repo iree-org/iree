@@ -209,7 +209,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 #define DECLARE_DISPATCH_OPC(ordinal, name) &&_dispatch_##name,
 #define DECLARE_DISPATCH_RSV(ordinal) &&_dispatch_unhandled,
   static const void* kDispatchTable[256] = {
-      IREE_VM_OP_TABLE(DECLARE_DISPATCH_OPC, DECLARE_DISPATCH_RSV)};
+      IREE_VM_OP_CORE_TABLE(DECLARE_DISPATCH_OPC, DECLARE_DISPATCH_RSV)};
 
 #define DISPATCH_UNHANDLED() \
   _dispatch_unhandled:       \
@@ -238,7 +238,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     return IREE_STATUS_UNIMPLEMENTED;
 
 #define DISPATCH_OP(op_name, body)      \
-  case IREE_VM_OP_##op_name:            \
+  case IREE_VM_OP_CORE_##op_name:       \
     IREE_DISPATCH_LOG_OPCODE(#op_name); \
     body;                               \
     break;
@@ -890,6 +890,16 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
       pc = block_pc;
     });
+
+    //===------------------------------------------------------------------===//
+    // Extension trampolines
+    //===------------------------------------------------------------------===//
+
+    DISPATCH_OP(PrefixExtI64, { return IREE_STATUS_UNIMPLEMENTED; });
+
+    DISPATCH_OP(PrefixExtF32, { return IREE_STATUS_UNIMPLEMENTED; });
+
+    DISPATCH_OP(PrefixExtF64, { return IREE_STATUS_UNIMPLEMENTED; });
 
     // NOLINTNEXTLINE(misc-static-assert)
     DISPATCH_UNHANDLED();
