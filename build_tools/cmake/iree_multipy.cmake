@@ -211,7 +211,7 @@ function(iree_py_library)
   set(_NAME "${_PACKAGE_NAME}_${ARG_NAME}")
 
   # Add path to each source file
-  list(TRANSFORM _RULE_SRCS PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+  list(TRANSFORM ARG_SRCS PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
 
   add_custom_target(${_NAME} ALL
     COMMAND ${CMAKE_COMMAND} -E copy ${ARG_SRCS} "${CMAKE_CURRENT_BINARY_DIR}/"
@@ -228,17 +228,21 @@ function(iree_py_library)
 endfunction()
 
 function(iree_pyext_pybind11_options name)
+  target_include_directories(${name}
+    PRIVATE
+      ${PYBIND11_INCLUDE_DIR}
+  )
   target_compile_options(${name}
-  PRIVATE
-  $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-    -frtti -fexceptions
-    # Noisy pybind warnings
-    -Wno-unused-value
-    -Wno-covered-switch-default
-  >
-  $<$<CXX_COMPILER_ID:MSVC>:
-    # Enable RTTI and exceptions.
-    /EHsc /GR>
+    PRIVATE
+      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+        -frtti -fexceptions
+        # Noisy pybind warnings
+        -Wno-unused-value
+        -Wno-covered-switch-default
+      >
+      $<$<CXX_COMPILER_ID:MSVC>:
+        # Enable RTTI and exceptions.
+        /EHsc /GR>
   )
   set_target_properties(
     ${name} PROPERTIES CXX_VISIBILITY_PRESET "hidden")
