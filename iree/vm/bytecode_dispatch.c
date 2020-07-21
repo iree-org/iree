@@ -644,12 +644,6 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CMP_I32(CmpNEI32, int32_t, !=);
     DISPATCH_OP_CMP_I32(CmpLTI32S, int32_t, <);
     DISPATCH_OP_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP_CMP_I32(CmpLTEI32S, int32_t, <=);
-    DISPATCH_OP_CMP_I32(CmpLTEI32U, uint32_t, <=);
-    DISPATCH_OP_CMP_I32(CmpGTI32S, int32_t, >);
-    DISPATCH_OP_CMP_I32(CmpGTI32U, uint32_t, >);
-    DISPATCH_OP_CMP_I32(CmpGTEI32S, int32_t, >=);
-    DISPATCH_OP_CMP_I32(CmpGTEI32U, uint32_t, >=);
     DISPATCH_OP(CmpNZI32, {
       int32_t operand = VM_DecOperandRegI32("operand");
       int32_t* result = VM_DecResultRegI32("result");
