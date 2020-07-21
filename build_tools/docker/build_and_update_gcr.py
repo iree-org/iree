@@ -127,12 +127,12 @@ if __name__ == '__main__':
 
   # Check if any images depend on `args.images` and update them if they do.
   images_to_update_set = set()
-  queue = list(args.images)
-  while queue:
-    image = queue.pop()
+  to_check = list(args.images)
+  while to_check:
+    image = to_check.pop()
     if image not in images_to_update_set:
       images_to_update_set.add(image)
-      queue.extend(IMAGES_TO_DEPENDENT_IMAGES[image])
+      to_check.extend(IMAGES_TO_DEPENDENT_IMAGES[image])
 
   # Topo sort by image dependency
   images_to_update = sorted(
