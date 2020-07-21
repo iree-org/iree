@@ -30,8 +30,8 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 
 # Print Vulkan related information: SDK version and GPU ICD version
-vulkaninfo 2>/dev/null | grep "Vulkan Instance"
-vulkaninfo 2>/dev/null | grep -A7 "VkPhysicalDeviceProperties"
+vulkaninfo 2>/dev/null | grep "Vulkan Instance" || echo "Vulkan Instance not found!"
+vulkaninfo 2>/dev/null | grep -A7 "VkPhysicalDeviceProperties"  || echo "VkPhysicalDeviceProperties not found!"
 
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
