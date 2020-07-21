@@ -292,7 +292,10 @@ function(iree_py_test)
     set(VER_NAME "${_NAME_PATH}__${V}")
     add_test(
       NAME ${VER_NAME}
-      COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh "${IREE_MULTIPY_${V}_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
+      COMMAND
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+        "${IREE_MULTIPY_${V}_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
