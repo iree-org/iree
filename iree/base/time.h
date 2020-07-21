@@ -43,7 +43,7 @@ class ChronoType {
     return !(lhs == rhs);
   }
   friend inline bool operator<(const ChronoType& lhs, const ChronoType& rhs) {
-    return rhs.value_ < lhs.value_;
+    return lhs.value_ < rhs.value_;
   }
   friend inline bool operator>(const ChronoType& lhs, const ChronoType& rhs) {
     return rhs < lhs;
