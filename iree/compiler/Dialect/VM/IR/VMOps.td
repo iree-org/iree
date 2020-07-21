@@ -1294,8 +1294,18 @@ def VM_ExtI8I32SOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.s", VM_OPC_ExtI8I32S>
   let hasFolder = 1;
 }
 
+def VM_ExtI8I32UOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.u", VM_OPC_ExtI8I32U> {
+  let summary = [{integer zero extend 8 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
 def VM_ExtI16I32SOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.s", VM_OPC_ExtI16I32S> {
   let summary = [{integer sign extend 16 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI16I32UOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.u", VM_OPC_ExtI16I32U> {
+  let summary = [{integer zero extend 16 bits to 32 bits}];
   let hasFolder = 1;
 }
 

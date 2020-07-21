@@ -605,9 +605,19 @@ OpFoldResult ExtI8I32SOp::fold(ArrayRef<Attribute> operands) {
       operands, [&](APInt a) { return a.trunc(8).sext(32); });
 }
 
+OpFoldResult ExtI8I32UOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return a.trunc(8).zext(32); });
+}
+
 OpFoldResult ExtI16I32SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldUnaryOp<IntegerAttr>(
       operands, [&](APInt a) { return a.trunc(16).sext(32); });
+}
+
+OpFoldResult ExtI16I32UOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return a.trunc(16).zext(32); });
 }
 
 //===----------------------------------------------------------------------===//
