@@ -110,7 +110,6 @@ bool GenerateImpl(const std::string& impl_file,
                   const std::vector<std::string>& input_files,
                   const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
-  f << "#include <cstdalign>\n";
   f << "#include <cstddef>\n";
   GenerateTocStruct(f);
   GenerateNamespaceOpen(f);
