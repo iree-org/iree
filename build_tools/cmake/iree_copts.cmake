@@ -183,10 +183,19 @@ iree_select_compiler_opts(FLATBUFFERS_COPTS
 list(APPEND IREE_DEFAULT_COPTS ${FLATBUFFERS_COPTS})
 
 #-------------------------------------------------------------------------------
-# Third party: glslang
+# Third party: flatcc
 #-------------------------------------------------------------------------------
 
-set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
+set(FLATCC_TEST OFF CACHE BOOL "" FORCE)
+set(FLATCC_CXX_TEST OFF CACHE BOOL "" FORCE)
+set(FLATCC_REFLECTION OFF CACHE BOOL "" FORCE)
+set(FLATCC_ALLOW_WERROR OFF CACHE BOOL "" FORCE)
+
+if(CMAKE_CROSSCOMPILING)
+  set(FLATCC_RTONLY ON CACHE BOOL "" FORCE)
+else()
+  set(FLATCC_RTONLY OFF CACHE BOOL "" FORCE)
+endif()
 
 #-------------------------------------------------------------------------------
 # Third party: gtest
