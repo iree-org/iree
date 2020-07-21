@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_pybind_cc_library(
+iree_pyext_library(
   NAME
-    common
-  HDRS
+    PyextCommonLib
+  SRCS
     "binding.h"
     "status_utils.h"
-  SRCS
     "status_utils.cc"
   DEPS
     iree::base::api

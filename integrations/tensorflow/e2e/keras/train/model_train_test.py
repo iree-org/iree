@@ -77,7 +77,7 @@ class ModelTrain(tf.Module):
 
 @tf_test_utils.compile_module(
     ModelTrain.CreateModule, exported_names=["TrainStep"])
-class ModelTrainTest(tf_test_utils.SavedModelTestCase):
+class ModelTrainTest(tf_test_utils.CompiledModuleTestCase):
 
   def generate_regression_data(self, size=8):
     x = np.arange(size) - size // 2

@@ -27,8 +27,13 @@ IREE_GCR_URL = 'gcr.io/iree-oss/'
 DOCKER_DIR = 'build_tools/docker/'
 
 IMAGES = [
-    'bazel', 'bazel-bindings', 'bazel-tensorflow', 'cmake', 'cmake-android',
-    'rbe-toolchain'
+    'bazel',
+    'bazel-bindings',
+    'bazel-tensorflow',
+    'cmake',
+    'cmake-android',
+    'cmake-nvidia',
+    'rbe-toolchain',
 ]
 IMAGES_HELP = [f'`{name}`' for name in IMAGES]
 IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
@@ -36,7 +41,7 @@ IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
 # Map from image names to images that depend on them.
 IMAGES_TO_DEPENDENT_IMAGES = {
     'bazel': ['bazel-bindings', 'bazel-tensorflow'],
-    'cmake': ['cmake-android']
+    'cmake': ['cmake-android', 'cmake-nvidia'],
 }
 
 RBE_MESSAGE = """

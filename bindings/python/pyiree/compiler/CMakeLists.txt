@@ -17,41 +17,41 @@ iree_py_library(
     compiler
   SRCS
     "__init__.py"
-  DEPS
-    ::binding
+  PYEXT_DEPS
+    ::PyExtCompiler
 )
 
-iree_py_extension(
+iree_pyext_module(
   NAME
+    PyExtCompiler
+  MODULE_NAME
     binding
   SRCS
     "initialize_module.cc"
-  DEPS
-    ::compiler_library
-    bindings::python::pyiree::common
-  COPTS
-    ${PYBIND_COPTS}
-    ${PYBIND_EXTENSION_COPTS}
-  TYPE
-    SHARED
+  PYEXT_DEPS
+    ::PyExtCompilerLib
+    bindings::python::pyiree::common::PyextCommonLib
 )
 
-iree_pybind_cc_library(
+iree_pyext_library(
   NAME
-    compiler_library
-  HDRS
-    "compiler.h"
+    PyExtCompilerLib
   SRCS
+    "compiler.h"
     "compiler.cc"
+  PYEXT_DEPS
+    bindings::python::pyiree::common::PyextCommonLib
+  COPTS
+    ${PYBIND_REGISTER_MLIR_PASSES}
   DEPS
-    # Transforms. Adopted from the Bazel variable COMPILER_DEPS.
+    # Transforms. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::VM::Transforms
-    # Targets. Adopted from the Bazel variable COMPILER_DEPS.
+    # Targets. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::HAL::Target::VMLA
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
@@ -62,16 +62,11 @@ iree_pybind_cc_library(
     iree::tools::init_iree_passes_and_dialects
     iree::tools::init_mlir_passes_and_dialects
     iree::tools::init_targets
-    bindings::python::pyiree::common
     LLVMSupport
     MLIRIR
     MLIRSCFTransforms
     MLIRParser
     MLIRPass
-  COPTS
-    ${PYBIND_REGISTER_MLIR_PASSES}
-  TYPE
-    STATIC
 )
 
 iree_py_test(

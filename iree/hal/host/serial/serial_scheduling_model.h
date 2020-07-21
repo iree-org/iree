@@ -50,10 +50,10 @@ class SerialSchedulingModel final : public SchedulingModel {
   StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
 
   Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                           absl::Time deadline) override;
+                           Time deadline_ns) override;
   StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
-                                 absl::Time deadline) override;
-  Status WaitIdle(absl::Time deadline) override;
+                                 Time deadline_ns) override;
+  Status WaitIdle(Time deadline_ns) override;
 
  private:
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues_;

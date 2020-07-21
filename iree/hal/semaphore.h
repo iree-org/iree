@@ -17,8 +17,6 @@
 
 #include <cstdint>
 
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/hal/resource.h"
@@ -85,16 +83,16 @@ class Semaphore : public Resource {
   virtual void Fail(Status status) = 0;
 
   // Blocks the caller until the semaphore reaches or exceedes the specified
-  // payload value or the |deadline| elapses.
+  // payload value or the |deadline_ns| elapses.
   //
   // Returns success if the wait is successful and the semaphore has met or
   // exceeded the required payload value.
   //
-  // Returns DEADLINE_EXCEEDED if the |deadline| elapses without the semaphore
-  // reaching the required value.
-  virtual Status Wait(uint64_t value, absl::Time deadline) = 0;
-  inline Status Wait(uint64_t value, absl::Duration timeout) {
-    return Wait(value, RelativeTimeoutToDeadline(timeout));
+  // Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the
+  // semaphore reaching the required value.
+  virtual Status Wait(uint64_t value, Time deadline_ns) = 0;
+  inline Status Wait(uint64_t value, Duration timeout_ns) {
+    return Wait(value, RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
 };
 

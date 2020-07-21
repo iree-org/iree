@@ -39,7 +39,7 @@ class BatchNormModule(tf.Module):
 
 
 @tf_test_utils.compile_module(BatchNormModule)
-class BatchNormTest(tf_test_utils.SavedModelTestCase):
+class BatchNormTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_batch_norm_inference(self):
     np.random.seed(12345)

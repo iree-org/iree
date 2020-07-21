@@ -29,7 +29,7 @@ class ResourcesOpsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ResourcesOpsModule)
-class ResourcesOpsTest(tf_test_utils.SavedModelTestCase):
+class ResourcesOpsTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_add_assign(self):
     result = self.get_module().add_assign(np.array(9., dtype=np.float32))

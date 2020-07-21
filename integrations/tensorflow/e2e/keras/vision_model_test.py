@@ -14,6 +14,8 @@
 # limitations under the License.
 """Test all applications models in Keras."""
 import os
+
+from absl import app
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
@@ -72,74 +74,84 @@ APP_MODELS = {
 }
 
 
-def get_input_shape(data, model):
-  if data == 'imagenet':
-    if (model == 'InceptionV3' or model == 'Xception' or
-        model == 'InceptionResNetV2'):
+def get_input_shape():
+  if FLAGS.data == 'imagenet':
+    if FLAGS.model in ['InceptionV3', 'Xception', 'InceptionResNetV2']:
       return (1, 299, 299, 3)
-    elif model == 'NASNetLarge':
+    elif FLAGS.model == 'NASNetLarge':
       return (1, 331, 331, 3)
     else:
       return (1, 224, 224, 3)
-  elif data == 'cifar10':
+  elif FLAGS.data == 'cifar10':
     return (1, 32, 32, 3)
   else:
-    raise ValueError('Not supported data ', data)
+    raise ValueError(f'Data not supported: {FLAGS.data}')
 
 
-def models():
-  tf.keras.backend.set_learning_phase(False)
+def load_cifar10_weights(model):
+  file_name = 'cifar10' + FLAGS.model
+  # get_file will download the model weights from a publicly available folder,
+  # save them to cache_dir=~/.keras/models/ and return a path to them.
+  url = os.path.join(
+      FLAGS.url, f'cifar10_include_top_{FLAGS.include_top}_{FLAGS.model}.h5')
+  weights_path = tf.keras.utils.get_file(file_name, url)
+  model.load_weights(weights_path)
+  return model
+
+
+def initialize_model():
   tf_utils.set_random_seed()
+  tf.keras.backend.set_learning_phase(False)
 
-  input_shape = get_input_shape(FLAGS.data, FLAGS.model)
-  # keras model receives images size as input,
-  # where batch size is not specified - by default it is dynamic
-  if FLAGS.model in APP_MODELS:
-    weights = 'imagenet' if FLAGS.data == 'imagenet' else None
+  # Keras applications models receive input shapes without a batch dimension, as
+  # the batch size is dynamic by default. This selects just the image size.
+  input_shape = get_input_shape()[1:]
 
-    # if weights == 'imagenet' it will load weights from external tf.keras URL
-    model = APP_MODELS[FLAGS.model](
-        weights=weights,
-        include_top=FLAGS.include_top,
-        input_shape=input_shape[1:])
+  # If weights == 'imagenet', the model will load the appropriate weights from
+  # an external tf.keras URL.
+  weights = 'imagenet' if FLAGS.data == 'imagenet' else None
 
-    if FLAGS.data == 'cifar10' and FLAGS.url:
-      file_name = 'cifar10' + FLAGS.model
-      # it will download model weights from publically available folder: PATH
-      # and save it to cache_dir=~/.keras and return path to it
-      weights_path = tf.keras.utils.get_file(
-          file_name,
-          os.path.join(
-              FLAGS.url,
-              'cifar10_include_top_{}_{}'.format(FLAGS.include_top,
-                                                 FLAGS.model + '.h5')))
+  model = APP_MODELS[FLAGS.model](
+      weights=weights, include_top=FLAGS.include_top, input_shape=input_shape)
 
-      model.load_weights(weights_path)
-  else:
-    raise ValueError('Unsupported model', FLAGS.model)
-
-  module = tf.Module()
-  module.m = model
-  # specify input size with static batch size
-  # TODO(b/142948097): with support of dynamic shape
-  # replace input_shape by model.input_shape, so batch size will be dynamic (-1)
-  module.predict = tf.function(input_signature=[tf.TensorSpec(input_shape)])(
-      model.call)
-  return module
+  if FLAGS.data == 'cifar10' and FLAGS.url:
+    model = load_cifar10_weights(model)
+  return model
 
 
-@tf_test_utils.compile_module(models, exported_names=['predict'])
-class AppTest(tf_test_utils.SavedModelTestCase):
+class VisionModule(tf.Module):
+
+  def __init__(self):
+    super(VisionModule, self).__init__()
+    self.m = initialize_model()
+    # Specify input shape with a static batch size.
+    # TODO(b/142948097): Add support for dynamic shapes in SPIR-V lowering.
+    # Replace input_shape with m.input_shape to make the batch size dynamic.
+    self.predict = tf.function(
+        input_signature=[tf.TensorSpec(get_input_shape())])(
+            self.m.call)
+
+
+@tf_test_utils.compile_module(VisionModule, exported_names=['predict'])
+class AppTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_application(self):
-    input_shape = get_input_shape(FLAGS.data, FLAGS.model)
-    input_data = np.random.rand(np.prod(np.array(input_shape))).astype(
-        np.float32)
-    input_data = input_data.reshape(input_shape)
+    input_data = np.random.rand(*get_input_shape()).astype(np.float32)
     self.get_module().predict(input_data).print().assert_all_close(atol=1e-6)
 
 
-if __name__ == '__main__':
+def main(argv):
+  del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+
+  if FLAGS.model not in APP_MODELS:
+    raise ValueError(f'Unsupported model: {FLAGS.model}')
+  # Override VisionModule's __name__ to be more specific.
+  VisionModule.__name__ = FLAGS.model
+
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

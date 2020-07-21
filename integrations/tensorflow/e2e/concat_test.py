@@ -51,7 +51,7 @@ class ConcatOpsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ConcatOpsModule)
-class ConcatOpsTest(tf_test_utils.SavedModelTestCase):
+class ConcatOpsTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_concat_zero_dim(self):
     tf_utils.set_random_seed()

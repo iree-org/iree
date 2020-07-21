@@ -8,7 +8,7 @@ vm.module @trunc_folds {
   vm.func @trunc_i8_const() -> i32 {
     // CHECK: vm.const.i32 255 : i32
     %c = vm.const.i32 0xFFFFFFFF : i32
-    %0 = vm.trunc.i8 %c : i32
+    %0 = vm.trunc.i32.i8 %c : i32
     vm.return %0 : i32
   }
 
@@ -16,7 +16,7 @@ vm.module @trunc_folds {
   vm.func @trunc_i16_const() -> i32 {
     // CHECK: vm.const.i32 65535 : i32
     %c = vm.const.i32 0xFFFFFFFF : i32
-    %0 = vm.trunc.i16 %c : i32
+    %0 = vm.trunc.i32.i16 %c : i32
     vm.return %0 : i32
   }
 }

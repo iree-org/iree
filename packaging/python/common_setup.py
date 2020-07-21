@@ -16,6 +16,7 @@ import os
 import platform
 import setuptools
 import sys
+import sysconfig
 from datetime import date
 
 
@@ -99,15 +100,6 @@ def get_setup_defaults(sub_project, description, package_dir=None):
   }
 
 
-def get_native_file_extension():
-  if platform.system() == "Windows":
-    return "pyd"
-  elif platform.system() == "Darwin":
-    return "dylib"
-  else:
-    return "so"
-
-
 def setup(**kwargs):
   # See: https://stackoverflow.com/q/45150304
   try:
@@ -128,7 +120,7 @@ def setup(**kwargs):
   # Unfortunately, bazel is imprecise and scatters .so files around, so
   # need to be specific.
   package_data = {
-      "": ["*.%s" % (get_native_file_extension(),)],
+      "": ["*%s" % (sysconfig.get_config_var("EXT_SUFFIX"),)],
   }
   setuptools.setup(
       package_data=package_data,

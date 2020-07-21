@@ -64,9 +64,6 @@ def _create_default_iree_driver(
       continue
     try:
       driver = _binding.HalDriver.create(driver_name)
-      print(
-          "Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
-      return driver
       # TODO(laurenzo): Remove these prints to stderr (for now, more information
       # is better and there is no better way to report it yet).
     except Exception as ex:  # pylint: disable=broad-except
@@ -74,6 +71,23 @@ def _create_default_iree_driver(
           "Could not create default driver %s: %r" % (driver_name, ex),
           file=sys.stderr)
       driver_exceptions[driver_name] = ex
+      continue
+
+    # Sanity check creation of the default device and skip the driver if
+    # this fails (this works around issues where the driver is present
+    # but there are no devices). This default initialization scheme needs
+    # to be improved.
+    try:
+      device = driver.create_default_device()
+    except Exception as ex:
+      print(
+          "Could not create default driver device %s: %r" % (driver_name, ex),
+          file=sys.stderr)
+      driver_exceptions[driver_name] = ex
+      continue
+
+    print("Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
+    return driver
 
   # All failed.
   raise RuntimeError("Could not create any requested driver "

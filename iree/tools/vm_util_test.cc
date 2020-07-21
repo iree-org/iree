@@ -21,8 +21,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm/value.h"
-#include "iree/vm/variant_list.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace {
@@ -42,72 +41,64 @@ class VmUtilTest : public ::testing::Test {
 };
 
 TEST_F(VmUtilTest, ParsePrintBuffer) {
-  auto buf_string = "2x2xi32=[42 43][44 45]";
+  absl::string_view buf_string = "2x2xi32=[42 43][44 45]";
   RawSignatureParser::Description desc;
   desc.type = RawSignatureParser::Type::kBuffer;
   desc.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
   desc.dims = {2, 2};
 
-  ASSERT_OK_AND_ASSIGN(auto* variant_list,
+  ASSERT_OK_AND_ASSIGN(auto variant_list,
                        ParseToVariantList({desc}, allocator_, {buf_string}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc}, variant_list, &os));
+  ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
-
-  iree_vm_variant_list_free(variant_list);
 }
 
 TEST_F(VmUtilTest, ParsePrintScalar) {
-  auto input_string = "i32=42";
+  absl::string_view input_string = "i32=42";
   RawSignatureParser::Description desc;
   desc.type = RawSignatureParser::Type::kScalar;
   desc.scalar.type = AbiConstants::ScalarType::kSint32;
 
-  ASSERT_OK_AND_ASSIGN(auto* variant_list,
+  ASSERT_OK_AND_ASSIGN(auto variant_list,
                        ParseToVariantList({desc}, allocator_, {input_string}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc}, variant_list, &os));
+  ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(input_string, "\n"));
-
-  iree_vm_variant_list_free(variant_list);
 }
 
 TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
-  auto buf_string = "i32=42";
+  absl::string_view buf_string = "i32=42";
   RawSignatureParser::Description desc;
   desc.type = RawSignatureParser::Type::kBuffer;
   desc.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
 
-  ASSERT_OK_AND_ASSIGN(auto* variant_list,
+  ASSERT_OK_AND_ASSIGN(auto variant_list,
                        ParseToVariantList({desc}, allocator_, {buf_string}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc}, variant_list, &os));
+  ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
-
-  iree_vm_variant_list_free(variant_list);
 }
 
 TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
-  auto buf_string1 = "2x2xi32=[42 43][44 45]";
+  absl::string_view buf_string1 = "2x2xi32=[42 43][44 45]";
   RawSignatureParser::Description desc1;
   desc1.type = RawSignatureParser::Type::kBuffer;
   desc1.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
   desc1.dims = {2, 2};
 
-  auto buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
+  absl::string_view buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
   RawSignatureParser::Description desc2;
   desc2.type = RawSignatureParser::Type::kBuffer;
   desc2.buffer.scalar_type = AbiConstants::ScalarType::kIeeeFloat64;
   desc2.dims = {2, 3};
 
-  ASSERT_OK_AND_ASSIGN(auto* variant_list,
+  ASSERT_OK_AND_ASSIGN(auto variant_list,
                        ParseToVariantList({desc1, desc2}, allocator_,
                                           {buf_string1, buf_string2}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc1, desc2}, variant_list, &os));
+  ASSERT_OK(PrintVariantList({desc1, desc2}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string1, "\n", buf_string2, "\n"));
-
-  iree_vm_variant_list_free(variant_list);
 }
 
 }  // namespace

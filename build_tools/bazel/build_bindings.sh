@@ -74,12 +74,22 @@ fi
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "nokokoro".
-bazel query //bindings/... | \
-  xargs bazel test ${test_env_args[@]} \
-    --config=generic_clang \
-    --build_tag_filters="${BUILD_TAG_FILTERS?}" \
-    --test_tag_filters="${TEST_TAG_FILTERS?}" \
-    --keep_going \
-    --test_output=errors \
-    --config=rs \
-    --config=rbe
+# Explicitly list bazelrc so that builds are reproducible and get cache hits
+# when this script is invoked locally.
+bazel \
+  --nosystem_rc --nohome_rc --noworkspace_rc \
+  --bazelrc=build_tools/bazel/iree.bazelrc \
+  query \
+    //bindings/... | \
+      xargs bazel \
+        --nosystem_rc --nohome_rc --noworkspace_rc \
+        --bazelrc=build_tools/bazel/iree.bazelrc \
+          test \
+            ${test_env_args[@]} \
+            --config=generic_clang \
+            --build_tag_filters="${BUILD_TAG_FILTERS?}" \
+            --test_tag_filters="${TEST_TAG_FILTERS?}" \
+            --keep_going \
+            --test_output=errors \
+            --config=rs \
+            --config=rbe

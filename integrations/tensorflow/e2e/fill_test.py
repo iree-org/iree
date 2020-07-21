@@ -31,7 +31,7 @@ class FillModule(tf.Module):
 
 
 @tf_test_utils.compile_module(FillModule)
-class FillTest(tf_test_utils.SavedModelTestCase):
+class FillTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_fill(self):
     dims = np.array([2, 3], dtype=np.int32)

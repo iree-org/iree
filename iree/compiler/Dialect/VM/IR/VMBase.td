@@ -56,15 +56,39 @@ def VM_Dialect : Dialect {
 // VM opcodes
 //===----------------------------------------------------------------------===//
 // Opcode ranges:
-// 0x00-0x7F: core VM opcodes, reserved for this dialect
-// 0x80-0xFF: unreserved, used by target-specific ops (like SIMD)
+// 0x00-0x9F: core VM opcodes, reserved for this dialect
+// 0xA0-0xFF: unreserved, used to prefix extension op sets
 //
 // Note that changing existing opcode assignments will invalidate all binaries
 // and should only be done when breaking changes are acceptable. We could add a
 // versioning system here to automatically switch between different encodings
 // but we are a long way out to stabilizing this format :)
+//
+// Some opcodes require an extension prefix to indicate that runtime support
+// is optional. An op with the ExtI64 trait will require VM_OPC_ExtI64, for
+// example. Ops that bridge extension sets have a canonical form that may
+// require multiple prefix codes (for example, the i64<->f64 extensions).
 
-class VM_OPC<int opcode, string name> : I32EnumAttrCase<name, opcode>;
+class VM_OPC<int opcode, string name> :
+    IntEnumAttrCaseBase<I8, name, name, opcode>;
+
+class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
+                      string description,
+                      VM_OPC prefix = ?,
+                      list<VM_OPC> cases> :
+    IntEnumAttr<I8, name, description, cases> {
+  let cppNamespace = "IREE::VM";
+  let returnType = cppNamespace # "::" # name;
+  let underlyingType = "uint8_t";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getInt())";
+  let constBuilderCall =
+          "$_builder.getI8IntegerAttr(static_cast<int8_t>($0))";
+
+  // Used by VMOpTableGen:
+  string opcodeEnumName = enumName;
+  VM_OPC opcodePrefix = prefix;
+  string opcodeEnumTag = enumTag;
+}
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -123,8 +147,8 @@ def VM_OPC_ShrI32S               : VM_OPC<0x2E, "ShrI32S">;
 def VM_OPC_ShrI32U               : VM_OPC<0x2F, "ShrI32U">;
 
 // Casting and type conversion/emulation:
-def VM_OPC_TruncI8               : VM_OPC<0x31, "TruncI8">;
-def VM_OPC_TruncI16              : VM_OPC<0x32, "TruncI16">;
+def VM_OPC_TruncI32I8            : VM_OPC<0x31, "TruncI32I8">;
+def VM_OPC_TruncI32I16           : VM_OPC<0x32, "TruncI32I16">;
 def VM_OPC_ExtI8I32S             : VM_OPC<0x33, "ExtI8I32S">;
 def VM_OPC_ExtI16I32S            : VM_OPC<0x34, "ExtI16I32S">;
 
@@ -163,8 +187,19 @@ def VM_OPC_Print                 : VM_OPC<0x7D, "Print">;
 def VM_OPC_CondBreak             : VM_OPC<0x7E, "CondBreak">;
 def VM_OPC_Break                 : VM_OPC<0x7F, "Break">;
 
-def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
-    // Core VM opcodes (0x00-0x7F):
+// Extension prefixes:
+def VM_OPC_PrefixExtI64          : VM_OPC<0xA0, "PrefixExtI64">;
+def VM_OPC_PrefixExtF32          : VM_OPC<0xA1, "PrefixExtF32">;
+def VM_OPC_PrefixExtF64          : VM_OPC<0xA2, "PrefixExtF64">;
+
+// Runtime enum iree_vm_core_op_t:
+def VM_CoreOpcodeAttr :
+    VM_OPC_EnumAttr<"Opcode",
+                    "iree_vm_core_op_t",
+                    "CORE",  // IREE_VM_OP_CORE_*
+                    "valid VM core operation encodings",
+                    ?, [
+    // Core VM opcodes (0x00-0x9F):
     VM_OPC_GlobalLoadI32,
     VM_OPC_GlobalStoreI32,
     VM_OPC_GlobalLoadIndirectI32,
@@ -203,6 +238,10 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_ShlI32,
     VM_OPC_ShrI32S,
     VM_OPC_ShrI32U,
+    VM_OPC_TruncI32I8,
+    VM_OPC_TruncI32I16,
+    VM_OPC_ExtI8I32S,
+    VM_OPC_ExtI16I32S,
     VM_OPC_CmpEQI32,
     VM_OPC_CmpNEI32,
     VM_OPC_CmpLTI32S,
@@ -229,11 +268,105 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_CondBreak,
     VM_OPC_Break,
 
-    // Extension opcodes (0x80-0xFF):
-    // TODO(benvanik): SIMD dialect.
-  ]> {
-  let cppNamespace = "IREE::VM";
-}
+    // Extension opcodes (0xA0-0xFF):
+    VM_OPC_PrefixExtI64,  // VM_ExtI64OpcodeAttr
+    VM_OPC_PrefixExtF32,  // VM_ExtF32OpcodeAttr
+    VM_OPC_PrefixExtF64,  // VM_ExtF64OpcodeAttr
+  ]>;
+
+// i64 extension:
+// (ops are encoded as a VM_OPC_ExtI64 + the opcode below)
+def VM_OPC_GlobalLoadI64         : VM_OPC<0x00, "GlobalLoadI64">;
+def VM_OPC_GlobalStoreI64        : VM_OPC<0x01, "GlobalStoreI64">;
+def VM_OPC_GlobalLoadIndirectI64 : VM_OPC<0x02, "GlobalLoadIndirectI64">;
+def VM_OPC_GlobalStoreIndirectI64: VM_OPC<0x03, "GlobalStoreIndirectI64">;
+def VM_OPC_ConstI64Zero          : VM_OPC<0x08, "ConstI64Zero">;
+def VM_OPC_ConstI64              : VM_OPC<0x09, "ConstI64">;
+def VM_OPC_ListGetI64            : VM_OPC<0x14, "ListGetI64">;
+def VM_OPC_ListSetI64            : VM_OPC<0x15, "ListSetI64">;
+def VM_OPC_SelectI64             : VM_OPC<0x1E, "SelectI64">;
+def VM_OPC_SwitchI64             : VM_OPC<0x20, "SwitchI64">;
+def VM_OPC_AddI64                : VM_OPC<0x22, "AddI64">;
+def VM_OPC_SubI64                : VM_OPC<0x23, "SubI64">;
+def VM_OPC_MulI64                : VM_OPC<0x24, "MulI64">;
+def VM_OPC_DivI64S               : VM_OPC<0x25, "DivI64S">;
+def VM_OPC_DivI64U               : VM_OPC<0x26, "DivI64U">;
+def VM_OPC_RemI64S               : VM_OPC<0x27, "RemI64S">;
+def VM_OPC_RemI64U               : VM_OPC<0x28, "RemI64U">;
+def VM_OPC_NotI64                : VM_OPC<0x29, "NotI64">;
+def VM_OPC_AndI64                : VM_OPC<0x2A, "AndI64">;
+def VM_OPC_OrI64                 : VM_OPC<0x2B, "OrI64">;
+def VM_OPC_XorI64                : VM_OPC<0x2C, "XorI64">;
+def VM_OPC_ShlI64                : VM_OPC<0x2D, "ShlI64">;
+def VM_OPC_ShrI64S               : VM_OPC<0x2E, "ShrI64S">;
+def VM_OPC_ShrI64U               : VM_OPC<0x2F, "ShrI64U">;
+def VM_OPC_TruncI64I8            : VM_OPC<0x31, "TruncI64I8">;
+def VM_OPC_TruncI64I16           : VM_OPC<0x32, "TruncI64I16">;
+def VM_OPC_TruncI64I32           : VM_OPC<0x36, "TruncI64I32">;
+def VM_OPC_ExtI8I64S             : VM_OPC<0x33, "ExtI8I64S">;
+def VM_OPC_ExtI16I64S            : VM_OPC<0x34, "ExtI16I64S">;
+def VM_OPC_ExtI32I64S            : VM_OPC<0x35, "ExtI32I64S">;
+def VM_OPC_CmpEQI64              : VM_OPC<0x40, "CmpEQI64">;
+def VM_OPC_CmpNEI64              : VM_OPC<0x41, "CmpNEI64">;
+def VM_OPC_CmpLTI64S             : VM_OPC<0x42, "CmpLTI64S">;
+def VM_OPC_CmpLTI64U             : VM_OPC<0x43, "CmpLTI64U">;
+def VM_OPC_CmpLTEI64S            : VM_OPC<0x44, "CmpLTEI64S">;
+def VM_OPC_CmpLTEI64U            : VM_OPC<0x45, "CmpLTEI64U">;
+def VM_OPC_CmpGTI64S             : VM_OPC<0x46, "CmpGTI64S">;
+def VM_OPC_CmpGTI64U             : VM_OPC<0x47, "CmpGTI64U">;
+def VM_OPC_CmpGTEI64S            : VM_OPC<0x48, "CmpGTEI64S">;
+def VM_OPC_CmpGTEI64U            : VM_OPC<0x49, "CmpGTEI64U">;
+def VM_OPC_CmpNZI64              : VM_OPC<0x4D, "CmpNZI64">;
+
+// Runtime enum iree_vm_ext_i64_op_t:
+def VM_ExtI64OpcodeAttr :
+    VM_OPC_EnumAttr<"ExtI64Opcode",
+                    "iree_vm_ext_i64_op_t",
+                    "EXT_I64",  // IREE_VM_OP_EXT_I64_*
+                    "valid VM operation encodings in the i64 extension",
+                    VM_OPC_PrefixExtI64, [
+    VM_OPC_GlobalLoadI64,
+    VM_OPC_GlobalStoreI64,
+    VM_OPC_GlobalLoadIndirectI64,
+    VM_OPC_GlobalStoreIndirectI64,
+    VM_OPC_ConstI64Zero,
+    VM_OPC_ConstI64,
+    VM_OPC_ListGetI64,
+    VM_OPC_ListSetI64,
+    VM_OPC_SelectI64,
+    VM_OPC_SwitchI64,
+    VM_OPC_AddI64,
+    VM_OPC_SubI64,
+    VM_OPC_MulI64,
+    VM_OPC_DivI64S,
+    VM_OPC_DivI64U,
+    VM_OPC_RemI64S,
+    VM_OPC_RemI64U,
+    VM_OPC_NotI64,
+    VM_OPC_AndI64,
+    VM_OPC_OrI64,
+    VM_OPC_XorI64,
+    VM_OPC_ShlI64,
+    VM_OPC_ShrI64S,
+    VM_OPC_ShrI64U,
+    VM_OPC_TruncI64I8,
+    VM_OPC_TruncI64I16,
+    VM_OPC_TruncI64I32,
+    VM_OPC_ExtI8I64S,
+    VM_OPC_ExtI16I64S,
+    VM_OPC_ExtI32I64S,
+    VM_OPC_CmpEQI64,
+    VM_OPC_CmpNEI64,
+    VM_OPC_CmpLTI64S,
+    VM_OPC_CmpLTI64U,
+    VM_OPC_CmpLTEI64S,
+    VM_OPC_CmpLTEI64U,
+    VM_OPC_CmpGTI64S,
+    VM_OPC_CmpGTI64U,
+    VM_OPC_CmpGTEI64S,
+    VM_OPC_CmpGTEI64U,
+    VM_OPC_CmpNZI64,
+  ]>;
 
 //===----------------------------------------------------------------------===//
 // Declarative encoding framework
@@ -374,6 +507,40 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
   list<VM_EncEncodeExpr> encoding = ?;
 }
 
+def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
+  let description = [{
+    Interface used for VM ops that declare global values.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the storage type of this global such as i32.
+    }],
+    "Type", "getStorageType", (ins)>,
+    InterfaceMethod<[{
+      Returns the size in bytes of the global when stored in rwdata. Valid only
+      for globals using primitive storage.
+    }],
+    "size_t", "getStorageSize", (ins), [{
+      auto storageType = $_self.getStorageType();
+      assert(storageType.isIntOrFloat());
+      assert(storageType.getIntOrFloatBitWidth() % 8 == 0);
+      return storageType.getIntOrFloatBitWidth() / 8;
+    }]>,
+    InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
+    InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
+    InterfaceMethod<[{}], "Optional<StringRef>", "getInitializerAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<IntegerAttr>", "getOrdinalAttr", (ins)>,
+    InterfaceMethod<[{}], "int", "getOrdinal", (ins), [{
+      return $_self.getOrdinalAttr().getValue().template cast<IntegerAttr>().getInt();
+    }]>,
+    InterfaceMethod<[{}], "void", "makeMutable", (ins)>,
+    InterfaceMethod<[{}], "void", "clearInitializer", (ins)>,
+    InterfaceMethod<[{}], "void", "clearInitialValue", (ins)>,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // VM traits
 //===----------------------------------------------------------------------===//
@@ -389,6 +556,13 @@ def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;
 // Operations with this trait will disallow code motion across them to ensure
 // that execution order before and after the barrier op remains the same.
 def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
+
+// Operations with this trait require the VM i64 extension.
+def VM_ExtI64 : NativeOpTrait<"IREE::VM::ExtI64">;
+// Operations with this trait require the VM f32 extension.
+def VM_ExtF32 : NativeOpTrait<"IREE::VM::ExtF32">;
+// Operations with this trait require the VM f64 extension.
+def VM_ExtF64 : NativeOpTrait<"IREE::VM::ExtF64">;
 
 //===----------------------------------------------------------------------===//
 // ref<T> types
@@ -471,13 +645,16 @@ def VM_CondValue : I<32> {
 
 def VM_AnyType : AnyTypeOf<[
   I32,
+  I64,
+  F32,
+  F64,
   VM_CondValue,
   VM_AnyRef,
 ]>;
 
 def VM_PrimitiveType : AnyTypeOf<[
-  AnyIntOfWidths<[8, 16, 32]>,
-  FloatOfWidths<[16, 32]>,
+  AnyIntOfWidths<[8, 16, 32, 64]>,
+  FloatOfWidths<[16, 32, 64]>,
 ]>;
 
 class VM_ConstIntValueAttr<I type> : Attr<

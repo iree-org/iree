@@ -49,9 +49,15 @@ class FunctionAbiTest(absltest.TestCase):
   def setUpClass(cls):
     super().setUpClass()
     driver_names = rt.HalDriver.query()
-    print("DRIVER_NAMES =", driver_names)
-    cls.driver = rt.HalDriver.create("vulkan")
-    cls.device = cls.driver.create_default_device()
+    for driver_name in driver_names:
+      print("Try create driver:", driver_name)
+      try:
+        cls.driver = rt.HalDriver.create(driver_name)
+        cls.device = cls.driver.create_default_device()
+      except Exception:
+        print("Could not create driver:", driver_name)
+      else:
+        break
 
   def setUp(self):
     super().setUp()

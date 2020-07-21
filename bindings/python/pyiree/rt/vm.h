@@ -21,7 +21,7 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/variant_list.h"
+#include "iree/vm/list.h"
 
 namespace iree {
 namespace python {
@@ -67,7 +67,7 @@ class VmVariantList {
   VmVariantList() : list_(nullptr) {}
   ~VmVariantList() {
     if (list_) {
-      iree_vm_variant_list_free(list_);
+      iree_vm_list_release(list_);
     }
   }
 
@@ -80,28 +80,29 @@ class VmVariantList {
   VmVariantList(const VmVariantList&) = delete;
 
   static VmVariantList Create(iree_host_size_t capacity) {
-    iree_vm_variant_list_t* list;
-    CheckApiStatus(
-        iree_vm_variant_list_alloc(capacity, IREE_ALLOCATOR_SYSTEM, &list),
-        "Error allocating variant list");
+    iree_vm_list_t* list;
+    CheckApiStatus(iree_vm_list_create(/*element_type=*/nullptr, capacity,
+                                       IREE_ALLOCATOR_SYSTEM, &list),
+                   "Error allocating variant list");
     return VmVariantList(list);
   }
 
-  iree_host_size_t size() const { return iree_vm_variant_list_size(list_); }
+  iree_host_size_t size() const { return iree_vm_list_size(list_); }
 
-  iree_vm_variant_list_t* raw_ptr() { return list_; }
-  const iree_vm_variant_list_t* raw_ptr() const { return list_; }
+  iree_vm_list_t* raw_ptr() { return list_; }
+  const iree_vm_list_t* raw_ptr() const { return list_; }
 
   void AppendNullRef() {
-    CheckApiStatus(iree_vm_variant_list_append_null_ref(raw_ptr()),
+    iree_vm_ref_t null_ref = {0};
+    CheckApiStatus(iree_vm_list_push_ref_move(raw_ptr(), &null_ref),
                    "Error appending to list");
   }
 
   std::string DebugString() const;
 
  private:
-  VmVariantList(iree_vm_variant_list_t* list) : list_(list) {}
-  iree_vm_variant_list_t* list_;
+  VmVariantList(iree_vm_list_t* list) : list_(list) {}
+  iree_vm_list_t* list_;
 };
 
 //------------------------------------------------------------------------------

@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <thread>  // NOLINT
 
-#include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
@@ -73,7 +72,7 @@ TEST(CondVarSemaphoreTest, StickyFailure) {
 // Tests waiting on no semaphores.
 TEST(CondVarSemaphoreTest, EmptyWait) {
   EXPECT_OK(CondVarSemaphore::WaitForSemaphores({}, /*wait_all=*/true,
-                                                absl::InfiniteFuture()));
+                                                InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
@@ -81,9 +80,9 @@ TEST(CondVarSemaphoreTest, WaitAlreadySignaled) {
   CondVarSemaphore semaphore(2u);
   // Test both previous and current values.
   EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
-      {{&semaphore, 1u}}, /*wait_all=*/true, absl::InfiniteFuture()));
+      {{&semaphore, 1u}}, /*wait_all=*/true, InfiniteFuture()));
   EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
-      {{&semaphore, 2u}}, /*wait_all=*/true, absl::InfiniteFuture()));
+      {{&semaphore, 2u}}, /*wait_all=*/true, InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has not been signaled.
@@ -91,7 +90,7 @@ TEST(CondVarSemaphoreTest, WaitUnsignaled) {
   CondVarSemaphore semaphore(2u);
   // NOTE: we don't actually block here because otherwise we'd lock up.
   EXPECT_TRUE(IsDeadlineExceeded(CondVarSemaphore::WaitForSemaphores(
-      {{&semaphore, 3u}}, /*wait_all=*/true, absl::InfinitePast())));
+      {{&semaphore, 3u}}, /*wait_all=*/true, InfinitePast())));
 }
 
 // Tests waiting on a failed semaphore (it should return the error on the
@@ -100,7 +99,7 @@ TEST(CondVarSemaphoreTest, WaitAlreadyFailed) {
   CondVarSemaphore semaphore(2u);
   semaphore.Fail(UnknownErrorBuilder(IREE_LOC));
   EXPECT_TRUE(IsUnknown(CondVarSemaphore::WaitForSemaphores(
-      {{&semaphore, 2u}}, /*wait_all=*/true, absl::InfinitePast())));
+      {{&semaphore, 2u}}, /*wait_all=*/true, InfinitePast())));
 }
 
 // Tests threading behavior by ping-ponging between the test main thread and
@@ -111,14 +110,14 @@ TEST(CondVarSemaphoreTest, PingPong) {
   std::thread thread([&]() {
     // Should advance right past this because the value is already set.
     ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
-        {{&a2b, 0u}}, /*wait_all=*/true, absl::InfiniteFuture()));
+        {{&a2b, 0u}}, /*wait_all=*/true, InfiniteFuture()));
     ASSERT_OK(b2a.Signal(1u));
     // Jump ahead.
     ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
-        {{&a2b, 4u}}, /*wait_all=*/true, absl::InfiniteFuture()));
+        {{&a2b, 4u}}, /*wait_all=*/true, InfiniteFuture()));
   });
   ASSERT_OK(CondVarSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
-                                                absl::InfiniteFuture()));
+                                                InfiniteFuture()));
   ASSERT_OK(a2b.Signal(4u));
   thread.join();
 }
@@ -131,10 +130,10 @@ TEST(CondVarSemaphoreTest, FailNotifies) {
   std::thread thread([&]() {
     ASSERT_OK(b2a.Signal(1u));
     got_failure = IsUnknown(CondVarSemaphore::WaitForSemaphores(
-        {{&a2b, 1u}}, /*wait_all=*/true, absl::InfiniteFuture()));
+        {{&a2b, 1u}}, /*wait_all=*/true, InfiniteFuture()));
   });
   ASSERT_OK(CondVarSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
-                                                absl::InfiniteFuture()));
+                                                InfiniteFuture()));
   a2b.Fail(UnknownErrorBuilder(IREE_LOC));
   thread.join();
   ASSERT_TRUE(got_failure);

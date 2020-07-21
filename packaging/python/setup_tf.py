@@ -45,7 +45,12 @@ def run():
       sub_project="tf",
       description="IREE TensorFlow Compiler",
       package_dir=package_dir)
-  common_setup.setup(packages=packages, **setup_kwargs)
+  common_setup.setup(
+      packages=packages,
+      ext_modules=[
+          setuptools.Extension(name="pyiree.tf.compiler.binding", sources=[]),
+      ],
+      **setup_kwargs)
 
 
 if __name__ == "__main__":

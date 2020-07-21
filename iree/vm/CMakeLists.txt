@@ -106,6 +106,30 @@ iree_bytecode_module(
 
 iree_cc_test(
   NAME
+    bytecode_module_size_benchmark
+  SRCS
+    "bytecode_module_size_benchmark.cc"
+  DEPS
+    ::bytecode_module
+    ::bytecode_module_size_benchmark_module_cc
+    ::vm
+    iree::base::api
+)
+
+iree_bytecode_module(
+  NAME
+    bytecode_module_size_benchmark_module
+  SRC
+    "bytecode_module_size_benchmark.mlir"
+  CC_NAMESPACE
+    "iree::vm"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
     bytecode_module_test
   SRCS
     "bytecode_module_test.cc"
@@ -165,8 +189,8 @@ iree_cc_library(
     "invocation.c"
   DEPS
     ::context
+    ::list
     ::module
-    ::variant_list
     iree::base::api
     iree::base::tracing
   PUBLIC
@@ -283,7 +307,6 @@ iree_cc_library(
   DEPS
     ::module
     ::ref
-    ::variant_list
     iree::base::alignment
     iree::base::api
     iree::base::tracing
@@ -324,19 +347,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    variant_list
-  HDRS
-    "variant_list.h"
-  SRCS
-    "variant_list.c"
-  DEPS
-    ::ref
-    ::value
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     vm
   HDRS
     "api.h"
@@ -351,7 +361,6 @@ iree_cc_library(
     ::stack
     ::type_def
     ::value
-    ::variant_list
     iree::base::api
   PUBLIC
 )

@@ -18,8 +18,6 @@
 #include <vector>
 
 #include "absl/synchronization/mutex.h"
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
@@ -164,16 +162,16 @@ class DeviceManager final {
   // Submissions may be made from any thread. Behavior is undefined
   // if a thread is performing a WaitIdle while another thread submits work.
   Status Submit(Device* device, CommandQueue* command_queue,
-                absl::Span<const SubmissionBatch> batches, absl::Time deadline);
+                absl::Span<const SubmissionBatch> batches, Time deadline_ns);
   Status Submit(Device* device, CommandQueue* command_queue,
                 absl::Span<const SubmissionBatch> batches,
-                absl::Duration timeout) {
+                Duration timeout_ns) {
     return Submit(device, command_queue, batches,
-                  RelativeTimeoutToDeadline(timeout));
+                  RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
   Status Submit(Device* device, CommandQueue* command_queue,
                 absl::Span<const SubmissionBatch> batches) {
-    return Submit(device, command_queue, batches, absl::InfinitePast());
+    return Submit(device, command_queue, batches, InfinitePast());
   }
 
   // Flushes any requests that are pending in the scheduler and ensures they
@@ -192,11 +190,11 @@ class DeviceManager final {
   //
   // If any used device has encountered an error during submission at any
   // point it will be returned here (repeatedly).
-  Status WaitIdle(absl::Time deadline);
-  inline Status WaitIdle(absl::Duration timeout) {
-    return WaitIdle(RelativeTimeoutToDeadline(timeout));
+  Status WaitIdle(Time deadline_ns);
+  inline Status WaitIdle(Duration timeout_ns) {
+    return WaitIdle(RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
-  inline Status WaitIdle() { return WaitIdle(absl::InfiniteFuture()); }
+  inline Status WaitIdle() { return WaitIdle(InfiniteFuture()); }
 
  private:
   mutable absl::Mutex device_mutex_;

@@ -322,12 +322,14 @@ class TensorList final : public RefObject<TensorList> {
 static iree_vm_ref_type_descriptor_t iree_tensorlist_descriptor = {0};
 
 // Register our type with the vm::ref<T> static machinery.
+namespace vm {
 template <>
-struct ::iree::vm::ref_type_descriptor<TensorList> {
+struct ref_type_descriptor<TensorList> {
   static const iree_vm_ref_type_descriptor_t* get() {
     return &iree_tensorlist_descriptor;
   }
 };
+}  // namespace vm
 
 extern "C" iree_status_t iree_tensorlist_module_register_types() {
   static bool has_registered = false;

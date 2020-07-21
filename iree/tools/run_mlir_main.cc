@@ -66,7 +66,6 @@
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/value.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -125,7 +124,7 @@ static llvm::cl::list<std::string> input_values_flag{
 static llvm::cl::opt<std::string> input_values_file_flag{
     "input-value-file",
     llvm::cl::desc("Provides a file for input shapes and optional values (see "
-                   "run_module_main.cc for details)"),
+                   "ParseToVariantListFromFile in vm_util.h for details)"),
     llvm::cl::init(""),
 };
 
@@ -265,23 +264,6 @@ StatusOr<std::string> PrepareModule(
   return binary_contents;
 }
 
-// Returns a splitted input values from `filename` using newline as separater.
-StatusOr<std::vector<std::string>> GetInputValues(const std::string& filename) {
-  std::string error_message;
-  auto file = mlir::openInputFile(filename, &error_message);
-  if (!file) {
-    return NotFoundErrorBuilder(IREE_LOC) << "Unable to open input file '"
-                                          << filename << "': " << error_message;
-  }
-  llvm::SmallVector<llvm::StringRef, 8> source_buffers;
-  file->getBuffer().split(source_buffers, /*Separator=*/"\n", /*MaxSplit=*/-1,
-                          /*KeepEmpty=*/false);
-  std::vector<std::string> res;
-  res.reserve(source_buffers.size());
-  for (auto s : source_buffers) res.emplace_back(s);
-  return res;
-}
-
 // Evaluates a single function in its own fiber, printing the results to stdout.
 Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
@@ -291,43 +273,40 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
   std::cout << "EXEC @" << export_name << std::endl;
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
-  iree_vm_variant_list_t* input_list;
+  vm::ref<iree_vm_list_t> inputs;
   if (!input_values_file_flag.empty()) {
     if (!input_values_flag.empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of input_values_file_flag and "
-                "input_values_flag is set";
+             << "Expected only one of input_values and "
+                "input_values_file to be set";
     }
-    ASSIGN_OR_RETURN(auto input_values, GetInputValues(input_values_file_flag));
-    ASSIGN_OR_RETURN(input_list,
-                     ParseToVariantList(input_descs, allocator, input_values));
+    ASSIGN_OR_RETURN(inputs,
+                     ParseToVariantListFromFile(input_descs, allocator,
+                                                input_values_file_flag));
   } else {
     auto input_values_list = absl::MakeConstSpan(
         input_values_flag.empty() ? nullptr : &input_values_flag.front(),
         input_values_flag.size());
-    ASSIGN_OR_RETURN(input_list, ParseToVariantList(input_descs, allocator,
-                                                    input_values_list));
+    ASSIGN_OR_RETURN(
+        inputs, ParseToVariantList(input_descs, allocator, input_values_list));
   }
 
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.
-  iree_vm_variant_list_t* output_list = nullptr;
+  vm::ref<iree_vm_list_t> outputs;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_alloc(output_descs.size(), IREE_ALLOCATOR_SYSTEM,
-                                 &output_list),
+      iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
+                          IREE_ALLOCATOR_SYSTEM, &outputs),
       IREE_LOC));
 
   // Synchronously invoke the function.
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_invoke(context, function, /*policy=*/nullptr, input_list,
-                     output_list, IREE_ALLOCATOR_SYSTEM),
+      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
+                     outputs.get(), IREE_ALLOCATOR_SYSTEM),
       IREE_LOC));
 
-  iree_vm_variant_list_free(input_list);
-
   // Print outputs.
-  RETURN_IF_ERROR(PrintVariantList(output_descs, output_list));
-  iree_vm_variant_list_free(output_list);
+  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
 
   return OkStatus();
 }

@@ -24,21 +24,23 @@ NUM_BATCH = 7
 INPUT_SHAPE = [None, None, NUM_UNITS]
 
 
-def lstm_module():
-  tf_utils.set_random_seed()
-  inputs = tf.keras.layers.Input(batch_size=None, shape=INPUT_SHAPE[1:])
-  outputs = tf.keras.layers.LSTM(units=NUM_UNITS, return_sequences=True)(inputs)
-  model = tf.keras.Model(inputs, outputs)
-  module = tf.Module()
-  module.m = model
-  module.predict = tf.function(
-      input_signature=[tf.TensorSpec(INPUT_SHAPE, tf.float32)])(
-          model.call)
-  return module
+class Lstm(tf.Module):
+
+  def __init__(self):
+    super(Lstm, self).__init__()
+    tf_utils.set_random_seed()
+    inputs = tf.keras.layers.Input(batch_size=None, shape=INPUT_SHAPE[1:])
+    outputs = tf.keras.layers.LSTM(
+        units=NUM_UNITS, return_sequences=True)(
+            inputs)
+    self.m = tf.keras.Model(inputs, outputs)
+    self.predict = tf.function(
+        input_signature=[tf.TensorSpec(INPUT_SHAPE, tf.float32)])(
+            self.m.call)
 
 
-@tf_test_utils.compile_module(lstm_module, exported_names=["predict"])
-class LstmTest(tf_test_utils.SavedModelTestCase):
+@tf_test_utils.compile_module(Lstm, exported_names=["predict"])
+class LstmTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_lstm(self):
     m = self.get_module()

@@ -22,8 +22,8 @@
 #include "iree/base/signature_mangle.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
-#include "iree/vm/module.h"
-#include "iree/vm/variant_list.h"
+#include "iree/vm/api.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 
@@ -50,10 +50,21 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
 // Uses |allocator| to allocate the buffers.
 // Uses descriptors in |descs| for type information and validation.
 // The returned variant list must be freed by the caller.
-StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
+StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator,
+    absl::Span<const absl::string_view> input_strings);
+StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
     absl::Span<const std::string> input_strings);
+
+// Parses the content in |filename| into a variant list of VM scalars and
+// buffers. See ParseToVariantList for the format of scalars and buffers. The
+// inputs are expected to be newline-separated.
+StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantListFromFile(
+    absl::Span<const RawSignatureParser::Description> descs,
+    iree_hal_allocator_t* allocator, const std::string& filename);
 
 // Prints a variant list of VM scalars and buffers to |os|.
 // Prints scalars in the format:
@@ -64,7 +75,7 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
 // https://github.com/google/iree/tree/main/iree/hal/api.h
 // Uses descriptors in |descs| for type information and validation.
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
-                        iree_vm_variant_list_t* variant_list,
+                        iree_vm_list_t* variant_list,
                         std::ostream* os = &std::cout);
 
 // Creates the default device for |driver| in |out_device|.

@@ -71,7 +71,7 @@ TEST_P(CommandQueueTest, BlockingSubmit) {
 
   ASSERT_OK(command_queue->Submit(
       {{}, {command_buffer.get()}, {{semaphore.get(), 1ull}}}));
-  ASSERT_OK(semaphore->Wait(1ull, absl::InfiniteFuture()));
+  ASSERT_OK(semaphore->Wait(1ull, InfiniteFuture()));
 }
 
 // Tests waiting while work is pending/in-flight.
@@ -91,12 +91,11 @@ TEST_P(CommandQueueTest, WaitTimeout) {
 
   // Work shouldn't start until the wait semaphore reaches its payload value.
   EXPECT_THAT(signal_semaphore->Query(), IsOkAndHolds(Eq(0ull)));
-  EXPECT_TRUE(
-      IsDeadlineExceeded(command_queue->WaitIdle(absl::Milliseconds(100))));
+  EXPECT_TRUE(IsDeadlineExceeded(command_queue->WaitIdle(Milliseconds(100))));
 
   // Signal the wait semaphore, work should begin and complete.
   ASSERT_OK(wait_semaphore->Signal(1ull));
-  ASSERT_OK(signal_semaphore->Wait(1ull, absl::InfiniteFuture()));
+  ASSERT_OK(signal_semaphore->Wait(1ull, InfiniteFuture()));
 }
 
 // Tests using multiple wait and signal semaphores.
@@ -120,8 +119,7 @@ TEST_P(CommandQueueTest, WaitMultiple) {
   EXPECT_THAT(signal_semaphore_1->Query(), IsOkAndHolds(Eq(0ull)));
   EXPECT_THAT(signal_semaphore_2->Query(), IsOkAndHolds(Eq(0ull)));
   // Note: This fails with Vulkan timeline semaphore emulation (returns OK)
-  EXPECT_TRUE(
-      IsDeadlineExceeded(command_queue->WaitIdle(absl::Milliseconds(100))));
+  EXPECT_TRUE(IsDeadlineExceeded(command_queue->WaitIdle(Milliseconds(100))));
 
   // Signal the wait semaphores, work should only begin after each is set.
   ASSERT_OK(wait_semaphore_1->Signal(1ull));

@@ -590,12 +590,12 @@ OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {
 // Casting and type conversion/emulation
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TruncI8Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI32I8Op::fold(ArrayRef<Attribute> operands) {
   return constFoldUnaryOp<IntegerAttr>(
       operands, [&](APInt a) { return a.trunc(8).zext(32); });
 }
 
-OpFoldResult TruncI16Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI32I16Op::fold(ArrayRef<Attribute> operands) {
   return constFoldUnaryOp<IntegerAttr>(
       operands, [&](APInt a) { return a.trunc(16).zext(32); });
 }

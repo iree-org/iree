@@ -41,7 +41,7 @@ class StringsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(StringsModule)
-class StringsTest(tf_test_utils.SavedModelTestCase):
+class StringsTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_print_ids(self):
     input_ids = np.asarray(

@@ -71,7 +71,7 @@ class MatrixOpsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(MatrixOpsModule)
-class MatrixOpsTest(tf_test_utils.SavedModelTestCase):
+class MatrixOpsTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_basic_matmul(self):
     m = self.get_module()

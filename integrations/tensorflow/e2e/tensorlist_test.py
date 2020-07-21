@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
@@ -69,7 +65,7 @@ class TensorListModule(tf.Module):
 
 
 @tf_test_utils.compile_module(TensorListModule)
-class TensorListTest(tf_test_utils.SavedModelTestCase):
+class TensorListTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_identity_through_tensorlist(self):
     m = self.get_module()

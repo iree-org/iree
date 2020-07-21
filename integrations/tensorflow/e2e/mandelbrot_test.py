@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
@@ -95,7 +91,7 @@ class MandelbrotModule(tf.Module):
 
 
 @tf_test_utils.compile_module(MandelbrotModule)
-class MandelbrotTest(tf_test_utils.SavedModelTestCase):
+class MandelbrotTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_mandelbrot(self):
     mandelbrot = self.get_module()

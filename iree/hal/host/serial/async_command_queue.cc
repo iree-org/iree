@@ -103,7 +103,7 @@ Status AsyncCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
   return submission_queue_.Enqueue(batches);
 }
 
-Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
+Status AsyncCommandQueue::WaitIdle(Time deadline_ns) {
   IREE_TRACE_SCOPE0("AsyncCommandQueue::WaitIdle");
 
   // Wait until the deadline, the thread exits, or there are no more pending
@@ -115,7 +115,7 @@ Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
                 return queue->empty() || !queue->permanent_error().ok();
               },
               &submission_queue_),
-          deadline)) {
+          absl::FromUnixNanos(static_cast<int64_t>(deadline_ns)))) {
     return DeadlineExceededErrorBuilder(IREE_LOC)
            << "Deadline exceeded waiting for submission thread to go idle";
   }

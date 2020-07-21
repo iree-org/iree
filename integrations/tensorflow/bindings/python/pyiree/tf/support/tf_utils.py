@@ -136,22 +136,24 @@ class CompiledModule(object):
   """Base class for the TF and IREE compiled module facades."""
 
   @staticmethod
-  def compile(constructor, backend_info, exported_names=(), artifacts_dir=None):
+  def compile(module_class,
+              backend_info,
+              exported_names=(),
+              artifacts_dir=None):
     """Compile a tf.Module using the CompiledModule subclass in backend_info.
 
     Args:
-      constructor: a tf.Module subclass or function which returns a tf.Module
-        subclass instance.
+      module_class: the tf.Module subclass to compile.
       backend_info: an element of BackendInfo corresponding to the backend to
         compile to. If a TF 'backend' is provided then the module is wrapped in
         a TfCompiledModule.
       exported_names: an optional iterable of strings representing which of the
-        tf.Module's functions to compile. If exported_names is empty all
+        module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
     """
     compile = backend_info.CompiledModule.compile
-    return compile(constructor, backend_info, exported_names, artifacts_dir)
+    return compile(module_class, backend_info, exported_names, artifacts_dir)
 
   @staticmethod
   def from_existing(module):
@@ -160,9 +162,9 @@ class CompiledModule(object):
     from_existing = module._backend_info.CompiledModule.from_existing
     return from_existing(module)
 
-  def __init__(self, constructor, backend_info, exported_names, artifacts_dir):
+  def __init__(self, module_class, backend_info, exported_names, artifacts_dir):
     """Default constructor – use `compile` or `from_existing` instead."""
-    self._constructor = constructor
+    self._module_class = module_class
     self._backend_info = backend_info
     self._exported_names = exported_names
     self._artifacts_dir = artifacts_dir
@@ -172,45 +174,47 @@ class IreeCompiledModule(CompiledModule):
   """Iree compiled module."""
 
   @staticmethod
-  def compile(constructor, backend_info, exported_names=(), artifacts_dir=None):
+  def compile(module_class,
+              backend_info,
+              exported_names=(),
+              artifacts_dir=None):
     """Compile a tf.Module to the target backend in backend_info.
 
     Args:
-      constructor: a tf.Module subclass or function which returns a tf.Module
-        subclass instance.
+      module_class: the tf.Module subclass to compile.
       backend_info: an element of BackendInfo corresponding to the IREE backend
         to compile to.
       exported_names: an optional iterable of strings representing which of the
-        tf.Module's functions to compile. If exported_names is empty all
+        module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
     """
-    return IreeCompiledModule(constructor, backend_info, exported_names,
+    return IreeCompiledModule(module_class, backend_info, exported_names,
                               artifacts_dir)
 
   @staticmethod
   def from_existing(module):
     """Duplicates 'module' with the tf.Module's state without recompiling."""
     default_args = [
-        module._constructor, module._backend_info, module._exported_names,
+        module._module_class, module._backend_info, module._exported_names,
         module._artifacts_dir
     ]
     from_existing_args = [module._module_blob, module._module, module._config]
     return IreeCompiledModule(*default_args, from_existing_args)
 
   def __init__(self,
-               constructor,
+               module_class,
                backend_info,
                exported_names,
                artifacts_dir,
                _from_existing_args=None):
     """Default constructor – use `compile` or `from_existing` instead."""
-    super().__init__(constructor, backend_info, exported_names, artifacts_dir)
+    super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
     if _from_existing_args is None:
       # Called from IreeCompiledModule.compile(...)
       self._module_blob = compile_tf_module(
-          tf_module=constructor(),
+          tf_module=module_class(),
           target_backends=backend_info.iree_compiler_targets,
           exported_names=exported_names,
           artifacts_dir=artifacts_dir)
@@ -250,35 +254,37 @@ class TfCompiledModule(CompiledModule):
   """
 
   @staticmethod
-  def compile(constructor, backend_info, exported_names=(), artifacts_dir=None):
+  def compile(module_class,
+              backend_info,
+              exported_names=(),
+              artifacts_dir=None):
     """Wrap a tf.Module in a TFCompiledModule facade.
 
     Args:
-      constructor: a tf.Module subclass or function which returns a tf.Module
-        subclass instance.
+      module_class: the tf.Module subclass to 'compile'.
       backend_info: one of the 'tf*' elements in BackendInfo.
-      exported_names: an optional iterable of strings representing the which of
-        the tf.Module's functions should be callable. If exported_names is empty
-        then all functions are callable.
+      exported_names: an optional iterable of strings representing which of the
+        module_class's functions should be callable. If exported_names is empty
+        then all functions will be callable.
       artifacts_dir: an optional path to save compilation artifacts to. Has no
         effect for this subclass as nothing is compiled.
     """
-    return TfCompiledModule(constructor, backend_info, exported_names,
+    return TfCompiledModule(module_class, backend_info, exported_names,
                             artifacts_dir)
 
   @staticmethod
   def from_existing(module):
-    """Duplicates 'module's facade with the starting state of constructor."""
-    duplicate_module = TfCompiledModule(module._constructor,
+    """Duplicates 'module's facade with the starting state of module_class."""
+    duplicate_module = TfCompiledModule(module._module_class,
                                         module._backend_info,
                                         module._exported_names,
                                         module._artifacts_dir)
     return duplicate_module
 
-  def __init__(self, constructor, backend_info, exported_names, artifacts_dir):
+  def __init__(self, module_class, backend_info, exported_names, artifacts_dir):
     """Default constructor – use `compile` or `from_existing` instead."""
-    super().__init__(constructor, backend_info, exported_names, artifacts_dir)
-    self._tf_module = constructor()
+    super().__init__(module_class, backend_info, exported_names, artifacts_dir)
+    self._tf_module = module_class()
 
   def __getattr__(self, attr):
     # Try to resolve it as a function.

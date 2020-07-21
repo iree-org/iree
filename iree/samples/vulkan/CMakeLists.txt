@@ -59,6 +59,7 @@ else()
         iree::samples::vulkan::simple_mul_bytecode_module_cc
         iree::vm
         iree::vm::bytecode_module
+        iree::vm::ref_cc
         SDL2-static
         Vulkan::Vulkan
       LINKOPTS

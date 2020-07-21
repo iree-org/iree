@@ -22,8 +22,8 @@
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/invocation.h"
+#include "iree/vm/list.h"
 #include "iree/vm/module.h"
-#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace hal {
@@ -133,8 +133,8 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
 
   auto dispatch_state = make_ref<VMLADispatchState>();
   dispatch_state->function = entry_functions_[params.entry_point];
-  dispatch_state->input_list_size =
-      iree_vm_variant_list_alloc_size(/*interface*/ 1 + /*workgroup_xyz[3]*/ 3);
+  dispatch_state->input_list_size = iree_vm_list_storage_size(
+      /*element_type=*/nullptr, /*interface*/ 1 + /*workgroup_xyz[3]*/ 3);
 
   auto* interface = &dispatch_state->interface;
   RETURN_IF_ERROR(interface->SetConstants(params.push_constants->values));
@@ -163,18 +163,20 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
   IREE_TRACE_SCOPE0("VMLAExecutable::DispatchTile");
   auto* dispatch_state = static_cast<VMLADispatchState*>(state);
 
-  auto* input_list = reinterpret_cast<iree_vm_variant_list_t*>(
-      alloca(dispatch_state->input_list_size));
-  iree_vm_variant_list_init(input_list,
-                            /*interface*/ 1 + /*workgroup_xyz[3]*/ 3);
-  iree_vm_variant_list_append_ref_retain(input_list,
-                                         &dispatch_state->interface_ref);
-  iree_vm_variant_list_append_value(input_list,
-                                    iree_vm_value_make_i32(workgroup_xyz[0]));
-  iree_vm_variant_list_append_value(input_list,
-                                    iree_vm_value_make_i32(workgroup_xyz[1]));
-  iree_vm_variant_list_append_value(input_list,
-                                    iree_vm_value_make_i32(workgroup_xyz[2]));
+  auto* input_list_storage = alloca(dispatch_state->input_list_size);
+  iree_vm_list_t* input_list = nullptr;
+  RETURN_IF_ERROR(
+      FromApiStatus(iree_vm_list_initialize(
+                        iree_make_byte_span(input_list_storage,
+                                            dispatch_state->input_list_size),
+                        /*element_type=*/nullptr,
+                        /*interface*/ 1 + /*workgroup_xyz[3]*/ 3, &input_list),
+                    IREE_LOC));
+  iree_vm_list_push_ref_retain(input_list, &dispatch_state->interface_ref);
+  for (int i = 0; i < workgroup_xyz.size(); ++i) {
+    iree_vm_value_t value = iree_vm_value_make_i32(workgroup_xyz[i]);
+    iree_vm_list_push_value(input_list, &value);
+  }
 
   auto status =
       FromApiStatus(iree_vm_invoke(context(), dispatch_state->function,
@@ -182,7 +184,7 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
                                    /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
                     IREE_LOC);
 
-  iree_vm_variant_list_free(input_list);
+  iree_vm_list_deinitialize(input_list);
 
   return std::move(status);
 }

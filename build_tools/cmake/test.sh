@@ -62,4 +62,4 @@ fi
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 cd ${ROOT_DIR?}/build
-ctest --label-exclude "${label_exclude_regex?}"
+ctest --output-on-failure --label-exclude "${label_exclude_regex?}"

@@ -24,6 +24,7 @@
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/vm_util.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
 ABSL_FLAG(std::string, input_file, "-",
@@ -47,6 +48,10 @@ ABSL_FLAG(std::vector<std::string>, inputs, {},
           "used to separate elements. They are reserved for separating input "
           "values:\n"
           "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
+
+ABSL_FLAG(std::string, inputs_file, "",
+          "Provides a file for input shapes and optional values (see "
+          "ParseToVariantListFromFile in vm_util.h for details)");
 
 namespace iree {
 namespace {
@@ -105,30 +110,40 @@ Status Run() {
   RETURN_IF_ERROR(ValidateFunctionAbi(function));
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
-  ASSIGN_OR_RETURN(
-      iree_vm_variant_list_t * inputs,
-      ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                         absl::GetFlag(FLAGS_inputs)));
+  vm::ref<iree_vm_list_t> inputs;
+  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_inputs).empty()) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Expected only one of inputs and inputs_file to be set";
+    }
+    ASSIGN_OR_RETURN(inputs, ParseToVariantListFromFile(
+                                 input_descs, iree_hal_device_allocator(device),
+                                 absl::GetFlag(FLAGS_inputs_file)));
+  } else {
+    ASSIGN_OR_RETURN(inputs, ParseToVariantList(
+                                 input_descs, iree_hal_device_allocator(device),
+                                 absl::GetFlag(FLAGS_inputs)));
+  }
 
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
-  iree_vm_variant_list_t* outputs = nullptr;
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_variant_list_alloc(output_descs.size(),
-                                               IREE_ALLOCATOR_SYSTEM, &outputs),
-                    IREE_LOC));
+  vm::ref<iree_vm_list_t> outputs;
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
+                          IREE_ALLOCATOR_SYSTEM, &outputs),
+      IREE_LOC));
 
   std::cout << "EXEC @" << function_name << "\n";
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                   inputs, outputs, IREE_ALLOCATOR_SYSTEM),
-                    IREE_LOC))
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
+                     outputs.get(), IREE_ALLOCATOR_SYSTEM),
+      IREE_LOC))
       << "invoking function " << function_name;
 
-  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs))
+  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()))
       << "printing results";
 
-  iree_vm_variant_list_free(inputs);
-  iree_vm_variant_list_free(outputs);
+  iree_vm_list_deinitialize(inputs.get());
+  iree_vm_list_deinitialize(outputs.get());
   iree_vm_module_release(hal_module);
   iree_vm_module_release(input_module);
   iree_hal_device_release(device);
