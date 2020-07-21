@@ -32,7 +32,7 @@ docker run \
   --volume "${WORKDIR?}:${WORKDIR?}" \
   --workdir="${WORKDIR?}" \
   --rm \
-  gcr.io/iree-oss/bazel-bindings:latest \
+  gcr.io/iree-oss/bazel-bindings:prod \
   kokoro/gcp_ubuntu/bazel/bindings/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
