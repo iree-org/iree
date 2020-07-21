@@ -58,7 +58,7 @@ class CustomOpShapeBuilderList {
   }
 
   template <typename BuilderTy, typename... ConstructorArgs>
-  BuilderTy &make(ConstructorArgs &&... args) {
+  BuilderTy &make(ConstructorArgs &&...args) {
     auto instance =
         std::make_unique<BuilderTy>(std::forward<ConstructorArgs>(args)...);
     BuilderTy *unowned = instance.get();
