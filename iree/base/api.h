@@ -374,7 +374,7 @@ typedef int64_t iree_time_t;
 // Like absl::Duration, represented as relative nanoseconds.
 typedef int64_t iree_duration_t;
 // Like absl::InfiniteDuration.
-#define IREE_DURATION_INFINITE INT64_MIN
+#define IREE_DURATION_INFINITE INT64_MAX
 // Like absl::ZeroDuration.
 #define IREE_DURATION_ZERO 0
 
