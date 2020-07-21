@@ -368,11 +368,14 @@ if(CMAKE_CROSSCOMPILING)
   add_custom_target(iree_host_flatcc_cli
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different
-        "${IREE_HOST_BINARY_ROOT}/third_party/flatcc/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
+        "${PROJECT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
         "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli"
     DEPENDS iree_host_build_flatcc_cli
     COMMENT "Installing host flatcc..."
   )
+else()
+  # TODO: unify flatc and flatcc handling to the same mechanism.
+  add_executable(iree_host_flatcc_cli ALIAS flatcc_cli)
 endif()
 
 if(${IREE_BUILD_COMPILER})
