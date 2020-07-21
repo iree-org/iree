@@ -802,7 +802,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_431
+`value` | Attribute | anonymous_438
 
 #### Results:
 
@@ -1081,7 +1081,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_434
+`initial_value` | Attribute | anonymous_441
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
