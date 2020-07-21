@@ -115,7 +115,7 @@ function(flatbuffer_c_library)
     MAIN_DEPENDENCY
       ${_RULE_SRCS}
     DEPENDS
-      ${_FLATCC_BIN}
+      iree_host_flatcc_cli
       ${_RULE_SRCS}
     COMMAND_EXPAND_LISTS
   )
