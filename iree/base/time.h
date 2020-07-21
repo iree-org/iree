@@ -15,6 +15,9 @@
 #ifndef IREE_BASE_TIME_H_
 #define IREE_BASE_TIME_H_
 
+#include <type_traits>
+#include <utility>
+
 #include "iree/base/api.h"
 
 namespace iree {

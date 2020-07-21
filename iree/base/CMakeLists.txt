@@ -524,6 +524,16 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    time_test
+  SRCS
+    "time_test.cc"
+  DEPS
+    ::time
+    iree::testing::gtest_main
+)
+
 if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
