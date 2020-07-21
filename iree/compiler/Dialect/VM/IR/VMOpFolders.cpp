@@ -716,9 +716,7 @@ OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void CmpLTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpLTI32SOp, CmpGTEI32SOp>>(context);
-}
+                                              MLIRContext *context) {}
 
 OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
@@ -730,9 +728,7 @@ OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void CmpLTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpLTI32UOp, CmpGTEI32UOp>>(context);
-}
+                                              MLIRContext *context) {}
 
 namespace {
 
