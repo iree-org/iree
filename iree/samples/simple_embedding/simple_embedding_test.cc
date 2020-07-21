@@ -183,6 +183,8 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   ASSERT_API_OK(iree_hal_buffer_unmap(ret_buffer, &mapped_memory));
   LOG(INFO) << "Results match!";
 
+  iree_vm_list_deinitialize(inputs.get());
+  iree_vm_list_deinitialize(outputs.get());
   iree_hal_device_release(device);
   iree_vm_context_release(context);
   iree_vm_instance_release(instance);
