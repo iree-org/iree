@@ -39,13 +39,14 @@ IMAGES_TO_DEPENDENCIES = {
     'rbe-toolchain': [],
 }
 
-IMAGES_TO_DEPENDENT_IMAGES = {
-    v: k
-    for v in dependencies
-    for k, dependencies in IMAGES_TO_DEPENDENCIES.items()}
+IMAGES_TO_DEPENDENT_IMAGES = {k:[] for k in IMAGES_TO_DEPENDENCIES.keys()}
+for image, dependencies in IMAGES_TO_DEPENDENCIES.items():
+  for d in dependencies:
+     IMAGES_TO_DEPENDENT_IMAGES[d].append(image)
+
 
 IMAGES_HELP = [f'`{name}`' for name in IMAGES_TO_DEPENDENCIES.keys()]
-IMAGES_HELP = f'{", ".join(IMAGES_HELP[:-1])} or {IMAGES_HELP[-1]}'
+IMAGES_HELP = f'{", ".join(IMAGES_HELP)} or `all`'
 
 RBE_MESSAGE = """
 Remember to update the `rbe_default` digest in the `WORKSPACE` file to reflect
@@ -125,14 +126,19 @@ if __name__ == '__main__':
     subprocess.check_output(['gcloud', 'auth', 'configure-docker'])
 
   # Check if any images depend on `args.images` and update them if they do.
-  images_to_update_set = set(args.images)
-  for image in args.images:
-    images_to_update_set.update(IMAGES_TO_DEPENDENT_IMAGES[image])
+  images_to_update_set = set()
+  queue = list(args.images)
+  while queue:
+    image = queue.pop()
+    if image not in images_to_update_set:
+      images_to_update_set.add(image)
+      queue.extend(IMAGES_TO_DEPENDENT_IMAGES[image])
 
   # Topo sort by image dependency
   images_to_update = sorted(
       images_to_update_set, key=functools.cmp_to_key(cmp_images_by_dependency))
 
+  print(f'Also updating dependent images. Will update: {images_to_update}')
   for image in images_to_update:
     print(f'Updating image {image}')
     image_url = os.path.join(IREE_GCR_URL, f'{image}:{args.tag}')
