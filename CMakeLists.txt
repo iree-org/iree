@@ -202,7 +202,6 @@ include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
 include(iree_multipy)
-include(iree_py_test)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
@@ -325,7 +324,8 @@ if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
   find_package(PythonInterp 3 REQUIRED)
 endif()
 if(${IREE_BUILD_PYTHON_BINDINGS})
-  find_package(PythonLibs 3 REQUIRED)
+  # Note: Optional because python libs can be manually specified.
+  find_package(PythonLibs 3)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH

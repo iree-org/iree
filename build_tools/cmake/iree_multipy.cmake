@@ -22,14 +22,17 @@ function(iree_multipy_configure)
   # Configure the defaults.
   # Note that this is using the pybind11 configuration vars, which creates
   # a fragile dependency. It would be better to derive these locally.
-  set(IREE_MULTIPY_DEFAULT_INCLUDE_DIRS "${PYTHON_INCLUDE_DIRS}" CACHE INTERNAL "Python include dirs" )
-  set(IREE_MULTIPY_DEFAULT_LIBRARIES "${PYTHON_LIBRARIES}" CACHE INTERNAL "Python libraries")
-  set(IREE_MULTIPY_DEFAULT_PREFIX "${PYTHON_MODULE_PREFIX}" CACHE INTERNAL "Python module prefix")
-  set(IREE_MULTIPY_DEFAULT_SUFFIX "${PYTHON_MODULE_SUFFIX}" CACHE INTERNAL "Python module suffix")
-  set(IREE_MULTIPY_DEFAULT_EXTENSION "${PYTHON_MODULE_EXTENSION}" CACHE INTERNAL "Python module extension")
+  if(PYTHONLIBS_FOUND)
+    set(IREE_MULTIPY_DEFAULT_EXECUTABLE "${PYTHON_EXECUTABLE}" CACHE INTERNAL "Python executable" )
+    set(IREE_MULTIPY_DEFAULT_INCLUDE_DIRS "${PYTHON_INCLUDE_DIRS}" CACHE INTERNAL "Python include dirs" )
+    set(IREE_MULTIPY_DEFAULT_LIBRARIES "${PYTHON_LIBRARIES}" CACHE INTERNAL "Python libraries")
+    set(IREE_MULTIPY_DEFAULT_PREFIX "${PYTHON_MODULE_PREFIX}" CACHE INTERNAL "Python module prefix")
+    set(IREE_MULTIPY_DEFAULT_SUFFIX "${PYTHON_MODULE_SUFFIX}" CACHE INTERNAL "Python module suffix")
+    set(IREE_MULTIPY_DEFAULT_EXTENSION "${PYTHON_MODULE_EXTENSION}" CACHE INTERNAL "Python module extension")
+  endif()
 
   if(IREE_MULTIPY_VERSIONS)
-    set(IREE_MULTIPY_VERSIONS_EFFECTIVE "${IREE_MULTIPY_VERSIONS}")
+    set(IREE_MULTIPY_VERSIONS_EFFECTIVE "${IREE_MULTIPY_VERSIONS}" CACHE INTERNAL "Python extension versions")
   else()
     message(STATUS "Multi-python extension versions not found: using defaults")
     set(IREE_MULTIPY_VERSIONS_EFFECTIVE "DEFAULT" CACHE INTERNAL "Python extension versions")
@@ -39,18 +42,22 @@ function(iree_multipy_configure)
   message(STATUS "Multipy extension versions: ${IREE_MULTIPY_VERSIONS_EFFECTIVE}")
   foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
     message(STATUS "  - Multipy version ${V}")
+    message(STATUS "    : EXECUTABLE = ${IREE_MULTIPY_${V}_EXECUTABLE}")
     message(STATUS "    : INCLUDE_DIRS = ${IREE_MULTIPY_${V}_INCLUDE_DIRS}")
     message(STATUS "    : LIBRARIES = ${IREE_MULTIPY_${V}_LIBRARIES}")
     message(STATUS "    : PREFIX = ${IREE_MULTIPY_${V}_PREFIX}")
     message(STATUS "    : SUFFIX = ${IREE_MULTIPY_${V}_SUFFIX}")
     message(STATUS "    : EXTENSION = ${IREE_MULTIPY_${V}_EXTENSION}")
 
-    # Only INCLUDE_DIRS and EXTENSION are needed for all configs.
+    # Check for required settings.
     if(NOT IREE_MULTIPY_${V}_INCLUDE_DIRS)
-      message(FATAL "MULTIPY config ${V}: No IREE_MULTIPY_{VER}_INCLUDE_DIRS var")
+      message(FATAL " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_EXECUTABLE var")
+    endif()
+    if(NOT IREE_MULTIPY_${V}_INCLUDE_DIRS)
+      message(FATAL " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_INCLUDE_DIRS var")
     endif()
     if(NOT IREE_MULTIPY_${V}_EXTENSION)
-      message(FATAL "MULTIPY config ${V}: No IREE_MULTIPY_{VER}_EXTENSION var")
+      message(FATAL " MULTIPY version ${V}: No IREE_MULTIPY_${VER}_EXTENSION var")
     endif()
   endforeach()
 endfunction()
@@ -132,10 +139,10 @@ function(iree_pyext_module)
     # Track target and deps, use in iree_complete_py_extension_link_options() later.
     # See iree_complete_py_extension_link_options() in iree_py_extension.cmake
     # TODO: Move that implementation here.
-    list(TRANSFORM ARG_PYEXT_DEPS APPEND "__${V}")
+    set(TRANSFORMED_PYEXT_DEPS "${ARG_PYEXT_DEPS}")
+    list(TRANSFORM TRANSFORMED_PYEXT_DEPS APPEND "__${V}")
     set_property(GLOBAL APPEND PROPERTY _IREE_PY_EXTENSION_NAMES "${VER_NAME}")
-    set_property(TARGET ${VER_NAME} PROPERTY DIRECT_DEPS ${ARG_DEPS} ${ARG_PYEXT_DEPS})
-
+    set_property(TARGET ${VER_NAME} PROPERTY DIRECT_DEPS ${ARG_DEPS} ${TRANSFORMED_PYEXT_DEPS})
     _alias_iree_pyext_library("${ARG_NAME}" "${V}" ${VER_NAME})
   endforeach()
 endfunction()
@@ -167,11 +174,12 @@ function(iree_pyext_library)
         "${IREE_MULTIPY_${V}_INCLUDE_DIRS}"
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
     )
-    list(TRANSFORM ARG_PYEXT_DEPS APPEND "__${V}")
+    set(TRANSFORMED_PYEXT_DEPS "${ARG_PYEXT_DEPS}")
+    list(TRANSFORM TRANSFORMED_PYEXT_DEPS APPEND "__${V}")
     target_link_libraries(${VER_NAME}
       PUBLIC
         ${ARG_DEPS}
-        ${ARG_PYEXT_DEPS}
+        ${TRANSFORMED_PYEXT_DEPS}
       PRIVATE
         ${IREE_DEFAULT_LINKOPTS}
     )
@@ -248,6 +256,52 @@ function(iree_pyext_pybind11_options name)
     ${name} PROPERTIES CXX_VISIBILITY_PRESET "hidden")
 endfunction()
 
+# iree_py_test()
+#
+# CMake function to imitate Bazel's iree_py_test rule.
+#
+# Parameters:
+# NAME: name of test
+# SRCS: List of source file
+# DEPS: List of deps the test requires
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
+
+function(iree_py_test)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME"
+    "SRCS;DEPS;LABELS"
+    ${ARGN}
+  )
+
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
+  iree_package_ns(_PACKAGE_NS)
+  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+
+  foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
+    set(VER_NAME "${_NAME_PATH}__${V}")
+    add_test(
+      NAME ${VER_NAME}
+      COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh "${IREE_MULTIPY_${V}_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+
+    set_property(TEST ${VER_NAME} PROPERTY LABELS "${_RULE_LABELS}")
+    set_property(TEST ${VER_NAME} PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH};TEST_TMPDIR=${_NAME}_${V}_test_tmpdir")
+    # TODO(marbre): Find out how to add deps to tests.
+    #               Similar to _RULE_DATA in iree_lit_test().
+  endforeach()
+endfunction()
 
 ###############################################################################
 # Always-link/transitive dependency management
@@ -378,7 +432,6 @@ function(iree_complete_py_extension_link_options)
           ${_STANDARD_DEPS}
         PRIVATE
           ${_RULE_LINKOPTS}
-          ${PYTHON_LIBRARY}
       )
     else()
       target_link_libraries(${_NAME}
@@ -389,7 +442,6 @@ function(iree_complete_py_extension_link_options)
           ${_STANDARD_DEPS}
         PRIVATE
           ${_RULE_LINKOPTS}
-          ${PYTHON_LIBRARY}
       )
     endif()
   endforeach(_NAME)
