@@ -57,10 +57,18 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
     return failure();
   }
 
+#ifndef NDEBUG
+  builder.create<TensorTraceOp>(regionOp.getLoc(), newArgs);
+#endif
+
   // Create the dispatch op to the executable function.
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), executableOp.getName(), entryPointOp.getName(),
       regionOp.workload(), outlinedFuncOp.getType().getResults(), newArgs);
+
+#ifndef NDEBUG
+  builder.create<TensorTraceOp>(regionOp.getLoc(), dispatchOp.getResults());
+#endif
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {

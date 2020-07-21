@@ -100,6 +100,8 @@ void populateHALBufferViewToVMPatterns(MLIRContext *context,
                                        SymbolTable &importSymbols,
                                        TypeConverter &typeConverter,
                                        OwningRewritePatternList &patterns) {
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewTraceOp>>(
+      context, importSymbols, typeConverter, "hal.buffer_view.trace");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewCreateOp>>(
       context, importSymbols, typeConverter, "hal.buffer_view.create");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewSubviewOp>>(
