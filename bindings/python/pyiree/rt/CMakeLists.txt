@@ -12,50 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_py_library(
+iree_pyext_library(
   NAME
-    rt
+    PyExtRtLib
   SRCS
-    "__init__.py"
-    # "system_api.py"
-  DEPS
-    ::binding
-)
-
-iree_py_extension(
-  NAME
-    binding
-  SRCS
-    "initialize_module.cc"
-  DEPS
-    iree::hal::vulkan::vulkan_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    ::rt_library
-    bindings::python::pyiree::common
-    iree::base::initializer
-  COPTS
-    ${PYBIND_COPTS}
-    ${PYBIND_EXTENSION_COPTS}
-  TYPE
-    SHARED
-)
-
-iree_pybind_cc_library(
-  NAME
-    rt_library
-  HDRS
     "function_abi.h"
     "hal.h"
     "host_types.h"
     "vm.h"
-  SRCS
     "function_abi.cc"
     "hal.cc"
     "host_types.cc"
     "vm.cc"
+  PYEXT_DEPS
+    bindings::python::pyiree::common::PyextCommonLib
   DEPS
-    bindings::python::pyiree::common
     iree::base::api
     iree::base::signature_mangle
     iree::hal::api
@@ -71,17 +42,32 @@ iree_pybind_cc_library(
     absl::strings
     absl::optional
     absl::span
-  TYPE
-    STATIC
+)
+
+iree_pyext_module(
+  NAME
+    PyExtRt
+  MODULE_NAME binding
+  SRCS
+    "initialize_module.cc"
+  PYEXT_DEPS
+    ::PyExtRtLib
+    bindings::python::pyiree::common::PyextCommonLib
+  DEPS
+    iree::hal::vulkan::vulkan_driver_module
+    iree::hal::llvmjit::llvmjit_driver_module
+    iree::hal::vmla::vmla_driver_module
+    iree::base::initializer
 )
 
 iree_py_library(
   NAME
-    system_api
+    rt
   SRCS
+    "__init__.py"
     "system_api.py"
-  DEPS
-    ::binding
+  PYEXT_DEPS
+    ::PyExtRt
 )
 
 iree_py_test(
