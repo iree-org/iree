@@ -135,6 +135,34 @@
 // use move semantics on the ref objects. Since we are reusing the normal VM
 // code paths which are likely still in instruction cache the bulk of the work
 // amounts to some small memcpys.
+//
+// Alternative register widths
+// ---------------------------
+// Registers in the VM are just a blob of memory and not physical device
+// registers. They have a natural width of 32-bits as that covers a majority of
+// our usage for i32/f32 but can be accessed at larger widths such as 64-bits or
+// more for vector operations. The base of each frame's register memory is
+// 16-byte aligned and accessing any individual register as a 32-bit value is
+// always 4-byte aligned.
+//
+// Supporting other register widths is "free" in that the registers for all
+// widths alias the same register storage memory. This is similar to how
+// physical registers work in x86 where each register can be accessed at
+// different sizes (like EAX/RAX alias and the SIMD registers alias as XMM1 is
+// 128-bit, YMM1 is 256-bit, and ZMM1 is 512-bit but all the same storage).
+//
+// The requirements for doing this is that the base alignment for any register
+// must be a multiple of 4 (due to the native 32-bit storage) AND aligned to the
+// natural size of the register (so 8 bytes for i64, 16 bytes for v128, etc).
+// This alignment can easily be done by masking off the low bits such that we
+// know for any valid `reg` ordinal aligned to 4 bytes `reg/N` will still be
+// within register storage. For example, i64 registers are accessed as `reg&~1`
+// to align to 8 bytes starting at byte 0 of the register storage.
+//
+// Transferring between register types can be done with vm.ext.* and vm.trunc.*
+// ops. For example, vm.trunc.i64.i32 will read an 8 byte register and write a
+// two 4 byte registers (effectively) with hi=0 and lo=the lower 32-bits of the
+// value.
 
 // Multiplier on the capacity of the stack frame storage when growing.
 // Since we never shrink stacks it's nice to keep this relative low. If we
