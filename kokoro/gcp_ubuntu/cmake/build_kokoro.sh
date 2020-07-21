@@ -31,7 +31,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/kokoro/gcp_ubuntu/docker_common.sh"
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake:latest \
+  gcr.io/iree-oss/cmake:prod \
   kokoro/gcp_ubuntu/cmake/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
