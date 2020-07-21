@@ -59,6 +59,12 @@ RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
   && echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
     | tee /etc/apt/sources.list.d/bazel.list \
   && apt-get update \
+  # Install Bazel pinned at the version we want. Optionally install an
+  # additional version of Bazel to ease upgrades (modify NEW_BAZEL_VERSION
+  # above). Bazel does some shenanigans to select the correct version based on
+  # your .bazelversion file. When upgrading, we therefore need to have both the
+  # old and new version. When the versions are the same this second installation
+  # is effectively a noop.
   && apt-get install "bazel=${BAZEL_VERSION?}" "bazel-${NEW_BAZEL_VERSION?}"
 
 # TF requires python2 numpy at configure time...
