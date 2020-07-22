@@ -50,3 +50,6 @@
 [submodule "third_party/marl"]
 	path = third_party/marl
 	url = https://github.com/google/marl.git
+[submodule "third_party/flatcc"]
+	path = third_party/flatcc
+	url = https://github.com/dvidelabs/flatcc.git

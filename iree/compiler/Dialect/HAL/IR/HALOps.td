@@ -927,6 +927,17 @@ def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
   let assemblyFormat = [{$buffer_view attr-dict `:` type($result)}];
 }
 
+def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
+  let summary = [{trace value(s) operation}];
+  let description = [{
+    Trace point for dispatchable functions.
+  }];
+
+  let arguments = (ins Variadic<HAL_BufferView>:$operands);
+
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//

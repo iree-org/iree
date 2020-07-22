@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -120,13 +121,36 @@ class TensorStoreOpConversion
   }
 };
 
+class TensorTraceOpConversion
+    : public OpConversionPattern<IREE::Flow::TensorTraceOp> {
+ public:
+  TensorTraceOpConversion(MLIRContext *ctx, TypeConverter &converter)
+      : OpConversionPattern(ctx) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::Flow::TensorTraceOp traceOp, llvm::ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    Location loc = traceOp.getLoc();
+    SmallVector<Value, 4> bufferViews;
+    for (auto operand : llvm::enumerate(rawOperands)) {
+      auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
+          loc, traceOp.getOperand(operand.index()), operand.value(), rewriter);
+      bufferViews.emplace_back(adaptor.getBufferView());
+    }
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(traceOp,
+                                                              bufferViews);
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateFlowTensorToHALPatterns(MLIRContext *context,
                                      OwningRewritePatternList &patterns,
                                      TypeConverter &converter) {
   patterns.insert<ConstantTensorOpConversion, TensorLoadOpConversion,
-                  TensorStoreOpConversion>(context, converter);
+                  TensorStoreOpConversion, TensorTraceOpConversion>(context,
+                                                                    converter);
 }
 
 }  // namespace iree_compiler

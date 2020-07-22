@@ -202,7 +202,6 @@ include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
 include(iree_multipy)
-include(iree_py_test)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
@@ -248,7 +247,6 @@ include(iree_setup_toolchain)
 #   - Provided: When IREE is used as a sub-project, it is assumed that the LLVM
 #     dependency is added prior to including this configuration.
 #-------------------------------------------------------------------------------
-
 
 # Adds bundled projects that must be included after the LLVM directory has
 # been added and within the scope of its settings (i.e. build type override,
@@ -312,7 +310,6 @@ if(${IREE_ENABLE_MLIR})
   add_bundled_mlir_dependent_projects()
 endif()
 
-
 #-------------------------------------------------------------------------------
 # Non-LLVM Dependencies
 #-------------------------------------------------------------------------------
@@ -327,7 +324,8 @@ if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
   find_package(PythonInterp 3 REQUIRED)
 endif()
 if(${IREE_BUILD_PYTHON_BINDINGS})
-  find_package(PythonLibs 3 REQUIRED)
+  # Note: Optional because python libs can be manually specified.
+  find_package(PythonLibs 3)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
@@ -335,20 +333,24 @@ list(APPEND CMAKE_MODULE_PATH
 )
 
 include(external_cc_library)
+include(flatbuffer_c_library)
 include(flatbuffer_cc_library)
 
+add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 
 if(CMAKE_CROSSCOMPILING)
   # We need flatc to generate some source code. When cross-compiling, we need
   # to make sure the flatc binary is configured under host environment.
   iree_declare_host_excutable(flatc BUILDONLY)
+  iree_declare_host_excutable(flatcc BUILDONLY)
 
   # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
   # binary in BuildFlatBuffers().
@@ -356,11 +358,20 @@ if(CMAKE_CROSSCOMPILING)
 
   # Add a custom target to copy the flatc to the binary directory.
   add_custom_target(iree_host_flatc
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-      "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc${IREE_HOST_EXECUTABLE_SUFFIX}"
-      "${IREE_HOST_BINARY_ROOT}/bin"
+    COMMAND
+      "${CMAKE_COMMAND}" -E copy_if_different
+        "${IREE_HOST_BINARY_ROOT}/third_party/flatbuffers/flatc${IREE_HOST_EXECUTABLE_SUFFIX}"
+        "${IREE_HOST_BINARY_ROOT}/bin"
     DEPENDS iree_host_build_flatc
     COMMENT "Installing host flatc..."
+  )
+  add_custom_target(iree_host_flatcc
+    COMMAND
+      "${CMAKE_COMMAND}" -E copy_if_different
+        "${IREE_HOST_BINARY_ROOT}/third_party/flatcc/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
+        "${IREE_HOST_BINARY_ROOT}/bin"
+    DEPENDS iree_host_build_flatcc
+    COMMENT "Installing host flatcc..."
   )
 endif()
 

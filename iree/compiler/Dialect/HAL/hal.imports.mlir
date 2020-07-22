@@ -214,6 +214,11 @@ vm.import @buffer_view.dims.4(
 ) -> (i32, i32, i32, i32)
 attributes {nosideeffects}
 
+// Prints out the content of buffers.
+vm.import @buffer_view.trace(
+  %operands : !vm.ref<!hal.buffer_view> ...
+)
+
 //===----------------------------------------------------------------------===//
 // iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//

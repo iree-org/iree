@@ -27,6 +27,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -523,11 +524,6 @@ static AffineMapAttr getPadOpInputIndexingMap(
 LogicalResult PadOpConversion::apply(
     mhlo::PadOp op, ArrayRef<Value> inputBuffers, ArrayRef<Value> resultBuffers,
     ConversionPatternRewriter &rewriter) const {
-  if (llvm::any_of(op.interior_padding().getValues<IntegerAttr>(),
-                   [](auto attr) { return attr.getInt() != 0; }))
-    return op.emitError(
-        "pad op with non-zero interiror_padding is not supported");
-
   mhlo::PadOp::Adaptor adaptor(inputBuffers);
   auto loc = op.getLoc();
 
@@ -535,7 +531,7 @@ LogicalResult PadOpConversion::apply(
   Value paddingVal =
       paddingConstVal
           ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
-          : adaptor.padding_value();
+          : rewriter.create<LoadOp>(loc, adaptor.padding_value());
 
   auto operandType = adaptor.operand().getType().cast<ShapedType>();
   int rank = operandType.getRank();
@@ -561,58 +557,29 @@ LogicalResult PadOpConversion::apply(
       getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
       /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
-  // Add a block to the region.
-  auto *region = &linalgOp.region();
-  auto *block = rewriter.createBlock(region, region->end());
-  SmallVector<Type, 4> bodyArgTypes;
-  bodyArgTypes.append(rank, rewriter.getIndexType());
-  bodyArgTypes.append(linalgOpArgs.size(), operandType.getElementType());
-  block->addArguments(bodyArgTypes);
-  rewriter.setInsertionPointToEnd(block);
-
-  // If the `index` of the result at a particular dimension i, is d_i, check if
-  //
-  // (d_i >= edge_padding_low[i]) &&
-  // (d_i < (edge_padding_low[i] + operand_shape[i])).
-  //
-  // If true, then use the value of the operand, otherwise use the padding
-  // value.
   const auto &edgePaddingLow = op.edge_padding_low();
-  const auto &edgePaddingHigh = op.edge_padding_high();
-
-  Type indexType = rewriter.getIndexType();
-  Value cond = nullptr;
-  auto applyAndOp = [&](Value val) {
-    cond = cond ? rewriter.create<AndOp>(loc, cond, val) : val;
-  };
-  for (int i = 0; i < rank; ++i) {
-    Value dim = block->getArgument(i);
-    int64_t paddingLow = edgePaddingLow.getValue<IntegerAttr>(i).getInt();
-    int64_t paddingHigh = edgePaddingHigh.getValue<IntegerAttr>(i).getInt();
-    auto low = rewriter.create<ConstantOp>(
-        loc, indexType, rewriter.getIntegerAttr(indexType, paddingLow));
-
-    // d_i < (edge_padding_low[i] + operand_shape[i])
-    if (paddingLow != 0 && paddingHigh != 0) {
-      auto operandExtent = rewriter.create<DimOp>(loc, adaptor.operand(), i);
-      auto bound = rewriter.create<AddIOp>(loc, low, operandExtent);
-      auto checkUb =
-          rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, dim, bound);
-      applyAndOp(checkUb);
-    }
-
-    if (paddingLow != 0) {
-      // d_i >= edge_padding_low[i]
-      auto checkLb = rewriter.create<CmpIOp>(loc, CmpIPredicate::sge, dim, low);
-      applyAndOp(checkLb);
-    }
+  const auto &interiorPadding = op.interior_padding();
+  SmallVector<Value, 3> offsets, sizes, strides;
+  for (auto it : llvm::enumerate(llvm::zip(edgePaddingLow, interiorPadding))) {
+    Value startIndex = rewriter.create<ConstantIndexOp>(
+        loc, std::get<0>(it.value()).getZExtValue());
+    offsets.push_back(startIndex);
+    Value size = rewriter.create<DimOp>(loc, resultBuffers[0], it.index());
+    sizes.push_back(size);
+    Value stride = rewriter.create<ConstantIndexOp>(
+        loc, std::get<1>(it.value()).getZExtValue() + 1);
+    strides.push_back(stride);
   }
-  Value inputVal = block->getArgument(rank);
-  if (!paddingConstVal) paddingVal = block->getArgument(rank + 1);
-  Value result =
-      cond ? rewriter.create<SelectOp>(loc, cond, inputVal, paddingVal)
-           : inputVal;
-  rewriter.create<linalg::YieldOp>(loc, result);
+
+  // TODO(hanchung): Move SubViewOp this down to before where it is used.
+  // The pass for splitting dispatch function for vulkan requires no other ops
+  // interleave with Linalg structured ops, so put the SubViewOp in the
+  // beginning.
+  auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], offsets,
+                                              sizes, strides);
+  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], paddingVal);
+  rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+
   return success();
 }
 
