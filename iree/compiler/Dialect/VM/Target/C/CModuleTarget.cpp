@@ -34,7 +34,7 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
                                  llvm::raw_ostream &output) {
   PassManager pm(outerModuleOp.getContext());
 
-  pm.addPass(std::make_unique<ConvertVMToEmitCPass>());
+  pm.addPass(createConvertVMToEmitCPass());
 
   if (failed(pm.run(outerModuleOp))) {
     return failure();

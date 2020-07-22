@@ -22,7 +22,6 @@ if(${IREE_ENABLE_EMITC})
       "ConvertVMToEmitC.h"
     SRCS
       "ConvertVMToEmitC.cpp"
-      "ConvertVMToEmitCTest.cpp"
     DEPS
       MLIRIR
       MLIRPass

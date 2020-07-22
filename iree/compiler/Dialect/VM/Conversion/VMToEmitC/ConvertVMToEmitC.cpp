@@ -69,24 +69,38 @@ void populateVMToCPatterns(MLIRContext *context,
 namespace IREE {
 namespace VM {
 
+namespace {
+
 // A pass converting IREE VM operations into the EmitC dialect.
-void ConvertVMToEmitCPass::runOnOperation() {
-  ConversionTarget target(getContext());
+class ConvertVMToEmitCPass
+    : public PassWrapper<ConvertVMToEmitCPass, OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() {
+    ConversionTarget target(getContext());
 
-  OwningRewritePatternList patterns;
-  populateVMToCPatterns(&getContext(), patterns);
+    OwningRewritePatternList patterns;
+    populateVMToCPatterns(&getContext(), patterns);
 
-  target.addLegalDialect<mlir::emitc::EmitCDialect>();
-  target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addIllegalOp<IREE::VM::AddI32Op>();
+    target.addLegalDialect<mlir::emitc::EmitCDialect>();
+    target.addLegalDialect<IREE::VM::VMDialect>();
+    target.addIllegalOp<IREE::VM::AddI32Op>();
 
-  if (failed(applyPartialConversion(getOperation(), target, patterns))) {
-    return signalPassFailure();
+    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
+      return signalPassFailure();
+    }
   }
+};
+
+}  // namespace
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertVMToEmitCPass() {
+  return std::make_unique<ConvertVMToEmitCPass>();
 }
 
 }  // namespace VM
 }  // namespace IREE
+
+static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass(
+    "test-iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC VM dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir
