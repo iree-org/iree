@@ -44,7 +44,7 @@ include(CMakeParseArguments)
 #   NAME
 #     base_schema
 #   SRCS
-#     "a.cc"
+#     "a.fbs"
 # )
 # flatbuffer_cc_library(
 #   NAME
@@ -52,11 +52,11 @@ include(CMakeParseArguments)
 #   SRCS
 #     "b.fbs"
 #   DEPS
-#     iree::schemas::base_schema # not "awesome" !
+#     iree::schemas::base_schema
 #   PUBLIC
 # )
 #
-# flatbuffer_cc_library(
+# iree_cc_binary(
 #   NAME
 #     main_lib
 #   ...

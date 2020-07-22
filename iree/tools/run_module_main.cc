@@ -142,8 +142,8 @@ Status Run() {
   RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()))
       << "printing results";
 
-  iree_vm_list_deinitialize(inputs.get());
-  iree_vm_list_deinitialize(outputs.get());
+  inputs.reset();
+  outputs.reset();
   iree_vm_module_release(hal_module);
   iree_vm_module_release(input_module);
   iree_hal_device_release(device);

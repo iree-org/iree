@@ -14,30 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test IREE's bindings within the gcr.io/iree-oss/bazel-bindings
-# image using Kokoro.
+# Build and test IREE's core within the gcr.io/iree-oss/bazel image using
+# Kokoro.
+# Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
+# are set by Kokoro.
 
-set -e
 set -x
+set -e
+set -o pipefail
 
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Kokoro checks out the repository here.
-WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
+source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
 
-# Mount the checked out repository, make that the working directory and run the
-# tests in the bazel-bindings image.
-docker run \
-  --volume "${WORKDIR?}:${WORKDIR?}" \
-  --workdir="${WORKDIR?}" \
-  --rm \
-  gcr.io/iree-oss/bazel-bindings:prod \
-  kokoro/gcp_ubuntu/bazel/bindings/build.sh
+# Sets DOCKER_RUN_ARGS
+docker_setup
+
+docker run "${DOCKER_RUN_ARGS[@]?}" \
+  gcr.io/iree-oss/bazel:prod \
+  build_tools/kokoro/gcp_ubuntu/bazel/linux/x86/core/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
-sudo rm -rf "${KOKORO_ARTIFACTS_DIR?}"/*
+rm -rf "${KOKORO_ARTIFACTS_DIR?}"/*
 
 # Print out artifacts dir contents after deleting them as a coherence check.
 ls -1a "${KOKORO_ARTIFACTS_DIR?}/"
