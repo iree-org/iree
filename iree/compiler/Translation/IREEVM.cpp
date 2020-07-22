@@ -77,10 +77,10 @@ void registerIREEVMTransformPassPipeline() {
       });
 }
 
-LogicalResult translateFromMLIRToVMBytecodeModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::BytecodeTargetOptions bytecodeOptions,
-    llvm::raw_ostream &output) {
+/// TODO(simon-camp) This function is not part of the header, should it be
+/// forward declared?
+LogicalResult translateFromMLIRToVM(
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
   // Convert from our source to a vm.module in canonical form.
   // After this completes we have a non-bytecode-specific vm.module that we
   // could lower to other forms (LLVM IR, C, etc).
@@ -90,8 +90,21 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager);
   passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
+  }
+  return success();
+}
+
+LogicalResult translateFromMLIRToVMBytecodeModule(
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    llvm::raw_ostream &output) {
+  auto result = translateFromMLIRToVM(moduleOp, executableOptions);
+
+  if (failed(result)) {
+    return result;
   }
 
   // Serialize to bytecode.
@@ -111,17 +124,10 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 LogicalResult translateFromMLIRToVMCModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
     llvm::raw_ostream &output) {
-  // Convert from our source to a vm.module in canonical form.
-  // After this completes we have a non-bytecode-specific vm.module that we
-  // could lower to other forms (LLVM IR, C, etc).
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
-  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
-  IREE::VM::buildVMTransformPassPipeline(passManager);
-  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError() << "conversion from source -> vm failed";
+  auto result = translateFromMLIRToVM(moduleOp, executableOptions);
+
+  if (failed(result)) {
+    return result;
   }
 
   // Serialize to c code.
