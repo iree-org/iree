@@ -44,6 +44,7 @@ def install_deps():
         "pip",
         "install",
         "absl-py",
+        "numpy",
     ]
     print("EXEC:", " ".join(args))
     subprocess.check_call(args)

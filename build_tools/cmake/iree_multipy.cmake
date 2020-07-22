@@ -107,7 +107,18 @@ function(iree_pyext_module)
 
   foreach(V ${IREE_MULTIPY_VERSIONS_EFFECTIVE})
     set(VER_NAME "${_NAME}__${V}")
-    add_library(${VER_NAME} SHARED ${ARG_SRCS})
+
+    # If configured to link against libraries, build in SHARED mode (which
+    # disallows undefined symbols). Otherwise, build in MODULE mode, which
+    # does not enforce that. This should naturally do the right thing on
+    # each platform based on whether configured with a list of libraries to
+    # link or not.
+    set(LIBRARY_TYPE MODULE)
+    if(IREE_MULTIPY_${V}_LIBRARIES)
+      set(LIBRARY_TYPE SHARED)
+    endif()
+
+    add_library(${VER_NAME} ${LIBRARY_TYPE} ${ARG_SRCS})
     add_dependencies(${_NAME} ${VER_NAME})
     set_target_properties(
       ${VER_NAME} PROPERTIES
