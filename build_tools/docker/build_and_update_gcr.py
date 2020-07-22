@@ -41,8 +41,8 @@ IMAGES_TO_DEPENDENCIES = {
 
 IMAGES_TO_DEPENDENT_IMAGES = {k:[] for k in IMAGES_TO_DEPENDENCIES.keys()}
 for image, dependencies in IMAGES_TO_DEPENDENCIES.items():
-  for d in dependencies:
-     IMAGES_TO_DEPENDENT_IMAGES[d].append(image)
+  for dependency in dependencies:
+     IMAGES_TO_DEPENDENT_IMAGES[dependency].append(image)
 
 
 IMAGES_HELP = [f'`{name}`' for name in IMAGES_TO_DEPENDENCIES.keys()]
