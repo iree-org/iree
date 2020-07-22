@@ -1,4 +1,4 @@
-# Function signatures
+# Function Signatures
 
 A key job of the IREE compiler and runtime is capturing function call semantics
 from the originating system and providing mechanisms so that invocations can be

@@ -30,7 +30,7 @@ $ bazel test iree/base:arena_test
 To use the Vulkan backend as test driver, you may need to select between a
 Vulkan implementation from SwiftShader and multiple Vulkan-capable hardware
 devices. This can be done via environment variables. See the
-[generic Vulkan setup](GetStarted/generic_vulkan_env_setup.md#useful-environment-variables)
+[generic Vulkan setup](get_started/generic_vulkan_env_setup.md#useful-environment-variables)
 page for details regarding these variables.
 
 For Bazel, you can persist the configuration in `user.bazelrc` to save typing.

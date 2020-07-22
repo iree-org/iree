@@ -1,4 +1,4 @@
-# Getting Started on macOS with Bazel
+# Getting Started on macOS with CMake
 
 <!--
 Notes to those updating this guide:
@@ -6,8 +6,8 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_linux_bazel.md and
-      getting_started_windows_bazel.md
+    * This document parallels getting_started_linux_cmake.md and
+      getting_started_windows_cmake.md
       Please keep them in sync.
 -->
 
@@ -29,34 +29,35 @@ This guide uses [Homebrew](https://brew.sh/) to install IREE's dependencies.
 $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
-### Install Bazel
+### Install CMake
 
-Install Bazel via Homebrew:
+IREE uses [CMake](https://cmake.org/) version `>= 3.13`. Brew ships the latest
+release.
 
 ```shell
-$ brew install bazel
+$ brew install cmake
+$ cmake --version  # >= 3.13
 ```
 
-Note: when you first run `bazel` to build IREE, it will prompt you to copy and
-run a shell command to select the right version.
+### Install Ninja
 
-### Install python3 numpy
+[Ninja](https://ninja-build.org/) is a fast build system that you can use as a
+CMake generator.
 
 ```shell
-$ python3 -m pip install numpy --user
+$ brew install ninja
 ```
 
 ## Clone and Build
 
 ### Clone
 
-Clone the repository, initialize its submodules and configure:
+Clone the repository and initialize its submodules:
 
 ```shell
 $ git clone https://github.com/google/iree.git
 $ cd iree
 $ git submodule update --init
-$ python3 configure_bazel.py
 ```
 
 > Tip:<br>
@@ -65,53 +66,36 @@ $ python3 configure_bazel.py
 
 ### Build
 
-Run all core tests that pass on our OSS CI:
+Configure:
 
 ```shell
-$ bazel test -k //iree/... \
-    --test_env=IREE_VULKAN_DISABLE=1 \
-    --build_tag_filters="-nokokoro" \
-    --test_tag_filters="--nokokoro,-driver=vulkan"
+$ cmake -G Ninja -B build/ .
 ```
 
+Note: this should use `Clang` by default on macOS. `GCC` is not fully supported
+by IREE.
+
 > Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Not all tests are passing on macOS, but the build does
-> complete successfully at the time of writing.
+> &nbsp;&nbsp;&nbsp;&nbsp;The root
+> [CMakeLists.txt](https://github.com/google/iree/blob/main/CMakeLists.txt)
+> file has options for configuring which parts of the project to enable.<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
 
-In general, build artifacts will be under the `bazel-bin` directory at the top
-level.
-
-## Recommended user.bazelrc
-
-You can put a user.bazelrc at the root of the repository and it will be ignored
-by git. The recommended contents for Linux/macOS are:
+Build all targets:
 
 ```shell
-build --disk_cache=/tmp/bazel-cache
-
-# Use --config=debug to compile iree and llvm without optimizations
-# and with assertions enabled.
-build:debug --config=asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-O0' --strip=never
-
-# Use --config=asserts to enable assertions in iree and llvm.
-build:asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-UNDEBUG'
+$ cmake --build build/
 ```
 
 ## What's next?
 
 ### Take a Look Around
 
-Build all of IREE's 'tools' directory:
+Check out the contents of the 'tools' build directory:
 
 ```shell
-$ bazel build iree/tools/...
-```
-
-Check out what was built:
-
-```shell
-$ ls bazel-bin/iree/tools/
-$ ./bazel-bin/iree/tools/iree-translate --help
+$ ls build/iree/tools
+$ ./build/iree/tools/iree-translate --help
 ```
 
 Translate a
@@ -119,14 +103,14 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
+$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
     -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
 
 *   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developer_overview.md) <!-- TODO: Link to macOS
+    [Developer Overview](../developing_iree/developer_overview.md) <!-- TODO: Link to macOS
     versions of these guides once they are developed.
 *   To target GPUs using Vulkan, see
     [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)

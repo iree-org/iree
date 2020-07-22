@@ -48,6 +48,7 @@ def parse_arguments():
 # header. This dictionary will overrule that default behavior.
 DOC_TITLE_DICT = {
     'index.md': 'Home',
+
     'getting_started_linux_bazel.md': 'Linux with Bazel',
     'getting_started_linux_cmake.md': 'Linux with CMake',
     'getting_started_linux_vulkan.md': 'Linux with Vulkan',
@@ -59,12 +60,9 @@ DOC_TITLE_DICT = {
     'getting_started_android_cmake.md': 'Android with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
     'getting_started_python.md': 'Python',
-    'cmake_options_and_variables.md': 'CMake Options and Variables',
-    'op_coverage.md': 'XLA HLO Operation Coverage',
-    'e2e_coverage.md': 'TensorFlow E2E Coverage',
-    'roadmap.md': 'Short-term Focus Areas',
-    'roadmap_design.md': 'Long-term Design Roadmap',
-    'iree_community.md': 'Community',
+
+    'milestones.md': 'Short-term Focus Areas',
+    'design_roadmap.md': 'Long-term Design Roadmap',
 }
 
 # A dictionary containing source file to permanent link mappings.
@@ -75,25 +73,6 @@ DOC_TITLE_DICT = {
 # allows one to override the permanent link if necessary.
 PERMALINK_DICT = {
     'index.md': '/',
-    'getting_started_linux_bazel.md': 'GetStarted/LinuxBazel',
-    'getting_started_linux_cmake.md': 'GetStarted/LinuxCMake',
-    'getting_started_linux_vulkan.md': 'GetStarted/LinuxVulkan',
-    'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
-    'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
-    'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
-    'getting_started_macos_cmake.md': 'GetStarted/macOSCMake',
-    'getting_started_macos_vulkan.md': 'GetStarted/macOSVulkan',
-    'getting_started_android_cmake.md': 'GetStarted/AndroidCMake',
-    'generic_vulkan_env_setup.md': 'GetStarted/GenericVulkanSetup',
-    'getting_started_python.md': 'GetStarted/Python',
-    'cmake_options_and_variables.md': 'GetStarted/CMakeOptionsVariables',
-    'developer_overview.md': 'DeveloperOverview',
-    'testing_guide.md': 'TestingGuide',
-    'op_coverage.md': 'HLOOpCoverage',
-    'e2e_coverage.md': 'TensorFlowE2ECoverage',
-    'roadmap.md': 'FocusAreas',
-    'roadmap_design.md': 'DesignRoadmap',
-    'iree_community.md': 'Community',
 }
 
 # A dictionary containing source file to navigation order mappings.
@@ -102,15 +81,18 @@ PERMALINK_DICT = {
 # the left panel of https://google.github.io/iree website. This allows one
 # to specify an order for a specific doc.
 NAVI_ORDER_DICT = {
+    # Top level entries
     'index.md': 1,
-    # 'Getting Started' is 2.
-    'developer_overview.md': 3,
-    'roadmap_design.md': 4,
-    'roadmap.md': 5,
-    'op_coverage.md': 6,
-    'e2e_coverage.md': 7,
-    'testing_guide.md': 8,
+    # 'Using IREE' is 2.
+    # 'Getting Started' is 3.
+    # 'Developing IREE' is 4.
+    'design_roadmap.md': 5,
+    'milestones.md': 6,
+    'xla_op_coverage.md': 7,
+    'tf_e2e_coverage.md': 8,
     'iree_community.md': 9,
+    # 'Design Docs' is 10.
+    # 'Dialect Definitions' is 11.
 
     # Within 'Getting Started' use explicit ordering.
     # Alphabetical would put 'bazel' before 'cmake' and 'python' between 'linux'
@@ -127,6 +109,16 @@ NAVI_ORDER_DICT = {
     'getting_started_python.md': 10,
     'generic_vulkan_env_setup.md': 11,
     'cmake_options_and_variables.md': 12,
+
+    # Within 'Developing IREE' use explicit ordering.
+    'developer_overview.md': 1,
+    'contributor_tips.md': 2,
+    'testing_guide.md': 3,
+    'benchmarking.md': 4,
+    'repository_management.md': 5,
+
+    # Within 'Using IREE' use explicit ordering.
+    'using_colab.md': 1,
 }
 
 # A dictionary containing source directory to section tile mappings.
@@ -137,14 +129,17 @@ NAVI_ORDER_DICT = {
 # Note that the title here must match with index.md file's title under the
 # subdirectory.
 DIRECTORY_TITLE_DICT = {
+    'design_docs': 'Design Docs',
+    'developing_iree': 'Developing IREE',
     'Dialects': 'Dialect Definitions',
-    'GetStarted': 'Getting Started',
+    'get_started': 'Getting Started',
+    'using_iree': 'Using IREE',
 }
 
 # A dictionary containing the supporting JavaScript files for each doc.
 JS_FILES_DICT = {
-    'op_coverage.md': ['js/add_classes.js'],
-    'e2e_coverage.md': ['js/add_classes.js'],
+    'xla_op_coverage.md': ['js/add_classes.js'],
+    'tf_e2e_coverage.md': ['js/add_classes.js'],
 }
 
 
@@ -164,19 +159,20 @@ def process_file(basedir, relpath, filename):
   # Use the default layout for everything.
   front_matter['layout'] = 'default'
   # Use the base filename as permanent link.
-  front_matter['permalink'] = base_name
+  # Replace '_' with '-'. Underscores are not typical in URLs...
+  front_matter['permalink'] = base_name.replace('_', '-')
 
   # Organize each doc to a section matching its directory structure.
   if relpath and relpath != '.':
-    front_matter['parent'] = relpath
-    front_matter['permalink'] = f'{relpath}/{front_matter["permalink"]}'
+    hyphen_relpath = relpath.replace('_', '-')
+    front_matter['permalink'] = f'{hyphen_relpath}/{front_matter["permalink"]}'
 
   # Find the title and TOC.
   lines = content.splitlines()
   title_line_index = None
   toc_index = None
   for (index, line) in enumerate(lines):
-    if line.startswith('# '):
+    if line.startswith('# ') and title_line_index is None:
       title_line_index = index
     if line == '[TOC]':
       toc_index = index
