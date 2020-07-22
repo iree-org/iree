@@ -25,6 +25,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
@@ -39,6 +40,11 @@ namespace IREE {
 namespace Flow {
 
 namespace {
+
+static llvm::cl::opt<bool> traceDispatchTensors(
+    "iree-flow-trace-dispatch-tensors",
+    llvm::cl::desc("Trace input/output values for each dispatch function"),
+    llvm::cl::init(false));
 
 // Converts a dispatch_region into a dispatch to the outlined region function.
 LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
@@ -57,10 +63,27 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
     return failure();
   }
 
+  auto getTensorTypeArgs = [](auto args) {
+    SmallVector<Value, 4> res;
+    for (auto arg : args) {
+      if (arg.getType().template isa<TensorType>()) res.push_back(arg);
+    }
+    return res;
+  };
+  if (traceDispatchTensors) {
+    builder.create<TensorTraceOp>(regionOp.getLoc(),
+                                  getTensorTypeArgs(newArgs));
+  }
+
   // Create the dispatch op to the executable function.
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), executableOp.getName(), entryPointOp.getName(),
       regionOp.workload(), outlinedFuncOp.getType().getResults(), newArgs);
+
+  if (traceDispatchTensors) {
+    builder.create<TensorTraceOp>(regionOp.getLoc(),
+                                  getTensorTypeArgs(dispatchOp.getResults()));
+  }
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
