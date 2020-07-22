@@ -116,7 +116,7 @@ class ModelRunner {
   }
   // Direct invocation based on MemRefType which automatically packs the data.
   template <typename... Args>
-  llvm::Error invoke(StringRef funcName, Args &... args) {
+  llvm::Error invoke(StringRef funcName, Args &...args) {
     const std::string adapterName =
         std::string("_mlir_ciface_") + funcName.str();
     void *argsArray[] = {getData(args)...};

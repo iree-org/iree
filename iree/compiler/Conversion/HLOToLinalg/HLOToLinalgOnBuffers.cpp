@@ -445,7 +445,7 @@ LogicalResult ConcatenateOpConversion::apply(
       rewriter.getI64IntegerAttr(1),                    // args_out
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, nloops, nonParallelLoops),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
@@ -532,6 +532,30 @@ LogicalResult PadOpConversion::apply(
       paddingConstVal
           ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
           : rewriter.create<LoadOp>(loc, adaptor.padding_value());
+
+  auto operandType = adaptor.operand().getType().cast<ShapedType>();
+  int rank = operandType.getRank();
+
+  SmallVector<Attribute, 2> indexingMaps;
+  indexingMaps.emplace_back(getPadOpInputIndexingMap(op, rank, rewriter));
+  if (!paddingConstVal) {
+    indexingMaps.emplace_back(AffineMapAttr::get(
+        AffineMap::get(rank, /*symbolCount=*/0, rewriter.getContext())));
+  }
+  indexingMaps.emplace_back(AffineMapAttr::get(
+      AffineMap::getMultiDimIdentityMap(rank, rewriter.getContext())));
+
+  SmallVector<Type, 2> resultTypes = {};
+  SmallVector<Value, 2> linalgOpArgs = {adaptor.operand()};
+  if (!paddingConstVal) linalgOpArgs.push_back(adaptor.padding_value());
+  linalgOpArgs.push_back(resultBuffers[0]);
+  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
+      loc, resultTypes, linalgOpArgs,
+      rewriter.getI64IntegerAttr(linalgOpArgs.size() - 1),  // args_in
+      rewriter.getI64IntegerAttr(1),                        // args_out
+      rewriter.getArrayAttr(indexingMaps),
+      getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   const auto &edgePaddingLow = op.edge_padding_low();
   const auto &interiorPadding = op.interior_padding();
@@ -658,7 +682,7 @@ LogicalResult TorchIndexSelectOpConversion::apply(
       rewriter.getI64IntegerAttr(1),  // args_out
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
@@ -962,7 +986,7 @@ LogicalResult ReduceOpConversion::apply(
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, nInputRank,
                                        reductionDims.size()),
-      /*doc=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
 
   linalgOp.region().takeBody(reduceOp.body());
   {
@@ -1038,7 +1062,8 @@ struct LinalgOpOnTensorConversion
         op.getLoc(), ArrayRef<Type>(), opArgs, op.args_in(), op.args_out(),
         op.indexing_maps(), op.iterator_types(),
         /*doc=*/nullptr,
-        /*library_call=*/nullptr);
+        /*library_call=*/nullptr,
+        /*symbol_source=*/nullptr);
     // Move the region from the replaced op into the new op.
     unsigned numTensorOperands = op.getNumOperands();
     // indexed_generic op has arguments for each index. In the case of generic
