@@ -5,7 +5,8 @@ module {
   func @pad_cst() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
-    // CHECK: linalg.indexed_generic
+    // CHECK: linalg.fill
+    // CHECK: linalg.copy
     %1 = constant dense<0.0> : tensor<f32>
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
@@ -29,7 +30,8 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    // CHECK: linalg.indexed_generic
+    // CHECK: linalg.fill
+    // CHECK: linalg.copy
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
       edge_padding_low = dense<[4, 5]> : tensor<2xi64>,
@@ -52,7 +54,8 @@ module {
   func @pad_no_op() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
-    // CHECK: linalg.indexed_generic
+    // CHECK: linalg.fill
+    // CHECK: linalg.copy
     %1 = constant dense<0.0> : tensor<f32>
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<0> : tensor<2xi64>,
