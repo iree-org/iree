@@ -217,7 +217,7 @@ error respectively.
 
 #### Read inputs from a file
 
-All the IREE tools support to read input values from a file. This is quite
+All the IREE tools support reading input values from a file. This is quite
 useful for debugging. Use `-help` for each tool to see what the flag to set. The
 inputs are expected to be newline-separated. Each input should be either a
 scalar or a buffer. Scalars should be in the format `type=value` and buffers
