@@ -29,4 +29,3 @@ iree_check_single_backend_test_suite(
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
-
