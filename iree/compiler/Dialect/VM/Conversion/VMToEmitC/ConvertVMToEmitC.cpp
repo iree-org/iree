@@ -45,17 +45,17 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     MLIRContext *ctx = srcOp.getContext();
 
     // name of the function to call
-    StringAttr callee_ = StringAttr::get(funcName, ctx);
+    StringAttr callee = StringAttr::get(funcName, ctx);
 
     // attributes of the function call; references only the variable operands
-    ArrayAttr args_ = ArrayAttr::get({IntegerAttr::get(IndexType::get(ctx), 0),
-                                      IntegerAttr::get(IndexType::get(ctx), 1)},
-                                     ctx);
+    ArrayAttr args = ArrayAttr::get({IntegerAttr::get(IndexType::get(ctx), 0),
+                                     IntegerAttr::get(IndexType::get(ctx), 1)},
+                                    ctx);
     // operands of the function
-    ValueRange operands_{srcAdapter.lhs(), srcAdapter.rhs()};
+    ValueRange operands{srcAdapter.lhs(), srcAdapter.rhs()};
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
-                                         callee_, args_, operands_);
+                                         callee, args, operands);
 
     return success();
   }
