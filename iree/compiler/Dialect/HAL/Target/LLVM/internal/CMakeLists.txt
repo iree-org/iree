@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "LLVMAOTTargetLinker.cpp"
   DEPS
+    LLVMSupport
     iree::base::status
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOTTargetLinker_hdrs
   PUBLIC
