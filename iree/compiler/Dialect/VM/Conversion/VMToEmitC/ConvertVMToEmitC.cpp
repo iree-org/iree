@@ -42,12 +42,10 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::Adaptor srcAdapter(operands);
 
-    MLIRContext *ctx = srcOp.getContext();
-
-    StringAttr callee = StringAttr::get(funcName, ctx);
-    ArrayAttr args = ArrayAttr::get({IntegerAttr::get(IndexType::get(ctx), 0),
-                                     IntegerAttr::get(IndexType::get(ctx), 1)},
-                                    ctx);
+    StringAttr callee = rewriter.getStringAttr(funcName);
+    ArrayAttr args =
+        rewriter.getArrayAttr({IntegerAttr::get(rewriter.getIndexType(), 0),
+                               IntegerAttr::get(rewriter.getIndexType(), 1)});
     ValueRange dstOperands{srcAdapter.lhs(), srcAdapter.rhs()};
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
