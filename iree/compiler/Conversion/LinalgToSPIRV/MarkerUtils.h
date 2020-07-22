@@ -31,7 +31,7 @@ class Operation;
 namespace iree_compiler {
 
 /// Marker to denote that a linalg operation is to be partitioned to workitems.
-StringRef getWorkItemMarker();
+StringRef getWorkGroupMarker();
 
 /// Returns true if an operation has the specified `marker`. When `marker` is
 /// empty, returns true if the operation has any marker.
@@ -39,14 +39,14 @@ bool hasMarker(Operation *, StringRef marker = "");
 
 /// Returns true if an operation has marker to denote that it is to be
 /// partitioned to workitems.
-bool hasWorkItemMarker(Operation *);
+bool hasWorkGroupMarker(Operation *);
 
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
 
 /// Sets marker to denote that a linalg operation is to be partitioned to
 /// workitems.
-void setWorkItemMarker(Operation *);
+void setWorkGroupMarker(Operation *);
 
 }  // namespace iree_compiler
 }  // namespace mlir

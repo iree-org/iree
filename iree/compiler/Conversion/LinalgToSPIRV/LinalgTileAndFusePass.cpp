@@ -314,7 +314,7 @@ struct PromoteSubviewsPattern
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!hasWorkItemMarker(op)) return failure();
+    if (!hasWorkGroupMarker(op)) return failure();
     return linalg::LinalgPromotionPattern<linalg::MatmulOp>::matchAndRewrite(
         op, rewriter);
   }
@@ -365,7 +365,7 @@ void LinalgTileAndFusePass::runOnFunction() {
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
       tileSizeCalculator.getWorkGroupSize(),
       linalg::LinalgMarker(ArrayRef<Identifier>(),
-                           Identifier::get(getWorkItemMarker(), context)));
+                           Identifier::get(getWorkGroupMarker(), context)));
   applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
   if (useWorkgroupMemory) {
@@ -385,7 +385,7 @@ void LinalgTileAndFusePass::runOnFunction() {
                 [&](OpBuilder &b, Value src, Value dst) -> LogicalResult {
                   return copyToFromWorkgroupMemory(b, src, dst);
                 }),
-        linalg::LinalgMarker(Identifier::get(getWorkItemMarker(), context),
+        linalg::LinalgMarker(Identifier::get(getWorkGroupMarker(), context),
                              Identifier::get(PromotionMarker, context)));
     applyPatternsAndFoldGreedily(getOperation(), promotionPatterns);
   }
@@ -394,7 +394,7 @@ void LinalgTileAndFusePass::runOnFunction() {
   OpBuilder builder(context);
   funcOp.walk([&builder](linalg::LinalgOp linalgOp) {
     if (hasMarker(linalgOp, PromotionMarker)) {
-      setWorkItemMarker(linalgOp);
+      setWorkGroupMarker(linalgOp);
       insertBarrierAfter(builder, linalgOp.getLoc(), linalgOp);
     }
   });
