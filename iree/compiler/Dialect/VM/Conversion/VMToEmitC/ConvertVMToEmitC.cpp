@@ -25,7 +25,7 @@ namespace iree_compiler {
 
 namespace {
 
-// Taken over from StandartToVM.
+// Taken over from StandardToVM.
 // We need to replace the Op depending on the operand.
 // We could start with a conversion for IREE::VM::AddI32Op
 template <typename SrcOpTy, typename DstOpTy>
@@ -44,18 +44,14 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 
     MLIRContext *ctx = srcOp.getContext();
 
-    // name of the function to call
     StringAttr callee = StringAttr::get(funcName, ctx);
-
-    // attributes of the function call; references only the variable operands
     ArrayAttr args = ArrayAttr::get({IntegerAttr::get(IndexType::get(ctx), 0),
                                      IntegerAttr::get(IndexType::get(ctx), 1)},
                                     ctx);
-    // operands of the function
-    ValueRange operands{srcAdapter.lhs(), srcAdapter.rhs()};
+    ValueRange dstOperands{srcAdapter.lhs(), srcAdapter.rhs()};
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
-                                         callee, args, operands);
+                                         callee, args, dstOperands);
 
     return success();
   }
