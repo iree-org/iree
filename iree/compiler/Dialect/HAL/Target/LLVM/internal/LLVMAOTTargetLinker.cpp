@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTargetLinker.h"
 
 #include "iree/base/status.h"
+#include "llvm/Support/ToolOutputFile.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -23,18 +24,47 @@ namespace HAL {
 
 iree::StatusOr<std::string> linkLLVMAOTObjects(
     const std::string& linkerToolPath, const std::string& objData) {
-  std::string archiveFile, sharedLibFile;
-  ASSIGN_OR_RETURN(archiveFile, iree::file_io::GetTempFile("objfile"));
-  RETURN_IF_ERROR(iree::file_io::SetFileContents(archiveFile, objData));
-  ASSIGN_OR_RETURN(sharedLibFile, iree::file_io::GetTempFile("dylibfile"));
-  std::string linkingCmd =
-      linkerToolPath + " -shared " + archiveFile + " -o " + sharedLibFile;
+  llvm::SmallString<32> objFilePath, dylibFilePath;
+  if (std::error_code error = llvm::sys::fs::createTemporaryFile(
+          "llvmaot_dylibs", "objfile", objFilePath)) {
+    return iree::InternalErrorBuilder(IREE_LOC)
+           << "Failed to generate temporary file for objfile : '"
+           << error.message() << "'";
+  }
+  if (std::error_code error = llvm::sys::fs::createTemporaryFile(
+          "llvmaot_dylibs", "dylibfile", dylibFilePath)) {
+    return iree::InternalErrorBuilder(IREE_LOC)
+           << "Failed to generate temporary file for dylib : '"
+           << error.message() << "'";
+  }
+  std::error_code error;
+  auto outputFile = std::make_unique<llvm::ToolOutputFile>(
+      objFilePath, error, llvm::sys::fs::F_None);
+  if (error) {
+    return iree::InternalErrorBuilder(IREE_LOC)
+           << "Failed to open temporary objfile '" << objFilePath.c_str()
+           << "' for dylib : '" << error.message() << "'";
+  }
+
+  outputFile->os() << objData;
+  outputFile->os().flush();
+
+  auto linkingCmd =
+      (linkerToolPath + " -shared " + objFilePath + " -o " + dylibFilePath)
+          .str();
   int systemRet = system(linkingCmd.c_str());
   if (systemRet != 0) {
     return iree::InternalErrorBuilder(IREE_LOC)
            << linkingCmd << " failed with exit code " << systemRet;
   }
-  return iree::file_io::GetFileContents(sharedLibFile);
+
+  auto dylibData = llvm::MemoryBuffer::getFile(dylibFilePath);
+  if (!dylibData) {
+    return iree::InternalErrorBuilder(IREE_LOC)
+           << "Failed to read temporary dylib file '" << dylibFilePath.c_str()
+           << "'";
+  }
+  return dylibData.get()->getBuffer().str();
 }
 
 iree::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
