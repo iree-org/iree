@@ -17,9 +17,6 @@
 // Based on mlir-opt but without registering passes and dialects we don't care
 // about.
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "emitc/InitDialect.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
@@ -39,6 +36,10 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
+
+#ifdef IREE_HAVE_EMITC_DIALECT
+#include "emitc/InitDialect.h"
+#endif  // IREE_HAVE_EMITC_DIALECT
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),

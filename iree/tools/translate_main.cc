@@ -17,10 +17,6 @@
 // We need this entry function because we want to register PassManager CLI
 // options, which is missing in MLIR's translation main entry function.
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "emitc/InitDialect.h"
-#include "emitc/InitTranslation.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/tools/init_compiler_modules.h"
@@ -41,6 +37,11 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Translation.h"
+
+#ifdef IREE_HAVE_EMITC_DIALECT
+#include "emitc/InitDialect.h"
+#include "emitc/InitTranslation.h"
+#endif  // IREE_HAVE_EMITC_DIALECT
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
