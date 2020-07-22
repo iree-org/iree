@@ -63,7 +63,7 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 rbe_autoconfig(
     name = "rbe_default",
     base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:b59d8cc422b03524394d4d05e443bf38d4fe96fab06197b34174de01572e8161",
+    digest = "sha256:bc2d61ad05453928e67b434ae019e7d050dda46c091270f2b81b2f09da2276ce",
     registry = "gcr.io",
     repository = "iree-oss/rbe-toolchain",
     use_checked_in_confs = "Force",
@@ -181,6 +181,13 @@ maybe(
     local_repository,
     name = "com_github_google_flatbuffers",
     path = "third_party/flatbuffers",
+)
+
+maybe(
+    new_local_repository,
+    name = "com_github_dvidelabs_flatcc",
+    build_file = "build_tools/third_party/flatcc/BUILD.overlay",
+    path = "third_party/flatcc",
 )
 
 # TODO(scotttodd): TensorFlow is squatting on the vulkan_headers repo name, so

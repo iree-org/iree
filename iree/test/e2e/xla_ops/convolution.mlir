@@ -65,51 +65,47 @@ func @conv2d_1452x3221_same() attributes { iree.module.export } {
   return
 }
 
-// TODO(#2345): This test seems to fail when executed with another
-// test from this file, but passes as a standalone test. Needs further
-// investigation
-
-// func @conv2d_2451x2311_same() attributes { iree.module.export } {
-//   %inputs = iree.unfoldable_constant dense<[
-//       [[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0]],
-//        [[ 6.0], [ 7.0], [ 8.0], [ 9.0], [10.0]],
-//        [[11.0], [12.0], [13.0], [14.0], [15.0]],
-//        [[16.0], [17.0], [18.0], [19.0], [20.0]]],
-//       [[[21.0], [22.0], [23.0], [24.0], [25.0]],
-//        [[26.0], [27.0], [28.0], [29.0], [30.0]],
-//        [[31.0], [32.0], [33.0], [34.0], [35.0]],
-//        [[36.0], [37.0], [38.0], [39.0], [40.0]]]]> : tensor <2x4x5x1xf32>
-//   %weights = iree.unfoldable_constant dense<[
-//       [[[1.0]], [[2.0]], [[3.0]]],
-//       [[[4.0]], [[5.0]], [[6.0]]]]> : tensor <2x3x1x1xf32>
-//   %res = "mhlo.convolution"(%inputs, %weights) {
-//        batch_group_count = 1 : i64,
-//        dimension_numbers = {
-//          input_batch_dimension = 0 : i64,
-//          input_feature_dimension = 3 : i64,
-//          input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-//          kernel_input_feature_dimension = 2 : i64,
-//          kernel_output_feature_dimension = 3 : i64,
-//          kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-//          output_batch_dimension = 0 : i64,
-//          output_feature_dimension = 3 : i64,
-//          output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
-//        feature_group_count = 1 : i64,
-//        padding = dense<[[0, 1], [1, 1]]> : tensor<2x2xi64>,
-//        rhs_dilation = dense<1> : tensor<2xi64>,
-//        window_strides = dense<1> : tensor<2xi64>} :
-//        (tensor<2x4x5x1xf32>, tensor<2x3x1x1xf32>) -> tensor<2x4x5x1xf32>
-//   check.expect_almost_eq_const(%res, dense<[
-//     [[[ 80.0], [121.0], [142.0], [163.0], [100.0]],
-//      [[160.0], [226.0], [247.0], [268.0], [160.0]],
-//      [[240.0], [331.0], [352.0], [373.0], [220.0]],
-//      [[ 83.0], [104.0], [110.0], [116.0], [ 59.0]]],
-//     [[[400.0], [541.0], [562.0], [583.0], [340.0]],
-//      [[480.0], [646.0], [667.0], [688.0], [400.0]],
-//      [[560.0], [751.0], [772.0], [793.0], [460.0]],
-//      [[183.0], [224.0], [230.0], [236.0], [119.0]]]]> : tensor<2x4x5x1xf32>) : tensor<2x4x5x1xf32>
-//   return
-// }
+func @conv2d_2451x2311_same() attributes { iree.module.export } {
+  %inputs = iree.unfoldable_constant dense<[
+      [[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0]],
+       [[ 6.0], [ 7.0], [ 8.0], [ 9.0], [10.0]],
+       [[11.0], [12.0], [13.0], [14.0], [15.0]],
+       [[16.0], [17.0], [18.0], [19.0], [20.0]]],
+      [[[21.0], [22.0], [23.0], [24.0], [25.0]],
+       [[26.0], [27.0], [28.0], [29.0], [30.0]],
+       [[31.0], [32.0], [33.0], [34.0], [35.0]],
+       [[36.0], [37.0], [38.0], [39.0], [40.0]]]]> : tensor <2x4x5x1xf32>
+  %weights = iree.unfoldable_constant dense<[
+      [[[1.0]], [[2.0]], [[3.0]]],
+      [[[4.0]], [[5.0]], [[6.0]]]]> : tensor <2x3x1x1xf32>
+  %res = "mhlo.convolution"(%inputs, %weights) {
+       batch_group_count = 1 : i64,
+       dimension_numbers = {
+         input_batch_dimension = 0 : i64,
+         input_feature_dimension = 3 : i64,
+         input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
+         kernel_input_feature_dimension = 2 : i64,
+         kernel_output_feature_dimension = 3 : i64,
+         kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
+         output_batch_dimension = 0 : i64,
+         output_feature_dimension = 3 : i64,
+         output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+       feature_group_count = 1 : i64,
+       padding = dense<[[0, 1], [1, 1]]> : tensor<2x2xi64>,
+       rhs_dilation = dense<1> : tensor<2xi64>,
+       window_strides = dense<1> : tensor<2xi64>} :
+       (tensor<2x4x5x1xf32>, tensor<2x3x1x1xf32>) -> tensor<2x4x5x1xf32>
+  check.expect_almost_eq_const(%res, dense<[
+    [[[ 80.0], [121.0], [142.0], [163.0], [100.0]],
+     [[160.0], [226.0], [247.0], [268.0], [160.0]],
+     [[240.0], [331.0], [352.0], [373.0], [220.0]],
+     [[ 83.0], [104.0], [110.0], [116.0], [ 59.0]]],
+    [[[400.0], [541.0], [562.0], [583.0], [340.0]],
+     [[480.0], [646.0], [667.0], [688.0], [400.0]],
+     [[560.0], [751.0], [772.0], [793.0], [460.0]],
+     [[183.0], [224.0], [230.0], [236.0], [119.0]]]]> : tensor<2x4x5x1xf32>) : tensor<2x4x5x1xf32>
+  return
+}
 
 func @conv2d_no_padding2() attributes { iree.module.export } {
   %inputs = iree.unfoldable_constant dense<[
