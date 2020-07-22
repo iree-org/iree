@@ -24,19 +24,19 @@ def iree_flatbuffer_c_library(
     flatcc_rt = "@com_github_dvidelabs_flatcc//:runtime"
 
     flags = [
-      "-o$(RULEDIR)",
+        "-o$(RULEDIR)",
     ] + flatcc_args
 
     out_stem = "%s" % (srcs[0].replace(".fbs", ""))
 
     outs = []
     for arg in flags:
-      if arg == "--reader":
-        outs += ["%s_reader.h" % (out_stem)]
-      if arg == "--builder":
-        outs += ["%s_builder.h" % (out_stem)]
-      if arg == "--verifier":
-        outs += ["%s_verifier.h" % (out_stem)]
+        if arg == "--reader":
+            outs += ["%s_reader.h" % (out_stem)]
+        if arg == "--builder":
+            outs += ["%s_builder.h" % (out_stem)]
+        if arg == "--verifier":
+            outs += ["%s_verifier.h" % (out_stem)]
 
     native.genrule(
         name = name + "_gen",
@@ -50,7 +50,7 @@ def iree_flatbuffer_c_library(
         name = name,
         hdrs = outs,
         deps = [
-          flatcc_rt,
+            flatcc_rt,
         ],
         testonly = testonly,
         **kwargs

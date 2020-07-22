@@ -91,7 +91,8 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
   llvm::ModuleAnalysisManager moduleAnalysisManager;
 
   llvm::PassInstrumentationCallbacks passInstrumentationCallbacks;
-  llvm::StandardInstrumentations standardInstrumentations;
+  llvm::StandardInstrumentations standardInstrumentations(
+      /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 
   llvm::PassBuilder passBuilder(machine, options.pipelineTuningOptions, {},

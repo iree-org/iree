@@ -237,8 +237,8 @@ class BuildFileFunctions(object):
   def _convert_flatcc_args_block(self, flatcc_args):
     if not flatcc_args:
       return ""
-    flatcc_args = "\n".join([f'    "{flatcc_arg}"'
-                             for flatcc_arg in flatcc_args])
+    flatcc_args = "\n".join(
+        [f'    "{flatcc_arg}"' for flatcc_arg in flatcc_args])
     return f"  FLATCC_ARGS\n{flatcc_args}\n"
 
   def _convert_unimplemented_function(self, function, details=""):

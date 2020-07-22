@@ -39,11 +39,10 @@ IMAGES_TO_DEPENDENCIES = {
     'rbe-toolchain': [],
 }
 
-IMAGES_TO_DEPENDENT_IMAGES = {k:[] for k in IMAGES_TO_DEPENDENCIES.keys()}
+IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES.keys()}
 for image, dependencies in IMAGES_TO_DEPENDENCIES.items():
   for dependency in dependencies:
-     IMAGES_TO_DEPENDENT_IMAGES[dependency].append(image)
-
+    IMAGES_TO_DEPENDENT_IMAGES[dependency].append(image)
 
 IMAGES_HELP = [f'`{name}`' for name in IMAGES_TO_DEPENDENCIES.keys()]
 IMAGES_HELP = f'{", ".join(IMAGES_HELP)} or `all`'
@@ -80,7 +79,7 @@ def parse_arguments():
 
   args = parser.parse_args()
   for image in args.images:
-    if image == "all":
+    if image == 'all':
       args.images = IMAGES_TO_DEPENDENCIES.keys()
     elif image not in IMAGES_TO_DEPENDENCIES.keys():
       raise parser.error('Expected --image to be one of:\n'

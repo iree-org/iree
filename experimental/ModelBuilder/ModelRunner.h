@@ -116,7 +116,10 @@ class ModelRunner {
   }
   // Direct invocation based on MemRefType which automatically packs the data.
   template <typename... Args>
-  llvm::Error invoke(StringRef funcName, Args &... args) {
+  // TODO(suderman): Re-enable clang-format when new version migrates.
+  // clang-format off
+  llvm::Error invoke(StringRef funcName, Args &...args) {
+    // clang-format on
     const std::string adapterName =
         std::string("_mlir_ciface_") + funcName.str();
     void *argsArray[] = {getData(args)...};
