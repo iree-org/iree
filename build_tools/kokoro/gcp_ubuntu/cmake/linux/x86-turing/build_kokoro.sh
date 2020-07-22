@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the project within the gcr.io/iree-oss/cmake using Kokoro.
+# Build and test the project within the gcr.io/iree-oss/cmake image using
+# Kokoro.
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -25,14 +26,16 @@ set -o pipefail
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-source "${KOKORO_ARTIFACTS_DIR?}/github/iree/kokoro/gcp_ubuntu/docker_common.sh"
+source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
 
 # Sets DOCKER_RUN_ARGS
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake:prod \
-  kokoro/gcp_ubuntu/cmake/build.sh
+  --env IREE_VULKAN_DISABLE=0 \
+  --gpus all \
+  gcr.io/iree-oss/cmake-nvidia:prod \
+  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.

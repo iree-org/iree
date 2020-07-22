@@ -26,14 +26,14 @@ set -o pipefail
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-source "${KOKORO_ARTIFACTS_DIR?}/github/iree/kokoro/gcp_ubuntu/docker_common.sh"
+source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
 
 # Sets DOCKER_RUN_ARGS
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   gcr.io/iree-oss/bazel-tensorflow:prod \
-  kokoro/gcp_ubuntu/bazel/integrations/build.sh
+  build_tools/kokoro/gcp_ubuntu/bazel/linux/x86/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
