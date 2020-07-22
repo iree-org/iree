@@ -616,7 +616,7 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
     Trace point for dispatchable functions.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$operands);
+  let arguments = (ins Variadic<FLOW_Tensor>:$operands);
 
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }

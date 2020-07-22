@@ -133,10 +133,6 @@ class TensorTraceOpConversion
     Location loc = traceOp.getLoc();
     SmallVector<Value, 4> bufferViews;
     for (auto operand : llvm::enumerate(rawOperands)) {
-      if (!IREE::HAL::TensorRewriteAdaptor::isValidNewType(
-              operand.value().getType())) {
-        return failure();
-      }
       auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
           loc, traceOp.getOperand(operand.index()), operand.value(), rewriter);
       bufferViews.emplace_back(adaptor.getBufferView());
