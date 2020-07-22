@@ -347,6 +347,25 @@ Returns a tensor with the element at the given index set to the given value.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
+### `flow.tensor.trace` (IREE::Flow::TensorTraceOp)
+
+trace value(s) operation
+
+Syntax:
+
+```
+operation ::= `flow.tensor.trace` attr-dict ($operands^ `:` type($operands))?
+```
+
+
+Trace point for dispatchable functions.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operands` | ranked tensor of any type values
+
 ### `flow.tensor.update` (IREE::Flow::TensorUpdateOp)
 
 updates a tensor with the contents of another tensor

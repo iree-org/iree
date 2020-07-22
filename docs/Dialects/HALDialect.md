@@ -765,6 +765,25 @@ the original and sliced references must be synchronized.
 | :----: | ----------- |
 `result` | buffer_view
 
+### `hal.buffer_view.trace` (IREE::HAL::BufferViewTraceOp)
+
+trace value(s) operation
+
+Syntax:
+
+```
+operation ::= `hal.buffer_view.trace` attr-dict ($operands^ `:` type($operands))?
+```
+
+
+Trace point for dispatchable functions.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operands` | buffer_view
+
 ### `hal.buffer.write_data` (IREE::HAL::BufferWriteDataOp)
 
 heap-to-buffer write operation
