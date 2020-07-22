@@ -524,11 +524,6 @@ static AffineMapAttr getPadOpInputIndexingMap(
 LogicalResult PadOpConversion::apply(
     mhlo::PadOp op, ArrayRef<Value> inputBuffers, ArrayRef<Value> resultBuffers,
     ConversionPatternRewriter &rewriter) const {
-  if (llvm::any_of(op.interior_padding().getValues<IntegerAttr>(),
-                   [](auto attr) { return attr.getInt() != 0; }))
-    return op.emitError(
-        "pad op with non-zero interiror_padding is not supported");
-
   mhlo::PadOp::Adaptor adaptor(inputBuffers);
   auto loc = op.getLoc();
 
@@ -552,8 +547,9 @@ LogicalResult PadOpConversion::apply(
     strides.push_back(stride);
   }
 
+  // TODO(hanchung): Move SubViewOp this down to before where it is used.
   // The pass for splitting dispatch function for vulkan requires no other ops
-  // interleave with Linalg structured ops, so put the SubviewOp in the
+  // interleave with Linalg structured ops, so put the SubViewOp in the
   // beginning.
   auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], offsets,
                                               sizes, strides);
