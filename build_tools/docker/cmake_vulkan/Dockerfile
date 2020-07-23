@@ -12,32 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE using CMake and testing IREE with NVIDIA GPUs.
+# An image with Vulkan SDK for building IREE using CMake.
 
 # Build using:
-# docker build --tag gcr.io/iree-oss/cmake-nvidia \
-#              build_tools/docker/cmake_nvidia/
+# docker build --tag gcr.io/iree-oss/cmake-vulkan \
+#              build_tools/docker/cmake_vulkan/
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
 # docker run -it --rm --entrypoint bash \
 #   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
 #   --gpus all \
-#   gcr.io/iree-oss/cmake-nvidia
+#   gcr.io/iree-oss/cmake-vulkan
 
 # Set up the image and working directory by inheriting the base
 # CMake configuration.
-# Note that we don't start from NVIDIA's docker base:
-# - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda):
-#     it's.. for CUDA.
-# - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
-#      does not support Ubuntu 18.04.
-# This allows to share configuration with base CMake, but it also means we need
-# to MATCH the driver version between the host machine and the docker image.
-# TODO: use iree-vulkan as the base.
 FROM gcr.io/iree-oss/cmake
 
-# Additionally, we need to install the Vulkan SDK and the NVIDIA Vulkan driver.
+# Additionally, we need to install the Vulkan SDK.
 
 ARG VULKAN_SDK_VERSION=1.2.141
 
@@ -52,4 +44,4 @@ RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
     "/etc/apt/sources.list.d/lunarg-vulkan-${VULKAN_SDK_VERSION?}-bionic.list" \
     "http://packages.lunarg.com/vulkan/${VULKAN_SDK_VERSION?}/lunarg-vulkan-${VULKAN_SDK_VERSION?}-bionic.list" \
   && apt-get update \
-  && apt-get install -y vulkan-sdk nvidia-driver-440
+  && apt-get install -y vulkan-sdk
