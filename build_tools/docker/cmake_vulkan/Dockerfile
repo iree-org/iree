@@ -16,7 +16,7 @@
 
 # Build using:
 # docker build --tag gcr.io/iree-oss/cmake-vulkan \
-#              build_tools/docker/cmake_vulkan/
+#   build_tools/docker/cmake_vulkan/
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:

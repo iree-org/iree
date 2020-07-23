@@ -34,7 +34,7 @@
 #      does not support Ubuntu 18.04.
 # This allows to share configuration with base CMake, but it also means we need
 # to MATCH the driver version between the host machine and the docker image.
-# TODO: use iree-vulkan as the base.
+# TODO: use cmake-vulkan as the base.
 FROM gcr.io/iree-oss/cmake
 
 # Additionally, we need to install the Vulkan SDK and the NVIDIA Vulkan driver.
