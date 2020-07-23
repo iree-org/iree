@@ -802,7 +802,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_438
+`value` | Attribute | anonymous_435
 
 #### Results:
 
@@ -963,6 +963,30 @@ operation ::= `vm.ext.i16.i32.s` $operand attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.ext.i16.i32.u` (IREE::VM::ExtI16I32UOp)
+
+integer zero extend 16 bits to 32 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
 ### `vm.ext.i8.i32.s` (IREE::VM::ExtI8I32SOp)
 
 integer sign extend 8 bits to 32 bits
@@ -971,6 +995,30 @@ Syntax:
 
 ```
 operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.ext.i8.i32.u` (IREE::VM::ExtI8I32UOp)
+
+integer zero extend 8 bits to 32 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($result)
 ```
 
 
@@ -1081,7 +1129,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_441
+`initial_value` | Attribute | anonymous_438
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
