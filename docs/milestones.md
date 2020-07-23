@@ -1,11 +1,11 @@
-# IREE Roadmap
+# IREE Milestones
 
 ## Design
 
 Though many of the core dialects are now in place enough for correctness testing
 a large majority of the features we are most excited to demonstrate are still
 TODO and will be coming over the next few quarters. You can find a highlighted
-set of coming features in the [design roadmap](roadmap_design.md).
+set of coming features in the [design roadmap](design_roadmap.md).
 
 ## Spring/Summer 2020 Focus Areas
 
@@ -37,7 +37,7 @@ amount of glue mostly ready to accept it.
 ### HAL: Marl CPU Scheduling
 
 We want to plug in [marl](https://github.com/google/marl) to provide
-[CPU-side work scheduling](roadmap_design.md#gpu-like-cpu-scheduling) that
+[CPU-side work scheduling](design_roadmap.md#gpu-like-cpu-scheduling) that
 matches GPU semantics. This will enable improved CPU utilization and allow us to
 verify the approach with benchmarks.
 

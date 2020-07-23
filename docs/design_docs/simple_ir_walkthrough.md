@@ -1,5 +1,7 @@
 # Simple IR Walkthrough
 
+Note that this doc is quite outdated. We expect to update it soon.
+
 ## Overview
 
 This walks through the process of lowering TensorFlow python to an IREE module,

@@ -2,7 +2,7 @@
 
 This is an opinionated guide documenting workflows that some members of the team
 have found useful. It is focused on meta-tooling, not on IREE code specifically
-(you will find the latter in the [Developer Overview](../developer_overview.md))
+(you will find the latter in the [Developer Overview](developer_overview.md))
 It is certainly possible to use workflows other than these, but some common
 tasks, especially for maintainers will likely be made easier if you use these
 flows. It assumes a basic knowledge of `git` and GitHub and suggests some
