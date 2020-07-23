@@ -216,6 +216,28 @@ These flags can control IREE tool output verbosity. `--iree_minloglevel` and
 accept a number where 0, 1, 2, 3 stands for info, warning, error, and fatal
 error respectively.
 
+#### Read inputs from a file
+
+All the IREE tools support reading input values from a file. This is quite
+useful for debugging. Use `-help` for each tool to see what the flag to set. The
+inputs are expected to be newline-separated. Each input should be either a
+scalar or a buffer. Scalars should be in the format `type=value` and buffers
+should be in the format `[shape]xtype=[value]`. For example:
+
+```
+1x5xf32=1,-2,-3,4,-5
+1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1
+```
+
+#### `iree-flow-trace-dispatch-tensors`
+
+This flag will enable tracing inputs and outputs for each dispatch function. It
+is easier to narrow down test cases, since IREE breaks a ML workload into
+multiple dispatch function. When the flag is on, IREE will insert trace points
+before and after each dispatch function. The first trace op is for inputs, and
+the second trace op is for outputs. There will be two events for one dispatch
+function.
+
 ### Useful Vulkan driver flags
 
 For IREE's Vulkan runtime driver, there are a few useful
