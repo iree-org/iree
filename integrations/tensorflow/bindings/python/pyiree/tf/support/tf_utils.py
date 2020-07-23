@@ -39,6 +39,16 @@ def set_random_seed(seed=0):
   np.random.seed(seed)
 
 
+def backends_to_str(target_backends):
+  """Creates a flattened and normalized string representing target_backends."""
+  normalized_backends = []
+  for backend in target_backends:
+    # Remove unusual characters and ensure names don't end or start in "_".
+    backend = re.sub("[^0-9a-zA-Z_]+", "_", backend)
+    normalized_backends.append(backend.strip("_"))
+  return "__".join(normalized_backends)
+
+
 def compile_tf_module(tf_module,
                       target_backends=(),
                       exported_names=(),
@@ -52,9 +62,9 @@ def compile_tf_module(tf_module,
     saved_model:
       A TF SavedModel directory containing the files used translate the
       tf.Module into an IREE module.
-    tf_input__backends.mlir:
+    tf_input.mlir:
       MLIR for the module in TF's input dialect.
-    iree_input__backends.mlir:
+    iree_input.mlir:
       The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
     compiled__backends.vmfb:
       A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
@@ -77,14 +87,6 @@ def compile_tf_module(tf_module,
     # We break up the compilation here so we can save intermediary artifacts.
     compiler_context = compiler.Context()
 
-    if artifacts_dir is not None:
-      normalized_backends = []
-      for backend in target_backends:
-        # Remove unusual characters and ensure names don't end or start in "_".
-        backend = re.sub("[^0-9a-zA-Z_]+", "_", backend)
-        normalized_backends.append(backend.strip("_"))
-      backends_string = "__".join(normalized_backends)
-
     # Convert the tf_module into raw TF input MLIR.
     compiler_module = compiler.tf_load_saved_model(
         sm_path,
@@ -93,8 +95,7 @@ def compile_tf_module(tf_module,
         pass_pipeline=())
 
     if artifacts_dir is not None:
-      tf_mlir_path = os.path.join(artifacts_dir,
-                                  f"tf_input__{backends_string}.mlir")
+      tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
       logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
       with open(tf_mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
@@ -103,16 +104,15 @@ def compile_tf_module(tf_module,
     compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
 
     if artifacts_dir is not None:
-      iree_mlir_path = os.path.join(artifacts_dir,
-                                    f"iree_input__{backends_string}.mlir")
+      iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
       logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
       with open(iree_mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
 
     compiled_module = compiler_module.compile(target_backends=target_backends)
     if artifacts_dir is not None:
-      compiled_path = os.path.join(artifacts_dir,
-                                   f"compiled__{backends_string}.vmfb")
+      compiled_name = f"compiled__{backends_to_str(target_backends)}.vmfb"
+      compiled_path = os.path.join(artifacts_dir, compiled_name)
       logging.info("Saving compiled IREE module to: %s", compiled_path)
       with open(compiled_path, "wb") as f:
         f.write(compiled_module)
