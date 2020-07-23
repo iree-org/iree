@@ -29,17 +29,12 @@ export CMAKE_BIN="$(which cmake)"
 "$CXX" --version
 python3 --version
 
-# Check out submodules first because we need to build SwiftShader next.
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
-# Build SwiftShader Vulkan implementation.
-./build_tools/third_party/swiftshader/build_vk_swiftshader.sh
-export VK_ICD_FILENAMES=$PWD/build-swiftshader/Linux/vk_swiftshader_icd.json
-
 # Print Vulkan related information: SDK version and GPU ICD version
 vulkaninfo 2>/dev/null | grep "Vulkan Instance" || echo "Vulkan Instance not found!"
 vulkaninfo 2>/dev/null | grep -A7 "VkPhysicalDeviceProperties"  || echo "VkPhysicalDeviceProperties not found!"
+
+echo "Initializing submodules"
+./scripts/git/submodule_versions.py init
 
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
