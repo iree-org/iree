@@ -94,6 +94,13 @@ set(IREE_ALL_HAL_DRIVERS
 if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
   set( IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS} )
 endif()
+
+# For cross compilation towords Android, we don't want LLVM JIT HAL driver.
+if(ANDROID AND LLVM IN_LIST IREE_HAL_DRIVERS_TO_BUILD)
+  list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
+  message(STATUS "Removed LLVM JIT HAL driver for Android build")
+endif()
+
 message(STATUS "Building HAL drivers ${IREE_HAL_DRIVERS_TO_BUILD}")
 
 # Default every IREE_HAL_DRIVER_* to OFF
@@ -101,12 +108,6 @@ foreach(_backend ${IREE_ALL_HAL_DRIVERS})
   string(TOUPPER "${_backend}" uppercase_backend)
   set(IREE_HAL_DRIVER_${uppercase_backend} OFF CACHE BOOL "" FORCE)
 endforeach()
-
-# For cross compilation towords Android, we don't want LLVM JIT HAL driver.
-if(ANDROID)
-  message(STATUS "Removed LLVM JIT HAL driver for Android build")
-  list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
-endif()
 
 # Set IREE_HAL_DRIVER_* based on configuration
 foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
