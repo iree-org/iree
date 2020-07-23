@@ -150,7 +150,9 @@ def VM_OPC_ShrI32U               : VM_OPC<0x2F, "ShrI32U">;
 def VM_OPC_TruncI32I8            : VM_OPC<0x31, "TruncI32I8">;
 def VM_OPC_TruncI32I16           : VM_OPC<0x32, "TruncI32I16">;
 def VM_OPC_ExtI8I32S             : VM_OPC<0x33, "ExtI8I32S">;
-def VM_OPC_ExtI16I32S            : VM_OPC<0x34, "ExtI16I32S">;
+def VM_OPC_ExtI8I32U             : VM_OPC<0x34, "ExtI8I32U">;
+def VM_OPC_ExtI16I32S            : VM_OPC<0x35, "ExtI16I32S">;
+def VM_OPC_ExtI16I32U            : VM_OPC<0x36, "ExtI16I32U">;
 
 // Reduction arithmetic:
 
@@ -159,12 +161,6 @@ def VM_OPC_CmpEQI32              : VM_OPC<0x40, "CmpEQI32">;
 def VM_OPC_CmpNEI32              : VM_OPC<0x41, "CmpNEI32">;
 def VM_OPC_CmpLTI32S             : VM_OPC<0x42, "CmpLTI32S">;
 def VM_OPC_CmpLTI32U             : VM_OPC<0x43, "CmpLTI32U">;
-def VM_OPC_CmpLTEI32S            : VM_OPC<0x44, "CmpLTEI32S">;
-def VM_OPC_CmpLTEI32U            : VM_OPC<0x45, "CmpLTEI32U">;
-def VM_OPC_CmpGTI32S             : VM_OPC<0x46, "CmpGTI32S">;
-def VM_OPC_CmpGTI32U             : VM_OPC<0x47, "CmpGTI32U">;
-def VM_OPC_CmpGTEI32S            : VM_OPC<0x48, "CmpGTEI32S">;
-def VM_OPC_CmpGTEI32U            : VM_OPC<0x49, "CmpGTEI32U">;
 def VM_OPC_CmpNZI32              : VM_OPC<0x4D, "CmpNZI32">;
 def VM_OPC_CmpEQRef              : VM_OPC<0x4A, "CmpEQRef">;
 def VM_OPC_CmpNERef              : VM_OPC<0x4B, "CmpNERef">;
@@ -241,17 +237,13 @@ def VM_CoreOpcodeAttr :
     VM_OPC_TruncI32I8,
     VM_OPC_TruncI32I16,
     VM_OPC_ExtI8I32S,
+    VM_OPC_ExtI8I32U,
     VM_OPC_ExtI16I32S,
+    VM_OPC_ExtI16I32U,
     VM_OPC_CmpEQI32,
     VM_OPC_CmpNEI32,
     VM_OPC_CmpLTI32S,
     VM_OPC_CmpLTI32U,
-    VM_OPC_CmpLTEI32S,
-    VM_OPC_CmpLTEI32U,
-    VM_OPC_CmpGTI32S,
-    VM_OPC_CmpGTI32U,
-    VM_OPC_CmpGTEI32S,
-    VM_OPC_CmpGTEI32U,
     VM_OPC_CmpNZI32,
     VM_OPC_CmpEQRef,
     VM_OPC_CmpNERef,
@@ -300,22 +292,19 @@ def VM_OPC_XorI64                : VM_OPC<0x2C, "XorI64">;
 def VM_OPC_ShlI64                : VM_OPC<0x2D, "ShlI64">;
 def VM_OPC_ShrI64S               : VM_OPC<0x2E, "ShrI64S">;
 def VM_OPC_ShrI64U               : VM_OPC<0x2F, "ShrI64U">;
-def VM_OPC_TruncI64I8            : VM_OPC<0x31, "TruncI64I8">;
-def VM_OPC_TruncI64I16           : VM_OPC<0x32, "TruncI64I16">;
-def VM_OPC_TruncI64I32           : VM_OPC<0x36, "TruncI64I32">;
+def VM_OPC_TruncI64I8            : VM_OPC<0x30, "TruncI64I8">;
+def VM_OPC_TruncI64I16           : VM_OPC<0x31, "TruncI64I16">;
+def VM_OPC_TruncI64I32           : VM_OPC<0x32, "TruncI64I32">;
 def VM_OPC_ExtI8I64S             : VM_OPC<0x33, "ExtI8I64S">;
-def VM_OPC_ExtI16I64S            : VM_OPC<0x34, "ExtI16I64S">;
-def VM_OPC_ExtI32I64S            : VM_OPC<0x35, "ExtI32I64S">;
+def VM_OPC_ExtI8I64U             : VM_OPC<0x34, "ExtI8I64U">;
+def VM_OPC_ExtI16I64S            : VM_OPC<0x35, "ExtI16I64S">;
+def VM_OPC_ExtI16I64U            : VM_OPC<0x36, "ExtI16I64U">;
+def VM_OPC_ExtI32I64S            : VM_OPC<0x37, "ExtI32I64S">;
+def VM_OPC_ExtI32I64U            : VM_OPC<0x38, "ExtI32I64U">;
 def VM_OPC_CmpEQI64              : VM_OPC<0x40, "CmpEQI64">;
 def VM_OPC_CmpNEI64              : VM_OPC<0x41, "CmpNEI64">;
 def VM_OPC_CmpLTI64S             : VM_OPC<0x42, "CmpLTI64S">;
 def VM_OPC_CmpLTI64U             : VM_OPC<0x43, "CmpLTI64U">;
-def VM_OPC_CmpLTEI64S            : VM_OPC<0x44, "CmpLTEI64S">;
-def VM_OPC_CmpLTEI64U            : VM_OPC<0x45, "CmpLTEI64U">;
-def VM_OPC_CmpGTI64S             : VM_OPC<0x46, "CmpGTI64S">;
-def VM_OPC_CmpGTI64U             : VM_OPC<0x47, "CmpGTI64U">;
-def VM_OPC_CmpGTEI64S            : VM_OPC<0x48, "CmpGTEI64S">;
-def VM_OPC_CmpGTEI64U            : VM_OPC<0x49, "CmpGTEI64U">;
 def VM_OPC_CmpNZI64              : VM_OPC<0x4D, "CmpNZI64">;
 
 // Runtime enum iree_vm_ext_i64_op_t:
@@ -353,18 +342,15 @@ def VM_ExtI64OpcodeAttr :
     VM_OPC_TruncI64I16,
     VM_OPC_TruncI64I32,
     VM_OPC_ExtI8I64S,
+    VM_OPC_ExtI8I64U,
     VM_OPC_ExtI16I64S,
+    VM_OPC_ExtI16I64U,
     VM_OPC_ExtI32I64S,
+    VM_OPC_ExtI32I64U,
     VM_OPC_CmpEQI64,
     VM_OPC_CmpNEI64,
     VM_OPC_CmpLTI64S,
     VM_OPC_CmpLTI64U,
-    VM_OPC_CmpLTEI64S,
-    VM_OPC_CmpLTEI64U,
-    VM_OPC_CmpGTI64S,
-    VM_OPC_CmpGTI64U,
-    VM_OPC_CmpGTEI64S,
-    VM_OPC_CmpGTEI64U,
     VM_OPC_CmpNZI64,
   ]>;
 
