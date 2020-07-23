@@ -118,9 +118,11 @@ operation on `memref`s. This part of the pipeline is common to both CPU and GPU
 code generation.
 
 The steps involved in this conversion is shown below. Each of the arrows
-represents a pass in the pipeline ![MHLO To Linalg on `memref`.
-conversion](./hlo_to_linalg.png) The next sections describe each of
-these passes in more detail.
+represents a pass in the pipeline:
+
+![MHLO To Linalg on `memref` conversion](./hlo_to_linalg.png)
+
+The next sections describe each of these passes in more detail.
 
 
 ### MHLO to Linalg on tensors
@@ -314,9 +316,11 @@ The following sections describe the progressive lowering of Linalg operation on
 buffers to SPIR-V dialect. Once lowered to the SPIR-V dialect, it can be
 serialized into a SPIR-V binary using the [serialization mechanism provided by
 the SPIR-V dialect][SpirvSerialization]. The steps involved in the lowering are
-described below, with each of the arrows representing a pass. ![Linalg on
-`memref` to SPIR-V conversion](./CodegenPasses/linalg_to_spirv.png) These passes
-are described below in more detail.
+described below, with each of the arrows representing a pass.
+
+![Linalg on `memref` to SPIR-V conversion](./linalg_to_spirv.png)
+
+These passes are described below in more detail.
 
 ### Tiling and fusion on buffer operations
 
@@ -339,7 +343,7 @@ of the original iteration space (i.e. inter-tile loops) and can be distributed
 to workgroups.
 
 ```mlir
-func @main_ex_dispatch_0() 
+func @main_ex_dispatch_0()
   attributes {
     spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}} {
   %cst = constant 0.000000e+00 : f32
