@@ -72,17 +72,21 @@ Builds experimental projects. Defaults to `OFF`.
 
 #### `IREE_HAL_DRIVERS_TO_BUILD`:STRING
 
-*This does not have any effect at the moment, but will be supported in the
-future!* Semicolon-separated list of HAL drivers to build, or `all` for building
-all HAL drivers. Case-insensitive. Defaults to `all`. Example:
+*Righ now this only affects whether tests are enabled when compiling for
+Android; it will be fully supported in the future!*
+
+Semicolon-separated list of HAL drivers to build, or `all` for building all HAL
+drivers. Case-insensitive. Defaults to `all`. Example:
 `-DIREE_HAL_DRIVERS_TO_BUILD="Vulkan;VMLA"`.
 
 #### `IREE_TARGET_BACKENDS_TO_BUILD`:STRING
 
-*This does not have any effect at the moment, but will be supported in the
-future!* Semicolon-separated list of HAL drivers to build, or `all` for building
-all HAL drivers. Case-insensitive. Defaults to `all`. Example:
-`-DIREE_HAL_DRIVERS_TO_BUILD="Vulkan_SPIRV;VMLA"`.
+*Righ now this only affects whether tests are enabled when compiling for
+Android; it will be fully supported in the future!*
+
+Semicolon-separated list of HAL drivers to build, or `all` for building all
+compiler target backends. Case-insensitive. Defaults to `all`. Example:
+`-DIREE_HAL_DRIVERS_TO_BUILD="Vulkan-SPIRV;VMLA"`.
 
 #### `IREE_ENABLE_LLD`:BOOL
 
