@@ -45,7 +45,7 @@ For development, IREE supports both Bazel and CMake on Windows and Linux. We are
 working on enabling macOS support. For deployment, IREE aims to additionally
 cover Android and iOS.
 
-Please see the [Getting Started](https://google.github.io/iree/GetStarted) pages
+Please see the [Getting Started](https://google.github.io/iree/get_started) pages
 on IREE's [documentation hub](https://google.github.io/iree) to configure,
 compile, and run IREE in your favorite development environment!
 
@@ -76,7 +76,7 @@ hardware/API-specific binaries like SPIR-V.
 
 The architecture of IREE is best illustrated by the following picture:
 
-![IREE Architecture](./docs/IREE-Architecture.svg)
+![IREE Architecture](./docs/iree_architecture.svg)
 
 Being compilation-based means IREE does not have a traditional runtime that
 dispatches "ops" to their fat kernel implementations. What IREE provides is a
@@ -108,8 +108,8 @@ IREE aims to
 ## Roadmap and Milestones
 
 IREE is still at its early stage; we have lots of exciting future plans. Please
-check out the [long-term design roadmap](./docs/roadmap_design.md) and
-[short-term focus areas](./docs/roadmap.md).
+check out the [long-term design roadmap](./docs/design_roadmap.md) and
+[short-term focus areas](./docs/milestones.md).
 
 We use [GitHub Projects](https://github.com/google/iree/projects) to track
 various IREE components and

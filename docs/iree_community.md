@@ -1,7 +1,7 @@
 ---
 layout: default
-permalink: Community
-title: Community
+permalink: iree-community
+title: "IREE Community"
 nav_order: 9
 ---
 
