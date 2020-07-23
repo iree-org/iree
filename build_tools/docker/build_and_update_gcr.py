@@ -122,7 +122,11 @@ if __name__ == '__main__':
 
   # Ensure the user has the correct authorization if they try to push to GCR.
   if args.push:
-    subprocess.check_output(['gcloud', 'auth', 'configure-docker'])
+    if run_command(['which', 'gcloud']) != 0:
+      print('gcloud not found.'
+            ' See https://cloud.google.com/sdk/install for installation.')
+      sys.exit(1)
+    check_command(['gcloud', 'auth', 'configure-docker'])
 
   # Check if any images depend on `args.images` and update them if they do.
   images_to_update_set = set()
