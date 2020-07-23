@@ -58,7 +58,7 @@ for them (e.g. because they don't have write access).
 ## Peculiarities
 
 Our documentation on
-[repository management](https://github.com/google/iree/blob/main/docs/repository_management.md)
+[repository management](https://github.com/google/iree/blob/main/docs/developing_iree/repository_management.md)
 has more information on some of the oddities in our repository setup and
 workflows. For the most part, these should be transparent to normal developer
 workflows.

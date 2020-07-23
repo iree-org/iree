@@ -26,10 +26,10 @@ The test suites can be run excluding Vulkan by specifying
 ## Compiling `tf.Module`s
 
 Compatible TensorFlow modules can be compiled to specific IREE backends using
-`IreeCompiledModule.compile(...)`. This also optionally saves compilation
-artifacts to a specified directory. These artifacts include: MLIR across various
-lowerings, a TensorFlow SavedModel, and the compiled VM FlatBuffer. A basic
-example of creating and calling an `IreeCompiledModule` can be found in
+`IreeCompiledModule`. This also optionally saves compilation artifacts to a
+specified directory. These artifacts include: MLIR across various lowerings, a
+TensorFlow SavedModel, and the compiled VM FlatBuffer. A basic example of
+creating and calling an `IreeCompiledModule` can be found in
 [`tf_utils_test.py`](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/pyiree/tf/support/tf_utils_test.py)
 
 When using Keras models or tf.Modules with functions that IREE can't compile,
@@ -38,7 +38,7 @@ When using Keras models or tf.Modules with functions that IREE can't compile,
 ```python
 from pyiree.tf.support import tf_utils
 vmla_module = tf_utils.IreeCompiledModule(
-    constructor=KerasTFModuleClass,
+    module_class=KerasTFModuleClass,
     backend_info=tf_utils.BackendInfo.ALL['iree_vmla'],
     exported_names=['predict'])
 vmla_module.predict(...)

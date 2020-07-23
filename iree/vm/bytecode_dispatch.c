@@ -608,7 +608,9 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CAST_I32(TruncI32I8, uint8_t, uint32_t);
     DISPATCH_OP_CAST_I32(TruncI32I16, uint16_t, uint32_t);
     DISPATCH_OP_CAST_I32(ExtI8I32S, int8_t, int32_t);
+    DISPATCH_OP_CAST_I32(ExtI8I32U, uint8_t, uint32_t);
     DISPATCH_OP_CAST_I32(ExtI16I32S, int16_t, int32_t);
+    DISPATCH_OP_CAST_I32(ExtI16I32U, uint16_t, uint32_t);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
@@ -642,12 +644,6 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CMP_I32(CmpNEI32, int32_t, !=);
     DISPATCH_OP_CMP_I32(CmpLTI32S, int32_t, <);
     DISPATCH_OP_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP_CMP_I32(CmpLTEI32S, int32_t, <=);
-    DISPATCH_OP_CMP_I32(CmpLTEI32U, uint32_t, <=);
-    DISPATCH_OP_CMP_I32(CmpGTI32S, int32_t, >);
-    DISPATCH_OP_CMP_I32(CmpGTI32U, uint32_t, >);
-    DISPATCH_OP_CMP_I32(CmpGTEI32S, int32_t, >=);
-    DISPATCH_OP_CMP_I32(CmpGTEI32U, uint32_t, >=);
     DISPATCH_OP(CmpNZI32, {
       int32_t operand = VM_DecOperandRegI32("operand");
       int32_t* result = VM_DecResultRegI32("result");

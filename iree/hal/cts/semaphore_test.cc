@@ -76,7 +76,7 @@ TEST_P(SemaphoreTest, WaitAlreadySignaled) {
 }
 
 // Tests waiting on a semaphore that has not been signaled.
-TEST_P(SemaphoreTest, DISABLED_WaitUnsignaled) {
+TEST_P(SemaphoreTest, WaitUnsignaled) {
   ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(2u));
   // NOTE: we don't actually block here because otherwise we'd lock up.
   // Result status is undefined - some backends may return DeadlineExceededError
@@ -90,7 +90,7 @@ TEST_P(SemaphoreTest, DISABLED_WaitUnsignaled) {
 
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
-TEST_P(SemaphoreTest, DISABLED_PingPong) {
+TEST_P(SemaphoreTest, PingPong) {
   ASSERT_OK_AND_ASSIGN(auto a2b, device_->CreateSemaphore(0u));
   ASSERT_OK_AND_ASSIGN(auto b2a, device_->CreateSemaphore(0u));
   std::thread thread([&]() {

@@ -126,8 +126,8 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
 ### Further Reading
 
 *   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developer_overview.md) <!-- TODO: Link to macOS
-    versions of these guides once they are developed.
+    [Developer Overview](../developing_iree/developer_overview.md) <!-- TODO:
+    Link to macOS versions of these guides once they are developed.
 *   To target GPUs using Vulkan, see
     [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 *   To use IREE's Python bindings, see

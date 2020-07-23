@@ -20,8 +20,12 @@ vm.module @my_module {
   vm.func @ext(%arg0 : i32) -> i32 {
     // CHECK-NEXT: %0 = vm.ext.i8.i32.s %arg0 : i32
     %0 = vm.ext.i8.i32.s %arg0 : i32
-    // CHECK-NEXT: %1 = vm.ext.i16.i32.s %0 : i32
-    %1 = vm.ext.i16.i32.s %0 : i32
-    vm.return %1 : i32
+    // CHECK-NEXT: %1 = vm.ext.i8.i32.u %0 : i32
+    %1 = vm.ext.i8.i32.u %0 : i32
+    // CHECK-NEXT: %2 = vm.ext.i16.i32.s %1 : i32
+    %2 = vm.ext.i16.i32.s %1 : i32
+    // CHECK-NEXT: %3 = vm.ext.i16.i32.u %2 : i32
+    %3 = vm.ext.i16.i32.u %2 : i32
+    vm.return %3 : i32
   }
 }

@@ -634,8 +634,9 @@ LogicalResult TorchIndexSelectOpConversion::apply(
   int batch = op.batch_dims().getSExtValue();
   auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
   int nIndices = indexShapeType.getRank();
-  if (batch < 0)
-    return op.emitError("expected batch_dims is greater than or equal to zero");
+  auto inputShapeType = adaptor.input().getType().dyn_cast<ShapedType>();
+  if (axis < 0) axis += inputShapeType.getRank();
+  if (batch < 0) batch += nIndices;
 
   Location loc = op.getLoc();
   Value output = op.getResult();
