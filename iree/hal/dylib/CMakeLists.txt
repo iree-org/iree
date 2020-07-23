@@ -65,7 +65,6 @@ iree_cc_library(
   SRCS
     "dylib_executable.cc"
   DEPS
-    ::memref_runtime
     absl::inlined_vector
     absl::span
     flatbuffers
@@ -95,13 +94,5 @@ iree_cc_library(
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    memref_runtime
-  HDRS
-    "memref_runtime.h"
   PUBLIC
 )

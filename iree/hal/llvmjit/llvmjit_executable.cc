@@ -21,7 +21,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/llvmjit/memref_runtime.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -82,13 +81,11 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
       make_ref<LLVMJITExecutable>(spec, std::move(ll_jit), allow_aliasing_data);
 
   for (const auto func_name : *entry_points) {
-    auto func_symbol =
-        executable->ll_jit_->lookup("invoke_" + func_name->str());
+    auto func_symbol = executable->ll_jit_->lookup(func_name->str());
     if (!func_symbol) {
       return NotFoundErrorBuilder(IREE_LOC)
              << "Can't JIT compile function : " << func_name;
     }
-    // Map function to its invoke_ symbol.
     executable->symbols_.push_back(func_symbol.get());
   }
 
@@ -111,15 +108,10 @@ LLVMJITExecutable::~LLVMJITExecutable() = default;
 
 struct LLVMJITDispatchState : public HostExecutable::DispatchState {
   LLVMJITDispatchState() = default;
-  ~LLVMJITDispatchState() override {
-    for (int i = 0; i < descriptors.size(); ++i) {
-      freeUnrankedDescriptor(descriptors[i]);
-    }
-  }
 
   llvm::JITEvaluatedSymbol symbol;
-  llvm::SmallVector<UnrankedMemRefType<uint32_t>*, 4> descriptors;
   llvm::SmallVector<void*, 4> args;
+  llvm::SmallVector<int64_t, 4> push_constant;
 };
 
 StatusOr<ref_ptr<HostExecutable::DispatchState>>
@@ -142,17 +134,13 @@ LLVMJITExecutable::PrepareDispatch(const DispatchParams& params) {
                                         MemoryAccessBitfield::kWrite,
                                         io_binding.offset, io_binding.length));
       auto data = memory.mutable_data();
-      auto descriptor = allocUnrankedDescriptor<uint32_t>(data);
-      dispatch_state->descriptors.push_back(descriptor);
-      dispatch_state->args.push_back(&descriptor->descriptor);
+      dispatch_state->args.push_back(data);
     }
   }
-
-  auto push_constants_descriptor = allocUnrankedDescriptor<uint32_t>(
-      const_cast<uint32_t*>(params.push_constants->values.data()),
-      {static_cast<int64_t>(params.push_constants->values.size())});
-  dispatch_state->descriptors.push_back(push_constants_descriptor);
-  dispatch_state->args.push_back(&push_constants_descriptor->descriptor);
+  // TODO(ataei): Consider moving this casting to codegen side ?!
+  for (int i = 0; i < params.push_constants->values.size(); ++i) {
+    dispatch_state->push_constant.push_back(params.push_constants->values[i]);
+  }
 
   return std::move(dispatch_state);
 }
@@ -162,8 +150,9 @@ Status LLVMJITExecutable::DispatchTile(DispatchState* state,
   IREE_TRACE_SCOPE0("LLVMJITExecutable::DispatchTile");
   auto* dispatch_state = static_cast<LLVMJITDispatchState*>(state);
 
-  auto func_ptr = (void (*)(void**))dispatch_state->symbol.getAddress();
-  func_ptr(dispatch_state->args.data());
+  auto func_ptr =
+      (void (*)(void**, int64_t*))dispatch_state->symbol.getAddress();
+  func_ptr(dispatch_state->args.data(), dispatch_state->push_constant.data());
 
   return OkStatus();
 }

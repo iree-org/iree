@@ -65,13 +65,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto executableOp = cast<ExecutableOp>(targetOp.getParentOp());
     auto entryPointOps =
         executableOp.getBlock().getOps<ExecutableEntryPointOp>();
-    const bool addCInterface = true;
+
     for (auto entryPointOp : entryPointOps) {
-      std::string funcName =
-          addCInterface ? "_mlir_ciface_" + std::string(entryPointOp.sym_name())
-                        : std::string(entryPointOp.sym_name());
-      dyLibExecutableDef.entry_points.push_back("invoke_" + funcName);
-      createLLVMInvocationFunc(funcName, llvmModule.get());
+      dyLibExecutableDef.entry_points.push_back(
+          std::string(entryPointOp.sym_name()));
     }
 
     // LLVMIR opt passes.
