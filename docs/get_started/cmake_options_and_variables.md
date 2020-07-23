@@ -73,7 +73,7 @@ all HAL drivers. Case-insensitive. Defaults to `all`. Example:
 *This does not have any effect at the moment, but will be supported in the
 future!* Semicolon-separated list of HAL drivers to build, or `all` for building
 all HAL drivers. Case-insensitive. Defaults to `all`. Example:
-`-DIREE_HAL_DRIVERS_TO_BUILD="Vulkan_SPIRV;VMLA"`.
+`-DIREE_HAL_DRIVERS_TO_BUILD="Vulkan-SPIRV;VMLA"`.
 
 #### `IREE_ENABLE_LLD`:BOOL
 

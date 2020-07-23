@@ -102,6 +102,12 @@ foreach(_backend ${IREE_ALL_HAL_DRIVERS})
   set(IREE_HAL_DRIVER_${uppercase_backend} OFF CACHE BOOL "" FORCE)
 endforeach()
 
+# For cross compilation towords Android, we don't want LLVM JIT HAL driver.
+if(ANDROID)
+  message(STATUS "Removed LLVM JIT HAL driver for Android build")
+  list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
+endif()
+
 # Set IREE_HAL_DRIVER_* based on configuration
 foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
@@ -112,8 +118,8 @@ endforeach()
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
   # TODO(scotttodd): LLVMAOT
-  LLVMIR
-  Vulkan_SPIRV
+  LLVM-IR
+  Vulkan-SPIRV
   VMLA
 )
 
