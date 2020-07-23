@@ -43,7 +43,7 @@ fi
 declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
-  --test_env=IREE_LLVMAOT_LINKER_PATH
+  --action_env=IREE_LLVMAOT_LINKER_PATH=$IREE_LLVMAOT_LINKER_PATH
 )
 
 declare -a default_build_tag_filters=("-nokokoro")
