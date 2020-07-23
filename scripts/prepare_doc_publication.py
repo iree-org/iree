@@ -48,7 +48,6 @@ def parse_arguments():
 # header. This dictionary will overrule that default behavior.
 DOC_TITLE_DICT = {
     'index.md': 'Home',
-
     'getting_started_linux_bazel.md': 'Linux with Bazel',
     'getting_started_linux_cmake.md': 'Linux with CMake',
     'getting_started_linux_vulkan.md': 'Linux with Vulkan',
@@ -60,7 +59,6 @@ DOC_TITLE_DICT = {
     'getting_started_android_cmake.md': 'Android with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
     'getting_started_python.md': 'Python',
-
     'milestones.md': 'Short-term Focus Areas',
     'design_roadmap.md': 'Long-term Design Roadmap',
 }
