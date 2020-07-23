@@ -20,11 +20,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Converts function signture type from hal interface op annotation to memref
-/// argument.
-std::unique_ptr<OperationPass<ModuleOp>>
-createHALInterfaceToMemrefArgumentsPass();
-
 /// Pass to perform final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 

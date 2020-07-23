@@ -17,7 +17,6 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/dylib/memref_runtime.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
 
 namespace iree {
@@ -96,15 +95,9 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
 
 struct DyLibDispatchState : public HostExecutable::DispatchState {
   DyLibDispatchState() = default;
-  ~DyLibDispatchState() override {
-    for (int i = 0; i < descriptors.size(); ++i) {
-      freeUnrankedDescriptor(descriptors[i]);
-    }
-  }
-
   void* entry_function = nullptr;
-  absl::InlinedVector<UnrankedMemRefType<uint32_t>*, 4> descriptors;
   absl::InlinedVector<void*, 4> args;
+  absl::InlinedVector<int64_t, 4> push_constant;
 };
 
 StatusOr<ref_ptr<HostExecutable::DispatchState>>
@@ -127,17 +120,14 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
                                         MemoryAccessBitfield::kWrite,
                                         io_binding.offset, io_binding.length));
       auto data = memory.mutable_data();
-      auto descriptor = allocUnrankedDescriptor<uint32_t>(data);
-      dispatch_state->descriptors.push_back(descriptor);
-      dispatch_state->args.push_back(&descriptor->descriptor);
+
+      dispatch_state->args.push_back(data);
     }
   }
-
-  auto push_constants_descriptor = allocUnrankedDescriptor<uint32_t>(
-      const_cast<uint32_t*>(params.push_constants->values.data()),
-      {static_cast<int64_t>(params.push_constants->values.size())});
-  dispatch_state->descriptors.push_back(push_constants_descriptor);
-  dispatch_state->args.push_back(&push_constants_descriptor->descriptor);
+  // TODO(ataei): Consider moving this casting to codegen side ?!
+  for (int i = 0; i < params.push_constants->values.size(); ++i) {
+    dispatch_state->push_constant.push_back(params.push_constants->values[i]);
+  }
 
   return std::move(dispatch_state);
 }
@@ -147,8 +137,10 @@ Status DyLibExecutable::DispatchTile(DispatchState* state,
   IREE_TRACE_SCOPE0("DyLibExecutable::DispatchTile");
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
 
-  auto entry_function = (void (*)(void**))dispatch_state->entry_function;
-  entry_function(dispatch_state->args.data());
+  auto entry_function =
+      (void (*)(void**, int64_t*))dispatch_state->entry_function;
+  entry_function(dispatch_state->args.data(),
+                 dispatch_state->push_constant.data());
 
   return OkStatus();
 }

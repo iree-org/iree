@@ -47,7 +47,6 @@ inline void registerLinalgToSPIRVPasses() {
 inline void registerLinalgToLLVMPasses() {
   static bool init_once = []() {
     // LinalgToLLVM
-    createHALInterfaceToMemrefArgumentsPass();
     return true;
   }();
   (void)init_once;
