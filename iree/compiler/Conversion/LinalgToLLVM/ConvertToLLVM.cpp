@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -134,8 +135,13 @@ struct ConvertToLLVMPass
 
 void ConvertToLLVMPass::runOnOperation() {
   auto module = getOperation();
-  OwningRewritePatternList patterns;
+
   LLVMTypeConverter converter(&getContext());
+  converter.addConversion([](Shape::RankedShapeType, SmallVectorImpl<Type> &) {
+    return success();
+  });
+
+  OwningRewritePatternList patterns;
   populateAffineToStdConversionPatterns(patterns, &getContext());
   populateLoopToStdConversionPatterns(patterns, &getContext());
   populateExpandTanhPattern(patterns, &getContext());

@@ -80,13 +80,12 @@ VMTypeConverter::VMTypeConverter() {
       });
 
   // TODO(b/145876978): materialize conversion for other types
-  addMaterialization([](PatternRewriter &rewriter,
-                        Shape::RankedShapeType resultType, ValueRange inputs,
-                        Location loc) -> Optional<Value> {
+  addArgumentMaterialization([](OpBuilder &builder,
+                                Shape::RankedShapeType resultType,
+                                ValueRange inputs, Location loc) -> Value {
     LLVM_DEBUG(llvm::dbgs()
                << "MATERIALIZE CONVERSION: " << resultType << "\n");
-    return rewriter.create<Shape::MakeRankedShapeOp>(loc, resultType, inputs)
-        .getResult();
+    return builder.create<Shape::MakeRankedShapeOp>(loc, resultType, inputs);
   });
 }
 
