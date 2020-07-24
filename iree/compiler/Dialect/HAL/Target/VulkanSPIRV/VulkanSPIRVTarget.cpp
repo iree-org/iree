@@ -304,8 +304,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
       // and there is only one `hal.executable.entry_point` op on this
       // execuctable initially.
       std::string baseName = dispatchState.entryPointOp.sym_name().str();
-      dispatchState.entryPointOp.setName(
-          llvm::StringRef(llvm::formatv("{0}_entry_0", baseName)));
+      // TODO(scotttodd): rename original entry point, replaceAllSymbolUses?
+      // dispatchState.entryPointOp.setName(
+      //     llvm::StringRef(llvm::formatv("{0}_entry_0", baseName)));
       auto executableBuilder =
           OpBuilder::atBlockBegin(&dispatchState.executableOp.getBlock());
       executableBuilder.setInsertionPointAfter(dispatchState.entryPointOp);
