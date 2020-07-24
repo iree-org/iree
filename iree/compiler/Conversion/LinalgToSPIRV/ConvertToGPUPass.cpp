@@ -563,7 +563,7 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     // Check for marker that specifies that the linalg op is to be partitioned
     // across threads within a workgroup.
-    if (!hasWorkItemMarker(linalgOp)) return failure();
+    if (!hasWorkGroupMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();
@@ -587,7 +587,7 @@ struct MapConvPoolToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!hasWorkItemMarker(linalgOp)) return failure();
+    if (!hasWorkGroupMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();

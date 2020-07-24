@@ -17,6 +17,7 @@
 import os
 import tempfile
 
+from absl import logging
 from absl.testing import parameterized
 from pyiree.tf.support import tf_utils
 import tensorflow as tf
@@ -52,7 +53,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       },
       {
           'testcase_name': 'multiple_backends',
-          'target_backends': ['vmla', 'llvm'],
+          'target_backends': ['vmla', 'llvm-ir'],
       },
   ])
   def test_artifact_saving(self, target_backends):
@@ -64,13 +65,13 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
           artifacts_dir=artifacts_dir)
 
       artifacts_to_check = [
-          'saved_model',
-          f'tf_input__{"__".join(target_backends)}.mlir',
-          f'iree_input__{"__".join(target_backends)}.mlir',
-          f'compiled__{"__".join(target_backends)}.vmfb',
+          'saved_model', 'tf_input.mlir', 'iree_input.mlir',
+          f'compiled__{tf_utils.backends_to_str(target_backends)}.vmfb',
       ]
       for artifact in artifacts_to_check:
-        self.assertTrue(os.path.exists(os.path.join(artifacts_dir, artifact)))
+        artifact_path = os.path.join(artifacts_dir, artifact)
+        logging.info('Checking path: %s', artifact_path)
+        self.assertTrue(os.path.exists(artifact_path))
 
   @parameterized.named_parameters([
       {
@@ -83,15 +84,15 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       },
   ])
   def test_unaltered_state(self, backend_name):
-    info = tf_utils.BackendInfo.ALL[backend_name]
-    module = tf_utils.CompiledModule.compile(StatefulCountingModule, info)
+    backend_info = tf_utils.BackendInfo.ALL[backend_name]
+    module = backend_info.CompiledModule(StatefulCountingModule, backend_info)
 
     # Test that incrementing works properly.
     self.assertEqual([0.], module.get_count())
     module.increment()
     self.assertEqual([1.], module.get_count())
 
-    reinitialized_module = tf_utils.CompiledModule.from_existing(module)
+    reinitialized_module = module.create_reinitialized()
     # Test reinitialization.
     self.assertEqual([0.], reinitialized_module.get_count())
     # Test independent state.

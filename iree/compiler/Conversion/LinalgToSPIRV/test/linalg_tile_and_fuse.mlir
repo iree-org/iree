@@ -51,7 +51,7 @@ module attributes {
 //       CHECK:     %[[VIEW2:.+]] = subview %[[ARG2]]
 //       CHECK:     linalg.conv
 //  CHECK-SAME:       %[[ARG0]], %[[VIEW1]], %[[VIEW2]]
-//  CHECK-SAME:       "workitem"
+//  CHECK-SAME:       "workgroup"
 
 // -----
 
@@ -81,7 +81,7 @@ module attributes {
 //       CHECK:     %[[VIEW1:.+]] = subview %[[ARG1]]
 //       CHECK:     %[[VIEW2:.+]] = subview %[[ARG2]]
 //       CHECK:     linalg.matmul
-//  CHECK-SAME:       "workitem"
+//  CHECK-SAME:       "workgroup"
 //  CHECK-SAME:       %[[VIEW0]], %[[VIEW1]], %[[VIEW2]]
 
 // -----
@@ -111,4 +111,4 @@ module attributes {
 //       CHECK:     %[[VIEW2:.+]] = subview %[[ARG2]]
 //       CHECK:     linalg.pooling_max
 //  CHECK-SAME:       %[[VIEW0]], %[[ARG1]], %[[VIEW2]]
-//  CHECK-SAME:       "workitem"
+//  CHECK-SAME:       "workgroup"

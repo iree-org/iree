@@ -264,8 +264,7 @@ def _instantiate_backends(compiled_backends):
       return self.multi()
 
   reinitialized_modules = [
-      tf_utils.CompiledModule.from_existing(module)
-      for module in compiled_backends.values()
+      module.create_reinitialized() for module in compiled_backends.values()
   ]
   return VirtualBackendsClass(*reinitialized_modules)
 
@@ -366,10 +365,12 @@ class CompiledModuleTestCase(tf.test.TestCase):
     try:
       backends = get_backends()
       cls._compiled_backends_dict = {}
-      for backend in backends:
-        compiled_backend = tf_utils.CompiledModule.compile(
-            cls._module_class, backend, cls._exported_names, global_debug_dir)
-        cls._compiled_backends_dict[backend.name] = compiled_backend
+      for backend_info in backends:
+        compiled_backend = backend_info.CompiledModule(cls._module_class,
+                                                       backend_info,
+                                                       cls._exported_names,
+                                                       global_debug_dir)
+        cls._compiled_backends_dict[backend_info.name] = compiled_backend
     finally:
       # Disable crash reproducer (to avoid inadvertently overwriting this
       # path on a subsequent interaction).
