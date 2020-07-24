@@ -17,7 +17,7 @@
 
 # Build using:
 # docker build --tag gcr.io/iree-oss/cmake-swiftshader \
-#              build_tools/docker/cmake_swiftshader/
+#   build_tools/docker/cmake_swiftshader/
 
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
