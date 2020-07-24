@@ -47,8 +47,9 @@ hal.executable.target "vulkan*" {
   }
 }
 ```
-<a name="snippet1"></a>
-Snippet 1 : Dispatch region with matrix-matrix multiply operation.
+
+<a name="snippet1"></a> Snippet 1 : Dispatch region with matrix-matrix multiply
+operation.
 
 ```mlir
 hal.executable.target "vulkan*" {
@@ -82,13 +83,14 @@ hal.executable.target "vulkan*" {
   }
 }
 ```
-<a name="snippet2"></a>
-Snippet 2 : Dispatch region with element-wise operations.
+
+<a name="snippet2"></a> Snippet 2 : Dispatch region with element-wise
+operations.
 
 __Roadmap Note__: The current implementation might not actually fuse the
 operations grouped into a dispatch region into a single kernel. It is possible
-to end up with multiple kernels per dispatch region. Over time we plan to address
-this by using fusion at different levels (see below).
+to end up with multiple kernels per dispatch region. Over time we plan to
+address this by using fusion at different levels (see below).
 
 The inputs to the dispatch region are materialized within the entry point
 function using the `hal.interface.load.tensor` operation, This operation returns
@@ -109,13 +111,13 @@ above two examples can be found here ([matrix-matrix multiply op][DotAfterAll],
 
 ## Conversion from MHLO dialect to Linalg on buffers
 
-The code generation pipeline heavily relies on use of [Structured
-Operations][LinalgRationale], specifically the [Linalg Dialect][LinalgDialect].
-Both, the Linalg operations on `tensor`s and on `memref`s are central to the
-progressive lowering approach followed here. The first part of the code
-generation pipeline is to convert the MHLO operations on `tensor`s to Linalg
-operation on `memref`s. This part of the pipeline is common to both CPU and GPU
-code generation.
+The code generation pipeline heavily relies on use of
+[Structured Operations][LinalgRationale], specifically the
+[Linalg Dialect][LinalgDialect]. Both, the Linalg operations on `tensor`s and on
+`memref`s are central to the progressive lowering approach followed here. The
+first part of the code generation pipeline is to convert the MHLO operations on
+`tensor`s to Linalg operation on `memref`s. This part of the pipeline is common
+to both CPU and GPU code generation.
 
 The steps involved in this conversion is shown below. Each of the arrows
 represents a pass in the pipeline:
@@ -123,7 +125,6 @@ represents a pass in the pipeline:
 ![MHLO To Linalg on `memref` conversion](./hlo_to_linalg.png)
 
 The next sections describe each of these passes in more detail.
-
 
 ### MHLO to Linalg on tensors
 
@@ -151,8 +152,9 @@ operations are converted to `linalg.generic` operations on tensors.
        linalg.yield %5 : f32
      }: tensor<10x5xf32>, tensor<10x5xf32> -> tensor<10x5xf32>
 ```
-<a name="snippet3"></a>
-Snippet 3 : MHLO to Linalg conversion for [element-wise operations](#snippet2)
+
+<a name="snippet3"></a> Snippet 3 : MHLO to Linalg conversion for
+[element-wise operations](#snippet2)
 
 At the time of writing the representation of Linalg on `tensor`s does not model
 reduction iterator types completely. Specifically, the reduction in Linalg is
@@ -181,7 +183,7 @@ result. The details involved have not been fully worked out yet.
 The Linalg on `tensor` operations generated at the previous step are fused using
 the [LinalgFusionOfTensorOps][LinalgFusionOfTensorOps] from MLIR. Since
 `tensor`s are SSA values, fusion at this stage can be done without using alias
-analysis or dependence analysis based on reads and writes.  Instead the use-def
+analysis or dependence analysis based on reads and writes. Instead the use-def
 chains for the `tensor` values can be used to implement producer-consumer
 fusion. This stage fuses most elementwise operations, broadcast operations and
 data movement operations. An example of the fused op is shown below.
@@ -198,9 +200,9 @@ data movement operations. An example of the fused op is shown below.
        linalg.yield %5 : f32
      }: tensor<?x5xf32>, tensor<?x5xf32>, tensor<?x5xf32> -> tensor<?x5xf32>
 ```
-<a name="snippet4"></a>
-Snippet 4: Fusion of Linalg operation on tensors for element-wise operations
-shown in [Snippet 3](#snippet3)
+
+<a name="snippet4"></a> Snippet 4: Fusion of Linalg operation on tensors for
+element-wise operations shown in [Snippet 3](#snippet3)
 
 ### Conversion of Linalg on tensors to Linalg on buffers
 
@@ -253,8 +255,8 @@ is used within IREE:
 __Roadmap Note__ : Right now the code-generation pipeline relies on fusion of
 operations on tensor level. In the near future, we want to be able to fuse
 operations like `linalg.matmul` and `linalg.conv` with consumers/producers that
-are element-wise operations using the [fusion of Linalg operation on
-`memref`s][LinalgFusionOnBuffers].
+are element-wise operations using the
+[fusion of Linalg operation on `memref`s][LinalgFusionOnBuffers].
 
 At this stage of the compilation all operations must have been converted to
 Linalg operations on buffers. Shown below are the IR at the end of this stage
@@ -275,8 +277,8 @@ func @main_ex_dispatch() {
   return
 }
 ```
-<a name="snippet5"></a>
-Snippet 5 : Matrix-matrix multiply after conversion to
+
+<a name="snippet5"></a> Snippet 5 : Matrix-matrix multiply after conversion to
 Linalg operation on `memref`s.
 
 ```mlir
@@ -303,9 +305,9 @@ func @main_ex_dispatch() {
   return
 }
 ```
-<a name="snippet6"></a>
-Snippet 6 : Elementwise operations after conversion to Linalg operation on
-`memref`s
+
+<a name="snippet6"></a> Snippet 6 : Elementwise operations after conversion to
+Linalg operation on `memref`s
 
 The rest of the code-generation differs on whether the compilation is for CPU
 (using LLVM) or for GPU (using SPIR-V).
@@ -314,9 +316,10 @@ The rest of the code-generation differs on whether the compilation is for CPU
 
 The following sections describe the progressive lowering of Linalg operation on
 buffers to SPIR-V dialect. Once lowered to the SPIR-V dialect, it can be
-serialized into a SPIR-V binary using the [serialization mechanism provided by
-the SPIR-V dialect][SpirvSerialization]. The steps involved in the lowering are
-described below, with each of the arrows representing a pass.
+serialized into a SPIR-V binary using the
+[serialization mechanism provided by the SPIR-V dialect][SpirvSerialization].
+The steps involved in the lowering are described below, with each of the arrows
+representing a pass.
 
 ![Linalg on `memref` to SPIR-V conversion](./linalg_to_spirv.png)
 
@@ -329,18 +332,18 @@ The GPU hardware typically provides multiple-levels of compute hierarchy, namely
 warps and threads, respectively, in CUDA terminology. Tiling is a way to map the
 computations to each level of the compute hierarchy. For example 3-D tiling a
 `linalg.matmul` operation decomposes the computation into several tiled
-matrix-matrix multiplies. [Tiling transformation in Linalg
-dialect][LinalgTiling] generates the outer-loops that iterate over tiled
-`linalg.matmul` operations. These outer loops can be mapped to different
-workgroups, if they are parallel. The tiled `linalg.matmul` operation can be
-further tiled to map to subgroups. Finally, the tiled operation can be lowered
-to loops with individual iterations mapped to workitems. The
-[LinalgTileAndFusePass][LinalgTileAndFuse] uses the Linalg Tiling patterns
-([defined here][LinalgTilingPatterns]) to tile operations like `linalg.matmul`,
-`linalg.conv` and `linalg.*_pooling`. The result of tiling the code in Snippet 5
-is shown below. As expected there are 2-parallel loops that iterate over tiles
-of the original iteration space (i.e. inter-tile loops) and can be distributed
-to workgroups.
+matrix-matrix multiplies.
+[Tiling transformation in Linalg dialect][LinalgTiling] generates the
+outer-loops that iterate over tiled `linalg.matmul` operations. These outer
+loops can be mapped to different workgroups, if they are parallel. The tiled
+`linalg.matmul` operation can be further tiled to map to subgroups. Finally, the
+tiled operation can be lowered to loops with individual iterations mapped to
+workitems. The [LinalgTileAndFusePass][LinalgTileAndFuse] uses the Linalg Tiling
+patterns ([defined here][LinalgTilingPatterns]) to tile operations like
+`linalg.matmul`, `linalg.conv` and `linalg.*_pooling`. The result of tiling the
+code in Snippet 5 is shown below. As expected there are 2-parallel loops that
+iterate over tiles of the original iteration space (i.e. inter-tile loops) and
+can be distributed to workgroups.
 
 ```mlir
 func @main_ex_dispatch_0()
@@ -372,15 +375,14 @@ func @main_ex_dispatch_0()
   return
 }
 ```
-<a name="snippet7"></a>
-Snippet 7 : `linalg.matmul` after tiling.
+
+<a name="snippet7"></a> Snippet 7 : `linalg.matmul` after tiling.
 
 #### Tile Size and Workgroup Size
 
 When operations that are to be tiled exist within the dispatch function (like
-`linalg.matmul` or `linalg.conv`), this pass also decides the
-1. Tile size to be used for the tiling.
-1. The workgroup size to be used.
+`linalg.matmul` or `linalg.conv`), this pass also decides the 1. Tile size to be
+used for the tiling. 1. The workgroup size to be used.
 
 The tile size and workgroup size are closely linked since the code within the
 tiled loops are to be collectively executed by the entire workgroup. In other
@@ -397,14 +399,13 @@ functionality, with performance considerations addressed over time.
 Downstream passes have to handle tiled Linalg operations and untiled Linalg
 operation that might exist in the same function in different ways. For example,
 while the former are to be executed collectively by workitems within a
-workgroup, the latter have to be executed by all workitems across
-workgroups. One way to distinguish these two operations is to use the marker
-mechanism in Linalg ([LinalgMarker][LinalgTilingPatterns]). This is a `StrAttr`
-whose value can be used to encode the scope of the operation. For example, in
-Snippet 7 above, the tiled `linalg.matmul` operation has a marker `workgroup` to
-indicate that this operation needs to be executed by a workgroup in a collective
-manner. At this time, the code-generation pipeline uses only the `workgroup`
-marker.
+workgroup, the latter have to be executed by all workitems across workgroups.
+One way to distinguish these two operations is to use the marker mechanism in
+Linalg ([LinalgMarker][LinalgTilingPatterns]). This is a `StrAttr` whose value
+can be used to encode the scope of the operation. For example, in Snippet 7
+above, the tiled `linalg.matmul` operation has a marker `workgroup` to indicate
+that this operation needs to be executed by a workgroup in a collective manner.
+At this time, the code-generation pipeline uses only the `workgroup` marker.
 
 __Roadmap Note__ : Markers are meant to be short-lived, ideally set and consumed
 within the same pass. In the current pipeline the lifetime spans passes to allow
@@ -422,18 +423,18 @@ prefetch the inputs to the tiled operation. For example in the matrix-matrix
 multiply case, the same data row (column) of the LHS (RHS) matrix is read by
 multiple workitems. Prefetching the data into `Workgroup` memory can reduce the
 number of loads to `StorageClass` memory by an order of magnitude. This
-transformation can be achieved by using the [`Linalg
-Promotion`][LinalgPromotionPatterns] which modifies the `subview`s that are the
-operands to the tiled Linalg operation to use a new `memref` object. The size of
-this `memref` is computed from the size of the `subview`. This `memref` object
-is later lowered to use `Workgroup` memory Storage Class. The snippet below
-shows this transformation when applied to `linalg.matmul` (along with
+transformation can be achieved by using the
+[`Linalg Promotion`][LinalgPromotionPatterns] which modifies the `subview`s that
+are the operands to the tiled Linalg operation to use a new `memref` object. The
+size of this `memref` is computed from the size of the `subview`. This `memref`
+object is later lowered to use `Workgroup` memory Storage Class. The snippet
+below shows this transformation when applied to `linalg.matmul` (along with
 tiling). The newly created `memref` objects are annotated with the memory space
 `3` to indicate that they are to be lowered to use `Workgroup` memory. The copy
 of data from the original `memref` into the new `memref`, as well as the
 necessary synchronization constructs are generated as well. Note the memory
-space annotation used here is consistent with what [address space annotations
-used in NVVM][NVVMAddressSpace].
+space annotation used here is consistent with what
+[address space annotations used in NVVM][NVVMAddressSpace].
 
 ```mlir
 func @matmul_tile()
@@ -479,41 +480,39 @@ func @matmul_tile()
 }
 ```
 
-<a name="snippet8"></a>
-Snippet 8: `linalg.matmul` after tiling and promotion of operand subviews to use
-`Workgroup` memory.
+<a name="snippet8"></a> Snippet 8: `linalg.matmul` after tiling and promotion of
+operand subviews to use `Workgroup` memory.
 
 ### Distributing to workgroups and workitems
 
 After tiling the operations within the dispatch functions are either
 `scf.parallel` operations or Linalg operations.
 
-- The outer `scf.parallel` operations represent parallel loops that are to be
-  distributed across workgroups. The distribution here assumes that the number
-  of workgroups along each dimension is equal to the number of iterations of the
-  `scf.parallel` operation.
+-   The outer `scf.parallel` operations represent parallel loops that are to be
+    distributed across workgroups. The distribution here assumes that the number
+    of workgroups along each dimension is equal to the number of iterations of
+    the `scf.parallel` operation.
 
-- Linalg operations that are not tiled, and are therefore __not within__ `scf`
-  operations, are lowered to loops. The resulting outer `scf.parallel` operations are
-  collapsed to have a single induction variable. This loop is then distributed
-  across workitems using their `GlobalInvocationId`, (which is same as
-  `blockIdx * blockDim + threadIdx` in CUDA terminology).
+-   Linalg operations that are not tiled, and are therefore __not within__ `scf`
+    operations, are lowered to loops. The resulting outer `scf.parallel`
+    operations are collapsed to have a single induction variable. This loop is
+    then distributed across workitems using their `GlobalInvocationId`, (which
+    is same as `blockIdx * blockDim + threadIdx` in CUDA terminology).
 
-- Linalg operations that are tiled, and are therefore __within__ `scf`
-  operations, are lowered to loops and the iterations of the `scf.parallel`
-  operations are mapped to workitems using their `LocalInvocationId` (which is
-  same as `threadIdx` in CUDA terminology). Note that these operations are
-  tagged with the `workgroup` marker which makes it easy to disambiguate from
-  the case where Linalg operations are outside of `scf` operations. Here too,
-  the distribution assumes that the workgroup size is greater than or equal to
-  the number of iterations of the partitioned loop.
+-   Linalg operations that are tiled, and are therefore __within__ `scf`
+    operations, are lowered to loops and the iterations of the `scf.parallel`
+    operations are mapped to workitems using their `LocalInvocationId` (which is
+    same as `threadIdx` in CUDA terminology). Note that these operations are
+    tagged with the `workgroup` marker which makes it easy to disambiguate from
+    the case where Linalg operations are outside of `scf` operations. Here too,
+    the distribution assumes that the workgroup size is greater than or equal to
+    the number of iterations of the partitioned loop.
 
-These transformations are applied by the
-[`ConvertToGPUPass`][ConvertToGPU]. Below is the result of applying this pass to
-Snippet 7. The outer `scf.parallel` loop is distributed across workgroups. The
-tiled `linalg.matmul` operation is lowered to loops, and the outer
-`scf.parallel` operation generated during this lowering are distributed across
-workitems within the workgroup.
+These transformations are applied by the [`ConvertToGPUPass`][ConvertToGPU].
+Below is the result of applying this pass to Snippet 7. The outer `scf.parallel`
+loop is distributed across workgroups. The tiled `linalg.matmul` operation is
+lowered to loops, and the outer `scf.parallel` operation generated during this
+lowering are distributed across workitems within the workgroup.
 
 ```mlir
 func @main_ex_dispatch_0_dispatch_1()
@@ -557,9 +556,9 @@ func @main_ex_dispatch_0_dispatch_1()
   return
 }
 ```
-<a name="snippet9"></a>
-Snippet 9: `linalg.matmul` after distributing parallel inter-tile loops to
-workgroups and intra-tile loops to workitems.
+
+<a name="snippet9"></a> Snippet 9: `linalg.matmul` after distributing parallel
+inter-tile loops to workgroups and intra-tile loops to workitems.
 
 [Snippet 6](#snippet6) shows the fused element-wise operations represented using
 a `linalg.generic` operation. This operation is not tiled in the
@@ -601,8 +600,9 @@ func @main_ex_dispatch_0()
   return
 }
 ```
-<a name="snippet10"></a>
-Snippet 10: Distributing the iterations for pointwise operations for GPU execution.
+
+<a name="snippet10"></a> Snippet 10: Distributing the iterations for pointwise
+operations for GPU execution.
 
 ### Lowering to SPIR-V dialect
 
@@ -612,10 +612,10 @@ system, its best to lower all the operations to SPIR-V in one step. This is done
 by applying all the patterns that lower all the different IR constructs into
 SPIR-V within the [`ConvertToSPIRVPass`][ConvertToSPIRV]. These are
 
-- [GPU dialect to SPIR-V conversion][GPUToSPIRV].
-- [SCF dialect to SPIR-V conversion][SCFToSPIRV].
-- [Standard dialect to SPIR-V conversion][StandardToSPIRV].
-- Patterns that lower the `iree.placeholder` instruction into a SPIR-V.
+-   [GPU dialect to SPIR-V conversion][GPUToSPIRV].
+-   [SCF dialect to SPIR-V conversion][SCFToSPIRV].
+-   [Standard dialect to SPIR-V conversion][StandardToSPIRV].
+-   Patterns that lower the `iree.placeholder` instruction into a SPIR-V.
 
 Once applied the resulting IR is in SPIR-V dialect that can be serialized to a
 SPIR-V binary.
