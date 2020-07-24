@@ -36,12 +36,12 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //      CHECK:     %[[ALLOC2:.+]] = alloc(%[[C4]], %[[C8]]) : memref<?x?xf32, 3>
 //      CHECK:     %[[SUBVIEW2:.+]] = subview %[[ALLOC2]]
 //      CHECK:     linalg.copy(%[[ARG0SV]], %[[SUBVIEW1]])
-// CHECK-SAME:       "workitem"
+// CHECK-SAME:       "workgroup"
 //      CHECK:     spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
 //      CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW2]])
-// CHECK-SAME:       "workitem"
+// CHECK-SAME:       "workgroup"
 //      CHECK:     spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
-//      CHECK:     linalg.matmul {{.*}}"workitem"{{.*}} %[[SUBVIEW1]], %[[SUBVIEW2]], %[[RET0SV]]
+//      CHECK:     linalg.matmul {{.*}}"workgroup"{{.*}} %[[SUBVIEW1]], %[[SUBVIEW2]], %[[RET0SV]]
 //      CHECK:     spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
 //  CHECK-DAG:     dealloc %[[ALLOC1]] : memref<?x?xf32, 3>
 //  CHECK-DAG:     dealloc %[[ALLOC2]] : memref<?x?xf32, 3>

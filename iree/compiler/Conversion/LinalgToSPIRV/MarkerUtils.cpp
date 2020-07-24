@@ -36,18 +36,12 @@ static bool checkMarkerValue(Operation *op, StringRef marker = "") {
 
 StringRef getWorkGroupMarker() { return "workgroup"; }
 
-StringRef getWorkItemMarker() { return "workitem"; }
-
 bool hasMarker(Operation *op, StringRef marker) {
   return checkMarkerValue(op, marker);
 }
 
 bool hasWorkGroupMarker(Operation *op) {
   return checkMarkerValue(op, getWorkGroupMarker());
-}
-
-bool hasWorkItemMarker(Operation *op) {
-  return checkMarkerValue(op, getWorkItemMarker());
 }
 
 void setMarker(Operation *op, StringRef marker) {
@@ -57,6 +51,5 @@ void setMarker(Operation *op, StringRef marker) {
 
 void setWorkGroupMarker(Operation *op) { setMarker(op, getWorkGroupMarker()); }
 
-void setWorkItemMarker(Operation *op) { setMarker(op, getWorkItemMarker()); }
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -173,6 +173,17 @@ function(iree_check_single_backend_test_suite)
     ${ARGN}
   )
 
+
+  string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
+  if(NOT IREE_HAL_DRIVER_${_UPPERCASE_DRIVER})
+    return()
+  endif()
+
+  string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
+  if(NOT IREE_TARGET_BACKEND_${_UPPERCASE_TARGET_BACKEND})
+    return()
+  endif()
+
   foreach(_SRC IN LISTS _RULE_SRCS)
     set(_TEST_NAME "${_RULE_NAME}_${_SRC}")
     iree_check_test(
