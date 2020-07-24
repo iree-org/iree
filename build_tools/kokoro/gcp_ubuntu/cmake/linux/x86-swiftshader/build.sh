@@ -33,6 +33,9 @@ python3 --version
 vulkaninfo 2>/dev/null | grep "Vulkan Instance" || echo "Vulkan Instance not found!"
 vulkaninfo 2>/dev/null | grep -A7 "VkPhysicalDeviceProperties"  || echo "VkPhysicalDeviceProperties not found!"
 
+# Print SwiftShader git commit
+cat /swiftshader/git-commit
+
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
