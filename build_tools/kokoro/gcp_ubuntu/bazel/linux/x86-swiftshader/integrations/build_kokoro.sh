@@ -34,7 +34,7 @@ docker_setup
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --env IREE_VULKAN_DISABLE=0 \
   gcr.io/iree-oss/bazel-swiftshader:prod \
-  build_tools/kokoro/gcp_ubuntu/bazel/linux/x86/swiftshader/build.sh
+  build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.

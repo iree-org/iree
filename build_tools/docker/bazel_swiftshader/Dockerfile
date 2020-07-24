@@ -27,7 +27,7 @@
 # Set up the image and working directory.
 FROM gcr.io/iree-oss/bazel-tensorflow
 
-# TODO: The following steps are copied from cmake, cmake-vulkan, and
+# TODO(#2651): The following steps are copied from cmake, cmake-vulkan, and
 # cmake-swiftshader. We might want to consider using docker multi-stage
 # builds to factor them out.
 
@@ -56,7 +56,6 @@ ARG SWIFTSHADER_COMMIT=6a8a74986c357b0c6fa0dfd2b4b9230af8d39d1a
 RUN apt-get update && apt-get install -y cmake ninja-build zlib1g-dev
 
 # Update cmake to v3.13+, which is ahead of apt-get's version (3.10.2).
-# Install dependencies, including an old version of cmake to bootstrap.
 ENV CMAKE_VERSION 3.13.5
 RUN apt-get update \
   && mkdir ./cmake_install \
