@@ -52,7 +52,7 @@ RUN git clone https://github.com/google/swiftshader \
   # Copy the ICD JSON and .so to a known place.
   && cp -rf build-swiftshader/Linux /swiftshader \
   # Keep track of the commit we are using.
-  && cd swiftshader && git rev-parse HEAD > /swiftshader/git-commit && cd .. \
+  && echo "${SWIFTSHADER_COMMIT?}" > /swiftshader/git-commit \
   # Clean up everything.
   && rm -rf swiftshader build-swiftshader
 
