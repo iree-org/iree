@@ -66,6 +66,7 @@ iree_check_single_backend_test_suite(
     "tanh.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
