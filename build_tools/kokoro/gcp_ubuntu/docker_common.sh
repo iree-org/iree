@@ -32,13 +32,10 @@ function docker_setup() {
     mkdir -p "${fake_etc_dir?}"
 
     local fake_group="${fake_etc_dir?}/group"
-    local fake_passwd="${fake_etc_dir?}/group"
+    local fake_passwd="${fake_etc_dir?}/passwd"
 
-    cp /etc/passwd "${fake_group?}"
-    cp /etc/group "${fake_passwd?}"
-    getent group "$(id -g)" >> "${fake_group?}"
-    getent passwd "$(id -u)" >> "${fake_passwd?}"
-
+    getent group > "${fake_group?}"
+    getent passwd > "${fake_passwd?}"
 
     local workdir="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
