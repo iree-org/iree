@@ -40,7 +40,6 @@ iree_cc_test(
   DEPS
     ::async_command_queue
     absl::memory
-    absl::time
     iree::base::status
     iree::base::status_matchers
     iree::base::time

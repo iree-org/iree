@@ -39,7 +39,7 @@ class Conv2dModule(tf.Module):
 
 
 @tf_test_utils.compile_module(Conv2dModule)
-class ConvTest(tf_test_utils.SavedModelTestCase):
+class ConvTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_batched_feature_unpadded(self):
     i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])

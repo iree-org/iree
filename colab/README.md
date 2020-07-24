@@ -1,7 +1,7 @@
 # Google Colaboratory (Colab) Notebooks
 
 To run these notebooks with a local runtime, refer to the
-[Using Colab docs](../docs/using_colab.md).
+[Using Colab docs](../docs/using_iree/using_colab.md).
 
 Hosted/remote runtimes are not yet supported.
 

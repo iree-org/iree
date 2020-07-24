@@ -23,6 +23,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module.h"
@@ -144,31 +145,30 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 
   // Setup call inputs with our buffers.
   // TODO(benvanik): make a macro/magic.
-  iree_vm_variant_list_t* inputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
+                                     IREE_ALLOCATOR_SYSTEM, &inputs));
   auto arg0_buffer_ref = iree_hal_buffer_move_ref(arg0_buffer);
   auto arg1_buffer_ref = iree_hal_buffer_move_ref(arg1_buffer);
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_append_ref_move(inputs, &arg0_buffer_ref));
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_append_ref_move(inputs, &arg1_buffer_ref));
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_ref));
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg1_buffer_ref));
 
   // Prepare outputs list to accept the results from the invocation.
-  iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &outputs));
 
   // Synchronously invoke the function.
   LOG(INFO) << "Calling " << kMainFunctionName << "...";
   IREE_ASSERT_OK(iree_vm_invoke(context, main_function,
-                                /*policy=*/nullptr, inputs, outputs,
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
                                 IREE_ALLOCATOR_SYSTEM));
-  iree_vm_variant_list_free(inputs);
 
   // Get the result buffers from the invocation.
   LOG(INFO) << "Retreiving results...";
-  iree_hal_buffer_t* ret_buffer =
-      iree_hal_buffer_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+  auto* ret_buffer =
+      reinterpret_cast<iree_hal_buffer_t*>(iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_hal_buffer_get_descriptor()));
   ASSERT_NE(nullptr, ret_buffer);
 
   // Read back the results and ensure we got the right values.
@@ -183,8 +183,8 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   ASSERT_API_OK(iree_hal_buffer_unmap(ret_buffer, &mapped_memory));
   LOG(INFO) << "Results match!";
 
-  iree_vm_variant_list_free(outputs);
-
+  inputs.reset();
+  outputs.reset();
   iree_hal_device_release(device);
   iree_vm_context_release(context);
   iree_vm_instance_release(instance);

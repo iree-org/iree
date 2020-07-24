@@ -457,6 +457,30 @@ class HALModuleState final {
     return BufferViewDimsN<4>(std::move(buffer_view));
   }
 
+  Status BufferViewTrace(
+      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views) {
+    // TODO(hanchung): Have better information for each dump, eg, having StrAttr
+    // for each trace event so we can map the dump to dispatch functions easier.
+    fprintf(stderr, "=== DEBUG DUMP ===\n");
+    for (auto& view : buffer_views) {
+      std::string result_str(4096, '\0');
+      iree_status_t status;
+      do {
+        iree_host_size_t actual_length = 0;
+        status = iree_hal_buffer_view_format(
+            view.get(), /*max_element_count=*/1024, result_str.size() + 1,
+            &result_str[0], &actual_length);
+        result_str.resize(actual_length);
+      } while (iree_status_is_out_of_range(status));
+      if (!iree_status_is_ok(status)) {
+        return FromApiStatus(status, IREE_LOC);
+      }
+      fprintf(stderr, "%s\n", result_str.c_str());
+    }
+    fprintf(stderr, "\n");
+    return OkStatus();
+  }
+
   //===--------------------------------------------------------------------===//
   // iree::hal::CommandBuffer
   //===--------------------------------------------------------------------===//
@@ -876,6 +900,8 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::BufferViewDims3),
     vm::MakeNativeFunction("buffer_view.dims.4",
                            &HALModuleState::BufferViewDims4),
+    vm::MakeNativeFunction("buffer_view.trace",
+                           &HALModuleState::BufferViewTrace),
 
     vm::MakeNativeFunction("command_buffer.create",
                            &HALModuleState::CommandBufferCreate),

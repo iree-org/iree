@@ -167,21 +167,6 @@ typedef uint64_t iree_device_size_t;
 // Whole length of the underlying buffer.
 #define IREE_WHOLE_BUFFER (iree_device_size_t(-1))
 
-// Like absl::Time, represented as nanoseconds since unix epoch.
-// TODO(benvanik): pick something easy to get into/outof time_t/etc.
-typedef int64_t iree_time_t;
-// Like absl::InfinitePast.
-#define IREE_TIME_INFINITE_PAST INT64_MIN
-// Like absl::InfiniteFuture.
-#define IREE_TIME_INFINITE_FUTURE INT64_MAX
-
-// Like absl::Duration, represented as relative nanoseconds.
-typedef int64_t iree_duration_t;
-// Like absl::InfiniteDuration.
-#define IREE_DURATION_INFINITE INT64_MIN
-// Like absl::ZeroDuration.
-#define IREE_DURATION_ZERO 0
-
 // A span of mutable bytes (ala std::span of uint8_t).
 typedef struct {
   uint8_t* data;
@@ -371,6 +356,43 @@ iree_api_version_check(iree_api_version_t expected_version,
 // iree_allocator_free are safe to call before this.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree_time_t and iree_duration_t
+//===----------------------------------------------------------------------===//
+
+// Like absl::Time, represented as nanoseconds since unix epoch.
+// TODO(benvanik): pick something easy to get into/outof time_t/etc.
+typedef int64_t iree_time_t;
+// Like absl::InfinitePast.
+#define IREE_TIME_INFINITE_PAST INT64_MIN
+// Like absl::InfiniteFuture.
+#define IREE_TIME_INFINITE_FUTURE INT64_MAX
+
+// Like absl::Duration, represented as relative nanoseconds.
+typedef int64_t iree_duration_t;
+// Like absl::InfiniteDuration.
+#define IREE_DURATION_INFINITE INT64_MAX
+// Like absl::ZeroDuration.
+#define IREE_DURATION_ZERO 0
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Returns the current system time in unix nanoseconds.
+// Depending on the system architecture and power mode this time may have a
+// very coarse granularity (on the order of microseconds to milliseconds).
+//
+// The system timer may not be monotonic; users should ensure when comparing
+// times they check for negative values in case the time moves backwards.
+IREE_API_EXPORT iree_time_t iree_time_now();
+
+// Converts a relative timeout duration to an absolute deadline time.
+// This handles the special cases of IREE_DURATION_ZERO and
+// IREE_DURATION_INFINITE to avoid extraneous time queries.
+IREE_API_EXPORT iree_time_t
+iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

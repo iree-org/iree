@@ -35,6 +35,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
 
 // Other dependencies (helpers, etc.)
 #include "absl/base/macros.h"
@@ -723,36 +724,34 @@ int iree::IreeMain(int argc, char** argv) {
         iree_hal_buffer_release(input0_buffer);
         iree_hal_buffer_release(input1_buffer);
         // Marshal input buffer views through a VM variant list.
-        iree_vm_variant_list_t* input_list = nullptr;
-        CHECK_IREE_OK(
-            iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &input_list));
+        vm::ref<iree_vm_list_t> inputs;
+        CHECK_IREE_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
+                                          IREE_ALLOCATOR_SYSTEM, &inputs));
         auto input0_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input0_buffer_view);
         auto input1_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input1_buffer_view);
-        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(
-            input_list, &input0_buffer_view_ref));
-        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(
-            input_list, &input1_buffer_view_ref));
+        CHECK_IREE_OK(
+            iree_vm_list_push_ref_move(inputs.get(), &input0_buffer_view_ref));
+        CHECK_IREE_OK(
+            iree_vm_list_push_ref_move(inputs.get(), &input1_buffer_view_ref));
 
         // Prepare outputs list to accept results from the invocation.
-        iree_vm_variant_list_t* output_list = nullptr;
-        CHECK_IREE_OK(iree_vm_variant_list_alloc(kElementCount * sizeof(float),
-                                                 IREE_ALLOCATOR_SYSTEM,
-                                                 &output_list));
+        vm::ref<iree_vm_list_t> outputs;
+        CHECK_IREE_OK(iree_vm_list_create(/*element_type=*/nullptr,
+                                          kElementCount * sizeof(float),
+                                          IREE_ALLOCATOR_SYSTEM, &outputs));
 
         // Synchronously invoke the function.
         CHECK_IREE_OK(iree_vm_invoke(iree_context, main_function,
-                                     /*policy=*/nullptr, input_list,
-                                     output_list, IREE_ALLOCATOR_SYSTEM));
-        iree_vm_variant_list_free(input_list);
+                                     /*policy=*/nullptr, inputs.get(),
+                                     outputs.get(), IREE_ALLOCATOR_SYSTEM));
 
         // Read back the results.
         DLOG(INFO) << "Reading back results...";
-        iree_vm_variant_t* output_variant =
-            iree_vm_variant_list_get(output_list, 0);
-        auto* output_buffer_view =
-            iree_hal_buffer_view_deref(&output_variant->ref);
+        auto* output_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(
+            iree_vm_list_get_ref_deref(outputs.get(), 0,
+                                       iree_hal_buffer_view_get_descriptor()));
         auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
         iree_hal_mapped_memory_t mapped_memory;
         CHECK_IREE_OK(iree_hal_buffer_map(output_buffer,
@@ -761,7 +760,6 @@ int iree::IreeMain(int argc, char** argv) {
         memcpy(&latest_output, mapped_memory.contents.data,
                mapped_memory.contents.data_length);
         iree_hal_buffer_unmap(output_buffer, &mapped_memory);
-        iree_vm_variant_list_free(output_list);
 
         dirty = false;
       }

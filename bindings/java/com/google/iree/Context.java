@@ -54,6 +54,15 @@ final class Context {
     }
   }
 
+  public Function resolveFunction(String name) throws Exception {
+    Function function = new Function();
+    Status status = Status.fromCode(nativeResolveFunction(function.getNativeAddress(), name));
+    if (!status.isOk()) {
+      throw status.toException("Could not resolve function");
+    }
+    return function;
+  }
+
   public int getId() {
     return nativeGetId();
   }
@@ -81,6 +90,8 @@ final class Context {
   private native int nativeCreateWithModules(long instanceAddress, long[] moduleAddresses);
 
   private native int nativeRegisterModules(long[] moduleAddresses);
+
+  private native int nativeResolveFunction(long functionAddress, String name);
 
   private native void nativeFree();
 

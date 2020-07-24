@@ -256,6 +256,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
       Symbol,
+      VM_GlobalOpInterface,
     ])> {
   let arguments = (ins
     StrAttr:$sym_name,
@@ -291,9 +292,15 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
   ];
 
   let extraClassDeclaration = [{
+    StringRef getSymbolName() { return sym_name(); }
+    Type getStorageType() { return type(); }
+    bool isMutable() { return is_mutable(); }
     void makeMutable() { setAttr("is_mutable", UnitAttr::get(getContext())); }
+    Optional<StringRef> getInitializerAttr() { return initializer(); }
     void clearInitializer() { removeAttr("initializer"); }
+    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { removeAttr("initial_value"); }
+    Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
   }];
 
   let parser = [{ return parseGlobalOp(parser, &result); }];
@@ -1248,7 +1255,7 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
-    VM_EncIntAttr<"amount", type.bitwidth>,
+    VM_EncIntAttr<"amount", 8>,
     VM_EncResult<"result">,
   ];
 }
@@ -1272,12 +1279,12 @@ def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
 // Casting and type conversion/emulation
 //===----------------------------------------------------------------------===//
 
-def VM_TruncI8Op : VM_UnaryArithmeticOp<I32, "trunc.i8", VM_OPC_TruncI8> {
+def VM_TruncI32I8Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
   let summary = [{integer truncate to 8 bits}];
   let hasFolder = 1;
 }
 
-def VM_TruncI16Op : VM_UnaryArithmeticOp<I32, "trunc.i16", VM_OPC_TruncI16> {
+def VM_TruncI32I16Op : VM_UnaryArithmeticOp<I32, "trunc.i32.i16", VM_OPC_TruncI32I16> {
   let summary = [{integer truncate to 16 bits}];
   let hasFolder = 1;
 }
@@ -1287,8 +1294,18 @@ def VM_ExtI8I32SOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.s", VM_OPC_ExtI8I32S>
   let hasFolder = 1;
 }
 
+def VM_ExtI8I32UOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.u", VM_OPC_ExtI8I32U> {
+  let summary = [{integer zero extend 8 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
 def VM_ExtI16I32SOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.s", VM_OPC_ExtI16I32S> {
   let summary = [{integer sign extend 16 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI16I32UOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.u", VM_OPC_ExtI16I32U> {
+  let summary = [{integer zero extend 16 bits to 32 bits}];
   let hasFolder = 1;
 }
 
@@ -1355,6 +1372,27 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
+class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
+                                  list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      AllTypesMatch<["lhs", "rhs"]>,
+      VM_PseudoOp,
+    ])> {
+  let description = [{
+    Compares two operands with the specified predicate.
+  }];
+
+  let arguments = (ins
+    type:$lhs,
+    type:$rhs
+  );
+  let results = (outs
+    I32:$result
+  );
+
+  let assemblyFormat = "operands attr-dict `:` type($lhs)";
+}
+
 def VM_CmpEQI32Op :
     VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32, [Commutative]> {
   let summary = [{integer equality comparison operation}];
@@ -1384,43 +1422,42 @@ def VM_CmpLTI32UOp :
 }
 
 def VM_CmpLTEI32SOp :
-    VM_BinaryComparisonOp<I32, "cmp.lte.i32.s", VM_OPC_CmpLTEI32S> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.s"> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32UOp :
-    VM_BinaryComparisonOp<I32, "cmp.lte.i32.u", VM_OPC_CmpLTEI32U> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.u"> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
-// TODO(benvanik): drop these and rely on lt/lte only?
 def VM_CmpGTI32SOp :
-    VM_BinaryComparisonOp<I32, "cmp.gt.i32.s", VM_OPC_CmpGTI32S> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.s"> {
   let summary = [{signed integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32UOp :
-    VM_BinaryComparisonOp<I32, "cmp.gt.i32.u", VM_OPC_CmpGTI32U> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.u"> {
   let summary = [{unsigned integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32SOp :
-    VM_BinaryComparisonOp<I32, "cmp.gte.i32.s", VM_OPC_CmpGTEI32S> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.s"> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32UOp :
-    VM_BinaryComparisonOp<I32, "cmp.gte.i32.u", VM_OPC_CmpGTEI32U> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.u"> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;

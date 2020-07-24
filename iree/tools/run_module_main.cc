@@ -24,6 +24,7 @@
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/vm_util.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
 ABSL_FLAG(std::string, input_file, "-",
@@ -109,11 +110,11 @@ Status Run() {
   RETURN_IF_ERROR(ValidateFunctionAbi(function));
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
-  iree_vm_variant_list_t* inputs;
+  vm::ref<iree_vm_list_t> inputs;
   if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
     if (!absl::GetFlag(FLAGS_inputs).empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of inputs and inputs_flag to be set";
+             << "Expected only one of inputs and inputs_file to be set";
     }
     ASSIGN_OR_RETURN(inputs, ParseToVariantListFromFile(
                                  input_descs, iree_hal_device_allocator(device),
@@ -125,24 +126,24 @@ Status Run() {
   }
 
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
-  iree_vm_variant_list_t* outputs = nullptr;
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_variant_list_alloc(output_descs.size(),
-                                               IREE_ALLOCATOR_SYSTEM, &outputs),
-                    IREE_LOC));
+  vm::ref<iree_vm_list_t> outputs;
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
+                          IREE_ALLOCATOR_SYSTEM, &outputs),
+      IREE_LOC));
 
   std::cout << "EXEC @" << function_name << "\n";
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                   inputs, outputs, IREE_ALLOCATOR_SYSTEM),
-                    IREE_LOC))
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
+                     outputs.get(), IREE_ALLOCATOR_SYSTEM),
+      IREE_LOC))
       << "invoking function " << function_name;
 
-  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs))
+  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()))
       << "printing results";
 
-  iree_vm_variant_list_free(inputs);
-  iree_vm_variant_list_free(outputs);
+  inputs.reset();
+  outputs.reset();
   iree_vm_module_release(hal_module);
   iree_vm_module_release(input_module);
   iree_hal_device_release(device);

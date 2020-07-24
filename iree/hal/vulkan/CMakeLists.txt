@@ -141,10 +141,10 @@ iree_cc_library(
   DEPS
     absl::core_headers
     absl::synchronization
-    absl::time
     iree::base::arena
     iree::base::memory
     iree::base::status
+    iree::base::time
     iree::base::tracing
     iree::hal::command_queue
     iree::hal::vulkan::direct_command_buffer
@@ -212,9 +212,9 @@ iree_cc_library(
     ::timepoint_util
     absl::inlined_vector
     absl::synchronization
-    absl::time
     iree::base::intrusive_list
     iree::base::status
+    iree::base::time
     iree::base::tracing
     iree::hal::semaphore
     Vulkan::Headers
@@ -454,6 +454,7 @@ iree_cc_library(
     iree::base::intrusive_list
     iree::base::ref_ptr
     iree::base::status
+    iree::base::time
     iree::base::tracing
     Vulkan::Headers
   PUBLIC
@@ -526,6 +527,7 @@ iree_cc_library(
     iree::base::math
     iree::base::memory
     iree::base::status
+    iree::base::time
     iree::base::tracing
     iree::hal::allocator
     iree::hal::command_buffer_validation

@@ -49,7 +49,7 @@ class GatherModule(tf.Module):
 
 
 @tf_test_utils.compile_module(GatherModule)
-class GatherTest(tf_test_utils.SavedModelTestCase):
+class GatherTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_gather_axis0_scalar(self):
     indices = np.array(2, dtype=np.int32)

@@ -64,7 +64,6 @@ cc_library(
     srcs = ["llvmjit_executable.cc"],
     hdrs = ["llvmjit_executable.h"],
     deps = [
-        ":memref_runtime",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:buffer",
@@ -93,12 +92,5 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
-    ],
-)
-
-cc_library(
-    name = "memref_runtime",
-    hdrs = [
-        "memref_runtime.h",
     ],
 )

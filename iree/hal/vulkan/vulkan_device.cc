@@ -24,6 +24,7 @@
 #include "absl/synchronization/mutex.h"
 #include "iree/base/math.h"
 #include "iree/base/status.h"
+#include "iree/base/time.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/command_queue.h"
@@ -736,20 +737,20 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
 }
 
 Status VulkanDevice::WaitAllSemaphores(
-    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+    absl::Span<const SemaphoreValue> semaphores, Time deadline_ns) {
   IREE_TRACE_SCOPE0("VulkanDevice::WaitAllSemaphores");
-  return WaitSemaphores(semaphores, deadline, /*wait_flags=*/0);
+  return WaitSemaphores(semaphores, deadline_ns, /*wait_flags=*/0);
 }
 
 StatusOr<int> VulkanDevice::WaitAnySemaphore(
-    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+    absl::Span<const SemaphoreValue> semaphores, Time deadline_ns) {
   IREE_TRACE_SCOPE0("VulkanDevice::WaitAnySemaphore");
-  return WaitSemaphores(semaphores, deadline,
+  return WaitSemaphores(semaphores, deadline_ns,
                         /*wait_flags=*/VK_SEMAPHORE_WAIT_ANY_BIT);
 }
 
 Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                                    absl::Time deadline,
+                                    Time deadline_ns,
                                     VkSemaphoreWaitFlags wait_flags) {
   IREE_TRACE_SCOPE0("VulkanDevice::WaitSemaphores");
 
@@ -762,7 +763,7 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
     for (int i = 0; i < semaphores.size(); ++i) {
       auto* semaphore =
           static_cast<EmulatedTimelineSemaphore*>(semaphores[i].semaphore);
-      RETURN_IF_ERROR(semaphore->Wait(semaphores[i].value, deadline));
+      RETURN_IF_ERROR(semaphore->Wait(semaphores[i].value, deadline_ns));
       if (wait_flags & VK_SEMAPHORE_WAIT_ANY_BIT) return OkStatus();
     }
 
@@ -786,22 +787,14 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
   wait_info.pSemaphores = semaphore_handles.data();
   wait_info.pValues = semaphore_values.data();
 
-  uint64_t timeout_nanos;
-  if (deadline == absl::InfiniteFuture()) {
-    timeout_nanos = UINT64_MAX;
-  } else if (deadline == absl::InfinitePast()) {
-    timeout_nanos = 0;
-  } else {
-    auto relative_nanos = absl::ToInt64Nanoseconds(deadline - absl::Now());
-    timeout_nanos = relative_nanos < 0 ? 0 : relative_nanos;
-  }
-
   // NOTE: this may fail with a timeout (VK_TIMEOUT) or in the case of a
   // device loss event may return either VK_SUCCESS *or* VK_ERROR_DEVICE_LOST.
   // We may want to explicitly query for device loss after a successful wait
   // to ensure we consistently return errors.
+  uint64_t timeout_ns =
+      static_cast<uint64_t>(DeadlineToRelativeTimeoutNanos(deadline_ns));
   VkResult result =
-      syms()->vkWaitSemaphores(*logical_device_, &wait_info, timeout_nanos);
+      syms()->vkWaitSemaphores(*logical_device_, &wait_info, timeout_ns);
   if (result == VK_ERROR_DEVICE_LOST) {
     // Nothing we do now matters.
     return VkResultToStatus(result);
@@ -813,8 +806,8 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
   return OkStatus();
 }
 
-Status VulkanDevice::WaitIdle(absl::Time deadline) {
-  if (deadline == absl::InfiniteFuture()) {
+Status VulkanDevice::WaitIdle(Time deadline_ns) {
+  if (deadline_ns == InfiniteFuture()) {
     // Fast path for using vkDeviceWaitIdle, which is usually cheaper (as it
     // requires fewer calls into the driver).
     IREE_TRACE_SCOPE0("VulkanDevice::WaitIdle#vkDeviceWaitIdle");
@@ -824,7 +817,7 @@ Status VulkanDevice::WaitIdle(absl::Time deadline) {
 
   IREE_TRACE_SCOPE0("VulkanDevice::WaitIdle#Semaphores");
   for (auto& command_queue : command_queues_) {
-    RETURN_IF_ERROR(command_queue->WaitIdle(deadline));
+    RETURN_IF_ERROR(command_queue->WaitIdle(deadline_ns));
   }
   return OkStatus();
 }

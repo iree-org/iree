@@ -18,6 +18,7 @@
 #include <cstring>
 #include <string>
 
+#include "absl/time/clock.h"
 #include "iree/base/api_util.h"
 #include "iree/base/file_mapping.h"
 #include "iree/base/init.h"
@@ -88,6 +89,24 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv) {
   InitializeEnvironment(argc, argv);
   return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_time_t and iree_duration_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_time_t iree_time_now() {
+  return absl::GetCurrentTimeNanos();
+}
+
+IREE_API_EXPORT iree_time_t
+iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {
+  if (timeout_ns == IREE_DURATION_ZERO) {
+    return IREE_TIME_INFINITE_PAST;
+  } else if (timeout_ns == IREE_DURATION_INFINITE) {
+    return IREE_TIME_INFINITE_FUTURE;
+  }
+  return iree_time_now() + timeout_ns;
 }
 
 //===----------------------------------------------------------------------===//

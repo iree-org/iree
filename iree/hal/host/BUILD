@@ -41,10 +41,10 @@ cc_test(
     srcs = ["condvar_semaphore_test.cc"],
     deps = [
         ":condvar_semaphore",
+        "//iree/base:api",
         "//iree/base:status",
         "//iree/base:status_matchers",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/time",
     ],
 )
 

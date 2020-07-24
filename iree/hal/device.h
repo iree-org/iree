@@ -17,8 +17,6 @@
 
 #include <memory>
 
-#include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
@@ -138,10 +136,11 @@ class Device : public RefObject<Device> {
   // having been signaled. Note that a subset of the |semaphores| may have been
   // signaled and each can be queried to see which ones.
   virtual Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                                   absl::Time deadline) = 0;
+                                   Time deadline_ns) = 0;
   inline Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                                  absl::Duration timeout) {
-    return WaitAllSemaphores(semaphores, RelativeTimeoutToDeadline(timeout));
+                                  Duration timeout_ns) {
+    return WaitAllSemaphores(semaphores,
+                             RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
 
   // Blocks the caller until at least one of the |semaphores| reaches or exceeds
@@ -156,20 +155,21 @@ class Device : public RefObject<Device> {
   // Returns DEADLINE_EXCEEDED if the |deadline| elapses without any semaphores
   // having been signaled.
   virtual StatusOr<int> WaitAnySemaphore(
-      absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) = 0;
+      absl::Span<const SemaphoreValue> semaphores, Time deadline_ns) = 0;
   inline StatusOr<int> WaitAnySemaphore(
-      absl::Span<const SemaphoreValue> semaphores, absl::Duration timeout) {
-    return WaitAnySemaphore(semaphores, RelativeTimeoutToDeadline(timeout));
+      absl::Span<const SemaphoreValue> semaphores, Duration timeout_ns) {
+    return WaitAnySemaphore(semaphores,
+                            RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
 
   // Blocks until all outstanding requests on all queues have been
   // completed. This is equivalent to having waited on all outstanding
   // semaphores.
-  virtual Status WaitIdle(absl::Time deadline) = 0;
-  inline Status WaitIdle(absl::Duration timeout) {
-    return WaitIdle(RelativeTimeoutToDeadline(timeout));
+  virtual Status WaitIdle(Time deadline_ns) = 0;
+  inline Status WaitIdle(Duration timeout_ns) {
+    return WaitIdle(RelativeTimeoutToDeadlineNanos(timeout_ns));
   }
-  inline Status WaitIdle() { return WaitIdle(absl::InfiniteFuture()); }
+  inline Status WaitIdle() { return WaitIdle(InfiniteFuture()); }
 
  protected:
   explicit Device(DeviceInfo device_info)

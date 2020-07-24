@@ -97,7 +97,7 @@ void NativeTimelineSemaphore::Fail(Status status) {
   logical_device_->syms()->vkSignalSemaphore(*logical_device_, &signal_info);
 }
 
-Status NativeTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
+Status NativeTimelineSemaphore::Wait(uint64_t value, Time deadline_ns) {
   IREE_TRACE_SCOPE0("NativeTimelineSemaphore::Wait");
 
   VkSemaphoreWaitInfo wait_info;
@@ -108,14 +108,15 @@ Status NativeTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
   wait_info.pSemaphores = &handle_;
   wait_info.pValues = &value;
 
-  uint64_t timeout_nanos;
-  if (deadline == absl::InfiniteFuture()) {
-    timeout_nanos = UINT64_MAX;
-  } else if (deadline == absl::InfinitePast()) {
-    timeout_nanos = 0;
+  uint64_t timeout_ns;
+  if (deadline_ns == InfiniteFuture()) {
+    timeout_ns = UINT64_MAX;
+  } else if (deadline_ns == InfinitePast()) {
+    timeout_ns = 0;
   } else {
-    auto relative_nanos = absl::ToInt64Nanoseconds(deadline - absl::Now());
-    timeout_nanos = relative_nanos < 0 ? 0 : relative_nanos;
+    Duration relative_ns = deadline_ns - Now();
+    timeout_ns = static_cast<int64_t>(
+        relative_ns < ZeroDuration() ? ZeroDuration() : relative_ns);
   }
 
   // NOTE: this may fail with a timeout (VK_TIMEOUT) or in the case of a
@@ -126,7 +127,7 @@ Status NativeTimelineSemaphore::Wait(uint64_t value, absl::Time deadline) {
     return UnknownErrorBuilder(IREE_LOC) << "vkWaitSemaphores not defined";
   }
   VkResult result = logical_device_->syms()->vkWaitSemaphores(
-      *logical_device_, &wait_info, timeout_nanos);
+      *logical_device_, &wait_info, timeout_ns);
   if (result == VK_ERROR_DEVICE_LOST) {
     // Nothing we do now matters.
     return VkResultToStatus(result);

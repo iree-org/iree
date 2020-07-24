@@ -234,6 +234,13 @@ class BuildFileFunctions(object):
     flatc_args = "\n".join([f'    "{flatc_arg}"' for flatc_arg in flatc_args])
     return f"  FLATC_ARGS\n{flatc_args}\n"
 
+  def _convert_flatcc_args_block(self, flatcc_args):
+    if not flatcc_args:
+      return ""
+    flatcc_args = "\n".join(
+        [f'    "{flatcc_arg}"' for flatcc_arg in flatcc_args])
+    return f"  FLATCC_ARGS\n{flatcc_args}\n"
+
   def _convert_unimplemented_function(self, function, details=""):
     message = f"Unimplemented {function}: {details}"
     if not self.converter.first_error:
@@ -479,6 +486,17 @@ class BuildFileFunctions(object):
                             f"{namespace_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
+                            f"  PUBLIC\n)\n\n")
+
+  def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None):
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
+    flatcc_args_block = self._convert_flatcc_args_block(flatcc_args)
+
+    self.converter.body += (f"flatbuffer_c_library(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{flatcc_args_block}"
                             f"  PUBLIC\n)\n\n")
 
   def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=None):

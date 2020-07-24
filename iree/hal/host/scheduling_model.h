@@ -71,7 +71,7 @@ class SchedulingModel {
   // having been signaled. Note that a subset of the |semaphores| may have been
   // signaled and each can be queried to see which ones.
   virtual Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                                   absl::Time deadline) = 0;
+                                   Time deadline_ns) = 0;
 
   // Blocks the caller until at least one of the |semaphores| reaches or exceeds
   // the specified payload value or the |deadline| elapses. All |semaphores|
@@ -85,12 +85,12 @@ class SchedulingModel {
   // Returns DEADLINE_EXCEEDED if the |deadline| elapses without any semaphores
   // having been signaled.
   virtual StatusOr<int> WaitAnySemaphore(
-      absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) = 0;
+      absl::Span<const SemaphoreValue> semaphores, Time deadline_ns) = 0;
 
   // Blocks until all outstanding requests on all queues have been
   // completed. This is equivalent to having waited on all outstanding
   // semaphores.
-  virtual Status WaitIdle(absl::Time deadline) = 0;
+  virtual Status WaitIdle(Time deadline_ns) = 0;
 };
 
 }  // namespace host

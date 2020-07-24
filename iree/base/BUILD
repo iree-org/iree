@@ -43,6 +43,7 @@ cc_library(
         ":file_mapping",
         ":init",
         ":tracing",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -60,7 +61,6 @@ cc_library(
         ":status",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/time",
     ],
 )
 
@@ -431,7 +431,16 @@ cc_library(
     name = "time",
     hdrs = ["time.h"],
     deps = [
-        "@com_google_absl//absl/time",
+        ":api",
+    ],
+)
+
+cc_test(
+    name = "time_test",
+    srcs = ["time_test.cc"],
+    deps = [
+        ":time",
+        "//iree/testing:gtest_main",
     ],
 )
 

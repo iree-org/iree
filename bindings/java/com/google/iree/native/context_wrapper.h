@@ -15,6 +15,7 @@
 #ifndef IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
 #define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
 
+#include "bindings/java/com/google/iree/native/function_wrapper.h"
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
 #include "bindings/java/com/google/iree/native/module_wrapper.h"
 #include "iree/base/status.h"
@@ -33,6 +34,9 @@ class ContextWrapper {
                            const std::vector<ModuleWrapper*>& module_wrappers);
 
   Status RegisterModules(const std::vector<ModuleWrapper*>& module_wrappers);
+
+  Status ResolveFunction(const FunctionWrapper& function_wrapper,
+                         iree_string_view_t name);
 
   int id() const;
 

@@ -26,13 +26,9 @@
 #include "iree/modules/strings/api_detail.h"
 #include "iree/modules/strings/strings_module_test_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/context.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
-#include "iree/vm/ref.h"
 #include "iree/vm/ref_cc.h"
-#include "iree/vm/stack.h"
 
 using testing::internal::CaptureStdout;
 using testing::internal::GetCapturedStdout;
@@ -138,37 +134,33 @@ class StringsModuleTest : public ::testing::Test {
         shape.data(), shape.size(), &input_string_tensor));
 
     // Construct the input list for execution.
-    iree_vm_variant_list_t* inputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+    vm::ref<iree_vm_list_t> inputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &inputs));
 
     // Add the string tensor to the input list.
-    iree_vm_ref_t input_string_tensor_ref =
-        strings_string_tensor_move_ref(input_string_tensor.get());
-    IREE_ASSERT_OK(iree_vm_variant_list_append_ref_retain(
-        inputs, &input_string_tensor_ref));
+    IREE_ASSERT_OK(
+        iree_vm_list_push_ref_retain(inputs.get(), input_string_tensor));
 
     // Construct the output list for accepting results from the invocation.
-    iree_vm_variant_list_t* outputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &outputs));
 
     // Invoke the function.
-    IREE_ASSERT_OK(iree_vm_invoke(
-        context_, LookupFunction("string_tensor_to_string"),
-        /*policy=*/nullptr, inputs, outputs, IREE_ALLOCATOR_SYSTEM));
+    IREE_ASSERT_OK(iree_vm_invoke(context_,
+                                  LookupFunction("string_tensor_to_string"),
+                                  /*policy=*/nullptr, inputs.get(),
+                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
 
-    // Retrieve and validate the string tensor;
-    strings_string_t* output_string =
-        strings_string_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+    // Retrieve and validate the string tensor.
+    auto* output_string =
+        reinterpret_cast<strings_string_t*>(iree_vm_list_get_ref_deref(
+            outputs.get(), 0, strings_string_get_descriptor()));
     ASSERT_EQ(output_string->value.size, expected_output.length());
     EXPECT_EQ(
         absl::string_view(output_string->value.data, output_string->value.size),
         expected_output);
-
-    // Free the lists.
-    iree_vm_variant_list_free(inputs);
-    iree_vm_variant_list_free(outputs);
   }
 
   template <typename T, iree_hal_element_type_t E>
@@ -179,33 +171,26 @@ class StringsModuleTest : public ::testing::Test {
     CreateBufferView<T, E>(contents, shape, &input_buffer_view);
 
     // Construct the input list for execution.
-    iree_vm_variant_list_t* inputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+    vm::ref<iree_vm_list_t> inputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &inputs));
 
     // Add the buffer view to the input list.
-    iree_vm_ref_t input_buffer_view_ref =
-        iree_hal_buffer_view_move_ref(input_buffer_view.get());
-
     IREE_ASSERT_OK(
-        iree_vm_variant_list_append_ref_retain(inputs, &input_buffer_view_ref));
+        iree_vm_list_push_ref_retain(inputs.get(), input_buffer_view));
 
     // Construct the output list for accepting results from the invocation.
-    iree_vm_variant_list_t* outputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("to_string_tensor"),
-                                  /*policy=*/nullptr, inputs, outputs,
-                                  IREE_ALLOCATOR_SYSTEM));
+                                  /*policy=*/nullptr, inputs.get(),
+                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
 
     // Compare the output to the expected result.
     CompareResults(expected, shape, outputs);
-
-    // Free the lists.
-    iree_vm_variant_list_free(inputs);
-    iree_vm_variant_list_free(outputs);
   }
 
   void TestGather(absl::Span<const iree_string_view_t> dict,
@@ -219,43 +204,36 @@ class StringsModuleTest : public ::testing::Test {
         dict_shape.size(), &dict_string_tensor));
 
     // Construct the input list for execution.
-    iree_vm_variant_list_t* inputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
+    vm::ref<iree_vm_list_t> inputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
+                                       IREE_ALLOCATOR_SYSTEM, &inputs));
 
     // Add the dict to the input list.
     iree_vm_ref_t dict_string_tensor_ref =
         strings_string_tensor_move_ref(dict_string_tensor.get());
-    IREE_ASSERT_OK(iree_vm_variant_list_append_ref_retain(
-        inputs, &dict_string_tensor_ref));
+    IREE_ASSERT_OK(
+        iree_vm_list_push_ref_retain(inputs.get(), &dict_string_tensor_ref));
 
     vm::ref<iree_hal_buffer_view_t> input_buffer_view;
     CreateBufferView<int32_t, IREE_HAL_ELEMENT_TYPE_SINT_32>(
         ids, ids_shape, &input_buffer_view);
 
     // Add the ids tensor to the input list.
-    iree_vm_ref_t input_buffer_view_ref =
-        iree_hal_buffer_view_move_ref(input_buffer_view.get());
-
     IREE_ASSERT_OK(
-        iree_vm_variant_list_append_ref_retain(inputs, &input_buffer_view_ref));
+        iree_vm_list_push_ref_retain(inputs.get(), input_buffer_view));
 
     // Construct the output list for accepting results from the invocation.
-    iree_vm_variant_list_t* outputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("gather"),
-                                  /*policy=*/nullptr, inputs, outputs,
-                                  IREE_ALLOCATOR_SYSTEM));
+                                  /*policy=*/nullptr, inputs.get(),
+                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
 
     // Compare the output to the expected result.
-    CompareResults(expected, ids_shape, outputs);
-
-    // Free the lists.
-    iree_vm_variant_list_free(inputs);
-    iree_vm_variant_list_free(outputs);
+    CompareResults(expected, ids_shape, std::move(outputs));
   }
 
   void TestConcat(absl::Span<const iree_string_view_t> string_views,
@@ -267,43 +245,37 @@ class StringsModuleTest : public ::testing::Test {
         shape.data(), shape.size(), &string_tensor));
 
     // Construct the input list for execution.
-    iree_vm_variant_list_t* inputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+    vm::ref<iree_vm_list_t> inputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &inputs));
 
     // Add the dict to the input list.
-    iree_vm_ref_t string_tensor_ref =
-        strings_string_tensor_move_ref(string_tensor.get());
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_append_ref_retain(inputs, &string_tensor_ref));
+    IREE_ASSERT_OK(iree_vm_list_push_ref_retain(inputs.get(), string_tensor));
 
     // Construct the output list for accepting results from the invocation.
-    iree_vm_variant_list_t* outputs = nullptr;
-    IREE_ASSERT_OK(
-        iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                       IREE_ALLOCATOR_SYSTEM, &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("concat"),
-                                  /*policy=*/nullptr, inputs, outputs,
-                                  IREE_ALLOCATOR_SYSTEM));
+                                  /*policy=*/nullptr, inputs.get(),
+                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
 
     // Remove the last dimension from the shape to get the expected shape
     shape.remove_suffix(1);
 
     // Compare the output to the expected result.
-    CompareResults(expected, shape, outputs);
-
-    // Free the lists.
-    iree_vm_variant_list_free(inputs);
-    iree_vm_variant_list_free(outputs);
+    CompareResults(expected, shape, std::move(outputs));
   }
 
   void CompareResults(absl::Span<const iree_string_view_t> expected,
                       absl::Span<const int32_t> expected_shape,
-                      iree_vm_variant_list_t* outputs) {
-    // Retrieve and validate the string tensor;
-    strings_string_tensor_t* output_tensor =
-        strings_string_tensor_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+                      vm::ref<iree_vm_list_t> outputs) {
+    // Retrieve and validate the string tensor.
+    auto* output_tensor =
+        reinterpret_cast<strings_string_tensor_t*>(iree_vm_list_get_ref_deref(
+            outputs.get(), 0, strings_string_tensor_get_descriptor()));
 
     // Validate the count.
     size_t count;
@@ -348,26 +320,24 @@ TEST_F(StringsModuleTest, Prototype) {
   std::string expected_output = "42\n";
 
   // Construct the input list for execution.
-  iree_vm_variant_list_t* inputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+                                     IREE_ALLOCATOR_SYSTEM, &inputs));
 
   // Add the value parameter.
   iree_vm_value_t value = iree_vm_value_make_i32(input);
-  IREE_ASSERT_OK(iree_vm_variant_list_append_value(inputs, value));
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &value));
 
   // Prepare outputs list to accept the results from the invocation.
-  iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(
-      iree_vm_variant_list_alloc(0, IREE_ALLOCATOR_SYSTEM, &outputs));
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 0,
+                                     IREE_ALLOCATOR_SYSTEM, &outputs));
 
   CaptureStdout();
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("print_example_func"),
-                                /*policy=*/nullptr, inputs, outputs,
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
                                 IREE_ALLOCATOR_SYSTEM));
   EXPECT_EQ(GetCapturedStdout(), expected_output);
-
-  iree_vm_variant_list_free(inputs);
-  iree_vm_variant_list_free(outputs);
 }
 
 TEST_F(StringsModuleTest, StringTensorToString_Scalar) {

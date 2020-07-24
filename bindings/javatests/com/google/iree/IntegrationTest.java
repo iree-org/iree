@@ -60,6 +60,12 @@ public final class IntegrationTest {
 
     assertNotEquals(ireeContext.getId(), -1);
 
+    String functionName = "module.simple_mul";
+    Function function = ireeContext.resolveFunction(functionName);
+
+    // TODO(jennik): Invoke the function.
+
+    function.free();
     module.free();
     ireeContext.free();
     instance.free();
@@ -83,6 +89,10 @@ public final class IntegrationTest {
     modules.add(module);
     ireeContext.registerModules(modules);
 
+    String functionName = "module.simple_mul";
+    Function function = ireeContext.resolveFunction(functionName);
+
+    function.free();
     module.free();
     ireeContext.free();
     instance.free();

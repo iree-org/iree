@@ -16,8 +16,8 @@
 
 #include <memory>
 
-#include "absl/time/clock.h"
 #include "absl/types/span.h"
+#include "iree/base/api.h"
 #include "iree/base/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/tracing.h"
@@ -266,10 +266,10 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
   return true;
 }
 
-Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
+Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
   absl::MutexLock lock(&mutex_);
 
-  if (deadline == absl::InfiniteFuture()) {
+  if (deadline_ns == InfiniteFuture()) {
     IREE_TRACE_SCOPE0("SerializingCommandQueue::WaitIdle#vkQueueWaitIdle");
     // Fast path for using vkQueueWaitIdle, which is usually cheaper (as it
     // requires fewer calls into the driver).
@@ -296,21 +296,21 @@ Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
   do {
     RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
 
-    uint64_t timeout_nanos;
-    if (deadline == absl::InfinitePast()) {
-      // Do not wait.
-      timeout_nanos = 0;
+    uint64_t timeout_ns;
+    if (deadline_ns == InfiniteFuture()) {
+      timeout_ns = UINT64_MAX;
+    } else if (deadline_ns == InfinitePast()) {
+      timeout_ns = 0;
     } else {
       // Convert to relative time in nanoseconds.
       // The implementation may not wait with this granularity (like, by
       // 10000x).
-      absl::Time now = absl::Now();
-      if (deadline < now) {
+      Duration relative_ns = deadline_ns - Now();
+      if (relative_ns < ZeroDuration()) {
         return DeadlineExceededErrorBuilder(IREE_LOC)
                << "Deadline exceeded waiting for idle";
       }
-      timeout_nanos =
-          static_cast<uint64_t>(absl::ToInt64Nanoseconds(deadline - now));
+      timeout_ns = static_cast<uint64_t>(relative_ns);
     }
 
     if (pending_fences_.empty()) continue;
@@ -321,7 +321,7 @@ Status SerializingCommandQueue::WaitIdle(absl::Time deadline) {
 
     VkResult result =
         syms()->vkWaitForFences(*logical_device_, fences.size(), fences.data(),
-                                /*waitAll=*/VK_TRUE, timeout_nanos);
+                                /*waitAll=*/VK_TRUE, timeout_ns);
 
     switch (result) {
       case VK_SUCCESS:

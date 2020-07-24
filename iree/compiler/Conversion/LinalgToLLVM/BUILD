@@ -22,7 +22,6 @@ cc_library(
     name = "LinalgToLLVM",
     srcs = [
         "ConvertToLLVM.cpp",
-        "HALInterfaceToMemrefArguments.cpp",
         "Passes.cpp",
     ],
     hdrs = [

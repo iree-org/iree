@@ -610,6 +610,17 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let hasFolder = 1;
 }
 
+def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
+  let summary = [{trace value(s) operation}];
+  let description = [{
+    Trace point for dispatchable functions.
+  }];
+
+  let arguments = (ins Variadic<FLOW_Tensor>:$operands);
+
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+}
+
 //===----------------------------------------------------------------------===//
 // Streams
 //===----------------------------------------------------------------------===//

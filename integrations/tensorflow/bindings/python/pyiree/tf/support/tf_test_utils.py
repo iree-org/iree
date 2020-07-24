@@ -264,24 +264,22 @@ def _instantiate_backends(compiled_backends):
       return self.multi()
 
   reinitialized_modules = [
-      tf_utils.CompiledModule.from_existing(module)
-      for module in compiled_backends.values()
+      module.create_reinitialized() for module in compiled_backends.values()
   ]
   return VirtualBackendsClass(*reinitialized_modules)
 
 
-def compile_module(module_ctor, exported_names=()):
-  """SavedModelTestCase decorator that compiles a tf.Module.
+def compile_module(module_class, exported_names=()):
+  """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
   be accessed individually via self.compiled_modules.backend_name or as a union
   via self.get_module().
 
   Args:
-    module_ctor: tf.Module subclass or function which returns a tf.Module
-      subclass instance.
+    module_class: the tf.Module subclass to compile.
     exported_names: optional iterable of strings representing which of
-      module_ctor's functions to compile. If exported_names is empty all
+      module_class's functions to compile. If exported_names is empty all
       functions will be compiled.
 
   Returns:
@@ -290,11 +288,11 @@ def compile_module(module_ctor, exported_names=()):
 
   def decorator(cls):
     """Decorator Function."""
-    if not issubclass(cls, SavedModelTestCase):
+    if not issubclass(cls, CompiledModuleTestCase):
       logging.exception(
           "The 'compile_module' decorator must be applied to a "
-          "SavedModelTestCase derived class, which %s is not.", cls)
-    cls._module_ctor = module_ctor
+          "CompiledModuleTestCase derived class, which %s is not.", cls)
+    cls._module_class = module_class
     cls._exported_names = exported_names
     return cls
 
@@ -336,11 +334,11 @@ def get_backends():
   return backends
 
 
-class SavedModelTestCase(tf.test.TestCase):
-  """Tests against a SavedModel."""
+class CompiledModuleTestCase(tf.test.TestCase):
+  """Compiles a tf.Module to multiple backends to test their correctness."""
 
   # Will be initialized by the @compile_module decorator.
-  _module_ctor = None
+  _module_class = None
   _exported_names = ()
 
   # Will be initialized in setUpClass to a dict of
@@ -350,27 +348,33 @@ class SavedModelTestCase(tf.test.TestCase):
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
-    if cls._module_ctor is not None:
-      # Setup the debug directory for this test. Creates a global variable
-      # `global_debug_dir`.
-      _setup_test_debug_dir(test_name=cls.__name__)
+    if cls._module_class is None:
+      raise AttributeError(
+          "setUpClass was called but no module was specified. Specify a module "
+          "to compile via the @tf_test_utils.compile_module decorator.")
 
-      # Setup crash reproducer for the test.
-      crash_reproducer_path = os.path.join(global_debug_dir, "reproducer.mlir")
-      compiler.Context.default_crash_reproducer_path = crash_reproducer_path
+    # Setup the debug directory for this test. Creates a global variable
+    # `global_debug_dir`.
+    _setup_test_debug_dir(test_name=cls.__name__)
 
-      # Create a CompiledModule for each backend.
-      try:
-        backends = get_backends()
-        cls._compiled_backends_dict = {}
-        for backend in backends:
-          compiled_backend = tf_utils.CompiledModule.compile(
-              cls._module_ctor, backend, cls._exported_names, global_debug_dir)
-          cls._compiled_backends_dict[backend.name] = compiled_backend
-      finally:
-        # Disable crash reproducer (to avoid inadvertently overwriting this
-        # path on a subsequent interaction).
-        compiler.Context.default_crash_reproducer_path = None
+    # Setup crash reproducer for the test.
+    crash_reproducer_path = os.path.join(global_debug_dir, "reproducer.mlir")
+    compiler.Context.default_crash_reproducer_path = crash_reproducer_path
+
+    # Create a CompiledModule for each backend.
+    try:
+      backends = get_backends()
+      cls._compiled_backends_dict = {}
+      for backend_info in backends:
+        compiled_backend = backend_info.CompiledModule(cls._module_class,
+                                                       backend_info,
+                                                       cls._exported_names,
+                                                       global_debug_dir)
+        cls._compiled_backends_dict[backend_info.name] = compiled_backend
+    finally:
+      # Disable crash reproducer (to avoid inadvertently overwriting this
+      # path on a subsequent interaction).
+      compiler.Context.default_crash_reproducer_path = None
 
   @classmethod
   def tearDownClass(cls):

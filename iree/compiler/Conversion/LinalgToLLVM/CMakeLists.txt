@@ -21,7 +21,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
-    "HALInterfaceToMemrefArguments.cpp"
     "Passes.cpp"
   DEPS
     MLIRAffineToStandard

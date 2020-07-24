@@ -58,7 +58,10 @@ class CustomOpShapeBuilderList {
   }
 
   template <typename BuilderTy, typename... ConstructorArgs>
-  BuilderTy &make(ConstructorArgs &&... args) {
+  // TODO(suderman): Re-enable clang-format when new version migrates.
+  // clang-format off
+  BuilderTy &make(ConstructorArgs &&...args) {
+    // clang-format on
     auto instance =
         std::make_unique<BuilderTy>(std::forward<ConstructorArgs>(args)...);
     BuilderTy *unowned = instance.get();

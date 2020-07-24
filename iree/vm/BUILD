@@ -92,6 +92,24 @@ iree_bytecode_module(
 )
 
 cc_test(
+    name = "bytecode_module_size_benchmark",
+    srcs = ["bytecode_module_size_benchmark.cc"],
+    deps = [
+        ":bytecode_module",
+        ":bytecode_module_size_benchmark_module_cc",
+        ":vm",
+        "//iree/base:api",
+    ],
+)
+
+iree_bytecode_module(
+    name = "bytecode_module_size_benchmark_module",
+    src = "bytecode_module_size_benchmark.mlir",
+    cc_namespace = "iree::vm",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
+)
+
+cc_test(
     name = "bytecode_module_test",
     srcs = ["bytecode_module_test.cc"],
     deps = [
@@ -149,8 +167,8 @@ cc_library(
     hdrs = ["invocation.h"],
     deps = [
         ":context",
+        ":list",
         ":module",
-        ":variant_list",
         "//iree/base:api",
         "//iree/base:tracing",
     ],
@@ -251,7 +269,6 @@ cc_library(
     deps = [
         ":module",
         ":ref",
-        ":variant_list",
         "//iree/base:alignment",
         "//iree/base:api",
         "//iree/base:tracing",
@@ -285,16 +302,6 @@ cc_library(
 )
 
 cc_library(
-    name = "variant_list",
-    srcs = ["variant_list.c"],
-    hdrs = ["variant_list.h"],
-    deps = [
-        ":ref",
-        ":value",
-    ],
-)
-
-cc_library(
     name = "vm",
     hdrs = [
         "api.h",
@@ -310,7 +317,6 @@ cc_library(
         ":stack",
         ":type_def",
         ":value",
-        ":variant_list",
         "//iree/base:api",
     ],
 )

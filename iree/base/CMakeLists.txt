@@ -38,6 +38,7 @@ iree_cc_library(
     ::file_mapping
     ::init
     ::tracing
+    absl::time
   PUBLIC
 )
 
@@ -519,8 +520,18 @@ iree_cc_library(
   HDRS
     "time.h"
   DEPS
-    absl::time
+    ::api
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    time_test
+  SRCS
+    "time_test.cc"
+  DEPS
+    ::time
+    iree::testing::gtest_main
 )
 
 if(${IREE_ENABLE_RUNTIME_TRACING})

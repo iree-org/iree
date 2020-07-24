@@ -17,6 +17,9 @@
 // Partition computation within dispatch function to workgroups/workitems.
 //
 //===----------------------------------------------------------------------===//
+
+#include <array>
+
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -425,7 +428,7 @@ static void getGPUProcessorIdsAndCounts(Location loc,
                                         unsigned numDims,
                                         MutableArrayRef<Value> id,
                                         MutableArrayRef<Value> count) {
-  ArrayRef<StringRef> dims = {"x", "y", "z"};
+  std::array<StringRef, 3> dims{"x", "y", "z"};
   assert(id.size() == numDims);
   assert(count.size() == numDims);
   for (unsigned i = 0; i < numDims; ++i) {
@@ -560,7 +563,7 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     // Check for marker that specifies that the linalg op is to be partitioned
     // across threads within a workgroup.
-    if (!hasWorkItemMarker(linalgOp)) return failure();
+    if (!hasWorkGroupMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();
@@ -584,7 +587,7 @@ struct MapConvPoolToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
   LogicalResult matchAndRewrite(
       LinalgOpTy linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!hasWorkItemMarker(linalgOp)) return failure();
+    if (!hasWorkGroupMarker(linalgOp)) return failure();
     Optional<linalg::LinalgLoops> loops =
         linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, linalgOp);
     if (!loops) return failure();

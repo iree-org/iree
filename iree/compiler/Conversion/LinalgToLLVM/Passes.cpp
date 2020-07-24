@@ -35,10 +35,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // Convert ExecuableOp entry function to use memref arguments.
-  passManager.addPass(createHALInterfaceToMemrefArgumentsPass());
-
-  // (Linalg, STD) -> LLVM
+  // (HAL, IREE, Linalg, STD) -> LLVM
   // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
   passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createCanonicalizerPass());

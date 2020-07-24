@@ -106,11 +106,11 @@ class VulkanDevice final : public Device {
 
   StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
   Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                           absl::Time deadline) override;
+                           Time deadline_ns) override;
   StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
-                                 absl::Time deadline) override;
+                                 Time deadline_ns) override;
 
-  Status WaitIdle(absl::Time deadline) override;
+  Status WaitIdle(Time deadline_ns) override;
 
  private:
   VulkanDevice(
@@ -125,7 +125,7 @@ class VulkanDevice final : public Device {
       DebugCaptureManager* debug_capture_manager);
 
   Status WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                        absl::Time deadline, VkSemaphoreWaitFlags wait_flags);
+                        Time deadline_ns, VkSemaphoreWaitFlags wait_flags);
 
   bool emulating_timeline_semaphores() const {
     return semaphore_pool_ != nullptr;

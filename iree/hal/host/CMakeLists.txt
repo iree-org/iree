@@ -39,7 +39,7 @@ iree_cc_test(
     "condvar_semaphore_test.cc"
   DEPS
     ::condvar_semaphore
-    absl::time
+    iree::base::api
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main

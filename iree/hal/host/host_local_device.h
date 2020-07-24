@@ -63,11 +63,11 @@ class HostLocalDevice : public Device {
 
   StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
   Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
-                           absl::Time deadline) override;
+                           Time deadline_ns) override;
   StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
-                                 absl::Time deadline) override;
+                                 Time deadline_ns) override;
 
-  Status WaitIdle(absl::Time deadline) override;
+  Status WaitIdle(Time deadline_ns) override;
 
  protected:
   explicit HostLocalDevice(DeviceInfo device_info,

@@ -15,6 +15,7 @@
 #include <jni.h>
 
 #include "bindings/java/com/google/iree/native/context_wrapper.h"
+#include "bindings/java/com/google/iree/native/function_wrapper.h"
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
 #include "bindings/java/com/google/iree/native/module_wrapper.h"
 #include "iree/base/logging.h"
@@ -23,6 +24,7 @@
 #define JNI_PREFIX(METHOD) Java_com_google_iree_Context_##METHOD
 
 using iree::java::ContextWrapper;
+using iree::java::FunctionWrapper;
 using iree::java::InstanceWrapper;
 using iree::java::ModuleWrapper;
 
@@ -98,6 +100,21 @@ JNI_FUNC jint JNI_PREFIX(nativeRegisterModules)(JNIEnv* env, jobject thiz,
 
   auto modules = GetModuleWrappersFromAdresses(env, moduleAddresses);
   auto status = context->RegisterModules(modules);
+  return (jint)status.code();
+}
+
+JNI_FUNC jint JNI_PREFIX(nativeResolveFunction)(JNIEnv* env, jobject thiz,
+                                                jlong functionAddress,
+                                                jstring name) {
+  ContextWrapper* context = GetContextWrapper(env, thiz);
+  CHECK_NE(context, nullptr);
+
+  auto function = (FunctionWrapper*)functionAddress;
+  const char* native_name = env->GetStringUTFChars(name, /*isCopy=*/nullptr);
+
+  auto status = context->ResolveFunction(
+      *function, iree_string_view_t{native_name, strlen(native_name)});
+  env->ReleaseStringUTFChars(name, native_name);
   return (jint)status.code();
 }
 

@@ -178,7 +178,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceLocalBuffer(
 
 Status DeviceManager::Submit(Device* device, CommandQueue* command_queue,
                              absl::Span<const SubmissionBatch> batches,
-                             absl::Time deadline) {
+                             Time deadline_ns) {
   IREE_TRACE_SCOPE0("DeviceManager::Submit");
   return command_queue->Submit(batches);
 }
@@ -188,11 +188,11 @@ Status DeviceManager::Flush() {
   return OkStatus();
 }
 
-Status DeviceManager::WaitIdle(absl::Time deadline) {
+Status DeviceManager::WaitIdle(Time deadline_ns) {
   IREE_TRACE_SCOPE0("DeviceManager::WaitIdle");
   absl::MutexLock lock(&device_mutex_);
   for (const auto& device : devices_) {
-    RETURN_IF_ERROR(device->WaitIdle(deadline));
+    RETURN_IF_ERROR(device->WaitIdle(deadline_ns));
   }
   return OkStatus();
 }

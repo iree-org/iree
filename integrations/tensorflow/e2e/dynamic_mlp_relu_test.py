@@ -66,7 +66,7 @@ class Mlp(tf.Module):
 
 
 @tf_test_utils.compile_module(Mlp, exported_names=["predict"])
-class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
+class DynamicMlpTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_dynamic_batch(self):
     m = self.get_module()

@@ -162,7 +162,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
         %12 = dim %arg2, %c1 : memref<?x?xf32>
         %13 = affine.min #map0(%arg4)[%12]
         %14 = subview %arg2[%arg3, %arg4] [%11, %13] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map2>
-        linalg.matmul %5, %9, %14 {__internal_linalg_transform__ = "workitem"} : (memref<?x?xf32, #map2>, memref<?x?xf32, #map2>, memref<?x?xf32, #map2>)
+        linalg.matmul %5, %9, %14 {__internal_linalg_transform__ = "workgroup"} : (memref<?x?xf32, #map2>, memref<?x?xf32, #map2>, memref<?x?xf32, #map2>)
       }
       scf.yield
     }
@@ -235,7 +235,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
       %13 = affine.min #map5(%arg5)[%4]
       %14 = dim %arg2, %c3 : memref<?x?x?x?xf32>
       %15 = subview %arg2[%arg3, %arg4, %arg5, 0] [%11, %12, %13, %14] [1, 1, 1, 1]  : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map3>
-      linalg.conv(%arg0, %9, %15) {__internal_linalg_transform__ = "workitem", dilations = [1, 1], strides = [1, 1]} : memref<?x?x?x?xf32>, memref<?x?x?x?xf32, #map3>, memref<?x?x?x?xf32, #map3>
+      linalg.conv(%arg0, %9, %15) {__internal_linalg_transform__ = "workgroup", dilations = [1, 1], strides = [1, 1]} : memref<?x?x?x?xf32>, memref<?x?x?x?xf32, #map3>, memref<?x?x?x?xf32, #map3>
       scf.yield
     }
     return
@@ -364,7 +364,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
       %9 = affine.min #map3(%arg3)[%2]
       %10 = affine.min #map4(%arg4)[%3]
       %11 = subview %arg2[%arg3, %arg4] [%9, %10] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map2>
-      linalg.pooling_max(%8, %arg1, %11) {__internal_linalg_transform__ = "workitem", dilations = [1, 1], strides = [1, 1]} : memref<?x?xf32, #map2>, memref<?x?xf32>, memref<?x?xf32, #map2>
+      linalg.pooling_max(%8, %arg1, %11) {__internal_linalg_transform__ = "workgroup", dilations = [1, 1], strides = [1, 1]} : memref<?x?xf32, #map2>, memref<?x?xf32>, memref<?x?xf32, #map2>
       scf.yield
     }
     return
