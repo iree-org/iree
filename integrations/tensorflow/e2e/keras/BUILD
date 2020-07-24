@@ -23,6 +23,7 @@ load(
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
     "iree_py_binary",
+    "iree_py_test",
 )
 load(
     "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.bzl",
@@ -82,6 +83,7 @@ Command arguments description:
 
 SPECIAL_CASES = [
     "vision_model_test.py",
+    "lstm_static_trace_test.py",
 ]
 
 VMLA_FAILING = [
@@ -226,6 +228,26 @@ iree_py_binary(
     srcs = ["train_vision_models_on_cifar.py"],
     python_version = "PY3",
     srcs_version = "PY2AND3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+# Traced tests – Temporarily separate from the rest of the testing infra while
+# prototyping a change.
+
+iree_py_test(
+    name = "lstm_static_trace_test_vmla",
+    srcs = ["lstm_static_trace_test.py"],
+    args = [
+        "--reference_backend=tf",
+        "--target_backends=tf,iree_vmla",
+    ],
+    main = "lstm_static_trace_test.py",
+    python_version = "PY3",
+    tags = [
+        "driver=vmla",
+    ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

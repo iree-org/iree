@@ -21,6 +21,7 @@
 import collections
 import os
 import re
+import tempfile
 
 from absl import flags
 from absl import logging
@@ -35,6 +36,15 @@ flags.DEFINE_string(
     "debug_dir", None,
     "Specifies a directory to dump debug artifacts to. Defaults to "
     "--test_tmpdir")
+flags.DEFINE_string(
+    "artifacts_dir", None,
+    "Specifies a directory to dump compilation artifacts and traces to. "
+    "Defaults to the OS's tempdir.")
+flags.DEFINE_string("reference_backend", "tf",
+                    "The backend to treat as a source of truth.")
+flags.DEFINE_bool(
+    "summarize", True,
+    "Summarize the inputs and outputs of each module trace logged to disk.")
 FLAGS = flags.FLAGS
 
 
@@ -51,6 +61,19 @@ def _setup_test_debug_dir(test_name):
     os.makedirs(global_debug_dir)
   except IOError:
     logging.exception("Error creating debug dir for: %s", global_debug_dir)
+
+
+def _setup_artifacts_dir(module_name):
+  parent_dir = FLAGS.artifacts_dir
+  if parent_dir is None:
+    parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
+  artifacts_dir = os.path.join(parent_dir, module_name)
+  logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
+
+  # If the artifacts already exist then we overwrite/update them.
+  if not os.path.exists(artifacts_dir):
+    os.makedirs(artifacts_dir)
+  return artifacts_dir
 
 
 class _VirtualModuleInstance(object):
@@ -386,3 +409,205 @@ class CompiledModuleTestCase(tf.test.TestCase):
 
   def get_module(self):
     return self.compiled_modules.all
+
+
+def get_target_backends():
+  """Gets the BackendInfo instances to compare with the reference backend.
+
+  By default all backends in BackendInfo will be used. Specific backends to
+  run on can be specified using the `--target_backends` flag.
+
+  Returns:
+    Sequence of BackendInfo that should be used.
+  """
+  if FLAGS.target_backends is not None:
+    logging.info("Using backends from command line: %s", FLAGS.target_backends)
+    backends = _parse_target_backends(FLAGS.target_backends)
+  else:
+    # If no backends are specified, use them all.
+    backends = list(tf_utils.BackendInfo.ALL.values())
+  return backends
+
+
+class TracedModuleTestCase(tf.test.TestCase):
+  """Compiles a tf.Module to multiple backends to test their correctness."""
+  # This class uses the following abbreviations:
+  #   ref: reference – for the reference CompiledModule
+  #   tar: target - for one of the target CompiledModules
+
+  # Will be initialized by the @compile_module decorator.
+  _module_class = None
+  _exported_names = ()
+
+  # Will be initialized in setUpClass
+  _ref_module = None
+  _tar_modules = None
+
+  @classmethod
+  def _compile(cls, backend_info):
+    return backend_info.CompiledModule(cls._module_class, backend_info,
+                                       cls._exported_names, cls._artifacts_dir)
+
+  @classmethod
+  def setUpClass(cls):
+    # Ran before any of the unit tests.
+    super().setUpClass()
+    if cls._module_class is None:
+      raise AttributeError(
+          "setUpClass was called but no module was specified. Specify a module "
+          "to compile via the @tf_test_utils.compile_module decorator.")
+
+    # Setup the directory for saving compilation artifacts and traces.
+    cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
+
+    # Setup crash reproducer for the test.
+    crash_reproducer_path = os.path.join(cls._artifacts_dir, "reproducer.mlir")
+    compiler.Context.default_crash_reproducer_path = crash_reproducer_path
+
+    # Create a CompiledModule for the reference backend and each target backend.
+    try:
+      ref_backend_info = tf_utils.BackendInfo.ALL[FLAGS.reference_backend]
+      cls._ref_module = cls._compile(ref_backend_info)
+
+      tar_backend_infos = get_target_backends()
+      cls._tar_modules = [
+          cls._compile(backend_info) for backend_info in tar_backend_infos
+      ]
+    finally:
+      # TODO(meadowlark): Move this into tf_util.compile_tf_module to prevent
+      # overwritting `reproducer.mlir`.
+      # Disable crash reproducer (to avoid inadvertently overwriting this
+      # path if there are multiple TestCases in the same file).
+      compiler.Context.default_crash_reproducer_path = None
+
+  def setUp(self):
+    # Ran before each unit test.
+    super().setUp()
+    self._ref_module.create_reinitialized()
+    self._tar_modules = [
+        module.create_reinitialized() for module in self._tar_modules
+    ]
+
+  def compare_backends(self, trace_function, rtol=1e-6, atol=1e-6):
+    """Run the reference and target backends on trace_function and compare them.
+
+    Args:
+      trace_function: a function accepting a TracedModule as its argument.
+      rtol: a float as defined in np.allclose. Will be overridden in any
+        comparison between calls to the trace with a `rtol` kwarg.
+      atol: a float as defined in np.allclose. Will be overridden in any
+        comparison between calls to the trace with a `atol` kwarg.
+    """
+    # Trace the test function for each backend.
+    ref_trace = tf_utils.TracedModule(self._ref_module, trace_function)
+    tar_traces = [
+        tf_utils.TracedModule(module, trace_function)
+        for module in self._tar_modules
+    ]
+
+    # Compare each target trace with the reference trace.
+    failed_backend_indices = []
+    for i, tar_trace in enumerate(tar_traces):
+      logging.info("Comparing the reference backend '%s' with '%s'",
+                   ref_trace.backend, tar_trace.backend)
+      traces_match = self._compare_traces(ref_trace, tar_trace, rtol, atol)
+      if not traces_match:
+        failed_backend_indices.append(i)
+
+    # Save the results to disk before validating.
+    trace_dir = os.path.join(self._artifacts_dir, "traces")
+    if not os.path.exists(trace_dir):
+      os.makedirs(trace_dir)
+    ref_trace.save_plaintext(trace_dir, FLAGS.summarize)
+    for tar_trace in tar_traces:
+      tar_trace.save_plaintext(trace_dir, FLAGS.summarize)
+
+    # Validate results.
+    if len(failed_backend_indices) > 0:
+      # Extract info for logging.
+      failed_traces = [tar_traces[b] for b in failed_backend_indices]
+      failed_backends = [trace.backend for trace in failed_traces]
+      failure_info = (
+          "Comparision between the reference backend and the following targets "
+          f"failed: {failed_backends}. The  errors above show the outputs of "
+          "the non-matching calls.")
+
+      # This condition is always True, but is useful for context in the logs.
+      self.assertFalse(len(failed_backends) > 0, failure_info)
+
+  def _compare_traces(self, ref_trace, tar_trace, default_rtol, default_atol):
+    traces_match = True
+    for ref_call, tar_call in zip(ref_trace, tar_trace):
+      ref_call.record_tolerances_if_unset(default_rtol, default_atol)
+      tar_call.record_tolerances_if_unset(default_rtol, default_atol)
+      # Get the potentially overridden tolerances for comparisons of this call.
+      rtol, atol = ref_call.get_tolerances()
+
+      logging.info("Comparing calls to '%s'", ref_call.method)
+      calls_match = self._check_same(ref_call.outputs, tar_call.outputs, rtol,
+                                     atol)
+
+      # Log the inputs and outputs if they don't match.
+      if not calls_match:
+        logging.error("Comparision between '%s' and '%s' failed on method '%s'",
+                      ref_trace.backend, tar_trace.backend, ref_call.method)
+        logging.error("Reference result '%s':\n%s", ref_trace.backend, ref_call)
+        logging.error("Target result '%s':\n%s", tar_trace.backend, tar_call)
+
+      traces_match = traces_match and calls_match
+    return traces_match
+
+  def _check_same(self, ref, tar, rtol, atol):
+    """Checks that ref and tar have identical datastructures and values."""
+    # Check for matching types.
+    if not isinstance(tar, type(ref)):
+      logging.error(
+          "Expected ref and tar to have the same type but got '%s' and '%s'",
+          type(ref), type(tar))
+      return False
+
+    if ref is None:
+      # Nothing to compare (e.g. the called method had no outputs).
+      return True
+
+    # Recursive check for dicts.
+    if isinstance(ref, dict):
+      if ref.keys() != tar.keys():
+        logging.error(
+            "Expected ref and tar to have the same keys, but got '%s' and '%s'",
+            ref.keys(), tar.keys())
+        return False
+      # Check that all of the dictionaries' values are the same.
+      for key in ref:
+        if not self._check_same(ref[key], tar[key], rtol, atol):
+          return False
+
+    # Recursive check for iterables.
+    elif isinstance(ref, list) or isinstance(ref, tuple):
+      if len(ref) != len(tar):
+        logging.error(
+            "Expected ref and tar to have the same length, but got %s and %s",
+            len(ref), len(tar))
+        return False
+      # Check that all of the iterables' values are the same.
+      for i in range(len(ref)):
+        if not self._check_same(ref[i], tar[i], rtol, atol):
+          return False
+
+    # Base check for numpy arrays.
+    elif isinstance(ref, np.ndarray):
+      if isinstance(ref.flat[0], np.floating):
+        return np.allclose(ref, tar, rtol=rtol, atol=atol)
+      else:
+        return np.array_equal(ref, tar)
+
+    # If outputs end up here then an extra branch for that type should be added.
+    else:
+      logging.warning("Comparing an unexpected result type of %s", type(ref))
+      return ref == tar
+    return True
+
+  @classmethod
+  def tearDownClass(cls):
+    # Ran after all unit tests are completed.
+    super().tearDownClass()

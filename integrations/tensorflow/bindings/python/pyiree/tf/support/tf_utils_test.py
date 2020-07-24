@@ -43,6 +43,10 @@ class StatefulCountingModule(tf.Module):
   def get_count(self):
     return self.count
 
+  @tf.function(input_signature=[tf.TensorSpec([1])])
+  def increment_by(self, value):
+    self.count.assign_add(value)
+
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
@@ -99,6 +103,28 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual([0.], reinitialized_module.get_count())
     # Test independent state.
     self.assertEqual([1.], module.get_count())
+
+  def test_trace_inputs_and_outputs(self):
+    backend_info = tf_utils.BackendInfo.ALL['tf']
+    module = backend_info.CompiledModule(StatefulCountingModule, backend_info)
+
+    def trace_function(trace):
+      # No inputs or outpus
+      trace.increment()
+      # Only inputs
+      trace.increment_by([81.])
+      # Only outputs
+      trace.get_count()
+
+    trace = tf_utils.TracedModule(module, trace_function)
+
+    self.assertTrue(isinstance(trace.calls[0].inputs, tuple))
+    self.assertTrue(len(trace.calls[0].inputs) == 0)
+    self.assertTrue(isinstance(trace.calls[0].outputs, tuple))
+    self.assertTrue(len(trace.calls[0].outputs) == 0)
+
+    self.assertAllClose(trace.calls[1].inputs[0], [81.])
+    self.assertAllClose(trace.calls[2].outputs[0], [82.])
 
 
 if __name__ == '__main__':
