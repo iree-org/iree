@@ -43,6 +43,11 @@ declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
 )
+# Pass in VK_ICD_FILENAMES if exists so that the Vulkan loader can find the
+# Vulkan implementation.
+if  [[ -v VK_ICD_FILENAMES ]]; then
+  test_env_args+=(--test_env=VK_ICD_FILENAMES=$VK_ICD_FILENAMES)
+fi
 
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro")
