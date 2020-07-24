@@ -57,6 +57,7 @@ cc_binary(
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
         "@dear_imgui",
         "@dear_imgui//:imgui_sdl_vulkan",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
