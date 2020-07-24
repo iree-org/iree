@@ -36,7 +36,7 @@ ARG SWIFTSHADER_COMMIT=6a8a74986c357b0c6fa0dfd2b4b9230af8d39d1a
 RUN apt-get update && apt-get install zlib1g-dev
 
 RUN git clone https://github.com/google/swiftshader \
-  && cd swiftshader && git checkout $SWIFTSHADER_COMMIT && cd .. \
+  && cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd .. \
   # Only build SwiftShader Vulkan ICD.
   && cmake -S swiftshader/ -B build-swiftshader/ \
            -GNinja \

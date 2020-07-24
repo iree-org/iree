@@ -30,7 +30,7 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 
 # For some reason the environment variable set in base `cmake` image cannot
-# reach the child `cmake-swiftshader` image.. Given this environment variable
+# reach the child `cmake-swiftshader` image. Given this environment variable
 # is just a temporary solution, duplicate it here instead of spending all
 # the effort trying to figure out why.
 # TODO(#2645): remove this once we have a better solution for AOT linker
