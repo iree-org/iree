@@ -45,7 +45,7 @@ For development, IREE supports both Bazel and CMake on Windows and Linux. We are
 working on enabling macOS support. For deployment, IREE aims to additionally
 cover Android and iOS.
 
-Please see the [Getting Started](https://google.github.io/iree/get_started)
+Please see the [Getting Started](https://google.github.io/iree/get-started)
 pages on IREE's [documentation hub](https://google.github.io/iree) to configure,
 compile, and run IREE in your favorite development environment!
 
