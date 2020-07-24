@@ -36,6 +36,8 @@ IMAGES_TO_DEPENDENCIES = {
     'cmake': [],
     'cmake-android': ['cmake'],
     'cmake-nvidia': ['cmake'],
+    'cmake-vulkan': ['cmake'],
+    'cmake-swiftshader': ['cmake-vulkan'],
     'rbe-toolchain': [],
 }
 
