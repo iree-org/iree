@@ -323,7 +323,7 @@ LogicalResult FromExtentTensorOp::inferReturnTypes(
   if (!inputType || !isValidTensorOfExtents(inputType)) {
     return emitOptionalError(location, "Invalid input type, ",
                              operands[0].getType(),
-                             ", for from_extent_tensor op");    
+                             ", for from_extent_tensor op");
   }
   SmallVector<int64_t, 6> extents(inputType.getDimSize(0),
                                   static_cast<int64_t>(-1));
