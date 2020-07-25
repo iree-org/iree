@@ -100,8 +100,22 @@ class ConvertShapeOfOp : public OpConversionPattern<shape::ShapeOfOp> {
     }
     auto resultType =
         RankedShapeType::get(tensorType.getShape(), rewriter.getContext());
-    rewriter.replaceOpWithNewOp<Shape::GetRankedShapeOp>(op, resultType,
-                                                         operands[0]);
+    auto getRanked = rewriter.create<Shape::GetRankedShapeOp>(
+        op.getLoc(), resultType, operands[0]);
+
+    // For FromExtentTensorOp users, just forward the result from GetRanked.
+    SmallPtrSet<Operation*, 2> toDelete;
+    for (auto use : op.getOperation()->getUsers()) {
+      if (isa<FromExtentTensorOp>(use)) {
+        use->replaceAllUsesWith(getRanked);
+        toDelete.insert(use);
+      }
+    }
+    for (Operation* use : toDelete) {
+        rewriter.eraseOp(use);
+    }
+
+    rewriter.replaceOp(op.getOperation(), getRanked.getResult());
     return success();
   }
 };
