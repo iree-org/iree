@@ -29,6 +29,8 @@ function docker_setup() {
     # such that they don't contain the information about normal users and we
     # want these scripts to be runnable locally for debugging.
     local fake_etc_dir="${KOKORO_ROOT?}/fake_etc"
+    # Bazel wants a home directory
+    # TODO: more explanation if this works
     mkdir -p "${fake_etc_dir?}"
 
     local fake_group="${fake_etc_dir?}/group"
@@ -36,6 +38,9 @@ function docker_setup() {
 
     getent group > "${fake_group?}"
     getent passwd > "${fake_passwd?}"
+
+    local fake_home="${KOKORO_ROOT?}/fake_home"
+    mkdir -p "${fake_home}"
 
     local workdir="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
@@ -49,9 +54,7 @@ function docker_setup() {
       # information, but it also makes some other things more pleasant.
       --volume="${fake_group?}:/etc/group:ro"
       --volume="${fake_passwd?}:/etc/passwd:ro"
-      # Allow Bazel to write its special cache directories. This is the
-      # default path Bazel will write to.
-      --volume="${HOME?}/.cache/bazel:${HOME?}/.cache/bazel"
+      --volume="${fake_home?}:${HOME?}"
       # Make gcloud credentials available. This isn't necessary when running
       # in GCE but enables using this script locally with RBE.
       --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
