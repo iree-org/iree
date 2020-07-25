@@ -12,17 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-iree_cc_library(
-  NAME
-    init_conversions
-  HDRS
-    "init_conversions.h"
-  DEPS
-    iree::compiler::Conversion::HLOToHLO
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::LinalgToSPIRV
-  PUBLIC
+cc_library(
+    name = "HLOToHLO",
+    srcs = [
+        "DecomposeHLOClamp.cpp",
+        "Passes.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:CFGTransforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
+    ],
 )

@@ -41,6 +41,7 @@ external_cc_library(
     "lib/Dialect/mhlo/transforms/chlo_legalize_to_hlo.cc"
     "lib/Dialect/mhlo/transforms/legalize_control_flow.cc"
     "lib/Dialect/mhlo/transforms/legalize_to_standard.cc"
+    "lib/Dialect/mhlo/transforms/lower_complex.cc"
     "lib/Dialect/mhlo/transforms/lower_general_dot.cc"
     "lib/Dialect/mhlo/transforms/materialize_broadcasts.cc"
     "lib/Dialect/mhlo/transforms/unfuse_batch_norm.cc"
@@ -88,6 +89,7 @@ external_cc_library(
     tensorflow_mlir_hlo_hlo_ops_pattern_gen
     tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
     tensorflow_mlir_hlo_legalize_to_standard_patterns_gen
+    tensorflow_mlir_hlo_lower_to_complex_inc_gen
     tensorflow_mlir_hlo_lhlo_ops_gen
     tensorflow_mlir_hlo_xla_canonicalize_gen
   PUBLIC
@@ -220,4 +222,19 @@ external_tablegen_library(
     "lib/Dialect/mhlo/transforms/legalize_to_standard_patterns.td"
   OUTS
     -gen-rewriters lib/Dialect/mhlo/transforms/generated_legalize_to_standard.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_hlo_lower_to_complex_inc_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_HLO_SRC_ROOT}
+  SRCS
+    "lib/Dialect/mhlo/transforms/lower_complex_patterns.td"
+  OUTS
+    -gen-rewriters lib/Dialect/mhlo/transforms/generated_lower_complex.inc
 )

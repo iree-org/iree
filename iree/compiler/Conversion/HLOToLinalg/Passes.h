@@ -27,9 +27,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Crates a pass to decompose XLA-HLO clamp ops into primitive ops.
-std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
-
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 

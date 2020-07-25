@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 #define IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 
+#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -25,6 +26,10 @@ namespace iree_compiler {
 // These functions should be called before creating any MLIRContext if one
 // expects all the possible conversions to be made available to the context
 // automatically.
+
+inline void registerHLOToHLOPasses() {
+  createHLOToHLOPass();
+}
 
 inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
