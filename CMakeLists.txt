@@ -290,6 +290,8 @@ if(${IREE_ENABLE_MLIR})
     message(STATUS "Adding bundled LLVM source dependency")
     add_iree_mlir_src_dep("third_party/llvm-project")
   elseif(${IREE_MLIR_DEP_MODE} STREQUAL "INSTALLED")
+    # Deps of installed MLIR/LLVM packages.
+    find_package(ZLIB)  # See: https://reviews.llvm.org/D79219
     message(STATUS "Looking for installed MLIR/LLVM packages (configure with MLIR_DIR variable)")
     find_package(MLIR REQUIRED CONFIG)
     message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
