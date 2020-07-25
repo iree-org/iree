@@ -90,7 +90,8 @@ NAVI_ORDER_DICT = {
     'tf_e2e_coverage.md': 8,
     'iree_community.md': 9,
     # 'Design Docs' is 10.
-    # 'Dialect Definitions' is 11.
+    # 'IR Conversion Examples' is 11.
+    # 'Dialect Definitions' is 12.
 
     # Within 'Getting Started' use explicit ordering.
     # Alphabetical would put 'bazel' before 'cmake' and 'python' between 'linux'
@@ -131,6 +132,7 @@ DIRECTORY_TITLE_DICT = {
     'developing_iree': 'Developing IREE',
     'Dialects': 'Dialect Definitions',
     'get_started': 'Getting Started',
+    'ir_examples': 'IR Conversion Examples',
     'using_iree': 'Using IREE',
 }
 
