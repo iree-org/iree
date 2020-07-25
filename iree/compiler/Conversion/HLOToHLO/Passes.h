@@ -35,8 +35,8 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPass();
 
 /// Populates the patterns that convert from XLA-HLO to XLA-HLO. Imports
 /// patterns from XLA.
-void populateHLOToHLOPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+void populateHLOToHLOPatterns(MLIRContext *context,
+                              OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

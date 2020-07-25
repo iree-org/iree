@@ -31,14 +31,13 @@ struct ConvertHLOToHLOPass
     if (failed(applyPatternsAndFoldGreedily(getOperation(), greedyPatterns))) {
       return signalPassFailure();
     }
- }
+  }
 };
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPass() {
   return std::make_unique<ConvertHLOToHLOPass>();
 }
-
 
 static PassRegistration<ConvertHLOToHLOPass> pass(
     "iree-codegen-hlo-to-hlo",
