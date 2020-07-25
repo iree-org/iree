@@ -3,7 +3,7 @@ layout: default
 title: Dialect Definitions
 has_children: true
 permalink: Dialects
-nav_order: 11
+nav_order: 12
 ---
 
 # Dialect Definitions
