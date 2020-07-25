@@ -82,13 +82,12 @@ function docker_setup() {
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
-      --env HOME="${fake_home_dir?}"
-      --volume="${fake_home_dir?}:${fake_home_dir?}"
+      --volume="${fake_home_dir?}:${HOME?}"
     )
 
     # Make gcloud credentials available. This isn't necessary when running in
     # GCE but enables using this script locally with RBE.
     DOCKER_RUN_ARGS+=(
-      --volume="${HOME?}/.config/gcloud:${fake_home_dir?}/.config/gcloud:ro"
+      --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
     )
 }
