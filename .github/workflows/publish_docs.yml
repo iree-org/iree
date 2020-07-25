@@ -15,9 +15,9 @@
 name: Publish Documentation
 
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    # Every working day at 12pm UTC
+    - cron: '0 12 * * 1-5'
 
 jobs:
   linux:
