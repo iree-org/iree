@@ -34,7 +34,7 @@ function docker_setup() {
     DOCKER_RUN_ARGS+=(--rm)
 
 
-    # Run as the current user and group. If only it were this simple.
+    # Run as the current user and group. If only it were this simple...
     DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
 
 
@@ -43,10 +43,14 @@ function docker_setup() {
     # The thing that really matters is the IDs, so the key thing is that Docker
     # writes files as the same ID as the current user, which we set above, but
     # without the group and passwd file, lots of things get upset because they
-    # don't recognize the current user ID (e.g. `whoami` fails).
+    # don't recognize the current user ID (e.g. `whoami` fails). Bazel in
+    # particular looks for a home directory and is not happy when it can't find
+    # one.
     # So we make the container share the host mapping, which guarantees that the
     # current user is mapped. If there was any user or group in the container
-    # that we cared about, this wouldn't work, but luckily we don't.
+    # that we cared about, this wouldn't necessarily work because the host and
+    # container don't necessarily map the ID to the same user. Luckily though,
+    # we don't.
     # We don't just mount the real /etc/passwd and /etc/group because Google
     # Linux workstations do some interesting stuff with user/group permissions
     # such that they don't contain the information about normal users and we
@@ -73,11 +77,13 @@ function docker_setup() {
     # runnable locally. Instead, we give it a special home directory to write
     # into. We don't just mount the user home directory (or some subset thereof)
     # for two reasons:
-    #   1. We probably don't want to just implicitly share this between runs or
-    #      pollute a local directory when running locally.
+    #   1. We probably don't want Docker to just write into the user's home
+    #      directory when running locally.
     #   2. When running with Kokoro, we mount a local scratch SSD to KOKORO_ROOT
     #      whereas the home directory is on the persistent SSD boot disk. It
-    #      turns out that makes a huge difference for the Bazel cache directory.
+    #      turns out that makes a huge difference in performance for Bazel
+    #      running with local execution (not with RBE) because it is IO bound at
+    #      64 cores.
     local fake_home_dir="${KOKORO_ROOT?}/fake_home"
     mkdir -p "${fake_home_dir}"
 
