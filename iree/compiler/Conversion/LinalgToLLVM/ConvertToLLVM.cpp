@@ -28,6 +28,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -308,6 +309,17 @@ struct ConvertToLLVMPass
 }  // namespace
 
 void ConvertToLLVMPass::runOnOperation() {
+  // Vector -> Vector transformation is needed before we do any conversion to
+  // LLVM.
+  {
+    OwningRewritePatternList patterns;
+    vector::populateVectorToVectorCanonicalizationPatterns(patterns,
+                                                           &getContext());
+    vector::populateVectorSlicesLoweringPatterns(patterns, &getContext());
+    vector::populateVectorContractLoweringPatterns(patterns, &getContext());
+    applyPatternsAndFoldGreedily(getOperation(), patterns);
+  }
+  //
   auto module = getOperation();
 
   LLVMTypeConverter converter(&getContext());
