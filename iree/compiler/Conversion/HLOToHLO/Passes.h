@@ -14,7 +14,9 @@
 
 //===- Passes.h - Codegen pass to convert from XLA-HLO to XLA-HLO ---------===//
 //
-// IREE specific passes used in the XLA-HLO to XLA-HLO
+// IREE specific passes used in the XLA-HLO to XLA-HLO. Some examples may be
+// raising gather operations to torch index select or decomposing complex
+// operations input real valued equivalents.
 //
 //===----------------------------------------------------------------------===//
 #ifndef IREE_COMPILER_CONVERSION_HLOTOHLO_PASSES_H_
@@ -27,7 +29,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Crates a pass to decompose XLA-HLO clamp ops into primitive ops.
+/// Creates a pass to decompose XLA-HLO clamp ops into primitive ops.
 std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
 
 /// Creates XLA-HLO to XLA-HLO transformation pass.
