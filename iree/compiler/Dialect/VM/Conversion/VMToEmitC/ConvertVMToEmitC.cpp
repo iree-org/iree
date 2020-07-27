@@ -73,7 +73,7 @@ namespace {
 
 // A pass converting IREE VM operations into the EmitC dialect.
 class ConvertVMToEmitCPass
-    : public PassWrapper<ConvertVMToEmitCPass, OperationPass<mlir::ModuleOp>> {
+    : public PassWrapper<ConvertVMToEmitCPass, OperationPass<IREE::VM::ModuleOp>> {
   void runOnOperation() {
     ConversionTarget target(getContext());
 
@@ -84,7 +84,7 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<IREE::VM::VMDialect>();
     target.addIllegalOp<IREE::VM::AddI32Op>();
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
+    if (failed(applyFullConversion(getOperation(), target, patterns))) {
       return signalPassFailure();
     }
   }
@@ -92,7 +92,7 @@ class ConvertVMToEmitCPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertVMToEmitCPass() {
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createConvertVMToEmitCPass() {
   return std::make_unique<ConvertVMToEmitCPass>();
 }
 

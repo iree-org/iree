@@ -27,7 +27,7 @@ void populateVMToCPatterns(MLIRContext *context,
 namespace IREE {
 namespace VM {
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertVMToEmitCPass();
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createConvertVMToEmitCPass();
 
 }  // namespace VM
 }  // namespace IREE
