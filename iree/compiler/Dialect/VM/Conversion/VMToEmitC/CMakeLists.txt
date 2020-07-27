@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (EmitC is only buildable with CMake)
-
-iree_add_all_subdirs()
-
-if(IREE_ENABLE_EMITC)
-  set(IREE_VM_CONDITIONAL_TARGETS
-    iree::compiler::Dialect::VM::Target::C
+if(${IREE_ENABLE_EMITC})
+  iree_add_all_subdirs()
+  
+  iree_cc_library(
+    NAME
+      VMToEmitC
+    HDRS
+      "ConvertVMToEmitC.h"
+    SRCS
+      "ConvertVMToEmitC.cpp"
+    DEPS
+      MLIRIR
+      MLIRPass
+      MLIREmitC
+      MLIRTransforms
+      iree::compiler::Dialect::VM::IR
+    PUBLIC
   )
 endif()
-
-iree_cc_library(
-  NAME
-    init_targets
-  HDRS
-    "init_targets.h"
-  DEPS
-    iree::compiler::Dialect::VM::Target::Bytecode
-    ${IREE_VM_CONDITIONAL_TARGETS}
-  PUBLIC
-)
