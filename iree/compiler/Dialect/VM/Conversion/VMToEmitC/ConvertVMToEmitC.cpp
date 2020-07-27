@@ -73,7 +73,8 @@ namespace {
 
 // A pass converting IREE VM operations into the EmitC dialect.
 class ConvertVMToEmitCPass
-    : public PassWrapper<ConvertVMToEmitCPass, OperationPass<IREE::VM::ModuleOp>> {
+    : public PassWrapper<ConvertVMToEmitCPass,
+                         OperationPass<IREE::VM::ModuleOp>> {
   void runOnOperation() {
     ConversionTarget target(getContext());
 
@@ -92,7 +93,8 @@ class ConvertVMToEmitCPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createConvertVMToEmitCPass() {
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createConvertVMToEmitCPass() {
   return std::make_unique<ConvertVMToEmitCPass>();
 }
 
