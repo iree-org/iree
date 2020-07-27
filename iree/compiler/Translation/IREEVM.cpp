@@ -77,9 +77,7 @@ void registerIREEVMTransformPassPipeline() {
       });
 }
 
-/// TODO(simon-camp) This function is not part of the header, should it be
-/// forward declared?
-LogicalResult translateFromMLIRToVM(
+static LogicalResult translateFromMLIRToVM(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
   // Convert from our source to a vm.module in canonical form.
   // After this completes we have a non-bytecode-specific vm.module that we
