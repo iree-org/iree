@@ -39,9 +39,5 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPass() {
   return std::make_unique<ConvertHLOToHLOPass>();
 }
 
-static PassRegistration<ConvertHLOToHLOPass> pass(
-    "iree-codegen-hlo-to-hlo",
-    "Convert from XLA-HLO ops XLA-HLO ops compatible with codegen");
-
 }  // namespace iree_compiler
 }  // namespace mlir
