@@ -100,7 +100,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertVMToEmitCPass() {
 }  // namespace IREE
 
 static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass(
-    "test-iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC VM dialect");
+    "iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir

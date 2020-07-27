@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-vm-to-emitc' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-convert-vm-to-emitc' %s | IreeFileCheck %s
 
 // CHECK: vm.module @add_module {
 vm.module @add_module {
