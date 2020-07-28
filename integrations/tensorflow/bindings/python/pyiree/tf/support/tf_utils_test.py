@@ -21,6 +21,7 @@ from absl import logging
 from absl.testing import parameterized
 from pyiree.tf.support import tf_utils
 import tensorflow as tf
+import numpy as np
 
 
 class ConstantModule(tf.Module):
@@ -65,7 +66,6 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
           artifacts_dir=artifacts_dir)
 
       artifacts_to_check = [
-          'saved_model',
           'tf_input.mlir',
           'iree_input.mlir',
           f'compiled__{tf_utils.backends_to_str(target_backends)}.vmfb',
@@ -99,6 +99,18 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual([0.], reinitialized_module.get_count())
     # Test independent state.
     self.assertEqual([1.], module.get_count())
+
+  def test_to_mlir_type(self):
+    self.assertEqual('i8', tf_utils.to_mlir_type(np.dtype('int8')))
+    self.assertEqual('i32', tf_utils.to_mlir_type(np.dtype('int32')))
+    self.assertEqual('f32', tf_utils.to_mlir_type(np.dtype('float32')))
+    self.assertEqual('f64', tf_utils.to_mlir_type(np.dtype('float64')))
+
+  def test_save_input_values(self):
+    inputs = [np.array([1, 2], dtype=np.int32)]
+    self.assertEqual('2xi32=1 2', tf_utils.save_input_values(inputs))
+    inputs = [np.array([1, 2], dtype=np.float32)]
+    self.assertEqual('2xf32=1.0 2.0', tf_utils.save_input_values(inputs))
 
 
 if __name__ == '__main__':

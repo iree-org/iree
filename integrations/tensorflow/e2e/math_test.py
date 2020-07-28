@@ -39,27 +39,35 @@ class MathModule(tf.Module):
 
 
 @tf_test_utils.compile_module(MathModule)
-class MathTest(tf_test_utils.CompiledModuleTestCase):
+class MathTest(tf_test_utils.TracedModuleTestCase):
 
   def test_abs(self):
-    a = np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32)
-    r = self.get_module().abs(a)
-    r.print().assert_all_close()
+
+    def abs(module):
+      module.abs(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
+
+    self.compare_backends(abs)
 
   def test_cos(self):
-    a = np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32)
-    r = self.get_module().cos(a)
-    r.print().assert_all_close()
+
+    def cos(module):
+      module.cos(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
+
+    self.compare_backends(cos)
 
   def test_log(self):
-    a = np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32)
-    r = self.get_module().log(a)
-    r.print().assert_all_close()
+
+    def log(module):
+      module.log(np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32))
+
+    self.compare_backends(log)
 
   def test_mod(self):
-    a = np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32)
-    r = self.get_module().mod(a)
-    r.print().assert_all_close()
+
+    def mod(module):
+      module.mod(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+
+    self.compare_backends(mod)
 
 
 if __name__ == "__main__":

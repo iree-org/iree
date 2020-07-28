@@ -123,8 +123,7 @@ class MaterializeResourceCachesPass
     descriptorSetLayoutCache_.try_emplace(bindingsAttr, variableOp);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
-        loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}),
-        ArrayRef<NamedAttribute>{});
+        loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
     SymbolTable::setSymbolVisibility(initializerOp,
                                      SymbolTable::Visibility::Private);
     auto *block = initializerOp.addEntryBlock();
@@ -168,8 +167,7 @@ class MaterializeResourceCachesPass
     executableLayoutCache_.try_emplace(setLayoutsArrayAttr, variableOp);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
-        loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}),
-        ArrayRef<NamedAttribute>{});
+        loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
     SymbolTable::setSymbolVisibility(initializerOp,
                                      SymbolTable::Visibility::Private);
     auto *block = initializerOp.addEntryBlock();
@@ -212,8 +210,7 @@ class MaterializeResourceCachesPass
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName,
-        moduleBuilder.getFunctionType({}, {executableCacheType}),
-        ArrayRef<NamedAttribute>{});
+        moduleBuilder.getFunctionType({}, {executableCacheType}));
     SymbolTable::setSymbolVisibility(initializerOp,
                                      SymbolTable::Visibility::Private);
     auto *block = initializerOp.addEntryBlock();

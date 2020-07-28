@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 STATIC_SIZE = 20
@@ -65,36 +67,46 @@ class TensorListModule(tf.Module):
 
 
 @tf_test_utils.compile_module(TensorListModule)
-class TensorListTest(tf_test_utils.CompiledModuleTestCase):
+class TensorListTest(tf_test_utils.TracedModuleTestCase):
 
   def test_identity_through_tensorlist(self):
-    m = self.get_module()
-    result = m.identity_through_tensorlist(tf.constant(42.))
-    result.print().assert_all_close()
+
+    def identity_through_tensorlist(module):
+      module.identity_through_tensorlist(np.array(42., dtype=np.float32))
+
+    self.compare_backends(identity_through_tensorlist)
 
   def test_add_through_tensorlist(self):
-    m = self.get_module()
-    result = m.add_through_tensorlist(tf.constant(42.), tf.constant(43.))
-    result.print().assert_all_close()
+
+    def add_through_tensorlist(module):
+      module.add_through_tensorlist(
+          np.array(42., dtype=np.float32), np.array(43., dtype=np.float32))
+
+    self.compare_backends(add_through_tensorlist)
 
   def test_slice_first_element_with_from_tensor(self):
-    m = self.get_module()
-    result = m.slice_first_element_with_from_tensor(
-        tf.range(STATIC_SIZE, dtype=tf.float32))
-    result.print().assert_all_close()
+
+    def slice_first_element_with_from_tensor(module):
+      module.slice_first_element_with_from_tensor(
+          np.arange(STATIC_SIZE, dtype=np.float32))
+
+    self.compare_backends(slice_first_element_with_from_tensor)
 
   def test_slice_first_element_with_from_tensor_high_rank(self):
-    m = self.get_module()
-    result = m.slice_first_element_with_from_tensor_high_rank(
-        tf.broadcast_to(
-            tf.range(STATIC_SIZE, dtype=tf.float32),
-            [STATIC_SIZE, STATIC_SIZE]))
-    result.print().assert_all_close()
+
+    def slice_first_element_with_from_tensor_high_rank(module):
+      module.slice_first_element_with_from_tensor_high_rank(
+          tf_utils.ndarange([STATIC_SIZE, STATIC_SIZE]))
+
+    self.compare_backends(slice_first_element_with_from_tensor_high_rank)
 
   def test_concat_with_tensorlist_stack(self):
-    m = self.get_module()
-    result = m.concat_with_tensorlist_stack(tf.constant(42.), tf.constant(43.))
-    result.print().assert_all_close()
+
+    def concat_with_tensorlist_stack(module):
+      module.concat_with_tensorlist_stack(
+          np.array(42., dtype=np.float32), np.array(43., dtype=np.float32))
+
+    self.compare_backends(concat_with_tensorlist_stack)
 
 
 if __name__ == "__main__":

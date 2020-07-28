@@ -52,6 +52,9 @@ class LLVMIRTargetBackend final : public TargetBackend {
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
     auto llvmModule = mlir::translateModuleToLLVMIR(targetOp.getInnerModule());
+    if (!llvmModule) {
+      return targetOp.emitError("Failed to translate executable to LLVM IR");
+    }
 
     // Create invocation function an populate entry_points.
     iree::LLVMIRExecutableDefT llvmIrExecutableDef;

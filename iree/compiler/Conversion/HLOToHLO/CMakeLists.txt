@@ -16,35 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    LinalgToLLVM
+    HLOToHLO
   HDRS
     "Passes.h"
   SRCS
-    "ConvertToLLVM.cpp"
-    "MatMulVectorization.cpp"
+    "DecomposeHLOClamp.cpp"
     "Passes.cpp"
   DEPS
-    MLIRAffineToStandard
     MLIRIR
-    MLIRLLVMIR
-    MLIRLinalgToLLVM
-    MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
-    MLIRStandardOps
-    MLIRStandardOpsTransforms
-    MLIRStandardToLLVM
-    MLIRTransforms
-    MLIRVector
-    MLIRVectorToLLVM
-    MLIRVectorToSCF
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::HLOToHLO
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
+    tensorflow::mlir_hlo
   PUBLIC
 )

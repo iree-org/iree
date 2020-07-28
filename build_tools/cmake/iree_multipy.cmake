@@ -98,7 +98,7 @@ endmacro()
 function(iree_pyext_module)
   cmake_parse_arguments(ARG
     ""
-    "NAME;MODULE_NAME"
+    "NAME;MODULE_NAME;UNIX_LINKER_SCRIPT"
     "SRCS;COPTS;DEPS;PYEXT_DEPS"
     ${ARGN})
   _setup_iree_pyext_names()
@@ -126,6 +126,14 @@ function(iree_pyext_module)
         PREFIX "${IREE_MULTIPY_${V}_PREFIX}"
         SUFFIX "${IREE_MULTIPY_${V}_SUFFIX}${IREE_MULTIPY_${V}_EXTENSION}"
     )
+
+    # Link flags.
+    if(UNIX AND NOT APPLE)  # Apple does not support linker scripts.
+      if(ARG_UNIX_LINKER_SCRIPT)
+        set_target_properties(${VER_NAME} PROPERTIES LINK_FLAGS
+          "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/${ARG_UNIX_LINKER_SCRIPT}")
+      endif()
+    endif()
 
     iree_pyext_pybind11_options(${VER_NAME})
     target_include_directories(${VER_NAME}

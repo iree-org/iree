@@ -41,6 +41,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",

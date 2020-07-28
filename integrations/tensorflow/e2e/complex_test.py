@@ -17,30 +17,32 @@ from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 
-class FillModule(tf.Module):
+class ComplexModule(tf.Module):
 
   def __init__(self):
     pass
 
   @tf.function(input_signature=[
-      tf.TensorSpec([2], tf.int32),
-      tf.TensorSpec([], tf.float32)
+      tf.TensorSpec([2], tf.float32),
+      tf.TensorSpec([2], tf.float32)
   ])
-  def fill(self, dims, value):
-    return tf.fill(dims, value)
+  def complex_exp(self, real, imag):
+    tensor = tf.complex(real, imag)
+    exp = tf.exp(tensor)
+    return tf.math.real(exp)
 
 
-@tf_test_utils.compile_module(FillModule)
-class FillTest(tf_test_utils.TracedModuleTestCase):
+@tf_test_utils.compile_module(ComplexModule)
+class ComplexTest(tf_test_utils.TracedModuleTestCase):
 
-  def test_fill(self):
+  def test_complex(self):
 
-    def fill(module):
-      dims = np.array([2, 3], dtype=np.int32)
-      value = np.array(9., dtype=np.float32)
-      module.fill(dims, value)
+    def complex_exp(module):
+      real = np.array([2., 3.], dtype=np.float32)
+      imag = np.array([-1., 0.4], dtype=np.float32)
+      module.complex_exp(real, imag)
 
-    self.compare_backends(fill)
+    self.compare_backends(complex_exp)
 
 
 if __name__ == "__main__":

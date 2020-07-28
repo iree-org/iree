@@ -330,6 +330,7 @@ if(${IREE_BUILD_COMPILER})
       iree::base::api
       iree::base::api_util
       iree::base::init
+      iree::base::localfile
       iree::base::source_location
       iree::base::status
       iree::base::tracing
