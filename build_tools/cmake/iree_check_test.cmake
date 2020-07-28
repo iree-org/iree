@@ -243,8 +243,8 @@ function(iree_check_test_suite)
   )
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
-    set(_RULE_TARGET_BACKENDS "vmla" "vulkan-spirv" "llvm-ir")
-    set(_RULE_DRIVERS "vmla" "vulkan" "llvm")
+    set(_RULE_TARGET_BACKENDS "vmla" "vulkan-spirv" "llvm-ir" "dylib-llvm-aot")
+    set(_RULE_DRIVERS "vmla" "vulkan" "llvm" "dylib")
   endif()
 
   list(LENGTH _RULE_TARGET_BACKENDS _TARGET_BACKEND_COUNT)
