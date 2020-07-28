@@ -44,8 +44,8 @@
 #include <functional>
 #include <memory>
 
-#include "third_party/llvm/llvm-project/llvm/include/llvm/ADT/Optional.h"
-#include "third_party/llvm/llvm-project/mlir/include/mlir/ExecutionEngine/CRunnerUtils.h"
+#include "llvm/ADT/Optional.h"
+#include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_
