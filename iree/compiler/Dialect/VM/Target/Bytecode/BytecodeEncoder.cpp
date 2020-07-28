@@ -107,6 +107,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
         return writeUint16(static_cast<uint16_t>(limitedValue));
       case 32:
         return writeUint32(static_cast<uint32_t>(limitedValue));
+      case 64:
+        return writeUint64(static_cast<uint64_t>(limitedValue));
       default:
         return currentOp_->emitOpError()
                << "attribute of bitwidth " << bitWidth << " not supported";
@@ -238,6 +240,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult writeUint32(uint32_t value) {
+    return writeBytes(&value, sizeof(value));
+  }
+
+  LogicalResult writeUint64(uint64_t value) {
     return writeBytes(&value, sizeof(value));
   }
 
