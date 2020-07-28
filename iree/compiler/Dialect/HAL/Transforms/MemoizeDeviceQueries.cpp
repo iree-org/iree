@@ -72,8 +72,7 @@ class MemoizeDeviceQueriesPass
           "_device_match_id_" + std::to_string(matchKey.index());
       auto initializerOp = moduleBuilder.create<FuncOp>(
           fusedLoc, variableName + "_initializer",
-          moduleBuilder.getFunctionType({}, {moduleBuilder.getI1Type()}),
-          ArrayRef<NamedAttribute>{});
+          moduleBuilder.getFunctionType({}, {moduleBuilder.getI1Type()}));
       SymbolTable::setSymbolVisibility(initializerOp,
                                        SymbolTable::Visibility::Private);
       auto variableOp = moduleBuilder.create<IREE::HAL::VariableOp>(
