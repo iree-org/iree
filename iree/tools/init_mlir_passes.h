@@ -106,47 +106,14 @@ inline void registerMlirPasses() {
   ::mlir::registerPass(
       "symbol-dce", "Eliminate dead symbols",
       []() -> std::unique_ptr<Pass> { return mlir::createSymbolDCEPass(); });
-  createCanonicalizerPass();
-  createCSEPass();
-  createSuperVectorizePass({});
-  createLoopUnrollPass();
-  createLoopUnrollAndJamPass();
-  createSimplifyAffineStructuresPass();
-  createLoopFusionPass();
-  createLoopInvariantCodeMotionPass();
-  createAffineLoopInvariantCodeMotionPass();
-  createPipelineDataTransferPass();
-  createLowerAffinePass();
-  createLoopTilingPass(0);
-  createLoopCoalescingPass();
-  createAffineDataCopyGenerationPass(0, 0);
-  createMemRefDataFlowOptPass();
-  createInlinerPass();
-  createSymbolDCEPass();
-  createLocationSnapshotPass({});
 
   // Linalg
 #define GEN_PASS_REGISTRATION
 #include "mlir/Dialect/Linalg/Passes.h.inc"
 
-  // Loop
-  createParallelLoopFusionPass();
-  createParallelLoopTilingPass();
-
-  // Quant
-  quant::createConvertSimulatedQuantPass();
-  quant::createConvertConstPass();
-
   // Shape
 #define GEN_PASS_REGISTRATION
 #include "mlir/Dialect/Shape/Transforms/Passes.h.inc"
-
-  // SPIR-V
-  spirv::createLowerABIAttributesPass();
-  createConvertGPUToSPIRVPass();
-  createConvertStandardToSPIRVPass();
-  createLegalizeStdOpsForSPIRVLoweringPass();
-  createLinalgToSPIRVPass();
 }
 
 }  // namespace mlir
