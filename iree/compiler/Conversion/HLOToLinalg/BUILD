@@ -21,7 +21,6 @@ package(
 cc_library(
     name = "HLOToLinalg",
     srcs = [
-        "DecomposeHLOClamp.cpp",
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "Passes.cpp",
@@ -32,6 +31,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
