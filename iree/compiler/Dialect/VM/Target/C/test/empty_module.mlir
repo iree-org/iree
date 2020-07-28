@@ -1,5 +1,5 @@
 // RUN: iree-translate -iree-vm-ir-to-c-module %s | IreeFileCheck %s
 
-// CHECK: // c module stub
+// CHECK: #include "vm_c_funcs.h"
 vm.module @empty_module {
 }
