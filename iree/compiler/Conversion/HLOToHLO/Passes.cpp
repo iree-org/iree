@@ -22,8 +22,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct ConvertHLOToHLOPass
-    : public PassWrapper<ConvertHLOToHLOPass, FunctionPass> {
+struct ConvertHLOToCompatibleHLOPass
+    : public PassWrapper<ConvertHLOToCompatibleHLOPass, FunctionPass> {
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList greedyPatterns;
@@ -35,8 +35,8 @@ struct ConvertHLOToHLOPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPass() {
-  return std::make_unique<ConvertHLOToHLOPass>();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToCompatibleHLOPass() {
+  return std::make_unique<ConvertHLOToCompatibleHLOPass>();
 }
 
 }  // namespace iree_compiler

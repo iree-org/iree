@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- Passes.h - Codegen pass to convert from XLA-HLO to XLA-HLO ---------===//
+//===- Passes.h - Pass to convert from XLA-HLO to IREE supported XLA-HLO --===//
 //
-// IREE specific passes used in the XLA-HLO to XLA-HLO. Some examples may be
-// raising gather operations to torch index select or decomposing complex
-// operations input real valued equivalents.
+// IREE specific passes used to sanitize XLA-HLO to IREE compatible XLA-HLO.
+// Some examples may be raising gather operations to torch index select or
+// decomposing complex operations input real valued equivalents.
 //
 //===----------------------------------------------------------------------===//
 #ifndef IREE_COMPILER_CONVERSION_HLOTOHLO_PASSES_H_
 #define IREE_COMPILER_CONVERSION_HLOTOHLO_PASSES_H_
+
 #include <memory>
 
 #include "mlir/IR/Function.h"
@@ -33,12 +34,12 @@ namespace iree_compiler {
 std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
 
 /// Creates XLA-HLO to XLA-HLO transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToHLOPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToCompatibleHLOPass();
 
-/// Populates the patterns that convert from XLA-HLO to XLA-HLO. Imports
-/// patterns from XLA.
-void populateHLOToHLOPatterns(MLIRContext *context,
-                              OwningRewritePatternList &patterns);
+/// Populates the patterns that convert from XLA-HLO to IREE compatible XLA-HLO.
+/// Imports patterns from the Tensorflow XLA passes.
+void populateHLOToCompatibleHLOPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir
