@@ -356,7 +356,7 @@ if(CMAKE_CROSSCOMPILING)
   # We need flatc to generate some source code. When cross-compiling, we need
   # to make sure the flatc binary is configured under host environment.
   iree_declare_host_excutable(flatc BUILDONLY)
-  iree_declare_host_excutable(flatcc BUILDONLY)
+  iree_declare_host_excutable(flatcc_cli BUILDONLY)
 
   # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
   # binary in BuildFlatBuffers().
@@ -371,14 +371,17 @@ if(CMAKE_CROSSCOMPILING)
     DEPENDS iree_host_build_flatc
     COMMENT "Installing host flatc..."
   )
-  add_custom_target(iree_host_flatcc
+  add_custom_target(iree_host_flatcc_cli
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different
-        "${IREE_HOST_BINARY_ROOT}/third_party/flatcc/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
-        "${IREE_HOST_BINARY_ROOT}/bin"
-    DEPENDS iree_host_build_flatcc
+        "${PROJECT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
+        "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli"
+    DEPENDS iree_host_build_flatcc_cli
     COMMENT "Installing host flatcc..."
   )
+else()
+  # TODO: unify flatc and flatcc handling to the same mechanism.
+  add_executable(iree_host_flatcc_cli ALIAS flatcc_cli)
 endif()
 
 if(${IREE_BUILD_COMPILER})

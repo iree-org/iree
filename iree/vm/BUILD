@@ -59,11 +59,10 @@ cc_library(
         ":value",
         "//iree/base:alignment",
         "//iree/base:api",
-        "//iree/base:flatbuffer_util",
+        "//iree/base:logging",
         "//iree/base:target_platform",
-        "//iree/schemas:bytecode_module_def_cc_fbs",
-        "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_absl//absl/strings",
+        "//iree/schemas:bytecode_module_def_c_fbs",
+        "@com_github_dvidelabs_flatcc//:runtime",
     ],
 )
 

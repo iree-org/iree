@@ -14,6 +14,18 @@
 
 iree_add_all_subdirs()
 
+flatbuffer_c_library(
+  NAME
+    bytecode_module_def_c_fbs
+  SRCS
+    "bytecode_module_def.fbs"
+  FLATCC_ARGS
+    "--reader"
+    "--builder"
+    "--verifier"
+  PUBLIC
+)
+
 flatbuffer_cc_library(
   NAME
     bytecode_module_def_cc_fbs

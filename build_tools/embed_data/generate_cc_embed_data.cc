@@ -110,14 +110,12 @@ bool GenerateImpl(const std::string& impl_file,
                   const std::vector<std::string>& input_files,
                   const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
+  f << "#include <cstdalign>\n";
   f << "#include <cstddef>\n";
   GenerateTocStruct(f);
   GenerateNamespaceOpen(f);
-  f << "static const struct ::iree::FileToc toc[] = {\n";
-  assert(input_files.size() == toc_files.size());
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
-    f << "  {";
-    f << "\"" << absl::CEscape(toc_files[i]) << "\",\n";
+    f << "alignas(alignof(void*)) static char const file_" << i << "[] = {\n";
     std::string contents;
     if (!SlurpFile(input_files[i], &contents)) {
       std::cerr << "Error reading file " << input_files[i] << "\n";
@@ -130,7 +128,16 @@ bool GenerateImpl(const std::string& impl_file,
       f << "\"" << absl::CHexEscape(line) << "\"\n";
       remaining_contents = remaining_contents.substr(line.size());
     }
-    f << "\"\\0\", " << contents.size() << "},\n";
+    f << "};\n";
+  }
+  f << "static const struct ::iree::FileToc toc[] = {\n";
+  assert(input_files.size() == toc_files.size());
+  for (size_t i = 0, e = input_files.size(); i < e; ++i) {
+    f << "  {\n";
+    f << "    \"" << absl::CEscape(toc_files[i]) << "\",\n";
+    f << "    file_" << i << ",\n";
+    f << "    sizeof(file_" << i << ") - 1\n";
+    f << "  },\n";
   }
   f << "  {nullptr, nullptr, 0},\n";
   f << "};\n";
