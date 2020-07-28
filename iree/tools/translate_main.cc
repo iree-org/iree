@@ -53,7 +53,7 @@ static llvm::cl::opt<std::string> outputFilename(
 
 static llvm::cl::opt<bool> splitInputFile(
     "split-input-file",
-    llvm::cl::desc("Split the input file into pieces and "
+    llvm::cl::desc("Split the input file into pieces and <test> "
                    "process each chunk independently"),
     llvm::cl::init(false));
 
