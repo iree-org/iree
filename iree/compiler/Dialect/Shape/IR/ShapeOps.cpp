@@ -321,7 +321,9 @@ LogicalResult FromExtentTensorOp::inferReturnTypes(
     SmallVectorImpl<Type> &inferredReturnTypes) {
   auto inputType = operands[0].getType().dyn_cast<RankedTensorType>();
   if (!inputType || !isValidTensorOfExtents(inputType)) {
-    return failure();
+    return emitOptionalError(location, "Invalid input type, ",
+                             operands[0].getType(),
+                             ", for from_extent_tensor op");
   }
   SmallVector<int64_t, 6> extents(inputType.getDimSize(0),
                                   static_cast<int64_t>(-1));

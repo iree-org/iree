@@ -26,8 +26,15 @@ SDL_DEFAULT_SRC_EXCLUDES = [
     "src/render/direct3d*/**",
     "src/render/SDL_d3d*",
     "src/haptic/windows/**",
+    "src/locale/windows/**",
+    "src/locale/winrt/**",
+    # Ignore Android and Emscripten locales
+    "src/locale/android/**",
+    "src/locale/emscripten/**",
     # Remove support for QNX
     "src/video/qnx/**",
+    # No dbus -> don't try to compile this file
+    "src/core/linux/SDL_fcitx.c",
 ]
 
 sdl_sources = select({
@@ -42,6 +49,9 @@ sdl_sources = select({
             # Ignore Linux/Unix
             "src/core/linux/**",
             "src/core/unix/**",
+            # Ignore Android and Emscripten locales
+            "src/locale/android/**",
+            "src/locale/emscripten/**",
             # Ignore thread (exclude for thread/windows)
             "src/thread/**",
             # Remove support for QNX
@@ -86,6 +96,7 @@ sdl_headers = [
     "include/SDL_keyboard.h",
     "include/SDL_keycode.h",
     "include/SDL_loadso.h",
+    "include/SDL_locale.h",
     "include/SDL_log.h",
     "include/SDL_main.h",
     "include/SDL_messagebox.h",

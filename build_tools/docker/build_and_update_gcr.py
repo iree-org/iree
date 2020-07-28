@@ -33,9 +33,13 @@ IMAGES_TO_DEPENDENCIES = {
     'bazel': [],
     'bazel-bindings': ['bazel'],
     'bazel-tensorflow': ['bazel-bindings'],
+    'bazel-nvidia': ['bazel-tensorflow'],
+    'bazel-swiftshader': ['bazel-tensorflow'],
     'cmake': [],
     'cmake-android': ['cmake'],
     'cmake-nvidia': ['cmake'],
+    'cmake-vulkan': ['cmake'],
+    'cmake-swiftshader': ['cmake-vulkan'],
     'rbe-toolchain': [],
 }
 

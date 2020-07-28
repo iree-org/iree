@@ -1,6 +1,4 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Deliberately blank as everything necessary is configured in common files, but
-# file must still exist to match corresponding (Google internal) job
-# configurations that trigger the builds.
+
+if(${IREE_ENABLE_EMITC})
+  iree_add_all_subdirs()
+  
+  iree_cc_library(
+    NAME
+      C
+    HDRS
+      "CModuleTarget.h"
+    SRCS
+      "CModuleTarget.cpp"
+      "TranslationRegistration.cpp"
+    DEPS
+      LLVMSupport
+      MLIRIR
+      MLIRPass
+      MLIRSupport
+      iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Conversion::VMToEmitC
+    PUBLIC
+  )
+endif()
