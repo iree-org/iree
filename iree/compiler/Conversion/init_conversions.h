@@ -27,7 +27,7 @@ namespace iree_compiler {
 // expects all the possible conversions to be made available to the context
 // automatically.
 
-inline void registerHLOToHLOPasses() { createHLOToHLOPass(); }
+inline void registerHLOToHLOPasses() { createHLOToCompatibleHLOPass(); }
 
 inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
