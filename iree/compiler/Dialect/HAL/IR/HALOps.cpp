@@ -1066,7 +1066,7 @@ static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
         auto &conditionRegion = std::get<1>(it);
         p.printAttribute(conditionAttr);
         p << "(";
-        auto regionOperands = conditionRegion.front().getArguments();
+        auto regionOperands = conditionRegion.getArguments();
         auto regionArgs = op.args().slice(argOffset, regionOperands.size());
         argOffset += regionOperands.size();
         // TODO(benvanik): figure out how to parse with shadowing.
@@ -1098,7 +1098,7 @@ static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
   }
   int argOffset = 0;
   for (auto &region : op.condition_regions()) {
-    auto regionOperands = region.front().getArguments();
+    auto regionOperands = region.getArguments();
     auto regionArgs = op.args().slice(argOffset, regionOperands.size());
     argOffset += regionOperands.size();
 
