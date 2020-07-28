@@ -38,8 +38,8 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToCompatibleHLOPass();
 
 /// Populates the patterns that convert from XLA-HLO to IREE compatible XLA-HLO.
 /// Imports patterns from the Tensorflow XLA passes.
-void populateHLOToCompatibleHLOPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+void populateHLOToCompatibleHLOPatterns(MLIRContext *context,
+                                        OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir
