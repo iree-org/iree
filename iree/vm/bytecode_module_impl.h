@@ -18,11 +18,14 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifdef IREE_PLATFORM_ANDROID
+#include <stdalign.h>
+#else
 // TODO(benvanik): figure out how to make MSVC happy with C11 stdalign.h.
-// #include <stdalign.h>
 #ifdef __cplusplus
 #include <cstdalign>
 #endif  // __cplusplus
+#endif
 
 #include "iree/base/api.h"
 #include "iree/vm/builtin_types.h"
