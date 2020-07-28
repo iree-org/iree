@@ -60,7 +60,6 @@ cc_library(
     srcs = ["dylib_executable.cc"],
     hdrs = ["dylib_executable.h"],
     deps = [
-        ":memref_runtime",
         "//iree/base:dynamic_library",
         "//iree/base:file_io",
         "//iree/base:status",
@@ -87,12 +86,5 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
-    ],
-)
-
-cc_library(
-    name = "memref_runtime",
-    hdrs = [
-        "memref_runtime.h",
     ],
 )

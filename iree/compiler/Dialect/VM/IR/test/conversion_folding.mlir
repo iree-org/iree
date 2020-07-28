@@ -33,11 +33,27 @@ vm.module @ext_folds {
     vm.return %0 : i32
   }
 
+  // CHECK-LABEL: @ext_i8_i32_u_const
+  vm.func @ext_i8_i32_u_const() -> i32 {
+    // CHECK: vm.const.i32 255 : i32
+    %c = vm.const.i32 0x000000FF : i32
+    %0 = vm.ext.i8.i32.u %c : i32
+    vm.return %0 : i32
+  }
+
   // CHECK-LABEL: @ext_i16_i32_s_const
   vm.func @ext_i16_i32_s_const() -> i32 {
     // CHECK: vm.const.i32 -1 : i32
     %c = vm.const.i32 0x0000FFFF : i32
     %0 = vm.ext.i16.i32.s %c : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @ext_i16_i32_u_const
+  vm.func @ext_i16_i32_u_const() -> i32 {
+    // CHECK: vm.const.i32 65535 : i32
+    %c = vm.const.i32 0x0000FFFF : i32
+    %0 = vm.ext.i16.i32.u %c : i32
     vm.return %0 : i32
   }
 }

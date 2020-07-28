@@ -58,13 +58,9 @@ class LLVMIRTargetBackend final : public TargetBackend {
     auto executableOp = cast<IREE::HAL::ExecutableOp>(targetOp.getParentOp());
     auto entryPointOps =
         executableOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
-    const bool addCInterface = true;
     for (auto entryPointOp : entryPointOps) {
-      std::string funcName =
-          addCInterface ? "_mlir_ciface_" + std::string(entryPointOp.sym_name())
-                        : std::string(entryPointOp.sym_name());
-      llvmIrExecutableDef.entry_points.push_back(funcName);
-      createLLVMInvocationFunc(funcName, llvmModule.get());
+      llvmIrExecutableDef.entry_points.push_back(
+          std::string(entryPointOp.sym_name()));
     }
 
     // LLVMIR opt passes.
@@ -74,8 +70,9 @@ class LLVMIRTargetBackend final : public TargetBackend {
                          options_.targetTriple);
       return failure();
     }
-    if (failed(
-            runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
+    LogicalResult translationResult =
+        runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get());
+    if (failed(translationResult)) {
       return targetOp.emitError(
           "Can't build LLVMIR opt passes for ExecutableOp module");
     }

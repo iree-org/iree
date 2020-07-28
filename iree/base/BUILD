@@ -435,6 +435,15 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "time_test",
+    srcs = ["time_test.cc"],
+    deps = [
+        ":time",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],

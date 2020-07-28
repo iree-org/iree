@@ -5,8 +5,8 @@
 // CHECK-LABEL: func @f
 func @f(%arg0: tensor<?xf32>) {
   // CHECK: shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3]>
-  %0 = shape.const_shape [1, 2, 3]
-  "foo.use"(%0) : (!shape.shape) -> ()
+  %0 = shape.const_shape [1, 2, 3] : tensor<?xindex>
+  "foo.use"(%0) : (tensor<?xindex>) -> ()
   return
 }
 

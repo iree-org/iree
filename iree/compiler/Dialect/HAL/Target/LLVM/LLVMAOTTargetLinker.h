@@ -18,7 +18,7 @@
 
 #include <string>
 
-#include "iree/base/file_io.h"
+#include "iree/base/status.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
 namespace mlir {

@@ -605,9 +605,19 @@ OpFoldResult ExtI8I32SOp::fold(ArrayRef<Attribute> operands) {
       operands, [&](APInt a) { return a.trunc(8).sext(32); });
 }
 
+OpFoldResult ExtI8I32UOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return a.trunc(8).zext(32); });
+}
+
 OpFoldResult ExtI16I32SOp::fold(ArrayRef<Attribute> operands) {
   return constFoldUnaryOp<IntegerAttr>(
       operands, [&](APInt a) { return a.trunc(16).sext(32); });
+}
+
+OpFoldResult ExtI16I32UOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return a.trunc(16).zext(32); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -706,9 +716,7 @@ OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void CmpLTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpLTI32SOp, CmpGTEI32SOp>>(context);
-}
+                                              MLIRContext *context) {}
 
 OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
@@ -720,9 +728,27 @@ OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void CmpLTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<SwapInvertedCmpOps<CmpLTI32UOp, CmpGTEI32UOp>>(context);
-}
+                                              MLIRContext *context) {}
+
+namespace {
+
+/// Rewrites a vm.cmp.lte.* pseudo op to a vm.cmp.lt.* op.
+template <typename T, typename U>
+struct RewritePseudoCmpLTEToLT : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    // !(lhs > rhs)
+    auto condValue =
+        rewriter.createOrFold<U>(op.getLoc(), op.getType(), op.rhs(), op.lhs());
+    rewriter.replaceOpWithNewOp<XorI32Op>(
+        op, op.getType(), condValue,
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
+    return success();
+  }
+};
+
+}  // namespace
 
 OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
@@ -736,6 +762,7 @@ OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
 void CmpLTEI32SOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpLTEI32SOp, CmpGTI32SOp>>(context);
+  results.insert<RewritePseudoCmpLTEToLT<CmpLTEI32SOp, CmpLTI32SOp>>(context);
 }
 
 OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -750,7 +777,24 @@ OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
 void CmpLTEI32UOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpLTEI32UOp, CmpGTI32UOp>>(context);
+  results.insert<RewritePseudoCmpLTEToLT<CmpLTEI32UOp, CmpLTI32UOp>>(context);
 }
+
+namespace {
+
+/// Rewrites a vm.cmp.gt.* pseudo op to a vm.cmp.lt.* op.
+template <typename T, typename U>
+struct RewritePseudoCmpGTToLT : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    // rhs < lhs
+    rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.rhs(), op.lhs());
+    return success();
+  }
+};
+
+}  // namespace
 
 OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
@@ -764,6 +808,7 @@ OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
 void CmpGTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTI32SOp, CmpLTEI32SOp>>(context);
+  results.insert<RewritePseudoCmpGTToLT<CmpGTI32SOp, CmpLTI32SOp>>(context);
 }
 
 OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -778,7 +823,28 @@ OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
 void CmpGTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTI32UOp, CmpLTEI32UOp>>(context);
+  results.insert<RewritePseudoCmpGTToLT<CmpGTI32UOp, CmpLTI32UOp>>(context);
 }
+
+namespace {
+
+/// Rewrites a vm.cmp.gte.* pseudo op to a vm.cmp.lt.* op.
+template <typename T, typename U>
+struct RewritePseudoCmpGTEToLT : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    // !(lhs < rhs)
+    auto condValue =
+        rewriter.createOrFold<U>(op.getLoc(), op.getType(), op.lhs(), op.rhs());
+    rewriter.replaceOpWithNewOp<XorI32Op>(
+        op, op.getType(), condValue,
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
+    return success();
+  }
+};
+
+}  // namespace
 
 OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
   if (lhs() == rhs()) {
@@ -792,6 +858,7 @@ OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
 void CmpGTEI32SOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEI32SOp, CmpLTI32SOp>>(context);
+  results.insert<RewritePseudoCmpGTEToLT<CmpGTEI32SOp, CmpLTI32SOp>>(context);
 }
 
 OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -806,6 +873,7 @@ OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
 void CmpGTEI32UOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEI32UOp, CmpLTI32UOp>>(context);
+  results.insert<RewritePseudoCmpGTEToLT<CmpGTEI32UOp, CmpLTI32UOp>>(context);
 }
 
 OpFoldResult CmpNZI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1202,11 +1270,11 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
     if (op.getOperation()->getOperand(0).getType().template isa<RefType>()) {
       condValue = rewriter.template createOrFold<CmpRefOp>(
           op.getLoc(), ArrayRef<Type>{condType},
-          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+          op.getOperation()->getOperands());
     } else {
       condValue = rewriter.template createOrFold<CmpI32Op>(
           op.getLoc(), ArrayRef<Type>{condType},
-          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+          op.getOperation()->getOperands());
     }
     condValue = rewriter.createOrFold<XorI32Op>(
         op.getLoc(), condType, condValue,

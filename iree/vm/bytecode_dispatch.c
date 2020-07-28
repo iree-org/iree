@@ -209,7 +209,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 #define DECLARE_DISPATCH_OPC(ordinal, name) &&_dispatch_##name,
 #define DECLARE_DISPATCH_RSV(ordinal) &&_dispatch_unhandled,
   static const void* kDispatchTable[256] = {
-      IREE_VM_OP_TABLE(DECLARE_DISPATCH_OPC, DECLARE_DISPATCH_RSV)};
+      IREE_VM_OP_CORE_TABLE(DECLARE_DISPATCH_OPC, DECLARE_DISPATCH_RSV)};
 
 #define DISPATCH_UNHANDLED() \
   _dispatch_unhandled:       \
@@ -238,7 +238,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     return IREE_STATUS_UNIMPLEMENTED;
 
 #define DISPATCH_OP(op_name, body)      \
-  case IREE_VM_OP_##op_name:            \
+  case IREE_VM_OP_CORE_##op_name:       \
     IREE_DISPATCH_LOG_OPCODE(#op_name); \
     body;                               \
     break;
@@ -608,7 +608,9 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CAST_I32(TruncI32I8, uint8_t, uint32_t);
     DISPATCH_OP_CAST_I32(TruncI32I16, uint16_t, uint32_t);
     DISPATCH_OP_CAST_I32(ExtI8I32S, int8_t, int32_t);
+    DISPATCH_OP_CAST_I32(ExtI8I32U, uint8_t, uint32_t);
     DISPATCH_OP_CAST_I32(ExtI16I32S, int16_t, int32_t);
+    DISPATCH_OP_CAST_I32(ExtI16I32U, uint16_t, uint32_t);
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
@@ -642,12 +644,6 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CMP_I32(CmpNEI32, int32_t, !=);
     DISPATCH_OP_CMP_I32(CmpLTI32S, int32_t, <);
     DISPATCH_OP_CMP_I32(CmpLTI32U, uint32_t, <);
-    DISPATCH_OP_CMP_I32(CmpLTEI32S, int32_t, <=);
-    DISPATCH_OP_CMP_I32(CmpLTEI32U, uint32_t, <=);
-    DISPATCH_OP_CMP_I32(CmpGTI32S, int32_t, >);
-    DISPATCH_OP_CMP_I32(CmpGTI32U, uint32_t, >);
-    DISPATCH_OP_CMP_I32(CmpGTEI32S, int32_t, >=);
-    DISPATCH_OP_CMP_I32(CmpGTEI32U, uint32_t, >=);
     DISPATCH_OP(CmpNZI32, {
       int32_t operand = VM_DecOperandRegI32("operand");
       int32_t* result = VM_DecResultRegI32("result");
@@ -745,7 +741,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         target_function.module = &module->interface;
         target_function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
         target_function.ordinal = function_ordinal;
-        const iree_vm_function_descriptor_t* target_descriptor =
+        const iree_vm_FunctionDescriptor_t* target_descriptor =
             &module->function_descriptor_table[function_ordinal];
         target_function.i32_register_count =
             target_descriptor->i32_register_count;
@@ -890,6 +886,16 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
       pc = block_pc;
     });
+
+    //===------------------------------------------------------------------===//
+    // Extension trampolines
+    //===------------------------------------------------------------------===//
+
+    DISPATCH_OP(PrefixExtI64, { return IREE_STATUS_UNIMPLEMENTED; });
+
+    DISPATCH_OP(PrefixExtF32, { return IREE_STATUS_UNIMPLEMENTED; });
+
+    DISPATCH_OP(PrefixExtF64, { return IREE_STATUS_UNIMPLEMENTED; });
 
     // NOLINTNEXTLINE(misc-static-assert)
     DISPATCH_UNHANDLED();

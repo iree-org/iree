@@ -118,6 +118,8 @@ void populateHALBufferViewToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.buffer_view.dim");
   patterns.insert<BufferViewDimsOpConversion>(
       context, importSymbols, typeConverter, "hal.buffer_view.dims");
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewTraceOp>>(
+      context, importSymbols, typeConverter, "hal.buffer_view.trace");
 }
 
 }  // namespace iree_compiler

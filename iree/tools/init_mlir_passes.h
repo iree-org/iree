@@ -33,6 +33,7 @@
 #include "mlir/Dialect/Quant/Passes.h"
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -135,6 +136,10 @@ inline void registerMlirPasses() {
   // Quant
   quant::createConvertSimulatedQuantPass();
   quant::createConvertConstPass();
+
+  // Shape
+#define GEN_PASS_REGISTRATION
+#include "mlir/Dialect/Shape/Transforms/Passes.h.inc"
 
   // SPIR-V
   spirv::createLowerABIAttributesPass();

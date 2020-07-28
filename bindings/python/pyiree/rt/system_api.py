@@ -81,14 +81,12 @@ def _create_default_iree_driver(
       device = driver.create_default_device()
     except Exception as ex:
       print(
-          "Could not create default driver device %s: %r" % (
-              driver_name, ex),
+          "Could not create default driver device %s: %r" % (driver_name, ex),
           file=sys.stderr)
       driver_exceptions[driver_name] = ex
       continue
 
-    print(
-        "Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
+    print("Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
     return driver
 
   # All failed.

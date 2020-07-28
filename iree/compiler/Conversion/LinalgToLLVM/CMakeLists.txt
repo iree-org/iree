@@ -21,7 +21,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "ConvertToLLVM.cpp"
-    "HALInterfaceToMemrefArguments.cpp"
+    "MatMulVectorization.cpp"
     "Passes.cpp"
   DEPS
     MLIRAffineToStandard
@@ -35,8 +35,10 @@ iree_cc_library(
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIRTransforms
+    MLIRVector
     MLIRVectorToLLVM
     MLIRVectorToSCF
+    iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect

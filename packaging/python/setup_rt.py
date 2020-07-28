@@ -35,7 +35,12 @@ def run():
   setup_kwargs = common_setup.get_setup_defaults(
       sub_project="rt",
       description="IREE Runtime Components (for executing compiled programs)")
-  common_setup.setup(packages=packages, **setup_kwargs)
+  common_setup.setup(
+      packages=packages,
+      ext_modules=[
+          setuptools.Extension(name="pyiree.rt.binding", sources=[]),
+      ],
+      **setup_kwargs)
 
 
 if __name__ == "__main__":

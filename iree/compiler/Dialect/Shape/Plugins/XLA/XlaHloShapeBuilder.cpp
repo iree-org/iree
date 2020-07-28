@@ -308,6 +308,130 @@ Value rewriteSelectOp(RankedShapeType resultShape, SelectOp selectOp,
   return builder.create<MakeRankedShapeOp>(loc, resultShape, dynamicDims);
 }
 
+Value rewriteTorchIndexSelect(RankedShapeType resultShape,
+                              TorchIndexSelectOp torchIndexSelectOp,
+                              OpBuilder &builder) {
+  if (!torchIndexSelectOp) return nullptr;
+  auto loc = torchIndexSelectOp.getLoc();
+
+  int64_t resultShapeRank = resultShape.getRank();
+  auto paramsType =
+      torchIndexSelectOp.input().getType().dyn_cast<RankedTensorType>();
+  auto indicesType =
+      torchIndexSelectOp.index().getType().dyn_cast<RankedTensorType>();
+  if (!paramsType || !indicesType) {
+    return nullptr;
+  }
+
+  auto axis = torchIndexSelectOp.dim();
+  auto batchDim = torchIndexSelectOp.batch_dims();
+  int64_t paramsRank = paramsType.getRank();
+  int64_t indicesRank = indicesType.getRank();
+
+  std::vector<int64_t> shape(paramsType.getShape());
+  int64_t axisValue = axis.getSExtValue();
+  int64_t batchDimValue = batchDim.getSExtValue();
+
+  // For neg axis values, we wrap around params,
+  // e.g. axis = -1 => params[:-1]
+  if (axisValue < 0) {
+    axisValue += paramsRank;
+  }
+  if (batchDimValue < 0) {
+    batchDimValue += indicesRank;
+  }
+
+  // params must be at least rank axis + 1
+  if (paramsRank < axisValue + 1) {
+    return nullptr;
+  }
+
+  auto paramsShapeValue = builder.create<GetRankedShapeOp>(
+      loc, RankedShapeType::get(paramsType.getShape(), builder.getContext()),
+      torchIndexSelectOp.input());
+  auto indicesShapeValue = builder.create<GetRankedShapeOp>(
+      loc, RankedShapeType::get(indicesType.getShape(), builder.getContext()),
+      torchIndexSelectOp.index());
+
+  SmallVector<Value, 4> dynamicDims;
+#define GENERATE_RANKED_DIM_OP(value, index)                                   \
+  do {                                                                         \
+    auto dimValue = builder.create<RankedDimOp>(                               \
+        loc, builder.getIndexType(), value, builder.getI64IntegerAttr(index)); \
+    dynamicDims.push_back(dimValue);                                           \
+  } while (0)
+
+  if (indicesRank == 0) {
+    // Scalar indices (output is rank(params) - 1).
+    if (resultShapeRank != paramsRank - 1) {
+      return nullptr;
+    }
+
+    // params.shape[:axis] + params.shape[axis+1:]
+    for (int64_t i = 0; i < paramsRank; ++i) {
+      if ((i == axisValue) || (i < axisValue && !resultShape.isDimDynamic(i)) ||
+          (i > axisValue && !resultShape.isDimDynamic(i - 1)))
+        continue;
+      GENERATE_RANKED_DIM_OP(paramsShapeValue, i);
+    }
+  } else if (indicesRank == 1) {
+    // Vector indices (output is rank(params)).
+    // Copy indices.shape into params.shape[axis]
+    if (resultShapeRank != paramsRank) {
+      return nullptr;
+    }
+
+    // params.shape[:axis] + indices.shape[batch_dims:]
+    //   + params.shape[indicesRank-batchDim+axisValue:]
+    int resultShapeIndex = 0;
+    // params.shape[:axis]
+    for (int64_t i = 0; i < axisValue; ++i) {
+      if (!resultShape.isDimDynamic(resultShapeIndex++)) continue;
+      GENERATE_RANKED_DIM_OP(paramsShapeValue, i);
+    }
+    // indices.shape[:batchDim]
+    for (int64_t i = batchDimValue;
+         i < indicesRank && resultShapeIndex < resultShapeRank; ++i) {
+      if (!resultShape.isDimDynamic(resultShapeIndex++)) continue;
+      GENERATE_RANKED_DIM_OP(indicesShapeValue, i);
+    }
+    // params.shape[indicesRank-batchDim+axisValue:]
+    // resultShapeIndex == indicesRank-batchDim+axisValue
+    for (int64_t i = resultShapeIndex; i < resultShapeRank; ++i) {
+      if (!resultShape.isDimDynamic(resultShapeIndex++)) continue;
+      GENERATE_RANKED_DIM_OP(paramsShapeValue, i);
+    }
+  } else {
+    // params.shape[:axis] + indices.shape[batch_dims:] + params.shape[axis +
+    // 1:]
+    // The expected rank is (paramsRank-1) + (indicesRank-batchDim)
+    auto expectedRank = paramsRank - 1 + indicesRank - batchDimValue;
+    if (resultShapeRank != expectedRank) {
+      return nullptr;
+    }
+
+    int resultShapeIndex = 0;
+    for (int64_t i = 0; i < axisValue; ++i) {
+      if (!resultShape.isDimDynamic(resultShapeIndex++)) continue;
+      GENERATE_RANKED_DIM_OP(paramsShapeValue, i);
+    }
+
+    for (int64_t i = batchDimValue; i < indicesRank; ++i) {
+      if (!resultShape.isDimDynamic(resultShapeIndex++)) continue;
+      GENERATE_RANKED_DIM_OP(indicesShapeValue, i);
+    }
+
+    for (int64_t i = axisValue + 1;
+         i < paramsRank && resultShapeIndex < resultShapeRank; ++i) {
+      if (!resultShape.isDimDynamic(resultShapeIndex++)) continue;
+      GENERATE_RANKED_DIM_OP(paramsShapeValue, i);
+    }
+  }
+#undef GENERATE_RANKED_DIM_OP
+
+  return builder.create<MakeRankedShapeOp>(loc, resultShape, dynamicDims);
+}
+
 }  // namespace
 
 // Creates a custom op shape builder for XLA-HLO ops that are not otherwise
@@ -340,6 +464,8 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   b.insertOpRankedShapeBuilder<TransposeOp>(rewriteTranspose);
   b.insertOpRankedShapeBuilder<mhlo::DotGeneralOp>(rewriteDotGeneral);
   b.insertOpRankedShapeBuilder<mhlo::DynamicReshapeOp>(rewriteDynamicReshape);
+  b.insertOpRankedShapeBuilder<mhlo::TorchIndexSelectOp>(
+      rewriteTorchIndexSelect);
 }
 
 }  // namespace mhlo

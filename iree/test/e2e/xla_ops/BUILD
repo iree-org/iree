@@ -62,6 +62,7 @@ iree_check_single_backend_test_suite(
         # "gather.mlir",
         # "gather_concat.mlir",
         #
+        "iota.mlir",
         "log.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -82,9 +83,7 @@ iree_check_single_backend_test_suite(
         "tanh.mlir",
         "torch_index_select.mlir",
         "transpose.mlir",
-
-        # TODO(#2022): fails on real devices.
-        # "while.mlir",
+        "while.mlir",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
@@ -108,6 +107,7 @@ iree_check_single_backend_test_suite(
         "divide.mlir",
         "dot.mlir",
         "exponential.mlir",
+        "iota.mlir",
         "log.mlir",
         "maximum.mlir",
         "minimum.mlir",

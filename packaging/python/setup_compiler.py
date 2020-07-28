@@ -39,7 +39,12 @@ def run():
   print("Found packages:", packages)
   setup_kwargs = common_setup.get_setup_defaults(
       sub_project="compiler", description="IREE Generic Compiler")
-  common_setup.setup(packages=packages, **setup_kwargs)
+  common_setup.setup(
+      packages=packages,
+      ext_modules=[
+          setuptools.Extension(name="pyiree.compiler.binding", sources=[]),
+      ],
+      **setup_kwargs)
 
 
 if __name__ == "__main__":

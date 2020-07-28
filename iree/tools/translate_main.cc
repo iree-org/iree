@@ -38,6 +38,11 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Translation.h"
 
+#ifdef IREE_HAVE_EMITC_DIALECT
+#include "emitc/InitDialect.h"
+#include "emitc/InitTranslation.h"
+#endif  // IREE_HAVE_EMITC_DIALECT
+
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
                                                 llvm::cl::init("-"));
@@ -56,12 +61,18 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
   mlir::registerMlirDialects();
+#ifdef IREE_HAVE_EMITC_DIALECT
+  mlir::registerEmitCDialect();
+#endif  // IREE_HAVE_EMITC_DIALECT
   mlir::registerXLADialects();
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
   mlir::registerMlirTranslations();
+#ifdef IREE_HAVE_EMITC_DIALECT
+  mlir::registerEmitCTranslation();
+#endif  // IREE_HAVE_EMITC_DIALECT
   mlir::iree_compiler::registerIreeTranslations();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
 

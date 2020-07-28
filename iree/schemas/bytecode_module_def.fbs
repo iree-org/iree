@@ -43,7 +43,7 @@ table FunctionSignatureDef {
   // Function level reflection attributes.
   // These are typically used to communicate additional ABI metadata needed
   // for dynamic invocation and host language mapping.
-  // See: docs/function_abi.md
+  // See: docs/design_docs/function_abi.md
   reflection_attrs:[ReflectionAttrDef];
 }
 
@@ -93,7 +93,7 @@ table RodataSegmentDef {
   compression_type:CompressionTypeDef;
 
   // Contents in a format defined by CompressionTypeDef.
-  data:[uint8] (force_align: 16);
+  data:[uint8];
 }
 
 // Read-write data segment.
@@ -117,6 +117,7 @@ struct FunctionDescriptor {
   // Offset and length within the larger bytecode data block.
   bytecode_offset:int32;
   bytecode_length:int32;
+  // TODO(benvanik): remove counts and embed directly in bytecode.
   // Total number of i32 registers used by the function.
   i32_register_count:int16;
   // Total number of ref_ptr registers used by the function.
@@ -175,7 +176,7 @@ table BytecodeModuleDef {
   function_descriptors:[FunctionDescriptor];
 
   // Bytecode contents. One large buffer containing all of the function op data.
-  bytecode_data:[uint8] (force_align: 4);
+  bytecode_data:[uint8];
 }
 
 root_type BytecodeModuleDef;

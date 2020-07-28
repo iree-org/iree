@@ -21,6 +21,9 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 void registerToVMBytecodeTranslation();
+#ifdef IREE_HAVE_EMITC_DIALECT
+void registerToCTranslation();
+#endif  // IREE_HAVE_EMITC_DIALECT
 }  // namespace VM
 }  // namespace IREE
 
@@ -31,6 +34,10 @@ void registerToVMBytecodeTranslation();
 inline void registerVMTargets() {
   static bool init_once = []() {
     IREE::VM::registerToVMBytecodeTranslation();
+#ifdef IREE_HAVE_EMITC_DIALECT
+    IREE::VM::registerToCTranslation();
+#endif  // IREE_HAVE_EMITC_DIALECT
+
     return true;
   }();
   (void)init_once;

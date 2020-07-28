@@ -64,6 +64,8 @@ EXPLICIT_TARGET_MAPPING = {
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_google_flatbuffers//:flatbuffers": ["flatbuffers"],
+    "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
+    "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
     "@sdl2//:SDL2": ["SDL2-static"]

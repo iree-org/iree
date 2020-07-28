@@ -39,22 +39,32 @@ def set_random_seed(seed=0):
   np.random.seed(seed)
 
 
+def backends_to_str(target_backends):
+  """Creates a flattened and normalized string representing target_backends."""
+  normalized_backends = []
+  for backend in target_backends:
+    # Remove unusual characters and ensure names don't end or start in "_".
+    backend = re.sub("[^0-9a-zA-Z_]+", "_", backend)
+    normalized_backends.append(backend.strip("_"))
+  return "__".join(normalized_backends)
+
+
 def compile_tf_module(tf_module,
                       target_backends=(),
                       exported_names=(),
                       artifacts_dir=None):
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
-  The artifact this creates is not callable. See IreeCompiledModule.compile(...)
-  for an API that returns a module that can be called without any further steps.
+  The artifact this creates is not callable. See IreeCompiledModule for an API
+  that returns a module that can be called without any further steps.
 
   If artifacts_dir is provided then the following artifacts will be saved:
     saved_model:
       A TF SavedModel directory containing the files used translate the
       tf.Module into an IREE module.
-    tf_input__backends.mlir:
+    tf_input.mlir:
       MLIR for the module in TF's input dialect.
-    iree_input__backends.mlir:
+    iree_input.mlir:
       The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
     compiled__backends.vmfb:
       A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
@@ -77,14 +87,6 @@ def compile_tf_module(tf_module,
     # We break up the compilation here so we can save intermediary artifacts.
     compiler_context = compiler.Context()
 
-    if artifacts_dir is not None:
-      normalized_backends = []
-      for backend in target_backends:
-        # Remove unusual characters and ensure names don't end or start in "_".
-        backend = re.sub("[^0-9a-zA-Z_]+", "_", backend)
-        normalized_backends.append(backend.strip("_"))
-      backends_string = "__".join(normalized_backends)
-
     # Convert the tf_module into raw TF input MLIR.
     compiler_module = compiler.tf_load_saved_model(
         sm_path,
@@ -93,8 +95,7 @@ def compile_tf_module(tf_module,
         pass_pipeline=())
 
     if artifacts_dir is not None:
-      tf_mlir_path = os.path.join(artifacts_dir,
-                                  f"tf_input__{backends_string}.mlir")
+      tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
       logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
       with open(tf_mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
@@ -103,16 +104,15 @@ def compile_tf_module(tf_module,
     compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
 
     if artifacts_dir is not None:
-      iree_mlir_path = os.path.join(artifacts_dir,
-                                    f"iree_input__{backends_string}.mlir")
+      iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
       logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
       with open(iree_mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
 
     compiled_module = compiler_module.compile(target_backends=target_backends)
     if artifacts_dir is not None:
-      compiled_path = os.path.join(artifacts_dir,
-                                   f"compiled__{backends_string}.vmfb")
+      compiled_name = f"compiled__{backends_to_str(target_backends)}.vmfb"
+      compiled_path = os.path.join(artifacts_dir, compiled_name)
       logging.info("Saving compiled IREE module to: %s", compiled_path)
       with open(compiled_path, "wb") as f:
         f.write(compiled_module)
@@ -133,51 +133,29 @@ def compile_tf_module(tf_module,
 
 
 class CompiledModule(object):
-  """Base class for the TF and IREE compiled module facades."""
-
-  @staticmethod
-  def compile(module_class,
-              backend_info,
-              exported_names=(),
-              artifacts_dir=None):
-    """Compile a tf.Module using the CompiledModule subclass in backend_info.
-
-    Args:
-      module_class: the tf.Module subclass to compile.
-      backend_info: an element of BackendInfo corresponding to the backend to
-        compile to. If a TF 'backend' is provided then the module is wrapped in
-        a TfCompiledModule.
-      exported_names: an optional iterable of strings representing which of the
-        module_class's functions to compile. If exported_names is empty all
-        functions will be compiled.
-      artifacts_dir: an optional path to save compilation artifacts to.
-    """
-    compile = backend_info.CompiledModule.compile
-    return compile(module_class, backend_info, exported_names, artifacts_dir)
-
-  @staticmethod
-  def from_existing(module):
-    """Duplicates 'module' with the tf.Module's state without recompiling."""
-    # Use the backend_info attr to determine which subclass' constructor to use.
-    from_existing = module._backend_info.CompiledModule.from_existing
-    return from_existing(module)
+  """Base class for the TF and IREE compiled modules."""
 
   def __init__(self, module_class, backend_info, exported_names, artifacts_dir):
-    """Default constructor – use `compile` or `from_existing` instead."""
+    """Shared base constructor – not useful on its own."""
     self._module_class = module_class
     self._backend_info = backend_info
     self._exported_names = exported_names
     self._artifacts_dir = artifacts_dir
 
+  def create_reinitialized(self):
+    """Duplicates this module with its initial state without recompiling."""
+    raise NotImplementedError()
+
 
 class IreeCompiledModule(CompiledModule):
   """Iree compiled module."""
 
-  @staticmethod
-  def compile(module_class,
-              backend_info,
-              exported_names=(),
-              artifacts_dir=None):
+  def __init__(self,
+               module_class,
+               backend_info,
+               exported_names=[],
+               artifacts_dir=None,
+               _create_reinitialized_args=None):
     """Compile a tf.Module to the target backend in backend_info.
 
     Args:
@@ -189,30 +167,9 @@ class IreeCompiledModule(CompiledModule):
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
     """
-    return IreeCompiledModule(module_class, backend_info, exported_names,
-                              artifacts_dir)
-
-  @staticmethod
-  def from_existing(module):
-    """Duplicates 'module' with the tf.Module's state without recompiling."""
-    default_args = [
-        module._module_class, module._backend_info, module._exported_names,
-        module._artifacts_dir
-    ]
-    from_existing_args = [module._module_blob, module._module, module._config]
-    return IreeCompiledModule(*default_args, from_existing_args)
-
-  def __init__(self,
-               module_class,
-               backend_info,
-               exported_names,
-               artifacts_dir,
-               _from_existing_args=None):
-    """Default constructor – use `compile` or `from_existing` instead."""
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
-    if _from_existing_args is None:
-      # Called from IreeCompiledModule.compile(...)
+    if _create_reinitialized_args is None:
       self._module_blob = compile_tf_module(
           tf_module=module_class(),
           target_backends=backend_info.iree_compiler_targets,
@@ -221,12 +178,21 @@ class IreeCompiledModule(CompiledModule):
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.iree_driver)
     else:
-      # Called from IreeCompiledModule.from_existing(module)
-      self._module_blob, self._module, self._config = _from_existing_args
+      # Called from self.create_reinitialized()
+      self._module_blob, self._module, self._config = _create_reinitialized_args
 
     # Holds all of the module's mutable state.
     self._context = rt.SystemContext(
         modules=[self._module], config=self._config)
+
+  def create_reinitialized(self):
+    """Duplicates this module with its initial state without recompiling."""
+    default_args = [
+        self._module_class, self._backend_info, self._exported_names,
+        self._artifacts_dir
+    ]
+    create_reinitialized_args = [self._module_blob, self._module, self._config]
+    return IreeCompiledModule(*default_args, create_reinitialized_args)
 
   def __getattr__(self, attr):
     # Try to resolve it as a function.
@@ -253,11 +219,11 @@ class TfCompiledModule(CompiledModule):
   normalize TensorFlow's output to Numpy.
   """
 
-  @staticmethod
-  def compile(module_class,
-              backend_info,
-              exported_names=(),
-              artifacts_dir=None):
+  def __init__(self,
+               module_class,
+               backend_info,
+               exported_names=[],
+               artifacts_dir=None):
     """Wrap a tf.Module in a TFCompiledModule facade.
 
     Args:
@@ -269,22 +235,13 @@ class TfCompiledModule(CompiledModule):
       artifacts_dir: an optional path to save compilation artifacts to. Has no
         effect for this subclass as nothing is compiled.
     """
-    return TfCompiledModule(module_class, backend_info, exported_names,
-                            artifacts_dir)
-
-  @staticmethod
-  def from_existing(module):
-    """Duplicates 'module's facade with the starting state of module_class."""
-    duplicate_module = TfCompiledModule(module._module_class,
-                                        module._backend_info,
-                                        module._exported_names,
-                                        module._artifacts_dir)
-    return duplicate_module
-
-  def __init__(self, module_class, backend_info, exported_names, artifacts_dir):
-    """Default constructor – use `compile` or `from_existing` instead."""
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
     self._tf_module = module_class()
+
+  def create_reinitialized(self):
+    """Duplicates this module with the starting state of module_class."""
+    return TfCompiledModule(self._module_class, self._backend_info,
+                            self._exported_names, self._artifacts_dir)
 
   def __getattr__(self, attr):
     # Try to resolve it as a function.

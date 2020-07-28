@@ -337,7 +337,7 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
   mlir::applyPassManagerCLOptions(pass_manager);
   auto crash_reproducer_path = context_->crash_reproducer_path();
   if (crash_reproducer_path) {
-    pass_manager.enableCrashReproducerGeneration(*crash_reproducer_path);
+    pass_manager.enableCrashReproducerGeneration(*crash_reproducer_path, true);
   }
 
   mlir::iree_compiler::IREE::HAL::TargetOptions executable_options;

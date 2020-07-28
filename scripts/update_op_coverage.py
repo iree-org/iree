@@ -30,14 +30,15 @@ FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
 # TODO(scotttodd): LLVM AOT (dylib-llvm-aot) HAL target(s)
-OP_COVERAGE_DESCRIPTION = """# HLO Op Coverage
+OP_COVERAGE_DESCRIPTION = """# XLA HLO Op Coverage
 There are three backend [targets](https://github.com/google/iree/tree/main/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
 - llvm-ir
 - vulkan-spirv
 
-The table shows the supported XLA HLO ops on each backend.
+The table shows the supported XLA HLO ops on each backend. It is auto-generated
+from IREE's test status.
 
 """
 
@@ -117,7 +118,7 @@ def generate_table(build_dir):
 if __name__ == '__main__':
   args = parse_arguments()
   content = generate_table(args.build_dir)
-  table_path = os.path.join(args.build_dir, 'doc', 'op_coverage.md')
+  table_path = os.path.join(args.build_dir, 'doc', 'xla_op_coverage.md')
   with open(table_path, 'w', encoding='utf-8') as f:
     f.write(OP_COVERAGE_DESCRIPTION)
     f.write(content)

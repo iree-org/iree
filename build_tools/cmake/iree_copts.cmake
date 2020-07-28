@@ -183,10 +183,19 @@ iree_select_compiler_opts(FLATBUFFERS_COPTS
 list(APPEND IREE_DEFAULT_COPTS ${FLATBUFFERS_COPTS})
 
 #-------------------------------------------------------------------------------
-# Third party: glslang
+# Third party: flatcc
 #-------------------------------------------------------------------------------
 
-set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
+set(FLATCC_TEST OFF CACHE BOOL "" FORCE)
+set(FLATCC_CXX_TEST OFF CACHE BOOL "" FORCE)
+set(FLATCC_REFLECTION OFF CACHE BOOL "" FORCE)
+set(FLATCC_ALLOW_WERROR OFF CACHE BOOL "" FORCE)
+
+if(CMAKE_CROSSCOMPILING)
+  set(FLATCC_RTONLY ON CACHE BOOL "" FORCE)
+else()
+  set(FLATCC_RTONLY OFF CACHE BOOL "" FORCE)
+endif()
 
 #-------------------------------------------------------------------------------
 # Third party: gtest
@@ -241,3 +250,15 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
 )
+
+#-------------------------------------------------------------------------------
+# Third party: mlir-emitc
+#-------------------------------------------------------------------------------
+
+if(IREE_ENABLE_EMITC)
+  list(APPEND IREE_COMMON_INCLUDE_DIRS
+    ${PROJECT_SOURCE_DIR}/third_party/mlir-emitc/include
+    ${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include
+  )
+  add_definitions(-DIREE_HAVE_EMITC_DIALECT)
+endif()
