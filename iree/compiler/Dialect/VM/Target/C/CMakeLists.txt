@@ -12,23 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (EmitC is only buildable with CMake)
 
-iree_add_all_subdirs()
-
-if(IREE_ENABLE_EMITC)
-  set(IREE_VM_CONDITIONAL_TARGETS
-    iree::compiler::Dialect::VM::Target::C
+if(${IREE_ENABLE_EMITC})
+  iree_add_all_subdirs()
+  
+  iree_cc_library(
+    NAME
+      C
+    HDRS
+      "CModuleTarget.h"
+    SRCS
+      "CModuleTarget.cpp"
+      "TranslationRegistration.cpp"
+    DEPS
+      LLVMSupport
+      MLIRIR
+      MLIRPass
+      MLIRSupport
+      iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Conversion::VMToEmitC
+    PUBLIC
   )
 endif()
-
-iree_cc_library(
-  NAME
-    init_targets
-  HDRS
-    "init_targets.h"
-  DEPS
-    iree::compiler::Dialect::VM::Target::Bytecode
-    ${IREE_VM_CONDITIONAL_TARGETS}
-  PUBLIC
-)
