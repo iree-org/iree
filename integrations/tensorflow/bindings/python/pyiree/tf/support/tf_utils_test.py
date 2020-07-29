@@ -108,13 +108,9 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual('f64', tf_utils.to_mlir_type(np.dtype('float64')))
 
   def test_save_input_values(self):
-    inputs = [
-        np.array([1, 2], dtype=np.int32),
-    ]
+    inputs = [np.array([1, 2], dtype=np.int32)]
     self.assertEqual('2xi32=1 2', tf_utils.save_input_values(inputs))
-    inputs = [
-        np.array([1, 2], dtype=np.float32),
-    ]
+    inputs = [np.array([1, 2], dtype=np.float32)]
     self.assertEqual('2xf32=1.0 2.0', tf_utils.save_input_values(inputs))
 
 

@@ -49,35 +49,34 @@ def backends_to_str(target_backends):
   return "__".join(normalized_backends)
 
 
-def to_mlir_type(dt):
-  """Returns a string that denotes the type `dt` in MLIR style"""
-  s = ""
-  if np.issubdtype(dt, np.integer):
-    s = "i"
-  elif np.issubdtype(dt, np.floating):
-    s = "f"
+def to_mlir_type(dtype):
+  """Returns a string that denotes the type `dtype` in MLIR style."""
+  bits = dtype.itemsize * 8
+  if np.issubdtype(dtype, np.integer):
+    return f"i{bits}"
+  elif np.issubdtype(dtype, np.floating):
+    return f"f{bits}"
   else:
-    raise TypeError("expected integer or floating type")
-  s += str(dt.itemsize * 8)
-  return s
+    raise TypeError(f"Expected integer or floating type, but got {dtype}")
 
 
 def save_input_values(inputs, artifacts_dir=None):
   """Saves input values with IREE tools format if `artifacts_dir` is set."""
-  res = []
-  for i in inputs:
-    shape = [str(dim) for dim in list(i.shape)]
-    shape.append(to_mlir_type(i.dtype))
-    s = "x".join(shape) + "=" + " ".join([str(x) for x in i.flatten()])
-    res.append(s)
-  res = "\n".join(res)
+  result = []
+  for array in inputs:
+    shape = [str(dim) for dim in list(array.shape)]
+    shape.append(to_mlir_type(array.dtype))
+    shape = "x".join(shape)
+    values = " ".join([str(x) for x in array.flatten()])
+    result.append(f"{shape}={values}")
+  result = "\n".join(result)
   if artifacts_dir is not None:
     inputs_path = os.path.join(artifacts_dir, "inputs.txt")
     logging.info("Saving IREE input values to: %s", inputs_path)
     with open(inputs_path, "w") as f:
-      f.write(res)
+      f.write(result)
       f.write("\n")
-  return res
+  return result
 
 
 def compile_tf_module(tf_module,
