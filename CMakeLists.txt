@@ -95,7 +95,8 @@ if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
   set( IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS} )
   # For cross compilation towords Android, we don't want LLVM JIT HAL driver.
   if(ANDROID)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
+    # TODO(ataei): Enable dylib/dylib-llvm-aot for android.
+    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM DyLib)
   endif()
 endif()
 message(STATUS "Building HAL drivers ${IREE_HAL_DRIVERS_TO_BUILD}")
