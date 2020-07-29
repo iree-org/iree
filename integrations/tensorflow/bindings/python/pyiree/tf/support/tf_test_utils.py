@@ -567,6 +567,76 @@ class TracedModule:
     for call in self.calls:
       yield call
 
+  @staticmethod
+  def compare_traces(ref_trace, tar_trace):
+    traces_match = True
+    for ref_call, tar_call in zip(ref_trace, tar_trace):
+      rtol, atol = ref_call.get_tolerances()
+
+      logging.info("Comparing calls to '%s'", ref_call.method)
+      calls_match = TracedModule._check_same(ref_call.outputs, tar_call.outputs,
+                                             rtol, atol)
+
+      # Log the inputs and outputs if they don't match.
+      if not calls_match:
+        logging.error("Comparision between '%s' and '%s' failed on method '%s'",
+                      ref_trace.backend, tar_trace.backend, ref_call.method)
+        logging.error("Reference result '%s':\n%s", ref_trace.backend, ref_call)
+        logging.error("Target result '%s':\n%s", tar_trace.backend, tar_call)
+
+      traces_match = traces_match and calls_match
+    return traces_match
+
+  @staticmethod
+  def _check_same(ref, tar, rtol, atol):
+    """Checks that ref and tar have identical datastructures and values."""
+    # Check for matching types.
+    if not isinstance(tar, type(ref)):
+      logging.error(
+          "Expected ref and tar to have the same type but got '%s' and '%s'",
+          type(ref), type(tar))
+      return False
+
+    if ref is None:
+      # Nothing to compare (e.g. the called method had no outputs).
+      return True
+
+    # Recursive check for dicts.
+    if isinstance(ref, dict):
+      if ref.keys() != tar.keys():
+        logging.error(
+            "Expected ref and tar to have the same keys, but got '%s' and '%s'",
+            ref.keys(), tar.keys())
+        return False
+      # Check that all of the dictionaries' values are the same.
+      for key in ref:
+        if not TracedModule._check_same(ref[key], tar[key], rtol, atol):
+          return False
+
+    # Recursive check for iterables.
+    elif isinstance(ref, list) or isinstance(ref, tuple):
+      if len(ref) != len(tar):
+        logging.error(
+            "Expected ref and tar to have the same length, but got %s and %s",
+            len(ref), len(tar))
+        return False
+      # Check that all of the iterables' values are the same.
+      for i in range(len(ref)):
+        if not TracedModule._check_same(ref[i], tar[i], rtol, atol):
+          return False
+
+    # Base check for numpy arrays.
+    elif isinstance(ref, np.ndarray):
+      if isinstance(ref.flat[0], np.floating):
+        return np.allclose(ref, tar, rtol=rtol, atol=atol)
+      else:
+        return np.array_equal(ref, tar)
+
+    # If outputs end up here then an extra branch for that type should be added.
+    else:
+      raise TypeError(f"Encountered results with unexpected type {type(ref)}")
+    return True
+
 
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
@@ -644,7 +714,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
                    ref_trace.backend, tar_trace.backend)
-      traces_match = self._compare_traces(ref_trace, tar_trace)
+      traces_match = TracedModule.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
 
@@ -668,74 +738,6 @@ class TracedModuleTestCase(tf.test.TestCase):
 
       # This condition is always True, but is useful for context in the logs.
       self.assertFalse(len(failed_backends) > 0, failure_info)
-
-  def _compare_traces(self, ref_trace, tar_trace):
-    traces_match = True
-    for ref_call, tar_call in zip(ref_trace, tar_trace):
-      rtol, atol = ref_call.get_tolerances()
-
-      logging.info("Comparing calls to '%s'", ref_call.method)
-      calls_match = self._check_same(ref_call.outputs, tar_call.outputs, rtol,
-                                     atol)
-
-      # Log the inputs and outputs if they don't match.
-      if not calls_match:
-        logging.error("Comparision between '%s' and '%s' failed on method '%s'",
-                      ref_trace.backend, tar_trace.backend, ref_call.method)
-        logging.error("Reference result '%s':\n%s", ref_trace.backend, ref_call)
-        logging.error("Target result '%s':\n%s", tar_trace.backend, tar_call)
-
-      traces_match = traces_match and calls_match
-    return traces_match
-
-  def _check_same(self, ref, tar, rtol, atol):
-    """Checks that ref and tar have identical datastructures and values."""
-    # Check for matching types.
-    if not isinstance(tar, type(ref)):
-      logging.error(
-          "Expected ref and tar to have the same type but got '%s' and '%s'",
-          type(ref), type(tar))
-      return False
-
-    if ref is None:
-      # Nothing to compare (e.g. the called method had no outputs).
-      return True
-
-    # Recursive check for dicts.
-    if isinstance(ref, dict):
-      if ref.keys() != tar.keys():
-        logging.error(
-            "Expected ref and tar to have the same keys, but got '%s' and '%s'",
-            ref.keys(), tar.keys())
-        return False
-      # Check that all of the dictionaries' values are the same.
-      for key in ref:
-        if not self._check_same(ref[key], tar[key], rtol, atol):
-          return False
-
-    # Recursive check for iterables.
-    elif isinstance(ref, list) or isinstance(ref, tuple):
-      if len(ref) != len(tar):
-        logging.error(
-            "Expected ref and tar to have the same length, but got %s and %s",
-            len(ref), len(tar))
-        return False
-      # Check that all of the iterables' values are the same.
-      for i in range(len(ref)):
-        if not self._check_same(ref[i], tar[i], rtol, atol):
-          return False
-
-    # Base check for numpy arrays.
-    elif isinstance(ref, np.ndarray):
-      if isinstance(ref.flat[0], np.floating):
-        return np.allclose(ref, tar, rtol=rtol, atol=atol)
-      else:
-        return np.array_equal(ref, tar)
-
-    # If outputs end up here then an extra branch for that type should be added.
-    else:
-      raise TypeError(f"Encountered results with unexpected type {type(ref)}")
-    return True
 
   @classmethod
   def tearDownClass(cls):
