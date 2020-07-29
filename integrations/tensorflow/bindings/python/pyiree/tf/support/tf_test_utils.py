@@ -573,18 +573,17 @@ class TracedModule:
       raise ValueError(
           "The reference and target traces have different call structures:\n"
           f"Reference: {ref_methods}\nTarget:    {tar_methods}")
-      return False
 
     for ref_call, tar_call in zip(ref_trace, tar_trace):
       logging.info("Comparing calls to '%s'", ref_call.method)
       rtol, atol = ref_call.get_tolerances()
 
-      inputs_match = TracedModule._check_same(
-          ref_call.inputs, tar_call.inputs, rtol, atol)
+      inputs_match = TracedModule._check_same(ref_call.inputs, tar_call.inputs,
+                                              rtol, atol)
       if not inputs_match:
         logging.error("Inputs did not match.")
-      outputs_match = TracedModule._check_same(
-          ref_call.outputs, tar_call.outputs, rtol, atol)
+      outputs_match = TracedModule._check_same(ref_call.outputs,
+                                               tar_call.outputs, rtol, atol)
       if not outputs_match:
         logging.error("Outputs did not match.")
       calls_match = inputs_match and outputs_match
