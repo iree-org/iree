@@ -67,9 +67,10 @@ external_cc_library(
   INCLUDES
     ${IREE_ROOT_DIR}/third_party/tensorflow/
     ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/
+    ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR
+    ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms/
   DEPS
     absl::core_headers
-    absl::flat_hash_set
     LLVMSupport
     MLIRAnalysis
     MLIRInferTypeOpInterface
@@ -123,8 +124,8 @@ external_tablegen_library(
   OUTS
     -gen-op-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h.inc
     -gen-op-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.cc.inc
-    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_structs.h.inc
-    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_structs.cc.inc
+    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_structs.h.inc
+    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_structs.cc.inc
 )
 
 external_tablegen_library(
@@ -155,7 +156,7 @@ external_tablegen_library(
   SRCS
     "lib/Dialect/mhlo/IR/hlo_patterns.td"
   OUTS
-    -gen-rewriters include/mlir-hlo/Dialect/mhlo/IR/hlo_patterns.cc.inc
+    -gen-rewriters lib/Dialect/mhlo/IR/hlo_patterns.cc.inc
 )
 
 external_tablegen_library(
@@ -172,8 +173,8 @@ external_tablegen_library(
   OUTS
     -gen-op-decls include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h.inc
     -gen-op-defs include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.cc.inc
-    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/lhlo_structs.h.inc
-    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/lhlo_structs.cc.inc
+    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops_structs.h.inc
+    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops_structs.cc.inc
 )
 
 external_tablegen_library(
@@ -186,9 +187,9 @@ external_tablegen_library(
   ROOT
     ${TF_MLIR_HLO_SRC_ROOT}
   SRCS
-    "lib/Dialect/mhlo/transforms/canonicalize.td"
+  "lib/Dialect/mhlo/IR/mhlo_canonicalize.td"
   OUTS
-    -gen-rewriters lib/Dialect/mhlo/transforms/generated_canonicalize.inc
+    -gen-rewriters lib/Dialect/mhlo/IR/mhlo_canonicalize.inc
 )
 
 external_tablegen_library(
@@ -204,7 +205,7 @@ external_tablegen_library(
     "include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.td"
   OUTS
     -gen-op-interface-decls include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h.inc
-    -gen-op-interface-defs include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.cc.inc
+    -gen-op-interface-defs include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.cpp.inc
 )
 
 external_tablegen_library(
