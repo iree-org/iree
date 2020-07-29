@@ -116,10 +116,10 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     trace = tf_test_utils.Trace(module, trace_function)
     trace_function(tf_test_utils.TracedModule(module, trace))
 
-    self.assertTrue(isinstance(trace.calls[0].inputs, tuple))
-    self.assertTrue(len(trace.calls[0].inputs) == 0)
-    self.assertTrue(isinstance(trace.calls[0].outputs, tuple))
-    self.assertTrue(len(trace.calls[0].outputs) == 0)
+    self.assertIsInstance(trace.calls[0].inputs, tuple)
+    self.assertEmpty(trace.calls[0].inputs)
+    self.assertIsInstance(trace.calls[0].outputs, tuple)
+    self.assertEmpty(trace.calls[0].outputs)
 
     self.assertAllClose(trace.calls[1].inputs[0], [81.])
     self.assertAllClose(trace.calls[2].outputs[0], [82.])

@@ -26,7 +26,6 @@ import collections
 import copy
 import inspect
 import os
-import pickle
 import re
 import sys
 import tempfile
@@ -484,15 +483,29 @@ class ModuleCall:
 
 
 class Trace:
+  """Stores the inputs and outputs of a series of calls to a module."""
 
   def __init__(self, module, function):
+    """Extracts metadata from module and function and initializes.
+
+    Example usage:
+      def forward_pass(...):
+        ...
+      module = IreeCompiledModule(...)
+      trace = Trace(module, forward_pass)
+      forward_pass(TracedModule(module, trace))
+
+    Args:
+      module: the module who's outputs this trace will record.
+      function: the function that module will be traced on.
+    """
     # Extract metadata from module and function.
     self.module_name = module.module_name
     self.backend = module.backend
     self.function_name = function.__name__
     self.function_sourcefile = inspect.getsourcefile(function)
     source, start_line = inspect.getsourcelines(function)
-    self.function_range = (start_line, start_line + len(source))
+    self.function_line_numbers = (start_line, start_line + len(source))
     self.function_source = "".join(source)
 
     self.calls = []
@@ -516,7 +529,7 @@ class Trace:
     # Check that all method invocations match.
     ref_methods = [(call.method, call.rtol, call.atol) for call in ref_trace]
     tar_methods = [(call.method, call.rtol, call.atol) for call in tar_trace]
-    if not ref_methods == tar_methods:
+    if ref_methods != tar_methods:
       # Raise a ValueError instead of returning False since this is an
       # unexpected error.
       raise ValueError(
