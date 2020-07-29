@@ -40,6 +40,7 @@ external_cc_library(
     "lib/Dialect/mhlo/IR/lhlo_ops.cc"
     "lib/Dialect/mhlo/transforms/chlo_legalize_to_hlo.cc"
     "lib/Dialect/mhlo/transforms/legalize_control_flow.cc"
+    "lib/Dialect/mhlo/transforms/legalize_gather_to_torch_index_select.cc"
     "lib/Dialect/mhlo/transforms/legalize_to_standard.cc"
     "lib/Dialect/mhlo/transforms/lower_complex.cc"
     "lib/Dialect/mhlo/transforms/lower_general_dot.cc"
