@@ -17,11 +17,9 @@
 # pylint: disable=protected-access
 
 import collections
-import copy
 import os
 import random
 import re
-import sys
 import tempfile
 
 from absl import flags
@@ -32,7 +30,6 @@ from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
 FLAGS = flags.FLAGS
-NUMPY_LINEWIDTH = 120
 
 
 def set_random_seed(seed=0):
@@ -324,139 +321,3 @@ BackendInfo.add(
     CompiledModule=IreeCompiledModule,
     iree_driver="llvm",
     iree_compiler_targets=["llvm-ir"])
-
-
-def _indent(input_str, indentation=2):
-  """Indents a string by the specified number of spaces, defaulting to 2."""
-  spaces = " " * indentation
-  lines = input_str.split("\n")
-  # Prepend spaces to each non-empty line.
-  lines = [f"{spaces}{line}" if len(line) else line for line in lines]
-  return "\n".join(lines)
-
-
-class ModuleCall:
-
-  def __init__(self, method_name, inputs, outputs, rtol=1e-6, atol=1e-6):
-    """Records the details of a call to a CompiledModule."""
-    self.method = method_name
-
-    # Deepcopy to safegard against mutation.
-    self.inputs = copy.deepcopy(inputs)
-    if outputs is not None:
-      outputs = copy.deepcopy(outputs)
-    else:
-      outputs = tuple()
-    self.outputs = outputs if isinstance(outputs, tuple) else (outputs,)
-
-    self.rtol = rtol
-    self.atol = atol
-
-  def get_tolerances(self):
-    """Gets the floating point tolerances associated with this call."""
-    return self.rtol, self.atol
-
-  def __str__(self):
-    prior_printoptions = np.get_printoptions()
-    np.set_printoptions(linewidth=NUMPY_LINEWIDTH)
-
-    header = f"Method: {self.method}"
-    inputs = "\n".join(_indent(str(value)) for value in self.inputs)
-    outputs = "\n".join(_indent(str(value)) for value in self.outputs)
-    tolerances = _indent(f"rtol={self.rtol}, atol={self.atol}")
-    body = f"Inputs:\n{inputs}\nOutputs:\n{outputs}\nTolerances:\n{tolerances}"
-    result = f"{header}\n{_indent(body)}"
-
-    np.set_printoptions(**prior_printoptions)
-    return result
-
-
-class TracedModule:
-
-  def __init__(self, module, trace_function=None):
-    """Wraps a CompiledModule so that all inputs and outputs are traced.
-
-    The TracedModule returned will have an API almost identical to that of the
-    passed CompiledModule. The only change is that if the keywords `rtol` or
-    `atol` are passed to one of the CompiledModule's functions, they will be
-    used to set the tolerance for comparing that call to the same call in
-    another trace. They will not be passed to the CompiledModule's method.
-    So for example, calling `trace.add(a, b, rtol=1e-8)` would be the same as
-    calling `module.add(a, b)`.
-
-    Args:
-      module: the CompiledModule to trace.
-      trace_function: an optional function accepting a TracedModule to run this
-        module through. Useful for comparing backends on the same set of calls.
-    """
-    self.module = module
-    self.trace_function = trace_function
-    self.trace_name = "unnamed_trace"  # Used for saving.
-    self.calls = []
-    if self.trace_function is not None:
-      self.trace_name = self.trace_function.__name__
-      self.trace_function(self)
-
-  def _trace_call(self, method, method_name):
-    """Decorates a CompiledModule method to capture its inputs and outputs."""
-
-    def call(*args, **kwargs):
-      # Pop manually specified tolerances from the kwargs (if any).
-      tolerances = {}
-      tolerances["rtol"] = kwargs.pop("rtol", None)
-      tolerances["atol"] = kwargs.pop("atol", None)
-      # Only pass these to ModuleCall if they were specified by the user.
-      tolerances = {k: v for k, v in tolerances.items() if v is not None}
-
-      # Run the method and record the details of the call.
-      outputs = method(*args, **kwargs)
-      self.calls.append(ModuleCall(method_name, args, outputs, **tolerances))
-      return outputs
-
-    return call
-
-  def __getattr__(self, attr):
-    # Try to resolve it as an attr on self.module.
-    if not hasattr(self.module, attr):
-      raise AttributeError(f"The compiled module does not have attr '{attr}'")
-    module_attr = getattr(self.module, attr)
-    if not hasattr(module_attr, "__call__"):
-      # e.g. trace.backend_name
-      return module_attr
-    else:
-      # e.g. trace.simple_mul(a, b)
-      return self._trace_call(module_attr, method_name=attr)
-
-  def __str__(self):
-    header = f"Trace of {self.module_name} compiled to '{self.backend}' "
-    if self.trace_name != "unnamed_trace":
-      header += f"on function '{self.trace_name}':"
-    # Give each call a number so it's easier to compare between multiple traces.
-    calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
-    calls = _indent("\n".join(calls))
-    return f"{header}\n{calls}"
-
-  def save_plaintext(self, trace_dir, summarize=True):
-    """Saves a human-readable string representation of this trace to disk.
-
-    Args:
-      trace_dir: the directory to save the trace in.
-      summarize: a bool controlling whether numpy should summarize the inputs
-        and outputs if they're large. Setting this to False is very slow for
-        large outputs.
-    """
-    prior_printoptions = np.get_printoptions()
-    np.set_printoptions(
-        linewidth=NUMPY_LINEWIDTH,
-        threshold=None if summarize else sys.maxsize,
-        edgeitems=10)  # Can show more items since they won't clutter the logs.
-
-    path = os.path.join(trace_dir, f"{self.trace_name}__{self.backend}.txt")
-    with open(path, "w") as f:
-      f.write(str(self))
-
-    np.set_printoptions(**prior_printoptions)
-
-  def __iter__(self):
-    for call in self.calls:
-      yield call

@@ -17,7 +17,26 @@
 from absl.testing import parameterized
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow as tf
+
+
+class StatefulCountingModule(tf.Module):
+
+  def __init__(self):
+    self.count = tf.Variable([0.])
+
+  @tf.function(input_signature=[])
+  def increment(self):
+    self.count.assign_add(tf.constant([1.]))
+
+  @tf.function(input_signature=[])
+  def get_count(self):
+    return self.count
+
+  @tf.function(input_signature=[tf.TensorSpec([1])])
+  def increment_by(self, value):
+    self.count.assign_add(value)
 
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
@@ -77,6 +96,28 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     }
     same = tf_test_utils._recursive_check_same(ref, tgt)
     self.assertEqual(tgt_same, same)
+
+  def test_trace_inputs_and_outputs(self):
+    backend_info = tf_utils.BackendInfo.ALL['tf']
+    module = backend_info.CompiledModule(StatefulCountingModule, backend_info)
+
+    def trace_function(trace):
+      # No inputs or outpus
+      trace.increment()
+      # Only inputs
+      trace.increment_by([81.])
+      # Only outputs
+      trace.get_count()
+
+    trace = tf_test_utils.TracedModule(module, trace_function)
+
+    self.assertTrue(isinstance(trace.calls[0].inputs, tuple))
+    self.assertTrue(len(trace.calls[0].inputs) == 0)
+    self.assertTrue(isinstance(trace.calls[0].outputs, tuple))
+    self.assertTrue(len(trace.calls[0].outputs) == 0)
+
+    self.assertAllClose(trace.calls[1].inputs[0], [81.])
+    self.assertAllClose(trace.calls[2].outputs[0], [82.])
 
 
 if __name__ == '__main__':
