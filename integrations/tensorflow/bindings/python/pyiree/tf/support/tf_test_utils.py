@@ -488,15 +488,11 @@ class TracedModuleTestCase(tf.test.TestCase):
         module.create_reinitialized() for module in self._tar_modules
     ]
 
-  def compare_backends(self, trace_function, rtol=1e-6, atol=1e-6):
+  def compare_backends(self, trace_function):
     """Run the reference and target backends on trace_function and compare them.
 
     Args:
       trace_function: a function accepting a TracedModule as its argument.
-      rtol: a float as defined in np.allclose. Will be overridden in any
-        comparison between calls to the trace with a `rtol` kwarg.
-      atol: a float as defined in np.allclose. Will be overridden in any
-        comparison between calls to the trace with a `atol` kwarg.
     """
     # Trace the test function for each backend.
     ref_trace = tf_utils.TracedModule(self._ref_module, trace_function)
@@ -510,7 +506,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
                    ref_trace.backend, tar_trace.backend)
-      traces_match = self._compare_traces(ref_trace, tar_trace, rtol, atol)
+      traces_match = self._compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
 
@@ -535,12 +531,9 @@ class TracedModuleTestCase(tf.test.TestCase):
       # This condition is always True, but is useful for context in the logs.
       self.assertFalse(len(failed_backends) > 0, failure_info)
 
-  def _compare_traces(self, ref_trace, tar_trace, default_rtol, default_atol):
+  def _compare_traces(self, ref_trace, tar_trace):
     traces_match = True
     for ref_call, tar_call in zip(ref_trace, tar_trace):
-      ref_call.record_tolerances_if_unset(default_rtol, default_atol)
-      tar_call.record_tolerances_if_unset(default_rtol, default_atol)
-      # Get the potentially overridden tolerances for comparisons of this call.
       rtol, atol = ref_call.get_tolerances()
 
       logging.info("Comparing calls to '%s'", ref_call.method)

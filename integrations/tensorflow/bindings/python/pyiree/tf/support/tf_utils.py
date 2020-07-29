@@ -337,7 +337,7 @@ def _indent(input_str, indentation=2):
 
 class ModuleCall:
 
-  def __init__(self, method_name, inputs, outputs, rtol=None, atol=None):
+  def __init__(self, method_name, inputs, outputs, rtol=1e-6, atol=1e-6):
     """Records the details of a call to a CompiledModule."""
     self.method = method_name
 
@@ -351,13 +351,6 @@ class ModuleCall:
 
     self.rtol = rtol
     self.atol = atol
-
-  def record_tolerances_if_unset(self, rtol, atol):
-    """Record rtol or atol if they weren't specified for this call."""
-    if self.rtol is None:
-      self.rtol = rtol
-    if self.atol is None:
-      self.atol = atol
 
   def get_tolerances(self):
     """Gets the floating point tolerances associated with this call."""
@@ -409,12 +402,15 @@ class TracedModule:
 
     def call(*args, **kwargs):
       # Pop manually specified tolerances from the kwargs (if any).
-      rtol = kwargs.pop("rtol", None)
-      atol = kwargs.pop("atol", None)
+      tolerances = {}
+      tolerances["rtol"] = kwargs.pop("rtol", None)
+      tolerances["atol"] = kwargs.pop("atol", None)
+      # Only pass these to ModuleCall if they were specified by the user.
+      tolerances = {k: v for k, v in tolerances.items() if v is not None}
 
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)
-      self.calls.append(ModuleCall(method_name, args, outputs, rtol, atol))
+      self.calls.append(ModuleCall(method_name, args, outputs, **tolerances))
       return outputs
 
     return call
