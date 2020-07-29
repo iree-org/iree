@@ -37,9 +37,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createTFSavedModelLowerGlobalTensors();
 std::unique_ptr<OperationPass<ModuleOp>>
 createTFSavedModelLowerExportedFunctions();
 
-// Guarantee that all FuncOp's have a single use.
-std::unique_ptr<OperationPass<ModuleOp>> createGuaranteeAllFuncsOneUse();
-
 // Push resource casts forward to better propagate resource related shapes.
 std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCasts();
 
