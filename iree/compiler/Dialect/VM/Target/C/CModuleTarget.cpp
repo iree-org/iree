@@ -26,10 +26,10 @@ namespace VM {
 static LogicalResult translateReturnOpToC(mlir::emitc::CppEmitter &emitter,
                                           IREE::VM::ReturnOp returnOp,
                                           llvm::raw_ostream &output) {
-  int i = 0;
+  int outputIndex = 0;
   for (auto operand : returnOp.getOperands()) {
-    output << "*out" << i++ << " = " << emitter.getOrCreateName(operand)
-           << ";\n";
+    output << "*out" << outputIndex++ << " = "
+           << emitter.getOrCreateName(operand) << ";\n";
   }
 
   output << "return IREE_STATUS_OK;\n";
@@ -55,27 +55,31 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
 
   output << "iree_status_t " << funcOp.getName() << "(";
 
-  // function arguments
-  int i = 0;
-  const int totalCount = funcOp.getNumArguments() + funcOp.getNumResults();
-  for (auto arg : funcOp.getArguments()) {
-    i++;
-    emitter.emitType(arg.getType());
-    output << " " << emitter.getOrCreateName(arg);
-    if (i < totalCount) output << ", ";
+  mlir::emitc::interleaveCommaWithError(
+      funcOp.getArguments(), output, [&](auto arg) -> LogicalResult {
+        if (failed(emitter.emitType(arg.getType()))) {
+          return failure();
+        }
+        output << " " << emitter.getOrCreateName(arg);
+        return success();
+      });
+
+  if (funcOp.getNumResults() > 0) {
+    output << ", ";
   }
 
-  int j = 0;
-  for (auto result : funcOp.getType().getResults()) {
-    i++;
-    emitter.emitType(result);
-    output << " *out_" << j++;
-    if (i < totalCount) output << ", ";
-  }
+  int outputIndex = 0;
+  mlir::emitc::interleaveCommaWithError(funcOp.getType().getResults(), output,
+                                        [&](Type type) -> LogicalResult {
+                                          if (failed(emitter.emitType(type))) {
+                                            return failure();
+                                          }
+                                          output << " *out_" << outputIndex++;
+                                          return success();
+                                        });
 
   output << ") {\n";
 
-  // function body
   for (auto &op : funcOp.getOps()) {
     if (failed(translateOpToC(emitter, op, output))) {
       return failure();
