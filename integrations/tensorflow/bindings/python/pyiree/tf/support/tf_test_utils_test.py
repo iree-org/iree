@@ -102,18 +102,19 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(tgt_same, same)
 
   def test_trace_inputs_and_outputs(self):
-    backend_info = tf_utils.BackendInfo.ALL['tf']
-    module = backend_info.CompiledModule(StatefulCountingModule, backend_info)
 
-    def trace_function(trace):
+    def trace_function(module):
       # No inputs or outpus
-      trace.increment()
+      module.increment()
       # Only inputs
-      trace.increment_by(np.array([81.], dtype=np.float32))
+      module.increment_by(np.array([81.], dtype=np.float32))
       # Only outputs
-      trace.get_count()
+      module.get_count()
 
-    trace = tf_test_utils.TracedModule(module, trace_function)
+    module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                       tf_utils.BackendInfo.ALL['tf'])
+    trace = tf_test_utils.Trace(module, trace_function)
+    trace_function(tf_test_utils.TracedModule(module, trace))
 
     self.assertTrue(isinstance(trace.calls[0].inputs, tuple))
     self.assertTrue(len(trace.calls[0].inputs) == 0)
@@ -124,36 +125,47 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(trace.calls[2].outputs[0], [82.])
 
   def test_nonmatching_methods(self):
-    tf_info = tf_utils.BackendInfo.ALL['tf']
-    tf_module = tf_info.CompiledModule(StatefulCountingModule, tf_info)
-    tf_trace = tf_test_utils.TracedModule(tf_module)
 
-    vmla_info = tf_utils.BackendInfo.ALL['iree_vmla']
-    vmla_module = vmla_info.CompiledModule(StatefulCountingModule, vmla_info)
-    vmla_trace = tf_test_utils.TracedModule(vmla_module)
+    def tf_function(module):
+      module.increment()
+      module.increment()
 
-    tf_trace.increment()
-    tf_trace.increment()
-    vmla_trace.increment()
-    vmla_trace.decrement()
+    def vmla_function(module):
+      module.increment()
+      module.decrement()
+
+    tf_module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                          tf_utils.BackendInfo.ALL['tf'])
+    tf_trace = tf_test_utils.Trace(tf_module, tf_function)
+    tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
+
+    vmla_module = tf_utils.IreeCompiledModule(
+        StatefulCountingModule, tf_utils.BackendInfo.ALL['iree_vmla'])
+    vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
+    vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 
     with self.assertRaises(ValueError):
-      tf_test_utils.TracedModule.compare_traces(tf_trace, vmla_trace)
+      tf_test_utils.Trace.compare_traces(tf_trace, vmla_trace)
 
   def test_nonmatching_inputs(self):
-    tf_info = tf_utils.BackendInfo.ALL['tf']
-    tf_module = tf_info.CompiledModule(StatefulCountingModule, tf_info)
-    tf_trace = tf_test_utils.TracedModule(tf_module)
 
-    vmla_info = tf_utils.BackendInfo.ALL['iree_vmla']
-    vmla_module = vmla_info.CompiledModule(StatefulCountingModule, vmla_info)
-    vmla_trace = tf_test_utils.TracedModule(vmla_module)
+    def tf_function(module):
+      module.increment_by(np.array([42.], dtype=np.float32))
 
-    tf_trace.increment_by(np.array([42.], dtype=np.float32))
-    vmla_trace.increment_by(np.array([22.], dtype=np.float32))
+    def vmla_function(module):
+      module.increment_by(np.array([22.], dtype=np.float32))
 
-    self.assertFalse(
-        tf_test_utils.TracedModule.compare_traces(tf_trace, vmla_trace))
+    tf_module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                          tf_utils.BackendInfo.ALL['tf'])
+    tf_trace = tf_test_utils.Trace(tf_module, tf_function)
+    tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
+
+    vmla_module = tf_utils.IreeCompiledModule(
+        StatefulCountingModule, tf_utils.BackendInfo.ALL['iree_vmla'])
+    vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
+    vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
+
+    self.assertFalse(tf_test_utils.Trace.compare_traces(tf_trace, vmla_trace))
 
 
 if __name__ == '__main__':

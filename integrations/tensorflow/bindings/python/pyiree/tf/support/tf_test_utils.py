@@ -24,6 +24,7 @@
 
 import collections
 import copy
+import inspect
 import os
 import pickle
 import re
@@ -52,9 +53,6 @@ flags.DEFINE_string("reference_backend", "tf",
 flags.DEFINE_bool(
     "summarize", True,
     "Summarize the inputs and outputs of each module trace logged to disk.")
-flags.DEFINE_bool(
-    "pickle_args", False,
-    "Save copies of the inputs and outputs to the traced modules to disk")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
@@ -485,66 +483,23 @@ class ModuleCall:
     return result
 
 
-class TracedModule:
+class Trace:
 
-  def __init__(self, module, trace_function=None):
-    """Wraps a CompiledModule so that all inputs and outputs are traced.
+  def __init__(self, module, function):
+    # Extract metadata from module and function.
+    self.module_name = module.module_name
+    self.backend = module.backend
+    self.function_name = function.__name__
+    self.function_sourcefile = inspect.getsourcefile(function)
+    source, start_line = inspect.getsourcelines(function)
+    self.function_range = (start_line, start_line + len(source))
+    self.function_source = "".join(source)
 
-    The TracedModule returned will have an API almost identical to that of the
-    passed CompiledModule. The only change is that if the keywords `rtol` or
-    `atol` are passed to one of the CompiledModule's functions, they will be
-    used to set the tolerance for comparing that call to the same call in
-    another trace. They will not be passed to the CompiledModule's method.
-    So for example, calling `trace.add(a, b, rtol=1e-8)` would be the same as
-    calling `module.add(a, b)`.
-
-    Args:
-      module: the CompiledModule to trace.
-      trace_function: an optional function accepting a TracedModule to run this
-        module through. Useful for comparing backends on the same set of calls.
-    """
-    self.module = module
-    self.trace_function = trace_function
-    self.trace_name = "unnamed_trace"  # Used for saving.
     self.calls = []
-    if self.trace_function is not None:
-      self.trace_name = self.trace_function.__name__
-      self.trace_function(self)
-
-  def _trace_call(self, method, method_name):
-    """Decorates a CompiledModule method to capture its inputs and outputs."""
-
-    def call(*args, **kwargs):
-      # Pop manually specified tolerances from the kwargs (if any).
-      tolerances = {}
-      tolerances["rtol"] = kwargs.pop("rtol", None)
-      tolerances["atol"] = kwargs.pop("atol", None)
-      # Only pass these to ModuleCall if they were specified by the user.
-      tolerances = {k: v for k, v in tolerances.items() if v is not None}
-
-      # Run the method and record the details of the call.
-      outputs = method(*args, **kwargs)
-      self.calls.append(ModuleCall(method_name, args, outputs, **tolerances))
-      return outputs
-
-    return call
-
-  def __getattr__(self, attr):
-    # Try to resolve it as an attr on self.module.
-    if not hasattr(self.module, attr):
-      raise AttributeError(f"The compiled module does not have attr '{attr}'")
-    module_attr = getattr(self.module, attr)
-    if not hasattr(module_attr, "__call__"):
-      # e.g. trace.backend_name
-      return module_attr
-    else:
-      # e.g. trace.simple_mul(a, b)
-      return self._trace_call(module_attr, method_name=attr)
 
   def __str__(self):
-    header = f"Trace of {self.module_name} compiled to '{self.backend}' "
-    if self.trace_name != "unnamed_trace":
-      header += f"on function '{self.trace_name}':"
+    header = (f"Trace of {self.module_name} compiled to '{self.backend}' "
+              f"on function '{self.function_name}':")
     # Give each call a number so it's easier to compare between multiple traces.
     calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
     calls = _indent("\n".join(calls))
@@ -553,12 +508,6 @@ class TracedModule:
   def __iter__(self):
     for call in self.calls:
       yield call
-
-  def __getitem__(self, key):
-    return self.calls[key]
-
-  def __len__(self):
-    return len(self.calls)
 
   @staticmethod
   def compare_traces(ref_trace, tar_trace):
@@ -578,12 +527,12 @@ class TracedModule:
       logging.info("Comparing calls to '%s'", ref_call.method)
       rtol, atol = ref_call.get_tolerances()
 
-      inputs_match = TracedModule._check_same(ref_call.inputs, tar_call.inputs,
-                                              rtol, atol)
+      inputs_match = Trace._check_same(ref_call.inputs, tar_call.inputs, rtol,
+                                       atol)
       if not inputs_match:
         logging.error("Inputs did not match.")
-      outputs_match = TracedModule._check_same(ref_call.outputs,
-                                               tar_call.outputs, rtol, atol)
+      outputs_match = Trace._check_same(ref_call.outputs, tar_call.outputs,
+                                        rtol, atol)
       if not outputs_match:
         logging.error("Outputs did not match.")
       calls_match = inputs_match and outputs_match
@@ -620,7 +569,7 @@ class TracedModule:
         return False
       # Check that all of the dictionaries' values are the same.
       for key in ref:
-        if not TracedModule._check_same(ref[key], tar[key], rtol, atol):
+        if not Trace._check_same(ref[key], tar[key], rtol, atol):
           return False
 
     # Recursive check for iterables.
@@ -632,7 +581,7 @@ class TracedModule:
         return False
       # Check that all of the iterables' values are the same.
       for i in range(len(ref)):
-        if not TracedModule._check_same(ref[i], tar[i], rtol, atol):
+        if not Trace._check_same(ref[i], tar[i], rtol, atol):
           return False
 
     # Base check for numpy arrays.
@@ -648,7 +597,7 @@ class TracedModule:
     return True
 
   def _get_trace_dir(self, artifacts_dir):
-    trace_dir = os.path.join(artifacts_dir, "traces", self.trace_name)
+    trace_dir = os.path.join(artifacts_dir, "traces")
     if not os.path.exists(trace_dir):
       os.makedirs(trace_dir)
     return trace_dir
@@ -669,26 +618,64 @@ class TracedModule:
         edgeitems=10)  # Can show more items since they won't clutter the logs.
 
     trace_dir = self._get_trace_dir(artifacts_dir)
-    path = os.path.join(trace_dir, f"plaintext__{self.backend}.txt")
+    path = os.path.join(trace_dir, f"{self.function_name}__{self.backend}.txt")
     with open(path, "w") as f:
       f.write(str(self))
       f.write("\n")
 
     np.set_printoptions(**prior_printoptions)
 
-  def save_pickle(self, artifacts_dir):
-    """Saves pickled copies of the inputs and outputs to this module."""
-    # TODO(meadowlark): Fix the following issues and pickle this class directly:
-    #   - Need to have pyiree installed (same goes for saving ModuleCalls).
-    #   - Can't save trace_function easily as it's in a local scope.
-    trace_dir = self._get_trace_dir(artifacts_dir)
-    for i, call in enumerate(self.calls):
-      path = os.path.join(trace_dir, f"call_{i}_inputs__{self.backend}.pkl")
-      with open(path, "wb") as f:
-        pickle.dump(call.inputs, f)
-      path = os.path.join(trace_dir, f"call_{i}_outputs__{self.backend}.pkl")
-      with open(path, "wb") as f:
-        pickle.dump(call.outputs, f)
+
+class TracedModule:
+
+  def __init__(self, module, trace):
+    """Wraps a CompiledModule so that all inputs and outputs are traced.
+
+    The TracedModule returned will have an API almost identical to that of the
+    passed CompiledModule. The only changes are:
+      - If the keywords `rtol` or `atol` are passed to one of the
+        CompiledModule's methods, then they will be used to set the tolerance
+        for comparing that call to the same call in another trace. So for
+        example, calling `traced_module.add(a, b rtol=1e-8)` would be the same
+        as calling `module.add(a, b)`.
+
+    Args:
+      module: the CompiledModule to trace.
+      trace: the Trace to record calls to this module with.
+    """
+    self._module = module
+    self._trace = trace
+
+  def _trace_call(self, method, method_name):
+    """Decorates a CompiledModule method to capture its inputs and outputs."""
+
+    def call(*args, **kwargs):
+      # Pop manually specified tolerances from the kwargs (if any).
+      tolerances = {}
+      tolerances["rtol"] = kwargs.pop("rtol", None)
+      tolerances["atol"] = kwargs.pop("atol", None)
+      # Only pass these to ModuleCall if they were specified by the user.
+      tolerances = {k: v for k, v in tolerances.items() if v is not None}
+
+      # Run the method and record the details of the call.
+      outputs = method(*args, **kwargs)
+      self._trace.calls.append(
+          ModuleCall(method_name, args, outputs, **tolerances))
+      return outputs
+
+    return call
+
+  def __getattr__(self, attr):
+    # Try to resolve it as an attr on self.module.
+    if not hasattr(self._module, attr):
+      raise AttributeError(f"The compiled module does not have attr '{attr}'")
+    module_attr = getattr(self._module, attr)
+    if not hasattr(module_attr, "__call__"):
+      # e.g. trace.backend
+      return module_attr
+    else:
+      # e.g. trace.simple_mul(a, b)
+      return self._trace_call(module_attr, method_name=attr)
 
 
 class TracedModuleTestCase(tf.test.TestCase):
@@ -752,39 +739,37 @@ class TracedModuleTestCase(tf.test.TestCase):
     Args:
       trace_function: a function accepting a TracedModule as its argument.
     """
-    # Trace the test function for each backend.
-    ref_trace = TracedModule(self._ref_module, trace_function)
-    tar_traces = [
-        TracedModule(module, trace_function) for module in self._tar_modules
-    ]
+    # Create Traces for each backend.
+    ref_trace = Trace(self._ref_module, trace_function)
+    tar_traces = [Trace(module, trace_function) for module in self._tar_modules]
 
-    # Compare each target trace with the reference trace.
+    # Run the traces through trace_function with their associated modules.
+    trace_function(TracedModule(self._ref_module, ref_trace))
+    for module, trace in zip(self._tar_modules, tar_traces):
+      trace_function(TracedModule(module, trace))
+
+    # Compare each target trace of trace_function with the reference trace.
     failed_backend_indices = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
                    ref_trace.backend, tar_trace.backend)
-      traces_match = TracedModule.compare_traces(ref_trace, tar_trace)
+      traces_match = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
 
     # Save the results to disk before validating.
     ref_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
-    if FLAGS.pickle_args:
-      ref_trace.save_pickle(self._artifacts_dir)
     for tar_trace in tar_traces:
       tar_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
-      if FLAGS.pickle_args:
-        tar_trace.save_pickle(self._artifacts_dir)
 
     # Validate results.
     if len(failed_backend_indices) > 0:
       # Extract info for logging.
-      failed_traces = [tar_traces[b] for b in failed_backend_indices]
-      failed_backends = [trace.backend for trace in failed_traces]
+      failed_backends = [tar_traces[i].backend for i in failed_backend_indices]
       failure_info = (
           "Comparision between the reference backend and the following targets "
-          f"failed: {failed_backends}. The  errors above show the outputs of "
-          "the non-matching calls.")
+          f"failed: {failed_backends}. The errors above show the inputs and "
+          "outputs the non-matching calls.")
 
       # This condition is always True, but is useful for context in the logs.
       self.assertFalse(len(failed_backends) > 0, failure_info)
