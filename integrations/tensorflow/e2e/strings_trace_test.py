@@ -47,21 +47,21 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_print_ids(self):
 
-    def print_ids(trace):
+    def print_ids(module):
       input_ids = np.asarray(
           [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
            [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-      trace.print_ids(input_ids)
+      module.print_ids(input_ids)
 
     self.compare_backends(print_ids)
 
   def test_strings_to_ids(self):
 
-    def strings_to_ids(trace):
+    def strings_to_ids(module):
       input_ids = np.asarray(
           [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
            [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-      trace.strings_to_ids(input_ids)
+      module.strings_to_ids(input_ids)
 
     self.compare_backends(strings_to_ids)
 

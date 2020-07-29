@@ -43,22 +43,22 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
   def test_simple_mul(self):
 
-    def simple_mul(trace):
+    def simple_mul(module):
       a = np.array([1., 2., 3., 4.], dtype=np.float32)
       b = np.array([400., 5., 6., 7.], dtype=np.float32)
-      c = trace.simple_mul(a, b)
-      trace.simple_mul(a, c)
+      c = module.simple_mul(a, b)
+      module.simple_mul(a, c)
 
     self.compare_backends(simple_mul)
 
   def test_simple_matmul(self):
 
-    def simple_matmul(trace):
+    def simple_matmul(module):
       np.random.seed(12345)
       # Note: scaling by a small value to increase numerical stability.
       a = np.random.random((128, 3072)).astype(np.float32) * 1e-3
       b = np.random.random((3072, 256)).astype(np.float32) * 1e-3
-      trace.simple_matmul(a, b)
+      module.simple_matmul(a, b)
 
     self.compare_backends(simple_matmul)
 
