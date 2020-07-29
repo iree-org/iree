@@ -46,6 +46,11 @@ build:generic_gcc --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 # This is a good compromise between runtime and debugability.
 build:generic_gcc --copt=-UNDEBUG
 
+# Disable warnings we don't care about or that generally have a low signal/noise
+# ratio.
+build:generic_gcc --copt=-Wno-unused-but-set-parameter
+build:generic_gcc --copt=-Wno-comment
+build:generic_gcc --copt=-Wno-attributes
 
 ###############################################################################
 # Options for "generic_clang" builds: these options should generally apply to
