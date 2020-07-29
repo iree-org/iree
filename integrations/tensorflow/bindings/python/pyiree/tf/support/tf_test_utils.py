@@ -596,8 +596,7 @@ class TracedModuleTestCase(tf.test.TestCase):
 
     # If outputs end up here then an extra branch for that type should be added.
     else:
-      logging.warning("Comparing an unexpected result type of %s", type(ref))
-      return ref == tar
+      raise TypeError(f"Encountered results with unexpected type {type(ref)}")
     return True
 
   @classmethod
