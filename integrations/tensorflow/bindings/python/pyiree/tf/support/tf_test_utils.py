@@ -567,22 +567,46 @@ class TracedModule:
     for call in self.calls:
       yield call
 
+  def __getitem__(self, key):
+    return self.calls[key]
+
+  def __len__(self):
+    return len(self.calls)
+
   @staticmethod
   def compare_traces(ref_trace, tar_trace):
     traces_match = True
+
+    # Check that all method invocations match.
+    ref_methods = [(call.method, call.rtol, call.atol) for call in ref_trace]
+    tar_methods = [(call.method, call.rtol, call.atol) for call in tar_trace]
+    if not ref_methods == tar_methods:
+      # Raise a ValueError instead of returning False since this is an
+      # unexpected error.
+      raise ValueError(
+          "The reference and target traces have different call structures:\n"
+          f"Reference: {ref_methods}\nTarget:    {tar_methods}")
+      return False
+
     for ref_call, tar_call in zip(ref_trace, tar_trace):
+      logging.info("Comparing calls to '%s'", ref_call.method)
       rtol, atol = ref_call.get_tolerances()
 
-      logging.info("Comparing calls to '%s'", ref_call.method)
-      calls_match = TracedModule._check_same(ref_call.outputs, tar_call.outputs,
-                                             rtol, atol)
+      inputs_match = TracedModule._check_same(
+          ref_call.inputs, tar_call.inputs, rtol, atol)
+      if not inputs_match:
+        logging.error("Inputs did not match.")
+      outputs_match = TracedModule._check_same(
+          ref_call.outputs, tar_call.outputs, rtol, atol)
+      if not outputs_match:
+        logging.error("Outputs did not match.")
+      calls_match = inputs_match and outputs_match
 
-      # Log the inputs and outputs if they don't match.
       if not calls_match:
         logging.error("Comparision between '%s' and '%s' failed on method '%s'",
                       ref_trace.backend, tar_trace.backend, ref_call.method)
-        logging.error("Reference result '%s':\n%s", ref_trace.backend, ref_call)
-        logging.error("Target result '%s':\n%s", tar_trace.backend, tar_call)
+        logging.error("Reference call '%s':\n%s", ref_trace.backend, ref_call)
+        logging.error("Target call '%s':\n%s", tar_trace.backend, tar_call)
 
       traces_match = traces_match and calls_match
     return traces_match

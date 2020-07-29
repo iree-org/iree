@@ -38,6 +38,10 @@ class StatefulCountingModule(tf.Module):
   def increment_by(self, value):
     self.count.assign_add(value)
 
+  @tf.function(input_signature=[])
+  def decrement(self):
+    self.count.assign_sub(tf.constant([1.]))
+
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
@@ -105,7 +109,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       # No inputs or outpus
       trace.increment()
       # Only inputs
-      trace.increment_by([81.])
+      trace.increment_by(np.array([81.], dtype=np.float32))
       # Only outputs
       trace.get_count()
 
@@ -118,6 +122,38 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
     self.assertAllClose(trace.calls[1].inputs[0], [81.])
     self.assertAllClose(trace.calls[2].outputs[0], [82.])
+
+  def test_nonmatching_methods(self):
+    tf_info = tf_utils.BackendInfo.ALL['tf']
+    tf_module = tf_info.CompiledModule(StatefulCountingModule, tf_info)
+    tf_trace = tf_test_utils.TracedModule(tf_module)
+
+    vmla_info = tf_utils.BackendInfo.ALL['iree_vmla']
+    vmla_module = vmla_info.CompiledModule(StatefulCountingModule, vmla_info)
+    vmla_trace = tf_test_utils.TracedModule(vmla_module)
+
+    tf_trace.increment()
+    tf_trace.increment()
+    vmla_trace.increment()
+    vmla_trace.decrement()
+
+    with self.assertRaises(ValueError):
+      tf_test_utils.TracedModule.compare_traces(tf_trace, vmla_trace)
+
+  def test_nonmatching_inputs(self):
+    tf_info = tf_utils.BackendInfo.ALL['tf']
+    tf_module = tf_info.CompiledModule(StatefulCountingModule, tf_info)
+    tf_trace = tf_test_utils.TracedModule(tf_module)
+
+    vmla_info = tf_utils.BackendInfo.ALL['iree_vmla']
+    vmla_module = vmla_info.CompiledModule(StatefulCountingModule, vmla_info)
+    vmla_trace = tf_test_utils.TracedModule(vmla_module)
+
+    tf_trace.increment_by(np.array([42.], dtype=np.float32))
+    vmla_trace.increment_by(np.array([22.], dtype=np.float32))
+
+    self.assertFalse(
+        tf_test_utils.TracedModule.compare_traces(tf_trace, vmla_trace))
 
 
 if __name__ == '__main__':
