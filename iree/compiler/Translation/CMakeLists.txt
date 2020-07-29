@@ -12,15 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT (EmitC is only buildable with CMake)
-
 iree_add_all_subdirs()
-
-if(IREE_ENABLE_EMITC)
-  set(IREE_VM_CONDITIONAL_TARGETS
-    iree::compiler::Dialect::VM::Target::C
-  )
-endif()
 
 iree_cc_library(
   NAME
@@ -44,6 +36,5 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
-    ${IREE_VM_CONDITIONAL_TARGETS}
   PUBLIC
 )

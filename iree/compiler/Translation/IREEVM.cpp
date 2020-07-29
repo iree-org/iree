@@ -23,10 +23,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Translation.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -77,8 +73,10 @@ void registerIREEVMTransformPassPipeline() {
       });
 }
 
-static LogicalResult translateFromMLIRToVM(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
+LogicalResult translateFromMLIRToVMBytecodeModule(
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    llvm::raw_ostream &output) {
   // Convert from our source to a vm.module in canonical form.
   // After this completes we have a non-bytecode-specific vm.module that we
   // could lower to other forms (LLVM IR, C, etc).
@@ -88,21 +86,8 @@ static LogicalResult translateFromMLIRToVM(
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager);
   passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
-
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
-  }
-  return success();
-}
-
-LogicalResult translateFromMLIRToVMBytecodeModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::BytecodeTargetOptions bytecodeOptions,
-    llvm::raw_ostream &output) {
-  auto result = translateFromMLIRToVM(moduleOp, executableOptions);
-
-  if (failed(result)) {
-    return result;
   }
 
   // Serialize to bytecode.
@@ -118,37 +103,10 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
                                              bytecodeTargetOptions, output);
 }
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-LogicalResult translateFromMLIRToVMCModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
-    llvm::raw_ostream &output) {
-  auto result = translateFromMLIRToVM(moduleOp, executableOptions);
-
-  if (failed(result)) {
-    return result;
-  }
-
-  // Serialize to c code.
-  return mlir::iree_compiler::IREE::VM::translateModuleToC(moduleOp, output);
-}
-
-static LogicalResult translateFromMLIRToVMCModuleWithFlags(
-    ModuleOp moduleOp, llvm::raw_ostream &output) {
-  mlir::registerPassManagerCLOptions();
-  auto TargetOptions = IREE::HAL::getTargetOptionsFromFlags();
-  return translateFromMLIRToVMCModule(moduleOp, TargetOptions, output);
-}
-#endif  // IREE_HAVE_EMITC_DIALECT
-
 void registerIREEVMTranslation() {
   TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
       "iree-mlir-to-vm-bytecode-module",
       translateFromMLIRToVMBytecodeModuleWithFlags);
-
-#ifdef IREE_HAVE_EMITC_DIALECT
-  TranslateFromMLIRRegistration toVMCModuleWithFlags(
-      "iree-mlir-to-vm-c-module", translateFromMLIRToVMCModuleWithFlags);
-#endif  // IREE_HAVE_EMITC_DIALECT
 }
 
 }  // namespace iree_compiler

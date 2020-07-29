@@ -37,10 +37,6 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "emitc/InitDialect.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
-
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
                                                 llvm::cl::init("-"));
@@ -78,9 +74,6 @@ static llvm::cl::opt<bool> showDialects(
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
   mlir::registerMlirPasses();
-#ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCDialect();
-#endif  // IREE_HAVE_EMITC_DIALECT
   mlir::registerXLADialects();
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
