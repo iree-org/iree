@@ -18,9 +18,14 @@
 # pylint: disable=protected-access
 # pylint: disable=unsupported-assignment-operation
 
+# This file uses the following abbreviations:
+#   ref: reference – for the reference CompiledModule
+#   tar: target - for one of the target CompiledModules
+
 import collections
 import copy
 import os
+import pickle
 import re
 import sys
 import tempfile
@@ -47,6 +52,9 @@ flags.DEFINE_string("reference_backend", "tf",
 flags.DEFINE_bool(
     "summarize", True,
     "Summarize the inputs and outputs of each module trace logged to disk.")
+flags.DEFINE_bool(
+    "pickle_args", False,
+    "Save copies of the inputs and outputs to the traced modules to disk")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
@@ -542,27 +550,6 @@ class TracedModule:
     calls = _indent("\n".join(calls))
     return f"{header}\n{calls}"
 
-  def save_plaintext(self, trace_dir, summarize=True):
-    """Saves a human-readable string representation of this trace to disk.
-
-    Args:
-      trace_dir: the directory to save the trace in.
-      summarize: a bool controlling whether numpy should summarize the inputs
-        and outputs if they're large. Setting this to False is very slow for
-        large outputs.
-    """
-    prior_printoptions = np.get_printoptions()
-    np.set_printoptions(
-        linewidth=NUMPY_LINEWIDTH,
-        threshold=None if summarize else sys.maxsize,
-        edgeitems=10)  # Can show more items since they won't clutter the logs.
-
-    path = os.path.join(trace_dir, f"{self.trace_name}__{self.backend}.txt")
-    with open(path, "w") as f:
-      f.write(str(self))
-
-    np.set_printoptions(**prior_printoptions)
-
   def __iter__(self):
     for call in self.calls:
       yield call
@@ -661,13 +648,52 @@ class TracedModule:
       raise TypeError(f"Encountered results with unexpected type {type(ref)}")
     return True
 
+  def _get_trace_dir(self, artifacts_dir):
+    trace_dir = os.path.join(artifacts_dir, "traces", self.trace_name)
+    if not os.path.exists(trace_dir):
+      os.makedirs(trace_dir)
+    return trace_dir
+
+  def save_plaintext(self, artifacts_dir, summarize=True):
+    """Saves a human-readable string representation of this trace to disk.
+
+    Args:
+      artifacts_dir: the base directory to save the trace in.
+      summarize: a bool controlling whether numpy should summarize the inputs
+        and outputs if they're large. Setting this to False is very slow for
+        large outputs.
+    """
+    prior_printoptions = np.get_printoptions()
+    np.set_printoptions(
+        linewidth=NUMPY_LINEWIDTH,
+        threshold=None if summarize else sys.maxsize,
+        edgeitems=10)  # Can show more items since they won't clutter the logs.
+
+    trace_dir = self._get_trace_dir(artifacts_dir)
+    path = os.path.join(trace_dir, f"plaintext__{self.backend}.txt")
+    with open(path, "w") as f:
+      f.write(str(self))
+      f.write("\n")
+
+    np.set_printoptions(**prior_printoptions)
+
+  def save_pickle(self, artifacts_dir):
+    """Saves pickled copies of the inputs and outputs to this module."""
+    # TODO(meadowlark): Fix the following issues and pickle this class directly:
+    #   - Need to have pyiree installed (same goes for saving ModuleCalls).
+    #   - Can't save trace_function easily as it's in a local scope.
+    trace_dir = self._get_trace_dir(artifacts_dir)
+    for i, call in enumerate(self.calls):
+      path = os.path.join(trace_dir, f"call_{i}_inputs__{self.backend}.pkl")
+      with open(path, "wb") as f:
+        pickle.dump(call.inputs, f)
+      path = os.path.join(trace_dir, f"call_{i}_outputs__{self.backend}.pkl")
+      with open(path, "wb") as f:
+        pickle.dump(call.outputs, f)
+
 
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
-  # This class uses the following abbreviations:
-  #   ref: reference – for the reference CompiledModule
-  #   tar: target - for one of the target CompiledModules
-
   # Will be initialized by the @compile_module decorator.
   _module_class = None
   _exported_names = ()
@@ -743,12 +769,13 @@ class TracedModuleTestCase(tf.test.TestCase):
         failed_backend_indices.append(i)
 
     # Save the results to disk before validating.
-    trace_dir = os.path.join(self._artifacts_dir, "traces")
-    if not os.path.exists(trace_dir):
-      os.makedirs(trace_dir)
-    ref_trace.save_plaintext(trace_dir, FLAGS.summarize)
+    ref_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
+    if FLAGS.pickle_args:
+      ref_trace.save_pickle(self._artifacts_dir)
     for tar_trace in tar_traces:
-      tar_trace.save_plaintext(trace_dir, FLAGS.summarize)
+      tar_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
+      if FLAGS.pickle_args:
+        tar_trace.save_pickle(self._artifacts_dir)
 
     # Validate results.
     if len(failed_backend_indices) > 0:
