@@ -57,7 +57,6 @@ iree_check_single_backend_test_suite(
         # TODO(#1696): Enable after standard dialect can support floor
         # operation. Lowering from XLA -> linalg should be easy fix.
         # "floor.mlir",
-
         "gather.mlir",
         "gather_concat.mlir",
         "iota.mlir",
