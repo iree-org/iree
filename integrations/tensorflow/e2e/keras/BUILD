@@ -83,7 +83,6 @@ Command arguments description:
 
 SPECIAL_CASES = [
     "vision_model_test.py",
-    "lstm_static_test.py",
 ]
 
 VMLA_FAILING = [

@@ -56,8 +56,6 @@ package(
 SPECIAL_CASES = [
     "explicit_backend_test.py",
     "linspace_test.py",
-    "simple_arithmetic_test.py",
-    "strings_test.py",
 ]
 
 # keep sorted
