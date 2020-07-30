@@ -40,7 +40,9 @@ external_cc_library(
     "lib/Dialect/mhlo/IR/lhlo_ops.cc"
     "lib/Dialect/mhlo/transforms/chlo_legalize_to_hlo.cc"
     "lib/Dialect/mhlo/transforms/legalize_control_flow.cc"
+    "lib/Dialect/mhlo/transforms/legalize_gather_to_torch_index_select.cc"
     "lib/Dialect/mhlo/transforms/legalize_to_standard.cc"
+    "lib/Dialect/mhlo/transforms/lower_complex.cc"
     "lib/Dialect/mhlo/transforms/lower_general_dot.cc"
     "lib/Dialect/mhlo/transforms/materialize_broadcasts.cc"
     "lib/Dialect/mhlo/transforms/unfuse_batch_norm.cc"
@@ -67,9 +69,10 @@ external_cc_library(
   INCLUDES
     ${IREE_ROOT_DIR}/third_party/tensorflow/
     ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/
+    ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR
+    ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms/
   DEPS
     absl::core_headers
-    absl::flat_hash_set
     LLVMSupport
     MLIRAnalysis
     MLIRInferTypeOpInterface
@@ -88,6 +91,7 @@ external_cc_library(
     tensorflow_mlir_hlo_hlo_ops_pattern_gen
     tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
     tensorflow_mlir_hlo_legalize_to_standard_patterns_gen
+    tensorflow_mlir_hlo_lower_to_complex_inc_gen
     tensorflow_mlir_hlo_lhlo_ops_gen
     tensorflow_mlir_hlo_xla_canonicalize_gen
   PUBLIC
@@ -123,8 +127,8 @@ external_tablegen_library(
   OUTS
     -gen-op-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h.inc
     -gen-op-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.cc.inc
-    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_structs.h.inc
-    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_structs.cc.inc
+    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_structs.h.inc
+    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_structs.cc.inc
 )
 
 external_tablegen_library(
@@ -155,7 +159,7 @@ external_tablegen_library(
   SRCS
     "lib/Dialect/mhlo/IR/hlo_patterns.td"
   OUTS
-    -gen-rewriters include/mlir-hlo/Dialect/mhlo/IR/hlo_patterns.cc.inc
+    -gen-rewriters lib/Dialect/mhlo/IR/hlo_patterns.cc.inc
 )
 
 external_tablegen_library(
@@ -172,8 +176,8 @@ external_tablegen_library(
   OUTS
     -gen-op-decls include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h.inc
     -gen-op-defs include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.cc.inc
-    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/lhlo_structs.h.inc
-    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/lhlo_structs.cc.inc
+    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops_structs.h.inc
+    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops_structs.cc.inc
 )
 
 external_tablegen_library(
@@ -186,9 +190,9 @@ external_tablegen_library(
   ROOT
     ${TF_MLIR_HLO_SRC_ROOT}
   SRCS
-    "lib/Dialect/mhlo/transforms/canonicalize.td"
+  "lib/Dialect/mhlo/IR/mhlo_canonicalize.td"
   OUTS
-    -gen-rewriters lib/Dialect/mhlo/transforms/generated_canonicalize.inc
+    -gen-rewriters lib/Dialect/mhlo/IR/mhlo_canonicalize.inc
 )
 
 external_tablegen_library(
@@ -204,7 +208,7 @@ external_tablegen_library(
     "include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.td"
   OUTS
     -gen-op-interface-decls include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h.inc
-    -gen-op-interface-defs include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.cc.inc
+    -gen-op-interface-defs include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.cpp.inc
 )
 
 external_tablegen_library(
@@ -220,4 +224,19 @@ external_tablegen_library(
     "lib/Dialect/mhlo/transforms/legalize_to_standard_patterns.td"
   OUTS
     -gen-rewriters lib/Dialect/mhlo/transforms/generated_legalize_to_standard.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_hlo_lower_to_complex_inc_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_HLO_SRC_ROOT}
+  SRCS
+    "lib/Dialect/mhlo/transforms/lower_complex_patterns.td"
+  OUTS
+    -gen-rewriters lib/Dialect/mhlo/transforms/generated_lower_complex.inc
 )

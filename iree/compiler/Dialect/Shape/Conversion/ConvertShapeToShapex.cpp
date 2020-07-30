@@ -100,8 +100,28 @@ class ConvertShapeOfOp : public OpConversionPattern<shape::ShapeOfOp> {
     }
     auto resultType =
         RankedShapeType::get(tensorType.getShape(), rewriter.getContext());
-    rewriter.replaceOpWithNewOp<Shape::GetRankedShapeOp>(op, resultType,
-                                                         operands[0]);
+    // TODO(jpienaar): The following needs to be re-evaluated once the patch
+    // train from 2020/07/23 integrates properly. This is required to make
+    // it forward and backwards compatible. Also, tests need to be added once
+    // upstream integrates (and this can be tested).
+    // rewriter.replaceOpWithNewOp<Shape::GetRankedShapeOp>(op, resultType,
+    //                                                      operands[0]);
+    auto getRanked = rewriter.create<Shape::GetRankedShapeOp>(
+        op.getLoc(), resultType, operands[0]);
+
+    // For FromExtentTensorOp users, just forward the result from GetRanked.
+    SmallPtrSet<Operation *, 2> toDelete;
+    for (auto use : op.getOperation()->getUsers()) {
+      if (isa<FromExtentTensorOp>(use)) {
+        use->replaceAllUsesWith(getRanked);
+        toDelete.insert(use);
+      }
+    }
+    for (Operation *use : toDelete) {
+      rewriter.eraseOp(use);
+    }
+
+    rewriter.replaceOp(op.getOperation(), getRanked.getResult());
     return success();
   }
 };

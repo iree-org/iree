@@ -20,7 +20,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "DecomposeHLOClamp.cpp"
     "HLOToLinalgOnBuffers.cpp"
     "HLOToLinalgOnTensors.cpp"
     "Passes.cpp"
@@ -36,6 +35,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::HLOToHLO
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR

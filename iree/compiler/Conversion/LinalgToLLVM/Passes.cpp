@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 
+#include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -25,6 +26,8 @@ namespace mlir {
 namespace iree_compiler {
 
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
+  // Linalg -> Vectors Ops.
+  passManager.addPass(createMatMulTileAndVectorizePass());
   // Linalg -> SCF
   passManager.addPass(createConvertLinalgToLoopsPass());
   passManager.addPass(createCanonicalizerPass());

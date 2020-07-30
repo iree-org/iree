@@ -26,16 +26,10 @@ set -o pipefail
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
+source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
 
-# TODO(#2653): Don't run docker as root
-DOCKER_RUN_ARGS=(
-      # Make the source repository available
-      --volume="${WORKDIR?}:${WORKDIR?}"
-      --workdir="${WORKDIR?}"
-      # Delete the container after
-      --rm
-)
+# Sets DOCKER_RUN_ARGS
+docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   gcr.io/iree-oss/bazel-tensorflow:prod \
@@ -43,8 +37,7 @@ docker run "${DOCKER_RUN_ARGS[@]?}" \
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
-# TODO(#2653): Remove sudo when docker doesn't run as root
-sudo rm -rf "${KOKORO_ARTIFACTS_DIR?}"/*
+rm -rf "${KOKORO_ARTIFACTS_DIR?}"/*
 
 # Print out artifacts dir contents after deleting them as a coherence check.
 ls -1a "${KOKORO_ARTIFACTS_DIR?}/"

@@ -64,7 +64,7 @@ config_setting(
 
 cc_library(
     name = "python_headers",
-    hdrs = glob(["include/*.h"]),
+    hdrs = glob(["include/**/*.h"]),
     srcs = [{extra_srcs}],
     includes = ["include"],
     linkopts = [],

@@ -28,6 +28,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -143,8 +144,9 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
  public:
   explicit ConvertFuncWithHALInterface(MLIRContext *context,
                                        LLVMTypeConverter &typeconverter)
-      : ConvertToLLVMPattern(FuncOp::getOperationName(), context,
-                             typeconverter) {}
+      : ConvertToLLVMPattern(
+            mlir::FuncOp::getOperationName(), context, typeconverter,
+            LowerToLLVMOptions::getDefaultOptions(), 65535 - 1) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
@@ -308,6 +310,17 @@ struct ConvertToLLVMPass
 }  // namespace
 
 void ConvertToLLVMPass::runOnOperation() {
+  // Vector -> Vector transformation is needed before we do any conversion to
+  // LLVM.
+  {
+    OwningRewritePatternList patterns;
+    vector::populateVectorToVectorCanonicalizationPatterns(patterns,
+                                                           &getContext());
+    vector::populateVectorSlicesLoweringPatterns(patterns, &getContext());
+    vector::populateVectorContractLoweringPatterns(patterns, &getContext());
+    applyPatternsAndFoldGreedily(getOperation(), patterns);
+  }
+  //
   auto module = getOperation();
 
   LLVMTypeConverter converter(&getContext());
@@ -333,8 +346,15 @@ void ConvertToLLVMPass::runOnOperation() {
                   RemoveInterfaceOpPattern>(&getContext(), converter);
   LLVMConversionTarget target(getContext());
   target.addLegalOp<ModuleOp, ModuleTerminatorOp>();
-  if (failed(applyPartialConversion(module, target, patterns)))
+  target.addIllegalOp<IREE::PlaceholderOp>();
+  target.addDynamicallyLegalOp<FuncOp>([](FuncOp funcOp) {
+    bool any = false;
+    funcOp.walk([&](IREE::PlaceholderOp placeholderOp) { any = true; });
+    return any ? false : true;
+  });
+  if (failed(applyPartialConversion(module, target, patterns))) {
     signalPassFailure();
+  }
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {

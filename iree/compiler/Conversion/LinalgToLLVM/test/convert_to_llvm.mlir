@@ -1,12 +1,14 @@
 // RUN: iree-opt -iree-codegen-convert-to-llvm -split-input-file %s | IreeFileCheck %s
 
-func @convert_dynamic_shape() {
+func @convert_dynamic_shape() -> f32 {
+  %c0 = constant 0 : index
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
   %1 = hal.interface.load.constant offset = 0 : index
   %2 = hal.interface.load.constant offset = 1 : index
   %3 = shapex.make_ranked_shape %1, %2 : (index, index) -> !shapex.ranked_shape<[?,?]>
   %6 = shapex.tie_shape %0, %3 : memref<?x?xf32>, !shapex.ranked_shape<[?,?]>
-  return
+  %7 = load %6[%c0, %c0] : memref<?x?xf32>
+  return %7 : f32
 }
 hal.interface @legacy_io attributes {push_constants = 2 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

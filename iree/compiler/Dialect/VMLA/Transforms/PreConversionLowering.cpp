@@ -34,6 +34,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -281,6 +282,15 @@ class PreConversionLoweringPass
  public:
   void runOnOperation() {
     MLIRContext *context = &getContext();
+
+    // These patterns should be run greedily as they are not dialect
+    // conversions.
+    OwningRewritePatternList greedyPatterns;
+    mhlo::PopulateComplexLoweringPatterns(context, &greedyPatterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(), greedyPatterns))) {
+      return signalPassFailure();
+    }
+
     OwningRewritePatternList patterns;
     ConversionTarget target(*context);
     target.addLegalDialect<StandardOpsDialect>();

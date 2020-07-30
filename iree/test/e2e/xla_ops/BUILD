@@ -57,11 +57,9 @@ iree_check_single_backend_test_suite(
         # TODO(#1696): Enable after standard dialect can support floor
         # operation. Lowering from XLA -> linalg should be easy fix.
         # "floor.mlir",
-
-        # TODO(#1694): Enable after mhlo.gather can be lowered to linalg.
-        # "gather.mlir",
-        # "gather_concat.mlir",
-        #
+        "gather.mlir",
+        "gather_concat.mlir",
+        "iota.mlir",
         "log.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -88,6 +86,8 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+# TODO(ataei): Enable dylib-llvm-aot tests.
+# See: https://github.com/google/iree/issues/2645
 iree_check_single_backend_test_suite(
     name = "check_llvm-ir_llvm",
     srcs = [
@@ -106,6 +106,9 @@ iree_check_single_backend_test_suite(
         "divide.mlir",
         "dot.mlir",
         "exponential.mlir",
+        "gather.mlir",
+        "gather_concat.mlir",
+        "iota.mlir",
         "log.mlir",
         "maximum.mlir",
         "minimum.mlir",

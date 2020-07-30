@@ -42,6 +42,7 @@ fi
 declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
+  --action_env=IREE_LLVMAOT_LINKER_PATH=$IREE_LLVMAOT_LINKER_PATH
 )
 # Pass in VK_ICD_FILENAMES if exists so that the Vulkan loader can find the
 # Vulkan implementation.
@@ -92,8 +93,6 @@ bazel \
         --config=generic_clang \
         --build_tag_filters="${BUILD_TAG_FILTERS?}" \
         --test_tag_filters="${TEST_TAG_FILTERS?}" \
+        --config=rs \
         --test_output=errors \
         --keep_going
-        # TODO: Enable result store once the Kokoro VMs used for this test have the
-        # appropriate auth.
-        # --config=rs

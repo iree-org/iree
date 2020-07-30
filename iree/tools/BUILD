@@ -243,6 +243,7 @@ iree_cc_binary(
         "@com_google_absl//absl/types:span",
         "//iree/base:api",
         "//iree/base:api_util",
+        "//iree/base:localfile",
         "//iree/base:source_location",
         "//iree/base:tracing",
         "//iree/compiler/Dialect/Flow/Transforms",
