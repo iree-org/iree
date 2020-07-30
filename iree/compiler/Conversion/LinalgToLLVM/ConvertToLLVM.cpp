@@ -218,11 +218,11 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
 
-    // func foo(%packed_buffer_args: !llvm<i8**>, %push_constant: !llvm<i64*>)
+    // func foo(%packed_buffer_args: !llvm<i8**>, %push_constant: !llvm<i32*>)
     auto packedBuffersArgsTy =
         LLVM::LLVMType::getInt8PtrTy(typeConverter.getDialect()).getPointerTo();
     auto pushConstantArgTy =
-        LLVM::LLVMType::getInt64Ty(typeConverter.getDialect()).getPointerTo();
+        LLVM::LLVMType::getInt32Ty(typeConverter.getDialect()).getPointerTo();
     signatureConverter.addInputs(packedBuffersArgsTy);
     signatureConverter.addInputs(pushConstantArgTy);
 
@@ -279,7 +279,9 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
                                                    newFuncOp.getArgument(1),
                                                    ArrayRef<Value>({offset}));
       Value dimConstant = builder.create<LLVM::LoadOp>(loc, constPtr);
-      rewriter.replaceOp(loadOp, dimConstant);
+      Value dimConstantCasted = builder.create<LLVM::ZExtOp>(
+          loc, typeConverter.convertType(loadOp.getType()), dimConstant);
+      rewriter.replaceOp(loadOp, dimConstantCasted);
     }
 
     rewriter.eraseOp(funcOp);
