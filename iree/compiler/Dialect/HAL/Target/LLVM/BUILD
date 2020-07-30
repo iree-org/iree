@@ -11,13 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-load("//iree:build_defs.oss.bzl", "platform_trampoline_deps")
+
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+# if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} AND NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
+if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
+  return()
+endif()
+""",
 )
 
 cc_library(

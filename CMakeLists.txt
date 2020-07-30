@@ -48,9 +48,9 @@ option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 
 #TODO: Make this functional!
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\"." FORCE)
+  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
 set(IREE_TARGET_BACKENDS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of target backends to build, or \"all\"." FORCE)
+  CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
 # LINT.ThenChange(
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_options,
 #   https://github.com/google/iree/tree/main/build_tools/cmake/iree_cross_compile.cmake:iree_cross_compile_invoke
@@ -87,8 +87,8 @@ endif()
 set(IREE_ALL_HAL_DRIVERS
   DyLib
   LLVM
-  Vulkan
   VMLA
+  Vulkan
 )
 
 if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
@@ -99,7 +99,7 @@ if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM DyLib)
   endif()
 endif()
-message(STATUS "Building HAL drivers ${IREE_HAL_DRIVERS_TO_BUILD}")
+message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
 
 # Default every IREE_HAL_DRIVER_* to OFF
 foreach(_backend ${IREE_ALL_HAL_DRIVERS})
@@ -125,7 +125,7 @@ set(IREE_ALL_TARGET_BACKENDS
 if( IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all" )
   set( IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS} )
 endif()
-message(STATUS "Building target backends ${IREE_TARGET_BACKENDS_TO_BUILD}")
+message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 
 # Default every IREE_TARGET_BACKEND_* to OFF
 foreach(_backend ${IREE_ALL_TARGET_BACKENDS})

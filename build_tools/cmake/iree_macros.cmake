@@ -252,3 +252,26 @@ function(iree_add_executable_dependencies EXECUTABLE DEPENDENCY)
     add_dependencies(${EXECUTABLE} ${DEPENDENCY})
   endif()
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Tests
+#-------------------------------------------------------------------------------
+
+# iree_add_test_environment_properties
+#
+# Adds test environment variable properties based on the current build options.
+#
+# Parameters:
+# TEST_NAME: the test name, e.g. iree/base:ref_ptr_test
+# TARGET_NAME: the target name, e.g. iree_base_ref_ptr_test
+function(iree_add_test_environment_properties TEST_NAME TARGET_NAME)
+  # Can technically build just a target backend and run tests which don't
+  # require a corresponding HAL driver, but that's an edge case - just disable
+  # if either isn't being built.
+  if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
+  endif()
+  if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} OR NOT ${IREE_HAL_DRIVER_LLVM})
+    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_LLVMJIT_DISABLE=1")
+  endif()
+endfunction()

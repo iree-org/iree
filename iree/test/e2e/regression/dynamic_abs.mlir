@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
-// RUN: iree-run-mlir -iree-hal-target-backends=llvm-ir %s | IreeFileCheck %s
+// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=llvm-ir %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @dynamic_tensor
 func @dynamic_tensor() -> tensor<?x?xf32> attributes { iree.module.export } {
