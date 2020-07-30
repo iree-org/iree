@@ -645,12 +645,11 @@ class TracedModule:
     """Wraps a CompiledModule so that all inputs and outputs are traced.
 
     The TracedModule returned will have an API almost identical to that of the
-    passed CompiledModule. The only changes are:
-      - If the keywords `rtol` or `atol` are passed to one of the
-        CompiledModule's methods, then they will be used to set the tolerance
-        for comparing that call to the same call in another trace. So for
-        example, calling `traced_module.add(a, b rtol=1e-8)` would be the same
-        as calling `module.add(a, b)`.
+    passed CompiledModule. The only changes is that if the keywords `rtol` or
+    `atol` are passed to one of the CompiledModule's methods, then they will be
+    used to set the tolerance for comparing that call to the same call in
+    another trace. So for example, calling `traced_module.add(a, b rtol=1e-8)`
+    would be the same as calling `module.add(a, b)`.
 
     Args:
       module: the CompiledModule to trace.
