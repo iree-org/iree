@@ -697,9 +697,9 @@ void ConvertToGPUPass::runOnFunction() {
 #undef ADD_ALL_LINALG_PATTERNS
 
 #define ADD_ALL_CONV_POOL_PATTERNS(OP_NAME)                                    \
-    MapConvPoolToLocalInvocationId<OP_NAME>,                                   \
-    MapLinalgOpToGlobalInvocationId<OP_NAME>
+    MapLinalgOpToLocalInvocationId<OP_NAME>
 
+    ADD_ALL_CONV_POOL_PATTERNS(linalg::ConvOp),
     ADD_ALL_CONV_POOL_PATTERNS(linalg::PoolingMaxOp),
     ADD_ALL_CONV_POOL_PATTERNS(linalg::PoolingMinOp),
     ADD_ALL_CONV_POOL_PATTERNS(linalg::PoolingSumOp),
@@ -709,12 +709,6 @@ void ConvertToGPUPass::runOnFunction() {
     MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
     PartitionPLoopToWorkgroups, RemoveLinalgRange>(context);
   // clang-format on
-
-  patterns.insert<MapLinalgOpToGlobalInvocationId<linalg::ConvOp>>(context);
-  if (useLegacyConvLowering)
-    patterns.insert<MapConvPoolToLocalInvocationId<linalg::ConvOp>>(context);
-  else
-    patterns.insert<MapLinalgOpToLocalInvocationId<linalg::ConvOp>>(context);
 
   if (failed(applyFullConversion(funcOp, target, patterns)))
     return signalPassFailure();
