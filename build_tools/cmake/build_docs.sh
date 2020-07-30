@@ -64,7 +64,6 @@ PYTHON_BIN=`which python3` scripts/update_e2e_coverage.py ${BUILD_DIR}
 # The list of input IR examples
 declare -a ir_examples=(
   iree/samples/ops/mhlo-dot.mlir
-  iree/samples/ops/mhlo-conv.mlir
 )
 # The list of compiler targets
 declare -a compiler_targets=(
@@ -78,7 +77,7 @@ for example in "${ir_examples[@]}"; do
   for target in "${compiler_targets[@]}"; do
     example_name=$(basename ${example%.mlir})
     filepath=${BUILD_DIR}/doc/ir_examples/${example_name}-${target}.md
-    title="${example_name} IR conversion example for ${target} backend"
+    title="${example_name} on ${target}"
 
     echo -e "# ${title}\n" > ${filepath}
 
@@ -96,6 +95,7 @@ iree-opt -iree-transformation-pipeline \\
   -iree-hal-target-backends=${target} \\
   --print-ir-after-all \\
   -mlir-disable-threading \\
+  -mlir-elide-elementsattrs-if-larger=8 \\
   ${example}
 "
     echo -e "${cmd}" >> ${filepath}
@@ -111,9 +111,13 @@ iree-opt -iree-transformation-pipeline \\
       -iree-hal-target-backends=${target} \
       -print-ir-after-all \
       -mlir-disable-threading \
+      -mlir-elide-elementsattrs-if-larger=8 \
       ${example} 1>/dev/null 2>${tmpfile}
+    # Turn pass comment into headers
     sed 's!^// \*\*\* IR Dump After \(.*\) \*\*\*$!```\n### IR Dump After \1\n```!' \
       ${tmpfile} >> ${filepath}
+    # Remove extra empty lines
+    sed -i '/^$/N;/^\n$/D' ${filepath}
     echo -e '```' >> ${filepath}
   done
 done
