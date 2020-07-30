@@ -43,10 +43,6 @@ class StatefulCountingModule(tf.Module):
   def get_count(self):
     return self.count
 
-  @tf.function(input_signature=[tf.TensorSpec([1])])
-  def increment_by(self, value):
-    self.count.assign_add(value)
-
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
