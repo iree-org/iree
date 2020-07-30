@@ -678,15 +678,15 @@ class TracedModule:
     return call
 
   def __getattr__(self, attr):
-    # Try to resolve it as an attr on self.module.
+    # Try to resolve it as an attr on self._module.
     if not hasattr(self._module, attr):
       raise AttributeError(f"The compiled module does not have attr '{attr}'")
     module_attr = getattr(self._module, attr)
     if not hasattr(module_attr, "__call__"):
-      # e.g. trace.backend
+      # e.g. traced_module.backend
       return module_attr
     else:
-      # e.g. trace.simple_mul(a, b)
+      # e.g. traced_module.simple_mul(a, b)
       return self._trace_call(module_attr, method_name=attr)
 
 
@@ -696,7 +696,7 @@ class TracedModuleTestCase(tf.test.TestCase):
   _module_class = None
   _exported_names = ()
 
-  # Will be initialized in setUpClass
+  # Will be initialized in setUpClass.
   _ref_module = None
   _tar_modules = None
 
