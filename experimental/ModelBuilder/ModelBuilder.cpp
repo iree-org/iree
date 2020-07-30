@@ -235,8 +235,7 @@ Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
     func = builder.create<FuncOp>(
         module.getLoc(), functionName,
         FunctionType::get(SmallVector<Type, 4>(values.getTypes()), returnTypes,
-                          builder.getContext()),
-        ArrayRef<NamedAttribute>{});
+                          builder.getContext()));
   }
   return std_call(builder.getSymbolRefAttr(func), returnTypes, values);
 }

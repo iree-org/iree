@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,34 +19,20 @@ package(
 )
 
 cc_library(
-    name = "HLOToLinalg",
+    name = "HLOToHLO",
     srcs = [
-        "HLOToLinalgOnBuffers.cpp",
-        "HLOToLinalgOnTensors.cpp",
+        "DecomposeHLOClamp.cpp",
         "Passes.cpp",
-        "ResolveShapeOps.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Conversion/CodegenUtils",
-        "//iree/compiler/Conversion/HLOToHLO",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/Shape/IR",
-        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_gather_to_torch_index_select",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
     ],
 )

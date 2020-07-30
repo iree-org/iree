@@ -49,6 +49,36 @@ def backends_to_str(target_backends):
   return "__".join(normalized_backends)
 
 
+def to_mlir_type(dtype):
+  """Returns a string that denotes the type `dtype` in MLIR style."""
+  bits = dtype.itemsize * 8
+  if np.issubdtype(dtype, np.integer):
+    return f"i{bits}"
+  elif np.issubdtype(dtype, np.floating):
+    return f"f{bits}"
+  else:
+    raise TypeError(f"Expected integer or floating type, but got {dtype}")
+
+
+def save_input_values(inputs, artifacts_dir=None):
+  """Saves input values with IREE tools format if `artifacts_dir` is set."""
+  result = []
+  for array in inputs:
+    shape = [str(dim) for dim in list(array.shape)]
+    shape.append(to_mlir_type(array.dtype))
+    shape = "x".join(shape)
+    values = " ".join([str(x) for x in array.flatten()])
+    result.append(f"{shape}={values}")
+  result = "\n".join(result)
+  if artifacts_dir is not None:
+    inputs_path = os.path.join(artifacts_dir, "inputs.txt")
+    logging.info("Saving IREE input values to: %s", inputs_path)
+    with open(inputs_path, "w") as f:
+      f.write(result)
+      f.write("\n")
+  return result
+
+
 def compile_tf_module(tf_module,
                       target_backends=(),
                       exported_names=(),

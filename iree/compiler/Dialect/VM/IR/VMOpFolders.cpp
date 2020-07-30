@@ -1270,11 +1270,11 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
     if (op.getOperation()->getOperand(0).getType().template isa<RefType>()) {
       condValue = rewriter.template createOrFold<CmpRefOp>(
           op.getLoc(), ArrayRef<Type>{condType},
-          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+          op.getOperation()->getOperands());
     } else {
       condValue = rewriter.template createOrFold<CmpI32Op>(
           op.getLoc(), ArrayRef<Type>{condType},
-          op.getOperation()->getOperands(), ArrayRef<NamedAttribute>{});
+          op.getOperation()->getOperands());
     }
     condValue = rewriter.createOrFold<XorI32Op>(
         op.getLoc(), condType, condValue,
