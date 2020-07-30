@@ -84,7 +84,6 @@ LLVM_FAILING = [
 VULKAN_FAILING = [
     "broadcasting_test.py",
     "control_flow_test.py",
-    "conv_test.py",
     "depth_conv_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
@@ -93,7 +92,6 @@ VULKAN_FAILING = [
     "matrix_ops_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "sliding_window_test.py",  # TODO(#2659)
     "strings_test.py",
 ]
 
