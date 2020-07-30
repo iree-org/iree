@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Temporary duplicate of `lstm_static_test.py` for prototyping.
+
 # This test is the same as keras_lstm_test, but all shapes are static.
 # This stresses the TensorList lowering more specifically.
 
@@ -43,17 +45,16 @@ class LstmStatic(tf.Module):
 
 
 @tf_test_utils.compile_module(LstmStatic, exported_names=["predict"])
-class LstmTest(tf_test_utils.CompiledModuleTestCase):
+class LstmTest(tf_test_utils.TracedModuleTestCase):
 
   def test_lstm(self):
-    m = self.get_module()
-    m.predict(
-        tf.constant(
-            np.arange(NUM_BATCH * NUM_TIMESTEPS * NUM_UNITS,
-                      dtype=np.float32).reshape(
-                          [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]),
-            shape=[NUM_BATCH, NUM_TIMESTEPS,
-                   NUM_UNITS])).print().assert_all_close(1e-5, 1e-5)
+
+    def predict(module):
+      inputs = np.arange(
+          np.prod(INPUT_SHAPE), dtype=np.float32).reshape(INPUT_SHAPE)
+      module.predict(inputs, rtol=1e-5, atol=1e-5)
+
+    self.compare_backends(predict)
 
 
 if __name__ == "__main__":

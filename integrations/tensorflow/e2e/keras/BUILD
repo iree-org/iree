@@ -83,7 +83,7 @@ Command arguments description:
 
 SPECIAL_CASES = [
     "vision_model_test.py",
-    "lstm_static_trace_test.py",
+    "lstm_static_test.py",
 ]
 
 VMLA_FAILING = [
@@ -247,13 +247,13 @@ iree_py_binary(
 # prototyping a change.
 
 iree_py_test(
-    name = "lstm_static_trace_test_vmla",
-    srcs = ["lstm_static_trace_test.py"],
+    name = "lstm_static_test_vmla",
+    srcs = ["lstm_static_test.py"],
     args = [
         "--reference_backend=tf",
         "--target_backends=tf,iree_vmla",
     ],
-    main = "lstm_static_trace_test.py",
+    main = "lstm_static_test.py",
     python_version = "PY3",
     tags = [
         "driver=vmla",
