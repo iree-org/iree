@@ -27,13 +27,13 @@ hal.executable.target "vulkan*" {
     func @main_ex_dispatch() {
       %c0 = constant 0 : index
       %0 = hal.interface.load.tensor @legacy_io::@arg0,
-             offset = %c0 : tensor<4x5xf32>
+             offset = %c0 : tensor<32x24xf32>
       %1 = hal.interface.load.tensor @legacy_io::@arg1,
-             offset = %c0 : tensor<5x10xf32>
+             offset = %c0 : tensor<24x16xf32>
       %2 = "mhlo.dot"(%0, %1) {precision_config = ["DEFAULT", "DEFAULT"]} :
-             (tensor<4x5xf32>, tensor<5x10xf32>) -> tensor<4x10xf32>
+             (tensor<32x24xf32>, tensor<24x16xf32>) -> tensor<32x16xf32>
       hal.interface.store.tensor %2, @legacy_io::@ret0,
-        offset = %c0 : tensor<4x10xf32>
+        offset = %c0 : tensor<32x16xf32>
       return
     }
     hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -57,17 +57,18 @@ hal.executable.target "vulkan*" {
     func @main_ex_dispatch() {
       %c0 = constant 0 : index
       %0 = hal.interface.load.tensor @legacy_io::@arg0,
-             offset = %c0 : tensor<10x5xf32>
+             offset = %c0 : tensor<10x15xf32>
       %1 = hal.interface.load.tensor @legacy_io::@arg1,
-             offset = %c0 : tensor<10x5xf32>
+             offset = %c0 : tensor<10x15xf32>
       %2 = hal.interface.load.tensor @legacy_io::@arg2,
-             offset = %c0 : tensor<10x5xf32>
+             offset = %c0 : tensor<15xf32>
       %3 = "mhlo.add"(%0, %1) :
-         (tensor<10x5xf32>, tensor<10x5xf32>) -> tensor<10x5xf32>
-      %4 = "mhlo.multiply"(%3, %2) :
-         (tensor<10x5xf32>, tensor<10x5xf32>) -> tensor<10x5xf32>
-      hal.interface.store.tensor %4, @legacy_io::@ret0,
-        offset = %c0 : tensor<10x5xf32>
+         (tensor<10x15xf32>, tensor<10x15xf32>) -> tensor<10x15xf32>
+      %4 = "mhlo.broadcast"(%2) : (tensor<15xf32>) -> tensor<10x15xf32>
+      %5 = "mhlo.multiply"(%3, %4) :
+         (tensor<10x15xf32>, tensor<10x15xf32>) -> tensor<10x15xf32>
+      hal.interface.store.tensor %5, @legacy_io::@ret0,
+        offset = %c0 : tensor<10x15xf32>
       return
     }
     hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -130,11 +131,13 @@ The next sections describe each of these passes in more detail.
 
 The first step is to convert MHLO operations to Linalg on tensors. This is done
 using the [HLOToLinalgPass][HLOToLinalgPass] from Tensorflow. An example of the
-conversion is shown below, where each of the `mhlo.add` and `mhlo.multiply`
-operations are converted to `linalg.generic` operations on tensors.
+conversion is shown below, where the `mhlo.add`, `mhlo.broadcast` and
+`mhlo.multiply` operations are converted to `linalg.generic` operations on
+tensors.
 
 ```mlir
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
 %3 = linalg.generic
        {args_in = 2 : i64, args_out = 1 : i64,
         indexing_maps = [#map0, #map0, #map0],
@@ -142,15 +145,22 @@ operations are converted to `linalg.generic` operations on tensors.
      ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
        %5 = addf %arg0, %arg1 : f32
        linalg.yield %5 : f32
-     } : tensor<10x5xf32>, tensor<10x5xf32> -> tensor<10x5xf32>
+     } : tensor<10x15xf32>, tensor<10x15xf32> -> tensor<10x15xf32>
 %4 = linalg.generic
+       {args_in = 1 : i64, args_out = 1 : i64,
+        indexing_maps = [#map1, #map0],
+        iterator_types = ["parallel", "parallel"]} %2 {
+     ^bb0(%arg0: f32):  // no predecessors
+       linalg.yield %arg0 : f32
+     }: tensor<15xf32> -> tensor<10x15xf32>
+%5 = linalg.generic
        {args_in = 2 : i64, args_out = 1 : i64,
         indexing_maps = [#map0, #map0, #map0],
-        iterator_types = ["parallel", "parallel"]} %3, %2 {
+        iterator_types = ["parallel", "parallel"]} %3, %4 {
      ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
        %5 = mulf %arg0, %arg1 : f32
        linalg.yield %5 : f32
-     }: tensor<10x5xf32>, tensor<10x5xf32> -> tensor<10x5xf32>
+     }: tensor<10x15xf32>, tensor<10x15xf32> -> tensor<10x15xf32>
 ```
 
 <a name="snippet3"></a> Snippet 3 : MHLO to Linalg conversion for
@@ -190,15 +200,16 @@ data movement operations. An example of the fused op is shown below.
 
 ```mlir
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
 %3 = linalg.generic
        {args_in = 3 : i64, args_out = 1 : i64,
-        indexing_maps = [#map0, #map0, #map0, #map0],
+        indexing_maps = [#map0, #map0, #map1, #map0],
         iterator_types = ["parallel", "parallel"]} %0, %1, %2 {
      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
        %4 = addf %arg0, %arg1 : f32
        %5 = mulf %4, %arg2 : f32
        linalg.yield %5 : f32
-     }: tensor<?x5xf32>, tensor<?x5xf32>, tensor<?x5xf32> -> tensor<?x5xf32>
+     }: tensor<10x15xf32>, tensor<10x15xf32>, tensor<15xf32> -> tensor<10x15xf32>
 ```
 
 <a name="snippet4"></a> Snippet 4: Fusion of Linalg operation on tensors for
@@ -265,15 +276,15 @@ for the two examples in Snippets 1 and 2.
 ```mlir
 func @main_ex_dispatch() {
   %0 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@ret0} : memref<4x10xf32>
+         {binding = @legacy_io::@ret0} : memref<32x16xf32>
   %c0 = constant 0 : index
   %1 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg0} : memref<4x5xf32>
+         {binding = @legacy_io::@arg0} : memref<32x24xf32>
   %2 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg1} : memref<5x10xf32>
+         {binding = @legacy_io::@arg1} : memref<24x16xf32>
   %cst = constant 0.000000e+00 : f32
   linalg.matmul(%1, %2, %0) :
-    memref<4x5xf32>, memref<5x10xf32>, memref<4x10xf32>
+    memref<32x24xf32>, memref<24x16xf32>, memref<32x16xf32>
   return
 }
 ```
@@ -283,25 +294,26 @@ Linalg operation on `memref`s.
 
 ```mlir
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
 func @main_ex_dispatch() {
   %0 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@ret0} : memref<10x5xf32>
+         {binding = @legacy_io::@ret0} : memref<10x15xf32>
   %c0 = constant 0 : index
   %1 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg0} : memref<10x5xf32>
+         {binding = @legacy_io::@arg0} : memref<10x15xf32>
   %2 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg1} : memref<10x5xf32>
+         {binding = @legacy_io::@arg1} : memref<10x15xf32>
   %3 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg2} : memref<10x5xf32>
+         {binding = @legacy_io::@arg2} : memref<15xf32>
   linalg.generic
     {args_in = 3 : i64, args_out = 1 : i64,
-     indexing_maps = [#map0, #map0, #map0],
+     indexing_maps = [#map0, #map0, #map1, #map0],
      iterator_types = ["parallel", "parallel"]} %1, %2, %3, %0 {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
     %4 = addf %arg0, %arg1 : f32
     %5 = mulf %4, %arg2 : f32
     linalg.yield %5 : f32
-  }: memref<10x5xf32>, memref<10x5xf32>, memref<10x5xf32>, memref<10x5xf32>
+  }: memref<10x15xf32>, memref<10x15xf32>, memref<15xf32>, memref<10x15xf32>
   return
 }
 ```
@@ -350,18 +362,20 @@ func @main_ex_dispatch_0()
   attributes {
     spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}} {
   %cst = constant 0.000000e+00 : f32
+  %c32 = constant 32 : index
+  %c24 = constant 24 : index
+  %c16 = constant 16 : index
   %c0 = constant 0 : index
   %c4 = constant 4 : index
-  %c10 = constant 10 : index
   %0 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@ret0} : memref<4x10xf32>
+         {binding = @legacy_io::@ret0} : memref<32x16xf32>
   %1 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg0} : memref<4x5xf32>
+         {binding = @legacy_io::@arg0} : memref<32x24xf32>
   %2 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg1} : memref<5x10xf32>
-  linalg.fill(%0, %cst) : memref<4x10xf32>, f32
-  scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c4, %c10) step (%c8, %c8) {
-    scf.for %arg2 = %c0 to %c5 step %c4 {
+         {binding = @legacy_io::@arg1} : memref<24x16xf32>
+  linalg.fill(%0, %cst) : memref<32x16xf32>, f32
+  scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c16) step (%c8, %c8) {
+    scf.for %arg2 = %c0 to %24 step %c4 {
       ...
       %5 = subview %1[%arg0, %arg2]...
       ...
@@ -440,19 +454,21 @@ space annotation used here is consistent with what
 func @matmul_tile()
   attributes {
     spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}} {
-  %c96 = constant 96 : index
+  %c32 = constant 32 : index
+  %c24 = constant 24 : index
+  %c16 = constant 16 : index
   %c4 = constant 4 : index
   %c8 = constant 8 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg0} : memref<96x96xf32>
+         {binding = @legacy_io::@arg0} : memref<32x24xf32>
   %1 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg1} : memref<96x96xf32>
+         {binding = @legacy_io::@arg1} : memref<24x16xf32>
   %2 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@ret0} : memref<96x96xf32>
-  scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c96, %c96) step (%c8, %c8) {
-    scf.for %arg2 = %c0 to %c96 step %c4 {
+         {binding = @legacy_io::@ret0} : memref<32x16xf32>
+  scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c16) step (%c8, %c8) {
+    scf.for %arg2 = %c0 to %c24 step %c4 {
       ...
       %5 = subview %0[%arg0, %arg2]...
       ...
@@ -518,38 +534,40 @@ lowering are distributed across workitems within the workgroup.
 func @main_ex_dispatch_0_dispatch_1()
   attributes {
     spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}} {
-  %c5 = constant 5 : index
+  %c24 = constant 24 : index
   %c8 = constant 8 : index
   %c4 = constant 4 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %0 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@ret0} : memref<4x10xf32>
+         {binding = @legacy_io::@ret0} : memref<32x16xf32>
   %1 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg0} : memref<4x5xf32>
+         {binding = @legacy_io::@arg0} : memref<32x24xf32>
   %2 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg1} : memref<5x10xf32>
+         {binding = @legacy_io::@arg1} : memref<24x16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = muli %3, %c8 : index
-  scf.for %arg0 = %c0 to %c5 step %c4 {
+  %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+  %5 = muli %4, %c8 : index
+  %6 = muli %3, %c8 : index
+  scf.for %arg0 = %c0 to %c24 step %c4 {
     ...
-    %9 = subview %1[0, %arg0]
+    %15 = subview %1[%5, %arg0]
     ...
-    %14 = subview %2[%arg0, %4]
-    %15 = subview %0[0, %4]
-    %16 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %17 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %18 = cmpi "slt", %17, %c4 : index
-    %19 = cmpi "slt", %16, %13 : index
-    %20 = and %18, %19 : i1
-    scf.if %20 {
-      scf.for %arg1 = %c0 to %8 step %c1 {
-        %21 = load %9[%17, %arg1] : memref<4x?xf32, #map0>
-        %22 = load %14[%arg1, %16] : memref<?x?xf32, #map1>
-        %23 = load %15[%17, %16] : memref<4x?xf32, #map1>
-        %24 = mulf %21, %22 : f32
-        %25 = addf %23, %24 : f32
-        store %25, %15[%17, %16] : memref<4x?xf32, #map1>
+    %20 = subview %2[%arg0, %6]
+    %21 = subview %0[%5, %6]
+    %22 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %23 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %24 = cmpi "slt", %23, %10 : index
+    %25 = cmpi "slt", %22, %19 : index
+    %26 = and %24, %25 : i1
+    scf.if %26 {
+      scf.for %arg1 = %c0 to %14 step %c1 {
+        %27 = load %15[%23, %arg1] : memref<?x?xf32, #map0>
+        %28 = load %20[%arg1, %22] : memref<?x?xf32, #map1>
+        %29 = load %21[%23, %22] : memref<?x?xf32, #map1>
+        %30 = mulf %21, %22 : f32
+        %31 = addf %23, %24 : f32
+        store %25, %15[%23, %22] : memref<4x?xf32, #map1>
       }
     }
   }
@@ -574,13 +592,13 @@ func @main_ex_dispatch_0()
   %c50 = constant 50 : index
   %c5 = constant 5 : index
   %0 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@ret0} : memref<10x5xf32>
+         {binding = @legacy_io::@ret0} : memref<10x15xf32>
   %1 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg0} : memref<10x5xf32>
+         {binding = @legacy_io::@arg0} : memref<10x15xf32>
   %2 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg1} : memref<10x5xf32>
+         {binding = @legacy_io::@arg1} : memref<10x15xf32>
   %3 = iree.placeholder for "interface buffer"
-         {binding = @legacy_io::@arg2} : memref<10x5xf32>
+         {binding = @legacy_io::@arg2} : memref<15xf32>
   %4 = "gpu.block_id"() {dimension = "x"} : () -> index
   %5 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %6 = "gpu.thread_id"() {dimension = "x"} : () -> index
@@ -590,12 +608,12 @@ func @main_ex_dispatch_0()
   scf.if %9 {
     %10 = divi_signed %8, %c5 : index
     %11 = remi_signed %8, %c5 : index
-    %12 = load %1[%10, %11] : memref<10x5xf32>
-    %13 = load %2[%10, %11] : memref<10x5xf32>
-    %14 = load %3[%10, %11] : memref<10x5xf32>
+    %12 = load %1[%10, %11] : memref<10x15xf32>
+    %13 = load %2[%10, %11] : memref<10x15xf32>
+    %14 = load %3[%11] : memref<15xf32>
     %15 = addf %12, %13 : f32
     %16 = mulf %15, %14 : f32
-    store %16, %0[%10, %11] : memref<10x5xf32>
+    store %16, %0[%10, %11] : memref<10x15xf32>
   }
   return
 }
