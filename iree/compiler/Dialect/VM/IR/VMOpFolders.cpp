@@ -1710,21 +1710,29 @@ void CondFailOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 namespace {
 
 /// Rewrites a check op to a cmp and a cond_fail.
-template <typename CheckOp, typename CmpI32Op, typename CmpRefOp>
+template <typename CheckOp, typename CmpI32Op, typename CmpI64Op,
+          typename CmpRefOp>
 struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
   using OpRewritePattern<CheckOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CheckOp op,
                                 PatternRewriter &rewriter) const override {
     Type condType = rewriter.getI32Type();
     Value condValue;
-    if (op.getOperation()->getOperand(0).getType().template isa<RefType>()) {
+    Type operandType = op.getOperation()->getOperand(0).getType();
+    if (operandType.template isa<RefType>()) {
       condValue = rewriter.template createOrFold<CmpRefOp>(
           op.getLoc(), ArrayRef<Type>{condType},
           op.getOperation()->getOperands());
-    } else {
+    } else if (operandType.isInteger(64)) {
+      condValue = rewriter.template createOrFold<CmpI64Op>(
+          op.getLoc(), ArrayRef<Type>{condType},
+          op.getOperation()->getOperands());
+    } else if (operandType.isInteger(32)) {
       condValue = rewriter.template createOrFold<CmpI32Op>(
           op.getLoc(), ArrayRef<Type>{condType},
           op.getOperation()->getOperands());
+    } else {
+      return failure();
     }
     condValue = rewriter.createOrFold<XorI32Op>(
         op.getLoc(), condType, condValue,
@@ -1741,19 +1749,22 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
 
 void CheckEQOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                             MLIRContext *context) {
-  results.insert<RewriteCheckToCondFail<CheckEQOp, CmpEQI32Op, CmpEQRefOp>>(
+  results.insert<
+      RewriteCheckToCondFail<CheckEQOp, CmpEQI32Op, CmpEQI64Op, CmpEQRefOp>>(
       context);
 }
 
 void CheckNEOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                             MLIRContext *context) {
-  results.insert<RewriteCheckToCondFail<CheckNEOp, CmpNEI32Op, CmpNERefOp>>(
+  results.insert<
+      RewriteCheckToCondFail<CheckNEOp, CmpNEI32Op, CmpNEI64Op, CmpNERefOp>>(
       context);
 }
 
 void CheckNZOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                             MLIRContext *context) {
-  results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZRefOp>>(
+  results.insert<
+      RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZI64Op, CmpNZRefOp>>(
       context);
 }
 

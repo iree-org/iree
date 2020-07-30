@@ -510,12 +510,14 @@ static bool isConstIntegerBuildableWith(Attribute value, Type type) {
   if (value.getType() != type) {
     return false;
   }
-  // Finally, check that the attribute kind is handled.
-  return value.isa<UnitAttr>() || value.isa<IntegerAttr>() ||
-         (value.isa<ElementsAttr>() && value.cast<ElementsAttr>()
-                                           .getType()
-                                           .getElementType()
-                                           .isSignlessInteger());
+  if (value.isa<UnitAttr>()) {
+    return SZ == 32;  // Conditions/bools are always i32
+  } else if (auto intAttr = value.dyn_cast<IntegerAttr>()) {
+    return intAttr.getType().isInteger(SZ);
+  } else if (auto elementsAttr = value.dyn_cast<ElementsAttr>()) {
+    return elementsAttr.getType().getElementType().isInteger(SZ);
+  }
+  return false;
 }
 
 template <int SZ>
