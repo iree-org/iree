@@ -272,9 +272,11 @@ static const int kRegSize = sizeof(uint16_t);
     break;
 
 #define BEGIN_DISPATCH_PREFIX(op_name, ext) \
-  case IREE_VM_OP_CORE_##op_name:           \
+  case IREE_VM_OP_CORE_##op_name: {         \
     switch (bytecode_data[pc++])
-#define END_DISPATCH_PREFIX() break;
+#define END_DISPATCH_PREFIX() \
+  break;                      \
+  }
 
 #endif  // IREE_DISPATCH_MODE_COMPUTED_GOTO
 
