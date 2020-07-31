@@ -37,8 +37,8 @@ iree_train_test_suite(
     ],
     tags = [
         "guitar",
-        # "manual",
-        # "nokokoro",
+        "manual",
+        "nokokoro",
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
