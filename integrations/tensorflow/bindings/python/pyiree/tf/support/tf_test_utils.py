@@ -427,26 +427,15 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Setup the directory for saving compilation artifacts and traces.
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
-    # Setup crash reproducer for the test.
-    crash_reproducer_path = os.path.join(cls._artifacts_dir, "reproducer.mlir")
-    compiler.Context.default_crash_reproducer_path = crash_reproducer_path
-
     # Create a CompiledModule for the reference backend and each target backend.
-    try:
-      ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
-                                              f"{FLAGS.reference_backend}_ref")
-      cls._ref_module = cls._compile(ref_backend_info)
+    ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
+                                            f"{FLAGS.reference_backend}_ref")
+    cls._ref_module = cls._compile(ref_backend_info)
 
-      tar_backend_infos = get_target_backends()
-      cls._tar_modules = [
-          cls._compile(backend_info) for backend_info in tar_backend_infos
-      ]
-    finally:
-      # TODO(meadowlark): Move this into tf_util.compile_tf_module to prevent
-      # overwritting `reproducer.mlir`.
-      # Disable crash reproducer (to avoid inadvertently overwriting this
-      # path if there are multiple TestCases in the same file).
-      compiler.Context.default_crash_reproducer_path = None
+    tar_backend_infos = get_target_backends()
+    cls._tar_modules = [
+        cls._compile(backend_info) for backend_info in tar_backend_infos
+    ]
 
   def setUp(self):
     # Ran before each unit test.

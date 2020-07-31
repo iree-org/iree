@@ -124,54 +124,62 @@ def compile_tf_module(tf_module,
 
   def _compile_from_path(sm_path):
     """Helper function for compile_tf_module."""
-    # We break up the compilation here so we can save intermediary artifacts.
-    compiler_context = compiler.Context()
-
-    # Convert the tf_module into raw TF input MLIR.
-    compiler_module = compiler.tf_load_saved_model(
-        sm_path,
-        exported_names=exported_names,
-        compiler_context=compiler_context,
-        pass_pipeline=())
-
     if artifacts_dir is not None:
-      tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
-      logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
-      with open(tf_mlir_path, "w") as f:
-        f.write(compiler_module.to_asm())
+      # Set up a crash reproducer for debugging.
+      compiler.Context.default_crash_reproducer_path = os.path.join(
+          artifacts_dir, f"reproducer__{backends_string}.mlir")
+    try:
+      # We break up the compilation here so we can save intermediary artifacts.
+      compiler_context = compiler.Context()
 
-    # Now run the passes manually that tf_load_saved_model would usually do.
-    compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
+      # Convert the tf_module into raw TF input MLIR.
+      compiler_module = compiler.tf_load_saved_model(
+          sm_path,
+          exported_names=exported_names,
+          compiler_context=compiler_context,
+          pass_pipeline=())
 
-    if artifacts_dir is not None:
-      iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
-      logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
-      with open(iree_mlir_path, "w") as f:
-        f.write(compiler_module.to_asm())
+      if artifacts_dir is not None:
+        tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
+        logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
+        with open(tf_mlir_path, "w") as f:
+          f.write(compiler_module.to_asm())
 
-    target_backends = []
-    for backend_info in backend_infos:
-      target_backends.extend(backend_info.compiler_targets)
+      # Now run the passes manually that tf_load_saved_model would usually do.
+      compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
 
-    compiled_module = compiler_module.compile(target_backends=target_backends)
-    if artifacts_dir is not None:
-      compiled_name = f"compiled__{backends_to_str(backend_infos)}.vmfb"
-      compiled_path = os.path.join(artifacts_dir, compiled_name)
-      logging.info("Saving compiled IREE module to: %s", compiled_path)
-      with open(compiled_path, "wb") as f:
-        f.write(compiled_module)
+      if artifacts_dir is not None:
+        iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
+        logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
+        with open(iree_mlir_path, "w") as f:
+          f.write(compiler_module.to_asm())
 
-    return compiled_module
+      target_backends = []
+      for backend_info in backend_infos:
+        target_backends.extend(backend_info.compiler_targets)
+      compiled_module = compiler_module.compile(target_backends=target_backends)
+
+      if artifacts_dir is not None:
+        compiled_name = f"compiled__{backends_string}.vmfb"
+        compiled_path = os.path.join(artifacts_dir, compiled_name)
+        logging.info("Saving compiled IREE module to: %s", compiled_path)
+        with open(compiled_path, "wb") as f:
+          f.write(compiled_module)
+
+      return compiled_module
+    except Exception:  # pylint: disable=broad-except
+      if artifacts_dir is not None:
+        # Disable the crash reproducer (to avoid inadvertently overwriting it).
+        compiler.Context.default_crash_reproducer_path = None
+      raise
 
   options = tf.saved_model.SaveOptions(save_debug_info=True)
+  backends_string = backends_to_str(backend_infos)
   if artifacts_dir is not None and FLAGS.keep_saved_model:
-    # Save the saved model alongside the other compilation artifacts.
-
     # Create a saved model for these target backends to avoid a race condition
     # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir,
-                           f"saved_model__{backends_to_str(backend_infos)}")
+    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
@@ -225,11 +233,10 @@ class IreeCompiledModule(CompiledModule):
 
     if _create_reinitialized_args is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(
-          tf_module=module_class(),
-          backend_infos=[backend_info],
-          exported_names=exported_names,
-          artifacts_dir=artifacts_dir)
+      self._module_blob = compile_tf_module(tf_module=module_class(),
+                                            backend_infos=[backend_info],
+                                            exported_names=exported_names,
+                                            artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
