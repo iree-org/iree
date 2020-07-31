@@ -15,6 +15,7 @@
 
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -44,8 +45,8 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
   def test_batched_feature_unpadded(self):
 
     def batched_feature_unpadded(module):
-      i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])
-      k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
+      i = tf_utils.ndarange([2, 4, 5, 2])
+      k = tf_utils.ndarange([2, 2, 2, 3])
       module.conv2d_2452x2223_valid(i, k)
 
     self.compare_backends(batched_feature_unpadded)
@@ -53,8 +54,8 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
   def test_batched_feature_unpadded_same(self):
 
     def batched_feature_unpadded_same(module):
-      i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])
-      k = np.arange(48, dtype=np.float32).reshape([2, 4, 2, 3])
+      i = tf_utils.ndarange([2, 4, 5, 2])
+      k = tf_utils.ndarange([2, 4, 2, 3])
       module.conv2d_2452x2223_same(i, k)
 
     self.compare_backends(batched_feature_unpadded_same)

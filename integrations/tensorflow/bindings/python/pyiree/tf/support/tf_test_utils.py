@@ -612,6 +612,10 @@ class Trace:
       else:
         return np.array_equal(ref, tar)
 
+    # Base check for native number types.
+    elif isinstance(ref, (int, float)):
+      return ref == tar
+
     # If outputs end up here then an extra branch for that type should be added.
     else:
       raise TypeError(f"Encountered results with unexpected type {type(ref)}")

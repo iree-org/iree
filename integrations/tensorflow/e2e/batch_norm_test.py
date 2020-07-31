@@ -16,6 +16,7 @@
 
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -44,13 +45,13 @@ class BatchNormTest(tf_test_utils.TracedModuleTestCase):
   def test_batch_norm_inference(self):
 
     def batch_norm_inference(module):
-      np.random.seed(12345)
+      tf_utils.set_random_seed()
       # Note: scaling by a small value to increase numerical stability.
-      x = np.random.random((4, 16)).astype(np.float32) * 1e-3
-      mean = np.random.random((16,)).astype(np.float32) * 1e-3
-      variance = np.random.random((16,)).astype(np.float32) * 1e-3
-      offset = np.random.random((16,)).astype(np.float32) * 1e-3
-      scale = np.random.random((16,)).astype(np.float32) * 1e-3
+      x = tf_utils.uniform((4, 16)) * 1e-3
+      mean = tf_utils.uniform((16,)) * 1e-3
+      variance = tf_utils.uniform((16,)) * 1e-3
+      offset = tf_utils.uniform((16,)) * 1e-3
+      scale = tf_utils.uniform((16,)) * 1e-3
       module.batch_norm_inference(x, mean, variance, offset, scale)
 
     self.compare_backends(batch_norm_inference)

@@ -50,8 +50,7 @@ class LstmTest(tf_test_utils.TracedModuleTestCase):
   def test_lstm(self):
 
     def predict(module):
-      inputs = np.arange(
-          np.prod(INPUT_SHAPE), dtype=np.float32).reshape(INPUT_SHAPE)
+      inputs = tf_utils.ndarange(INPUT_SHAPE)
       module.predict(inputs, rtol=1e-5, atol=1e-5)
 
     self.compare_backends(predict)

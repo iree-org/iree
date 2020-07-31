@@ -71,8 +71,8 @@ class DynamicMlpTest(tf_test_utils.TracedModuleTestCase):
   def test_dynamic_batch(self):
 
     def dynamic_batch(module):
-      np.random.seed(12345)
-      x = np.random.random([3, 28 * 28]).astype(np.float32) * 1e-3
+      tf_utils.set_random_seed(12345)
+      x = tf_utils.uniform([3, 28 * 28]) * 1e-3
       module.predict(x)
 
     self.compare_backends(dynamic_batch)

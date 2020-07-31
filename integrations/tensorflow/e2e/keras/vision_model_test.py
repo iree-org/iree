@@ -136,7 +136,7 @@ class VisionModule(tf.Module):
 class AppTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_application(self):
-    input_data = np.random.rand(*get_input_shape()).astype(np.float32)
+    input_data = tf_utils.uniform(get_input_shape())
     self.get_module().predict(input_data).print().assert_all_close(atol=1e-6)
 
 

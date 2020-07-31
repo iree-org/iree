@@ -14,6 +14,7 @@
 
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -55,7 +56,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
 
     def gather_axis0_scalar(module):
       indices = np.array(2, dtype=np.int32)
-      params = np.arange(32, dtype=np.float32).reshape(4, 8)
+      params = tf_utils.ndarange([4, 8])
       module.gather_axis0_scalar(params, indices)
 
     self.compare_backends(gather_axis0_scalar)
@@ -64,7 +65,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
 
     def gather_axis0_batch0(module):
       indices = np.array([2, 3], dtype=np.int32)
-      params = np.arange(32, dtype=np.float32).reshape(4, 8)
+      params = tf_utils.ndarange([4, 8])
       module.gather_axis0_batch0(params, indices)
 
     self.compare_backends(gather_axis0_batch0)
@@ -73,7 +74,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
 
     def gather_axis1_batch0(module):
       indices = np.array([2, 3], dtype=np.int32)
-      params = np.arange(4 * 7 * 8, dtype=np.float32).reshape(4, 7, 8)
+      params = tf_utils.ndarange([4, 7, 8])
       module.gather_axis1_batch0(params, indices)
 
     self.compare_backends(gather_axis1_batch0)
@@ -82,7 +83,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
 
     def gather_axis2_batch1(module):
       indices = np.array([[2], [3], [0], [1]], dtype=np.int32)
-      params = np.arange(4 * 7 * 8 * 2, dtype=np.float32).reshape(4, 7, 8, 2)
+      params = tf_utils.ndarange([4, 7, 8, 2])
       module.gather_axis2_batch1(params, indices)
 
     self.compare_backends(gather_axis2_batch1)

@@ -39,6 +39,14 @@ def set_random_seed(seed=0):
   np.random.seed(seed)
 
 
+def uniform(shape, dtype=np.float32):
+  return np.random.uniform(size=shape).astype(np.float32)
+
+
+def ndarange(shape, dtype=np.float32):
+  return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
+
+
 def backends_to_str(target_backends):
   """Creates a flattened and normalized string representing target_backends."""
   normalized_backends = []
