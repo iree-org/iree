@@ -323,10 +323,10 @@ def compile_module(module_class, exported_names=()):
 
   def decorator(cls):
     """Decorator Function."""
-    if not issubclass(cls, CompiledModuleTestCase):
+    if not issubclass(cls, TracedModuleTestCase):
       logging.exception(
           "The 'compile_module' decorator must be applied to a "
-          "CompiledModuleTestCase derived class, which %s is not.", cls)
+          "TracedModuleTestCase derived class, which %s is not.", cls)
     cls._module_class = module_class
     cls._exported_names = exported_names
     return cls

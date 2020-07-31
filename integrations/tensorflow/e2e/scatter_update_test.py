@@ -49,28 +49,37 @@ class ScatterUpdateModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ScatterUpdateModule)
-class ScatterUpdateTest(tf_test_utils.CompiledModuleTestCase):
+class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
 
   def test_scatter_update_1D(self):
-    tensor = tf.ones([8], dtype=tf.int32)
-    indices = tf.constant([[4], [5], [6]])
-    updates = tf.constant([9, 10, 11])
-    result = self.get_module().scatter_update_1D(tensor, indices, updates)
-    result.assert_all_close()
+
+    def scatter_update_1D(module):
+      tensor = np.ones([8], dtype=np.int32)
+      indices = np.array([[4], [5], [6]], dtype=np.int32)
+      updates = np.array([9, 10, 11], dtype=np.int32)
+      module.scatter_update_1D(tensor, indices, updates)
+
+    self.compare_backends(scatter_update_1D)
 
   def test_scatter_update_2D(self):
-    tensor = tf.ones([4, 3], dtype=tf.int32)
-    indices = tf.constant([[1, 0], [2, 1], [3, 2]])
-    updates = tf.constant([2, 5, 8])
-    result = self.get_module().scatter_update_2D(tensor, indices, updates)
-    result.assert_all_close()
+
+    def scatter_update_2D(module):
+      tensor = np.ones([4, 3], dtype=np.int32)
+      indices = np.array([[1, 0], [2, 1], [3, 2]], dtype=np.int32)
+      updates = np.array([2, 5, 8], dtype=np.int32)
+      module.scatter_update_2D(tensor, indices, updates)
+
+    self.compare_backends(scatter_update_2D)
 
   def test_scatter_update_2D_slice(self):
-    tensor = tf.ones([4, 3], dtype=tf.int32)
-    indices = tf.constant([[1]])
-    updates = tf.constant([[2, 3, 4]])
-    result = self.get_module().scatter_update_2D_slice(tensor, indices, updates)
-    result.assert_all_close()
+
+    def scatter_update_2D_slice(module):
+      tensor = np.ones([4, 3], dtype=np.int32)
+      indices = np.array([[1]], dtype=np.int32)
+      updates = np.array([[2, 3, 4]], dtype=np.int32)
+      module.scatter_update_2D_slice(tensor, indices, updates)
+
+    self.compare_backends(scatter_update_2D_slice)
 
 
 if __name__ == "__main__":

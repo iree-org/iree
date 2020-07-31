@@ -149,7 +149,7 @@ def compile_tf_module(tf_module,
 
     compiled_module = compiler_module.compile(target_backends=target_backends)
     if artifacts_dir is not None:
-      compiled_name = f"compiled__{backends_to_str(target_backends)}.vmfb"
+      compiled_name = f"compiled__{backends_string}.vmfb"
       compiled_path = os.path.join(artifacts_dir, compiled_name)
       logging.info("Saving compiled IREE module to: %s", compiled_path)
       with open(compiled_path, "wb") as f:
@@ -160,7 +160,11 @@ def compile_tf_module(tf_module,
   options = tf.saved_model.SaveOptions(save_debug_info=True)
   if artifacts_dir is not None:
     # Save the saved model alongside the other compilation artifacts.
-    sm_path = os.path.join(artifacts_dir, "saved_model")
+
+    backends_string = backends_to_str(target_backends)
+    # Create a saved model for these target backends to avoid a race condition.
+    # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
+    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:

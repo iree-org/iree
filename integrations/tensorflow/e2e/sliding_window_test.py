@@ -76,18 +76,20 @@ class SlidingWindowModule(tf.Module):
 
 
 @tf_test_utils.compile_module(SlidingWindowModule, exported_names=["predict"])
-class SlidingWindowTest(tf_test_utils.CompiledModuleTestCase):
+class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
 
-  def test_slidingwindow(self):
-    input1 = np.array([[1.0, 2.0]], dtype=np.float32)
-    result1 = self.get_module().predict(input1)
-    output1 = np.array([[0.0, 0.0], [0.0, 0.0], [1.0, 2.0]], dtype=np.float32)
-    assert np.allclose(result1, output1)
+  def test_sliding_window(self):
 
-    input2 = np.array([[3.0, 4.0]], dtype=np.float32)
-    result2 = self.get_module().predict(input2)
-    output2 = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
-    assert np.allclose(result2, output2)
+    def sliding_window(module):
+      input1 = np.array([[1.0, 2.0]], dtype=np.float32)
+      result1 = module.predict(input1)
+      # output1 = np.array([[0.0, 0.0], [0.0, 0.0], [1.0, 2.0]], dtype=np.float32)
+
+      input2 = np.array([[3.0, 4.0]], dtype=np.float32)
+      result2 = module.predict(input2)
+      # output2 = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+
+    self.compare_backends(sliding_window)
 
 
 if __name__ == "__main__":
