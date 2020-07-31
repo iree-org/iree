@@ -99,73 +99,109 @@ class Conv2dModule(tf.Module):
 
 
 @tf_test_utils.compile_module(Conv2dModule)
-class ConvTest(tf_test_utils.CompiledModuleTestCase):
+class ConvTest(tf_test_utils.TracedModuleTestCase):
 
   def test_id_batch_size_1(self):
-    i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
-    k = np.ones([1, 1, 1, 1], dtype=np.float32)
-    r = self.get_module().conv2d_1451x1111_valid(i, k)
-    r.print().assert_all_close()
+
+    def id_batch_size_1(module):
+      i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
+      k = np.ones([1, 1, 1, 1], dtype=np.float32)
+      module.conv2d_1451x1111_valid(i, k)
+
+    self.compare_backends(id_batch_size_1)
 
   def test_id_batch_size_2(self):
-    i = np.arange(40, dtype=np.float32).reshape([2, 4, 5, 1])
-    k = np.ones([1, 1, 1, 1], dtype=np.float32)
-    r = self.get_module().conv2d_2451x1111_valid(i, k)
-    r.print().assert_all_close()
 
-  def test_asym_kernel(self):
-    i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
-    k = np.array([[1, 4, 2], [-2, 0, 1]], dtype=np.float32).reshape(2, 3, 1, 1)
-    r = self.get_module().conv2d_1451x2311_valid(i, k)
-    r.print().assert_all_close()
+    def id_batch_size_2(module):
+      i = np.arange(40, dtype=np.float32).reshape([2, 4, 5, 1])
+      k = np.ones([1, 1, 1, 1], dtype=np.float32)
+      module.conv2d_2451x1111_valid(i, k)
+
+    self.compare_backends(id_batch_size_2)
+
+  def test_asymmetric_kernel(self):
+
+    def asymmetric_kernel(module):
+      i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
+      k = np.array([[1, 4, 2], [-2, 0, 1]],
+                   dtype=np.float32).reshape(2, 3, 1, 1)
+      module.conv2d_1451x2311_valid(i, k)
+
+    self.compare_backends(asymmetric_kernel)
 
   def test_padding(self):
-    i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
-    k = np.array([[1, 4, 2], [-2, 0, 1]], dtype=np.float32).reshape(2, 3, 1, 1)
-    r = self.get_module().conv2d_1451x2311_same(i, k)
-    r.print().assert_all_close()
+
+    def padding(module):
+      i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
+      k = np.array([[1, 4, 2], [-2, 0, 1]],
+                   dtype=np.float32).reshape(2, 3, 1, 1)
+      module.conv2d_1451x2311_same(i, k)
+
+    self.compare_backends(padding)
 
   def test_batched_padding(self):
-    i = np.arange(40, dtype=np.float32).reshape([2, 4, 5, 1])
-    k = np.array([[1, 4, 2], [-2, 0, 1]], dtype=np.float32).reshape(2, 3, 1, 1)
-    r = self.get_module().conv2d_2451x2311_same(i, k)
-    r.print().assert_all_close()
+
+    def batched_padding(module):
+      i = np.arange(40, dtype=np.float32).reshape([2, 4, 5, 1])
+      k = np.array([[1, 4, 2], [-2, 0, 1]],
+                   dtype=np.float32).reshape(2, 3, 1, 1)
+      module.conv2d_2451x2311_same(i, k)
+
+    self.compare_backends(batched_padding)
 
   def test_feature_reduce(self):
-    i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
-    k = np.ones([3, 2, 2, 1], dtype=np.float32)
-    r = self.get_module().conv2d_1452x3221_same(i, k)
-    r.print().assert_all_close()
+
+    def feature_reduce(module):
+      i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
+      k = np.ones([3, 2, 2, 1], dtype=np.float32)
+      module.conv2d_1452x3221_same(i, k)
+
+    self.compare_backends(feature_reduce)
 
   def test_feature_inflate(self):
-    i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
-    k = np.arange(2, dtype=np.float32).reshape([1, 1, 1, 2])
-    r = self.get_module().conv2d_1451x1112_same(i, k)
-    r.print().assert_all_close()
+
+    def feature_inflate(module):
+      i = np.arange(20, dtype=np.float32).reshape([1, 4, 5, 1])
+      k = np.arange(2, dtype=np.float32).reshape([1, 1, 1, 2])
+      module.conv2d_1451x1112_same(i, k)
+
+    self.compare_backends(feature_inflate)
 
   def test_feature_mix(self):
-    i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
-    k = np.arange(4, dtype=np.float32).reshape([1, 1, 2, 2])
-    r = self.get_module().conv2d_1452x1122_same(i, k)
-    r.print().assert_all_close()
+
+    def feature_mix(module):
+      i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
+      k = np.arange(4, dtype=np.float32).reshape([1, 1, 2, 2])
+      module.conv2d_1452x1122_same(i, k)
+
+    self.compare_backends(feature_mix)
 
   def test_feature_padded(self):
-    i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
-    k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
-    r = self.get_module().conv2d_1452x2223_same(i, k)
-    r.print().assert_all_close()
+
+    def feature_padded(module):
+      i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
+      k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
+      module.conv2d_1452x2223_same(i, k)
+
+    self.compare_backends(feature_padded)
 
   def test_feature_unpadded(self):
-    i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
-    k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
-    r = self.get_module().conv2d_1452x2223_valid(i, k)
-    r.print().assert_all_close()
+
+    def feature_unpadded(module):
+      i = np.arange(40, dtype=np.float32).reshape([1, 4, 5, 2])
+      k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
+      module.conv2d_1452x2223_valid(i, k)
+
+    self.compare_backends(feature_unpadded)
 
   def test_batched_feature_unpadded(self):
-    i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])
-    k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
-    r = self.get_module().conv2d_2452x2223_valid(i, k)
-    r.print().assert_all_close()
+
+    def batched_feature_unpadded(module):
+      i = np.arange(80, dtype=np.float32).reshape([2, 4, 5, 2])
+      k = np.arange(24, dtype=np.float32).reshape([2, 2, 2, 3])
+      module.conv2d_2452x2223_valid(i, k)
+
+    self.compare_backends(batched_feature_unpadded)
 
 
 if __name__ == "__main__":
