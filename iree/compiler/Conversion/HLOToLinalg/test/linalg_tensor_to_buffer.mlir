@@ -163,3 +163,42 @@ module {
 //   CHECK-DAG:   %[[ARG0:.*]] = iree.placeholder
 //  CHECK-SAME:     binding = @legacy_io::@arg0
 //       CHECK:   linalg.copy(%[[ARG0]], %[[RESULT]])
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2)>
+
+module {
+  func @store_reshape_src_and_result() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0,
+                                   offset = %c0 : tensor<2x4xf32>
+    %1 = linalg.generic
+           {args_in = 1 : i64, args_out = 1 : i64,
+            indexing_maps = [#map0, #map0],
+            iterator_types = ["parallel", "parallel"]} %0 {
+    ^bb0(%arg0: f32):  // no predecessors
+      %2 = tanh %arg0 : f32
+      linalg.yield %2 : f32
+    }: tensor<2x4xf32> -> tensor<2x4xf32>
+    %3 = linalg.tensor_reshape %1 [#map1, #map2] : tensor<2x4xf32> into tensor<1x2x4xf32>
+    hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<2x4xf32>
+    hal.interface.store.tensor %3, @legacy_io::@ret1, offset = %c0 : tensor<1x2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0,
+                                 type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=7,
+                                 type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=8,
+                                 type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+//  CHECK: func @store_reshape_src_and_result
+//  CHECK:   %[[RET:.*]] = linalg.reshape
+//  CHECK:   linalg.generic {{.*}} %{{.+}}, %[[SRC:.+]] {
+//  CHECK:   linalg.copy(%[[SRC]], %[[RET]]) : memref<2x4xf32>, memref<2x4xf32>

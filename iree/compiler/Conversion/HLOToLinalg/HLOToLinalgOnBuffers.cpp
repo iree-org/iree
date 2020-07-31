@@ -1289,7 +1289,17 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
           buffer, tensorReshapeOp.reassociation());
       tensor = tensorReshapeOp.src();
       buffer = newReshapeOp.result();
-      resultTensorToBufferMap[tensor] = buffer;
+      if (resultTensorToBufferMap[tensor]) {
+        // If a buffer is set, we need to a CopyOp. Otherwise, only one buffer's
+        // values will be set.  Set the insertion point after the
+        // InterfaceStoreTensorOp, so the data will be copied at the right
+        // point.
+        builder.setInsertionPointAfter(op);
+        builder.create<linalg::CopyOp>(op.getLoc(),
+                                       resultTensorToBufferMap[tensor], buffer);
+      } else {
+        resultTensorToBufferMap[tensor] = buffer;
+      }
       continue;
     }
     break;
