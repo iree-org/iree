@@ -50,7 +50,7 @@ TF_IMPORT_PASS_PIPELINE = (
     # Clean up tf_executor and extraneous unused functions.
     "symbol-dce",
     "tf-executor-graph-pruning",
-    "iree-guarantee-all-funcs-one-use",
+    "tf-guarantee-all-funcs-one-use",
     "tf-standard-pipeline",
     "tf-device-index-selector",
 
