@@ -17,7 +17,30 @@
 from absl.testing import parameterized
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow as tf
+
+
+class StatefulCountingModule(tf.Module):
+
+  def __init__(self):
+    self.count = tf.Variable([0.])
+
+  @tf.function(input_signature=[])
+  def increment(self):
+    self.count.assign_add(tf.constant([1.]))
+
+  @tf.function(input_signature=[])
+  def get_count(self):
+    return self.count
+
+  @tf.function(input_signature=[tf.TensorSpec([1])])
+  def increment_by(self, value):
+    self.count.assign_add(value)
+
+  @tf.function(input_signature=[])
+  def decrement(self):
+    self.count.assign_sub(tf.constant([1.]))
 
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
@@ -77,6 +100,72 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     }
     same = tf_test_utils._recursive_check_same(ref, tgt)
     self.assertEqual(tgt_same, same)
+
+  def test_trace_inputs_and_outputs(self):
+
+    def trace_function(module):
+      # No inputs or outpus
+      module.increment()
+      # Only inputs
+      module.increment_by(np.array([81.], dtype=np.float32))
+      # Only outputs
+      module.get_count()
+
+    module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                       tf_utils.BackendInfo.ALL['tf'])
+    trace = tf_test_utils.Trace(module, trace_function)
+    trace_function(tf_test_utils.TracedModule(module, trace))
+
+    self.assertIsInstance(trace.calls[0].inputs, tuple)
+    self.assertEmpty(trace.calls[0].inputs)
+    self.assertIsInstance(trace.calls[0].outputs, tuple)
+    self.assertEmpty(trace.calls[0].outputs)
+
+    self.assertAllClose(trace.calls[1].inputs[0], [81.])
+    self.assertAllClose(trace.calls[2].outputs[0], [82.])
+
+  def test_nonmatching_methods(self):
+
+    def tf_function(module):
+      module.increment()
+      module.increment()
+
+    def vmla_function(module):
+      module.increment()
+      module.decrement()
+
+    tf_module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                          tf_utils.BackendInfo.ALL['tf'])
+    tf_trace = tf_test_utils.Trace(tf_module, tf_function)
+    tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
+
+    vmla_module = tf_utils.IreeCompiledModule(
+        StatefulCountingModule, tf_utils.BackendInfo.ALL['iree_vmla'])
+    vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
+    vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
+
+    with self.assertRaises(ValueError):
+      tf_test_utils.Trace.compare_traces(tf_trace, vmla_trace)
+
+  def test_nonmatching_inputs(self):
+
+    def tf_function(module):
+      module.increment_by(np.array([42.], dtype=np.float32))
+
+    def vmla_function(module):
+      module.increment_by(np.array([22.], dtype=np.float32))
+
+    tf_module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                          tf_utils.BackendInfo.ALL['tf'])
+    tf_trace = tf_test_utils.Trace(tf_module, tf_function)
+    tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
+
+    vmla_module = tf_utils.IreeCompiledModule(
+        StatefulCountingModule, tf_utils.BackendInfo.ALL['iree_vmla'])
+    vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
+    vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
+
+    self.assertFalse(tf_test_utils.Trace.compare_traces(tf_trace, vmla_trace))
 
 
 if __name__ == '__main__':

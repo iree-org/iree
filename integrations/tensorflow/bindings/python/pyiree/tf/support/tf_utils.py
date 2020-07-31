@@ -172,6 +172,10 @@ class CompiledModule(object):
     self._exported_names = exported_names
     self._artifacts_dir = artifacts_dir
 
+    # Public attributes:
+    self.backend = self._backend_info.name
+    self.module_name = self._module_class.__name__
+
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
     raise NotImplementedError()
