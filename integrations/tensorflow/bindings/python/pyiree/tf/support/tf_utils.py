@@ -295,6 +295,13 @@ class _TfFunctionWrapper(object):
   def __init__(self, f):
     self._f = f
 
+  def _convert_to_numpy(self, tensor):
+    result = tensor.numpy()
+    if np.isscalar(result):
+      # convert_to_tensor isn't reversible via .numpy()
+      result = np.array(result)
+    return result
+
   def __call__(self, *args, **kwargs):
     # TensorFlow will auto-convert all inbound args.
     results = self._f(*args, **kwargs)
@@ -304,7 +311,7 @@ class _TfFunctionWrapper(object):
     if not isinstance(results, tuple):
       results = (results,)
     return tf.nest.map_structure(
-        lambda t: t.numpy() if isinstance(t, tf.Tensor) else t,
+        lambda t: self._convert_to_numpy(t) if isinstance(t, tf.Tensor) else t,
         *results,
         check_types=False)
 
