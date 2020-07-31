@@ -67,17 +67,23 @@ def _setup_artifacts_dir(module_name):
   return artifacts_dir
 
 
-def _parse_target_backends(target_backends):
-  """Decodes a comma-delimited string of backends into BackendInfo objects."""
-  backends = []
-  for backend_name in target_backends.split(","):
-    if backend_name not in tf_utils.BackendInfo.ALL.keys():
-      raise ValueError(
-          "Invalid backend specification string '{}', unexpected name '{}';"
-          " valid names are '{}'".format(target_backends, backend_name,
-                                         tf_utils.BackendInfo.ALL.keys()))
-    backends.append(tf_utils.BackendInfo.ALL[backend_name])
-  return backends
+def _parse_target_backends():
+  """Decodes --target_backends and creates unique names for their artifacts."""
+  backend_names = FLAGS.target_backends.split(",")
+  backend_to_index = {k: 0 for k in backend_names if backend_names.count(k) > 1}
+  artifact_names = []
+
+  # If there are multiple copies of the same backend_name, index them. e.g.
+  # backend_names = ["tf", "iree_vmla", "tf"]
+  # --> artifact_names = ["tf_0", "iree_vmla", "tf_1"]
+  for backend_name in backend_names:
+    if backend_name in backend_to_index:
+      artifact_names.append(f"{backend_name}_{backend_to_index[backend_name]}")
+      backend_to_index[backend_name] += 1
+    else:
+      artifact_names.append(backend_name)
+
+  return backend_names, artifact_names
 
 
 def get_target_backends():
@@ -91,10 +97,14 @@ def get_target_backends():
   """
   if FLAGS.target_backends is not None:
     logging.info("Using backends from command line: %s", FLAGS.target_backends)
-    backends = _parse_target_backends(FLAGS.target_backends)
+    backend_names, names = _parse_target_backends()
+    backends = [
+        tf_utils.BackendInfo(backend, name)
+        for backend, name in zip(backend_names, names)
+    ]
   else:
     # If no backends are specified, use them all.
-    backends = list(tf_utils.BackendInfo.ALL.values())
+    backends = tf_utils.BackendInfo.get_all_backends()
   return backends
 
 
@@ -402,8 +412,8 @@ class TracedModuleTestCase(tf.test.TestCase):
 
   @classmethod
   def _compile(cls, backend_info):
-    return backend_info.CompiledModule(cls._module_class, backend_info,
-                                       cls._exported_names, cls._artifacts_dir)
+    return backend_info.compile(cls._module_class, cls._exported_names,
+                                cls._artifacts_dir)
 
   @classmethod
   def setUpClass(cls):
@@ -423,7 +433,8 @@ class TracedModuleTestCase(tf.test.TestCase):
 
     # Create a CompiledModule for the reference backend and each target backend.
     try:
-      ref_backend_info = tf_utils.BackendInfo.ALL[FLAGS.reference_backend]
+      ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
+                                              f"{FLAGS.reference_backend}_ref")
       cls._ref_module = cls._compile(ref_backend_info)
 
       tar_backend_infos = get_target_backends()

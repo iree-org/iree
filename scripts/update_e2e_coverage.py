@@ -24,10 +24,10 @@ import os
 import subprocess
 
 REFERENCE_BACKEND = 'tf'
-# Assumes that tests are expanded for the tf_also, iree_vmla, iree_llvmjit and
+# Assumes that tests are expanded for the tf, iree_vmla, iree_llvmjit and
 # iree_vulkan backends.
 BACKENDS_TO_TITLES = collections.OrderedDict([
-    ('tf_also', 'tensorflow'),
+    ('tf', 'tensorflow'),
     ('iree_vmla', 'vmla'),
     ('iree_llvmjit', 'llvm-ir'),
     ('iree_vulkan', 'vulkan-spirv'),

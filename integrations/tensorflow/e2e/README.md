@@ -40,7 +40,7 @@ When using Keras models or tf.Modules with functions that IREE can't compile,
 from pyiree.tf.support import tf_utils
 vmla_module = tf_utils.IreeCompiledModule(
     module_class=KerasTFModuleClass,
-    backend_info=tf_utils.BackendInfo.ALL['iree_vmla'],
+    backend_info=tf_utils.BackendInfo('iree_vmla'),
     exported_names=['predict'])
 vmla_module.predict(...)
 ```
