@@ -1,5 +1,27 @@
 // RUN: iree-opt -split-input-file -iree-flow-form-streams %s | IreeFileCheck %s
 
+// CHECK-LABEL: func @outsideTieShape
+func @outsideTieShape(%arg0: tensor<?xi32> {iree.reflection = {}}, %arg1: !shapex.ranked_shape<[?]> {iree.reflection = {}}) -> (tensor<?xi32> {iree.reflection = {}}) attributes {iree.module.export} {
+  // CHECK: %[[WORKLOAD0:.+]] = constant 0 : index
+  %c0 = constant 0 : index
+  // CHECK-NEXT: %0 = shapex.tie_shape %arg0, %arg1 : tensor<?xi32>, !shapex.ranked_shape<[?]>
+  %2 = shapex.tie_shape %arg0, %arg1 : tensor<?xi32>, !shapex.ranked_shape<[?]>
+  // CHECK-NEXT: %[[WORKLOAD1:.+]] = constant 1 : index
+  %c1 = constant 1 : index
+  // CHECK-NEXT: %1 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?]> -> index
+  // CHECK-NEXT: %2 = flow.ex.stream.fragment(%arg2 = %arg0 : tensor<?xi32>, %arg3 = %1 : index, %arg4 = %[[WORKLOAD0]] : index, %arg5 = %0 : tensor<?xi32>) -> tensor<?xi32> {
+  // CHECK-NEXT:   %3 = shapex.make_ranked_shape %arg3 : (index) -> !shapex.ranked_shape<[?]>
+  // CHECK-NEXT:   %4 = shapex.tie_shape %arg2, %3 : tensor<?xi32>, !shapex.ranked_shape<[?]>
+  // CHECK-NEXT:   %5 = flow.dispatch @main_ex_dispatch_1::@main_ex_dispatch_1[%arg4 : index](%arg4, %4) : (index, tensor<?xi32>) -> tensor<?xi32>
+  // CHECK-NEXT:   flow.return %5 : tensor<?xi32>
+  // CHECK-NEXT: }
+  %15 = flow.dispatch @main_ex_dispatch_1::@main_ex_dispatch_1[%c0 : index](%c0, %2) : (index, tensor<?xi32>) -> tensor<?xi32>
+  // CHECK-NEXT: return %2 : tensor<?xi32>
+  return %15 : tensor<?xi32>
+}
+
+// -----
+
 flow.executable @outerOps_ex_dispatch_0 {
   flow.dispatch.entry @outerOps_rgn_dispatch_0 attributes {
     workload = 4 : index
