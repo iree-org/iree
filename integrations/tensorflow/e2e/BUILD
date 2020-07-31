@@ -54,7 +54,6 @@ package(
 # backends.
 # keep sorted
 SPECIAL_CASES = [
-    "explicit_backend_test.py",
     "linspace_test.py",
 ]
 
@@ -182,58 +181,6 @@ iree_e2e_test_suite(
         "nokokoro",
         "notap",
     ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-# This tests explicitly writing which backends to use in Python,
-# so overriding the backends can cause it to break.
-iree_py_test(
-    name = "explicit_backend_test",
-    srcs = ["explicit_backend_test.py"],
-    main = "explicit_backend_test.py",
-    python_version = "PY3",
-    tags = [
-        "driver=llvmjit",
-        "driver=vmla",
-        "driver=vulkan",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-# Traced tests – Temporarily separate from the rest of the testing infra while
-# prototyping a change.
-
-iree_py_test(
-    name = "simple_arithmetic_test",
-    srcs = ["simple_arithmetic_test.py"],
-    args = [
-        "--reference_backend=tf",
-        "--target_backends=tf,iree_vmla,iree_llvmjit",
-    ],
-    main = "simple_arithmetic_test.py",
-    python_version = "PY3",
-    tags = [
-        "driver=llvm",
-        "driver=vmla",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-iree_py_test(
-    name = "strings_test_tf",
-    srcs = ["strings_test.py"],
-    args = [
-        "--reference_backend=tf",
-        "--target_backends=tf",
-    ],
-    main = "strings_test.py",
-    python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

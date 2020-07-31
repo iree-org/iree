@@ -241,23 +241,3 @@ iree_py_binary(
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
-
-# Traced tests – Temporarily separate from the rest of the testing infra while
-# prototyping a change.
-
-iree_py_test(
-    name = "lstm_static_test_vmla",
-    srcs = ["lstm_static_test.py"],
-    args = [
-        "--reference_backend=tf",
-        "--target_backends=tf,iree_vmla",
-    ],
-    main = "lstm_static_test.py",
-    python_version = "PY3",
-    tags = [
-        "driver=vmla",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)

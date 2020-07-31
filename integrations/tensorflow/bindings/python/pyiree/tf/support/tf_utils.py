@@ -43,7 +43,7 @@ def set_random_seed(seed=0):
 
 
 def uniform(shape, dtype=np.float32):
-  return np.random.uniform(size=shape).astype(np.float32)
+  return np.random.uniform(size=shape).astype(dtype)
 
 
 def ndarange(shape, dtype=np.float32):
@@ -203,7 +203,7 @@ class IreeCompiledModule(CompiledModule):
   def __init__(self,
                module_class,
                backend_info,
-               exported_names=[],
+               exported_names=(),
                artifacts_dir=None,
                _create_reinitialized_args=None):
     """Compile a tf.Module to the target backend in backend_info.
@@ -216,6 +216,7 @@ class IreeCompiledModule(CompiledModule):
         module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
+      _create_reinitialized_args: used internally.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
@@ -272,7 +273,7 @@ class TfCompiledModule(CompiledModule):
   def __init__(self,
                module_class,
                backend_info,
-               exported_names=[],
+               exported_names=(),
                artifacts_dir=None):
     """Wrap a tf.Module in a TFCompiledModule facade.
 
@@ -295,7 +296,7 @@ class TfCompiledModule(CompiledModule):
 
   def __getattr__(self, attr):
     # Try to resolve it as a function.
-    exported = len(self._exported_names) == 0 or attr in self._exported_names
+    exported = not self._exported_names or attr in self._exported_names
     if not hasattr(self._tf_module, attr) or not exported:
       raise AttributeError(f"The TensorFlow module does not have attr '{attr}'")
     f = getattr(self._tf_module, attr)
