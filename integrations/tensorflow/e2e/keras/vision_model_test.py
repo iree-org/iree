@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test all applications models in Keras."""
+
 import os
 
 from absl import app
@@ -133,11 +134,15 @@ class VisionModule(tf.Module):
 
 
 @tf_test_utils.compile_module(VisionModule, exported_names=['predict'])
-class AppTest(tf_test_utils.CompiledModuleTestCase):
+class AppTest(tf_test_utils.TracedModuleTestCase):
 
   def test_application(self):
-    input_data = tf_utils.uniform(get_input_shape())
-    self.get_module().predict(input_data).print().assert_all_close(atol=1e-6)
+
+    def predict(module):
+      tf_utils.set_random_seed()
+      module.predict(tf_utils.uniform(get_input_shape()))
+
+    self.compare_backends(predict)
 
 
 def main(argv):
@@ -148,7 +153,7 @@ def main(argv):
   if FLAGS.model not in APP_MODELS:
     raise ValueError(f'Unsupported model: {FLAGS.model}')
   # Override VisionModule's __name__ to be more specific.
-  VisionModule.__name__ = FLAGS.model
+  VisionModule.__name__ = os.path.join(FLAGS.model, FLAGS.data)
 
   tf.test.main()
 

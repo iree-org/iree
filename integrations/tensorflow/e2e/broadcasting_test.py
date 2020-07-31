@@ -37,8 +37,8 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
 
     def add_same_shape(module):
       tf_utils.set_random_seed()
-      lhs = np.random.uniform(size=[4]).astype(np.float32)
-      rhs = np.random.uniform(size=[4]).astype(np.float32)
+      lhs = tf_utils.uniform([4])
+      rhs = tf_utils.uniform([4])
       module.add(lhs, rhs)
 
     self.compare_backends(add_same_shape)
@@ -47,8 +47,8 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
 
     def add_broadcast_lhs(module):
       tf_utils.set_random_seed()
-      lhs = np.random.uniform(size=[1]).astype(np.float32)
-      rhs = np.random.uniform(size=[4]).astype(np.float32)
+      lhs = tf_utils.uniform([1])
+      rhs = tf_utils.uniform([4])
       module.add(lhs, rhs)
 
     self.compare_backends(add_broadcast_lhs)
@@ -57,8 +57,8 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
 
     def add_broadcast_rhs(module):
       tf_utils.set_random_seed()
-      lhs = np.random.uniform(size=[4]).astype(np.float32)
-      rhs = np.random.uniform(size=[1]).astype(np.float32)
+      lhs = tf_utils.uniform([4])
+      rhs = tf_utils.uniform([1])
       module.add(lhs, rhs)
 
     self.compare_backends(add_broadcast_rhs)

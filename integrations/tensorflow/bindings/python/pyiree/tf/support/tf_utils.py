@@ -29,6 +29,9 @@ from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
+
+flags.DEFINE_bool("keep_saved_model", False,
+                  "Keep the SavedModel used by compile_tf_module on disk.")
 FLAGS = flags.FLAGS
 
 
@@ -149,7 +152,7 @@ def compile_tf_module(tf_module,
 
     compiled_module = compiler_module.compile(target_backends=target_backends)
     if artifacts_dir is not None:
-      compiled_name = f"compiled__{backends_string}.vmfb"
+      compiled_name = f"compiled__{backends_to_str(target_backends)}.vmfb"
       compiled_path = os.path.join(artifacts_dir, compiled_name)
       logging.info("Saving compiled IREE module to: %s", compiled_path)
       with open(compiled_path, "wb") as f:
@@ -158,13 +161,14 @@ def compile_tf_module(tf_module,
     return compiled_module
 
   options = tf.saved_model.SaveOptions(save_debug_info=True)
-  if artifacts_dir is not None:
+  if artifacts_dir is not None and FLAGS.keep_saved_model:
     # Save the saved model alongside the other compilation artifacts.
 
-    backends_string = backends_to_str(target_backends)
-    # Create a saved model for these target backends to avoid a race condition.
+    # Create a saved model for these target backends to avoid a race condition
+    # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
+    sm_path = os.path.join(artifacts_dir,
+                           f"saved_model__{backends_to_str(target_backends)}")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:

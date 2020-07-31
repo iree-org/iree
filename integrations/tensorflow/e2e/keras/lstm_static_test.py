@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Temporary duplicate of `lstm_static_test.py` for prototyping.
-
 # This test is the same as keras_lstm_test, but all shapes are static.
 # This stresses the TensorList lowering more specifically.
 
@@ -23,9 +21,9 @@ from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
-NUM_UNITS = 10
-NUM_TIMESTEPS = 24
 NUM_BATCH = 7
+NUM_TIMESTEPS = 24
+NUM_UNITS = 10
 INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 
 
@@ -45,7 +43,7 @@ class LstmStatic(tf.Module):
 
 
 @tf_test_utils.compile_module(LstmStatic, exported_names=["predict"])
-class LstmTest(tf_test_utils.TracedModuleTestCase):
+class LstmStaticTest(tf_test_utils.TracedModuleTestCase):
 
   def test_lstm(self):
 
