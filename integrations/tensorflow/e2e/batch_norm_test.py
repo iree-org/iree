@@ -45,7 +45,6 @@ class BatchNormTest(tf_test_utils.TracedModuleTestCase):
   def test_batch_norm_inference(self):
 
     def batch_norm_inference(module):
-      tf_utils.set_random_seed()
       # Note: scaling by a small value to increase numerical stability.
       x = tf_utils.uniform((4, 16)) * 1e-3
       mean = tf_utils.uniform((16,)) * 1e-3

@@ -53,7 +53,6 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
   def test_simple_matmul(self):
 
     def simple_matmul(module):
-      tf_utils.set_random_seed(12345)
       # Note: scaling by a small value to increase numerical stability.
       a = tf_utils.uniform((128, 3072)) * 1e-3
       b = tf_utils.uniform((3072, 256)) * 1e-3

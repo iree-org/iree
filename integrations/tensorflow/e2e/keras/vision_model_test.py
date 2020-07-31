@@ -139,7 +139,6 @@ class AppTest(tf_test_utils.TracedModuleTestCase):
   def test_application(self):
 
     def predict(module):
-      tf_utils.set_random_seed()
       module.predict(tf_utils.uniform(get_input_shape()))
 
     self.compare_backends(predict)

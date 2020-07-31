@@ -448,6 +448,9 @@ class TracedModuleTestCase(tf.test.TestCase):
   def compare_backends(self, trace_function):
     """Run the reference and target backends on trace_function and compare them.
 
+    Random seeds for tensorflow, numpy and python are set before each invocation
+    of trace_function.
+
     Args:
       trace_function: a function accepting a TracedModule as its argument.
     """
@@ -456,8 +459,10 @@ class TracedModuleTestCase(tf.test.TestCase):
     tar_traces = [Trace(module, trace_function) for module in self._tar_modules]
 
     # Run the traces through trace_function with their associated modules.
+    tf_utils.set_random_seed()
     trace_function(TracedModule(self._ref_module, ref_trace))
     for module, trace in zip(self._tar_modules, tar_traces):
+      tf_utils.set_random_seed()
       trace_function(TracedModule(module, trace))
 
     # Compare each target trace of trace_function with the reference trace.

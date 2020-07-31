@@ -57,7 +57,6 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_concat_zero_dim(self):
 
     def concat_zero_dim(module):
-      tf_utils.set_random_seed()
       a = tf_utils.uniform([1, 5, 0])
       b = tf_utils.uniform([1, 5, 1])
       module.concat_zero_dim(a, b)
@@ -67,7 +66,6 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_concat0axis(self):
 
     def concat0axis(module):
-      tf_utils.set_random_seed()
       a = tf_utils.uniform([1, 5, 1])
       b = tf_utils.uniform([1, 5, 1])
       module.concat0axis(a, b)
@@ -78,7 +76,6 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_concat1axis(self):
 
     def concat1axis(module):
-      tf_utils.set_random_seed()
       a = tf_utils.uniform([1, 5, 1])
       b = tf_utils.uniform([1, 5, 1])
       module.concat1axis(a, b)
@@ -89,7 +86,6 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_concat2axis(self):
 
     def concat2axis(module):
-      tf_utils.set_random_seed()
       a = tf_utils.uniform([1, 5, 1])
       b = tf_utils.uniform([1, 5, 1])
       module.concat2axis(a, b)

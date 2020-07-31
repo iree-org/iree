@@ -77,7 +77,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_basic_matmul(self):
 
     def basic_matmul(module):
-      tf_utils.set_random_seed()
       module.basic_matmul(tf_utils.uniform([4, 2]), tf_utils.uniform([2, 4]))
 
     self.compare_backends(basic_matmul)
@@ -85,7 +84,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_lhs_batch(self):
 
     def matmul_lhs_batch(module):
-      tf_utils.set_random_seed()
       module.matmul_lhs_batch(
         tf_utils.uniform([3, 4, 2]), tf_utils.uniform([2, 4]))
 
@@ -94,7 +92,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_rhs_batch(self):
 
     def matmul_rhs_batch(module):
-      tf_utils.set_random_seed()
       module.matmul_rhs_batch(
         tf_utils.uniform([4, 2]), tf_utils.uniform([3, 2, 4]))
 
@@ -103,7 +100,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_broadcast_singleton_dimension(self):
 
     def matmul_broadcast_singleton_dimension(module):
-      tf_utils.set_random_seed()
       module.matmul_broadcast_singleton_dimension(
         tf_utils.uniform([1, 4, 2]), tf_utils.uniform([3, 2, 4]))
 
@@ -112,7 +108,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_high_rank_batch(self):
 
     def matmul_high_rank_batch(module):
-      tf_utils.set_random_seed()
       module.matmul_high_rank_batch(
         tf_utils.uniform([1, 7, 4, 2]), tf_utils.uniform([7, 1, 2, 4]))
 
@@ -121,7 +116,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_dynamic_matching_batch(self):
 
     def matmul_dynamic_matching_batch(module):
-      tf_utils.set_random_seed()
       module.matmul_dynamic(
         tf_utils.uniform([2, 2, 3]), tf_utils.uniform([2, 3, 4]))
 
@@ -130,7 +124,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_dynamic_broadcast_lhs(self):
 
     def matmul_dynamic_broadcast_lhs(module):
-      tf_utils.set_random_seed()
       module.matmul_dynamic(
         tf_utils.uniform([1, 2, 3]), tf_utils.uniform([2, 3, 4]))
 
@@ -139,7 +132,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_dynamic_broadcast_rhs(self):
 
     def matmul_dynamic_broadcast_rhs(module):
-      tf_utils.set_random_seed()
       module.matmul_dynamic(
         tf_utils.uniform([2, 2, 3]), tf_utils.uniform([1, 3, 4]))
 
@@ -148,7 +140,6 @@ class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
   def test_matmul_dynamic_rank_broadcasting(self):
 
     def matmul_dynamic_rank_broadcasting(module):
-      tf_utils.set_random_seed()
       module.matmul_dynamic_lhs_batch(
         tf_utils.uniform([7, 2, 3]), tf_utils.uniform([3, 4]))
 

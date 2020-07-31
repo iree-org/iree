@@ -221,6 +221,7 @@ class IreeCompiledModule(CompiledModule):
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
     if _create_reinitialized_args is None:
+      set_random_seed()
       self._module_blob = compile_tf_module(
           tf_module=module_class(),
           target_backends=backend_info.iree_compiler_targets,
@@ -287,6 +288,7 @@ class TfCompiledModule(CompiledModule):
         effect for this subclass as nothing is compiled.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
+    set_random_seed()
     self._tf_module = module_class()
 
   def create_reinitialized(self):
