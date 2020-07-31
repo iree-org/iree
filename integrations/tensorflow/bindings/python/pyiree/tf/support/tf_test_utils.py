@@ -79,8 +79,12 @@ def _setup_artifacts_dir(module_name):
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
 
   # If the artifacts already exist then we overwrite/update them.
-  if not os.path.exists(artifacts_dir):
+  try:
+    # Use try/except instead of os.path.exists to address a race condition
+    # between multiple tests targets.
     os.makedirs(artifacts_dir)
+  except IOError:
+    pass
   return artifacts_dir
 
 
@@ -599,7 +603,11 @@ class Trace:
 
     # Base check for numpy arrays.
     elif isinstance(ref, np.ndarray):
-      if isinstance(ref.flat[0], np.floating):
+      if ref.dtype != tar.dtype:
+        logging.error("Expected ref and tar to have the same dtype, but got %s "
+                      " and %s", ref.dtype, tar.dtype)
+        return False
+      if np.issubdtype(ref.dtype, np.floating):
         return np.allclose(ref, tar, rtol=rtol, atol=atol)
       else:
         return np.array_equal(ref, tar)

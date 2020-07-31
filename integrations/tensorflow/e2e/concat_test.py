@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test concat op."""
 
+import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
@@ -51,40 +52,49 @@ class ConcatOpsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ConcatOpsModule)
-class ConcatOpsTest(tf_test_utils.CompiledModuleTestCase):
+class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_concat_zero_dim(self):
-    tf_utils.set_random_seed()
-    m = self.get_module()
-    a = tf.random.uniform([1, 5, 0], dtype=tf.float32)
-    b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    dst = m.concat_zero_dim(a, b)
-    dst.assert_all_close()
 
-  def concat0axis(self):
-    tf_utils.set_random_seed()
-    m = self.get_module()
-    a = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    dst = m.concat_zero_dim(a, b)
-    dst.assert_all_close()
+    def concat_zero_dim(module):
+      tf_utils.set_random_seed()
+      a = np.random.uniform(size=[1, 5, 0]).astype(np.float32)
+      b = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      module.concat_zero_dim(a, b)
 
-  def concat1axis(self):
-    tf_utils.set_random_seed()
-    m = self.get_module()
-    a = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    dst = m.concat_zero_dim(a, b)
-    dst.assert_all_close()
+    self.compare_backends(concat_zero_dim)
 
-  def concat2axis(self):
-    tf_utils.set_random_seed()
-    m = self.get_module()
-    a = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    b = tf.random.uniform([1, 5, 1], dtype=tf.float32)
-    dst = m.concat_zero_dim(a, b)
-    dst.assert_all_close()
+  def test_concat0axis(self):
 
+    def concat0axis(module):
+      tf_utils.set_random_seed()
+      a = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      b = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      module.concat0axis(a, b)
+
+    self.compare_backends(concat0axis)
+
+
+  def test_concat1axis(self):
+
+    def concat1axis(module):
+      tf_utils.set_random_seed()
+      a = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      b = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      module.concat1axis(a, b)
+
+    self.compare_backends(concat1axis)
+
+
+  def test_concat2axis(self):
+
+    def concat2axis(module):
+      tf_utils.set_random_seed()
+      a = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      b = np.random.uniform(size=[1, 5, 1]).astype(np.float32)
+      module.concat2axis(a, b)
+
+    self.compare_backends(concat2axis)
 
 if __name__ == "__main__":
   if hasattr(tf, "enable_v2_behavior"):
