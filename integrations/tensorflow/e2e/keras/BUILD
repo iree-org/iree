@@ -23,7 +23,6 @@ load(
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
     "iree_py_binary",
-    "iree_py_test",
 )
 load(
     "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.bzl",
