@@ -66,7 +66,6 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
           artifacts_dir=artifacts_dir)
 
       artifacts_to_check = [
-          'saved_model',
           'tf_input.mlir',
           'iree_input.mlir',
           f'compiled__{tf_utils.backends_to_str(target_backends)}.vmfb',
