@@ -26,21 +26,23 @@ class ComplexModule(tf.Module):
       tf.TensorSpec([2], tf.float32),
       tf.TensorSpec([2], tf.float32)
   ])
-  def complex(self, real, imag):
-    cmplx = tf.complex(real, imag)
-    absolute = tf.exp(cmplx);
-    return tf.math.real(absolute)
+  def complex_exp(self, real, imag):
+    tensor = tf.complex(real, imag)
+    exp = tf.exp(tensor)
+    return tf.math.real(exp)
 
 
 @tf_test_utils.compile_module(ComplexModule)
-class ComplexTest(tf_test_utils.CompiledModuleTestCase):
+class ComplexTest(tf_test_utils.TracedModuleTestCase):
 
   def test_complex(self):
-    dims = np.array([2., 3.], dtype=np.float32)
-    value = np.array([-1., 0.4], dtype=np.float32)
 
-    result = self.get_module().complex(dims, value)
-    result.assert_all_close()
+    def complex_exp(module):
+      real = np.array([2., 3.], dtype=np.float32)
+      imag = np.array([-1., 0.4], dtype=np.float32)
+      module.complex_exp(real, imag)
+
+    self.compare_backends(complex_exp)
 
 
 if __name__ == "__main__":

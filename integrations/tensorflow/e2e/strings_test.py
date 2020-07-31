@@ -41,20 +41,27 @@ class StringsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(StringsModule)
-class StringsTest(tf_test_utils.CompiledModuleTestCase):
+class StringsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_print_ids(self):
-    input_ids = np.asarray(
-        [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
-         [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-    self.get_module().print_ids(input_ids)
+
+    def print_ids(module):
+      input_ids = np.asarray(
+          [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
+           [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
+      module.print_ids(input_ids)
+
+    self.compare_backends(print_ids)
 
   def test_strings_to_ids(self):
-    input_ids = np.asarray(
-        [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
-         [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
-    result = self.get_module().strings_to_ids(input_ids)
-    result.assert_all_equal()
+
+    def strings_to_ids(module):
+      input_ids = np.asarray(
+          [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
+           [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
+      module.strings_to_ids(input_ids)
+
+    self.compare_backends(strings_to_ids)
 
 
 if __name__ == "__main__":

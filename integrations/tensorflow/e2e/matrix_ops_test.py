@@ -15,6 +15,7 @@
 """Test matrix ops."""
 
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -71,60 +72,78 @@ class MatrixOpsModule(tf.Module):
 
 
 @tf_test_utils.compile_module(MatrixOpsModule)
-class MatrixOpsTest(tf_test_utils.CompiledModuleTestCase):
+class MatrixOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_basic_matmul(self):
-    m = self.get_module()
-    dst = m.basic_matmul(tf.random.uniform([4, 2]), tf.random.uniform([2, 4]))
-    dst.assert_all_close()
+
+    def basic_matmul(module):
+      module.basic_matmul(tf_utils.uniform([4, 2]), tf_utils.uniform([2, 4]))
+
+    self.compare_backends(basic_matmul)
 
   def test_matmul_lhs_batch(self):
-    m = self.get_module()
-    dst = m.matmul_lhs_batch(
-        tf.random.uniform([3, 4, 2]), tf.random.uniform([2, 4]))
-    dst.assert_all_close()
+
+    def matmul_lhs_batch(module):
+      module.matmul_lhs_batch(
+        tf_utils.uniform([3, 4, 2]), tf_utils.uniform([2, 4]))
+
+    self.compare_backends(matmul_lhs_batch)
 
   def test_matmul_rhs_batch(self):
-    m = self.get_module()
-    dst = m.matmul_rhs_batch(
-        tf.random.uniform([4, 2]), tf.random.uniform([3, 2, 4]))
-    dst.assert_all_close()
+
+    def matmul_rhs_batch(module):
+      module.matmul_rhs_batch(
+        tf_utils.uniform([4, 2]), tf_utils.uniform([3, 2, 4]))
+
+    self.compare_backends(matmul_rhs_batch)
 
   def test_matmul_broadcast_singleton_dimension(self):
-    m = self.get_module()
-    dst = m.matmul_broadcast_singleton_dimension(
-        tf.random.uniform([1, 4, 2]), tf.random.uniform([3, 2, 4]))
-    dst.assert_all_close()
+
+    def matmul_broadcast_singleton_dimension(module):
+      module.matmul_broadcast_singleton_dimension(
+        tf_utils.uniform([1, 4, 2]), tf_utils.uniform([3, 2, 4]))
+
+    self.compare_backends(matmul_broadcast_singleton_dimension)
 
   def test_matmul_high_rank_batch(self):
-    m = self.get_module()
-    dst = m.matmul_high_rank_batch(
-        tf.random.uniform([1, 7, 4, 2]), tf.random.uniform([7, 1, 2, 4]))
-    dst.assert_all_close()
+
+    def matmul_high_rank_batch(module):
+      module.matmul_high_rank_batch(
+        tf_utils.uniform([1, 7, 4, 2]), tf_utils.uniform([7, 1, 2, 4]))
+
+    self.compare_backends(matmul_high_rank_batch)
 
   def test_matmul_dynamic_matching_batch(self):
-    m = self.get_module()
-    dst = m.matmul_dynamic(
-        tf.random.uniform([2, 2, 3]), tf.random.uniform([2, 3, 4]))
-    dst.assert_all_close()
+
+    def matmul_dynamic_matching_batch(module):
+      module.matmul_dynamic(
+        tf_utils.uniform([2, 2, 3]), tf_utils.uniform([2, 3, 4]))
+
+    self.compare_backends(matmul_dynamic_matching_batch)
 
   def test_matmul_dynamic_broadcast_lhs(self):
-    m = self.get_module()
-    dst = m.matmul_dynamic(
-        tf.random.uniform([1, 2, 3]), tf.random.uniform([2, 3, 4]))
-    dst.assert_all_close()
+
+    def matmul_dynamic_broadcast_lhs(module):
+      module.matmul_dynamic(
+        tf_utils.uniform([1, 2, 3]), tf_utils.uniform([2, 3, 4]))
+
+    self.compare_backends(matmul_dynamic_broadcast_lhs)
 
   def test_matmul_dynamic_broadcast_rhs(self):
-    m = self.get_module()
-    dst = m.matmul_dynamic(
-        tf.random.uniform([2, 2, 3]), tf.random.uniform([1, 3, 4]))
-    dst.assert_all_close()
+
+    def matmul_dynamic_broadcast_rhs(module):
+      module.matmul_dynamic(
+        tf_utils.uniform([2, 2, 3]), tf_utils.uniform([1, 3, 4]))
+
+    self.compare_backends(matmul_dynamic_broadcast_rhs)
 
   def test_matmul_dynamic_rank_broadcasting(self):
-    m = self.get_module()
-    dst = m.matmul_dynamic_lhs_batch(
-        tf.random.uniform([7, 2, 3]), tf.random.uniform([3, 4]))
-    dst.assert_all_close()
+
+    def matmul_dynamic_rank_broadcasting(module):
+      module.matmul_dynamic_lhs_batch(
+        tf_utils.uniform([7, 2, 3]), tf_utils.uniform([3, 4]))
+
+    self.compare_backends(matmul_dynamic_rank_broadcasting)
 
 
 if __name__ == "__main__":

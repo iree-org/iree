@@ -31,14 +31,16 @@ class FillModule(tf.Module):
 
 
 @tf_test_utils.compile_module(FillModule)
-class FillTest(tf_test_utils.CompiledModuleTestCase):
+class FillTest(tf_test_utils.TracedModuleTestCase):
 
   def test_fill(self):
-    dims = np.array([2, 3], dtype=np.int32)
-    value = np.array(9., dtype=np.float32)
 
-    result = self.get_module().fill(dims, value)
-    result.assert_all_close()
+    def fill(module):
+      dims = np.array([2, 3], dtype=np.int32)
+      value = np.array(9., dtype=np.float32)
+      module.fill(dims, value)
+
+    self.compare_backends(fill)
 
 
 if __name__ == "__main__":

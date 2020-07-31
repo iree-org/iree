@@ -21,7 +21,8 @@ targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
-`--test_tag_filters="-driver=vulkan"` in the `bazel test` invocation.
+`--test_tag_filters="-driver=vulkan"` in the `bazel test` invocation, or by
+adding `test --test_tag_filters="-driver=vulkan"` to your `user.bazelrc`.
 
 ## Compiling `tf.Module`s
 
@@ -44,6 +45,9 @@ vmla_module = tf_utils.IreeCompiledModule(
 vmla_module.predict(...)
 ```
 
+By default the TensorFlow SavedModels will not be kept. This can be overridden
+via the `--keep_saved_model` flag.
+
 ## Running tests
 
 For locally running tests and iterating on backend development, `bazel run` is
@@ -53,11 +57,15 @@ preferred.
 # Run math_test on all backends.
 bazel run :math_test_manual
 
-# Run math_test on the VMLA backend only.
+# Run math_test comparing TensorFlow to itself (e.g. to debug randomization).
+bazel run :math_test_manual -- target_backends=tf
+
+# Run math_test comparing the VMLA backend and TensorFlow.
 bazel run :math_test_manual -- --target_backends=iree_vmla
 
-# Same as above, but add `tf` backend to cross-check numerical correctness.
-bazel run :math_test_manual -- --target_backends=tf,iree_vmla
+# Run math_test comparing the VMLA backend to itself multiple times.
+bazel run :math_test_manual -- \
+  --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
 
 # Run math_test and output on failure.
 bazel test :math_test_manual --test_output=errors
@@ -66,14 +74,43 @@ bazel test :math_test_manual --test_output=errors
 bazel run :math_test_manual -- --test_output=streamed
 ```
 
-If you specify the same backend multiple times, for example
-`--target_backends=iree_vmla,iree_vmla`. The same backends are grouped and in
-this example `iree_vmla` will run once. If you specify `tf,iree_vmla` as
-backends, then we will test both backends and compare them with each other. If
-you specify `tf` backend only, then we will also test `tf` vs `tf` to capture
-any model initialization/randomization issues (it is a special case for debug
-purpose). For reproducibility of the unit tests we set random seed of `tf` and
-`numpy` by calling `tf_utils.set_random_seed()` before model creation.
+For reproducibility of the unit tests `CompiledModule()` sets the random seeds
+of `tf`, `numpy` and `python` by calling `tf_utils.set_random_seed()` before
+model creation.
+
+## Writing Tests
+
+Our tests use a class `TracedModule` to capture and store all of the inputs and
+outputs of a `CompiledModule` in a `Trace`. Each unittest on a `TestCase` uses
+the `compare_backends` method. This method runs the function it is passed with
+a `TracedModule` once for each reference and target backend. The inputs and
+outputs to these modules are then checked for correctness, using the reference
+backend as a source of truth. For example:
+
+```python
+# Compile a `tf.Module` named `SimpleArithmeticModule` into a `CompiledModule`.
+@tf_test_utils.compile_module(SimpleArithmeticModule)
+# Inherit from `TracedModuleTestCase`.
+class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
+
+  # Unit test.
+  def test_simple_mul(self):
+
+    # Trace function.
+    def simple_mul(module):
+      # A random seed is automatically set before each call to `simple_mul`.
+      a = tf_utils.uniform([4])
+      b = np.array([400., 5., 6., 7.], dtype=np.float32)
+      # The inputs `a` and `b` are recorded along with the output `c`
+      c = module.simple_mul(a, b)
+      # The inputs `a` and `b` are recorded along with the (unnamed) output
+      # module.simple_mul returns.
+      module.simple_mul(a, c)
+
+    # Calls `simple_mul` once for each backend, recording the inputs and outputs
+    # to `module` and then comparing them.
+    self.compare_backends(simple_mul)
+```
 
 ## Test Suites
 

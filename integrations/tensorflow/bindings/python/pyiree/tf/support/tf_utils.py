@@ -29,6 +29,9 @@ from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
+
+flags.DEFINE_bool("keep_saved_model", False,
+                  "Keep the SavedModel used by compile_tf_module on disk.")
 FLAGS = flags.FLAGS
 
 
@@ -37,6 +40,14 @@ def set_random_seed(seed=0):
   tf.random.set_seed(seed)
   random.seed(seed)
   np.random.seed(seed)
+
+
+def uniform(shape, dtype=np.float32):
+  return np.random.uniform(size=shape).astype(dtype)
+
+
+def ndarange(shape, dtype=np.float32):
+  return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
 def backends_to_str(target_backends):
@@ -150,9 +161,14 @@ def compile_tf_module(tf_module,
     return compiled_module
 
   options = tf.saved_model.SaveOptions(save_debug_info=True)
-  if artifacts_dir is not None:
+  if artifacts_dir is not None and FLAGS.keep_saved_model:
     # Save the saved model alongside the other compilation artifacts.
-    sm_path = os.path.join(artifacts_dir, "saved_model")
+
+    # Create a saved model for these target backends to avoid a race condition
+    # when running a test suite.
+    # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
+    sm_path = os.path.join(artifacts_dir,
+                           f"saved_model__{backends_to_str(target_backends)}")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
@@ -187,7 +203,7 @@ class IreeCompiledModule(CompiledModule):
   def __init__(self,
                module_class,
                backend_info,
-               exported_names=[],
+               exported_names=(),
                artifacts_dir=None,
                _create_reinitialized_args=None):
     """Compile a tf.Module to the target backend in backend_info.
@@ -200,10 +216,12 @@ class IreeCompiledModule(CompiledModule):
         module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
+      _create_reinitialized_args: used internally.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
     if _create_reinitialized_args is None:
+      set_random_seed()
       self._module_blob = compile_tf_module(
           tf_module=module_class(),
           target_backends=backend_info.iree_compiler_targets,
@@ -256,7 +274,7 @@ class TfCompiledModule(CompiledModule):
   def __init__(self,
                module_class,
                backend_info,
-               exported_names=[],
+               exported_names=(),
                artifacts_dir=None):
     """Wrap a tf.Module in a TFCompiledModule facade.
 
@@ -270,6 +288,7 @@ class TfCompiledModule(CompiledModule):
         effect for this subclass as nothing is compiled.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
+    set_random_seed()
     self._tf_module = module_class()
 
   def create_reinitialized(self):
@@ -279,7 +298,7 @@ class TfCompiledModule(CompiledModule):
 
   def __getattr__(self, attr):
     # Try to resolve it as a function.
-    exported = len(self._exported_names) == 0 or attr in self._exported_names
+    exported = not self._exported_names or attr in self._exported_names
     if not hasattr(self._tf_module, attr) or not exported:
       raise AttributeError(f"The TensorFlow module does not have attr '{attr}'")
     f = getattr(self._tf_module, attr)
@@ -295,6 +314,13 @@ class _TfFunctionWrapper(object):
   def __init__(self, f):
     self._f = f
 
+  def _convert_to_numpy(self, tensor):
+    result = tensor.numpy()
+    if np.isscalar(result):
+      # convert_to_tensor isn't reversible via .numpy()
+      result = np.array(result)
+    return result
+
   def __call__(self, *args, **kwargs):
     # TensorFlow will auto-convert all inbound args.
     results = self._f(*args, **kwargs)
@@ -304,7 +330,7 @@ class _TfFunctionWrapper(object):
     if not isinstance(results, tuple):
       results = (results,)
     return tf.nest.map_structure(
-        lambda t: t.numpy() if isinstance(t, tf.Tensor) else t,
+        lambda t: self._convert_to_numpy(t) if isinstance(t, tf.Tensor) else t,
         *results,
         check_types=False)
 

@@ -16,6 +16,7 @@
 
 import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -37,21 +38,27 @@ class SimpleArithmeticModule(tf.Module):
 
 
 @tf_test_utils.compile_module(SimpleArithmeticModule)
-class SimpleArithmeticTest(tf_test_utils.CompiledModuleTestCase):
+class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
   def test_simple_mul(self):
-    a = np.array([1., 2., 3., 4.], dtype=np.float32)
-    b = np.array([400., 5., 6., 7.], dtype=np.float32)
-    r = self.get_module().simple_mul(a, b)
-    r.print().assert_all_close()
+
+    def simple_mul(module):
+      a = np.array([1., 2., 3., 4.], dtype=np.float32)
+      b = np.array([400., 5., 6., 7.], dtype=np.float32)
+      c = module.simple_mul(a, b)
+      module.simple_mul(a, c)
+
+    self.compare_backends(simple_mul)
 
   def test_simple_matmul(self):
-    np.random.seed(12345)
-    # Note: scaling by a small value to increase numerical stability.
-    a = np.random.random((128, 3072)).astype(np.float32) * 1e-3
-    b = np.random.random((3072, 256)).astype(np.float32) * 1e-3
-    r = self.get_module().simple_matmul(a, b)
-    r.print().assert_all_close()
+
+    def simple_matmul(module):
+      # Note: scaling by a small value to increase numerical stability.
+      a = tf_utils.uniform((128, 3072)) * 1e-3
+      b = tf_utils.uniform((3072, 256)) * 1e-3
+      module.simple_matmul(a, b)
+
+    self.compare_backends(simple_matmul)
 
 
 if __name__ == "__main__":

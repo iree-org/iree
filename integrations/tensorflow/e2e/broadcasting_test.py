@@ -14,7 +14,9 @@
 # limitations under the License.
 """Test broadcasting support."""
 
+import numpy as np
 from pyiree.tf.support import tf_test_utils
+from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
@@ -29,24 +31,35 @@ class BroadcastingModule(tf.Module):
 
 
 @tf_test_utils.compile_module(BroadcastingModule)
-class BroadcastingTest(tf_test_utils.CompiledModuleTestCase):
+class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
 
   def test_add_same_shape(self):
-    m = self.get_module()
-    dst = m.add(tf.random.uniform([4]), tf.random.uniform([4]))
-    dst.print().assert_all_close()
 
+    def add_same_shape(module):
+      lhs = tf_utils.uniform([4])
+      rhs = tf_utils.uniform([4])
+      module.add(lhs, rhs)
 
-# TODO(silvasean): Make these work.
-#   def test_add_broadcast_lhs(self):
-#     m = self.get_module()
-#     dst = m.add(tf.random.uniform([1]), tf.random.uniform([4]))
-#     dst.print().assert_all_close()
-#
-#   def test_add_broadcast_rhs(self):
-#     m = self.get_module()
-#     dst = m.add(tf.random.uniform([4]), tf.random.uniform([1]))
-#     dst.print().assert_all_close()
+    self.compare_backends(add_same_shape)
+
+  def test_add_broadcast_lhs(self):
+
+    def add_broadcast_lhs(module):
+      lhs = tf_utils.uniform([1])
+      rhs = tf_utils.uniform([4])
+      module.add(lhs, rhs)
+
+    self.compare_backends(add_broadcast_lhs)
+
+  def test_add_broadcast_rhs(self):
+
+    def add_broadcast_rhs(module):
+      lhs = tf_utils.uniform([4])
+      rhs = tf_utils.uniform([1])
+      module.add(lhs, rhs)
+
+    self.compare_backends(add_broadcast_rhs)
+
 
 if __name__ == "__main__":
   if hasattr(tf, "enable_v2_behavior"):

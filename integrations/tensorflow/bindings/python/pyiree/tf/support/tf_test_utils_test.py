@@ -51,31 +51,31 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
           'array_c': np.array([0, 1, 2]),
           'array_d': np.array(['0', '1', '2']),
           'array_e': np.array([0.0, 0.1, 0.2]),
-          'tgt_same': True,
+          'tar_same': True,
       },
       {
           'testcase_name': 'wrong int',
           'array_c': np.array([1, 1, 2]),
           'array_d': np.array(['0', '1', '2']),
           'array_e': np.array([0.0, 0.1, 0.2]),
-          'tgt_same': False,
+          'tar_same': False,
       },
       {
           'testcase_name': 'wrong string',
           'array_c': np.array([0, 1, 2]),
           'array_d': np.array(['a', '1', '2']),
           'array_e': np.array([0.0, 0.1, 0.2]),
-          'tgt_same': False,
+          'tar_same': False,
       },
       {
           'testcase_name': 'wrong float',
           'array_c': np.array([0, 1, 2]),
           'array_d': np.array(['0', '1', '2']),
           'array_e': np.array([1.0, 0.1, 0.2]),
-          'tgt_same': False,
+          'tar_same': False,
       },
   ])
-  def test_recursive_check_same(self, array_c, array_d, array_e, tgt_same):
+  def test_recursive_check_same(self, array_c, array_d, array_e, tar_same):
 
     ref = {
         'a':
@@ -88,7 +88,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
             'e': np.array([0.0, 0.1, 0.2])
         }],
     }
-    tgt = {
+    tar = {
         'a': 1,
         'b': [{
             'c': array_c
@@ -98,8 +98,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
             'e': array_e
         }],
     }
-    same = tf_test_utils._recursive_check_same(ref, tgt)
-    self.assertEqual(tgt_same, same)
+    same = tf_test_utils.Trace._check_same(ref, tar, rtol=1e-6, atol=1e-6)
+    self.assertEqual(tar_same, same)
 
   def test_trace_inputs_and_outputs(self):
 
