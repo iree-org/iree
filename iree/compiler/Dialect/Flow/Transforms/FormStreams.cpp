@@ -132,6 +132,8 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     SmallVector<Value, 8> fragmentOperands;
     SmallVector<Value, 8> fragmentResults;
     SmallVector<Type, 8> fragmentResultTypes;
+    SmallVector<Operation *, 4> tieShapeOps;
+    SmallVector<Value, 8> outsideTieShapeOperands;
     for (auto *op : streamOps) {
       for (auto operand : op->getOperands()) {
         if (std::find(fragmentOperands.begin(), fragmentOperands.end(),
@@ -139,9 +141,21 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
           if (!operand.getDefiningOp() ||
               !streamOpSet.count(operand.getDefiningOp())) {
             fragmentOperands.push_back(operand);
+
+            auto operandDefiningOp = operand.getDefiningOp();
+            if (operandDefiningOp &&
+                llvm::isa<Shape::TieShapeOp>(operandDefiningOp)) {
+              tieShapeOps.push_back(operand.getDefiningOp());
+              auto definingOp =
+                  dyn_cast<Shape::TieShapeOp>(operand.getDefiningOp());
+              for (auto arg : definingOp.getOperands()) {
+                outsideTieShapeOperands.push_back(arg);
+              }
+            }
           }
         }
       }
+
       for (auto result : op->getResults()) {
         bool onlyStreamUses = true;
         for (auto &use : result.getUses()) {
@@ -157,6 +171,14 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
       }
     }
 
+    // TODO(Tao Peng): pass args(operand and shape) which need by outside
+    // tie_shape into fragment body, and ignore the tie_shape arg passed into
+    // the fragment, it will not be used, and will be deleted by canonicalizer
+    // later.
+    outsideTieShapeOperands.append(fragmentOperands.begin(),
+                                   fragmentOperands.end());
+    fragmentOperands = outsideTieShapeOperands;
+
     // Create the fragment and clone in all of the ops.
     auto fragmentOp = blockBuilder.create<ExStreamFragmentOp>(
         fragmentLoc, fragmentResultTypes, fragmentOperands);
@@ -168,6 +190,9 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
       mapping.map(fragmentOperands[arg.getArgNumber()], arg);
     }
     OpBuilder fragmentBuilder = OpBuilder::atBlockEnd(entryBlock);
+    for (auto *op : tieShapeOps) {
+      fragmentBuilder.clone(*op, mapping);
+    }
     for (auto *op : streamOps) {
       fragmentBuilder.clone(*op, mapping);
     }
