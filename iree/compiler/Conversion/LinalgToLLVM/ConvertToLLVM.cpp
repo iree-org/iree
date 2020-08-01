@@ -144,9 +144,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
  public:
   explicit ConvertFuncWithHALInterface(MLIRContext *context,
                                        LLVMTypeConverter &typeconverter)
-      : ConvertToLLVMPattern(
-            mlir::FuncOp::getOperationName(), context, typeconverter,
-            LowerToLLVMOptions::getDefaultOptions(), 65535 - 1) {}
+      : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
+                             typeconverter, 65535 - 1) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,

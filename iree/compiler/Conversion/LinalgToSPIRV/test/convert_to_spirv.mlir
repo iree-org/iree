@@ -58,11 +58,11 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     %2 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<8x8xi32>, vector<8x8xi32>
     %3 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} %0, %1, %2 : vector<8x32xi8>, vector<32x8xi8> into vector<8x8xi32>
     vector.transfer_write %3, %arg2[%c0, %c0] : vector<8x8xi32>, memref<8x8xi32>
-    // CHECK: %[[A:.+]] = spv.CooperativeMatrixLoadNV "StorageBuffer" %{{.*}}, %{{.*}}, %{{.*}}
-    // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV "StorageBuffer" %{{.*}}, %{{.*}}, %{{.*}}
-    // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV "StorageBuffer" %{{.*}}, %{{.*}}, %{{.*}}
+    // CHECK: %[[A:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
+    // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
+    // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV %{{.*}}, %{{.*}}, %{{.*}}
     // CHECK: %[[R:.+]] = spv.CooperativeMatrixMulAddNV %[[A]], %[[B]], %[[C]]
-    // CHECK: spv.CooperativeMatrixStoreNV "StorageBuffer" %{{.*}}, %[[R]], %{{.*}}, %{{.*}}
+    // CHECK: spv.CooperativeMatrixStoreNV %{{.*}}, %[[R]], %{{.*}}, %{{.*}}
     return
   }
 }
