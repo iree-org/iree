@@ -223,7 +223,7 @@ i32=5
 
 ##### Vulkan function `vkCreateInstance` not available
 
-Since Android 8 Oreo, Android re-architected the OS frameowrk with [project
+Since Android 8 Oreo, Android re-architected the OS framework with [project
 Treble](https://source.android.com/devices/architecture#hidl). Framework
 libraries and [vendor libraries](https://source.android.com/devices/architecture/vndk)
 have a more strict and clear separation. Their dependencies are carefully

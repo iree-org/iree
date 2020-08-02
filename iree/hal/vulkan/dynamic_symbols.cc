@@ -94,7 +94,7 @@ Status ResolveFunctions(DynamicSymbols* syms,
       get_proc_addr("vkGetInstanceProcAddr"));
 
 #if defined(IREE_PLATFORM_ANDROID)
-  // Since Android 8 Oreo, Android re-architected the OS frameowrk with project
+  // Since Android 8 Oreo, Android re-architected the OS framework with project
   // Treble. Framework libraries and vendor libraries have a more strict and
   // clear separation. Their dependencies are carefully scrutinized and only
   // selected cases are allowed. This is enforced with linker namespaces.
