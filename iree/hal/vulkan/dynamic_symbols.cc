@@ -82,7 +82,7 @@ static const char* kVulkanLoaderSearchNames[] = {
     "vulkan-1.dll",
 #else
     "libvulkan.so.1",
-#endif  // IREE_PLATFORM_WINDOWS
+#endif  // IREE_PLATFORM_ANDROID
 };
 
 Status ResolveFunctions(DynamicSymbols* syms,
@@ -92,6 +92,40 @@ Status ResolveFunctions(DynamicSymbols* syms,
   // single function.
   syms->vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
       get_proc_addr("vkGetInstanceProcAddr"));
+
+#if defined(IREE_PLATFORM_ANDROID)
+  // Since Android 8 Oreo, Android re-architected the OS framework with project
+  // Treble. Framework libraries and vendor libraries have a more strict and
+  // clear separation. Their dependencies are carefully scrutinized and only
+  // selected cases are allowed. This is enforced with linker namespaces.
+  //
+  // /data/local/tmp is the preferred directory for automating native binary
+  // tests built using NDK toolchain. They should be allowed to access libraries
+  // like libvulkan.so for their functionality. However, there was an issue
+  // with fully treblized Android 10 where /data/local/tmp did not have access
+  // to the linker namespaces needed by libvulkan.so. This is fixed via
+  // https://android.googlesource.com/platform/system/linkerconfig/+/296da5b1eb88a3527ee76352c2d987f82f3252eb
+  //
+  // But as typically in the Android system, it takes a long time to see the
+  // fix getting propagated, if ever. A known workaround is to symlink the
+  // vendor Vulkan implementation under /vendor/lib[64]/hw/vulkan.*.so as
+  // libvulkan.so under /data/local/tmp and use LD_LIBRARY_PATH=/data/local/tmp
+  // when invoking the test binaries. This effectively bypasses the Android
+  // Vulkan loader. This is fine for ARM Mali GPUs, whose driver exposes
+  // the symbol `vkGetInstanceProcAddr`. But for Qualcomm Adreno GPUs,
+  // the Vulkan implementation library does not directly expose the symbol.
+  // Instead it's hidden as `qglinternal::vkGetInstanceProcAddr`. So try to
+  // see whether we can get this symbol. This is a reasonable workaround
+  // as otherwise it means we need to wrap. every. single. binary. test.
+  // as. a. full-blown. Android. app.
+  if (!syms->vkGetInstanceProcAddr) {
+    syms->vkGetInstanceProcAddr =
+        reinterpret_cast<PFN_vkGetInstanceProcAddr>(get_proc_addr(
+            // C++ mangled name for "qglinternal::vkGetInstanceProcAddr"
+            "_ZN11qglinternal21vkGetInstanceProcAddrEP12VkInstance_TPKc"));
+  }
+#endif  // IREE_PLATFORM_ANDROID
+
   if (!syms->vkGetInstanceProcAddr) {
     return UnavailableErrorBuilder(IREE_LOC)
            << "Required method vkGetInstanceProcAddr not "
