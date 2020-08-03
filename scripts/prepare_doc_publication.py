@@ -51,7 +51,8 @@ DOC_TITLE_DICT = {
     'getting_started_linux_bazel.md': 'Linux with Bazel',
     'getting_started_linux_cmake.md': 'Linux with CMake',
     'getting_started_linux_vulkan.md': 'Linux with Vulkan',
-    'getting_started_linux_cmake_cross.md': 'Linux with Qemu',
+    'getting_started_linux_qemu': 'Linux with Qemu'
+    'getting_started_linux_cmake_cross.md': 'Linux with CMake Cross Compile',
     'getting_started_windows_bazel.md': 'Windows with Bazel',
     'getting_started_windows_cmake.md': 'Windows with CMake',
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
@@ -108,7 +109,8 @@ NAVI_ORDER_DICT = {
     'getting_started_python.md': 10,
     'generic_vulkan_env_setup.md': 11,
     'cmake_options_and_variables.md': 12,
-    'getting_started_linux_cmake_cross.md': 13,
+    'getting_started_linux_qemu.md': 13,
+    'getting_started_linux_cmake_cross.md': 14,
 
     # Within 'Developing IREE' use explicit ordering.
     'developer_overview.md': 1,
