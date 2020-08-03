@@ -107,7 +107,8 @@ def iree_vision_test_suite(
                     "--model={}".format(model),
                     "--data={}".format(dataset),
                     "--include_top=1",
-                    "--target_backends={},{}".format(reference_backend, backend),
+                    "--reference_backend={}".format(reference_backend),
+                    "--target_backends={}".format(backend),
                 ]
                 if external_weights:
                     args.append("--url={}".format(external_weights))

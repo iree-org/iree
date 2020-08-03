@@ -55,7 +55,8 @@ def iree_e2e_test_suite(
                 backend,
             )
             args = [
-                "--target_backends={},{}".format(reference_backend, backend),
+                "--reference_backend={}".format(reference_backend),
+                "--target_backends={}".format(backend),
             ]
 
             # TODO(GH-2175): Simplify this after backend names are standardized.

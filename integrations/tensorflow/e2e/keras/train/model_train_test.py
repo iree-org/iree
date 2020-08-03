@@ -65,7 +65,7 @@ class ModelTrain(tf.Module):
       tf.TensorSpec(_INPUT_DATA_SHAPE, tf.float32),
       tf.TensorSpec(_OUTPUT_DATA_SHAPE, tf.float32)
   ])
-  def TrainStep(self, inputs, targets):
+  def train_step(self, inputs, targets):
     with tf.GradientTape() as tape:
       predictions = self.model(inputs, training=True)
       loss_value = self.loss(predictions, targets)
@@ -76,8 +76,8 @@ class ModelTrain(tf.Module):
 
 
 @tf_test_utils.compile_module(
-    ModelTrain.CreateModule, exported_names=["TrainStep"])
-class ModelTrainTest(tf_test_utils.CompiledModuleTestCase):
+    ModelTrain.CreateModule, exported_names=["train_step"])
+class ModelTrainTest(tf_test_utils.TracedModuleTestCase):
 
   def generate_regression_data(self, size=8):
     x = np.arange(size) - size // 2
@@ -86,22 +86,25 @@ class ModelTrainTest(tf_test_utils.CompiledModuleTestCase):
 
   def test_model_train(self):
 
-    # generate input and output data for regression problem
+    # Generate input and output data for regression problem.
     inputs, targets = self.generate_regression_data()
 
-    # normalize data
+    # Normalize data.
     inputs = inputs / max(inputs)
     targets = targets / max(targets)
 
-    # generate polynomial features
+    # Generate polynomial features.
     inputs = np.expand_dims(inputs, axis=1)
     polynomial = PolynomialFeatures(_DEGREE)  # returns: [1, a, b, a^2, ab, b^2]
     inputs = polynomial.fit_transform(inputs)
 
     targets = np.expand_dims(targets, axis=1)
-    # run one iteration of training step
-    result = self.get_module().TrainStep(inputs, targets)
-    result.print().assert_all_close()
+
+    def train_step(module):
+      # Run one iteration of training step.
+      module.train_step(inputs, targets)
+
+    self.compare_backends(train_step)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@
 # Misc tools used to optimize, translate, and evaluate IREE.
 # Compiler tooling, like the compiler, is not designed to run on device and is tagged as "hostonly".
 
+load("//tools/build_defs/testing:bzl_library.bzl", "bzl_library")
 load(
     "//iree:build_defs.oss.bzl",
     "IREE_DRIVER_MODULES",
@@ -243,6 +244,7 @@ iree_cc_binary(
         "@com_google_absl//absl/types:span",
         "//iree/base:api",
         "//iree/base:api_util",
+        "//iree/base:localfile",
         "//iree/base:source_location",
         "//iree/base:tracing",
         "//iree/compiler/Dialect/Flow/Transforms",
@@ -371,4 +373,11 @@ cc_test(
         "//iree/testing:gtest_main",
         "//iree/vm",
     ],
+)
+
+bzl_library(
+    name = "compilation_bzl",
+    srcs = ["compilation.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
 )

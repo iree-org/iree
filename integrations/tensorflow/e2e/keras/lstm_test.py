@@ -18,10 +18,11 @@ from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
-NUM_UNITS = 10
-NUM_TIMESTEPS = 24
 NUM_BATCH = 7
-INPUT_SHAPE = [None, None, NUM_UNITS]
+NUM_TIMESTEPS = 24
+NUM_UNITS = 10
+DYNAMIC_SHAPE = [None, None, NUM_UNITS]
+INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 
 
 class Lstm(tf.Module):
@@ -29,28 +30,26 @@ class Lstm(tf.Module):
   def __init__(self):
     super(Lstm, self).__init__()
     tf_utils.set_random_seed()
-    inputs = tf.keras.layers.Input(batch_size=None, shape=INPUT_SHAPE[1:])
+    inputs = tf.keras.layers.Input(batch_size=None, shape=DYNAMIC_SHAPE[1:])
     outputs = tf.keras.layers.LSTM(
         units=NUM_UNITS, return_sequences=True)(
             inputs)
     self.m = tf.keras.Model(inputs, outputs)
     self.predict = tf.function(
-        input_signature=[tf.TensorSpec(INPUT_SHAPE, tf.float32)])(
+        input_signature=[tf.TensorSpec(DYNAMIC_SHAPE, tf.float32)])(
             self.m.call)
 
 
 @tf_test_utils.compile_module(Lstm, exported_names=["predict"])
-class LstmTest(tf_test_utils.CompiledModuleTestCase):
+class LstmTest(tf_test_utils.TracedModuleTestCase):
 
   def test_lstm(self):
-    m = self.get_module()
-    m.predict(
-        tf.constant(
-            np.arange(NUM_BATCH * NUM_TIMESTEPS * NUM_UNITS,
-                      dtype=np.float32).reshape(
-                          [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]),
-            shape=[NUM_BATCH, NUM_TIMESTEPS,
-                   NUM_UNITS])).print().assert_all_close()
+
+    def predict(module):
+      inputs = tf_utils.ndarange(INPUT_SHAPE)
+      module.predict(inputs)
+
+    self.compare_backends(predict)
 
 
 if __name__ == "__main__":

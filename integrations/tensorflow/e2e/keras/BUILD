@@ -18,6 +18,7 @@
 # Updates made to test suite names should also be reflected here:
 #   https://github.com/google/iree/blob/main/scripts/update_e2e_coverage.py
 
+load("//tools/build_defs/testing:bzl_library.bzl", "bzl_library")
 load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
@@ -185,11 +186,21 @@ iree_vision_test_suite(
         # interpreter and vulkan backends for these tests.
         {
             "models": [
-                "MobileNet",
                 "MobileNetV2",
             ],
             "datasets": [
                 "cifar10",
+            ],
+            "backends": [
+                "iree_vulkan",
+            ],
+        },
+        {
+            "models": [
+                "MobileNet",
+                "MobileNetV2",
+            ],
+            "datasets": [
                 "imagenet",
             ],
             "backends": [
@@ -229,4 +240,11 @@ iree_py_binary(
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
+)
+
+bzl_library(
+    name = "iree_vision_test_suite_bzl",
+    srcs = ["iree_vision_test_suite.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
 )

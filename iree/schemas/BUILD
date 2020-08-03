@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("//iree:build_defs.oss.bzl", "FLATBUFFER_SUPPORTS_REFLECTIONS", "iree_build_test", "iree_flatbuffer_cc_library")
+load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
@@ -33,7 +34,16 @@ FLATC_ARGS = [
     "--gen-object-api",
 ]
 
-# TODO(benvanik): also expose as C using flatcc.
+iree_flatbuffer_c_library(
+    name = "bytecode_module_def_c_fbs",
+    srcs = ["bytecode_module_def.fbs"],
+    flatcc_args = [
+        "--reader",
+        "--builder",
+        "--verifier",
+    ],
+)
+
 iree_flatbuffer_cc_library(
     name = "bytecode_module_def_cc_fbs",
     srcs = ["bytecode_module_def.fbs"],

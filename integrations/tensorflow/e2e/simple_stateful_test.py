@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
@@ -33,12 +34,15 @@ class Stateful(tf.Module):
 
 
 @tf_test_utils.compile_module(Stateful)
-class StatefulTest(tf_test_utils.CompiledModuleTestCase):
+class StatefulTest(tf_test_utils.TracedModuleTestCase):
 
   def test_stateful(self):
-    m = self.get_module()
-    m.inc_by(tf.constant(1.))
-    m.get_state().print().assert_all_close()
+
+    def get_state(module):
+      module.inc_by(np.array(1., dtype=np.float32))
+      module.get_state()
+
+    self.compare_backends(get_state)
 
 
 if __name__ == "__main__":

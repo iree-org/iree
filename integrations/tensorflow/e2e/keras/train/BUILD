@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//tools/build_defs/testing:bzl_library.bzl", "bzl_library")
 load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
@@ -62,4 +63,11 @@ iree_train_test_suite(
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
+)
+
+bzl_library(
+    name = "iree_train_test_suite_bzl",
+    srcs = ["iree_train_test_suite.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
 )

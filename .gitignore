@@ -39,3 +39,6 @@ imgui.ini
 compile_commands.json
 .cache/clangd
 .clangd/
+
+# Pyenv files
+.python-version

@@ -31,3 +31,20 @@ func @f(%arg0: tensor<3xf32>) -> tensor<5x6x3xf32> {
   %0 = "mhlo.broadcast"(%arg0) {broadcast_sizes = dense<[5, 6]> : tensor<2xi64>} : (tensor<3xf32>) -> tensor<5x6x3xf32>
   return %0 : tensor<5x6x3xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
+  // CHECK-NOT: "mhlo.complex"
+  %0 = "mhlo.complex"(%arg0, %arg1) : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xcomplex<f32>>
+
+  // CHECK-DAG: [[V1:%.+]] = mhlo.multiply %arg0, %arg0
+  // CHECK-DAG: [[V2:%.+]] = mhlo.multiply %arg1, %arg1
+  // CHECK-DAG: [[V3:%.+]] = mhlo.subtract [[V1]], [[V2]]
+  %1 = "mhlo.multiply"(%0, %0) : (tensor<3xcomplex<f32>>, tensor<3xcomplex<f32>>) -> tensor<3xcomplex<f32>>
+  %2 = "mhlo.real"(%1) : (tensor<3xcomplex<f32>>) -> tensor<3xf32>
+
+  // CHECK: return [[V3]]
+  return %2 : tensor<3xf32>
+}

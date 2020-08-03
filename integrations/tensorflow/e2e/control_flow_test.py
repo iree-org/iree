@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy
+import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
@@ -35,17 +35,23 @@ class ControlFlowModule(tf.Module):
 
 
 @tf_test_utils.compile_module(ControlFlowModule)
-class ControlFlowTest(tf_test_utils.CompiledModuleTestCase):
+class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
 
   def test_short_sequence(self):
-    input_array = numpy.array(9., dtype=numpy.float32)
-    result = self.get_module().collatz(input_array)
-    result.print().assert_all_close()
+
+    def short_sequence(module):
+      input_array = np.array(9., dtype=np.float32)
+      module.collatz(input_array)
+
+    self.compare_backends(short_sequence)
 
   def test_long_sequence(self):
-    input_array = numpy.array(178., dtype=numpy.float32)
-    result = self.get_module().collatz(input_array)
-    result.print().assert_all_close()
+
+    def long_sequence(module):
+      input_array = np.array(178., dtype=np.float32)
+      module.collatz(input_array)
+
+    self.compare_backends(long_sequence)
 
 
 if __name__ == "__main__":

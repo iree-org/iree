@@ -14,6 +14,7 @@
 
 # Generates source files with embedded file contents.
 
+load("//tools/build_defs/testing:bzl_library.bzl", "bzl_library")
 load(":build_defs.bzl", "cc_embed_data")
 
 package(
@@ -65,4 +66,11 @@ cc_test(
         ":testembed2",
         "//iree/testing:gtest_main",
     ],
+)
+
+bzl_library(
+    name = "build_defs_bzl",
+    srcs = ["build_defs.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
 )
