@@ -16,7 +16,6 @@
 
 # pylint: disable=protected-access
 
-import collections
 import os
 import random
 import re
@@ -233,10 +232,11 @@ class IreeCompiledModule(CompiledModule):
 
     if _create_reinitialized_args is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(tf_module=module_class(),
-                                            backend_infos=[backend_info],
-                                            exported_names=exported_names,
-                                            artifacts_dir=artifacts_dir)
+      self._module_blob = compile_tf_module(
+          tf_module=module_class(),
+          backend_infos=[backend_info],
+          exported_names=exported_names,
+          artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
@@ -244,8 +244,8 @@ class IreeCompiledModule(CompiledModule):
       self._module_blob, self._module, self._config = _create_reinitialized_args
 
     # Holds all of the module's mutable state.
-    self._context = rt.SystemContext(modules=[self._module],
-                                     config=self._config)
+    self._context = rt.SystemContext(
+        modules=[self._module], config=self._config)
 
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
@@ -325,6 +325,8 @@ class _TfFunctionWrapper(object):
     self._f = f
 
   def _convert_to_numpy(self, tensor):
+    if not isinstance(tensor, tf.Tensor):
+      return tensor
     result = tensor.numpy()
     if np.isscalar(result):
       # convert_to_tensor isn't reversible via .numpy()
@@ -339,15 +341,13 @@ class _TfFunctionWrapper(object):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(lambda t: self._convert_to_numpy(t)
-                                 if isinstance(t, tf.Tensor) else t,
-                                 *results,
-                                 check_types=False)
+    return tf.nest.map_structure(
+        self._convert_to_numpy, *results, check_types=False)
 
 
 class BackendInfo:
 
-  _NAME_TO_INFO = {
+  _name_to_info = {
       "tf": {
           "compiled_module_class": TfCompiledModule,
           "driver": None,
@@ -378,12 +378,16 @@ class BackendInfo:
         'tf', 'iree_vmla', 'iree_llvmjit', 'iree_vulkan'.
       artifact_name: an optional str specifying what name to use when saving
         compiled artifacts.
+
+    Raises:
+      KeyError: if backend_name is not one of ['tf', 'iree_vmla',
+      'iree_llvmjit', 'iree_vulkan'].
     """
-    if backend_name not in self._NAME_TO_INFO:
+    if backend_name not in self._name_to_info:
       raise KeyError(
           "Expected backend_name to be one of "
-          f"{list(self._NAME_TO_INFO.keys())} but got '{backend_name}'.")
-    info = self._NAME_TO_INFO[backend_name]
+          f"{list(self._name_to_info.keys())} but got '{backend_name}'.")
+    info = self._name_to_info[backend_name]
     self._compiled_module_class = info["compiled_module_class"]
     self.driver = info["driver"]
     self.compiler_targets = info["compiler_targets"]
@@ -394,7 +398,7 @@ class BackendInfo:
     return self._compiled_module_class(module, self, exported_names,
                                        artifacts_dir)
 
-  @staticmethod
-  def get_all_backends():
+  @classmethod
+  def get_all_backends(cls):
     """Returns a list of all BackendInfo configurations."""
-    return [BackendInfo(backend_name) for backend_name in self._NAME_TO_INFO]
+    return [BackendInfo(backend_name) for backend_name in cls._name_to_info]
