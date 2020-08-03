@@ -16,7 +16,6 @@
 
 # pylint: disable=protected-access
 
-import collections
 import os
 import random
 import re
@@ -49,14 +48,14 @@ def ndarange(shape, dtype=np.float32):
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
-def backends_to_str(target_backends):
-  """Creates a flattened and normalized string representing target_backends."""
-  normalized_backends = []
-  for backend in target_backends:
+def backends_to_str(backend_infos):
+  """Creates a normalized string representing the provided backends."""
+  normalized_names = []
+  for backend_info in backend_infos:
     # Remove unusual characters and ensure names don't end or start in "_".
-    backend = re.sub("[^0-9a-zA-Z_]+", "_", backend)
-    normalized_backends.append(backend.strip("_"))
-  return "__".join(normalized_backends)
+    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
+    normalized_names.append(name.strip("_"))
+  return "__".join(normalized_names)
 
 
 def to_mlir_type(dtype):
@@ -90,7 +89,7 @@ def save_input_values(inputs, artifacts_dir=None):
 
 
 def compile_tf_module(tf_module,
-                      target_backends=(),
+                      backend_infos=(),
                       exported_names=(),
                       artifacts_dir=None):
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
@@ -112,7 +111,7 @@ def compile_tf_module(tf_module,
 
   Args:
     tf_module: A tf.Module.
-    target_backends: Iterable of string backend names to compile for.
+    backend_infos: Iterable of BackendInfo names to compile for.
     exported_names: Iterable of dotted function names to consider for
       compilation.
     artifacts_dir: An optional string pointing to where compilation artifacts
@@ -124,50 +123,62 @@ def compile_tf_module(tf_module,
 
   def _compile_from_path(sm_path):
     """Helper function for compile_tf_module."""
-    # We break up the compilation here so we can save intermediary artifacts.
-    compiler_context = compiler.Context()
-
-    # Convert the tf_module into raw TF input MLIR.
-    compiler_module = compiler.tf_load_saved_model(
-        sm_path,
-        exported_names=exported_names,
-        compiler_context=compiler_context,
-        pass_pipeline=())
-
     if artifacts_dir is not None:
-      tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
-      logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
-      with open(tf_mlir_path, "w") as f:
-        f.write(compiler_module.to_asm())
+      # Set up a crash reproducer for debugging.
+      compiler.Context.default_crash_reproducer_path = os.path.join(
+          artifacts_dir, f"reproducer__{backends_string}.mlir")
+    try:
+      # We break up the compilation here so we can save intermediary artifacts.
+      compiler_context = compiler.Context()
 
-    # Now run the passes manually that tf_load_saved_model would usually do.
-    compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
+      # Convert the tf_module into raw TF input MLIR.
+      compiler_module = compiler.tf_load_saved_model(
+          sm_path,
+          exported_names=exported_names,
+          compiler_context=compiler_context,
+          pass_pipeline=())
 
-    if artifacts_dir is not None:
-      iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
-      logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
-      with open(iree_mlir_path, "w") as f:
-        f.write(compiler_module.to_asm())
+      if artifacts_dir is not None:
+        tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
+        logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
+        with open(tf_mlir_path, "w") as f:
+          f.write(compiler_module.to_asm())
 
-    compiled_module = compiler_module.compile(target_backends=target_backends)
-    if artifacts_dir is not None:
-      compiled_name = f"compiled__{backends_to_str(target_backends)}.vmfb"
-      compiled_path = os.path.join(artifacts_dir, compiled_name)
-      logging.info("Saving compiled IREE module to: %s", compiled_path)
-      with open(compiled_path, "wb") as f:
-        f.write(compiled_module)
+      # Now run the passes manually that tf_load_saved_model would usually do.
+      compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
 
-    return compiled_module
+      if artifacts_dir is not None:
+        iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
+        logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
+        with open(iree_mlir_path, "w") as f:
+          f.write(compiler_module.to_asm())
+
+      target_backends = []
+      for backend_info in backend_infos:
+        target_backends.extend(backend_info.compiler_targets)
+      compiled_module = compiler_module.compile(target_backends=target_backends)
+
+      if artifacts_dir is not None:
+        compiled_name = f"compiled__{backends_string}.vmfb"
+        compiled_path = os.path.join(artifacts_dir, compiled_name)
+        logging.info("Saving compiled IREE module to: %s", compiled_path)
+        with open(compiled_path, "wb") as f:
+          f.write(compiled_module)
+
+      return compiled_module
+    except Exception:  # pylint: disable=broad-except
+      if artifacts_dir is not None:
+        # Disable the crash reproducer (to avoid inadvertently overwriting it).
+        compiler.Context.default_crash_reproducer_path = None
+      raise
 
   options = tf.saved_model.SaveOptions(save_debug_info=True)
+  backends_string = backends_to_str(backend_infos)
   if artifacts_dir is not None and FLAGS.keep_saved_model:
-    # Save the saved model alongside the other compilation artifacts.
-
     # Create a saved model for these target backends to avoid a race condition
     # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir,
-                           f"saved_model__{backends_to_str(target_backends)}")
+    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
@@ -223,11 +234,11 @@ class IreeCompiledModule(CompiledModule):
       set_random_seed()
       self._module_blob = compile_tf_module(
           tf_module=module_class(),
-          target_backends=backend_info.iree_compiler_targets,
+          backend_infos=[backend_info],
           exported_names=exported_names,
           artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
-      self._config = rt.Config(driver_name=backend_info.iree_driver)
+      self._config = rt.Config(driver_name=backend_info.driver)
     else:
       # Called from self.create_reinitialized()
       self._module_blob, self._module, self._config = _create_reinitialized_args
@@ -314,6 +325,8 @@ class _TfFunctionWrapper(object):
     self._f = f
 
   def _convert_to_numpy(self, tensor):
+    if not isinstance(tensor, tf.Tensor):
+      return tensor
     result = tensor.numpy()
     if np.isscalar(result):
       # convert_to_tensor isn't reversible via .numpy()
@@ -329,50 +342,63 @@ class _TfFunctionWrapper(object):
     if not isinstance(results, tuple):
       results = (results,)
     return tf.nest.map_structure(
-        lambda t: self._convert_to_numpy(t) if isinstance(t, tf.Tensor) else t,
-        *results,
-        check_types=False)
+        self._convert_to_numpy, *results, check_types=False)
 
 
-class BackendInfo(
-    collections.namedtuple(
-        "BackendInfo",
-        ["name", "CompiledModule", "iree_driver", "iree_compiler_targets"])):
-  """Info object describing a backend."""
+class BackendInfo:
 
-  # All BackendInfo entries by name.
-  ALL = {}
+  _name_to_info = {
+      "tf": {
+          "compiled_module_class": TfCompiledModule,
+          "driver": None,
+          "compiler_targets": None,
+      },
+      "iree_vmla": {
+          "compiled_module_class": IreeCompiledModule,
+          "driver": "vmla",
+          "compiler_targets": ["vmla"]
+      },
+      "iree_llvmjit": {
+          "compiled_module_class": IreeCompiledModule,
+          "driver": "llvm",
+          "compiler_targets": ["llvm-ir"]
+      },
+      "iree_vulkan": {
+          "compiled_module_class": IreeCompiledModule,
+          "driver": "vulkan",
+          "compiler_targets": ["vulkan-*"]
+      },
+  }
+
+  def __init__(self, backend_name, artifact_name=None):
+    """Contains information for compiling the specified backend.
+
+    Args:
+      backend_name: a str specifying which backend to use. Should be one of
+        'tf', 'iree_vmla', 'iree_llvmjit', 'iree_vulkan'.
+      artifact_name: an optional str specifying what name to use when saving
+        compiled artifacts.
+
+    Raises:
+      KeyError: if backend_name is not one of ['tf', 'iree_vmla',
+      'iree_llvmjit', 'iree_vulkan'].
+    """
+    if backend_name not in self._name_to_info:
+      raise KeyError(
+          "Expected backend_name to be one of "
+          f"{list(self._name_to_info.keys())} but got '{backend_name}'.")
+    info = self._name_to_info[backend_name]
+    self._compiled_module_class = info["compiled_module_class"]
+    self.driver = info["driver"]
+    self.compiler_targets = info["compiler_targets"]
+    self.name = backend_name if artifact_name is None else artifact_name
+
+  def compile(self, module, exported_names=(), artifacts_dir=None):
+    """Creates a `CompiledModule` for this backend."""
+    return self._compiled_module_class(module, self, exported_names,
+                                       artifacts_dir)
 
   @classmethod
-  def add(cls, **kwargs):
-    backend_info = cls(**kwargs)
-    cls.ALL[backend_info.name] = backend_info
-
-
-BackendInfo.add(
-    name="tf",
-    CompiledModule=TfCompiledModule,
-    iree_driver=None,
-    iree_compiler_targets=None)
-# tf_also is used for checking test consistency
-# to catch any initialization/randomization issues between model runs
-BackendInfo.add(
-    name="tf_also",
-    CompiledModule=TfCompiledModule,
-    iree_driver=None,
-    iree_compiler_targets=None)
-BackendInfo.add(
-    name="iree_vmla",
-    CompiledModule=IreeCompiledModule,
-    iree_driver="vmla",
-    iree_compiler_targets=["vmla"])
-BackendInfo.add(
-    name="iree_vulkan",
-    CompiledModule=IreeCompiledModule,
-    iree_driver="vulkan",
-    iree_compiler_targets=["vulkan-*"])
-BackendInfo.add(
-    name="iree_llvmjit",
-    CompiledModule=IreeCompiledModule,
-    iree_driver="llvm",
-    iree_compiler_targets=["llvm-ir"])
+  def get_all_backends(cls):
+    """Returns a list of all BackendInfo configurations."""
+    return [BackendInfo(backend_name) for backend_name in cls._name_to_info]
