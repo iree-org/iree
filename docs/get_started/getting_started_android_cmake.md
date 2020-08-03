@@ -223,13 +223,42 @@ i32=5
 
 ##### Vulkan function `vkCreateInstance` not available
 
-This can happen on Android devices with ARM Mali GPUs, where there is only one
-monolithic driver (`/vendor/lib[64]/libGLES_mali.so`) and the vulkan vendor
-driver (`/vendor/lib[64]/hw/vulkan.*.so`) is just a symlink to it. This causes
-problems for Vulkan device enumeration under `/data/local/tmp/`. A known
-workaround is to copy the `libGLES_mali.so` library under `/data/local/tmp/` and
-rename it as `libvulkan.so` and then prefix `LD_LIBRARY_PATH=/data/local/tmp`
-when invoking IREE executables.
+Since Android 8 Oreo, Android re-architected the OS framework with
+[project Treble](https://source.android.com/devices/architecture#hidl).
+Framework libraries and
+[vendor libraries](https://source.android.com/devices/architecture/vndk) have a
+more strict and clear separation. Their dependencies are carefully scrutinized
+and only selected cases are allowed. This is enforced with
+[linker namespaces](https://source.android.com/devices/architecture/vndk/linker-namespace).
+
+`/data/local/tmp` is the preferred directory for automating native binary tests
+built using NDK toolchain. They should be allowed to access libraries like
+`libvulkan.so` for their functionality. However, there was an issue with fully
+treblized Android 10 where `/data/local/tmp` did not have access to the linker
+namespaces needed by `libvulkan.so`. This should be
+[fixed](https://android.googlesource.com/platform/system/linkerconfig/+/296da5b1eb88a3527ee76352c2d987f82f3252eb)
+now. But as typically in the Android system, it takes a long time to see the fix
+getting propagated, if ever.
+
+A known workaround is to symlink the vendor Vulkan implementation under
+`/vendor/lib[64]` as `libvulkan.so` under `/data/local/tmp` and use
+`LD_LIBRARY_PATH=/data/local/tmp` when invoking IREE executables.
+
+For Qualcomm Adreno GPUs, the vendor Vulkan implemenation is at
+`/vendor/lib[64]/hw/vulkan.*.so`. So for example for Snapdragon 865:
+
+```shell
+$ adb shell ln -s /vendor/lib64/hw/vulkan.kona.so /data/local/tmp/libvulkan.so
+```
+
+For ARM Mali GPUs, there is only one monolithic driver
+(`/vendor/lib[64]/libGLES_mali.so`) for OpenGL and Vulkan and the Vulkan vendor
+driver (`/vendor/lib[64]/hw/vulkan.*.so`) is just a symlink to it. So for
+example:
+
+```shell
+$ adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so
+```
 
 ### Dylib LLVM AOT backend
 
