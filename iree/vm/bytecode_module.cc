@@ -14,23 +14,20 @@
 
 #include "iree/vm/bytecode_module.h"
 
-#include <string.h>
-
-#include "absl/strings/match.h"
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
-#include "iree/base/flatbuffer_util.h"
+#include "iree/base/logging.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 
-// TODO(benvanik): replace with flatcc version so this file can be pure C.
-#include "flatbuffers/flatbuffers.h"
-#include "iree/schemas/bytecode_module_def_generated.h"
-
-#define IREE_VM_GET_MODULE_DEF(module)                 \
-  ::flatbuffers::GetRoot<iree::vm::BytecodeModuleDef>( \
-      module->flatbuffer_data.data)
+// Perform an strcmp between a flatbuffers string and an IREE string view.
+static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
+                                      iree_string_view_t rhs) {
+  size_t lhs_size = flatbuffers_string_len(lhs);
+  int x = strncmp(lhs, rhs.data, lhs_size < rhs.size ? lhs_size : rhs.size);
+  return x != 0 ? x : lhs_size < rhs.size ? -1 : lhs_size > rhs.size;
+}
 
 // Returns true if the given |type_def| is valid, meaning that the type it was
 // resolved from is registered or known to the system as a builtin.
@@ -41,28 +38,36 @@ static bool iree_vm_type_def_is_valid(iree_vm_type_def_t type_def) {
 
 // Resolves a type through either builtin rules or the ref registered types.
 static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
-    const iree::vm::TypeDef* type_def) {
-  auto full_name = iree::WrapString(type_def->full_name());
+    iree_vm_TypeDef_table_t type_def) {
   iree_vm_type_def_t result;
   memset(&result, 0, sizeof(result));
-  if (full_name == "i8") {
+  flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
+  if (!flatbuffers_string_len(full_name)) {
+    return result;
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("i8")) == 0) {
     result.value_type = IREE_VM_VALUE_TYPE_I8;
-  } else if (full_name == "i16") {
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("i16")) == 0) {
     result.value_type = IREE_VM_VALUE_TYPE_I16;
-  } else if (full_name == "i32") {
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("i32")) == 0) {
     result.value_type = IREE_VM_VALUE_TYPE_I32;
-  } else if (full_name == "i64") {
+  } else if (iree_vm_flatbuffer_strcmp(full_name,
+                                       iree_make_cstring_view("i64")) == 0) {
     result.value_type = IREE_VM_VALUE_TYPE_I64;
-  } else if (!full_name.empty() && full_name[0] == '!') {
-    full_name.remove_prefix(1);
-    if (absl::StartsWith(full_name, "vm.list<")) {
+  } else if (full_name[0] == '!') {
+    // Note that we drop the ! prefix:
+    iree_string_view_t type_name = iree_string_view_t{
+        full_name + 1, flatbuffers_string_len(full_name) - 1};
+    if (strncmp(type_name.data, "vm.list<", strlen("vm.list<")) == 0) {
       // This is a !vm.list<...> type. We don't actually care about the type as
-      // we allow list types to be widened.
-      full_name.remove_suffix(full_name.size() - 7);
+      // we allow list types to be widened. Rewrite to just vm.list as that's
+      // all we have registered.
+      type_name = iree_make_cstring_view("vm.list");
     }
     const iree_vm_ref_type_descriptor_t* type_descriptor =
-        iree_vm_ref_lookup_registered_type(
-            iree_string_view_t{full_name.data(), full_name.size()});
+        iree_vm_ref_lookup_registered_type(type_name);
     if (type_descriptor) {
       result.ref_type = type_descriptor->type;
     }
@@ -74,12 +79,13 @@ static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
 // |type_table| can be omitted to just perform verification that all types are
 // registered.
 static iree_status_t iree_vm_bytecode_module_resolve_types(
-    const iree::vm::BytecodeModuleDef* module_def,
-    iree_vm_type_def_t* type_table) {
-  for (int i = 0; i < module_def->types()->size(); ++i) {
-    type_table[i] =
-        iree_vm_bytecode_module_resolve_type(module_def->types()->Get(i));
+    iree_vm_TypeDef_vec_t type_defs, iree_vm_type_def_t* type_table) {
+  for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
+    iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
+    type_table[i] = iree_vm_bytecode_module_resolve_type(type_def);
     if (!iree_vm_type_def_is_valid(type_table[i])) {
+      LOG(ERROR) << "no type registered with name '"
+                 << iree_vm_TypeDef_full_name(type_def) << "'";
       return IREE_STATUS_NOT_FOUND;
     }
   }
@@ -91,121 +97,136 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
 // names on functions with internal linkage), however we shouldn't need to
 // bounds check anything within the flatbuffer after this succeeds.
 static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
-    const iree::vm::BytecodeModuleDef* module_def) {
-  if (!module_def->name() || module_def->name()->size() == 0) {
-    LOG(ERROR) << "All modules must have a name.";
+    iree_const_byte_span_t flatbuffer_data) {
+  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
+    LOG(ERROR) << "Flatbuffer data is not present or less than 16 bytes";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  if (!module_def->types()) {
-    LOG(ERROR) << "Type table is mandatory, though it could be empty (in empty "
-                  "modules).";
+  // Run flatcc generated verification. This ensures all pointers are in-bounds
+  // and that we can safely walk the file, but not that the actual contents of
+  // the flatbuffer meet our expectations.
+  int verify_ret = iree_vm_BytecodeModuleDef_verify_as_root(
+      flatbuffer_data.data, flatbuffer_data.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    LOG(ERROR) << flatcc_verify_error_string(verify_ret);
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  if (!module_def->exported_functions() ||
-      module_def->exported_functions()->size() == 0) {
-    LOG(ERROR) << "At least one exported function is required.";
+  iree_vm_BytecodeModuleDef_table_t module_def =
+      iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
+
+  flatbuffers_string_t name = iree_vm_BytecodeModuleDef_name(module_def);
+  if (!flatbuffers_string_len(name)) {
+    LOG(ERROR) << "module name missing";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  if (!module_def->internal_functions() ||
-      module_def->internal_functions()->size() == 0) {
-    LOG(ERROR) << "At least one internal function is required.";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (!module_def->function_descriptors() ||
-      module_def->function_descriptors()->size() !=
-          module_def->internal_functions()->size()) {
-    LOG(ERROR)
-        << "All internal functions need a mapping into the bytecode data.";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (!module_def->bytecode_data()) {
-    LOG(ERROR) << "Bytecode data is required if we have any functions.";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  for (int i = 0; i < module_def->types()->size(); ++i) {
-    const auto* type_def = module_def->types()->Get(i);
+  iree_vm_TypeDef_vec_t types = iree_vm_BytecodeModuleDef_types(module_def);
+  for (size_t i = 0; i < iree_vm_TypeDef_vec_len(types); ++i) {
+    iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(types, i);
     if (!type_def) {
-      LOG(ERROR) << "All types must be valid.";
-      return IREE_STATUS_INVALID_ARGUMENT;
-    } else if (!type_def->full_name() || type_def->full_name()->size() == 0) {
-      LOG(ERROR) << "All types require a name.";
+      LOG(ERROR) << "type def missing body";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    if (!iree_vm_type_def_is_valid(
-            iree_vm_bytecode_module_resolve_type(type_def))) {
-      LOG(ERROR) << "No type registered with name '"
-                 << type_def->full_name()->c_str() << "'.";
+    flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
+    if (flatbuffers_string_len(full_name) <= 0) {
+      LOG(ERROR) << "type def missing full_name";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
   }
 
-  if (module_def->imported_functions()) {
-    for (int i = 0; i < module_def->imported_functions()->size(); ++i) {
-      auto* import_def = module_def->imported_functions()->Get(i);
-      if (!import_def) {
-        LOG(ERROR) << "All imports must be valid.";
-        return IREE_STATUS_INVALID_ARGUMENT;
-      } else if (!import_def->full_name() ||
-                 import_def->full_name()->size() == 0) {
-        LOG(ERROR) << "All imports require a name.";
-        return IREE_STATUS_INVALID_ARGUMENT;
-      } else if (!import_def->signature()) {
-        LOG(ERROR) << "All imports require a signature.";
-        return IREE_STATUS_INVALID_ARGUMENT;
-      }
+  iree_vm_ImportFunctionDef_vec_t imported_functions =
+      iree_vm_BytecodeModuleDef_imported_functions(module_def);
+  iree_vm_ExportFunctionDef_vec_t exported_functions =
+      iree_vm_BytecodeModuleDef_exported_functions(module_def);
+  iree_vm_InternalFunctionDef_vec_t internal_functions =
+      iree_vm_BytecodeModuleDef_internal_functions(module_def);
+  iree_vm_FunctionDescriptor_vec_t function_descriptors =
+      iree_vm_BytecodeModuleDef_function_descriptors(module_def);
+
+  if (flatbuffers_vec_len(internal_functions) !=
+      flatbuffers_vec_len(function_descriptors)) {
+    LOG(ERROR)
+        << "mismatched internal_functions and function_descriptors vectors";
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  for (size_t i = 0; i < iree_vm_ImportFunctionDef_vec_len(imported_functions);
+       ++i) {
+    iree_vm_ImportFunctionDef_table_t import_def =
+        iree_vm_ImportFunctionDef_vec_at(imported_functions, i);
+    if (!import_def) {
+      LOG(ERROR) << "import def missing body";
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
+    flatbuffers_string_t full_name =
+        iree_vm_ImportFunctionDef_full_name(import_def);
+    if (!flatbuffers_string_len(full_name)) {
+      LOG(ERROR) << "import def missing full_name";
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
+    if (!iree_vm_ImportFunctionDef_signature(import_def)) {
+      LOG(ERROR) << "import def missing a function signature";
+      return IREE_STATUS_INVALID_ARGUMENT;
     }
   }
 
-  for (int i = 0; i < module_def->exported_functions()->size(); ++i) {
-    auto* export_def = module_def->exported_functions()->Get(i);
+  for (size_t i = 0; i < iree_vm_ExportFunctionDef_vec_len(exported_functions);
+       ++i) {
+    iree_vm_ExportFunctionDef_table_t export_def =
+        iree_vm_ExportFunctionDef_vec_at(exported_functions, i);
     if (!export_def) {
-      LOG(ERROR) << "All exports must be valid.";
+      LOG(ERROR) << "export def missing body";
       return IREE_STATUS_INVALID_ARGUMENT;
-    } else if (!export_def->local_name() ||
-               export_def->local_name()->size() == 0) {
-      LOG(ERROR) << "All exports require a name.";
+    }
+    flatbuffers_string_t local_name =
+        iree_vm_ExportFunctionDef_local_name(export_def);
+    if (!flatbuffers_string_len(local_name)) {
+      LOG(ERROR) << "export def missing local_name";
       return IREE_STATUS_INVALID_ARGUMENT;
-    } else if (!export_def->signature()) {
-      LOG(ERROR) << "All exports require a signature.";
+    }
+    if (!iree_vm_ExportFunctionDef_signature(export_def)) {
+      LOG(ERROR) << "export def missing a function signature";
       return IREE_STATUS_INVALID_ARGUMENT;
-    } else if (export_def->internal_ordinal() < 0 ||
-               export_def->internal_ordinal() >=
-                   module_def->internal_functions()->size()) {
-      LOG(ERROR)
-          << "Out-of-bounds reference to a function in the internal table.";
+    }
+    int32_t internal_ordinal =
+        iree_vm_ExportFunctionDef_internal_ordinal(export_def);
+    if (internal_ordinal < 0 ||
+        internal_ordinal >=
+            iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
+      LOG(ERROR) << "export def internal_ordinal out of bounds";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
   }
 
-  for (int i = 0; i < module_def->internal_functions()->size(); ++i) {
-    auto* function_def = module_def->internal_functions()->Get(i);
+  flatbuffers_uint8_vec_t bytecode_data =
+      iree_vm_BytecodeModuleDef_bytecode_data(module_def);
+  for (size_t i = 0;
+       i < iree_vm_InternalFunctionDef_vec_len(internal_functions); ++i) {
+    iree_vm_InternalFunctionDef_table_t function_def =
+        iree_vm_InternalFunctionDef_vec_at(internal_functions, i);
     if (!function_def) {
-      LOG(ERROR) << "All functions must be valid.";
+      LOG(ERROR) << "function def missing body";
       return IREE_STATUS_INVALID_ARGUMENT;
-    } else if (!function_def->signature()) {
-      LOG(ERROR) << "All functions require a signature.";
+    }
+    if (!iree_vm_InternalFunctionDef_signature(function_def)) {
+      LOG(ERROR) << "function def missing signature";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
 
-    const auto* function_descriptor =
-        module_def->function_descriptors()->Get(i);
-    if (!function_descriptor || function_descriptor->bytecode_offset() < 0 ||
-        function_descriptor->bytecode_length() < 0 ||
-        function_descriptor->bytecode_offset() +
-                function_descriptor->bytecode_length() >
-            module_def->bytecode_data()->size()) {
-      LOG(ERROR) << "Bytecode span must be a valid range.";
+    iree_vm_FunctionDescriptor_struct_t function_descriptor =
+        iree_vm_FunctionDescriptor_vec_at(function_descriptors, i);
+    if (function_descriptor->bytecode_offset < 0 ||
+        function_descriptor->bytecode_offset +
+                function_descriptor->bytecode_length >
+            flatbuffers_uint8_vec_len(bytecode_data)) {
+      LOG(ERROR) << "function descriptor bytecode span out of range";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    if (function_descriptor->i32_register_count() > IREE_I32_REGISTER_COUNT ||
-        function_descriptor->ref_register_count() > IREE_REF_REGISTER_COUNT) {
-      LOG(ERROR) << "Register counts out of range.";
+    if (function_descriptor->i32_register_count > IREE_I32_REGISTER_COUNT ||
+        function_descriptor->ref_register_count > IREE_REF_REGISTER_COUNT) {
+      LOG(ERROR) << "function descriptor register out of range";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
 
@@ -228,22 +249,21 @@ static void iree_vm_bytecode_module_destroy(void* self) {
 
 static iree_string_view_t iree_vm_bytecode_module_name(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
-  return iree_string_view_t{module_def->name()->data(),
-                            module_def->name()->size()};
+  flatbuffers_string_t name = iree_vm_BytecodeModuleDef_name(module->def);
+  return iree_string_view_t{name, flatbuffers_string_len(name)};
 }
 
 static iree_vm_module_signature_t iree_vm_bytecode_module_signature(
     void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
   iree_vm_module_signature_t signature;
-  signature.import_function_count =
-      module_def->imported_functions()
-          ? module_def->imported_functions()->size()
-          : 0;
-  signature.export_function_count = module_def->exported_functions()->size();
-  signature.internal_function_count = module_def->internal_functions()->size();
+  memset(&signature, 0, sizeof(signature));
+  signature.import_function_count = iree_vm_ImportFunctionDef_vec_len(
+      iree_vm_BytecodeModuleDef_imported_functions(module->def));
+  signature.export_function_count = iree_vm_ExportFunctionDef_vec_len(
+      iree_vm_BytecodeModuleDef_exported_functions(module->def));
+  signature.internal_function_count = iree_vm_InternalFunctionDef_vec_len(
+      iree_vm_BytecodeModuleDef_internal_functions(module->def));
   return signature;
 }
 
@@ -252,66 +272,75 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     iree_vm_function_t* out_function, iree_string_view_t* out_name,
     iree_vm_function_signature_t* out_signature) {
   if (out_function) {
-    memset(out_function, 0, sizeof(iree_vm_function_t));
+    memset(out_function, 0, sizeof(*out_function));
   }
   if (out_name) {
-    out_name->data = NULL;
-    out_name->size = 0;
+    memset(out_name, 0, sizeof(*out_name));
   }
   if (out_signature) {
-    memset(out_signature, 0, sizeof(iree_vm_function_signature_t));
+    memset(out_signature, 0, sizeof(*out_signature));
   }
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
-
-  const ::flatbuffers::String* name = nullptr;
-  const iree::vm::FunctionSignatureDef* signature = nullptr;
+  flatbuffers_string_t name = NULL;
+  iree_vm_FunctionSignatureDef_table_t signature = NULL;
   if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT) {
-    if (!module_def->imported_functions() || ordinal < 0 ||
-        ordinal >= module_def->imported_functions()->size()) {
+    iree_vm_ImportFunctionDef_vec_t imported_functions =
+        iree_vm_BytecodeModuleDef_imported_functions(module->def);
+    if (ordinal < 0 ||
+        ordinal >= iree_vm_ImportFunctionDef_vec_len(imported_functions)) {
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    auto* import_def = module_def->imported_functions()->Get(ordinal);
-    name = import_def->full_name();
-    signature = import_def->signature();
+    iree_vm_ImportFunctionDef_table_t import_def =
+        iree_vm_ImportFunctionDef_vec_at(imported_functions, ordinal);
+    name = iree_vm_ImportFunctionDef_full_name(import_def);
+    signature = iree_vm_ImportFunctionDef_signature(import_def);
     if (out_function) {
       out_function->module = &module->interface;
       out_function->linkage = linkage;
       out_function->ordinal = ordinal;
     }
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
-    if (ordinal < 0 || ordinal >= module_def->exported_functions()->size()) {
+    iree_vm_ExportFunctionDef_vec_t exported_functions =
+        iree_vm_BytecodeModuleDef_exported_functions(module->def);
+    if (ordinal < 0 ||
+        ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    auto* export_def = module_def->exported_functions()->Get(ordinal);
-    name = export_def->local_name();
-    signature = export_def->signature();
+    iree_vm_ExportFunctionDef_table_t export_def =
+        iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
+    name = iree_vm_ExportFunctionDef_local_name(export_def);
+    signature = iree_vm_ExportFunctionDef_signature(export_def);
     if (out_function) {
       out_function->module = &module->interface;
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-      out_function->ordinal = export_def->internal_ordinal();
+      out_function->ordinal =
+          iree_vm_ExportFunctionDef_internal_ordinal(export_def);
 
-      const iree_vm_function_descriptor_t* function_descriptor =
-          &module->function_descriptor_table[export_def->internal_ordinal()];
+      const iree_vm_FunctionDescriptor_t* function_descriptor =
+          &module->function_descriptor_table[out_function->ordinal];
       out_function->i32_register_count =
           function_descriptor->i32_register_count;
       out_function->ref_register_count =
           function_descriptor->ref_register_count;
     }
   } else {
-    if (ordinal < 0 || ordinal >= module_def->internal_functions()->size()) {
+    iree_vm_InternalFunctionDef_vec_t internal_functions =
+        iree_vm_BytecodeModuleDef_internal_functions(module->def);
+    if (ordinal < 0 ||
+        ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    auto* function_def = module_def->internal_functions()->Get(ordinal);
-    name = function_def->local_name();
-    signature = function_def->signature();
+    iree_vm_InternalFunctionDef_table_t function_def =
+        iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
+    name = iree_vm_InternalFunctionDef_local_name(function_def);
+    signature = iree_vm_InternalFunctionDef_signature(function_def);
     if (out_function) {
       out_function->module = &module->interface;
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
       out_function->ordinal = ordinal;
 
-      const iree_vm_function_descriptor_t* function_descriptor =
+      const iree_vm_FunctionDescriptor_t* function_descriptor =
           &module->function_descriptor_table[ordinal];
       out_function->i32_register_count =
           function_descriptor->i32_register_count;
@@ -321,14 +350,14 @@ static iree_status_t iree_vm_bytecode_module_get_function(
   }
 
   if (out_name && name) {
-    out_name->data = name->c_str();
-    out_name->size = name->size();
+    out_name->data = name;
+    out_name->size = flatbuffers_string_len(name);
   }
   if (out_signature && signature) {
-    out_signature->argument_count =
-        signature->argument_types() ? signature->argument_types()->size() : 0;
-    out_signature->result_count =
-        signature->result_types() ? signature->result_types()->size() : 0;
+    out_signature->argument_count = flatbuffers_int32_vec_len(
+        iree_vm_FunctionSignatureDef_argument_types(signature));
+    out_signature->result_count = flatbuffers_int32_vec_len(
+        iree_vm_FunctionSignatureDef_result_types(signature));
   }
 
   return IREE_STATUS_OK;
@@ -337,9 +366,6 @@ static iree_status_t iree_vm_bytecode_module_get_function(
 static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
     void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
     int32_t index, iree_string_view_t* key, iree_string_view_t* value) {
-  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
-
   if (linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
     iree_vm_function_t internal_function;
     iree_vm_bytecode_module_get_function(self, linkage, ordinal,
@@ -348,39 +374,43 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
     ordinal = internal_function.ordinal;
   }
 
-  if (ordinal < 0 || ordinal >= module_def->internal_functions()->size()) {
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  iree_vm_InternalFunctionDef_vec_t internal_functions =
+      iree_vm_BytecodeModuleDef_internal_functions(module->def);
+
+  if (ordinal < 0 ||
+      ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* export_def = module_def->internal_functions()->Get(ordinal);
-  const iree::vm::FunctionSignatureDef* signature = export_def->signature();
-  if (!signature->reflection_attrs() || index < 0 ||
-      index >= signature->reflection_attrs()->size()) {
+  iree_vm_InternalFunctionDef_table_t function_def =
+      iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
+  iree_vm_FunctionSignatureDef_table_t signature =
+      iree_vm_InternalFunctionDef_signature(function_def);
+  iree_vm_ReflectionAttrDef_vec_t reflection_attrs =
+      iree_vm_FunctionSignatureDef_reflection_attrs(signature);
+  if (index < 0 ||
+      index >= iree_vm_ReflectionAttrDef_vec_len(reflection_attrs)) {
     return IREE_STATUS_NOT_FOUND;
   }
-  const ::iree::vm::ReflectionAttrDef* attr =
-      signature->reflection_attrs()->Get(index);
-  const ::flatbuffers::String* attr_key = attr->key();
-  const ::flatbuffers::String* attr_value = attr->value();
-  if (!attr_key || !attr_value) {
+  iree_vm_ReflectionAttrDef_table_t attr =
+      iree_vm_ReflectionAttrDef_vec_at(reflection_attrs, index);
+  flatbuffers_string_t attr_key = iree_vm_ReflectionAttrDef_key(attr);
+  flatbuffers_string_t attr_value = iree_vm_ReflectionAttrDef_value(attr);
+  if (!flatbuffers_string_len(attr_key) ||
+      !flatbuffers_string_len(attr_value)) {
     // Because reflection metadata should not impose any overhead for the
     // non reflection case, we do not eagerly validate in on load -- instead
     // verify it structurally as needed.
     return IREE_STATUS_FAILED_PRECONDITION;
   }
 
-  key->data = attr_key->c_str();
-  key->size = attr_key->size();
-  value->data = attr_value->c_str();
-  value->size = attr_value->size();
+  key->data = attr_key;
+  key->size = flatbuffers_string_len(attr_key);
+  value->data = attr_value;
+  value->size = flatbuffers_string_len(attr_value);
 
   return IREE_STATUS_OK;
-}
-
-static bool iree_vm_bytecode_module_compare_str(const flatbuffers::String* lhs,
-                                                iree_string_view_t rhs) {
-  if (!lhs || lhs->size() != rhs.size) return false;
-  return strncmp(lhs->c_str(), rhs.data, rhs.size) == 0;
 }
 
 static iree_status_t iree_vm_bytecode_module_lookup_function(
@@ -389,42 +419,53 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
   if (!out_function) return IREE_STATUS_INVALID_ARGUMENT;
   memset(out_function, 0, sizeof(iree_vm_function_t));
 
-  if (!name.data || !name.size) return IREE_STATUS_INVALID_ARGUMENT;
-
-  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
+  if (iree_string_view_is_empty(name)) return IREE_STATUS_INVALID_ARGUMENT;
 
   // NOTE: we could organize imports/exports alphabetically so we could bsearch.
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT) {
-    if (!module_def->imported_functions()) {
-      return IREE_STATUS_NOT_FOUND;
-    }
-    for (int ordinal = 0; ordinal < module_def->imported_functions()->size();
+    iree_vm_ImportFunctionDef_vec_t imported_functions =
+        iree_vm_BytecodeModuleDef_imported_functions(module->def);
+    for (size_t ordinal = 0;
+         ordinal < iree_vm_ImportFunctionDef_vec_len(imported_functions);
          ++ordinal) {
-      auto* import_def = module_def->imported_functions()->Get(ordinal);
-      if (iree_vm_bytecode_module_compare_str(import_def->full_name(), name)) {
+      iree_vm_ImportFunctionDef_table_t import_def =
+          iree_vm_ImportFunctionDef_vec_at(imported_functions, ordinal);
+      if (iree_vm_flatbuffer_strcmp(
+              iree_vm_ImportFunctionDef_full_name(import_def), name) == 0) {
         return iree_vm_bytecode_module_get_function(self, linkage, ordinal,
                                                     out_function, NULL, NULL);
       }
     }
     return IREE_STATUS_NOT_FOUND;
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
-    for (int ordinal = 0; ordinal < module_def->exported_functions()->size();
+    iree_vm_ExportFunctionDef_vec_t exported_functions =
+        iree_vm_BytecodeModuleDef_exported_functions(module->def);
+    for (size_t ordinal = 0;
+         ordinal < iree_vm_InternalFunctionDef_vec_len(exported_functions);
          ++ordinal) {
-      auto* export_def = module_def->exported_functions()->Get(ordinal);
-      if (iree_vm_bytecode_module_compare_str(export_def->local_name(), name)) {
+      iree_vm_ExportFunctionDef_table_t export_def =
+          iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
+      if (iree_vm_flatbuffer_strcmp(
+              iree_vm_ExportFunctionDef_local_name(export_def), name) == 0) {
         return iree_vm_bytecode_module_get_function(
             self, IREE_VM_FUNCTION_LINKAGE_INTERNAL,
-            export_def->internal_ordinal(), out_function, NULL, NULL);
+            iree_vm_ExportFunctionDef_internal_ordinal(export_def),
+            out_function, NULL, NULL);
       }
     }
     return IREE_STATUS_NOT_FOUND;
   } else {
-    for (int ordinal = 0; ordinal < module_def->internal_functions()->size();
+    iree_vm_InternalFunctionDef_vec_t internal_functions =
+        iree_vm_BytecodeModuleDef_internal_functions(module->def);
+    for (size_t ordinal = 0;
+         ordinal < iree_vm_InternalFunctionDef_vec_len(internal_functions);
          ++ordinal) {
-      auto* function_def = module_def->internal_functions()->Get(ordinal);
-      if (iree_vm_bytecode_module_compare_str(function_def->local_name(),
-                                              name)) {
+      iree_vm_InternalFunctionDef_table_t function_def =
+          iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
+      if (iree_vm_flatbuffer_strcmp(
+              iree_vm_InternalFunctionDef_local_name(function_def), name) ==
+          0) {
         return iree_vm_bytecode_module_get_function(
             self, IREE_VM_FUNCTION_LINKAGE_INTERNAL, ordinal, out_function,
             NULL, NULL);
@@ -438,20 +479,21 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
 // Returns the total size of the structure and all tables with padding applied.
 // |state| may be null if only the structure size is required for allocation.
 static iree_host_size_t iree_vm_bytecode_module_layout_state(
-    const iree::vm::BytecodeModuleDef* module_def,
+    iree_vm_BytecodeModuleDef_table_t module_def,
     iree_vm_bytecode_module_state_t* state) {
-  int rwdata_storage_capacity =
-      module_def->module_state()
-          ? module_def->module_state()->global_bytes_capacity()
-          : 0;
-  int global_ref_count = module_def->module_state()
-                             ? module_def->module_state()->global_ref_count()
-                             : 0;
-  int rodata_ref_count =
-      module_def->rodata_segments() ? module_def->rodata_segments()->size() : 0;
-  int import_function_count = module_def->imported_functions()
-                                  ? module_def->imported_functions()->size()
-                                  : 0;
+  iree_vm_ModuleStateDef_table_t module_state =
+      iree_vm_BytecodeModuleDef_module_state(module_def);
+  int rwdata_storage_capacity = 0;
+  int global_ref_count = 0;
+  if (module_state) {
+    rwdata_storage_capacity =
+        iree_vm_ModuleStateDef_global_bytes_capacity(module_state);
+    global_ref_count = iree_vm_ModuleStateDef_global_ref_count(module_state);
+  }
+  int rodata_ref_count = iree_vm_RodataSegmentDef_vec_len(
+      iree_vm_BytecodeModuleDef_rodata_segments(module_def));
+  int import_function_count = iree_vm_ImportFunctionDef_vec_len(
+      iree_vm_BytecodeModuleDef_imported_functions(module_def));
 
   uint8_t* base_ptr = (uint8_t*)state;
   iree_host_size_t offset =
@@ -491,7 +533,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   *out_module_state = NULL;
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
+  iree_vm_BytecodeModuleDef_table_t module_def = module->def;
 
   // Compute the total size required (with padding) for the state structure.
   iree_host_size_t total_state_struct_size =
@@ -507,13 +549,16 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   iree_vm_bytecode_module_layout_state(module_def, state);
 
   // Setup rodata segments to point directly at the flatbuffer memory.
+  iree_vm_RodataSegmentDef_vec_t rodata_segments =
+      iree_vm_BytecodeModuleDef_rodata_segments(module_def);
   for (int i = 0; i < state->rodata_ref_count; ++i) {
-    const iree::vm::RodataSegmentDef* segment =
-        module_def->rodata_segments()->Get(i);
+    iree_vm_RodataSegmentDef_table_t segment =
+        iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
     iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];
     iree_atomic_store(&ref->ref_object.counter, 1);
-    ref->data.data = segment->data()->Data();
-    ref->data.data_length = segment->data()->size();
+    ref->data.data = iree_vm_RodataSegmentDef_data(segment);
+    ref->data.data_length =
+        flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment));
   }
 
   *out_module_state = (iree_vm_module_state_t*)state;
@@ -594,31 +639,24 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
     iree_const_byte_span_t flatbuffer_data,
     iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {
-  if (!out_module) {
-    LOG(ERROR) << "Output module argument not set";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
   *out_module = NULL;
 
-  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
-    LOG(ERROR) << "Flatbuffer data is not present or less than 16 bytes";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  } else if (!iree::vm::BytecodeModuleDefBufferHasIdentifier(
-                 flatbuffer_data.data)) {
-    LOG(ERROR) << "Flatbuffer data does not have bytecode module identifier";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_RETURN_IF_ERROR(
+      iree_vm_bytecode_module_flatbuffer_verify(flatbuffer_data));
 
-  const iree::vm::BytecodeModuleDef* module_def =
-      ::flatbuffers::GetRoot<iree::vm::BytecodeModuleDef>(flatbuffer_data.data);
+  iree_vm_BytecodeModuleDef_table_t module_def =
+      iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
   if (!module_def) {
-    LOG(ERROR) << "Failed getting root from flatbuffer data";
+    LOG(ERROR) << "failed getting root from flatbuffer data; expected "
+                  "identifier " iree_vm_BytecodeModuleDef_file_identifier
+                  " not found";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_flatbuffer_verify(module_def));
 
+  iree_vm_TypeDef_vec_t type_defs = iree_vm_BytecodeModuleDef_types(module_def);
   size_t type_table_size =
-      module_def->types()->size() * sizeof(iree_vm_type_def_t);
+      iree_vm_TypeDef_vec_len(type_defs) * sizeof(iree_vm_type_def_t);
 
   iree_vm_bytecode_module_t* module = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
@@ -626,21 +664,30 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
       (void**)&module));
   module->allocator = allocator;
 
+  iree_vm_FunctionDescriptor_vec_t function_descriptors =
+      iree_vm_BytecodeModuleDef_function_descriptors(module_def);
   module->function_descriptor_count =
-      module_def->function_descriptors()->size();
-  module->function_descriptor_table =
-      (const iree_vm_function_descriptor_t*)module_def->function_descriptors()
-          ->data();
+      iree_vm_FunctionDescriptor_vec_len(function_descriptors);
+  module->function_descriptor_table = function_descriptors;
+
+  flatbuffers_uint8_vec_t bytecode_data =
+      iree_vm_BytecodeModuleDef_bytecode_data(module_def);
   module->bytecode_data = iree_const_byte_span_t{
-      module_def->bytecode_data()->Data(), module_def->bytecode_data()->size()};
+      bytecode_data, flatbuffers_uint8_vec_len(bytecode_data)};
 
   module->flatbuffer_data = flatbuffer_data;
   module->flatbuffer_allocator = flatbuffer_allocator;
+  module->def = module_def;
 
-  module->type_count = module_def->types()->size();
+  module->type_count = iree_vm_TypeDef_vec_len(type_defs);
   module->type_table = (iree_vm_type_def_t*)((uint8_t*)module +
                                              sizeof(iree_vm_bytecode_module_t));
-  iree_vm_bytecode_module_resolve_types(module_def, module->type_table);
+  iree_status_t resolve_status =
+      iree_vm_bytecode_module_resolve_types(type_defs, module->type_table);
+  if (!iree_status_is_ok(resolve_status)) {
+    iree_allocator_free(allocator, module);
+    return resolve_status;
+  }
 
   iree_vm_module_initialize(&module->interface, module);
   module->interface.destroy = iree_vm_bytecode_module_destroy;

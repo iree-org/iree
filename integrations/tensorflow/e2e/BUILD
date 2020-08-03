@@ -23,7 +23,6 @@ load(
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
     "iree_py_binary",
-    "iree_py_test",
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
@@ -54,7 +53,6 @@ package(
 # backends.
 # keep sorted
 SPECIAL_CASES = [
-    "explicit_backend_test.py",
     "linspace_test.py",
 ]
 
@@ -84,7 +82,6 @@ LLVM_FAILING = [
 VULKAN_FAILING = [
     "broadcasting_test.py",
     "control_flow_test.py",
-    "conv_test.py",
     "depth_conv_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
@@ -93,7 +90,7 @@ VULKAN_FAILING = [
     "matrix_ops_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "sliding_window_test.py",  # TODO(#2659)
+    "sliding_window_test.py",  # TODO(#2659) Failing on nvidia, passing on swiftshader.
     "strings_test.py",
 ]
 
@@ -182,23 +179,6 @@ iree_e2e_test_suite(
         "manual",
         "nokokoro",
         "notap",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-# This tests explicitly writing which backends to use in Python,
-# so overriding the backends can cause it to break.
-iree_py_test(
-    name = "explicit_backend_test",
-    srcs = ["explicit_backend_test.py"],
-    main = "explicit_backend_test.py",
-    python_version = "PY3",
-    tags = [
-        "driver=llvmjit",
-        "driver=vmla",
-        "driver=vulkan",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",

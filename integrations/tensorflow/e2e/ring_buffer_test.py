@@ -179,27 +179,26 @@ class StatefulRingBufferModule(tf.Module):
 
 @tf_test_utils.compile_module(
     StatefulRingBufferModule, exported_names=["predict"])
-class StatefulRingBufferTest(tf_test_utils.CompiledModuleTestCase):
+class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
 
   def test_stateful_ringbuffer(self):
-    input1 = np.array([[1.0, 2.0]], dtype=np.float32)
-    result1 = self.get_module().predict(input1)
-    output1 = np.array([[1.0, 2.0]], dtype=np.float32)
-    assert np.allclose(result1, output1)
 
-    # ring buffer is not filled yet,
-    # so data from first cycle will be returned
-    input2 = np.array([[3.0, 4.0]], dtype=np.float32)
-    result2 = self.get_module().predict(input2)
-    output2 = np.array([[1.0, 2.0]], dtype=np.float32)
-    assert np.allclose(result2, output2)
+    def stateful_ringbuffer(module):
+      input1 = np.array([[1.0, 2.0]], dtype=np.float32)
+      module.predict(input1)
+      # output = np.array([[1.0, 2.0]], dtype=np.float32)
 
-    # on 3rd cycle we overwrite oldest data
-    # and return data from 2nd cycle
-    input3 = np.array([[5.0, 6.0]], dtype=np.float32)
-    result3 = self.get_module().predict(input3)
-    output3 = np.array([[3.0, 4.0]], dtype=np.float32)
-    assert np.allclose(result3, output3)
+      # ring buffer is not filled yet so data from first cycle will be returned.
+      input2 = np.array([[3.0, 4.0]], dtype=np.float32)
+      module.predict(input2)
+      # output = np.array([[1.0, 2.0]], dtype=np.float32)
+
+      # on 3rd cycle we overwrite oldest data and return data from 2nd cycle.
+      input3 = np.array([[5.0, 6.0]], dtype=np.float32)
+      module.predict(input3)
+      # output = np.array([[3.0, 4.0]], dtype=np.float32)
+
+    self.compare_backends(stateful_ringbuffer)
 
 
 if __name__ == "__main__":

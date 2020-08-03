@@ -55,6 +55,11 @@ Optionally add: `--define=PYIREE_TF_DISABLE_KERNELS=1` to build a 'thin' (less
 functional) version without TensorFlow kernels. This should not be done for
 released binaries but can help while developing.
 
+Note that bazel does not always build properly named artifacts. See the tool
+`hack_python_package_from_runfiles.py` to extract and fixup artifacts from a
+bazel-bin directory. If using this mechanism, then the environment variable
+`PYIREE_PYTHON_ROOT` should be set to a suitable temp directory.
+
 ```shell
 cd $IREE_SRC
 bazel build -c opt \

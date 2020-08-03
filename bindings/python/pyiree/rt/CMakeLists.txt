@@ -50,6 +50,8 @@ iree_pyext_module(
   MODULE_NAME binding
   SRCS
     "initialize_module.cc"
+  UNIX_LINKER_SCRIPT
+    "unix_version.lds"
   PYEXT_DEPS
     ::PyExtRtLib
     bindings::python::pyiree::common::PyextCommonLib

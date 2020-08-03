@@ -26,6 +26,8 @@ iree_pyext_module(
     PyExtCompiler
   MODULE_NAME
     binding
+  UNIX_LINKER_SCRIPT
+    "unix_version.lds"
   SRCS
     "initialize_module.cc"
   PYEXT_DEPS

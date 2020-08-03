@@ -34,14 +34,16 @@ class LinSpaceModule(tf.Module):
 
 
 @tf_test_utils.compile_module(LinSpaceModule)
-class LinspaceTest(tf_test_utils.CompiledModuleTestCase):
+class LinspaceTest(tf_test_utils.TracedModuleTestCase):
 
   def test_linspace(self):
-    start = np.array(10., dtype=np.float32)
-    stop = np.array(12., dtype=np.float32)
 
-    result = self.get_module().linspace(start, stop)
-    result.assert_all_close()
+    def linspace(module):
+      start = np.array(10., dtype=np.float32)
+      stop = np.array(12., dtype=np.float32)
+      module.linspace(start, stop)
+
+    self.compare_backends(linspace)
 
 
 if __name__ == "__main__":

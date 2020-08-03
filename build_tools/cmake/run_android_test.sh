@@ -35,7 +35,7 @@
 set -x
 set -e
 
-adb push $TEST_EXECUTABLE $TEST_ANDROID_ABS_DIR/$(basename $TEST_EXECUTABLE) 1>/dev/null
+adb push $TEST_EXECUTABLE $TEST_ANDROID_ABS_DIR/$(basename $TEST_EXECUTABLE)
 
 if [ -n "$TEST_DATA" ]; then
   adb push $TEST_DATA $TEST_ANDROID_ABS_DIR/$(basename $TEST_DATA)
