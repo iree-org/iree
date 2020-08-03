@@ -132,12 +132,12 @@ Build IREE with lld linker and experimental on.
 # export IREE_LLVMAOT_LINKER_PATH="$(which ld)"
 # export VULKAN_SDK=/path/to/vulkan-sdk
 # cmake -G Ninja /path/to/iree \
-    -B /path/to/iree-build/aarch64 \
+    -B /path/to/iree-build/build-aarch64 \
     -DIREE_BUILD_EXPERIMENTAL=ON \
     -DIREE_ENABLE_LLD=ON \
     -DCMAKE_C_COMPILER=./clang+llvm-10.0.0-aarch64-linux-gnu/bin/clang \
     -DCMAKE_CXX_COMPILER=./clang+llvm-10.0.0-aarch64-linux-gnu/bin/clang++
-# cmake --build /path/to/iree-build/aarch64
+# cmake --build /path/to/iree-build/build-aarch64
 ```
 
 ## What's next?
@@ -147,7 +147,7 @@ Build IREE with lld linker and experimental on.
 Check out the contents of the 'experimental test' build directory:
 
 ```shell
-# cd /path/to/iree-build/aarch64
+# cd /path/to/iree-build/build-aarch64
 # ls experimental/ModelBuilder/test
 ```
 
