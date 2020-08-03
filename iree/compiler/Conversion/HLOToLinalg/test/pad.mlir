@@ -70,3 +70,26 @@ module {
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
   }
 }
+
+// -----
+
+module {
+  // CHECK_LABEL: @cst_pad_cst
+  func @cst_pad_cst() {
+    %c0 = constant 0 : index
+    %0 = constant dense<1.0> : tensor<12x4xf32>
+    %1 = constant dense<0.0> : tensor<f32>
+    // CHECK: linalg.fill
+    // CHECK: linalg.fill
+    %2 = "mhlo.pad"(%0, %1) {
+      edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
+      edge_padding_low = dense<[4, 5]> : tensor<2xi64>,
+      interior_padding = dense<0> : tensor<2xi64>
+    } : (tensor<12x4xf32>, tensor<f32>) -> tensor<18x12xf32>
+    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<18x12xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write"
+  }
+}
