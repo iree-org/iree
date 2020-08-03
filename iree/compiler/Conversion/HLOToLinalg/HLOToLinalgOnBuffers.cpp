@@ -509,18 +509,6 @@ struct PadOpConversion
 };
 }  // namespace
 
-/// Returns an AffineMapAttr that is the indexing map to use for the input of a
-/// mhlo.pad `op`.
-static AffineMapAttr getPadOpInputIndexingMap(
-    mhlo::PadOp op, int rank, ConversionPatternRewriter &rewriter) {
-  const auto edgePaddingLow = convertDenseIntAttr(op.edge_padding_low());
-  SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < rank; ++i)
-    exprs.push_back((rewriter.getAffineDimExpr(i) - edgePaddingLow[i]));
-  return AffineMapAttr::get(
-      AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
-}
-
 LogicalResult PadOpConversion::apply(
     mhlo::PadOp op, ArrayRef<Value> inputBuffers, ArrayRef<Value> resultBuffers,
     ConversionPatternRewriter &rewriter) const {
@@ -554,7 +542,14 @@ LogicalResult PadOpConversion::apply(
   auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], offsets,
                                               sizes, strides);
   rewriter.create<linalg::FillOp>(loc, resultBuffers[0], paddingVal);
-  rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+  if (auto cstOp = dyn_cast<ConstantOp>(inputBuffers[0].getDefiningOp())) {
+    auto inputConstAttr =
+        cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
+    Value cstVal = rewriter.create<ConstantOp>(loc, inputConstAttr);
+    rewriter.create<linalg::FillOp>(loc, subViewOp, cstVal);
+  } else {
+    rewriter.create<linalg::CopyOp>(loc, inputBuffers[0], subViewOp);
+  }
 
   return success();
 }
