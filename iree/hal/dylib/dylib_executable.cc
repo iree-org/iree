@@ -97,7 +97,7 @@ struct DyLibDispatchState : public HostExecutable::DispatchState {
   DyLibDispatchState() = default;
   void* entry_function = nullptr;
   absl::InlinedVector<void*, 4> args;
-  absl::InlinedVector<int64_t, 4> push_constant;
+  absl::InlinedVector<int32_t, 4> push_constant;
 };
 
 StatusOr<ref_ptr<HostExecutable::DispatchState>>
@@ -124,7 +124,6 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
       dispatch_state->args.push_back(data);
     }
   }
-  // TODO(ataei): Consider moving this casting to codegen side ?!
   for (int i = 0; i < params.push_constants->values.size(); ++i) {
     dispatch_state->push_constant.push_back(params.push_constants->values[i]);
   }
@@ -138,7 +137,7 @@ Status DyLibExecutable::DispatchTile(DispatchState* state,
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
 
   auto entry_function =
-      (void (*)(void**, int64_t*))dispatch_state->entry_function;
+      (void (*)(void**, int32_t*))dispatch_state->entry_function;
   entry_function(dispatch_state->args.data(),
                  dispatch_state->push_constant.data());
 
