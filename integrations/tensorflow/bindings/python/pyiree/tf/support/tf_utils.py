@@ -397,4 +397,4 @@ class BackendInfo:
   @staticmethod
   def get_all_backends():
     """Returns a list of all BackendInfo configurations."""
-    return [BackendInfo(backend_name) for backend_name in _BACKEND_NAME_TO_INFO]
+    return [BackendInfo(backend_name) for backend_name in self._NAME_TO_INFO]
