@@ -276,7 +276,13 @@ class Trace:
             ref.dtype, tar.dtype)
         return False
       if np.issubdtype(ref.dtype, np.floating):
-        return np.allclose(ref, tar, rtol=rtol, atol=atol)
+        same = np.allclose(ref, tar, rtol=rtol, atol=atol)
+        if not same:
+          logging.error(
+              "Floating point difference between ref and tar was too large. "
+              "Max absolute difference: %s, rtol: %s, atol: %s",
+              np.max(np.abs(ref - tar)), rtol, atol)
+        return same
       else:
         return np.array_equal(ref, tar)
 
