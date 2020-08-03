@@ -125,17 +125,19 @@ makeStridedMemRefDescriptor(void *ptr, void *alignedPtr,
                                            allocFun);
 }
 
-// Mallocs a StridedMemRefDescriptor<T, 0>* (i.e. a pointer to scalar) that
-// matches the MLIR ABI. This is an implementation detail that is kept in sync
-// with MLIR codegen conventions.
-template <typename T, int N>
-typename std::enable_if<(N == 0), StridedMemRefType<T, 0> *>::type
-makeStridedMemRefDescriptor(void *ptr, void *alignedPtr,
-                            const std::array<int64_t, N> &shape = {},
-                            AllocFunType allocFun = &::malloc) {
-  return makeStridedMemRefDescriptor<T, N>(ptr, alignedPtr, shape, shape,
-                                           allocFun);
-}
+// Fixes compilation failures that started after merging cl/324296127.
+// // Mallocs a StridedMemRefDescriptor<T, 0>* (i.e. a pointer to scalar) that
+// // matches the MLIR ABI. This is an implementation detail that is kept in
+// sync
+// // with MLIR codegen conventions.
+// template <typename T, int N>
+// typename std::enable_if<(N == 0), StridedMemRefType<T, 0> *>::type
+// makeStridedMemRefDescriptor(void *ptr, void *alignedPtr,
+//                             const std::array<int64_t, N> &shape = {},
+//                             AllocFunType allocFun = &::malloc) {
+//   return makeStridedMemRefDescriptor<T, N>(ptr, alignedPtr, shape, shape,
+//                                            allocFun);
+// }
 
 // Mallocs an UnrankedMemRefType<T>* that contains a ranked
 // StridedMemRefDescriptor<T, Rank>* and matches the MLIR ABI. This is an

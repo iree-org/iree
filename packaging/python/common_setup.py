@@ -29,7 +29,8 @@ def get_exe_suffix():
 
 def get_package_dir(prefix=("bindings", "python")):
   explicit_root = os.environ.get("PYIREE_PYTHON_ROOT")
-  if explicit_root: return explicit_root
+  if explicit_root:
+    return explicit_root
 
   # Use env variables based on build system type.
   cmake_build_root = os.environ.get("PYIREE_CMAKE_BUILD_ROOT")

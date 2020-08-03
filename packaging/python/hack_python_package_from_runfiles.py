@@ -31,11 +31,10 @@ import shutil
 import sys
 import sysconfig
 
-
 FILE_NAME_MAP = {
-  "binding.so": "binding{}".format(sysconfig.get_config_var("EXT_SUFFIX")),
-  "binding.pyd": False,
-  "binding.dylib": False,
+    "binding.so": "binding{}".format(sysconfig.get_config_var("EXT_SUFFIX")),
+    "binding.pyd": False,
+    "binding.dylib": False,
 }
 
 
@@ -51,12 +50,14 @@ def copy_prefix(dest_dir, runfiles_dir, prefix):
   # Aren't bazel paths fun???
   # Note that the "iree_core" path segment corresponds to the workspace name.
   pkg_dir = os.path.join(runfiles_dir, "iree_core", *prefix)
-  if not os.path.exists(pkg_dir): return
+  if not os.path.exists(pkg_dir):
+    return
   dest_dir = os.path.join(dest_dir)
   for root, dirs, files in os.walk(pkg_dir):
     assert root.startswith(pkg_dir)
     dest_prefix = root[len(pkg_dir):]
-    if dest_prefix.startswith(os.path.sep): dest_prefix = dest_prefix[1:]
+    if dest_prefix.startswith(os.path.sep):
+      dest_prefix = dest_prefix[1:]
     local_dest_dir = os.path.join(dest_dir, dest_prefix)
     os.makedirs(local_dest_dir, exist_ok=True)
     for file in files:

@@ -21,7 +21,6 @@ package(
 cc_library(
     name = "tensorflow",
     srcs = [
-        "GuaranteeAllFuncsOneUse.cpp",
         "Passes.cpp",
         "PropagateResourceCasts.cpp",
         "TFSavedModelLowerExportedFunctions.cpp",

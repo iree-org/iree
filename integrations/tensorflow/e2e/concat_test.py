@@ -72,7 +72,6 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
 
     self.compare_backends(concat0axis)
 
-
   def test_concat1axis(self):
 
     def concat1axis(module):
@@ -82,7 +81,6 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
 
     self.compare_backends(concat1axis)
 
-
   def test_concat2axis(self):
 
     def concat2axis(module):
@@ -91,6 +89,7 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
       module.concat2axis(a, b)
 
     self.compare_backends(concat2axis)
+
 
 if __name__ == "__main__":
   if hasattr(tf, "enable_v2_behavior"):

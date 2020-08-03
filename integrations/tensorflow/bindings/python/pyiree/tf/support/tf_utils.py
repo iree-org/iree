@@ -29,7 +29,6 @@ from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
-
 flags.DEFINE_bool("keep_saved_model", False,
                   "Keep the SavedModel used by compile_tf_module on disk.")
 FLAGS = flags.FLAGS

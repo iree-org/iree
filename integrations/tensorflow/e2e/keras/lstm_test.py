@@ -24,6 +24,7 @@ NUM_UNITS = 10
 DYNAMIC_SHAPE = [None, None, NUM_UNITS]
 INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 
+
 class Lstm(tf.Module):
 
   def __init__(self):

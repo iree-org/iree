@@ -82,8 +82,8 @@ model creation.
 
 Our tests use a class `TracedModule` to capture and store all of the inputs and
 outputs of a `CompiledModule` in a `Trace`. Each unittest on a `TestCase` uses
-the `compare_backends` method. This method runs the function it is passed with
-a `TracedModule` once for each reference and target backend. The inputs and
+the `compare_backends` method. This method runs the function it is passed with a
+`TracedModule` once for each reference and target backend. The inputs and
 outputs to these modules are then checked for correctness, using the reference
 backend as a source of truth. For example:
 

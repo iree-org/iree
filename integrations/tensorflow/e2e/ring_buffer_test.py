@@ -193,14 +193,12 @@ class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
       module.predict(input2)
       # output = np.array([[1.0, 2.0]], dtype=np.float32)
 
-
       # on 3rd cycle we overwrite oldest data and return data from 2nd cycle.
       input3 = np.array([[5.0, 6.0]], dtype=np.float32)
       module.predict(input3)
       # output = np.array([[3.0, 4.0]], dtype=np.float32)
 
     self.compare_backends(stateful_ringbuffer)
-
 
 
 if __name__ == "__main__":

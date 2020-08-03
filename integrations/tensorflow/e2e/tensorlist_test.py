@@ -50,9 +50,8 @@ class TensorListModule(tf.Module):
   @tf.function(
       input_signature=[tf.TensorSpec([STATIC_SIZE, STATIC_SIZE], tf.float32)])
   def slice_first_element_with_from_tensor_high_rank(self, t):
-    ta = tf.TensorArray(dtype=tf.float32,
-                        size=STATIC_SIZE,
-                        element_shape=[STATIC_SIZE])
+    ta = tf.TensorArray(
+        dtype=tf.float32, size=STATIC_SIZE, element_shape=[STATIC_SIZE])
     ta = ta.unstack(t)
     return ta.read(0)
 
@@ -80,8 +79,8 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
   def test_add_through_tensorlist(self):
 
     def add_through_tensorlist(module):
-      module.add_through_tensorlist(np.array(42., dtype=np.float32),
-                                    np.array(43., dtype=np.float32))
+      module.add_through_tensorlist(
+          np.array(42., dtype=np.float32), np.array(43., dtype=np.float32))
 
     self.compare_backends(add_through_tensorlist)
 
@@ -104,8 +103,8 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
   def test_concat_with_tensorlist_stack(self):
 
     def concat_with_tensorlist_stack(module):
-      module.concat_with_tensorlist_stack(np.array(42., dtype=np.float32),
-                                          np.array(43., dtype=np.float32))
+      module.concat_with_tensorlist_stack(
+          np.array(42., dtype=np.float32), np.array(43., dtype=np.float32))
 
     self.compare_backends(concat_with_tensorlist_stack)
 
