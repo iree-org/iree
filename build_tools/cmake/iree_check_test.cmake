@@ -121,7 +121,7 @@ function(iree_check_test)
         TEST_EXECUTABLE=$<TARGET_FILE:iree_modules_check_iree-check-module>
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-    iree_add_test_environment_properties(${_TEST_NAME} ${_NAME})
+    iree_add_test_environment_properties(${_TEST_NAME})
   else(ANDROID)
     add_test(
       NAME
@@ -134,7 +134,7 @@ function(iree_check_test)
         ${_RULE_RUNNER_ARGS}
     )
     set_property(TEST "${_TEST_NAME}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-    iree_add_test_environment_properties(${_TEST_NAME} ${_NAME})
+    iree_add_test_environment_properties(${_TEST_NAME})
   endif(ANDROID)
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}" "driver=${_RULE_DRIVER}")

@@ -263,8 +263,7 @@ endfunction()
 #
 # Parameters:
 # TEST_NAME: the test name, e.g. iree/base:ref_ptr_test
-# TARGET_NAME: the target name, e.g. iree_base_ref_ptr_test
-function(iree_add_test_environment_properties TEST_NAME TARGET_NAME)
+function(iree_add_test_environment_properties TEST_NAME)
   # Can technically build just a target backend and run tests which don't
   # require a corresponding HAL driver, but that's an edge case - just disable
   # if either isn't being built.
