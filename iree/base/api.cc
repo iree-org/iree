@@ -32,6 +32,86 @@
 namespace iree {
 
 //===----------------------------------------------------------------------===//
+// iree_string_view_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT int IREE_API_CALL
+iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
+  size_t min_size = std::min(lhs.size, rhs.size);
+  int cmp = strncmp(lhs.data, rhs.data, min_size);
+  if (cmp != 0) return cmp;
+  return rhs.size - lhs.size;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
+    iree_string_view_t value, iree_string_view_t prefix) {
+  if (!value.data || !prefix.data) {
+    return false;
+  } else if (prefix.size > value.size) {
+    return false;
+  }
+  return strncmp(value.data, prefix.data, prefix.size) == 0;
+}
+
+IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
+    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
+    iree_string_view_t* out_rhs) {
+  if (!value.data || !value.size) {
+    return -1;
+  }
+  const void* first_ptr = std::memchr(value.data, split_char, value.size);
+  if (!first_ptr) {
+    return -1;
+  }
+  int offset =
+      static_cast<int>(reinterpret_cast<const char*>(first_ptr) - value.data);
+  if (out_lhs) {
+    out_lhs->data = value.data;
+    out_lhs->size = offset;
+  }
+  if (out_rhs) {
+    out_rhs->data = value.data + offset + 1;
+    out_rhs->size = value.size - offset - 1;
+  }
+  return offset;
+}
+
+static bool MatchPattern(absl::string_view value, absl::string_view pattern) {
+  size_t next_char_index = pattern.find_first_of("*?");
+  if (next_char_index == std::string::npos) {
+    return value == pattern;
+  } else if (next_char_index > 0) {
+    if (value.substr(0, next_char_index) !=
+        pattern.substr(0, next_char_index)) {
+      return false;
+    }
+    value = value.substr(next_char_index);
+    pattern = pattern.substr(next_char_index);
+  }
+  if (value.empty() && pattern.empty()) {
+    return true;
+  }
+  char pattern_char = pattern[0];
+  if (pattern_char == '*' && pattern.size() > 1 && value.empty()) {
+    return false;
+  } else if (pattern_char == '*' && pattern.size() == 1) {
+    return true;
+  } else if (pattern_char == '?' || value[0] == pattern_char) {
+    return MatchPattern(value.substr(1), pattern.substr(1));
+  } else if (pattern_char == '*') {
+    return MatchPattern(value, pattern.substr(1)) ||
+           MatchPattern(value.substr(1), pattern);
+  }
+  return false;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
+    iree_string_view_t value, iree_string_view_t pattern) {
+  return MatchPattern(absl::string_view(value.data, value.size),
+                      absl::string_view(pattern.data, pattern.size));
+}
+
+//===----------------------------------------------------------------------===//
 // iree_status_t
 //===----------------------------------------------------------------------===//
 
@@ -75,6 +155,130 @@ iree_status_code_string(iree_status_code_t code) {
     default:
       return "";
   }
+}
+
+// TODO(#265): move payload methods/types to header when API is stabilized.
+
+// Defines the type of an iree_status_payload_t.
+typedef enum {
+  // Opaque; payload may still be formatted by a formatter but is not possible
+  // to retrieve by the programmatic APIs.
+  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0,
+  // A string message annotation of type iree_status_payload_message_t.
+  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1,
+  // Starting type ID for user payloads. IREE reserves all payloads with types
+  // less than this.
+  IREE_STATUS_PAYLOAD_TYPE_MIN_USER = 0x70000000,
+} iree_status_payload_type_t;
+
+typedef struct iree_status_payload_s iree_status_payload_t;
+
+// Function that formats a payload into a human-readable string form for logs.
+typedef void(IREE_API_PTR* iree_status_payload_formatter_t)(
+    const iree_status_payload_t* payload, iree_host_size_t buffer_capacity,
+    char* buffer, iree_host_size_t* out_buffer_length);
+
+// Header for optional status payloads.
+// Each status may have zero or more payloads associated with it that can later
+// be used to produce more detailed logging or programmatically query
+// information about an error.
+struct iree_status_payload_s {
+  // Next payload in the status payload linked list.
+  struct iree_status_payload_s* next;
+  // Payload type identifier used for programmatic access to payloads. May be
+  // IREE_STATUS_PAYLOAD_TYPE_OPAQUE if the payload cannot be accessed directly.
+  iree_status_payload_type_t type;
+  // Allocator used for the payload and associated resources.
+  iree_allocator_t allocator;
+  // String formatter callback used to write the payload into a string buffer.
+  // If not present then the payload will be mentioned but not dumped when the
+  // status is logged.
+  iree_status_payload_formatter_t formatter;
+};
+
+// A string message (IREE_STATUS_PAYLOAD_TYPE_MESSAGE).
+typedef struct {
+  iree_status_payload_t header;
+  // String data reference. May point to an address immediately following this
+  // struct (if copied) or a constant string reference in rodata.
+  iree_string_view_t message;
+} iree_status_payload_message_t;
+
+// Allocated storage for an iree_status_t.
+// Only statuses that have either source information or payloads will have
+// storage allocated for them.
+typedef struct {
+  // __FILE__ of the originating status allocation.
+  const char* file;
+  // __LINE__ of the originating status allocation.
+  uint32_t line;
+  // Optional doubly-linked list of payloads associated with the status.
+  // Head = first added, tail = last added.
+  iree_status_payload_t* payload_head;
+  iree_status_payload_t* payload_tail;
+} iree_status_storage_t;
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
+                     iree_string_view_t message) {
+  // TODO(#265): status storage.
+  return code;
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
+                       const char* format, ...) {
+  // TODO(#265): status storage.
+  return code;
+}
+
+IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
+  iree_status_storage_t* storage =
+      (iree_status_storage_t*)(status & ~IREE_STATUS_CODE_MASK);
+  if (!storage) return;
+  iree_status_payload_t* payload = storage->payload_head;
+  while (payload) {
+    iree_status_payload_t* next = payload->next;
+    iree_allocator_free(payload->allocator, payload);
+    payload = next;
+  }
+  iree_allocator_free(IREE_ALLOCATOR_SYSTEM, storage);
+}
+
+IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
+  iree_status_free(status);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
+  iree_status_storage_t* storage =
+      (iree_status_storage_t*)(base_status & ~IREE_STATUS_CODE_MASK);
+  // TODO(benvanik): allocate storage if error but no storage already.
+  if (!storage) return base_status;
+  // TODO(#265): status storage.
+  return base_status;
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+IREE_PRINTF_ATTRIBUTE(2, 3)
+    iree_status_annotate_f(iree_status_t base_status, const char* format, ...) {
+  // TODO(#265): status storage.
+  return base_status;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL
+iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
+                   char* buffer, iree_host_size_t* out_buffer_length) {
+  // TODO(#265): status storage.
+  return false;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL
+iree_status_to_string(iree_status_t status, char** out_buffer,
+                      iree_host_size_t* out_buffer_length) {
+  // TODO(#265): status storage.
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -207,94 +411,6 @@ IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
   if (ptr) {
     std::free(ptr);
   }
-}
-
-//===----------------------------------------------------------------------===//
-// iree_string_view_t
-//===----------------------------------------------------------------------===//
-
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_make_cstring_view(const char* str) {
-  iree_string_view_t result;
-  result.data = str;
-  result.size = strlen(str);
-  return result;
-}
-
-IREE_API_EXPORT int IREE_API_CALL
-iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
-  size_t min_size = std::min(lhs.size, rhs.size);
-  int cmp = strncmp(lhs.data, rhs.data, min_size);
-  if (cmp != 0) return cmp;
-  return rhs.size - lhs.size;
-}
-
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix) {
-  if (!value.data || !prefix.data) {
-    return false;
-  } else if (prefix.size > value.size) {
-    return false;
-  }
-  return strncmp(value.data, prefix.data, prefix.size) == 0;
-}
-
-IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
-    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
-    iree_string_view_t* out_rhs) {
-  if (!value.data || !value.size) {
-    return -1;
-  }
-  const void* first_ptr = std::memchr(value.data, split_char, value.size);
-  if (!first_ptr) {
-    return -1;
-  }
-  int offset =
-      static_cast<int>(reinterpret_cast<const char*>(first_ptr) - value.data);
-  if (out_lhs) {
-    out_lhs->data = value.data;
-    out_lhs->size = offset;
-  }
-  if (out_rhs) {
-    out_rhs->data = value.data + offset + 1;
-    out_rhs->size = value.size - offset - 1;
-  }
-  return offset;
-}
-
-static bool MatchPattern(absl::string_view value, absl::string_view pattern) {
-  size_t next_char_index = pattern.find_first_of("*?");
-  if (next_char_index == std::string::npos) {
-    return value == pattern;
-  } else if (next_char_index > 0) {
-    if (value.substr(0, next_char_index) !=
-        pattern.substr(0, next_char_index)) {
-      return false;
-    }
-    value = value.substr(next_char_index);
-    pattern = pattern.substr(next_char_index);
-  }
-  if (value.empty() && pattern.empty()) {
-    return true;
-  }
-  char pattern_char = pattern[0];
-  if (pattern_char == '*' && pattern.size() > 1 && value.empty()) {
-    return false;
-  } else if (pattern_char == '*' && pattern.size() == 1) {
-    return true;
-  } else if (pattern_char == '?' || value[0] == pattern_char) {
-    return MatchPattern(value.substr(1), pattern.substr(1));
-  } else if (pattern_char == '*') {
-    return MatchPattern(value, pattern.substr(1)) ||
-           MatchPattern(value.substr(1), pattern);
-  }
-  return false;
-}
-
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
-    iree_string_view_t value, iree_string_view_t pattern) {
-  return MatchPattern(absl::string_view(value.data, value.size),
-                      absl::string_view(pattern.data, pattern.size));
 }
 
 //===----------------------------------------------------------------------===//

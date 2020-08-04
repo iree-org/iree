@@ -27,7 +27,8 @@ inline iree_status_t ToApiStatus(const Status& status) {
   if (!status.ok()) {
     LOG(ERROR) << status;
   }
-  return iree_make_status(status.code());
+  // TODO(#265): marshal Status to iree_status_t.
+  return iree_make_status(static_cast<iree_status_code_t>(status.code()));
 }
 
 inline StatusBuilder FromApiStatus(iree_status_t status_code,

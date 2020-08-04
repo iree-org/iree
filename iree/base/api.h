@@ -112,6 +112,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(_WIN32)
 // The safe malloca that may fall back to heap in the case of stack overflows:
@@ -146,6 +147,57 @@ extern "C" {
 #define IREE_API_CALL
 #define IREE_API_PTR
 #endif  // _WIN32
+
+// Queries for [[attribute]] identifiers in modern compilers.
+#ifdef __has_attribute
+#define IREE_HAVE_ATTRIBUTE(x) __has_attribute(x)
+#else
+#define IREE_HAVE_ATTRIBUTE(x) 0
+#endif  // __has_attribute
+
+// Tells the compiler to perform `printf` format string checking if the
+// compiler supports it; see the 'format' attribute in
+// <https://gcc.gnu.org/onlinedocs/gcc-4.7.0/gcc/Function-Attributes.html>.
+#if IREE_HAVE_ATTRIBUTE(format) || (defined(__GNUC__) && !defined(__clang__))
+#define IREE_PRINTF_ATTRIBUTE(string_index, first_to_check) \
+  __attribute__((__format__(__printf__, string_index, first_to_check)))
+#else
+// TODO(benvanik): use _Printf_format_string_ in SAL for MSVC.
+#define IREE_PRINTF_ATTRIBUTE(string_index, first_to_check)
+#endif  // IREE_HAVE_ATTRIBUTE
+
+// Annotation for function return values that ensures that they are used by the
+// caller.
+#if IREE_HAVE_ATTRIBUTE(nodiscard)
+#define IREE_MUST_USE_RESULT [[nodiscard]]
+#elif (defined(__clang__) && IREE_HAVE_ATTRIBUTE(warn_unused_result)) || \
+    (defined(__GNUC__) && (__GNUC__ >= 4))
+#define IREE_MUST_USE_RESULT __attribute__((warn_unused_result))
+#elif defined(_MSC_VER) && (_MSC_VER >= 1700)
+#define IREE_MUST_USE_RESULT _Check_return_
+#else
+#define IREE_MUST_USE_RESULT
+#endif  // IREE_HAVE_ATTRIBUTE(nodiscard)
+
+// Compiler hint that can be used to indicate conditions that are very very very
+// likely or unlikely. This is most useful for ensuring that unlikely cases such
+// as error handling are moved off the mainline code path such that the code is
+// only paged in when an error occurs.
+//
+// Example:
+//   if (IREE_UNLIKELY(something_failed)) {
+//     return do_expensive_error_logging();
+//   }
+#if IREE_HAVE_ATTRIBUTE(likely) && IREE_HAVE_ATTRIBUTE(unlikely)
+#define IREE_LIKELY(x) [[likely]] (x)
+#define IREE_UNLIKELY(x) [[unlikely]] (x)
+#elif defined(__GNUC__) || defined(__clang__)
+#define IREE_LIKELY(x) (__builtin_expect(!!(x), 1))
+#define IREE_UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#else
+#define IREE_LIKELY(x) (x)
+#define IREE_UNLIKELY(x) (x)
+#endif  // IREE_HAVE_ATTRIBUTE(likely)
 
 #if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
      __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
@@ -186,6 +238,62 @@ typedef struct {
   { (const uint8_t*)(data), (data_length) }
 
 //===----------------------------------------------------------------------===//
+// iree_string_view_t (like std::string_view/absl::string_view)
+//===----------------------------------------------------------------------===//
+
+// A string view (ala std::string_view) into a non-NUL-terminated string.
+typedef struct {
+  const char* data;
+  iree_host_size_t size;
+} iree_string_view_t;
+
+// Returns an empty string view ("").
+static inline iree_string_view_t iree_string_view_empty() {
+  iree_string_view_t v = {0, 0};
+  return v;
+}
+
+// Returns true if the given string view is the empty string.
+#define iree_string_view_is_empty(sv) (((sv).data == NULL) || ((sv).size == 0))
+
+// Returns a string view initialized with a reference to the given
+// NUL-terminated string literal.
+static inline iree_string_view_t iree_make_cstring_view(const char* str) {
+  iree_string_view_t v = {str, strlen(str)};
+  return v;
+}
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Like std::string::compare but with iree_string_view_t values.
+IREE_API_EXPORT int IREE_API_CALL
+iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
+
+// Returns true if the string starts with the given prefix.
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
+    iree_string_view_t value, iree_string_view_t prefix);
+
+// Splits |value| into two parts based on the first occurrence of |split_char|.
+// Returns the index of the |split_char| in the original |value| or -1 if not
+// found.
+IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
+    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
+    iree_string_view_t* out_rhs);
+
+// Returns true if the given |value| matches |pattern| (normal * and ? rules).
+// This accepts wildcards in the form of '*' and '?' for any delimited value.
+// '*' will match zero or more of any character and '?' will match exactly one
+// of any character.
+//
+// For example,
+// 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
+// 'foo-10?' matches: 'foo-101', 'foo-102'
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
+    iree_string_view_t value, iree_string_view_t pattern);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
 // iree_status_t and error reporting
 //===----------------------------------------------------------------------===//
 
@@ -214,8 +322,6 @@ typedef enum {
   IREE_STATUS_CODE_MASK = 0x1F,
 } iree_status_code_t;
 
-// TODO(#265): add ABSL_MUST_USE_RESULT to iree_status_t.
-
 // Opaque status structure containing an iree_status_code_t and optional status
 // object with more detailed information and payloads.
 //
@@ -225,22 +331,15 @@ typedef enum {
 // checks as cheap as an integer non-zero comparison. As the payload is optional
 // it's legal to construct an iree_status_t from an iree_status_code_t directly
 // meaning `return IREE_STATUS_INTERNAL;` (etc) is valid, though not as useful
-// as constructing via iree_make_status_* (which captures additional info).
+// as constructing via iree_make_status (which captures additional info).
 typedef uintptr_t iree_status_t;
-
-// Makes an iree_status_t with the given iree_status_code_t code.
-#define iree_make_status(code) \
-  (iree_status_t)(((iree_status_code_t)(code)) & IREE_STATUS_CODE_MASK)
-
-// TODO(#265): string formatting constructors.
-// TODO(#265): payload support (custom stack traces, etc).
 
 // Returns the iree_status_code_t from an iree_status_t.
 #define iree_status_code(value) \
-  ((iree_status_code_t)(value & IREE_STATUS_CODE_MASK))
+  ((iree_status_code_t)((value)&IREE_STATUS_CODE_MASK))
 
 // Macros to check the value of a status code.
-#define iree_status_is_ok(value) (value == IREE_STATUS_OK)
+#define iree_status_is_ok(value) ((value) == IREE_STATUS_OK)
 #define iree_status_is_cancelled(value) \
   (iree_status_code(value) == IREE_STATUS_CANCELLED)
 #define iree_status_is_unknown(value) \
@@ -274,35 +373,115 @@ typedef uintptr_t iree_status_t;
 #define iree_status_is_unauthenticated(value) \
   (iree_status_code(value) == IREE_STATUS_UNAUTHENTICATED)
 
-// TODO(#265): better logging of status checks.
-#define IREE_CHECK_OK(expr) CHECK_EQ(IREE_STATUS_OK, iree_status_code(expr))
-#define IREE_ASSERT_OK(expr) ASSERT_EQ(IREE_STATUS_OK, iree_status_code(expr))
-#define IREE_EXPECT_OK(expr) EXPECT_EQ(IREE_STATUS_OK, iree_status_code(expr))
+#define IREE_STATUS_IMPL_CONCAT_INNER_(x, y) x##y
+#define IREE_STATUS_IMPL_CONCAT_(x, y) IREE_STATUS_IMPL_CONCAT_INNER_(x, y)
 
-#define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
-#define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \
-  IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y)
-#define IREE_API_STATUS_MACROS_IMPL_RETURN_IF_API_ERROR_(var, expr) \
-  iree_status_t var = (expr);                                       \
-  if (var) return var;
+#define IREE_STATUS_IMPL_IDENTITY_(...) __VA_ARGS__
+#define IREE_STATUS_IMPL_GET_EXPR_(expr, ...) expr
+#define IREE_STATUS_IMPL_GET_ARGS_(expr, ...) __VA_ARGS__
+#define IREE_STATUS_IMPL_GET_MACRO_(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, \
+                                    _10, _11, _12, _13, _14, ...)           \
+  IREE_STATUS_IMPL_IDENTITY_(                                               \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_EXPR_)(__VA_ARGS__))
 
-// TODO(#265): variadic arguments to support appending strings.
+#define IREE_STATUS_IMPL_MAKE_EMPTY_(file, line, status_code, ...) \
+  iree_status_allocate(status_code, file, line, iree_string_view_empty())
+#define IREE_STATUS_IMPL_MAKE_ANNOTATE_(file, line, status_code, message) \
+  iree_status_allocate(status_code, file, line, iree_make_cstring_view(message))
+#define IREE_STATUS_IMPL_MAKE_ANNOTATE_F_(file, line, status_code, ...) \
+  iree_status_allocate_f(status_code, file, line, __VA_ARGS__)
+#define IREE_STATUS_IMPL_MAKE_SWITCH_(file, line, ...)                      \
+  IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_IDENTITY_(                    \
+      IREE_STATUS_IMPL_GET_MACRO_)(                                         \
+      __VA_ARGS__, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_,                       \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_, IREE_STATUS_IMPL_MAKE_EMPTY_))       \
+  (file, line, IREE_STATUS_IMPL_GET_EXPR_(__VA_ARGS__),                     \
+   IREE_STATUS_IMPL_GET_ARGS_(__VA_ARGS__))
+
+#define IREE_STATUS_IMPL_PASS_(var, ...) var
+#define IREE_STATUS_IMPL_ANNOTATE_(var, ...)                  \
+  IREE_STATUS_IMPL_IDENTITY_(iree_status_annotate(            \
+      var, iree_make_cstring_view(IREE_STATUS_IMPL_IDENTITY_( \
+               IREE_STATUS_IMPL_GET_ARGS_)(__VA_ARGS__))))
+#define IREE_STATUS_IMPL_ANNOTATE_F_(var, ...)       \
+  IREE_STATUS_IMPL_IDENTITY_(iree_status_annotate_f( \
+      var,                                           \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_ARGS_)(__VA_ARGS__)))
+#define IREE_STATUS_IMPL_ANNOTATE_SWITCH_(...)                                 \
+  IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_IDENTITY_(                       \
+      IREE_STATUS_IMPL_GET_MACRO_)(                                            \
+      __VA_ARGS__, IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
+      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
+      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
+      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
+      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
+      IREE_STATUS_IMPL_ANNOTATE_, IREE_STATUS_IMPL_PASS_))                     \
+  (IREE_STATUS_IMPL_GET_EXPR_(__VA_ARGS__),                                    \
+   IREE_STATUS_IMPL_GET_ARGS_(__VA_ARGS__))
+#define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, ...)                      \
+  iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_EXPR_)(__VA_ARGS__))); \
+  if (IREE_UNLIKELY(var)) {                                                  \
+    return IREE_STATUS_IMPL_ANNOTATE_SWITCH_(var, __VA_ARGS__);              \
+  }
+#define IREE_STATUS_IMPL_IGNORE_ERROR_(var, expr) \
+  iree_status_t var = (expr);                     \
+  if (IREE_UNLIKELY(var)) iree_status_ignore(var);
+
+// Returns an IREE_STATUS_OK.
+#define iree_ok_status() ((iree_status_t)IREE_STATUS_OK)
+
+// Makes an iree_status_t with the given iree_status_code_t code and records
+// the current source location.
+//
+// Optionally either a message string literal or printf-style format string may
+// be associated with the status.
+//
+// Examples:
+//  return iree_make_status(IREE_STATUS_CANCELLED);
+//  return iree_make_status(IREE_STATUS_CANCELLED, "because reasons");
+//  return iree_make_status(IREE_STATUS_CANCELLED, "because %d > %d", a, b);
+#define iree_make_status(...) \
+  IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)
+
 // Propagates the error returned by (expr) by returning from the current
-// function on non-OK status.
+// function on non-OK status. Optionally annotates the status with additional
+// information (see iree_status_annotate for more information).
 //
 // Example:
 //  iree_status_t OtherFunc(...);
 //  iree_status_t MyFunc(...) {
 //    IREE_RETURN_IF_ERROR(OtherFunc(...));
-//    return IREE_STATUS_OK;
+//    IREE_RETURN_IF_ERROR(OtherFunc(...), "with a message");
+//    IREE_RETURN_IF_ERROR(OtherFunc(...), "with a value: %d", 5);
+//    return iree_ok_status();
 //  }
-#define IREE_RETURN_IF_ERROR(expr)                  \
-  IREE_API_STATUS_MACROS_IMPL_RETURN_IF_API_ERROR_( \
-      IREE_API_STATUS_MACROS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
+#define IREE_RETURN_IF_ERROR(...)                       \
+  IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(                \
+      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_IDENTITY_(__VA_ARGS__)))
 
-// TODO(#265): clean up the status object.
-// Ignores the status result of (expr).
-#define IREE_IGNORE_ERROR(expr) (void)(expr)
+// Ignores the status result of (expr) regardless of its value.
+//
+// Example:
+//  IREE_IGNORE_ERROR(some_fn_that_may_fail());
+#define IREE_IGNORE_ERROR(expr)   \
+  IREE_STATUS_IMPL_IGNORE_ERROR_( \
+      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
+
+// TODO(#265): better logging of status checks.
+#define IREE_CHECK_OK(expr) CHECK_EQ(IREE_STATUS_OK, iree_status_code(expr))
+#define IREE_ASSERT_OK(expr) ASSERT_EQ(IREE_STATUS_OK, iree_status_code(expr))
+#define IREE_EXPECT_OK(expr) EXPECT_EQ(IREE_STATUS_OK, iree_status_code(expr))
+#define IREE_EXPECT_STATUS_IS(expected_code, expr) \
+  EXPECT_EQ(expected_code, iree_status_code(expr))
 
 #ifndef IREE_API_NO_PROTOTYPES
 
@@ -311,6 +490,56 @@ typedef uintptr_t iree_status_t;
 // result as the exact text may change.
 IREE_API_EXPORT const char* IREE_API_CALL
 iree_status_code_string(iree_status_code_t code);
+
+// Allocates a new status instance for a failing error |code|.
+// |file| and |line| should be populated with __FILE__ and __LINE__ at the call
+// site and an optional string |message| may be provided.
+//
+// The status will be allocated using the default system allocator and must be
+// freed using either iree_status_free or iree_status_ignore.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
+                     iree_string_view_t message);
+
+// Allocates a new status instance for a failing error |code| and annotates it
+// with a printf-style format string. Roughly equivalent (though more efficient)
+// than iree_status_allocate + iree_status_annotate_f.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+    IREE_PRINTF_ATTRIBUTE(4, 5)
+        iree_status_allocate_f(iree_status_code_t code, const char* file,
+                               uint32_t line, const char* format, ...);
+
+// Frees |status| if it has any associated storage.
+IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status);
+
+// Ignores |status| regardless of its value and frees any associated payloads.
+// Returns an OK status that can be used when chaining.
+IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
+
+// Annotates a status message with the given constant string message.
+// Ignored if |base_status| is OK.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_annotate(iree_status_t base_status, iree_string_view_t message);
+
+// Annotates a status message with the given printf-style message.
+// Ignored if |base_status| is OK.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+    IREE_PRINTF_ATTRIBUTE(2, 3)
+        iree_status_annotate_f(iree_status_t base_status, const char* format,
+                               ...);
+
+// Formats the status as a multi-line string containing all associated payloads.
+// Note that this may contain PII such as file paths and must only be used for
+// presenting errors to users and not sent to a logs aggregation service.
+IREE_API_EXPORT bool IREE_API_CALL
+iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
+                   char* buffer, iree_host_size_t* out_buffer_length);
+
+// Converts the status to an allocated string value.
+// The caller must free the buffer with the system allocator.
+IREE_API_EXPORT bool IREE_API_CALL
+iree_status_to_string(iree_status_t status, char** out_buffer,
+                      iree_host_size_t* out_buffer_length);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -469,58 +698,6 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
 // Frees a previously-allocated block of memory to the default system allocator.
 IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
                                                               void* ptr);
-
-#endif  // IREE_API_NO_PROTOTYPES
-
-//===----------------------------------------------------------------------===//
-// iree_string_view_t (like std::string_view/absl::string_view)
-//===----------------------------------------------------------------------===//
-
-// A string view (ala std::string_view) into a non-NUL-terminated string.
-typedef struct {
-  const char* data;
-  iree_host_size_t size;
-} iree_string_view_t;
-
-// Empty string view initializer.
-#define IREE_STRING_VIEW_EMPTY \
-  { 0, 0 }
-
-// Returns true if the given string view is the empty string.
-#define iree_string_view_is_empty(sv) (((sv).data == NULL) || (sv.size == 0))
-
-#ifndef IREE_API_NO_PROTOTYPES
-
-// Returns a string view initialized with a reference to the given
-// NUL-terminated string literal.
-IREE_API_EXPORT iree_string_view_t IREE_API_CALL
-iree_make_cstring_view(const char* str);
-
-// Like std::string::compare but with iree_string_view_t values.
-IREE_API_EXPORT int IREE_API_CALL
-iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
-
-// Returns true if the string starts with the given prefix.
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
-    iree_string_view_t value, iree_string_view_t prefix);
-
-// Splits |value| into two parts based on the first occurrence of |split_char|.
-// Returns the index of the |split_char| in the original |value| or -1 if not
-// found.
-IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
-    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
-    iree_string_view_t* out_rhs);
-
-// Returns true if the given |value| matches |pattern| (normal * and ? rules).
-// This accepts wildcards in the form of '*' and '?' for any delimited value.
-// '*' will match zero or more of any character and '?' will match exactly one
-// of any character.
-//
-// For example,
-// 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
-// 'foo-10?' matches: 'foo-101', 'foo-102'
-IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
-    iree_string_view_t value, iree_string_view_t pattern);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
