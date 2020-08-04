@@ -147,3 +147,85 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0 * 12 + d1 + 53)>
+
+module {
+  func @subview_interleaved() {
+    %cst = constant 0.000000e+00 : f32
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+    linalg.fill(%0, %cst) : memref<18x12xf32>, f32
+    %2 = subview %0[4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #map0>
+    linalg.copy(%1, %2) : memref<12x4xf32>, memref<18x12xf32, #map0>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
+  }
+}
+
+//      CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 12 + d1 + 53)>
+//      CHECK: module attributes {vkspv.entry_point_schedule =
+// CHECK-SAME:   ["subview_interleaved_dispatch_0",
+// CHECK-SAME:    "subview_interleaved_dispatch_1"]}
+//      CHECK: func @subview_interleaved_dispatch_1()
+//  CHECK-DAG:   %[[DST:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
+//  CHECK-DAG:   %[[SRC:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+//      CHECK:   %[[SUB:.+]] = subview %[[DST]][4, 5] [18, 12] [1, 1]  : memref<18x12xf32> to memref<18x12xf32, #[[MAP0]]>
+//      CHECK:   linalg.copy(%[[SRC]], %[[SUB]]) : memref<12x4xf32>, memref<18x12xf32, #[[MAP0]]>
+//      CHECK:   return
+//      CHECK: func @subview_interleaved_dispatch_0()
+//      CHECK:   %[[CST:.+]] = constant
+//      CHECK:   %[[DST2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
+//      CHECK:   linalg.fill(%[[DST2]], %[[CST]]) : memref<18x12xf32>, f32
+//      CHECK:   return
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2)>
+
+module {
+  func @reshape_interleaved() {
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<1x2x4xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
+    linalg.generic {args_in = 1 : i64, args_out = 1 : i64,
+                    indexing_maps = [#map0, #map0],
+                    iterator_types = ["parallel", "parallel"]} %2, %0 {
+    ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+      %4 = tanh %arg0 : f32
+      linalg.yield %4 : f32
+    }: memref<2x4xf32>, memref<2x4xf32>
+    %3 = linalg.reshape %0 [#map1, #map2] : memref<2x4xf32> into memref<1x2x4xf32>
+    linalg.copy(%3, %1) : memref<1x2x4xf32>, memref<1x2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//      CHECK: module attributes {vkspv.entry_point_schedule =
+// CHECK-SAME:   ["reshape_interleaved_dispatch_0",
+// CHECK-SAME:    "reshape_interleaved_dispatch_1"]}
+//      CHECK: func @reshape_interleaved_dispatch_1()
+//      CHECK:   %[[SRC1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
+//      CHECK:   %[[DST:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<1x2x4xf32>
+//      CHECK:   %[[SRC2:.+]] = linalg.reshape %[[SRC1]] [#[[MAP0]], #[[MAP1]]] : memref<2x4xf32> into memref<1x2x4xf32>
+//      CHECK:   linalg.copy(%[[SRC2]], %[[DST]]) : memref<1x2x4xf32>, memref<1x2x4xf32>
+//      CHECK:   return
+//      CHECK: func @reshape_interleaved_dispatch_0()
+//      CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
+//      CHECK:   %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
+//      CHECK:   linalg.generic {{.*}} %[[IN]], %[[OUT]]
