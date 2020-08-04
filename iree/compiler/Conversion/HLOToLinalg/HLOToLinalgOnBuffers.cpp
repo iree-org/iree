@@ -47,6 +47,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using OutputBufferMap = DenseMap<Operation *, Value>;
+
 // -----------------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------------------
@@ -1076,14 +1078,30 @@ struct TensorReshapeOpConversion
       linalg::TensorReshapeOp reshapeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     linalg::TensorReshapeOp::Adaptor adaptor(operands);
-    if (Value buffer =
-            resolveResult(reshapeOp.src(), adaptor.src(), reshapeOp.result(),
-                          resultTensorToBufferMap))
-      rewriter.replaceOp(reshapeOp, buffer);
-    else
+    // If result has an associated buffer.
+    Value bufferForResult = resultTensorToBufferMap.lookup(reshapeOp.result());
+    if (!bufferForResult) {
+      // This is not a reshape before store_tensor. Replace this op with a
+      // reshape on buffers.
       rewriter.replaceOpWithNewOp<linalg::ReshapeOp>(
           reshapeOp, getMemrefTypeForTensor(reshapeOp.result()), adaptor.src(),
           reshapeOp.reassociation());
+      return success();
+    }
+
+    // Look at all uses of bufferForResult in reshape ops. If once of those is
+    // the input operand, there is nothing to do.
+    if (!llvm::any_of(bufferForResult.getUses(), [&](auto &use) {
+          auto bufferReshapeOp = dyn_cast<linalg::ReshapeOp>(use.getOwner());
+          return bufferReshapeOp && bufferReshapeOp.result() == adaptor.src();
+        })) {
+      Value copySrc = rewriter.create<linalg::ReshapeOp>(
+          reshapeOp.getLoc(), bufferForResult.getType(), adaptor.src(),
+          reshapeOp.reassociation());
+      rewriter.create<linalg::CopyOp>(reshapeOp.getLoc(), copySrc,
+                                      bufferForResult);
+    }
+    rewriter.replaceOp(reshapeOp, bufferForResult);
     return success();
   }
 
@@ -1174,22 +1192,29 @@ struct HALInterfaceLoadTensorOpEraser final
 /// Erases the hal.interface.store.tensor and replace all uses with the buffer.
 struct HALInterfaceStoreTensorOpEraser final
     : public OpConversionPattern<IREE::HAL::InterfaceStoreTensorOp> {
-  HALInterfaceStoreTensorOpEraser(
-      MLIRContext *context, TensorToBufferMap const &resultTensorToBufferMap,
-      PatternBenefit benefit = 1)
+  HALInterfaceStoreTensorOpEraser(MLIRContext *context,
+                                  OutputBufferMap const &outputBufferMap,
+                                  PatternBenefit benefit = 1)
       : OpConversionPattern<IREE::HAL::InterfaceStoreTensorOp>(context,
                                                                benefit),
-        resultTensorToBufferMap(resultTensorToBufferMap) {}
+        outputBufferMap(outputBufferMap) {}
 
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceStoreTensorOp storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::InterfaceStoreTensorOp::Adaptor adaptor(operands);
     Value operand = adaptor.operand();
+    if (!operand.getType().isa<MemRefType>()) {
+      return storeOp.emitRemark()
+             << "expected replacement operand to be of memref type, got "
+             << operand.getType();
+    }
+    Value outputBuffer = outputBufferMap.lookup(storeOp);
+    if (!outputBuffer) return storeOp.emitError() << "undefined output buffer";
+
     // If we are just storing the buffer back to itself again, we can trivially
     // remove this op. Otherwise, copy the content from the source buffer to the
     // destination buffer.
-    Value outputBuffer = resultTensorToBufferMap.lookup(storeOp.operand());
     if (outputBuffer == operand) {
       rewriter.eraseOp(storeOp);
       return success();
@@ -1203,7 +1228,7 @@ struct HALInterfaceStoreTensorOpEraser final
   }
 
  private:
-  TensorToBufferMap const &resultTensorToBufferMap;
+  OutputBufferMap const &outputBufferMap;
 };
 }  // namespace
 
@@ -1241,7 +1266,7 @@ struct HALInterfaceStoreTensorOpEraser final
 /// tensor_reshape operation has a single use (the tensor_reshape) there
 /// distinction can be ignored.
 static LogicalResult createAndPropagateBufferUsedForResultTensor(
-    IREE::HAL::InterfaceStoreTensorOp op,
+    IREE::HAL::InterfaceStoreTensorOp op, OutputBufferMap &outputBufferMap,
     TensorToBufferMap &resultTensorToBufferMap, OpBuilder &builder) {
   if (!matchPattern(op.offset(), m_Zero()))
     return op.emitError("unhandled non-zero offset");
@@ -1259,8 +1284,9 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
                                                   "interface buffer");
   phOp.setAttr("binding", op.binding());
   Value buffer = phOp;
-  resultTensorToBufferMap[tensor] = buffer;
+  outputBufferMap[op] = buffer;
 
+  resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
   while (true) {
     if (auto tieShapeOp = tensor.getDefiningOp<Shape::TieShapeOp>()) {
       if (!tieShapeOp.result().hasOneUse()) break;
@@ -1269,7 +1295,7 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
           op.getLoc(), buffer.getType(), buffer, tieShapeOp.shape());
       tensor = tieShapeOp.operand();
       buffer = newTieShapeOp.result();
-      resultTensorToBufferMap[tensor] = buffer;
+      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
     }
     if (auto tensorReshapeOp =
@@ -1280,7 +1306,7 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
           buffer, tensorReshapeOp.reassociation());
       tensor = tensorReshapeOp.src();
       buffer = newReshapeOp.result();
-      resultTensorToBufferMap[tensor] = buffer;
+      resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
     }
     break;
@@ -1291,12 +1317,13 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
 /// Processes the hal.interface.store.tensor instructions to get buffer views
 /// for the inputs/outputs to the dispatch function.
 static LogicalResult createAndPropagateBufferUsedForResultTensors(
-    FuncOp funcOp, TensorToBufferMap &resultTensorToBufferMap) {
+    FuncOp funcOp, OutputBufferMap &outputBufferMap,
+    TensorToBufferMap &resultTensorToBufferMap) {
   OpBuilder builder(funcOp.getBody());
   auto walkResult = funcOp.walk(
       [&](IREE::HAL::InterfaceStoreTensorOp storeTensorOp) -> WalkResult {
         return createAndPropagateBufferUsedForResultTensor(
-            storeTensorOp, resultTensorToBufferMap, builder);
+            storeTensorOp, outputBufferMap, resultTensorToBufferMap, builder);
       });
   return failure(walkResult.wasInterrupted());
 }
@@ -1335,17 +1362,18 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   FuncOp funcOp = getFunction();
 
   // First create buffers for all StoreTensorOps.
+  OutputBufferMap outputBufferMap;
   TensorToBufferMap resultTensorToBufferMap;
   if (failed(createAndPropagateBufferUsedForResultTensors(
-          funcOp, resultTensorToBufferMap)))
+          funcOp, outputBufferMap, resultTensorToBufferMap)))
     return signalPassFailure();
 
   OwningRewritePatternList patterns;
   populateHLOToLinalgOnBuffersConversionPatterns(context, patterns,
                                                  resultTensorToBufferMap);
-  patterns.insert<HALInterfaceLoadTensorOpEraser,
-                  HALInterfaceStoreTensorOpEraser, ShapeOpPattern>(
+  patterns.insert<HALInterfaceLoadTensorOpEraser, ShapeOpPattern>(
       context, resultTensorToBufferMap);
+  patterns.insert<HALInterfaceStoreTensorOpEraser>(context, outputBufferMap);
 
   ConversionTarget target(*context);
   // Make sure all XLA HLO ops are converted to Linalg ops after this pass.
