@@ -16,15 +16,29 @@
 
 package com.google.iree;
 
+import android.util.Log;
 import java.nio.ByteBuffer;
 
 /** A VM module. */
 // TODO(jennik): Add BytecodeModule and HALModule classes.
 final class Module {
+  private static final String TAG = Module.class.getCanonicalName();
+
+  private static class Signature {
+    int importFunctionCount;
+    int exportFunctionCount;
+    int internalFunctionCount;
+
+    public Signature(int importFunctionCount, int exportFunctionCount, int internalFunctionCount) {
+      this.importFunctionCount = importFunctionCount;
+      this.exportFunctionCount = exportFunctionCount;
+      this.internalFunctionCount = internalFunctionCount;
+    }
+  }
+
   /**
    * Creates a VM module from a flatbuffer. The input ByteBuffer must be direct, and acceptable
-   * schemas for the flatbuffer are available at
-   * https://github.com/google/iree/tree/main/iree/schemas.
+   * schemas for the flatbuffer are available at https://github.com/google/iree/tree/main/iree/schemas.
    */
   public Module(ByteBuffer flatbufferData) throws Exception {
     nativeAddress = nativeNew();
@@ -39,6 +53,31 @@ final class Module {
     return nativeAddress;
   }
 
+  public String getName() {
+    return nativeGetName();
+  }
+
+  public Signature getSignature() {
+    return nativeGetSignature();
+  }
+
+  public String getDebugString() {
+    String name = getName();
+    Signature signature = getSignature();
+    String debugString = String.format("Module debug string\n"
+            + "-Name: %s\n"
+            + "-Import function count: %d\n"
+            + "-Export function count: %d\n"
+            + "-Internal function count: %d",
+        name, signature.importFunctionCount, signature.exportFunctionCount,
+        signature.internalFunctionCount);
+    return debugString;
+  }
+
+  public void printDebugString() {
+    Log.d(TAG, getDebugString());
+  }
+
   public void free() {
     nativeFree();
   }
@@ -48,6 +87,10 @@ final class Module {
   private native long nativeNew();
 
   private native int nativeCreate(ByteBuffer flatbufferData);
+
+  private native String nativeGetName();
+
+  private native Signature nativeGetSignature();
 
   private native void nativeFree();
 }

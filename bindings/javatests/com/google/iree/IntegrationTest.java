@@ -53,6 +53,7 @@ public final class IntegrationTest {
     InputStream moduleInputStream = resources.openRawResource(R.raw.simple_mul_bytecode_module);
     ByteBuffer moduleByteBuffer = convertInputStreamToByteBuffer(moduleInputStream);
     Module module = new Module(moduleByteBuffer);
+    module.printDebugString();
 
     List<Module> modules = new ArrayList<>();
     modules.add(module);
@@ -62,6 +63,7 @@ public final class IntegrationTest {
 
     String functionName = "module.simple_mul";
     Function function = ireeContext.resolveFunction(functionName);
+    function.printDebugString();
 
     // TODO(jennik): Invoke the function.
 
@@ -84,6 +86,7 @@ public final class IntegrationTest {
     InputStream moduleInputStream = resources.openRawResource(R.raw.simple_mul_bytecode_module);
     ByteBuffer moduleByteBuffer = convertInputStreamToByteBuffer(moduleInputStream);
     Module module = new Module(moduleByteBuffer);
+    module.printDebugString();
 
     List<Module> modules = new ArrayList<>();
     modules.add(module);
@@ -91,6 +94,7 @@ public final class IntegrationTest {
 
     String functionName = "module.simple_mul";
     Function function = ireeContext.resolveFunction(functionName);
+    function.printDebugString();
 
     function.free();
     module.free();
