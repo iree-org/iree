@@ -49,63 +49,20 @@ namespace mlir {
 inline void registerMlirPasses() {
   // A local workaround until we can use individual pass registration from
   // https://reviews.llvm.org/D77322
-  ::mlir::registerPass(
-      "affine-loop-fusion", "Fuse affine loop nests",
-      []() -> std::unique_ptr<Pass> { return mlir::createLoopFusionPass(); });
-  ::mlir::registerPass("affine-pipeline-data-transfer",
-                       "Pipeline non-blocking data transfers between "
-                       "explicitly managed levels of the memory hierarchy",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createPipelineDataTransferPass();
-                       });
-  ::mlir::registerPass(
-      "cse", "Eliminate common sub-expressions",
-      []() -> std::unique_ptr<Pass> { return mlir::createCSEPass(); });
-  ::mlir::registerPass("canonicalize", "Canonicalize operations",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createCanonicalizerPass();
-                       });
-  ::mlir::registerPass(
-      "inline", "Inline function calls",
-      []() -> std::unique_ptr<Pass> { return mlir::createInlinerPass(); });
-  ::mlir::registerPass("snapshot-op-locations",
-                       "Generate new locations from the current IR",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createLocationSnapshotPass();
-                       });
-  ::mlir::registerPass(
-      "loop-coalescing",
-      "Coalesce nested loops with independent bounds into a single loop",
-      []() -> std::unique_ptr<Pass> {
-        return mlir::createLoopCoalescingPass();
-      });
-  ::mlir::registerPass("loop-invariant-code-motion",
-                       "Hoist loop invariant instructions outside of the loop",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createLoopInvariantCodeMotionPass();
-                       });
-  ::mlir::registerPass("memref-dataflow-opt",
-                       "Perform store/load forwarding for memrefs",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createMemRefDataFlowOptPass();
-                       });
-  ::mlir::registerPass(
-      "parallel-loop-collapsing",
-      "Collapse parallel loops to use less induction variables",
-      []() -> std::unique_ptr<Pass> {
-        return mlir::createParallelLoopCollapsingPass();
-      });
-  ::mlir::registerPass(
-      "print-op-stats", "Print statistics of operations",
-      []() -> std::unique_ptr<Pass> { return mlir::createPrintOpStatsPass(); });
-  ::mlir::registerPass("strip-debuginfo",
-                       "Strip debug info from all operations",
-                       []() -> std::unique_ptr<Pass> {
-                         return mlir::createStripDebugInfoPass();
-                       });
-  ::mlir::registerPass(
-      "symbol-dce", "Eliminate dead symbols",
-      []() -> std::unique_ptr<Pass> { return mlir::createSymbolDCEPass(); });
+  ::mlir::registerAffineLoopFusionPass();
+  ::mlir::registerAffinePipelineDataTransferPass();
+  ::mlir::registerCSEPass();
+  ::mlir::registerCanonicalizerPass();
+  ::mlir::registerInlinerPass();
+  ::mlir::registerLocationSnapshotPass();
+  ::mlir::registerLoopCoalescingPass();
+  ::mlir::registerLoopInvariantCodeMotionPass();
+  ::mlir::registerMemRefDataFlowOptPass();
+  ::mlir::registerParallelLoopCollapsingPass();
+  ::mlir::registerPrintOpStatsPass();
+  ::mlir::registerStripDebugInfoPass();
+  ::mlir::registerSymbolDCEPass();
+
   createCanonicalizerPass();
   createCSEPass();
   createSuperVectorizePass({});
@@ -120,14 +77,9 @@ inline void registerMlirPasses() {
   createLoopTilingPass(0);
   createLoopCoalescingPass();
   createAffineDataCopyGenerationPass(0, 0);
-  createMemRefDataFlowOptPass();
-  createInlinerPass();
-  createSymbolDCEPass();
-  createLocationSnapshotPass({});
 
   // Linalg
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/Linalg/Passes.h.inc"
+  mlir::registerLinalgPasses();
 
   // Loop
   createParallelLoopFusionPass();
@@ -138,8 +90,7 @@ inline void registerMlirPasses() {
   quant::createConvertConstPass();
 
   // Shape
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/Shape/Transforms/Passes.h.inc"
+  mlir::registerShapePasses();
 
   // SPIR-V
   spirv::createLowerABIAttributesPass();
