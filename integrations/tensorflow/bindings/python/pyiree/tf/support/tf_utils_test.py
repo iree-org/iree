@@ -50,25 +50,27 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   @parameterized.named_parameters([
       {
           'testcase_name': 'single_backend',
-          'target_backends': ['vmla'],
+          'backend_infos': [tf_utils.BackendInfo('iree_vmla')],
       },
       {
-          'testcase_name': 'multiple_backends',
-          'target_backends': ['vmla', 'llvm-ir'],
+          'testcase_name':
+              'multiple_backends',
+          'backend_infos': [
+              tf_utils.BackendInfo('iree_vmla'),
+              tf_utils.BackendInfo('iree_llvmjit')
+          ],
       },
   ])
-  def test_artifact_saving(self, target_backends):
+  def test_artifact_saving(self, backend_infos):
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
       iree_compiled_module = tf_utils.compile_tf_module(
-          tf_module,
-          target_backends=target_backends,
-          artifacts_dir=artifacts_dir)
+          tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
 
       artifacts_to_check = [
           'tf_input.mlir',
           'iree_input.mlir',
-          f'compiled__{tf_utils.backends_to_str(target_backends)}.vmfb',
+          f'compiled__{tf_utils.backends_to_str(backend_infos)}.vmfb',
       ]
       for artifact in artifacts_to_check:
         artifact_path = os.path.join(artifacts_dir, artifact)
@@ -86,8 +88,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       },
   ])
   def test_unaltered_state(self, backend_name):
-    backend_info = tf_utils.BackendInfo.ALL[backend_name]
-    module = backend_info.CompiledModule(StatefulCountingModule, backend_info)
+    backend_info = tf_utils.BackendInfo(backend_name)
+    module = backend_info.compile(StatefulCountingModule)
 
     # Test that incrementing works properly.
     self.assertEqual([0.], module.get_count())

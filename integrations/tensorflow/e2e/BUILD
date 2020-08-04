@@ -117,7 +117,7 @@ VULKAN_PASSING = glob(
 iree_e2e_test_suite(
     name = "e2e_tests",
     backends_to_srcs = {
-        "tf_also": TF_PASSING,
+        "tf": TF_PASSING,
         "iree_vmla": VMLA_PASSING,
         "iree_llvmjit": LLVM_PASSING,
         "iree_vulkan": VULKAN_PASSING,
@@ -154,7 +154,7 @@ iree_e2e_test_suite(
     # TODO(#2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
     name = "linspace_tests",
     backends_to_srcs = {
-        "tf_also": ["linspace_test.py"],
+        "tf": ["linspace_test.py"],
         "iree_vmla": ["linspace_test.py"],
     },
     reference_backend = "tf",

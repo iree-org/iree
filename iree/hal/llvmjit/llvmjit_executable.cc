@@ -111,7 +111,7 @@ struct LLVMJITDispatchState : public HostExecutable::DispatchState {
 
   llvm::JITEvaluatedSymbol symbol;
   llvm::SmallVector<void*, 4> args;
-  llvm::SmallVector<int64_t, 4> push_constant;
+  llvm::SmallVector<int32_t, 4> push_constant;
 };
 
 StatusOr<ref_ptr<HostExecutable::DispatchState>>
@@ -151,7 +151,7 @@ Status LLVMJITExecutable::DispatchTile(DispatchState* state,
   auto* dispatch_state = static_cast<LLVMJITDispatchState*>(state);
 
   auto func_ptr =
-      (void (*)(void**, int64_t*))dispatch_state->symbol.getAddress();
+      (void (*)(void**, int32_t*))dispatch_state->symbol.getAddress();
   func_ptr(dispatch_state->args.data(), dispatch_state->push_constant.data());
 
   return OkStatus();

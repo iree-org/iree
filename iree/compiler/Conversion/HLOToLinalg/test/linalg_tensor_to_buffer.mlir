@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers -canonicalize %s | IreeFileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 
@@ -163,3 +163,212 @@ module {
 //   CHECK-DAG:   %[[ARG0:.*]] = iree.placeholder
 //  CHECK-SAME:     binding = @legacy_io::@arg0
 //       CHECK:   linalg.copy(%[[ARG0]], %[[RESULT]])
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+
+module {
+  func @store_value_twice() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0,
+                                   offset = %c0 : tensor<2x4xf32>
+    %1 = linalg.generic
+           {args_in = 1 : i64, args_out = 1 : i64,
+            indexing_maps = [#map0, #map0],
+            iterator_types = ["parallel", "parallel"]} %0 {
+    ^bb0(%arg0: f32):  // no predecessors
+      %2 = tanh %arg0 : f32
+      linalg.yield %2 : f32
+    }: tensor<2x4xf32> -> tensor<2x4xf32>
+    hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<2x4xf32>
+    hal.interface.store.tensor %1, @legacy_io::@ret1, offset = %c0 : tensor<2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0,
+                                 type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1,
+                                 type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=2,
+                                 type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @store_value_twice
+//       CHECK:   %[[T0:.*]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//       CHECK:   %[[T1:.*]] = iree.placeholder {{.*}} @legacy_io::@ret1
+//       CHECK:   %[[T2:.*]] = iree.placeholder {{.*}} @legacy_io::@arg0
+//       CHECK:   linalg.generic {{.*}} %[[T2]], %[[T0]]
+//       CHECK:   linalg.copy(%[[T0]], %[[T1]])
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2)>
+
+module {
+  func @store_reshape_src_and_result_0() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0,
+                                   offset = %c0 : tensor<2x4xf32>
+    %1 = linalg.generic
+           {args_in = 1 : i64, args_out = 1 : i64,
+            indexing_maps = [#map0, #map0],
+            iterator_types = ["parallel", "parallel"]} %0 {
+    ^bb0(%arg0: f32):  // no predecessors
+      %2 = tanh %arg0 : f32
+      linalg.yield %2 : f32
+    }: tensor<2x4xf32> -> tensor<2x4xf32>
+    %3 = linalg.tensor_reshape %1 [#map1, #map2] : tensor<2x4xf32> into tensor<1x2x4xf32>
+    hal.interface.store.tensor %3, @legacy_io::@ret1, offset = %c0 : tensor<1x2x4xf32>
+    hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0,
+                                 type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1,
+                                 type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=2,
+                                 type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @store_reshape_src_and_result_0
+//       CHECK:   %[[T0:.*]] = iree.placeholder {{.*}} @legacy_io::@ret1
+//       CHECK:   %[[T1:.*]] = linalg.reshape %[[T0]]
+//       CHECK:   %[[T2:.*]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//       CHECK:   %[[T3:.*]] = iree.placeholder {{.*}} @legacy_io::@arg0
+//       CHECK:   linalg.generic {{.*}} %[[T3]], %[[T1]]
+//       CHECK:   linalg.copy(%[[T1]], %[[T2]])
+//       CHECK:   return
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2)>
+
+module {
+  func @store_reshape_src_and_result_1() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0,
+                                   offset = %c0 : tensor<2x4xf32>
+    %1 = linalg.generic
+           {args_in = 1 : i64, args_out = 1 : i64,
+            indexing_maps = [#map0, #map0],
+            iterator_types = ["parallel", "parallel"]} %0 {
+    ^bb0(%arg0: f32):  // no predecessors
+      %2 = tanh %arg0 : f32
+      linalg.yield %2 : f32
+    }: tensor<2x4xf32> -> tensor<2x4xf32>
+    %3 = linalg.tensor_reshape %1 [#map1, #map2] : tensor<2x4xf32> into tensor<1x2x4xf32>
+    hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<2x4xf32>
+    hal.interface.store.tensor %3, @legacy_io::@ret1, offset = %c0 : tensor<1x2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0,
+                                 type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1,
+                                 type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=2,
+                                 type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @store_reshape_src_and_result_1
+//       CHECK:   %[[T0:.*]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//       CHECK:   %[[T1:.*]] = iree.placeholder {{.*}} @legacy_io::@ret1
+//       CHECK:   %[[T2:.*]] = iree.placeholder {{.*}} @legacy_io::@arg0
+//       CHECK:   linalg.generic {{.*}} %[[T2]], %[[T0]]
+//       CHECK:   %[[T3:.*]] = linalg.reshape %[[T0]]
+//       CHECK:   linalg.copy(%[[T3]], %[[T1]])
+//       CHECK:   return
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2)>
+
+module {
+  func @store_reshape_src_and_result_2() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0,
+                                   offset = %c0 : tensor<2x4xf32>
+    %1 = linalg.generic
+           {args_in = 1 : i64, args_out = 1 : i64,
+            indexing_maps = [#map0, #map0],
+            iterator_types = ["parallel", "parallel"]} %0 {
+    ^bb0(%arg0: f32):  // no predecessors
+      %2 = tanh %arg0 : f32
+      linalg.yield %2 : f32
+    }: tensor<2x4xf32> -> tensor<2x4xf32>
+    %3 = linalg.tensor_reshape %1 [#map1, #map2] : tensor<2x4xf32> into tensor<1x2x4xf32>
+    %4 = linalg.tensor_reshape %1 [#map1, #map2] : tensor<2x4xf32> into tensor<1x2x4xf32>
+    %5 = linalg.tensor_reshape %1 [#map1, #map2] : tensor<2x4xf32> into tensor<1x2x4xf32>
+    hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 : tensor<1x2x4xf32>
+    hal.interface.store.tensor %4, @legacy_io::@ret1, offset = %c0 : tensor<1x2x4xf32>
+    hal.interface.store.tensor %5, @legacy_io::@ret2, offset = %c0 : tensor<1x2x4xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0,
+                                 type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1,
+                                 type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=2,
+                                 type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret2, set=0, binding=3,
+                                 type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @store_reshape_src_and_result_2
+//       CHECK:   %[[T0:.*]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//       CHECK:   %[[T1:.*]] = linalg.reshape %[[T0]]
+//       CHECK:   %[[T2:.*]] = iree.placeholder {{.*}} @legacy_io::@ret1
+//       CHECK:   %[[T3:.*]] = iree.placeholder {{.*}} @legacy_io::@ret2
+//       CHECK:   %[[T4:.*]] = iree.placeholder {{.*}} @legacy_io::@arg0
+//       CHECK:   linalg.generic {{.*}} %[[T4]], %[[T1]]
+//       CHECK:   linalg.copy(%[[T0]], %[[T2]])
+//       CHECK:   linalg.copy(%[[T0]], %[[T3]])
+//       CHECK:   return
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map2 = affine_map<(d0, d1) -> (d0, d1)>
+
+module {
+  func @edge_detect_sobel_operator_ex_dispatch_3() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x128x128x1xf32>
+    %1 = linalg.tensor_reshape %0 [#map0, #map1] : tensor<1x128x128x1xf32> into tensor<128x128xf32>
+    %2 = linalg.tensor_reshape %0 [#map0, #map1] : tensor<1x128x128x1xf32> into tensor<128x128xf32>
+    %3 = linalg.generic {args_in = 2 : i64, args_out = 1 : i64, indexing_maps = [#map2, #map2, #map2], iterator_types = ["parallel", "parallel"]} %1, %2 {
+    ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+      %5 = mulf %arg0, %arg1 : f32
+      linalg.yield %5 : f32
+    }: tensor<128x128xf32>, tensor<128x128xf32> -> tensor<128x128xf32>
+    %4 = linalg.tensor_reshape %3 [#map0, #map1] : tensor<128x128xf32> into tensor<1x128x128x1xf32>
+    hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<1x128x128x1xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  }
+}
+// CHECK-LABEL: func @edge_detect_sobel_operator_ex_dispatch_3
+//       CHECK:   %[[T0:.*]] = iree.placeholder {{.*}} @legacy_io::@ret0
+//       CHECK:   %[[T1:.*]] = linalg.reshape %[[T0]]
+//       CHECK:   %[[T2:.*]] = iree.placeholder {{.*}} @legacy_io::@arg0
+//       CHECK:   %[[T3:.*]] = linalg.reshape %[[T2]]
+//       CHECK:   %[[T4:.*]] = linalg.reshape %[[T2]]
+//       CHECK:   linalg.generic {{.*}} %[[T3]], %[[T4]], %[[T1]]
+//       CHECK:   return

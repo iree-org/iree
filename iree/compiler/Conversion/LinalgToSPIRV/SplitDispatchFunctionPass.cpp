@@ -36,6 +36,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -61,11 +62,15 @@ bool canSeparateOps(ArrayRef<Operation *> ops) {
       }))
     return false;
 
-  // Require no other ops interleave with Linalg structured ops for now. This is
-  // the common case and it simplifies further analysis.
+  // Require no other non-metadata ops interleave with Linalg structured ops for
+  // now. This is the common case and it simplifies further analysis.
   for (auto currOp = ops.begin(), nextOp = std::next(ops.begin());
        nextOp != ops.end(); ++currOp, ++nextOp) {
-    if ((*currOp)->getNextNode() != *nextOp) return false;
+    Operation *iter = (*currOp)->getNextNode();
+    while (isa<linalg::ReshapeOp, SubViewOp>(iter)) {
+      iter = iter->getNextNode();
+    }
+    if (iter != *nextOp) return false;
   }
 
   return true;
