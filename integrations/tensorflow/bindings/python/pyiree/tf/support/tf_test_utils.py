@@ -288,10 +288,6 @@ class Trace:
       else:
         return np.array_equal(ref, tar)
 
-    # Base check for tf tensors.
-    elif isinstance(ref, tf.Tensor):
-      return tf.reduce_all(tf.equal(ref, tar))
-
     # Base check for native number types.
     elif isinstance(ref, (int, float)):
       return ref == tar
