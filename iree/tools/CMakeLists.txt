@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
+
 add_subdirectory(test)
 
 # Enable HAL driver modules based on options.
