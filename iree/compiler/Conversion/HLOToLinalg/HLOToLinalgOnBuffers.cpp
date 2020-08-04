@@ -535,13 +535,9 @@ LogicalResult PadOpConversion::apply(
     strides.push_back(stride);
   }
 
-  // TODO(hanchung): Move SubViewOp this down to before where it is used.
-  // The pass for splitting dispatch function for vulkan requires no other ops
-  // interleave with Linalg structured ops, so put the SubViewOp in the
-  // beginning.
+  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], paddingVal);
   auto subViewOp = rewriter.create<SubViewOp>(loc, resultBuffers[0], offsets,
                                               sizes, strides);
-  rewriter.create<linalg::FillOp>(loc, resultBuffers[0], paddingVal);
   if (auto cstOp = dyn_cast<ConstantOp>(inputBuffers[0].getDefiningOp())) {
     auto inputConstAttr =
         cstOp.valueAttr().cast<DenseElementsAttr>().getSplatValue();
