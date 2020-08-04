@@ -69,15 +69,19 @@ def to_mlir_type(dtype):
     raise TypeError(f"Expected integer or floating type, but got {dtype}")
 
 
+def get_mlir_shape_and_dtype(array):
+  shape_dtype = [str(dim) for dim in list(array.shape)]
+  shape_dtype.append(to_mlir_type(array.dtype))
+  return "x".join(shape_dtype)
+
+
 def save_input_values(inputs, artifacts_dir=None):
   """Saves input values with IREE tools format if `artifacts_dir` is set."""
   result = []
   for array in inputs:
-    shape = [str(dim) for dim in list(array.shape)]
-    shape.append(to_mlir_type(array.dtype))
-    shape = "x".join(shape)
+    shape_dtype = get_mlir_shape_and_dtype(array)
     values = " ".join([str(x) for x in array.flatten()])
-    result.append(f"{shape}={values}")
+    result.append(f"{shape_dtype}={values}")
   result = "\n".join(result)
   if artifacts_dir is not None:
     inputs_path = os.path.join(artifacts_dir, "inputs.txt")

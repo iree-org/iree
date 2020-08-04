@@ -144,9 +144,17 @@ class ModuleCall:
 
     header = f"Method: {self.method}"
     inputs = "\n".join(_indent(str(value)) for value in self.inputs)
+    input_shapes = ", ".join(
+        tf_utils.get_mlir_shape_and_dtype(value) for value in self.inputs)
+
     outputs = "\n".join(_indent(str(value)) for value in self.outputs)
+    output_shapes = ", ".join(
+        tf_utils.get_mlir_shape_and_dtype(value) for value in self.outputs)
+
     tolerances = _indent(f"rtol={self.rtol}, atol={self.atol}")
-    body = f"Inputs:\n{inputs}\nOutputs:\n{outputs}\nTolerances:\n{tolerances}"
+    body = (f"Inputs: {input_shapes}\n{inputs}\n"
+            f"Outputs: {output_shapes}\n{outputs}"
+            f"\nTolerances:\n{tolerances}")
     result = f"{header}\n{_indent(body)}"
 
     np.set_printoptions(**prior_printoptions)
