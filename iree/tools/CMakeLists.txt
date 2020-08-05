@@ -224,8 +224,6 @@ if(${IREE_BUILD_COMPILER})
       init_targets
     HDRS
       "init_targets.h"
-    SRCS
-      "init_targets.cc"
     DEPS
       ${_IREE_COMPILER_TARGETS}
     COPTS

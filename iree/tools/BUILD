@@ -143,7 +143,6 @@ cc_library(
 
 cc_library(
     name = "init_targets",
-    srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
     copts = [
         "-DIREE_HAVE_LLVMAOT_TARGET",
