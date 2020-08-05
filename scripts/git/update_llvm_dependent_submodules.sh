@@ -15,47 +15,46 @@
 # limitations under the License.
 
 # Creates a PR based on the specified BASE_BRANCH (default "google") to update
-# the TF submodule to the configured TENSORFLOW_COMMIT (default REMOTE for
-# current HEAD).
+# the LLVM-dependent submodules to the configured commits.
+#
+# Positional args will be passed through to update_to_llvm_syncpoint.py
 #
 # - Requries the gh CLI (https://github.com/cli/cli) to create a PR.
-# - Will force push to the configured PR_BRANCH (default "tf-submodule-update")
-#   on the configured FORK_REMOTE (default "origin")
+# - Will force push to the configured PR_BRANCH (default
+#   "llvm-dependent-submodule-update") on the configured FORK_REMOTE (default
+#   "origin")
 # - Requires that local BASE_BRANCH branch is a pristine (potentially stale)
 #   copy of the same branch on the configured UPSTREAM_REMOTE
 #   (default "upstream").
 # - Requires that the working directory be clean. Will abort otherwise.
-# - An optional TF_COMMIT_NICKNAME nickname can be given to the commit for the
-#   PR description. Otherwise, it will default to "current HEAD" if
-#   TENSORFLOW_COMMIT is REMOTE and the trimmed commit sha otherwise.
 
 set -e
 set -o pipefail
 
 export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
-TENSORFLOW_COMMIT="${1:-LATEST_MATCH}"
-PR_BRANCH="tf-submodule-update"
+PR_BRANCH="llvm-dependent-submodule-update"
 BASE_BRANCH="${BASE_BRANCH:-google}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 
 ./scripts/git/git_update.sh "${BASE_BRANCH?}"
 git checkout -B "${PR_BRANCH?}"
 
-CMD="./scripts/git/update_to_llvm_syncpoint.py --tensorflow_commit=${TENSORFLOW_COMMIT?}"
+CMD="./scripts/git/update_to_llvm_syncpoint.py $@"
 
 bash -c "${CMD?}"
 
 TF_SHA="$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
-
+LLVM_BAZEL_SHA="$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)"
 LLVM_SHA="$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)"
 
-TITLE="Integrate TF at tensorflow/tensorflow@${TF_SHA?}"
+TITLE="Synchronize submodules with LLVM at llvm/llvm-project@${LLVM_SHA?}"
 BODY="$(cat <<-EOF
 Updates TF to
 [${TF_SHA?}](https://github.com/tensorflow/tensorflow/commit/${TF_SHA?})
+and llvm-bazel to
+[${LLVM_BAZEL_SHA?}](https://github.com/google/llvm-bazel/commit/${LLVM_BAZEL_SHA?})
 matching
-[${LLVM_SHA?}](https://github.com/llvm/llvm-project/commit/${LLVM_SHA?})
-and copies over the LLVM BUILD files.
+[${LLVM_SHA?}](https://github.com/llvm/llvm-project/commit/${LLVM_SHA?}).
 
 \`${CMD?}\`
 EOF

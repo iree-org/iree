@@ -56,14 +56,15 @@ up by the `main` branch at an approximately daily cadence when merging in the
 Currently, the two most challenging projects to manage as dependencies are
 TensorFlow and LLVM. Both are typically pinned to specific versions that are
 integrated in the Google source repository at a cadence up to many times per
-day. Further, because LLVM does not ship with Bazel BUILD files, IREE "borrows"
-the BUILD files from TensorFlow (for building with Bazel). Just to make it more
-interesting, since TensorFlow does not ship with CMakeLists, IREE uses overlay
-CMakeLists.txt to build subsets of TensorFlow needed for the compiler (when
-built with CMake). While these externally managed build files are written to be
-moderately generic, they can and do break and require manual intervention at
-times (i.e. there is no guarantee that updating to a new commit of either will
-not require some manual work on the build files).
+day. Additionally, TensorFlow itself depends on LLVM. Further, since LLVM does
+not ship with Bazel BUILD files, we use BUILD files maintained in a separate
+[llvm-bazel repository](https://github.com/google/llvm-bazel). Just to make it
+more interesting, since TensorFlow does not ship with CMakeLists, IREE uses
+overlay CMakeLists.txt to build subsets of TensorFlow needed for the compiler
+(when built with CMake). While these externally managed build files are written
+to be moderately generic, they can and do break and require manual intervention
+at times (i.e. there is no guarantee that updating to a new commit of either
+will not require some manual work on the build files).
 
 The only combination which is expected to work is the llvm-project commit noted
 in the `LLVM_COMMIT` setting in
@@ -79,7 +80,7 @@ this integration. When this necessitates updating IREE to changing LLVM and MLIR
 APIs, these updates are performed atomically as part of the integration. However
 the changes performed here only guarantee that the internal build is not broken,
 which means that such integrations may very well break the OSS build on the
-`google` branch (in particular, it does not update teh LLVM BUILD files). The
+`google` branch (in particular, it does not update the LLVM BUILD files). The
 IREE build cop will fix the breakage on the `google` branch. We are continuing
 to work on improving this situation.
 
