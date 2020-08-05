@@ -13,20 +13,6 @@
 # limitations under the License.
 
 # Main IREE build file.
-# Note that project-wide, bazel repo aliases are used:
-#   "@com_google_absl//absl/python"
-#   "@com_google_absl//absl"
-#   "@bazel_skylib//lib"
-#   "@com_google_benchmark//:benchmark"
-#   "@llvm-project//mlir"
-#   "@llvm-project//llvm"
-#   "@com_github_google_flatbuffers//:flatbuffers"
-#   "@org_tensorflow//tensorflow"
-#   "@renderdoc_api//"
-#   "@com_google_ruy//ruy"
-#
-# Various scripts and helpers operate on these prefixes textually, so
-# avoid doing any systematic construction that would break the matching.
 
 package(
     default_visibility = ["//visibility:public"],
