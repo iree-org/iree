@@ -329,30 +329,27 @@ static LogicalResult distributeSingleIterationPerProcessor(
   assert(numLoops == processorIDs.size() &&
          "expected as many ids as number of loops");
 
-  TypeConverter::SignatureConversion signatureConverter(numLoops);
   auto lbs = pLoopOp.lowerBound();
   auto step = pLoopOp.step();
-  auto ubs = pLoopOp.upperBound();
-  Value cond = nullptr;
+  SmallVector<Value, 2> ivReplacements;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
     Value iterValue = rewriter.create<AddIOp>(
         loc, lbs[i], rewriter.create<MulIOp>(loc, processorIDs[i], step[i]));
-    Value cmp =
-        rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, iterValue, ubs[i]);
-    cond = (cond ? rewriter.create<AndOp>(loc, cond, cmp) : cmp);
-    signatureConverter.remapInput(i, iterValue);
+    ivReplacements.push_back(iterValue);
   }
   Region &pLoopOpRegion = pLoopOp.getLoopBody();
-  rewriter.applySignatureConversion(&pLoopOpRegion, signatureConverter);
 
   if (generateGuard) {
+    TypeConverter::SignatureConversion signatureConverter(numLoops);
     Value cond = nullptr;
     auto ubs = pLoopOp.upperBound();
     for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
       Value cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::slt,
-                                          processorIDs[i], ubs[i]);
+                                          ivReplacements[i], ubs[i]);
       cond = (cond ? rewriter.create<AndOp>(loc, cond, cmp) : cmp);
+      signatureConverter.remapInput(i, ivReplacements[i]);
     }
+    rewriter.applySignatureConversion(&pLoopOpRegion, signatureConverter);
     scf::IfOp ifOp = buildEmptyIfOp(loc, rewriter, cond);
     Region &ifOpRegion = ifOp.getRegion(0);
     rewriter.inlineRegionBefore(pLoopOpRegion, ifOpRegion, ifOpRegion.begin());
@@ -366,18 +363,13 @@ static LogicalResult distributeSingleIterationPerProcessor(
     //   scf.parallel's region, and from the latter to the block created by the
     //   split operation.
     // - Canonicalization will fold these branches away.
-    Block *parentBlock = pLoopOp.getOperation()->getBlock();
-    Block *newBlock =
-        rewriter.splitBlock(parentBlock, Block::iterator(pLoopOp));
-    Block &pLoopOpBody = pLoopOpRegion.front();
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.inlineRegionBefore(pLoopOpRegion, *parentBlock->getParent(),
-                                Region::iterator(newBlock));
-    rewriter.setInsertionPointToEnd(parentBlock);
-    rewriter.create<BranchOp>(loc, &pLoopOpBody);
-    rewriter.setInsertionPointToEnd(&pLoopOpBody);
-    rewriter.replaceOpWithNewOp<BranchOp>(pLoopOpBody.getTerminator(),
-                                          newBlock);
+    Block *destBlock = pLoopOp.getOperation()->getBlock();
+    Block *remainingInst =
+        rewriter.splitBlock(destBlock, Block::iterator(pLoopOp));
+    Block *sourceBlock = &pLoopOpRegion.front();
+    rewriter.eraseOp(sourceBlock->getTerminator());
+    rewriter.mergeBlocks(&pLoopOpRegion.front(), destBlock, ivReplacements);
+    rewriter.mergeBlocks(remainingInst, destBlock, {});
   }
   rewriter.eraseOp(pLoopOp);
   return success();
