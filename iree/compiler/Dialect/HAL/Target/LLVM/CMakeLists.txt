@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} AND NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
 if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
   return()
 endif()

@@ -20,9 +20,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# TODO(scotttodd): add 'common', 'JIT', 'AOT' subfolders to filter on
+#     IREE_TARGET_BACKEND_[DYLIB-LLVM-AOT|LLVM-IR]
 iree_cmake_extra_content(
     content = """
-# if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} AND NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT})
 if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
   return()
 endif()
