@@ -14,22 +14,7 @@
 
 iree_add_all_subdirs()
 
-# Enable HAL driver modules based on options.
-# bazel_to_cmake: DO NOT EDIT, this logic is not supported by conversion yet
-set (_IREE_HAL_DRIVER_MODULES "")
-if(${IREE_HAL_DRIVER_DYLIB})
-  list(APPEND _IREE_HAL_DRIVER_MODULES iree::hal::dylib::dylib_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_LLVM})
-  list(APPEND _IREE_HAL_DRIVER_MODULES iree::hal::llvmjit::llvmjit_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_VMLA})
-  list(APPEND _IREE_HAL_DRIVER_MODULES iree::hal::vmla::vmla_driver_module)
-endif()
-if(${IREE_HAL_DRIVER_VULKAN})
-  list(APPEND _IREE_HAL_DRIVER_MODULES iree::hal::vulkan::vulkan_driver_module)
-endif()
-
+# bazel_to_cmake: DO NOT EDIT, IREE_HAL_DRIVER_VMLA filtering is custom logic
 if(${IREE_HAL_DRIVER_VMLA})
   iree_cc_test(
     NAME
@@ -79,7 +64,7 @@ iree_cc_binary(
     iree::testing::gtest
     iree::tools::vm_util
     iree::vm::bytecode_module
-    ${_IREE_HAL_DRIVER_MODULES}
+    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
 )
 

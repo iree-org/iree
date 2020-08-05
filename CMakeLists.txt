@@ -113,6 +113,20 @@ foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
+# Enable HAL driver modules based on options.
+set (IREE_HAL_DRIVER_MODULES "")
+if(${IREE_HAL_DRIVER_DYLIB})
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::dylib::dylib_driver_module)
+endif()
+if(${IREE_HAL_DRIVER_LLVM})
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::llvmjit::llvmjit_driver_module)
+endif()
+if(${IREE_HAL_DRIVER_VMLA})
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vmla::vmla_driver_module)
+endif()
+if(${IREE_HAL_DRIVER_VULKAN})
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vulkan::vulkan_driver_module)
+endif()
 
 # List of all target backends to be built by default:
 set(IREE_ALL_TARGET_BACKENDS
@@ -144,6 +158,25 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
+
+# Enable compiler targets based on options.
+set(IREE_COMPILER_TARGETS "")
+set(IREE_COMPILER_TARGET_COPTS "")
+# TODO(#2645): Move LLVMAOT target under DYLIB-LLVM-AOT flag
+if(${IREE_TARGET_BACKEND_LLVM-IR})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMIR_TARGET")
+endif()
+if(${IREE_TARGET_BACKEND_VMLA})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
+endif()
+if(${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
+endif()
 
 #-------------------------------------------------------------------------------
 # Cross compiling configuration
