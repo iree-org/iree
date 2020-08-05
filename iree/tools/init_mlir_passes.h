@@ -22,11 +22,7 @@
 
 #include <cstdlib>
 
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
-#include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
-#include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
-#include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -34,70 +30,56 @@
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
-#include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 
-// This function may be called to register the MLIR passes with the
-// global registry.
+// This function may be called to register the MLIR passes with the global
+// registry.
 // If you're building a compiler, you likely don't need this: you would build a
 // pipeline programmatically without the need to register with the global
 // registry, since it would already be calling the creation routine of the
 // individual passes.
 // The global registry is interesting to interact with the command-line tools.
 inline void registerMlirPasses() {
-  // A local workaround until we can use individual pass registration from
-  // https://reviews.llvm.org/D77322
-  ::mlir::registerAffineLoopFusionPass();
-  ::mlir::registerAffinePipelineDataTransferPass();
-  ::mlir::registerCSEPass();
-  ::mlir::registerCanonicalizerPass();
-  ::mlir::registerInlinerPass();
-  ::mlir::registerLocationSnapshotPass();
-  ::mlir::registerLoopCoalescingPass();
-  ::mlir::registerLoopInvariantCodeMotionPass();
-  ::mlir::registerMemRefDataFlowOptPass();
-  ::mlir::registerParallelLoopCollapsingPass();
-  ::mlir::registerPrintOpStatsPass();
-  ::mlir::registerStripDebugInfoPass();
-  ::mlir::registerSymbolDCEPass();
+  // Core Transforms
+  registerCanonicalizerPass();
+  registerCSEPass();
+  registerInlinerPass();
+  registerLocationSnapshotPass();
+  registerLoopCoalescingPass();
+  registerLoopInvariantCodeMotionPass();
+  registerMemRefDataFlowOptPass();
+  registerParallelLoopCollapsingPass();
+  registerPrintOpStatsPass();
+  registerStripDebugInfoPass();
+  registerSymbolDCEPass();
 
-  createCanonicalizerPass();
-  createCSEPass();
-  createSuperVectorizePass({});
-  createLoopUnrollPass();
-  createLoopUnrollAndJamPass();
-  createSimplifyAffineStructuresPass();
-  createLoopFusionPass();
-  createLoopInvariantCodeMotionPass();
-  createAffineLoopInvariantCodeMotionPass();
-  createPipelineDataTransferPass();
-  createLowerAffinePass();
-  createLoopTilingPass(0);
-  createLoopCoalescingPass();
-  createAffineDataCopyGenerationPass(0, 0);
+  // Affine
+  registerAffinePasses();
+  registerAffineLoopFusionPass();
+  registerAffinePipelineDataTransferPass();
+  registerConvertAffineToStandardPass();
 
   // Linalg
-  mlir::registerLinalgPasses();
+  registerLinalgPasses();
 
-  // Loop
-  createParallelLoopFusionPass();
-  createParallelLoopTilingPass();
+  // SCF
+  registerSCFParallelLoopFusionPass();
+  registerSCFParallelLoopTilingPass();
 
   // Quant
-  quant::createConvertSimulatedQuantPass();
-  quant::createConvertConstPass();
+  quant::registerQuantPasses();
 
   // Shape
-  mlir::registerShapePasses();
+  registerShapePasses();
 
   // SPIR-V
-  spirv::createLowerABIAttributesPass();
-  createConvertGPUToSPIRVPass();
-  createConvertStandardToSPIRVPass();
-  createLegalizeStdOpsForSPIRVLoweringPass();
-  createLinalgToSPIRVPass();
+  spirv::registerSPIRVLowerABIAttributesPass();
+  registerConvertGPUToSPIRVPass();
+  registerConvertStandardToSPIRVPass();
+  registerLegalizeStandardForSPIRVPass();
+  registerConvertLinalgToSPIRVPass();
 }
 
 }  // namespace mlir
