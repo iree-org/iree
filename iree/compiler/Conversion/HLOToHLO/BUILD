@@ -22,7 +22,6 @@ cc_library(
     name = "HLOToHLO",
     srcs = [
         "DecomposeHLOClamp.cpp",
-        "Passes.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -32,7 +31,5 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_gather_to_torch_index_select",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
     ],
 )

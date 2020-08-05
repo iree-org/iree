@@ -33,14 +33,6 @@ namespace iree_compiler {
 /// Creates a pass to decompose XLA-HLO clamp ops into primitive ops.
 std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
 
-/// Creates XLA-HLO to XLA-HLO transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOToCompatibleHLOPass();
-
-/// Populates the patterns that convert from XLA-HLO to IREE compatible XLA-HLO.
-/// Imports patterns from the Tensorflow XLA passes.
-void populateHLOToCompatibleHLOPatterns(MLIRContext *context,
-                                        OwningRewritePatternList &patterns);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

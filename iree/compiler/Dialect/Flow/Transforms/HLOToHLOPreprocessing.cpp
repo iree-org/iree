@@ -191,6 +191,7 @@ struct HLOToHLOPreprocessing
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
+    mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
