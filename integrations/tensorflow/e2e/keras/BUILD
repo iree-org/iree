@@ -185,17 +185,6 @@ iree_vision_test_suite(
         # interpreter and vulkan backends for these tests.
         {
             "models": [
-                "MobileNetV2",
-            ],
-            "datasets": [
-                "cifar10",
-            ],
-            "backends": [
-                "iree_vulkan",
-            ],
-        },
-        {
-            "models": [
                 "MobileNet",
                 "MobileNetV2",
             ],
