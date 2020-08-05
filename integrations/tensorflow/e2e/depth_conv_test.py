@@ -26,7 +26,7 @@ class Conv2dModule(tf.Module):
       tf.TensorSpec([2, 4, 5, 2], tf.float32),
       tf.TensorSpec([2, 2, 2, 3], tf.float32),
   ])
-  def conv2d_2452x2223_valid(self, img, kernel):
+  def conv2d_2452x2423_valid(self, img, kernel):
     return tf.nn.depthwise_conv2d(
         img, kernel, [1, 1, 1, 1], "VALID", name="result")
 
@@ -34,9 +34,27 @@ class Conv2dModule(tf.Module):
       tf.TensorSpec([2, 4, 5, 2], tf.float32),
       tf.TensorSpec([2, 4, 2, 3], tf.float32),
   ])
-  def conv2d_2452x2223_same(self, img, kernel):
+  def conv2d_2452x2423_same(self, img, kernel):
     return tf.nn.depthwise_conv2d(
         img, kernel, [1, 1, 1, 1], "SAME", name="result")
+
+
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([2, 4, 5, 2], tf.float32),
+      tf.TensorSpec([2, 4, 2, 3], tf.float32),
+  ])
+  def conv2d_2452x2423_valid_stride_2(self, img, kernel):
+    return tf.nn.depthwise_conv2d(
+        img, kernel, [1, 2, 2, 1], "VALID", name="result")
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([2, 4, 5, 2], tf.float32),
+      tf.TensorSpec([2, 4, 2, 3], tf.float32),
+  ])
+  def conv2d_2452x2423_same_stride_2(self, img, kernel):
+    return tf.nn.depthwise_conv2d(
+        img, kernel, [1, 2, 2, 1], "SAME", name="result")
 
 
 @tf_test_utils.compile_module(Conv2dModule)
@@ -47,7 +65,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
     def batched_feature_unpadded(module):
       i = tf_utils.ndarange([2, 4, 5, 2])
       k = tf_utils.ndarange([2, 2, 2, 3])
-      module.conv2d_2452x2223_valid(i, k)
+      module.conv2d_2452x2423_valid(i, k)
 
     self.compare_backends(batched_feature_unpadded)
 
@@ -56,9 +74,28 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
     def batched_feature_unpadded_same(module):
       i = tf_utils.ndarange([2, 4, 5, 2])
       k = tf_utils.ndarange([2, 4, 2, 3])
-      module.conv2d_2452x2223_same(i, k)
+      module.conv2d_2452x2423_same(i, k)
 
     self.compare_backends(batched_feature_unpadded_same)
+
+  def test_batched_feature_unpadded_same_stride_2(self):
+
+    def batched_feature_unpadded_same_stride_2(module):
+      i = tf_utils.ndarange([2, 4, 5, 2])
+      k = tf_utils.ndarange([2, 4, 2, 3])
+      module.conv2d_2452x2423_valid_stride_2(i, k)
+
+    self.compare_backends(batched_feature_unpadded_same_stride_2)
+
+
+  def test_batched_feature_padded_same_stride_2(self):
+
+    def batched_feature_padded_same_stride_2(module):
+      i = tf_utils.ndarange([2, 4, 5, 2])
+      k = tf_utils.ndarange([2, 4, 2, 3])
+      module.conv2d_2452x2423_same_stride_2(i, k)
+
+    self.compare_backends(batched_feature_padded_same_stride_2)
 
 
 if __name__ == "__main__":
