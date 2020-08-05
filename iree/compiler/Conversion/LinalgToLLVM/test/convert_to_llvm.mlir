@@ -13,26 +13,26 @@ func @convert_dynamic_shape() -> f32 {
 hal.interface @legacy_io attributes {push_constants = 2 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 }
-// CHECK: llvm.func @convert_dynamic_shape(%[[ARG0:.+]]: !llvm<"i8**">, %[[ARG1:.+]]: !llvm<"i32*">)
-// CHECK: %[[PACKED_ARGS_PTR:.+]] = llvm.bitcast %[[ARG0]] : !llvm<"i8**"> to !llvm<"{ float* }*">
-// CHECK: %[[PACKED_ARGS:.+]] = llvm.load %[[PACKED_ARGS_PTR]] : !llvm<"{ float* }*">
-// CHECK: %[[MEMREF0_DATA_PTR:.+]] = llvm.extractvalue %[[PACKED_ARGS]][0] : !llvm<"{ float* }">
-// CHECK: %[[MEMREF0:.+]] = llvm.mlir.undef : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
-// CHECK: %[[MEMREF0_0:.+]] = llvm.insertvalue %[[MEMREF0_DATA_PTR]], %[[MEMREF0]][0] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
-// CHECK: %[[MEMREF0_1:.+]] = llvm.insertvalue %[[MEMREF0_DATA_PTR]], %[[MEMREF0_0]][1] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
+// CHECK: llvm.func @convert_dynamic_shape(%[[ARG0:.+]]: !llvm.ptr<ptr<i8>>, %[[ARG1:.+]]: !llvm.ptr<i32>)
+// CHECK: %[[PACKED_ARGS_PTR:.+]] = llvm.bitcast %[[ARG0]] : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>)>>
+// CHECK: %[[PACKED_ARGS:.+]] = llvm.load %[[PACKED_ARGS_PTR]] : !llvm.ptr<struct<(ptr<float>)>>
+// CHECK: %[[MEMREF0_DATA_PTR:.+]] = llvm.extractvalue %[[PACKED_ARGS]][0] : !llvm.struct<(ptr<float>)>
+// CHECK: %[[MEMREF0:.+]] = llvm.mlir.undef : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+// CHECK: %[[MEMREF0_0:.+]] = llvm.insertvalue %[[MEMREF0_DATA_PTR]], %[[MEMREF0]][0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+// CHECK: %[[MEMREF0_1:.+]] = llvm.insertvalue %[[MEMREF0_DATA_PTR]], %[[MEMREF0_0]][1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[CONST0:.+]] = llvm.mlir.constant(0 : i64) : !llvm.i64
-// CHECK: %[[DIM0_PTR:.+]] = llvm.getelementptr %[[ARG1]][%[[CONST0]]] : (!llvm<"i32*">, !llvm.i64) -> !llvm<"i32*">
-// CHECK: %[[DIM0:.+]] = llvm.load %[[DIM0_PTR]] : !llvm<"i32*">
+// CHECK: %[[DIM0_PTR:.+]] = llvm.getelementptr %[[ARG1]][%[[CONST0]]] : (!llvm.ptr<i32>, !llvm.i64) -> !llvm.ptr<i32>
+// CHECK: %[[DIM0:.+]] = llvm.load %[[DIM0_PTR]] : !llvm.ptr<i32>
 // CHECK: %[[DIM0CASTED:.+]] = llvm.zext %[[DIM0]] : !llvm.i32 to !llvm.i64
 // CHECK: %[[CONST1:.+]] = llvm.mlir.constant(1 : i64) : !llvm.i64
-// CHECK: %[[DIM1_PTR:.+]] = llvm.getelementptr %[[ARG1]][%[[CONST1]]] : (!llvm<"i32*">, !llvm.i64) -> !llvm<"i32*">
-// CHECK: %[[DIM1:.+]] = llvm.load %[[DIM1_PTR]] : !llvm<"i32*">
+// CHECK: %[[DIM1_PTR:.+]] = llvm.getelementptr %[[ARG1]][%[[CONST1]]] : (!llvm.ptr<i32>, !llvm.i64) -> !llvm.ptr<i32>
+// CHECK: %[[DIM1:.+]] = llvm.load %[[DIM1_PTR]] : !llvm.ptr<i32>
 // CHECK: %[[DIM1CASTED:.+]] = llvm.zext %[[DIM1]] : !llvm.i32 to !llvm.i64
-// CHECK: %[[MEMREF0_2:.+]] = llvm.insertvalue %[[DIM0CASTED]], %[[MEMREF0_1]][3, 0] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
-// CHECK: %[[MEMREF0_3:.+]] = llvm.insertvalue %[[DIM1CASTED]], %[[MEMREF0_2]][3, 1] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
+// CHECK: %[[MEMREF0_2:.+]] = llvm.insertvalue %[[DIM0CASTED]], %[[MEMREF0_1]][3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+// CHECK: %[[MEMREF0_3:.+]] = llvm.insertvalue %[[DIM1CASTED]], %[[MEMREF0_2]][3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[CONST1_STRIDE:.+]] = llvm.mlir.constant(1 : index) : !llvm.i64
-// CHECK: %[[MEMREF0_4:.+]] = llvm.insertvalue %[[CONST1_STRIDE]], %[[MEMREF0_3]][4, 1] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
-// CHECK: %[[STRIDE_DIM1:.+]] = llvm.extractvalue %[[MEMREF0_4]][4, 1] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
-// CHECK: %[[DIM1_0:.+]] = llvm.extractvalue %[[MEMREF0_4]][3, 1] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
+// CHECK: %[[MEMREF0_4:.+]] = llvm.insertvalue %[[CONST1_STRIDE]], %[[MEMREF0_3]][4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+// CHECK: %[[STRIDE_DIM1:.+]] = llvm.extractvalue %[[MEMREF0_4]][4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+// CHECK: %[[DIM1_0:.+]] = llvm.extractvalue %[[MEMREF0_4]][3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[STRIDE_DIM0:.+]] = llvm.mul %[[STRIDE_DIM1]], %[[DIM1_0]] : !llvm.i64
-// CHECK: llvm.insertvalue %[[STRIDE_DIM0]], %[[MEMREF0_4]][4, 0] : !llvm<"{ float*, float*, i64, [2 x i64], [2 x i64] }">
+// CHECK: llvm.insertvalue %[[STRIDE_DIM0]], %[[MEMREF0_4]][4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
