@@ -28,7 +28,6 @@ struct ConvertHLOToCompatibleHLOPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList greedyPatterns;
     mhlo::PopulateComplexLoweringPatterns(context, &greedyPatterns);
-    mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &greedyPatterns);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(), greedyPatterns))) {
       return signalPassFailure();
