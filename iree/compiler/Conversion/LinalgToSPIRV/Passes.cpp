@@ -50,20 +50,24 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-/// These options are only for testing purposes. For actual execution with IREE,
-/// these are computed by IREE/Backends automatically.
-struct WorkGroupOptions : public PassPipelineOptions<WorkGroupOptions> {
-  ListOption<int64_t> workGroupSize{
+/// Command line options for use with SPIR-V code-generation pass pipeline.
+struct SPIRVCodegenClOpts : public PassPipelineOptions<SPIRVCodegenClOpts> {
+  ListOption<int64_t> workgroupSize{
       *this, "workgroup-size",
       llvm::cl::desc(
           "Number of workgroups to dispatch for the SPIR-V module; at most "
           "three integers standarding for the x, y, and z dimension; "
           "additional arguments will be ignored (used only for testing)"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+  Option<bool> useWorkgroupMemory{
+      *this, "use-workgroup-memory",
+      llvm::cl::desc(
+          "Enable use workgroup memory in SPIR-V codegeneration pipeline"),
+      llvm::cl::init(false)};
 };
 
-void addLinalgToSPIRVPasses(OpPassManager &pm,
-                            ArrayRef<int64_t> workGroupSize) {
+static void addLinalgToSPIRVPasses(OpPassManager &pm,
+                                   const SPIRVCodegenOptions &options) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -93,9 +97,11 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   afterwards. This gives each Linalg op a second chance to be tiled,
   //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createLinalgTileAndFusePass(workGroupSize));
+  pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
+                                         options.useWorkgroupMemory));
   pm.addPass(createSplitDispatchFunctionPass());
-  pm.addPass(createLinalgTileAndFusePass(workGroupSize));
+  pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
+                                         options.useWorkgroupMemory));
   pm.addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
@@ -163,7 +169,7 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
 }  // namespace
 
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
-                                     ArrayRef<int64_t> workGroupSize) {
+                                     const SPIRVCodegenOptions &options) {
   //===--------------------------------------------------------------------===//
   // Inline the impl dispatch function into the wrapper dispatch function.
   //
@@ -207,27 +213,31 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final spv.module ready for serialization.
   //===--------------------------------------------------------------------===//
-  addLinalgToSPIRVPasses(pm, workGroupSize);
+  addLinalgToSPIRVPasses(pm, options);
 }
 
-static PassPipelineRegistration<WorkGroupOptions> linalgToSPIRVPipeline(
+static SPIRVCodegenOptions getSPIRVCodegenOptions(
+    const SPIRVCodegenClOpts &clOpts) {
+  SPIRVCodegenOptions options;
+  options.workgroupSize.assign(clOpts.workgroupSize.begin(),
+                               clOpts.workgroupSize.end());
+  options.useWorkgroupMemory = clOpts.useWorkgroupMemory;
+  return options;
+}
+
+static PassPipelineRegistration<SPIRVCodegenClOpts> linalgToSPIRVPipeline(
     "iree-codegen-linalg-to-spirv-pipeline",
     "Runs the progressive lowering pipeline from Linalg to SPIR-V",
-    [](OpPassManager &passManager, const WorkGroupOptions &options) {
-      SmallVector<int64_t, 2> workGroupSize;
-      workGroupSize.assign(options.workGroupSize.begin(),
-                           options.workGroupSize.end());
-      addLinalgToSPIRVPasses(passManager, workGroupSize);
+    [](OpPassManager &passManager, const SPIRVCodegenClOpts &options) {
+      addLinalgToSPIRVPasses(passManager, getSPIRVCodegenOptions(options));
     });
 
-static PassPipelineRegistration<WorkGroupOptions> hloToLinalgSPIRVPipeline(
+static PassPipelineRegistration<SPIRVCodegenClOpts> hloToLinalgSPIRVPipeline(
     "iree-codegen-hlo-to-spirv-pipeline",
     "Runs the progressive lowering pipeline from XLA HLO to Linalg to SPIR-V",
-    [](OpPassManager &passManager, const WorkGroupOptions &options) {
-      SmallVector<int64_t, 2> workGroupSize;
-      workGroupSize.assign(options.workGroupSize.begin(),
-                           options.workGroupSize.end());
-      buildSPIRVTransformPassPipeline(passManager, workGroupSize);
+    [](OpPassManager &passManager, const SPIRVCodegenClOpts &options) {
+      buildSPIRVTransformPassPipeline(passManager,
+                                      getSPIRVCodegenOptions(options));
     });
 
 }  // namespace iree_compiler

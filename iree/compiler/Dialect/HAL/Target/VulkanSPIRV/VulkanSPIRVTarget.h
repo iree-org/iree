@@ -17,6 +17,7 @@
 
 #include <string>
 
+#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -27,8 +28,8 @@ namespace HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // Workgroup size to use.
-  SmallVector<int64_t, 3> workgroupSize;
+  // SPIR-V codegeneration options
+  SPIRVCodegenOptions codegenOptions;
   // Vulkan target environment as #vk.target_env attribute assembly.
   std::string vulkanTargetEnv;
 };
