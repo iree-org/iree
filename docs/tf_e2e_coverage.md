@@ -56,7 +56,7 @@ target | tensorflow | vmla | llvm-ir | vulkan-spirv
 
 target | tensorflow | vmla | llvm-ir | vulkan-spirv
 :-: | :-: | :-: | :-: | :-:
-[MobileNetV2_cifar10](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/vision_model_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span>
+[MobileNetV2_cifar10](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/vision_model_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [MobileNetV2_imagenet](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/vision_model_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
 [MobileNet_cifar10](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/vision_model_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span>
 [MobileNet_imagenet](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/keras/vision_model_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
