@@ -81,8 +81,8 @@ static LogicalResult verifyModuleOp(ModuleOp op) {
 }
 
 static ParseResult parseFuncOp(OpAsmParser &parser, OperationState *result) {
-  auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results, impl::VariadicFlag,
+  auto buildFuncType = [](Builder &builder, TypeRange argTypes,
+                          TypeRange results, impl::VariadicFlag,
                           std::string &) {
     return builder.getFunctionType(argTypes, results);
   };
