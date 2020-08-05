@@ -15,19 +15,6 @@
 #ifndef IREE_TOOLS_INIT_TARGETS_H_
 #define IREE_TOOLS_INIT_TARGETS_H_
 
-#ifdef IREE_HAVE_LLVMAOT_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
-#endif
-#ifdef IREE_HAVE_LLVMIR_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRTarget.h"
-#endif
-#ifdef IREE_HAVE_VMLA_TARGET
-#include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
-#endif
-#ifdef IREE_HAVE_VULKANSPIRV_TARGET
-#include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
-#endif
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -35,29 +22,7 @@ namespace iree_compiler {
 // expects all the possible target backends to be available. Custom tools can
 // select which targets they want to support by only registering those they
 // need.
-inline void registerHALTargetBackends() {
-  static bool init_once = []() {
-
-#ifdef IREE_HAVE_LLVMAOT_TARGET
-    IREE::HAL::registerLLVMAOTTargetBackends(
-        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_LLVMIR_TARGET
-    IREE::HAL::registerLLVMIRTargetBackends(
-        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_VMLA_TARGET
-    IREE::HAL::registerVMLATargetBackends(
-        []() { return IREE::HAL::getVMLATargetOptionsFromFlags(); });
-#endif
-#ifdef IREE_HAVE_VULKANSPIRV_TARGET
-    IREE::HAL::registerVulkanSPIRVTargetBackends(
-        []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });
-#endif
-    return true;
-  }();
-  (void)init_once;
-}
+void registerHALTargetBackends();
 
 }  // namespace iree_compiler
 }  // namespace mlir
