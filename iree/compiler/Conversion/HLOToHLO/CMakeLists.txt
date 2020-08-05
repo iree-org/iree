@@ -21,7 +21,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "DecomposeHLOClamp.cpp"
-    "Passes.cpp"
   DEPS
     MLIRIR
     MLIRPass
