@@ -139,8 +139,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     tf_trace = tf_test_utils.Trace(tf_module, tf_function)
     tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
 
-    vmla_module = tf_utils.IreeCompiledModule(
-        StatefulCountingModule, tf_utils.BackendInfo('iree_vmla'))
+    vmla_module = tf_utils.IreeCompiledModule(StatefulCountingModule,
+                                              tf_utils.BackendInfo('iree_vmla'))
     vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
     vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 
@@ -160,8 +160,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     tf_trace = tf_test_utils.Trace(tf_module, tf_function)
     tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
 
-    vmla_module = tf_utils.IreeCompiledModule(
-        StatefulCountingModule, tf_utils.BackendInfo('iree_vmla'))
+    vmla_module = tf_utils.IreeCompiledModule(StatefulCountingModule,
+                                              tf_utils.BackendInfo('iree_vmla'))
     vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
     vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 

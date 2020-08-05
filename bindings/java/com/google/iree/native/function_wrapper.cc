@@ -21,5 +21,13 @@ iree_vm_function_t* FunctionWrapper::function() const {
   return function_.get();
 }
 
+iree_string_view_t FunctionWrapper::name() const {
+  return iree_vm_function_name(function_.get());
+}
+
+iree_vm_function_signature_t FunctionWrapper::signature() const {
+  return iree_vm_function_signature(function_.get());
+}
+
 }  // namespace java
 }  // namespace iree

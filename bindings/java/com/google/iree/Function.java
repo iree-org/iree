@@ -16,14 +16,51 @@
 
 package com.google.iree;
 
+import android.util.Log;
+
 /** A function reference. */
 final class Function {
+  private static final String TAG = Function.class.getCanonicalName();
+
+  public static class Signature {
+    int argumentCount;
+    int resultCount;
+
+    private Signature(int argumentCount, int resultCount) {
+      this.argumentCount = argumentCount;
+      this.resultCount = resultCount;
+    }
+  }
+
   public Function() {
     nativeAddress = nativeNew();
   }
 
   public long getNativeAddress() {
     return nativeAddress;
+  }
+
+  public String getName() {
+    return nativeGetName();
+  }
+
+  public Signature getSignature() {
+    return nativeGetSignature();
+  }
+
+  public String getDebugString() {
+    String name = getName();
+    Signature signature = getSignature();
+    String debugString = String.format("Function debug string\n"
+            + "-Name: %s\n"
+            + "-Argument count: %d\n"
+            + "-Result count: %d",
+        name, signature.argumentCount, signature.resultCount);
+    return debugString;
+  }
+
+  public void printDebugString() {
+    Log.d(TAG, getDebugString());
   }
 
   public void free() {
@@ -33,6 +70,10 @@ final class Function {
   private final long nativeAddress;
 
   private native long nativeNew();
+
+  private native String nativeGetName();
+
+  private native Signature nativeGetSignature();
 
   private native void nativeFree();
 }

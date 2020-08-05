@@ -26,6 +26,10 @@ class FunctionWrapper {
  public:
   iree_vm_function_t* function() const;
 
+  iree_string_view_t name() const;
+
+  iree_vm_function_signature_t signature() const;
+
  private:
   std::unique_ptr<iree_vm_function_t> function_ =
       std::make_unique<iree_vm_function_t>();

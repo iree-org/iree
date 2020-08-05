@@ -47,3 +47,23 @@ JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz) {
   CHECK_NE(function, nullptr);
   delete function;
 }
+
+JNI_FUNC jstring JNI_PREFIX(nativeGetName)(JNIEnv* env, jobject thiz) {
+  FunctionWrapper* function = GetFunctionWrapper(env, thiz);
+  CHECK_NE(function, nullptr);
+
+  iree_string_view_t function_name = function->name();
+  return env->NewStringUTF(function_name.data);
+}
+
+JNI_FUNC jobject JNI_PREFIX(nativeGetSignature)(JNIEnv* env, jobject thiz) {
+  FunctionWrapper* function = GetFunctionWrapper(env, thiz);
+  CHECK_NE(function, nullptr);
+
+  // TODO(jennik): Look into caching the results of these lookups.
+  iree_vm_function_signature_t function_signature = function->signature();
+  jclass cls = env->FindClass("com/google/iree/Function$Signature");
+  jmethodID constructor = env->GetMethodID(cls, "<init>", "(II)V");
+  return env->NewObject(cls, constructor, function_signature.argument_count,
+                        function_signature.result_count);
+}

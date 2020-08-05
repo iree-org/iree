@@ -27,6 +27,10 @@ class ModuleWrapper {
 
   iree_vm_module_t* module() const;
 
+  iree_string_view_t name() const;
+
+  iree_vm_module_signature_t signature() const;
+
   ~ModuleWrapper();
 
  private:

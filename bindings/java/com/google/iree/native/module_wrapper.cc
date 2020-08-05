@@ -30,6 +30,14 @@ Status ModuleWrapper::Create(const uint8_t* flatbuffer_data,
 
 iree_vm_module_t* ModuleWrapper::module() const { return module_; }
 
+iree_string_view_t ModuleWrapper::name() const {
+  return iree_vm_module_name(module_);
+}
+
+iree_vm_module_signature_t ModuleWrapper::signature() const {
+  return iree_vm_module_signature(module_);
+}
+
 ModuleWrapper::~ModuleWrapper() { iree_vm_module_release(module_); }
 
 }  // namespace java
