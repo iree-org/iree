@@ -36,7 +36,6 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan_wgmem",
     srcs = ["gemm.mlir"],
-    srcs = glob(["*.mlir"]),
     compiler_flags = ["-iree-spirv-use-workgroup-memory"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
