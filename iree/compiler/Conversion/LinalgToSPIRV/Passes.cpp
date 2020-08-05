@@ -62,7 +62,7 @@ struct SPIRVCodegenClOpts : public PassPipelineOptions<SPIRVCodegenClOpts> {
   Option<bool> useWorkgroupMemory{
       *this, "use-workgroup-memory",
       llvm::cl::desc(
-          "Enable use workgroup memory in SPIR-V codegeneration pipeline"),
+          "Enable use of workgroup memory in SPIR-V code generation pipeline"),
       llvm::cl::init(false)};
 };
 

@@ -53,7 +53,8 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
   static llvm::cl::opt<bool> clUseWorkgroupMemory(
       "iree-spirv-use-workgroup-memory",
-      llvm::cl::desc("Enable use of workgroup memory in SPIR-V codegeneration"),
+      llvm::cl::desc(
+          "Enable use of workgroup memory in SPIR-V code generation"),
       llvm::cl::init(false));
 
   static llvm::cl::list<unsigned> clWorkgroupSize(
