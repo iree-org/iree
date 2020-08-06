@@ -692,32 +692,6 @@ static inline iree_allocator_t iree_allocator_null() {
   return v;
 }
 
-//===----------------------------------------------------------------------===//
-// iree::FileMapping
-//===----------------------------------------------------------------------===//
-
-typedef struct iree_file_mapping iree_file_mapping_t;
-
-// Opens a file at |path| for read-only access via a file mapping.
-// |out_file_mapping| must be released by the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
-                            iree_file_mapping_t** out_file_mapping);
-
-// Retains the given |file_mapping| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_file_mapping_retain(iree_file_mapping_t* file_mapping);
-
-// Releases the given |file_mapping| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_file_mapping_release(iree_file_mapping_t* file_mapping);
-
-// Returns a reference to the byte buffer the |file_mapping| backs.
-// Though the returned buffer is non-const behavior is undefined if read-only
-// mappings are written to (exceptions, segfaults, etc).
-IREE_API_EXPORT iree_byte_span_t IREE_API_CALL
-iree_file_mapping_data(iree_file_mapping_t* file_mapping);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

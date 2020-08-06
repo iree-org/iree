@@ -20,7 +20,6 @@
 #include <string>
 
 #include "iree/base/api_util.h"
-#include "iree/base/file_mapping.h"
 #include "iree/base/init.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/tracing.h"
@@ -418,51 +417,4 @@ IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
   if (ptr) {
     std::free(ptr);
   }
-}
-
-//===----------------------------------------------------------------------===//
-// iree::FileMapping
-//===----------------------------------------------------------------------===//
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
-                            iree_file_mapping_t** out_file_mapping) {
-  IREE_TRACE_SCOPE0("iree_file_mapping_open_read");
-  IREE_ASSERT_ARGUMENT(out_file_mapping);
-  *out_file_mapping = nullptr;
-
-  IREE_API_ASSIGN_OR_RETURN(
-      auto file_mapping,
-      iree::FileMapping::OpenRead(std::string(path.data, path.size)));
-
-  *out_file_mapping =
-      reinterpret_cast<iree_file_mapping_t*>(file_mapping.release());
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_file_mapping_retain(iree_file_mapping_t* file_mapping) {
-  IREE_TRACE_SCOPE0("iree_file_mapping_retain");
-  IREE_ASSERT_ARGUMENT(file_mapping);
-  auto* handle = reinterpret_cast<iree::FileMapping*>(file_mapping);
-  handle->AddReference();
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_file_mapping_release(iree_file_mapping_t* file_mapping) {
-  IREE_TRACE_SCOPE0("iree_file_mapping_release");
-  IREE_ASSERT_ARGUMENT(file_mapping);
-  auto* handle = reinterpret_cast<iree::FileMapping*>(file_mapping);
-  handle->ReleaseReference();
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_byte_span_t IREE_API_CALL
-iree_file_mapping_data(iree_file_mapping_t* file_mapping) {
-  IREE_TRACE_SCOPE0("iree_file_mapping_data");
-  IREE_ASSERT_ARGUMENT(file_mapping);
-  auto* handle = reinterpret_cast<iree::FileMapping*>(file_mapping);
-  auto data = handle->data();
-  return {const_cast<uint8_t*>(data.data()), data.size()};
 }

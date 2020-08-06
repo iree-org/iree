@@ -40,7 +40,6 @@ cc_library(
     deps = [
         ":api_hdrs",
         ":api_util",
-        ":file_mapping",
         ":init",
         ":platform_headers",
         ":target_platform",
