@@ -58,7 +58,7 @@ std::vector<TestParams> GetModuleTestParams() {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
             module_file.size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+        iree_allocator_null(), iree_allocator_system(), &module))
         << "Bytecode module failed to load";
     iree_vm_module_signature_t signature = module->signature(module->self);
     test_params.reserve(test_params.size() + signature.export_function_count);
@@ -82,18 +82,18 @@ class VMBytecodeDispatchTest
   virtual void SetUp() {
     const auto& test_params = GetParam();
 
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
             test_params.module_file.size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
         << "Bytecode module failed to load";
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+        instance_, modules.data(), modules.size(), iree_allocator_system(),
         &context_));
   }
 
@@ -113,7 +113,7 @@ class VMBytecodeDispatchTest
 
     return iree_vm_invoke(context_, function,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
-                          /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM);
+                          /*outputs=*/nullptr, iree_allocator_system());
   }
 
   iree_vm_instance_t* instance_ = nullptr;

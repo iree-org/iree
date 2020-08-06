@@ -242,7 +242,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
     iree_allocator_free(payload->allocator, payload);
     payload = next;
   }
-  iree_allocator_free(IREE_ALLOCATOR_SYSTEM, storage);
+  iree_allocator_free(iree_allocator_system(), storage);
 }
 
 IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {

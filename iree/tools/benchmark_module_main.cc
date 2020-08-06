@@ -74,7 +74,7 @@ Status Run(::benchmark::State& state) {
       << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
+      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC))
       << "creating instance";
 
   ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
@@ -91,7 +91,7 @@ Status Run(::benchmark::State& state) {
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
   RETURN_IF_ERROR(FromApiStatus(iree_vm_context_create_with_modules(
                                     instance, modules.data(), modules.size(),
-                                    IREE_ALLOCATOR_SYSTEM, &context),
+                                    iree_allocator_system(), &context),
                                 IREE_LOC))
       << "creating context";
 
@@ -132,11 +132,11 @@ Status Run(::benchmark::State& state) {
     vm::ref<iree_vm_list_t> outputs;
     RETURN_IF_ERROR(FromApiStatus(
         iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
-                            IREE_ALLOCATOR_SYSTEM, &outputs),
+                            iree_allocator_system(), &outputs),
         IREE_LOC));
     RETURN_IF_ERROR(FromApiStatus(
         iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                       outputs.get(), IREE_ALLOCATOR_SYSTEM),
+                       outputs.get(), iree_allocator_system()),
         IREE_LOC));
   }
 
@@ -146,10 +146,10 @@ Status Run(::benchmark::State& state) {
     vm::ref<iree_vm_list_t> outputs;
     IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
                                       output_descs.size(),
-                                      IREE_ALLOCATOR_SYSTEM, &outputs));
+                                      iree_allocator_system(), &outputs));
     IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr,
                                  inputs.get(), outputs.get(),
-                                 IREE_ALLOCATOR_SYSTEM));
+                                 iree_allocator_system()));
   }
 
   iree_vm_module_release(hal_module);

@@ -163,13 +163,13 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
     iree_host_size_t driver_count = 0;
     RETURN_IF_ERROR(
         FromApiStatus(iree_hal_driver_registry_query_available_drivers(
-                          IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count),
+                          iree_allocator_system(), &driver_names, &driver_count),
                       IREE_LOC));
     for (int i = 0; i < driver_count; ++i) {
       target_backends.push_back(
           std::string(driver_names[i].data, driver_names[i].size));
     }
-    iree_allocator_free(IREE_ALLOCATOR_SYSTEM, driver_names);
+    iree_allocator_free(iree_allocator_system(), driver_names);
   }
   return target_backends;
 }
@@ -299,13 +299,13 @@ Status EvaluateFunction(iree_vm_context_t* context,
   vm::ref<iree_vm_list_t> outputs;
   RETURN_IF_ERROR(FromApiStatus(
       iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
-                          IREE_ALLOCATOR_SYSTEM, &outputs),
+                          iree_allocator_system(), &outputs),
       IREE_LOC));
 
   // Synchronously invoke the function.
   RETURN_IF_ERROR(FromApiStatus(
       iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                     outputs.get(), IREE_ALLOCATOR_SYSTEM),
+                     outputs.get(), iree_allocator_system()),
       IREE_LOC));
 
   // Print outputs.
@@ -365,7 +365,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
     RETURN_IF_ERROR(FromApiStatus(iree_vm_context_create_with_modules(
                                       instance, modules.data(), modules.size(),
-                                      IREE_ALLOCATOR_SYSTEM, &context),
+                                      iree_allocator_system(), &context),
                                   IREE_LOC))
         << "Creating context";
 
@@ -404,7 +404,7 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
 
   iree_vm_instance_t* instance = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
+      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC))
       << "Create instance";
 
   ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());

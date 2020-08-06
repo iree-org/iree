@@ -359,7 +359,7 @@ class CheckModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = IREE_ALLOCATOR_SYSTEM;
+  iree_allocator_t allocator_ = iree_allocator_system();
 };
 
 // Function table mapping imported function names to their implementation.

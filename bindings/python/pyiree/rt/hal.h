@@ -99,7 +99,7 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
         iree_hal_heap_buffer_allocate(
             static_cast<iree_hal_memory_type_t>(memory_type),
             static_cast<iree_hal_buffer_usage_t>(usage), allocation_size,
-            IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &buffer),
+            iree_allocator_system(), iree_allocator_system(), &buffer),
         "Error allocating heap buffer");
     return HalBuffer::CreateRetained(buffer);
   }
@@ -121,7 +121,7 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
         IREE_HAL_ELEMENT_TYPE_NONE, element_size * 8);
     CheckApiStatus(
         iree_hal_buffer_view_create(raw_ptr(), shape.s.data(), shape.s.size(),
-                                    element_type, IREE_ALLOCATOR_SYSTEM, &bv),
+                                    element_type, iree_allocator_system(), &bv),
         "Error creating buffer view");
     return HalBufferView::CreateRetained(bv);
   }

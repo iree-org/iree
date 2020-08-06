@@ -40,23 +40,23 @@ namespace {
 class StringsModuleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     // Setup strings module:
     IREE_CHECK_OK(iree_strings_module_register_types());
     IREE_CHECK_OK(
-        iree_strings_module_create(IREE_ALLOCATOR_SYSTEM, &strings_module_))
+        iree_strings_module_create(iree_allocator_system(), &strings_module_))
         << "Strings module failed to init";
 
     // Setup hal module:
     IREE_CHECK_OK(iree_hal_module_register_types());
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), IREE_ALLOCATOR_SYSTEM, &hal_driver));
+        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
-        hal_driver, IREE_ALLOCATOR_SYSTEM, &device_));
+        hal_driver, iree_allocator_system(), &device_));
     IREE_CHECK_OK(
-        iree_hal_module_create(device_, IREE_ALLOCATOR_SYSTEM, &hal_module_));
+        iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
     iree_hal_driver_release(hal_driver);
 
     // Setup the test module.
@@ -66,13 +66,13 @@ class StringsModuleTest : public ::testing::Test {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
         << "Bytecode module failed to load";
 
     std::vector<iree_vm_module_t*> modules = {strings_module_, hal_module_,
                                               bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+        instance_, modules.data(), modules.size(), iree_allocator_system(),
         &context_));
   }
 
@@ -122,7 +122,7 @@ class StringsModuleTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
     IREE_ASSERT_OK(
         iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(), E,
-                                    IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
+                                    iree_allocator_system(), &*out_buffer_view));
   }
 
   void TestStringTensorToString(
@@ -130,13 +130,13 @@ class StringsModuleTest : public ::testing::Test {
       absl::Span<const int32_t> shape, absl::string_view expected_output) {
     vm::ref<strings_string_tensor_t> input_string_tensor;
     IREE_ASSERT_OK(strings_string_tensor_create(
-        IREE_ALLOCATOR_SYSTEM, string_views.data(), string_views.size(),
+        iree_allocator_system(), string_views.data(), string_views.size(),
         shape.data(), shape.size(), &input_string_tensor));
 
     // Construct the input list for execution.
     vm::ref<iree_vm_list_t> inputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &inputs));
+                                       iree_allocator_system(), &inputs));
 
     // Add the string tensor to the input list.
     IREE_ASSERT_OK(
@@ -145,13 +145,13 @@ class StringsModuleTest : public ::testing::Test {
     // Construct the output list for accepting results from the invocation.
     vm::ref<iree_vm_list_t> outputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &outputs));
+                                       iree_allocator_system(), &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_,
                                   LookupFunction("string_tensor_to_string"),
                                   /*policy=*/nullptr, inputs.get(),
-                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
+                                  outputs.get(), iree_allocator_system()));
 
     // Retrieve and validate the string tensor.
     auto* output_string =
@@ -173,7 +173,7 @@ class StringsModuleTest : public ::testing::Test {
     // Construct the input list for execution.
     vm::ref<iree_vm_list_t> inputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &inputs));
+                                       iree_allocator_system(), &inputs));
 
     // Add the buffer view to the input list.
     IREE_ASSERT_OK(
@@ -182,12 +182,12 @@ class StringsModuleTest : public ::testing::Test {
     // Construct the output list for accepting results from the invocation.
     vm::ref<iree_vm_list_t> outputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &outputs));
+                                       iree_allocator_system(), &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("to_string_tensor"),
                                   /*policy=*/nullptr, inputs.get(),
-                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
+                                  outputs.get(), iree_allocator_system()));
 
     // Compare the output to the expected result.
     CompareResults(expected, shape, outputs);
@@ -200,13 +200,13 @@ class StringsModuleTest : public ::testing::Test {
                   absl::Span<const iree_string_view_t> expected) {
     vm::ref<strings_string_tensor_t> dict_string_tensor;
     IREE_ASSERT_OK(strings_string_tensor_create(
-        IREE_ALLOCATOR_SYSTEM, dict.data(), dict.size(), dict_shape.data(),
+        iree_allocator_system(), dict.data(), dict.size(), dict_shape.data(),
         dict_shape.size(), &dict_string_tensor));
 
     // Construct the input list for execution.
     vm::ref<iree_vm_list_t> inputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
-                                       IREE_ALLOCATOR_SYSTEM, &inputs));
+                                       iree_allocator_system(), &inputs));
 
     // Add the dict to the input list.
     iree_vm_ref_t dict_string_tensor_ref =
@@ -225,12 +225,12 @@ class StringsModuleTest : public ::testing::Test {
     // Construct the output list for accepting results from the invocation.
     vm::ref<iree_vm_list_t> outputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &outputs));
+                                       iree_allocator_system(), &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("gather"),
                                   /*policy=*/nullptr, inputs.get(),
-                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
+                                  outputs.get(), iree_allocator_system()));
 
     // Compare the output to the expected result.
     CompareResults(expected, ids_shape, std::move(outputs));
@@ -241,13 +241,13 @@ class StringsModuleTest : public ::testing::Test {
                   absl::Span<const iree_string_view_t> expected) {
     vm::ref<strings_string_tensor_t> string_tensor;
     IREE_ASSERT_OK(strings_string_tensor_create(
-        IREE_ALLOCATOR_SYSTEM, string_views.data(), string_views.size(),
+        iree_allocator_system(), string_views.data(), string_views.size(),
         shape.data(), shape.size(), &string_tensor));
 
     // Construct the input list for execution.
     vm::ref<iree_vm_list_t> inputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &inputs));
+                                       iree_allocator_system(), &inputs));
 
     // Add the dict to the input list.
     IREE_ASSERT_OK(iree_vm_list_push_ref_retain(inputs.get(), string_tensor));
@@ -255,12 +255,12 @@ class StringsModuleTest : public ::testing::Test {
     // Construct the output list for accepting results from the invocation.
     vm::ref<iree_vm_list_t> outputs;
     IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                       IREE_ALLOCATOR_SYSTEM, &outputs));
+                                       iree_allocator_system(), &outputs));
 
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("concat"),
                                   /*policy=*/nullptr, inputs.get(),
-                                  outputs.get(), IREE_ALLOCATOR_SYSTEM));
+                                  outputs.get(), iree_allocator_system()));
 
     // Remove the last dimension from the shape to get the expected shape
     shape.remove_suffix(1);
@@ -322,7 +322,7 @@ TEST_F(StringsModuleTest, Prototype) {
   // Construct the input list for execution.
   vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &inputs));
+                                     iree_allocator_system(), &inputs));
 
   // Add the value parameter.
   iree_vm_value_t value = iree_vm_value_make_i32(input);
@@ -331,12 +331,12 @@ TEST_F(StringsModuleTest, Prototype) {
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 0,
-                                     IREE_ALLOCATOR_SYSTEM, &outputs));
+                                     iree_allocator_system(), &outputs));
 
   CaptureStdout();
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("print_example_func"),
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                IREE_ALLOCATOR_SYSTEM));
+                                iree_allocator_system()));
   EXPECT_EQ(GetCapturedStdout(), expected_output);
 }
 

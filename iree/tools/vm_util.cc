@@ -92,7 +92,7 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
   vm::ref<iree_vm_list_t> variant_list;
   RETURN_IF_ERROR(FromApiStatus(
       iree_vm_list_create(/*element_type=*/nullptr, input_strings.size(),
-                          IREE_ALLOCATOR_SYSTEM, &variant_list),
+                          iree_allocator_system(), &variant_list),
       IREE_LOC));
   for (int i = 0; i < input_strings.size(); ++i) {
     auto input_string = input_strings[i];
@@ -127,7 +127,7 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
         iree_hal_buffer_view_t* buffer_view = nullptr;
         iree_status_t status = iree_hal_buffer_view_parse(
             iree_string_view_t{input_string.data(), input_string.size()},
-            allocator, IREE_ALLOCATOR_SYSTEM, &buffer_view);
+            allocator, iree_allocator_system(), &buffer_view);
         if (!iree_status_is_ok(status)) {
           return FromApiStatus(status, IREE_LOC)
                  << "Parsing value '" << input_string << "'";
@@ -239,12 +239,13 @@ Status CreateDevice(absl::string_view driver_name,
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_driver_registry_create_driver(
           iree_string_view_t{driver_name.data(), driver_name.size()},
-          IREE_ALLOCATOR_SYSTEM, &driver),
+          iree_allocator_system(), &driver),
       IREE_LOC))
       << "Creating driver '" << driver_name << "'";
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_driver_create_default_device(
-                                    driver, IREE_ALLOCATOR_SYSTEM, out_device),
-                                IREE_LOC))
+  RETURN_IF_ERROR(
+      FromApiStatus(iree_hal_driver_create_default_device(
+                        driver, iree_allocator_system(), out_device),
+                    IREE_LOC))
       << "Creating default device for driver '" << driver_name << "'";
   iree_hal_driver_release(driver);
   return OkStatus();
@@ -253,7 +254,7 @@ Status CreateDevice(absl::string_view driver_name,
 Status CreateHalModule(iree_hal_device_t* device,
                        iree_vm_module_t** out_module) {
   RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_module_create(device, IREE_ALLOCATOR_SYSTEM, out_module),
+      iree_hal_module_create(device, iree_allocator_system(), out_module),
       IREE_LOC))
       << "Creating HAL module";
   return OkStatus();
@@ -266,7 +267,7 @@ Status LoadBytecodeModule(absl::string_view module_data,
           iree_const_byte_span_t{
               reinterpret_cast<const uint8_t*>(module_data.data()),
               module_data.size()},
-          IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, out_module),
+          iree_allocator_null(), iree_allocator_system(), out_module),
       IREE_LOC))
       << "Deserializing module";
   return OkStatus();

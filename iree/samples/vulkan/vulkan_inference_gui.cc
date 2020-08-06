@@ -550,7 +550,7 @@ int iree::IreeMain(int argc, char** argv) {
 
   // Create a runtime Instance.
   iree_vm_instance_t* iree_instance = nullptr;
-  IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &iree_instance));
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &iree_instance));
 
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
   LOG(INFO) << "Creating Vulkan driver/device";
@@ -581,7 +581,7 @@ int iree::IreeMain(int argc, char** argv) {
       transfer_queue_set, &iree_vk_device));
   // Create a HAL module using the HAL device.
   iree_vm_module_t* hal_module = nullptr;
-  IREE_CHECK_OK(iree_hal_module_create(iree_vk_device, IREE_ALLOCATOR_SYSTEM,
+  IREE_CHECK_OK(iree_hal_module_create(iree_vk_device, iree_allocator_system(),
                                        &hal_module));
 
   // Load bytecode module from embedded data.
@@ -593,13 +593,13 @@ int iree::IreeMain(int argc, char** argv) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module));
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* iree_context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      iree_instance, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+      iree_instance, modules.data(), modules.size(), iree_allocator_system(),
       &iree_context));
   LOG(INFO) << "Module loaded and context is ready for use";
 
@@ -713,18 +713,18 @@ int iree::IreeMain(int argc, char** argv) {
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
         IREE_CHECK_OK(iree_hal_buffer_view_create(
             input0_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
-            IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ALLOCATOR_SYSTEM,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
             &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_create(
             input1_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
-            IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ALLOCATOR_SYSTEM,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
             &input1_buffer_view));
         iree_hal_buffer_release(input0_buffer);
         iree_hal_buffer_release(input1_buffer);
         // Marshal input buffer views through a VM variant list.
         vm::ref<iree_vm_list_t> inputs;
         IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
-                                          IREE_ALLOCATOR_SYSTEM, &inputs));
+                                          iree_allocator_system(), &inputs));
         auto input0_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input0_buffer_view);
         auto input1_buffer_view_ref =
@@ -738,12 +738,12 @@ int iree::IreeMain(int argc, char** argv) {
         vm::ref<iree_vm_list_t> outputs;
         IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
                                           kElementCount * sizeof(float),
-                                          IREE_ALLOCATOR_SYSTEM, &outputs));
+                                          iree_allocator_system(), &outputs));
 
         // Synchronously invoke the function.
         IREE_CHECK_OK(iree_vm_invoke(iree_context, main_function,
                                      /*policy=*/nullptr, inputs.get(),
-                                     outputs.get(), IREE_ALLOCATOR_SYSTEM));
+                                     outputs.get(), iree_allocator_system()));
 
         // Read back the results.
         DLOG(INFO) << "Reading back results...";

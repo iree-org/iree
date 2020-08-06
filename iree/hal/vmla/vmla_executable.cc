@@ -85,7 +85,7 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
           iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(
                                      executable_def->bytecode_module()->data()),
                                  executable_def->bytecode_module()->size()},
-          IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module),
+          iree_allocator_null(), iree_allocator_system(), &bytecode_module),
       IREE_LOC))
       << "Failed to load executable bytecode module";
 
@@ -104,7 +104,7 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
   std::array<iree_vm_module_t*, 2> modules = {vmla_module, bytecode_module};
   auto result = FromApiStatus(iree_vm_context_create_with_modules(
                                   instance, modules.data(), modules.size(),
-                                  IREE_ALLOCATOR_SYSTEM, &context_),
+                                  iree_allocator_system(), &context_),
                               IREE_LOC)
                 << "Failed resolving imports for executable module";
   iree_vm_module_release(bytecode_module);
@@ -149,7 +149,7 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
                                      binding.buffer->byte_offset());
       ASSIGN_OR_RETURN(auto buffer,
                        Buffer::WrapMutable(data, binding.buffer->byte_length(),
-                                           IREE_ALLOCATOR_NULL));
+                                           iree_allocator_null()));
       RETURN_IF_ERROR(interface->SetBinding(set_ordinal, binding.binding,
                                             {std::move(buffer)}));
     }
@@ -178,11 +178,11 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
     iree_vm_list_push_value(input_list, &value);
   }
 
-  auto status =
-      FromApiStatus(iree_vm_invoke(context(), dispatch_state->function,
-                                   /*policy=*/nullptr, input_list,
-                                   /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
-                    IREE_LOC);
+  auto status = FromApiStatus(
+      iree_vm_invoke(context(), dispatch_state->function,
+                     /*policy=*/nullptr, input_list,
+                     /*outputs=*/nullptr, iree_allocator_system()),
+      IREE_LOC);
 
   iree_vm_list_deinitialize(input_list);
 

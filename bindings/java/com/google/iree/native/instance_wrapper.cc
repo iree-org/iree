@@ -46,7 +46,7 @@ Status InstanceWrapper::Create() {
   std::call_once(setup_vm_once, [] { SetupVm(); });
 
   return FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_), IREE_LOC);
+      iree_vm_instance_create(iree_allocator_system(), &instance_), IREE_LOC);
 }
 
 iree_vm_instance_t* InstanceWrapper::instance() const { return instance_; }

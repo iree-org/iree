@@ -58,11 +58,11 @@ static iree_status_t RunFunction(benchmark::State& state,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+      iree_allocator_null(), iree_allocator_system(), &module))
       << "Bytecode module failed to load";
 
   iree_vm_module_state_t* module_state;
-  module->alloc_state(module->self, IREE_ALLOCATOR_SYSTEM, &module_state);
+  module->alloc_state(module->self, iree_allocator_system(), &module_state);
 
   iree_vm_module_t import_module;
   memset(&import_module, 0, sizeof(import_module));
@@ -106,7 +106,8 @@ static iree_status_t RunFunction(benchmark::State& state,
     result_registers->registers[i] = i;
   }
 
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver, IREE_ALLOCATOR_SYSTEM);
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver,
+                                  iree_allocator_system());
   while (state.KeepRunningBatch(batch_size)) {
     iree_vm_stack_frame_t* external_frame = NULL;
     IREE_CHECK_OK(iree_vm_stack_external_enter(
@@ -143,7 +144,7 @@ static void BM_ModuleCreate(benchmark::State& state) {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+        iree_allocator_null(), iree_allocator_system(), &module))
         << "Bytecode module failed to load";
 
     // Just testing creation and verification here!
@@ -162,12 +163,12 @@ static void BM_ModuleCreateState(benchmark::State& state) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+      iree_allocator_null(), iree_allocator_system(), &module))
       << "Bytecode module failed to load";
 
   while (state.KeepRunning()) {
     iree_vm_module_state_t* module_state;
-    module->alloc_state(module->self, IREE_ALLOCATOR_SYSTEM, &module_state);
+    module->alloc_state(module->self, iree_allocator_system(), &module_state);
 
     // Really just testing malloc overhead, though it'll be module-dependent
     // and if we do anything heavyweight on state init it'll show here.
@@ -189,11 +190,11 @@ static void BM_FullModuleInit(benchmark::State& state) {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+        iree_allocator_null(), iree_allocator_system(), &module))
         << "Bytecode module failed to load";
 
     iree_vm_module_state_t* module_state;
-    module->alloc_state(module->self, IREE_ALLOCATOR_SYSTEM, &module_state);
+    module->alloc_state(module->self, iree_allocator_system(), &module_state);
 
     benchmark::DoNotOptimize(module_state);
 

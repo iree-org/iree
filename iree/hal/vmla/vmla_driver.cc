@@ -51,13 +51,13 @@ StatusOr<ref_ptr<Driver>> VMLADriver::Create() {
   // tracing we have.
   iree_vm_instance_t* instance = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC));
+      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC));
 
   // TODO(benvanik): move to instance-based registration.
   RETURN_IF_ERROR(ModuleRegisterTypes()) << "VMLA type registration failed";
 
   iree_vm_module_t* vmla_module = nullptr;
-  RETURN_IF_ERROR(ModuleCreate(IREE_ALLOCATOR_SYSTEM, &vmla_module))
+  RETURN_IF_ERROR(ModuleCreate(iree_allocator_system(), &vmla_module))
       << "VMLA shared module creation failed";
 
   return make_ref<VMLADriver>(instance, vmla_module);

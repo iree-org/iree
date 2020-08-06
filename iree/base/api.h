@@ -658,7 +658,7 @@ typedef enum {
 
 // An allocator for host-memory allocations.
 // IREE will attempt to use this in place of the system malloc and free.
-// Pass the IREE_ALLOCATOR_SYSTEM macro to use the system allocator.
+// Pass the iree_allocator_system() macro to use the system allocator.
 typedef struct {
   // User-defined pointer passed to all functions.
   void* self;
@@ -702,22 +702,16 @@ IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
 
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
-#define IREE_ALLOCATOR_SYSTEM                                     \
-  iree_allocator_t {                                              \
-    0, iree_allocator_system_allocate, iree_allocator_system_free \
-  }
 static inline iree_allocator_t iree_allocator_system() {
-  iree_allocator_t v = {0, iree_allocator_system_allocate,
+  iree_allocator_t v = {NULL, iree_allocator_system_allocate,
                         iree_allocator_system_free};
   return v;
 }
 
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
-#define IREE_ALLOCATOR_NULL \
-  iree_allocator_t { 0, 0, 0 }
 static inline iree_allocator_t iree_allocator_null() {
-  iree_allocator_t v = {0, 0, 0};
+  iree_allocator_t v = {NULL, NULL, NULL};
   return v;
 }
 

@@ -61,7 +61,7 @@ class CheckModuleTest : public ::testing::Test {
       : instance_(instance), modules_(modules), function_(function) {}
   void SetUp() override {
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-        instance_, modules_.data(), modules_.size(), IREE_ALLOCATOR_SYSTEM,
+        instance_, modules_.data(), modules_.size(), iree_allocator_system(),
         &context_));
   }
   void TearDown() override { iree_vm_context_release(context_); }
@@ -69,7 +69,7 @@ class CheckModuleTest : public ::testing::Test {
   void TestBody() override {
     IREE_EXPECT_OK(iree_vm_invoke(context_, function_, /*policy=*/nullptr,
                                   /*inputs=*/nullptr, /*outputs=*/nullptr,
-                                  IREE_ALLOCATOR_SYSTEM));
+                                  iree_allocator_system()));
   }
 
  private:
@@ -87,7 +87,7 @@ StatusOr<int> Run(std::string input_file_path) {
       << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
+      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC))
       << "creating instance";
 
   std::string module_data;
@@ -106,7 +106,7 @@ StatusOr<int> Run(std::string input_file_path) {
   iree_vm_module_t* hal_module = nullptr;
   RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
   iree_vm_module_t* check_module = nullptr;
-  check_native_module_create(IREE_ALLOCATOR_SYSTEM, &check_module);
+  check_native_module_create(iree_allocator_system(), &check_module);
 
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};

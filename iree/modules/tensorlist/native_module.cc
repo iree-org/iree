@@ -98,7 +98,7 @@ class TensorList final : public RefObject<TensorList> {
       RETURN_IF_ERROR(FromApiStatus(
           iree_hal_buffer_subspan(iree_hal_buffer_view_buffer(tensor.get()),
                                   start_offset, subview_length,
-                                  IREE_ALLOCATOR_SYSTEM, &subview_buffer),
+                                  iree_allocator_system(), &subview_buffer),
           IREE_LOC));
 
       iree_hal_buffer_view_t* slice = nullptr;
@@ -106,7 +106,7 @@ class TensorList final : public RefObject<TensorList> {
           iree_hal_buffer_view_create(
               subview_buffer.get(), shape.data() + 1, shape.size() - 1,
               iree_hal_buffer_view_element_type(tensor.get()),
-              IREE_ALLOCATOR_SYSTEM, &slice),
+              iree_allocator_system(), &slice),
           IREE_LOC));
       list->SetItem(i, slice);
     }
@@ -180,7 +180,7 @@ class TensorList final : public RefObject<TensorList> {
     RETURN_IF_ERROR(FromApiStatus(
         iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
                                     result_shape.size(), type,
-                                    IREE_ALLOCATOR_SYSTEM, &result_view),
+                                    iree_allocator_system(), &result_view),
         IREE_LOC));
     return std::move(result_view);
   }
@@ -261,7 +261,7 @@ class TensorList final : public RefObject<TensorList> {
     RETURN_IF_ERROR(FromApiStatus(
         iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
                                     result_shape.size(), type,
-                                    IREE_ALLOCATOR_SYSTEM, &result_view),
+                                    iree_allocator_system(), &result_view),
         IREE_LOC));
 
     return std::move(result_view);

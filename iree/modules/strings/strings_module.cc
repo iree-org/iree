@@ -326,7 +326,7 @@ class StringsModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = IREE_ALLOCATOR_SYSTEM;
+  iree_allocator_t allocator_ = iree_allocator_system();
 
   template <typename T>
   void GenerateStringsByType(iree_hal_mapped_memory_t tensor_mapping,

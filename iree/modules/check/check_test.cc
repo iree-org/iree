@@ -40,17 +40,17 @@ class CheckTest : public ::testing::Test {
 
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_ASSERT_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), IREE_ALLOCATOR_SYSTEM, &hal_driver));
+        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
-        hal_driver, IREE_ALLOCATOR_SYSTEM, &device_));
+        hal_driver, iree_allocator_system(), &device_));
     IREE_ASSERT_OK(
-        iree_hal_module_create(device_, IREE_ALLOCATOR_SYSTEM, &hal_module_));
+        iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
     iree_hal_driver_release(hal_driver);
 
-    IREE_ASSERT_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
+    IREE_ASSERT_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_ASSERT_OK(
-        check_native_module_create(IREE_ALLOCATOR_SYSTEM, &check_module_))
+        check_native_module_create(iree_allocator_system(), &check_module_))
         << "Native module failed to init";
   }
 
@@ -64,7 +64,7 @@ class CheckTest : public ::testing::Test {
   void SetUp() override {
     std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_};
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+        instance_, modules.data(), modules.size(), iree_allocator_system(),
         &context_));
     allocator_ = iree_hal_device_allocator(device_);
   }
@@ -99,7 +99,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_SINT_32,
-        IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
+        iree_allocator_system(), &*out_buffer_view));
   }
 
   void CreateFloat32BufferView(absl::Span<const float> contents,
@@ -128,7 +128,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(
         iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
                                     IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-                                    IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
+                                    iree_allocator_system(), &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(absl::Span<const double> contents,
@@ -157,7 +157,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(
         iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
                                     IREE_HAL_ELEMENT_TYPE_FLOAT_64,
-                                    IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
+                                    iree_allocator_system(), &*out_buffer_view));
   }
 
   Status Invoke(absl::string_view function_name) {
@@ -173,7 +173,7 @@ class CheckTest : public ::testing::Test {
     return FromApiStatus(
         iree_vm_invoke(context_, function,
                        /*policy=*/nullptr, inputs_.get(),
-                       /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
+                       /*outputs=*/nullptr, iree_allocator_system()),
         IREE_LOC);
   }
 
@@ -181,7 +181,7 @@ class CheckTest : public ::testing::Test {
                 std::vector<iree_vm_value> args) {
     RETURN_IF_ERROR(
         FromApiStatus(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
-                                          IREE_ALLOCATOR_SYSTEM, &inputs_),
+                                          iree_allocator_system(), &inputs_),
                       IREE_LOC));
     for (iree_vm_value& arg : args) {
       RETURN_IF_ERROR(FromApiStatus(
@@ -194,7 +194,7 @@ class CheckTest : public ::testing::Test {
                 std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     RETURN_IF_ERROR(
         FromApiStatus(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
-                                          IREE_ALLOCATOR_SYSTEM, &inputs_),
+                                          iree_allocator_system(), &inputs_),
                       IREE_LOC));
     for (auto& arg : args) {
       iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());

@@ -23,8 +23,8 @@ Status ModuleWrapper::Create(const uint8_t* flatbuffer_data,
                              iree_host_size_t length) {
   return FromApiStatus(
       iree_vm_bytecode_module_create(
-          iree_const_byte_span_t{flatbuffer_data, length}, IREE_ALLOCATOR_NULL,
-          IREE_ALLOCATOR_SYSTEM, &module_),
+          iree_const_byte_span_t{flatbuffer_data, length},
+          iree_allocator_null(), iree_allocator_system(), &module_),
       IREE_LOC);
 }
 

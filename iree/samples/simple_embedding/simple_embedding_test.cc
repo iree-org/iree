@@ -47,14 +47,14 @@ std::vector<TestParams> GetAvailableDriverTestParams() {
   iree_string_view_t* driver_names = nullptr;
   iree_host_size_t driver_count = 0;
   IREE_CHECK_OK(iree_hal_driver_registry_query_available_drivers(
-      IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count));
+      iree_allocator_system(), &driver_names, &driver_count));
   for (int i = 0; i < driver_count; ++i) {
     TestParams test_params;
     test_params.driver_name =
         std::string(driver_names[i].data, driver_names[i].size);
     all_test_params.push_back(std::move(test_params));
   }
-  iree_allocator_free(IREE_ALLOCATOR_SYSTEM, driver_names);
+  iree_allocator_free(iree_allocator_system(), driver_names);
   return all_test_params;
 }
 
@@ -68,7 +68,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   IREE_ASSERT_OK(iree_hal_module_register_types());
 
   iree_vm_instance_t* instance = nullptr;
-  IREE_ASSERT_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance));
+  IREE_ASSERT_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
   // Create the driver/device as defined by the test and setup the HAL module.
   const auto& driver_name = GetParam().driver_name;
@@ -76,13 +76,13 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   iree_hal_driver_t* driver = nullptr;
   IREE_ASSERT_OK(iree_hal_driver_registry_create_driver(
       iree_string_view_t{driver_name.data(), driver_name.size()},
-      IREE_ALLOCATOR_SYSTEM, &driver));
+      iree_allocator_system(), &driver));
   iree_hal_device_t* device = nullptr;
   IREE_ASSERT_OK(iree_hal_driver_create_default_device(
-      driver, IREE_ALLOCATOR_SYSTEM, &device));
+      driver, iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_ASSERT_OK(
-      iree_hal_module_create(device, IREE_ALLOCATOR_SYSTEM, &hal_module));
+      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
   iree_hal_driver_release(driver);
 
   // Load bytecode module from the embedded data.
@@ -93,13 +93,13 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module));
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
   IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-      instance, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+      instance, modules.data(), modules.size(), iree_allocator_system(),
       &context));
   LOG(INFO) << "Module loaded and context is ready for use";
   iree_vm_module_release(hal_module);
@@ -143,7 +143,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // TODO(benvanik): make a macro/magic.
   vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
-                                     IREE_ALLOCATOR_SYSTEM, &inputs));
+                                     iree_allocator_system(), &inputs));
   auto arg0_buffer_ref = iree_hal_buffer_move_ref(arg0_buffer);
   auto arg1_buffer_ref = iree_hal_buffer_move_ref(arg1_buffer);
   IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_ref));
@@ -152,13 +152,13 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &outputs));
+                                     iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
   LOG(INFO) << "Calling " << kMainFunctionName << "...";
   IREE_ASSERT_OK(iree_vm_invoke(context, main_function,
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                IREE_ALLOCATOR_SYSTEM));
+                                iree_allocator_system()));
 
   // Get the result buffers from the invocation.
   LOG(INFO) << "Retreiving results...";

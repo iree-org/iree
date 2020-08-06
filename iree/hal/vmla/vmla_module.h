@@ -42,7 +42,7 @@ constexpr iree_vmla_size_t kVMLAWholeBuffer = -1;
 
 // A lightweight buffer lifetime management type.
 // This is exported to modules as `vmla.buffer`. It can be used to provide
-// views into existing rdata buffers (by specifying IREE_ALLOCATOR_NULL),
+// views into existing rdata buffers (by specifying iree_allocator_null()),
 // views into parent buffers (parents retained via a reference), or dedicated
 // allocations from an allocator.
 //

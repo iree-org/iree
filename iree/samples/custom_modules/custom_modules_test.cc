@@ -32,24 +32,24 @@ namespace {
 class CustomModulesTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     // TODO(benvanik): move to instance-based registration.
     IREE_CHECK_OK(iree_hal_module_register_types());
     // TODO(benvanik): make a 'don't care' helper method.
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("vmla"), IREE_ALLOCATOR_SYSTEM, &hal_driver));
+        iree_make_cstring_view("vmla"), iree_allocator_system(), &hal_driver));
     iree_hal_device_t* hal_device = nullptr;
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
-        hal_driver, IREE_ALLOCATOR_SYSTEM, &hal_device));
-    IREE_CHECK_OK(iree_hal_module_create(hal_device, IREE_ALLOCATOR_SYSTEM,
+        hal_driver, iree_allocator_system(), &hal_device));
+    IREE_CHECK_OK(iree_hal_module_create(hal_device, iree_allocator_system(),
                                          &hal_module_));
     iree_hal_device_release(hal_device);
     iree_hal_driver_release(hal_driver);
 
     IREE_CHECK_OK(iree_custom_native_module_register_types());
-    IREE_CHECK_OK(iree_custom_native_module_create(IREE_ALLOCATOR_SYSTEM,
+    IREE_CHECK_OK(iree_custom_native_module_create(iree_allocator_system(),
                                                    &native_module_))
         << "Native module failed to init";
 
@@ -59,13 +59,13 @@ class CustomModulesTest : public ::testing::Test {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
+        iree_allocator_null(), iree_allocator_system(), &bytecode_module_))
         << "Bytecode module failed to load";
 
     std::vector<iree_vm_module_t*> modules = {hal_module_, native_module_,
                                               bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+        instance_, modules.data(), modules.size(), iree_allocator_system(),
         &context_));
   }
 
@@ -99,14 +99,14 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
   iree_custom_message_t* input_message = nullptr;
   IREE_ASSERT_OK(
       iree_custom_message_wrap(iree_make_cstring_view("hello world!"),
-                               IREE_ALLOCATOR_SYSTEM, &input_message));
+                               iree_allocator_system(), &input_message));
   iree_vm_value_t count = iree_vm_value_make_i32(5);
 
   // Pass in the message and number of times to print it.
   // TODO(benvanik): make a macro/magic.
   iree::vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
-                                     IREE_ALLOCATOR_SYSTEM, &inputs));
+                                     iree_allocator_system(), &inputs));
   iree_vm_ref_t input_message_ref = iree_custom_message_move_ref(input_message);
   IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_message_ref));
   IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &count));
@@ -114,12 +114,12 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
   // Prepare outputs list to accept the results from the invocation.
   iree::vm::ref<iree_vm_list_t> outputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &outputs));
+                                     iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("reverseAndPrint"),
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                IREE_ALLOCATOR_SYSTEM));
+                                iree_allocator_system()));
 
   // Read back the message that we reversed inside of the module.
   iree_custom_message_t* reversed_message =
@@ -142,24 +142,24 @@ TEST_F(CustomModulesTest, PrintTensor) {
       IREE_HAL_MEMORY_ACCESS_ALL,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
                        sizeof(kBufferContents)},
-      IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &buffer));
+      iree_allocator_system(), iree_allocator_system(), &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &inputs));
+                                     iree_allocator_system(), &inputs));
   iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
   IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_buffer_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   iree::vm::ref<iree_vm_list_t> outputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &outputs));
+                                     iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("printTensor"),
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                IREE_ALLOCATOR_SYSTEM));
+                                iree_allocator_system()));
 
   // Read back the message that we printed inside of the module.
   iree_custom_message_t* printed_message =
@@ -182,24 +182,24 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
       IREE_HAL_MEMORY_ACCESS_ALL,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
                        sizeof(kBufferContents)},
-      IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &buffer));
+      iree_allocator_system(), iree_allocator_system(), &buffer));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &inputs));
+                                     iree_allocator_system(), &inputs));
   iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
   IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &input_buffer_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   iree::vm::ref<iree_vm_list_t> outputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &outputs));
+                                     iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("roundTripTensor"),
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                IREE_ALLOCATOR_SYSTEM));
+                                iree_allocator_system()));
 
   // Read back the message that's been moved around.
   iree_custom_message_t* printed_message =

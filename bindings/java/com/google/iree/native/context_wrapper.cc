@@ -36,7 +36,7 @@ std::vector<iree_vm_module_t*> GetModulesFromModuleWrappers(
 Status ContextWrapper::Create(const InstanceWrapper& instance_wrapper) {
   RETURN_IF_ERROR(
       FromApiStatus(iree_vm_context_create(instance_wrapper.instance(),
-                                           IREE_ALLOCATOR_SYSTEM, &context_),
+                                           iree_allocator_system(), &context_),
                     IREE_LOC));
   RETURN_IF_ERROR(CreateDefaultModules());
   std::vector<iree_vm_module_t*> default_modules = {hal_module_};
@@ -58,7 +58,7 @@ Status ContextWrapper::CreateWithModules(
 
   return FromApiStatus(iree_vm_context_create_with_modules(
                            instance_wrapper.instance(), modules.data(),
-                           modules.size(), IREE_ALLOCATOR_SYSTEM, &context_),
+                           modules.size(), iree_allocator_system(), &context_),
                        IREE_LOC);
 }
 
@@ -90,13 +90,13 @@ ContextWrapper::~ContextWrapper() {
 Status ContextWrapper::CreateDefaultModules() {
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_driver_registry_create_driver(iree_make_cstring_view("vmla"),
-                                             IREE_ALLOCATOR_SYSTEM, &driver_),
+                                             iree_allocator_system(), &driver_),
       IREE_LOC));
   RETURN_IF_ERROR(FromApiStatus(iree_hal_driver_create_default_device(
-                                    driver_, IREE_ALLOCATOR_SYSTEM, &device_),
+                                    driver_, iree_allocator_system(), &device_),
                                 IREE_LOC));
   return FromApiStatus(
-      iree_hal_module_create(device_, IREE_ALLOCATOR_SYSTEM, &hal_module_),
+      iree_hal_module_create(device_, iree_allocator_system(), &hal_module_),
       IREE_LOC);
 }
 

@@ -170,7 +170,7 @@ class CustomModuleState final {
     RETURN_IF_ERROR(FromApiStatus(
         iree_custom_message_create(
             iree_string_view_t{string_value.data(), string_value.size()},
-            IREE_ALLOCATOR_SYSTEM, &message),
+            iree_allocator_system(), &message),
         IREE_LOC));
     return std::move(message);
   }
@@ -228,7 +228,7 @@ class CustomModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = IREE_ALLOCATOR_SYSTEM;
+  iree_allocator_t allocator_ = iree_allocator_system();
 
   // HAL buffer allocator that uses host-local memory. This is just for this
   // test as we don't actually use a HAL device and don't have a real device

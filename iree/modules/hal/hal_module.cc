@@ -140,7 +140,7 @@ class HALModuleState final {
 
     vm::ref<iree_hal_semaphore_t> semaphore;
     RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_semaphore_create(device.get(), 0ull, IREE_ALLOCATOR_SYSTEM,
+        iree_hal_semaphore_create(device.get(), 0ull, iree_allocator_system(),
                                   &semaphore),
         IREE_LOC));
 
@@ -491,10 +491,10 @@ class HALModuleState final {
     IREE_TRACE_SCOPE0("HALModuleState::CommandBufferCreate");
 
     vm::ref<iree_hal_command_buffer_t> command_buffer;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_command_buffer_create(device.get(), modes, command_categories,
-                                       IREE_ALLOCATOR_SYSTEM, &command_buffer),
-        IREE_LOC))
+    RETURN_IF_ERROR(FromApiStatus(iree_hal_command_buffer_create(
+                                      device.get(), modes, command_categories,
+                                      iree_allocator_system(), &command_buffer),
+                                  IREE_LOC))
         << "Failed to create command buffer";
     return command_buffer;
   }
