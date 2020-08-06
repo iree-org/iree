@@ -159,25 +159,6 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
 
-# Enable compiler targets based on options.
-set(IREE_COMPILER_TARGETS "")
-set(IREE_COMPILER_TARGET_COPTS "")
-# TODO(#2645): Move LLVMAOT target under DYLIB-LLVM-AOT flag
-if(${IREE_TARGET_BACKEND_LLVM-IR})
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMIR_TARGET")
-endif()
-if(${IREE_TARGET_BACKEND_VMLA})
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
-endif()
-if(${IREE_TARGET_BACKEND_VULKAN-SPIRV})
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
-endif()
-
 #-------------------------------------------------------------------------------
 # Cross compiling configuration
 #-------------------------------------------------------------------------------
