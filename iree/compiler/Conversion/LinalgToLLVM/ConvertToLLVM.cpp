@@ -218,10 +218,10 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
 
     // func foo(%packed_buffer_args: !llvm<i8**>, %push_constant: !llvm<i32*>)
+    MLIRContext *context = rewriter.getContext();
     auto packedBuffersArgsTy =
-        LLVM::LLVMType::getInt8PtrTy(typeConverter.getDialect()).getPointerTo();
-    auto pushConstantArgTy =
-        LLVM::LLVMType::getInt32Ty(typeConverter.getDialect()).getPointerTo();
+        LLVM::LLVMType::getInt8PtrTy(context).getPointerTo();
+    auto pushConstantArgTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
     signatureConverter.addInputs(packedBuffersArgsTy);
     signatureConverter.addInputs(pushConstantArgTy);
 
@@ -244,7 +244,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // descriptors.
     Value packedBuffersArgsPtr = builder.create<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMType::getStructTy(typeConverter.getDialect(), inputStructPtrs)
+        LLVM::LLVMType::getStructTy(builder.getContext(), inputStructPtrs)
             .getPointerTo(),
         newFuncOp.getArgument(0));
     Value packedBuffersArgs =
@@ -272,7 +272,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // Lower hal.interface.load.constant ops into llvm.getelementptr, llvm.load
     for (auto loadOp : loadOps) {
       Value offset = builder.create<LLVM::ConstantOp>(
-          loc, LLVM::LLVMType::getInt64Ty(typeConverter.getDialect()),
+          loc, LLVM::LLVMType::getInt64Ty(context),
           builder.getI64IntegerAttr(loadOp.offset().getZExtValue()));
       Value constPtr = builder.create<LLVM::GEPOp>(loc, pushConstantArgTy,
                                                    newFuncOp.getArgument(1),
