@@ -454,7 +454,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 
   // Print the data argument remapping.
   p << "(";
-  interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
+  interleaveComma(llvm::zip(op.body().getArguments(), op.args()), p,
                   [&](std::tuple<BlockArgument, Value> it) {
                     p << std::get<0>(it) << " = " << std::get<1>(it);
                     p << " : ";
@@ -700,7 +700,7 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
 
   // Print the data argument remapping.
   p << "(";
-  interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
+  interleaveComma(llvm::zip(op.body().getArguments(), op.args()), p,
                   [&](std::tuple<BlockArgument, Value> it) {
                     p << std::get<0>(it) << " = " << std::get<1>(it);
                     p << " : ";

@@ -167,7 +167,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 
     // Get the arguments from the switch that we want to carry along in the
     // block arguments.
-    auto regionOperands = conditionRegion.front().getArguments();
+    auto regionOperands = conditionRegion.getArguments();
     auto regionArgs = switchOp.args().slice(argOffset, regionOperands.size());
     argOffset += regionOperands.size();
 
