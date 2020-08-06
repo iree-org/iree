@@ -71,6 +71,9 @@ class SerializingCommandQueue final : public CommandQueue {
   // Aborts all deferred submissions and waits for submitted work to complete.
   void AbortQueueSubmission();
 
+  // Informs this queue that the given |fences| are known to have signaled.
+  void SignalFences(absl::Span<VkFence> fences);
+
  private:
   // A submission batch together with the fence to singal its status.
   struct FencedSubmission : IntrusiveLinkBase<void> {

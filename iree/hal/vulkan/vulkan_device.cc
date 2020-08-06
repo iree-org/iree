@@ -729,6 +729,16 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
                 ->AbortQueueSubmission();
           }
         },
+        // Triggers necessary processing on all queues due to the given |fence|
+        // being signaled. This allows the queue to drop the fence ref it holds
+        // even when we are not waiting on the queue directly.
+        [this](absl::Span<VkFence> fences) {
+          IREE_TRACE_SCOPE0("<lambda>::OnFenceSignal");
+          for (const auto& queue : command_queues_) {
+            static_cast<SerializingCommandQueue*>(queue.get())
+                ->SignalFences(fences);
+          }
+        },
         add_ref(semaphore_pool_), initial_value);
   }
 
