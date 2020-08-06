@@ -386,10 +386,18 @@ LogicalResult ConvOpConversion::apply(
     rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
     return failure();
   }
+
+  ShapedType filterShapeType =
+      op.rhs().getType().dyn_cast_or_null<ShapedType>();
+  if (!filterShapeType) return failure();
+  auto shape = filterShapeType.getShape();
+  auto numGroups =
+      shape[op.dimension_numbers().kernel_input_feature_dimension().getInt()];
+  auto groupSize =
+      shape[op.dimension_numbers().kernel_output_feature_dimension().getInt()];
   // Depthwise conv path...
   if (op.feature_group_count().getZExtValue() > 1u &&
-      op.feature_group_count().getZExtValue() ==
-          op.dimension_numbers().kernel_input_feature_dimension().getInt()) {
+      op.feature_group_count().getZExtValue() == numGroups) {
     // Lowering depthwise convolution to linalg.generic op. The idea is to use
     // the group convolution formulation to perform the separable depthwise
     // convolution as the following, given an n-dimensional input x and filter w
@@ -442,10 +450,8 @@ LogicalResult ConvOpConversion::apply(
     for (int i = 0; i < spatialDims; ++i) {
       outputExprs.push_back(rewriter.getAffineDimExpr(d1Index + i));
     }
-    outputExprs.push_back(
-        rewriter.getAffineDimExpr(ciIndex) *
-            op.dimension_numbers().kernel_output_feature_dimension().getInt() +
-        rewriter.getAffineDimExpr(coIndex));
+    outputExprs.push_back(rewriter.getAffineDimExpr(ciIndex) * groupSize +
+                          rewriter.getAffineDimExpr(coIndex));
 
     // nloops = |d| + |k| + |{n, ci, co}|
     int nloops = spatialDims * 2 + 3;
