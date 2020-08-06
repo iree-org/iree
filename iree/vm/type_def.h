@@ -61,9 +61,9 @@ inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
 #define iree_vm_type_def_make_variant_type() \
   { .value_type = IREE_VM_VALUE_TYPE_NONE, .ref_type = IREE_VM_REF_TYPE_NULL, }
 #define iree_vm_type_def_make_value_type(value_type) \
-  { .value_type = value_type, .ref_type = IREE_VM_REF_TYPE_NULL, }
+  { .value_type = (value_type), .ref_type = IREE_VM_REF_TYPE_NULL, }
 #define iree_vm_type_def_make_ref_type(ref_type) \
-  { .value_type = IREE_VM_VALUE_TYPE_NONE, .ref_type = ref_type, }
+  { .value_type = IREE_VM_VALUE_TYPE_NONE, .ref_type = (ref_type), }
 #endif  // __cplusplus
 
 #define iree_vm_type_def_is_value(v) \
@@ -92,8 +92,8 @@ typedef struct {
 
 #define iree_vm_variant_empty() \
   { {IREE_VM_VALUE_TYPE_NONE, IREE_VM_REF_TYPE_NULL}, {0}, }
-#define iree_vm_variant_is_value(v) iree_vm_type_def_is_value(&v.type)
-#define iree_vm_variant_is_ref(v) iree_vm_type_def_is_ref(&v.type)
+#define iree_vm_variant_is_value(v) iree_vm_type_def_is_value(&(v).type)
+#define iree_vm_variant_is_ref(v) iree_vm_type_def_is_ref(&(v).type)
 
 #ifdef __cplusplus
 }  // extern "C"

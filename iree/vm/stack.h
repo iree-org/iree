@@ -135,9 +135,9 @@ typedef struct iree_vm_stack iree_vm_stack_t;
 // The contents of the |storage| can be anything upon initialization and the
 // stack must be deinitialized with iree_vm_stack_deinitialize before the
 // storage is freed. The provided |allocator| is only used for stack growth
-// beyond the intial storage capacity and may be iree_allocator_null() to prevent
-// growth. Use IREE_VM_STACK_DEFAULT_SIZE for a reasonable default or use
-// iree_vm_stack_allocate if the input programs may exceed reason.
+// beyond the intial storage capacity and may be iree_allocator_null() to
+// prevent growth. Use IREE_VM_STACK_DEFAULT_SIZE for a reasonable default or
+// use iree_vm_stack_allocate if the input programs may exceed reason.
 //
 // The provided |state_resolver| will be used to resolve a module to a module
 // state within a context. This will be called on function entry whenever module
