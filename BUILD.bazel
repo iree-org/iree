@@ -12,6 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Note that project-wide, bazel repo aliases are used. Various scripts and helpers operate on the
+# following prefixes textually, so avoid doing any systematic construction that would break the
+# matching.
+#
+#  "@absl_py//absl/"
+#  "@com_google_absl//absl/"
+#  "@com_google_absl//absl/"
+#  "@bazel_skylib//"
+#  "@com_google_benchmark//"
+#  "@com_github_google_flatbuffers//"
+#  "@com_github_dvidelabs_flatcc//"
+#  "@com_google_googletest//"
+#  "@llvm-project//"
+#  "@iree_pybind11//"
+#  "@renderdoc_api//"
+#  "@com_google_ruy//"
+#  "@sdl2//"
+#  "@org_tensorflow//tensorflow/"
+#  "@com_google_tracing_framework_cpp//"
+#  "@iree_vulkan_headers//"
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],

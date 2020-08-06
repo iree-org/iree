@@ -38,8 +38,6 @@ class Conv2dModule(tf.Module):
     return tf.nn.depthwise_conv2d(
         img, kernel, [1, 1, 1, 1], "SAME", name="result")
 
-
-
   @tf.function(input_signature=[
       tf.TensorSpec([2, 4, 5, 2], tf.float32),
       tf.TensorSpec([2, 4, 2, 3], tf.float32),
@@ -86,7 +84,6 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       module.conv2d_2452x2423_valid_stride_2(i, k)
 
     self.compare_backends(batched_feature_unpadded_same_stride_2)
-
 
   def test_batched_feature_padded_same_stride_2(self):
 
