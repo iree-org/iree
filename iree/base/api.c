@@ -14,10 +14,9 @@
 
 #include "iree/base/api.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <ctime>
 
 #include "iree/base/tracing.h"
 
@@ -65,7 +64,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
   }
   const char* result =
       (const char*)(memchr(value.data + pos, c, value.size - pos));
-  return result != nullptr ? result - value.data : IREE_STRING_VIEW_NPOS;
+  return result != NULL ? result - value.data : IREE_STRING_VIEW_NPOS;
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
@@ -114,8 +113,7 @@ IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
   if (!first_ptr) {
     return -1;
   }
-  intptr_t offset =
-      (intptr_t)(reinterpret_cast<const char*>(first_ptr) - value.data);
+  intptr_t offset = (intptr_t)((const char*)(first_ptr)-value.data);
   if (out_lhs) {
     out_lhs->data = value.data;
     out_lhs->size = offset;
@@ -131,7 +129,7 @@ static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
                                                 iree_string_view_t pattern) {
   iree_host_size_t next_char_index = iree_string_view_find_first_of(
       pattern, iree_make_cstring_view("*?"), /*pos=*/0);
-  if (next_char_index == std::string::npos) {
+  if (next_char_index == IREE_STRING_VIEW_NPOS) {
     return iree_string_view_equal(value, pattern);
   } else if (next_char_index > 0) {
     iree_string_view_t value_prefix =
@@ -401,30 +399,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
 // iree_time_t and iree_duration_t
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_time_t iree_time_now() {
-#if defined(IREE_PLATFORM_WINDOWS)
-  // GetSystemTimePreciseAsFileTime requires Windows 8, add a fallback
-  // (such as using std::chrono) if older support is needed.
-  FILETIME system_time;
-  ::GetSystemTimePreciseAsFileTime(&system_time);
-
-  constexpr int64_t kUnixEpochStartTicks = 116444736000000000i64;
-  constexpr int64_t kFtToMicroSec = 10;
-  LARGE_INTEGER li;
-  li.LowPart = system_time.dwLowDateTime;
-  li.HighPart = system_time.dwHighDateTime;
-  li.QuadPart -= kUnixEpochStartTicks;
-  li.QuadPart /= kFtToMicroSec;
-  return li.QuadPart;
-#elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
-    defined(IREE_PLATFORM_LINUX)
-  timespec clock_time;
-  clock_gettime(CLOCK_REALTIME, &clock_time);
-  return clock_time.tv_nsec;
-#else
-#error "IREE system clock needs to be set up for your platform"
-#endif
-}
+// In api_time.cc until we have our own portable C implementation:
+// IREE_API_EXPORT iree_time_t iree_time_now();
 
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {
@@ -464,33 +440,34 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
 IREE_API_EXPORT void IREE_API_CALL
 iree_allocator_free(iree_allocator_t allocator, void* ptr) {
   if (ptr && allocator.free) {
-    return allocator.free(allocator.self, ptr);
+    allocator.free(allocator.self, ptr);
   }
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
                                iree_host_size_t byte_length, void** out_ptr) {
-  IREE_TRACE_SCOPE0("iree_allocator_system_allocate");
   IREE_ASSERT_ARGUMENT(out_ptr);
   if (byte_length == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocations must be >0 bytes");
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   void* existing_ptr = *out_ptr;
-  void* ptr = nullptr;
+  void* ptr = NULL;
   if (existing_ptr && (mode & IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING)) {
-    ptr = std::realloc(existing_ptr, byte_length);
+    ptr = realloc(existing_ptr, byte_length);
     if (ptr && (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS)) {
-      std::memset(ptr, 0, byte_length);
+      memset(ptr, 0, byte_length);
     }
   } else {
     existing_ptr = NULL;
     if (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS) {
-      ptr = std::calloc(1, byte_length);
+      ptr = calloc(1, byte_length);
     } else {
-      ptr = std::malloc(byte_length);
+      ptr = malloc(byte_length);
     }
   }
   if (!ptr) {
@@ -504,14 +481,16 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
   IREE_TRACE_ALLOC(ptr, byte_length);
 
   *out_ptr = ptr;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
                                                               void* ptr) {
-  IREE_TRACE_SCOPE0("iree_allocator_system_free");
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_FREE(ptr);
   if (ptr) {
-    std::free(ptr);
+    free(ptr);
   }
+  IREE_TRACE_ZONE_END(z0);
 }

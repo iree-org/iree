@@ -31,7 +31,8 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
-    "api.cc"
+    "api.c"
+    "api_time.cc"
   DEPS
     ::api_hdrs
     ::api_util

@@ -34,7 +34,10 @@ cc_library(
 
 cc_library(
     name = "api",
-    srcs = ["api.cc"],
+    srcs = [
+      "api.c",
+      "api_time.cc",
+    ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
     deps = [
