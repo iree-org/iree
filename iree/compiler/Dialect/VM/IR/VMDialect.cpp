@@ -39,6 +39,18 @@ namespace {
 struct VMOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
 
+  void getIntegerName(IntegerAttr value, llvm::raw_svector_ostream &os) const {
+    if (!value) {
+      os << 'c';
+      return;
+    }
+    if (value.getValue() == 0) {
+      os << "zero";
+    } else {
+      os << 'c' << value.getValue();
+    }
+  }
+
   void getAsmResultNames(Operation *op,
                          OpAsmSetValueNameFn setNameFn) const final {
     SmallString<32> osBuffer;
@@ -54,18 +66,12 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       os << globalLoadOp.global();
     } else if (isa<ConstRefZeroOp>(op)) {
       os << "null";
-    } else if (isa<ConstI32ZeroOp>(op)) {
+    } else if (isa<ConstI32ZeroOp>(op) || isa<ConstI64ZeroOp>(op)) {
       os << "zero";
     } else if (auto constOp = dyn_cast<ConstI32Op>(op)) {
-      if (auto intAttr = constOp.value().dyn_cast<IntegerAttr>()) {
-        if (intAttr.getValue() == 0) {
-          os << "zero";
-        } else {
-          os << 'c' << intAttr.getValue();
-        }
-      } else {
-        os << 'c';
-      }
+      getIntegerName(constOp.value().dyn_cast<IntegerAttr>(), os);
+    } else if (auto constOp = dyn_cast<ConstI64Op>(op)) {
+      getIntegerName(constOp.value().dyn_cast<IntegerAttr>(), os);
     } else if (auto rodataOp = dyn_cast<ConstRefRodataOp>(op)) {
       os << rodataOp.rodata();
     } else if (auto refType =
@@ -75,27 +81,27 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       } else {
         os << "ref";
       }
-    } else if (isa<CmpEQI32Op>(op)) {
+    } else if (isa<CmpEQI32Op>(op) || isa<CmpEQI64Op>(op)) {
       os << "eq";
-    } else if (isa<CmpNEI32Op>(op)) {
+    } else if (isa<CmpNEI32Op>(op) || isa<CmpNEI64Op>(op)) {
       os << "ne";
-    } else if (isa<CmpLTI32SOp>(op)) {
+    } else if (isa<CmpLTI32SOp>(op) || isa<CmpLTI64SOp>(op)) {
       os << "slt";
-    } else if (isa<CmpLTI32UOp>(op)) {
+    } else if (isa<CmpLTI32UOp>(op) || isa<CmpLTI64UOp>(op)) {
       os << "ult";
-    } else if (isa<CmpLTEI32SOp>(op)) {
+    } else if (isa<CmpLTEI32SOp>(op) || isa<CmpLTEI64SOp>(op)) {
       os << "slte";
-    } else if (isa<CmpLTEI32UOp>(op)) {
+    } else if (isa<CmpLTEI32UOp>(op) || isa<CmpLTEI64UOp>(op)) {
       os << "ulte";
-    } else if (isa<CmpGTI32SOp>(op)) {
+    } else if (isa<CmpGTI32SOp>(op) || isa<CmpGTI64SOp>(op)) {
       os << "sgt";
-    } else if (isa<CmpGTI32UOp>(op)) {
+    } else if (isa<CmpGTI32UOp>(op) || isa<CmpGTI64UOp>(op)) {
       os << "ugt";
-    } else if (isa<CmpGTEI32SOp>(op)) {
+    } else if (isa<CmpGTEI32SOp>(op) || isa<CmpGTEI64SOp>(op)) {
       os << "sgte";
-    } else if (isa<CmpGTEI32UOp>(op)) {
+    } else if (isa<CmpGTEI32UOp>(op) || isa<CmpGTEI64UOp>(op)) {
       os << "ugte";
-    } else if (isa<CmpNZI32Op>(op)) {
+    } else if (isa<CmpNZI32Op>(op) || isa<CmpNZI64Op>(op)) {
       os << "nz";
     } else if (isa<CmpEQRefOp>(op)) {
       os << "req";
@@ -275,6 +281,12 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
       return builder.create<VM::ConstI32ZeroOp>(loc);
     }
     return builder.create<VM::ConstI32Op>(loc, convertedValue);
+  } else if (ConstI64Op::isBuildableWith(value, type)) {
+    auto convertedValue = ConstI64Op::convertConstValue(value);
+    if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
+      return builder.create<VM::ConstI64ZeroOp>(loc);
+    }
+    return builder.create<VM::ConstI64Op>(loc, convertedValue);
   } else if (type.isa<IREE::VM::RefType>()) {
     // The only constant type we support for ref_ptrs is null so we can just
     // emit that here.
