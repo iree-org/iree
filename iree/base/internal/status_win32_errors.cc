@@ -15,7 +15,7 @@
 #include "iree/base/internal/status_win32_errors.h"
 
 #include "absl/strings/str_cat.h"
-#include "iree/base/platform_headers.h"
+#include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 

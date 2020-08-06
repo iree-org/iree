@@ -24,7 +24,6 @@ iree_cc_library(
   DEPS
     absl::memory
     absl::strings
-    iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
   PUBLIC
@@ -42,7 +41,6 @@ iree_cc_library(
     absl::strings
     iree::base::file_io_hdrs
     iree::base::file_path
-    iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
@@ -60,7 +58,6 @@ iree_cc_library(
     absl::memory
     absl::strings
     iree::base::file_mapping_hdrs
-    iree::base::platform_headers
     iree::base::target_platform
     iree::base::tracing
   PUBLIC
@@ -90,7 +87,7 @@ iree_cc_library(
   DEPS
     absl::core_headers
     absl::flags
-    iree::base::platform_headers
+    iree::base::target_platform
   PUBLIC
 )
 
@@ -137,7 +134,6 @@ iree_cc_library(
     absl::memory
     absl::stacktrace
     absl::strings
-    iree::base::platform_headers
     iree::base::target_platform
   PUBLIC
 )

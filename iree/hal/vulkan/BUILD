@@ -158,7 +158,6 @@ cc_library(
     ],
     deps = [
         "//iree/base:dynamic_library",
-        "//iree/base:platform_headers",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:target_platform",
@@ -334,8 +333,8 @@ cc_library(
     deps = [
         "//iree/base:dynamic_library",
         "//iree/base:logging",
-        "//iree/base:platform_headers",
         "//iree/base:status",
+        "//iree/base:target_platform",
         "//iree/base:tracing",
         "//iree/hal:debug_capture_manager",
         "@com_google_absl//absl/types:span",

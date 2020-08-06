@@ -16,7 +16,7 @@
 
 #include "absl/types/span.h"
 #include "iree/base/logging.h"
-#include "iree/base/platform_headers.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)

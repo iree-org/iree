@@ -20,7 +20,6 @@ iree_cc_library(
   HDRS
     "alignment.h"
   DEPS
-    ::platform_headers
     ::target_platform
   PUBLIC
 )
@@ -92,7 +91,6 @@ iree_cc_library(
   HDRS
     "atomics.h"
   DEPS
-    ::platform_headers
     ::target_platform
   PUBLIC
 )
@@ -135,7 +133,6 @@ iree_cc_library(
     ${_DYNAMIC_LIBRARY_LINKOPTS}
   DEPS
     ::logging
-    ::platform_headers
     ::status
     ::target_platform
     ::tracing
@@ -376,7 +373,6 @@ iree_cc_library(
     "main_win32.cc"
   DEPS
     ::logging
-    ::platform_headers
     ::target_platform
   PUBLIC
 )
@@ -398,16 +394,6 @@ iree_cc_library(
     "memory.h"
   DEPS
     absl::span
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    platform_headers
-  HDRS
-    "platform_headers.h"
-  DEPS
-    ::target_platform
   PUBLIC
 )
 
