@@ -19,7 +19,6 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
@@ -52,6 +51,12 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
+  static llvm::cl::opt<bool> clUseWorkgroupMemory(
+      "iree-spirv-use-workgroup-memory",
+      llvm::cl::desc(
+          "Enable use of workgroup memory in SPIR-V code generation"),
+      llvm::cl::init(false));
+
   static llvm::cl::list<unsigned> clWorkgroupSize(
       "iree-spirv-workgroup-size",
       llvm::cl::desc(
@@ -66,8 +71,9 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
   VulkanSPIRVTargetOptions targetOptions;
   for (unsigned dim : clWorkgroupSize) {
-    targetOptions.workgroupSize.push_back(dim);
+    targetOptions.codegenOptions.workgroupSize.push_back(dim);
   }
+  targetOptions.codegenOptions.useWorkgroupMemory = clUseWorkgroupMemory;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   return targetOptions;
 }
@@ -236,7 +242,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpPassManager &passManager) override {
-    buildSPIRVTransformPassPipeline(passManager, options_.workgroupSize);
+    buildSPIRVTransformPassPipeline(passManager, options_.codegenOptions);
   }
 
   LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
