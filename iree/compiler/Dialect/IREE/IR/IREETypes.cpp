@@ -29,8 +29,7 @@ namespace IREE {
 namespace detail {
 
 struct PtrTypeStorage : public TypeStorage {
-  PtrTypeStorage(Type targetType, unsigned subclassData = 0)
-      : TypeStorage(subclassData), targetType(targetType) {}
+  PtrTypeStorage(Type targetType) : targetType(targetType) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
