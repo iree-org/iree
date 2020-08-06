@@ -33,8 +33,7 @@ namespace VM {
 namespace detail {
 
 struct ListTypeStorage : public TypeStorage {
-  ListTypeStorage(Type elementType, unsigned subclassData = 0)
-      : TypeStorage(subclassData), elementType(elementType) {}
+  ListTypeStorage(Type elementType) : elementType(elementType) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
@@ -81,8 +80,7 @@ Type ListType::getElementType() { return getImpl()->elementType; }
 namespace detail {
 
 struct RefTypeStorage : public TypeStorage {
-  RefTypeStorage(Type objectType, unsigned subclassData = 0)
-      : TypeStorage(subclassData), objectType(objectType.cast<Type>()) {}
+  RefTypeStorage(Type objectType) : objectType(objectType.cast<Type>()) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
