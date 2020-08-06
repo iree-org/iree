@@ -323,6 +323,58 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern);
 
 //===----------------------------------------------------------------------===//
+// IREE_STATUS_FEATURE flags and IREE_STATUS_MODE setting
+//===----------------------------------------------------------------------===//
+
+// Captures origin source information on a call to iree_make_status.
+// Status storage will be allocated and reference the __FILE__ and __LINE__
+// of where it is invoked.
+#define IREE_STATUS_FEATURE_SOURCE_LOCATION (1 << 0)
+
+// Captures annotation messages provided via iree_make_status or
+// iree_status_annotate.
+// Status storage will be allocated.
+#define IREE_STATUS_FEATURE_ANNOTATIONS (1 << 1)
+
+// Captures the current callstack on a call to iree_make_status.
+// Status storage will be allocated.
+#define IREE_STATUS_FEATURE_STACK_TRACE (1 << 2)
+
+// If no status mode override is provided we'll change the behavior based on
+// build configuration.
+#if !defined(IREE_STATUS_MODE)
+#ifdef NDEBUG
+// Release mode: just source location.
+#define IREE_STATUS_MODE 1
+#else
+// Debug mode: annotations and stack traces.
+#define IREE_STATUS_MODE 3
+#endif  // NDEBUG
+#endif  // !IREE_STATUS_MODE
+
+// Set IREE_STATUS_FEATURES based on IREE_STATUS_MODE if the user hasn't
+// overridden it with more specific settings.
+//
+// IREE_STATUS_MODE = 0: statuses are just integers
+// IREE_STATUS_MODE = 1: statuses have source location of error
+// IREE_STATUS_MODE = 2: statuses also have custom annotations
+// IREE_STATUS_MODE = 3: statuses also have stack traces of the error site
+#if !defined(IREE_STATUS_FEATURES)
+#if defined(IREE_STATUS_MODE) && IREE_STATUS_MODE == 1
+#define IREE_STATUS_FEATURES (IREE_STATUS_FEATURE_SOURCE_LOCATION)
+#elif defined(IREE_STATUS_MODE) && IREE_STATUS_MODE == 2
+#define IREE_STATUS_FEATURES \
+  (IREE_STATUS_FEATURE_SOURCE_LOCATION | IREE_STATUS_FEATURE_ANNOTATIONS)
+#elif defined(IREE_STATUS_MODE) && IREE_STATUS_MODE == 3
+#define IREE_STATUS_FEATURES                                               \
+  (IREE_STATUS_FEATURE_SOURCE_LOCATION | IREE_STATUS_FEATURE_ANNOTATIONS | \
+   IREE_STATUS_FEATURE_STACK_TRACE)
+#else
+#define IREE_STATUS_FEATURES 0
+#endif  // IREE_STATUS_MODE
+#endif  // !IREE_STATUS_FEATURES
+
+//===----------------------------------------------------------------------===//
 // iree_status_t and error reporting
 //===----------------------------------------------------------------------===//
 
@@ -464,6 +516,22 @@ typedef uintptr_t iree_status_t;
   iree_status_t var = (expr);                     \
   if (IREE_UNLIKELY(var)) iree_status_ignore(var);
 
+// We cut out all status storage code when not used.
+#if IREE_STATUS_FEATURES == 0
+#define IREE_STATUS_IMPL_MAKE_(code, ...) (code)
+#undef IREE_STATUS_IMPL_RETURN_IF_API_ERROR_
+#define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, expr, ...) \
+  iree_status_t var = (expr);                                 \
+  if (IREE_UNLIKELY(var)) return var;
+#undef IREE_STATUS_IMPL_IGNORE_ERROR_
+#define IREE_STATUS_IMPL_IGNORE_ERROR_(var, expr) \
+  iree_status_t var = (expr);                     \
+  (void)(var);
+#else
+#define IREE_STATUS_IMPL_MAKE_(...) \
+  IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)
+#endif  // !IREE_STATUS_FEATURES
+
 // Returns an IREE_STATUS_OK.
 #define iree_ok_status() ((iree_status_t)IREE_STATUS_OK)
 
@@ -477,8 +545,7 @@ typedef uintptr_t iree_status_t;
 //  return iree_make_status(IREE_STATUS_CANCELLED);
 //  return iree_make_status(IREE_STATUS_CANCELLED, "because reasons");
 //  return iree_make_status(IREE_STATUS_CANCELLED, "because %d > %d", a, b);
-#define iree_make_status(...) \
-  IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)
+#define iree_make_status IREE_STATUS_IMPL_MAKE_
 
 // Propagates the error returned by (expr) by returning from the current
 // function on non-OK status. Optionally annotates the status with additional

@@ -223,6 +223,9 @@ iree_status_code_string(iree_status_code_t code) {
   }
 }
 
+// We cut out all status storage code when not used.
+#if IREE_STATUS_FEATURES != 0
+
 // TODO(#265): move payload methods/types to header when API is stabilized.
 
 // Defines the type of an iree_status_payload_t.
@@ -284,21 +287,38 @@ typedef struct {
   iree_status_payload_t* payload_tail;
 } iree_status_storage_t;
 
+#endif  // IREE_STATUS_FEATURES != 0
+
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
                      iree_string_view_t message) {
-  // TODO(#265): status storage.
+  if (code == IREE_STATUS_OK) return iree_ok_status();
+#if IREE_STATUS_FEATURES == 0
+  return (iree_status_t)code;
+#elif (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
+    // TODO(#265): just allocate storage.
+#else
+  // TODO(#265): status storage + message payload.
   return code;
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
                        const char* format, ...) {
+#if IREE_STATUS_FEATURES == 0
+  return (iree_status_t)code;
+#elif (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
+  return iree_status_allocate(code, file, line, iree_string_view_empty());
+#else
   // TODO(#265): status storage.
+  if (code == IREE_STATUS_OK) return iree_ok_status();
   return code;
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
+#if IREE_STATUS_FEATURES != 0
   iree_status_storage_t* storage =
       (iree_status_storage_t*)(status & ~IREE_STATUS_CODE_MASK);
   if (!storage) return;
@@ -309,6 +329,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
     payload = next;
   }
   iree_allocator_free(iree_allocator_system(), storage);
+#endif  // IREE_STATUS_FEATURES != 0
 }
 
 IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
@@ -318,19 +339,27 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
+  return base_status;
+#else
   iree_status_storage_t* storage =
       (iree_status_storage_t*)(base_status & ~IREE_STATUS_CODE_MASK);
   // TODO(benvanik): allocate storage if error but no storage already.
   if (!storage) return base_status;
   // TODO(#265): status storage.
   return base_status;
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 IREE_PRINTF_ATTRIBUTE(2, 3)
     iree_status_annotate_f(iree_status_t base_status, const char* format, ...) {
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
+  return base_status;
+#else
   // TODO(#265): status storage.
   return base_status;
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 }
 
 IREE_API_EXPORT bool IREE_API_CALL

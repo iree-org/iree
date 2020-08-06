@@ -24,9 +24,8 @@
 namespace iree {
 
 inline iree_status_t ToApiStatus(const Status& status) {
-  if (!status.ok()) {
-    LOG(ERROR) << status;
-  }
+  if (status.ok()) return iree_ok_status();
+  LOG(ERROR) << status;
   // TODO(#265): marshal Status to iree_status_t.
   return iree_make_status(static_cast<iree_status_code_t>(status.code()));
 }
