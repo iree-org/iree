@@ -138,15 +138,29 @@ class ModuleCall:
     """Gets the floating point tolerances associated with this call."""
     return self.rtol, self.atol
 
+  def _get_shape_and_dtype(self, value):
+    if isinstance(value, np.ndarray):
+      return tf_utils.get_shape_and_dtype(value, allow_non_mlir_dtype=True)
+    else:
+      return str(type(value))
+
   def __str__(self):
     prior_printoptions = np.get_printoptions()
     np.set_printoptions(linewidth=NUMPY_LINEWIDTH)
 
     header = f"Method: {self.method}"
     inputs = "\n".join(_indent(str(value)) for value in self.inputs)
+    input_shapes = ", ".join(
+        self._get_shape_and_dtype(value) for value in self.inputs)
+
     outputs = "\n".join(_indent(str(value)) for value in self.outputs)
+    output_shapes = ", ".join(
+        self._get_shape_and_dtype(value) for value in self.outputs)
+
     tolerances = _indent(f"rtol={self.rtol}, atol={self.atol}")
-    body = f"Inputs:\n{inputs}\nOutputs:\n{outputs}\nTolerances:\n{tolerances}"
+    body = (f"Inputs: {input_shapes}\n{inputs}\n"
+            f"Outputs: {output_shapes}\n{outputs}"
+            f"\nTolerances:\n{tolerances}")
     result = f"{header}\n{_indent(body)}"
 
     np.set_printoptions(**prior_printoptions)
