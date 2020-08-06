@@ -12,13 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Dynamic Linkage
-// -----------------------------------------------------------------------------
-//
-// Define IREE_API_NO_PROTOTYPES to disable function prototypes when linking and
-// loading dynamically. This prevents accidental calls to functions without
-// going through the resolved symbols.
-//
 // API Versioning
 // -----------------------------------------------------------------------------
 //
@@ -277,8 +270,6 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
   return v;
 }
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Like std::string::compare but with iree_string_view_t values.
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
@@ -304,8 +295,6 @@ IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
 // 'foo-10?' matches: 'foo-101', 'foo-102'
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
 // iree_status_t and error reporting
@@ -498,8 +487,6 @@ typedef uintptr_t iree_status_t;
   EXPECT_EQ(expected_code, iree_status_code(expr))
 #define IREE_ASSERT_ARGUMENT(name) assert(name)
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Returns a NUL-terminated string constant for the given status code, such as
 // IREE_STATUS_UNAVAILABLE = "UNAVAILABLE". Do not rely on string-matching the
 // result as the exact text may change.
@@ -556,8 +543,6 @@ IREE_API_EXPORT bool IREE_API_CALL
 iree_status_to_string(iree_status_t status, char** out_buffer,
                       iree_host_size_t* out_buffer_length);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // IREE Core API
 //===----------------------------------------------------------------------===//
@@ -569,8 +554,6 @@ typedef enum {
   // Always set to the latest version of the library from source.
   IREE_API_VERSION_LATEST = IREE_API_VERSION_0,
 } iree_api_version_t;
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Checks whether the |expected_version| of the caller matches the implemented
 // version of |out_actual_version|. Forward compatibility of the API is
@@ -601,8 +584,6 @@ iree_api_version_check(iree_api_version_t expected_version,
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree_time_t and iree_duration_t
 //===----------------------------------------------------------------------===//
@@ -622,8 +603,6 @@ typedef int64_t iree_duration_t;
 // Like absl::ZeroDuration.
 #define IREE_DURATION_ZERO 0
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Returns the current system time in unix nanoseconds.
 // Depending on the system architecture and power mode this time may have a
 // very coarse granularity (on the order of microseconds to milliseconds).
@@ -637,8 +616,6 @@ IREE_API_EXPORT iree_time_t iree_time_now();
 // IREE_DURATION_INFINITE to avoid extraneous time queries.
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
 // iree_allocator_t (std::allocator-like interface)
@@ -677,8 +654,6 @@ typedef struct {
   void(IREE_API_PTR* free)(void* self, void* ptr);
 } iree_allocator_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Allocates a block of |byte_length| bytes from the given allocator.
 // The contents of the returned memory is guaranteed to be zeroed.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
@@ -702,8 +677,6 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
 IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
                                                               void* ptr);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 // Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
 static inline iree_allocator_t iree_allocator_system() {
@@ -725,8 +698,6 @@ static inline iree_allocator_t iree_allocator_null() {
 
 typedef struct iree_file_mapping iree_file_mapping_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Opens a file at |path| for read-only access via a file mapping.
 // |out_file_mapping| must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -746,8 +717,6 @@ iree_file_mapping_release(iree_file_mapping_t* file_mapping);
 // mappings are written to (exceptions, segfaults, etc).
 IREE_API_EXPORT iree_byte_span_t IREE_API_CALL
 iree_file_mapping_data(iree_file_mapping_t* file_mapping);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

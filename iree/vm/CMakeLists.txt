@@ -68,8 +68,7 @@ iree_cc_library(
     flatcc::runtime
     iree::base::alignment
     iree::base::api
-    iree::base::logging
-    iree::base::target_platform
+    iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC
 )

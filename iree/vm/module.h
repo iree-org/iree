@@ -217,8 +217,6 @@ typedef struct iree_vm_module {
       iree_string_view_t* value);
 } iree_vm_module_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Initializes the interface of a module handle.
 // This should be called by module implementations after they allocate
 // themselves to properly initialize the module interface prior to populating
@@ -296,8 +294,6 @@ iree_vm_get_function_reflection_attr(iree_vm_function_t function,
                                      iree_host_size_t index,
                                      iree_string_view_t* key,
                                      iree_string_view_t* value);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"
