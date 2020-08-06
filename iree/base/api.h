@@ -281,7 +281,7 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
 // Splits |value| into two parts based on the first occurrence of |split_char|.
 // Returns the index of the |split_char| in the original |value| or -1 if not
 // found.
-IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
+IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
     iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
     iree_string_view_t* out_rhs);
 
