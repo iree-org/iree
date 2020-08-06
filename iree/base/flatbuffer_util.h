@@ -33,6 +33,42 @@
 
 namespace iree {
 
+// A helper wrapper that moves the wrapped object on copy.
+// This is particularly handy for capturing unique_ptrs in lambdas.
+// Usage example:
+//
+//  std::unique_ptr<Foo> foo_ptr(new Foo());
+//  move_on_copy<std::unique_ptr<Foo>> foo(std::move(foo_ptr));
+//  auto some_lambda = [bar]() { ... }
+//
+template <typename T>
+struct move_on_copy {
+  explicit move_on_copy(T&& t) : value(std::move(t)) {}
+
+  move_on_copy(move_on_copy const& other) : value(std::move(other.value)) {}
+
+  move_on_copy(move_on_copy&& other) : value(std::move(other.value)) {}
+
+  move_on_copy& operator=(move_on_copy const& other) {
+    value = std::move(other.value);
+    return *this;
+  }
+
+  move_on_copy& operator=(move_on_copy&& other) {
+    value = std::move(other.value);
+    return *this;
+  }
+
+  mutable T value;
+};
+
+// Utility to aid in moving ref_ptr's into closures.
+//
+// Usage:
+//   auto baton = MoveToLambda(my_ref);
+//   DoSomething([baton] () { baton.value; });
+#define IreeMoveToLambda(p) ::iree::move_on_copy<decltype(p)>(std::move(p))
+
 // Wraps a FlatBuffer String in an absl::string_view.
 // Returns empty-string ("") for nullptr values.
 inline absl::string_view WrapString(const ::flatbuffers::String* value) {

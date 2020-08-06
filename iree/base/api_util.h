@@ -35,11 +35,6 @@ inline StatusBuilder FromApiStatus(iree_status_t status_code,
   return StatusBuilder(static_cast<StatusCode>(status_code), loc);
 }
 
-#define IREE_RETURN_IF_NULL(value)                       \
-  if (!(value))                                          \
-    return ::iree::InvalidArgumentErrorBuilder(IREE_LOC) \
-           << #value << " is null/empty";
-
 // Internal helper for concatenating macro values.
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \
@@ -98,30 +93,6 @@ class StatusAdaptorForApiMacros {
     return ::iree::ToApiStatus(std::move(statusor).status());               \
   }                                                                         \
   lhs = std::move(statusor).value()
-
-// Returns a vector initialized with the contents of a C-style list query.
-// For functions of the form (..., capacity, out_values, out_count) this will
-// try to fetch the items and resize as needed such that the returned value
-// contains all items available.
-//
-// Returns the empty vector if the query fails for any reason.
-template <typename T, typename... Args>
-absl::InlinedVector<T, 4> QueryListValues(
-    iree_status_t (*fn)(Args..., iree_host_size_t, T*, iree_host_size_t*),
-    Args... args) {
-  absl::InlinedVector<T, 4> values(4);
-  iree_host_size_t count = 0;
-  iree_status_t status = fn(args..., values.size(), values.data(), &count);
-  if (iree_status_is_out_of_range(status)) {
-    values.resize(count);
-    status = fn(args..., values.size(), values.data(), &count);
-  } else if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    return {};
-  }
-  values.resize(count);
-  return values;
-}
 
 }  // namespace iree
 
