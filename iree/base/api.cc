@@ -16,6 +16,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <string>
 
 #include "iree/base/api_util.h"
@@ -23,13 +24,6 @@
 #include "iree/base/init.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/tracing.h"
-
-#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
-    defined(IREE_PLATFORM_LINUX)
-#include <ctime>
-#endif
-
-namespace iree {
 
 //===----------------------------------------------------------------------===//
 // iree_string_view_t
@@ -40,14 +34,12 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
   size_t min_size = std::min(lhs.size, rhs.size);
   int cmp = strncmp(lhs.data, rhs.data, min_size);
   if (cmp != 0) return cmp;
-  return rhs.size - lhs.size;
+  return (int)(rhs.size - lhs.size);
 }
 
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
     iree_string_view_t value, iree_string_view_t prefix) {
-  if (!value.data || !prefix.data) {
-    return false;
-  } else if (prefix.size > value.size) {
+  if (!value.data || !prefix.data || prefix.size > value.size) {
     return false;
   }
   return strncmp(value.data, prefix.data, prefix.size) == 0;
@@ -288,6 +280,7 @@ iree_status_to_string(iree_status_t status, char** out_buffer,
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version) {
+  if (!out_actual_version) return IREE_STATUS_INVALID_ARGUMENT;
   iree_api_version_t actual_version = IREE_API_VERSION_0;
   *out_actual_version = actual_version;
   return expected_version == actual_version
@@ -300,7 +293,7 @@ iree_api_version_check(iree_api_version_t expected_version,
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv) {
-  InitializeEnvironment(argc, argv);
+  iree::InitializeEnvironment(argc, argv);
   return iree_ok_status();
 }
 
@@ -379,11 +372,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
                                iree_host_size_t byte_length, void** out_ptr) {
   IREE_TRACE_SCOPE0("iree_allocator_system_allocate");
-
-  if (!out_ptr) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no out_ptr specified");
-  } else if (byte_length == 0) {
+  IREE_ASSERT_ARGUMENT(out_ptr);
+  if (byte_length == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocations must be >0 bytes");
   }
@@ -434,31 +424,23 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
                             iree_file_mapping_t** out_file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_open_read");
-
-  if (!out_file_mapping) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no out_file_mapping specified");
-  }
+  IREE_ASSERT_ARGUMENT(out_file_mapping);
   *out_file_mapping = nullptr;
 
   IREE_API_ASSIGN_OR_RETURN(
       auto file_mapping,
-      FileMapping::OpenRead(std::string(path.data, path.size)));
+      iree::FileMapping::OpenRead(std::string(path.data, path.size)));
 
   *out_file_mapping =
       reinterpret_cast<iree_file_mapping_t*>(file_mapping.release());
-
   return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_file_mapping_retain(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_retain");
-  auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
-  if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "invalid file_mapping handle");
-  }
+  IREE_ASSERT_ARGUMENT(file_mapping);
+  auto* handle = reinterpret_cast<iree::FileMapping*>(file_mapping);
   handle->AddReference();
   return iree_ok_status();
 }
@@ -466,11 +448,8 @@ iree_file_mapping_retain(iree_file_mapping_t* file_mapping) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_file_mapping_release(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_release");
-  auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
-  if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "invalid file_mapping handle");
-  }
+  IREE_ASSERT_ARGUMENT(file_mapping);
+  auto* handle = reinterpret_cast<iree::FileMapping*>(file_mapping);
   handle->ReleaseReference();
   return iree_ok_status();
 }
@@ -478,10 +457,8 @@ iree_file_mapping_release(iree_file_mapping_t* file_mapping) {
 IREE_API_EXPORT iree_byte_span_t IREE_API_CALL
 iree_file_mapping_data(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_data");
-  auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
-  CHECK(handle) << "NULL file_mapping handle";
+  IREE_ASSERT_ARGUMENT(file_mapping);
+  auto* handle = reinterpret_cast<iree::FileMapping*>(file_mapping);
   auto data = handle->data();
   return {const_cast<uint8_t*>(data.data()), data.size()};
 }
-
-}  // namespace iree
