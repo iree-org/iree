@@ -54,7 +54,6 @@ iree_cc_library(
     "host_buffer.cc"
   DEPS
     iree::base::logging
-    iree::base::source_location
     iree::base::status
     iree::hal::buffer
   PUBLIC
@@ -110,7 +109,6 @@ iree_cc_library(
     "host_local_allocator.cc"
   DEPS
     ::host_buffer
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator

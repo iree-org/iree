@@ -14,7 +14,6 @@
 
 #include "iree/hal/vmla/vmla_cache.h"
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"

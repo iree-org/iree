@@ -59,7 +59,6 @@ iree_cc_library(
     "serial_command_processor.cc"
   DEPS
     absl::inlined_vector
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
@@ -82,7 +81,6 @@ iree_cc_library(
     ::serial_submission_queue
     absl::inlined_vector
     iree::base::memory
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::host::condvar_semaphore

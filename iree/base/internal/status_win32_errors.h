@@ -16,8 +16,8 @@
 #define IREE_BASE_INTERNAL_STATUS_WIN32_ERRORS_H_
 
 #include "absl/strings/string_view.h"
+#include "iree/base/internal/source_location.h"
 #include "iree/base/internal/statusor.h"
-#include "iree/base/source_location.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)

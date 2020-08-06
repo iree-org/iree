@@ -96,7 +96,6 @@ cc_library(
     hdrs = ["llvmjit_executable_cache.h"],
     deps = [
         ":llvmjit_executable",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:executable",

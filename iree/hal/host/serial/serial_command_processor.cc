@@ -14,7 +14,6 @@
 
 #include "iree/hal/host/serial/serial_command_processor.h"
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/host/host_descriptor_set.h"

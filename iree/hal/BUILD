@@ -29,7 +29,6 @@ cc_library(
     deps = [
         ":buffer",
         "//iree/base:ref_ptr",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/types:span",
@@ -95,7 +94,6 @@ cc_library(
         ":resource",
         "//iree/base:bitfield",
         "//iree/base:logging",
-        "//iree/base:source_location",
         "//iree/base:status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
@@ -255,7 +253,6 @@ cc_library(
         ":executable_format",
         ":heap_buffer",
         ":semaphore",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:time",
         "//iree/base:tracing",
@@ -351,7 +348,6 @@ cc_library(
     deps = [
         ":allocator",
         ":buffer",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_buffer",

@@ -62,7 +62,6 @@
 #include "absl/types/variant.h"
 #include "iree/base/bitfield.h"
 #include "iree/base/logging.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/hal/resource.h"
 

@@ -70,7 +70,6 @@ cc_library(
     hdrs = ["vmla_cache.h"],
     deps = [
         ":vmla_executable",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:allocator",

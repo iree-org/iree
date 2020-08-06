@@ -60,7 +60,6 @@ iree_cc_binary(
     iree::base::api_util
     iree::base::file_io
     iree::base::localfile
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::modules::hal
@@ -102,7 +101,6 @@ iree_cc_binary(
     iree::base::file_io
     iree::base::init
     iree::base::localfile
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::modules::hal

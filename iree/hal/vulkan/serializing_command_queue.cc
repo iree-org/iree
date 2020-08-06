@@ -19,7 +19,6 @@
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/memory.h"
-#include "iree/base/source_location.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/command_queue.h"

@@ -112,16 +112,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    source_location_internal
-  HDRS
-    "source_location.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     status_internal
   HDRS
+    "source_location.h"
     "status.h"
     "status_builder.h"
     "status_errno.h"
@@ -145,7 +138,6 @@ iree_cc_library(
     absl::stacktrace
     absl::strings
     iree::base::platform_headers
-    iree::base::source_location
     iree::base::target_platform
   PUBLIC
 )

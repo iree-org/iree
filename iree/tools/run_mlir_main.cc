@@ -46,7 +46,6 @@
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/init.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"

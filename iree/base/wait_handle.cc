@@ -27,7 +27,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 // TODO(benvanik): organize these macros - they are terrible.

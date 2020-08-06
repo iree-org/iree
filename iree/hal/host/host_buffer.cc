@@ -19,7 +19,6 @@
 #include <cstring>
 
 #include "iree/base/logging.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {

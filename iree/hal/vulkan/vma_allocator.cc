@@ -16,7 +16,6 @@
 
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"

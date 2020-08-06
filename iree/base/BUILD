@@ -246,7 +246,6 @@ cc_library(
         ":file_mapping",
         ":memory",
         ":ref_ptr",
-        ":source_location",
         ":status",
         ":tracing",
         "@com_github_google_flatbuffers//:flatbuffers",
@@ -392,17 +391,9 @@ cc_test(
 )
 
 cc_library(
-    name = "source_location",
-    hdrs = ["source_location.h"],
-    deps = platform_trampoline_deps("source_location"),
-)
-
-cc_library(
     name = "status",
     hdrs = ["status.h"],
-    deps = [
-        ":source_location",
-    ] + platform_trampoline_deps("status"),
+    deps = platform_trampoline_deps("status"),
 )
 
 cc_library(
@@ -462,7 +453,6 @@ cc_library(
 #     deps = [
 #         ":logging",
 #         ":ref_ptr",
-#         ":source_location",
 #         ":status",
 #         ":time",
 #         "@com_google_absl//absl/base:core_headers",

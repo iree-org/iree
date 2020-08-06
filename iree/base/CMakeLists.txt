@@ -290,7 +290,6 @@ iree_cc_library(
     ::file_mapping
     ::memory
     ::ref_ptr
-    ::source_location
     ::status
     ::tracing
     absl::memory
@@ -462,21 +461,10 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    source_location
-  HDRS
-    "source_location.h"
-  DEPS
-    iree::base::internal::source_location_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     status
   HDRS
     "status.h"
   DEPS
-    ::source_location
     iree::base::internal::status_internal
   PUBLIC
 )

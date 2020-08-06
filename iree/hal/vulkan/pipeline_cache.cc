@@ -16,7 +16,6 @@
 
 #include "absl/synchronization/mutex.h"
 #include "flatbuffers/flatbuffers.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"

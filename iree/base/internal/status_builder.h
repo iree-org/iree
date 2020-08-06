@@ -17,8 +17,8 @@
 
 #include "absl/strings/str_cat.h"
 #include "iree/base/internal/ostringstream.h"
+#include "iree/base/internal/source_location.h"
 #include "iree/base/internal/status.h"
-#include "iree/base/source_location.h"
 
 namespace iree {
 

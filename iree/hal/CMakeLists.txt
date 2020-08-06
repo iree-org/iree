@@ -25,7 +25,6 @@ iree_cc_library(
     ::buffer
     absl::span
     iree::base::ref_ptr
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
   PUBLIC
@@ -99,7 +98,6 @@ iree_cc_library(
     absl::variant
     iree::base::bitfield
     iree::base::logging
-    iree::base::source_location
     iree::base::status
   PUBLIC
 )
@@ -282,7 +280,6 @@ iree_cc_library(
     ::semaphore
     absl::span
     absl::synchronization
-    iree::base::source_location
     iree::base::status
     iree::base::time
     iree::base::tracing
@@ -405,7 +402,6 @@ iree_cc_library(
   DEPS
     ::allocator
     ::buffer
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::host::host_buffer

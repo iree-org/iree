@@ -18,7 +18,6 @@
 #include <string>
 #include <utility>
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/host/host_buffer.h"

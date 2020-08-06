@@ -20,7 +20,6 @@
 #include "absl/memory/memory.h"
 #include "iree/base/file_mapping.h"
 #include "iree/base/memory.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 

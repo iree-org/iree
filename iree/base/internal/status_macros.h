@@ -15,10 +15,10 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_MACROS_H_
 #define IREE_BASE_INTERNAL_STATUS_MACROS_H_
 
+#include "iree/base/internal/source_location.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
 #include "iree/base/internal/statusor.h"
-#include "iree/base/source_location.h"
 
 // Evaluates an expression that produces a `iree::Status`. If the status is not
 // ok, returns it from the current function.

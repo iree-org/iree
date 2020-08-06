@@ -19,7 +19,6 @@
 #include "iree/base/api_util.h"
 #include "iree/base/file_io.h"
 #include "iree/base/init.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"

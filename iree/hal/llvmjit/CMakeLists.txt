@@ -97,7 +97,6 @@ iree_cc_library(
     "llvmjit_executable_cache.cc"
   DEPS
     ::llvmjit_executable
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::executable

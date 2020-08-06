@@ -106,11 +106,6 @@ cc_library(
 )
 
 cc_library(
-    name = "source_location_internal",
-    hdrs = ["source_location.h"],
-)
-
-cc_library(
     name = "status_internal",
     srcs = [
         "status.cc",
@@ -121,6 +116,7 @@ cc_library(
         "statusor.cc",
     ],
     hdrs = [
+        "source_location.h",
         "status.h",
         "status_builder.h",
         "status_errno.h",
@@ -133,7 +129,6 @@ cc_library(
         ":logging_internal",
         ":ostringstream",
         "//iree/base:platform_headers",
-        "//iree/base:source_location",
         "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/debugging:stacktrace",
@@ -163,7 +158,6 @@ iree_build_test(
         ":file_mapping_internal",
         ":init_internal",
         ":logging_internal",
-        ":source_location_internal",
         ":status_internal",
         ":status_matchers_internal",
     ],

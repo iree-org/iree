@@ -58,7 +58,6 @@ cc_library(
     srcs = ["serial_command_processor.cc"],
     hdrs = ["serial_command_processor.h"],
     deps = [
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
@@ -78,7 +77,6 @@ cc_library(
         ":serial_command_processor",
         ":serial_submission_queue",
         "//iree/base:memory",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:condvar_semaphore",
