@@ -2,7 +2,7 @@
 layout: default
 title: IR Conversion Examples
 has_children: true
-permalink: ir_examples
+permalink: ir-examples
 nav_order: 11
 ---
 
