@@ -19,8 +19,6 @@
 
 #include <ctime>
 
-#include "iree/base/init.h"
-#include "iree/base/platform_headers.h"
 #include "iree/base/tracing.h"
 
 static inline size_t iree_min_host_size(size_t a, size_t b) {
@@ -396,7 +394,6 @@ iree_api_version_check(iree_api_version_t expected_version,
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv) {
-  iree::InitializeEnvironment(argc, argv);
   return iree_ok_status();
 }
 

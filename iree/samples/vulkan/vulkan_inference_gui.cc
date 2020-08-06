@@ -550,7 +550,8 @@ int iree::IreeMain(int argc, char** argv) {
 
   // Create a runtime Instance.
   iree_vm_instance_t* iree_instance = nullptr;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &iree_instance));
+  IREE_CHECK_OK(
+      iree_vm_instance_create(iree_allocator_system(), &iree_instance));
 
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
   LOG(INFO) << "Creating Vulkan driver/device";

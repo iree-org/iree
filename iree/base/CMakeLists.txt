@@ -35,9 +35,6 @@ iree_cc_library(
   DEPS
     ::api_hdrs
     ::api_util
-    ::init
-    ::platform_headers
-    ::target_platform
     ::tracing
   PUBLIC
 )
