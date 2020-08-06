@@ -91,6 +91,14 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
   return IREE_STRING_VIEW_NPOS;
 }
 
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_string_view_remove_prefix(iree_string_view_t value, iree_host_size_t n) {
+  if (n >= value.size) {
+    return iree_string_view_empty();
+  }
+  return iree_make_string_view(value.data + n, value.size - n);
+}
+
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n) {
   pos = iree_min_host_size(pos, value.size);
