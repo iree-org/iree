@@ -14,23 +14,35 @@
 
 #include "iree/base/api.h"
 
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <string>
+#include <stdlib.h>
+#include <string.h>
 
-#include "iree/base/api_util.h"
+#include <ctime>
+
 #include "iree/base/init.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/tracing.h"
+
+static inline size_t iree_min_host_size(size_t a, size_t b) {
+  return a < b ? a : b;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_string_view_t
 //===----------------------------------------------------------------------===//
 
+IREE_API_EXPORT bool IREE_API_CALL
+iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs) {
+  if (lhs.size != rhs.size) return false;
+  for (iree_host_size_t i = 0; i < lhs.size; ++i) {
+    if (lhs.data[i] != rhs.data[i]) return false;
+  }
+  return true;
+}
+
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
-  size_t min_size = std::min(lhs.size, rhs.size);
+  iree_host_size_t min_size = iree_min_host_size(lhs.size, rhs.size);
   int cmp = strncmp(lhs.data, rhs.data, min_size);
   if (cmp != 0) {
     return cmp;
@@ -48,13 +60,51 @@ IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
   return strncmp(value.data, prefix.data, prefix.size) == 0;
 }
 
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
+    iree_string_view_t value, char c, iree_host_size_t pos) {
+  if (iree_string_view_is_empty(value) || pos >= value.size) {
+    return IREE_STRING_VIEW_NPOS;
+  }
+  const char* result =
+      (const char*)(memchr(value.data + pos, c, value.size - pos));
+  return result != nullptr ? result - value.data : IREE_STRING_VIEW_NPOS;
+}
+
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
+    iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos) {
+  if (iree_string_view_is_empty(value) || iree_string_view_is_empty(s)) {
+    return IREE_STRING_VIEW_NPOS;
+  }
+  if (s.size == 1) {
+    // Avoid the cost of the lookup table for a single-character search.
+    return iree_string_view_find_char(value, s.data[0], pos);
+  }
+  bool lookup_table[UCHAR_MAX + 1] = {0};
+  for (iree_host_size_t i = 0; i < s.size; ++i) {
+    lookup_table[(uint8_t)s.data[i]] = true;
+  }
+  for (iree_host_size_t i = pos; i < value.size; ++i) {
+    if (lookup_table[(uint8_t)value.data[i]]) {
+      return i;
+    }
+  }
+  return IREE_STRING_VIEW_NPOS;
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
+    iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n) {
+  pos = iree_min_host_size(pos, value.size);
+  n = iree_min_host_size(n, value.size - pos);
+  return iree_make_string_view(value.data + pos, n);
+}
+
 IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
     iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
     iree_string_view_t* out_rhs) {
   if (!value.data || !value.size) {
     return -1;
   }
-  const void* first_ptr = std::memchr(value.data, split_char, value.size);
+  const void* first_ptr = memchr(value.data, split_char, value.size);
   if (!first_ptr) {
     return -1;
   }
@@ -71,39 +121,52 @@ IREE_API_EXPORT intptr_t IREE_API_CALL iree_string_view_split(
   return offset;
 }
 
-static bool MatchPattern(absl::string_view value, absl::string_view pattern) {
-  size_t next_char_index = pattern.find_first_of("*?");
+static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
+                                                iree_string_view_t pattern) {
+  iree_host_size_t next_char_index = iree_string_view_find_first_of(
+      pattern, iree_make_cstring_view("*?"), /*pos=*/0);
   if (next_char_index == std::string::npos) {
-    return value == pattern;
+    return iree_string_view_equal(value, pattern);
   } else if (next_char_index > 0) {
-    if (value.substr(0, next_char_index) !=
-        pattern.substr(0, next_char_index)) {
+    iree_string_view_t value_prefix =
+        iree_string_view_substr(value, 0, next_char_index);
+    iree_string_view_t pattern_prefix =
+        iree_string_view_substr(pattern, 0, next_char_index);
+    if (!iree_string_view_equal(value_prefix, pattern_prefix)) {
       return false;
     }
-    value = value.substr(next_char_index);
-    pattern = pattern.substr(next_char_index);
+    value =
+        iree_string_view_substr(value, next_char_index, IREE_STRING_VIEW_NPOS);
+    pattern = iree_string_view_substr(pattern, next_char_index,
+                                      IREE_STRING_VIEW_NPOS);
   }
-  if (value.empty() && pattern.empty()) {
+  if (iree_string_view_is_empty(value) && iree_string_view_is_empty(pattern)) {
     return true;
   }
-  char pattern_char = pattern[0];
-  if (pattern_char == '*' && pattern.size() > 1 && value.empty()) {
+  char pattern_char = pattern.data[0];
+  if (pattern_char == '*' && pattern.size > 1 &&
+      iree_string_view_is_empty(value)) {
     return false;
-  } else if (pattern_char == '*' && pattern.size() == 1) {
+  } else if (pattern_char == '*' && pattern.size == 1) {
     return true;
-  } else if (pattern_char == '?' || value[0] == pattern_char) {
-    return MatchPattern(value.substr(1), pattern.substr(1));
+  } else if (pattern_char == '?' || value.data[0] == pattern_char) {
+    return iree_string_view_match_pattern_impl(
+        iree_string_view_substr(value, 1, IREE_STRING_VIEW_NPOS),
+        iree_string_view_substr(pattern, 1, IREE_STRING_VIEW_NPOS));
   } else if (pattern_char == '*') {
-    return MatchPattern(value, pattern.substr(1)) ||
-           MatchPattern(value.substr(1), pattern);
+    return iree_string_view_match_pattern_impl(
+               value,
+               iree_string_view_substr(pattern, 1, IREE_STRING_VIEW_NPOS)) ||
+           iree_string_view_match_pattern_impl(
+               iree_string_view_substr(value, 1, IREE_STRING_VIEW_NPOS),
+               pattern);
   }
   return false;
 }
 
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern) {
-  return MatchPattern(absl::string_view(value.data, value.size),
-                      absl::string_view(pattern.data, pattern.size));
+  return iree_string_view_match_pattern_impl(value, pattern);
 }
 
 //===----------------------------------------------------------------------===//

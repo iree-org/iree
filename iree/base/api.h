@@ -242,6 +242,8 @@ static inline iree_const_byte_span_t iree_make_const_byte_span(
 // iree_string_view_t (like std::string_view/absl::string_view)
 //===----------------------------------------------------------------------===//
 
+#define IREE_STRING_VIEW_NPOS SIZE_MAX
+
 // A string view (ala std::string_view) into a non-NUL-terminated string.
 typedef struct {
   const char* data;
@@ -270,6 +272,10 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
   return v;
 }
 
+// Returns true if the two strings are equal (compare == 0).
+IREE_API_EXPORT bool IREE_API_CALL
+iree_string_view_equal(iree_string_view_t lhs, iree_string_view_t rhs);
+
 // Like std::string::compare but with iree_string_view_t values.
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
@@ -277,6 +283,22 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
 // Returns true if the string starts with the given prefix.
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
     iree_string_view_t value, iree_string_view_t prefix);
+
+// Finds the first occurrence of |c| in |value| starting at |pos|.
+// Returns the found character position or IREE_STRING_VIEW_NPOS if not found.
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_char(
+    iree_string_view_t value, char c, iree_host_size_t pos);
+
+// Returns the index of the first occurrence of one of the characters in |s| or
+// -1 if none of the characters were found.
+IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_string_view_find_first_of(
+    iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
+
+// Returns a substring of the string view at offset |pos| and length |n|.
+// Use |n| == INTPTR_MAX to take the remaineder of the string after |pos|.
+// Returns empty string on failure.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL iree_string_view_substr(
+    iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n);
 
 // Splits |value| into two parts based on the first occurrence of |split_char|.
 // Returns the index of the |split_char| in the original |value| or -1 if not
