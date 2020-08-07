@@ -138,6 +138,7 @@ TEST_P(VMBytecodeDispatchTest, Check) {
     } else {
       GTEST_FAIL() << "Function expected success but failed with error "
                    << iree_status_code_string(iree_status_code(result));
+      iree_status_ignore(result);
     }
   }
 }

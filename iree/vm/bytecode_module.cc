@@ -84,9 +84,9 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
     type_table[i] = iree_vm_bytecode_module_resolve_type(type_def);
     if (!iree_vm_type_def_is_valid(type_table[i])) {
-      LOG(ERROR) << "no type registered with name '"
-                 << iree_vm_TypeDef_full_name(type_def) << "'";
-      return iree_make_status(IREE_STATUS_NOT_FOUND);
+      return iree_make_status(IREE_STATUS_NOT_FOUND,
+                              "no type registered with name '%s'",
+                              iree_vm_TypeDef_full_name(type_def));
     }
   }
   return iree_ok_status();
@@ -99,8 +99,10 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
 static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data) {
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
-    LOG(ERROR) << "Flatbuffer data is not present or less than 16 bytes";
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        flatbuffer_data.data_length);
   }
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
@@ -109,8 +111,9 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
   int verify_ret = iree_vm_BytecodeModuleDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
   if (verify_ret != flatcc_verify_ok) {
-    LOG(ERROR) << flatcc_verify_error_string(verify_ret);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
   }
 
   iree_vm_BytecodeModuleDef_table_t module_def =
@@ -118,21 +121,21 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
 
   flatbuffers_string_t name = iree_vm_BytecodeModuleDef_name(module_def);
   if (!flatbuffers_string_len(name)) {
-    LOG(ERROR) << "module name missing";
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "module missing name field");
   }
 
   iree_vm_TypeDef_vec_t types = iree_vm_BytecodeModuleDef_types(module_def);
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(types); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(types, i);
     if (!type_def) {
-      LOG(ERROR) << "type def missing body";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "types[%zu] missing body", i);
     }
     flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
     if (flatbuffers_string_len(full_name) <= 0) {
-      LOG(ERROR) << "type def missing full_name";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "types[%zu] missing name", i);
     }
   }
 
@@ -147,9 +150,12 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
 
   if (flatbuffers_vec_len(internal_functions) !=
       flatbuffers_vec_len(function_descriptors)) {
-    LOG(ERROR)
-        << "mismatched internal_functions and function_descriptors vectors";
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "mismatched internal_functions/function_descriptors vectors (%zu != "
+        "%zu)",
+        flatbuffers_vec_len(internal_functions),
+        flatbuffers_vec_len(function_descriptors));
   }
 
   for (size_t i = 0; i < iree_vm_ImportFunctionDef_vec_len(imported_functions);
@@ -157,18 +163,18 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     iree_vm_ImportFunctionDef_table_t import_def =
         iree_vm_ImportFunctionDef_vec_at(imported_functions, i);
     if (!import_def) {
-      LOG(ERROR) << "import def missing body";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "imports[%zu] missing body", i);
     }
     flatbuffers_string_t full_name =
         iree_vm_ImportFunctionDef_full_name(import_def);
     if (!flatbuffers_string_len(full_name)) {
-      LOG(ERROR) << "import def missing full_name";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "imports[%zu] missing full_name", i);
     }
     if (!iree_vm_ImportFunctionDef_signature(import_def)) {
-      LOG(ERROR) << "import def missing a function signature";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "imports[%zu] missing signature", i);
     }
   }
 
@@ -177,26 +183,29 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     iree_vm_ExportFunctionDef_table_t export_def =
         iree_vm_ExportFunctionDef_vec_at(exported_functions, i);
     if (!export_def) {
-      LOG(ERROR) << "export def missing body";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "exports[%zu] missing body", i);
     }
     flatbuffers_string_t local_name =
         iree_vm_ExportFunctionDef_local_name(export_def);
     if (!flatbuffers_string_len(local_name)) {
-      LOG(ERROR) << "export def missing local_name";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "exports[%zu] missing local_name", i);
     }
     if (!iree_vm_ExportFunctionDef_signature(export_def)) {
-      LOG(ERROR) << "export def missing a function signature";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "exports[%zu] missing signature", i);
     }
     int32_t internal_ordinal =
         iree_vm_ExportFunctionDef_internal_ordinal(export_def);
     if (internal_ordinal < 0 ||
         internal_ordinal >=
             iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
-      LOG(ERROR) << "export def internal_ordinal out of bounds";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "exports[%zu] internal_ordinal out of bounds (0 < %d < %zu)", i,
+          internal_ordinal,
+          iree_vm_InternalFunctionDef_vec_len(internal_functions));
     }
   }
 
@@ -207,12 +216,12 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     iree_vm_InternalFunctionDef_table_t function_def =
         iree_vm_InternalFunctionDef_vec_at(internal_functions, i);
     if (!function_def) {
-      LOG(ERROR) << "function def missing body";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "functions[%zu] missing body", i);
     }
     if (!iree_vm_InternalFunctionDef_signature(function_def)) {
-      LOG(ERROR) << "function def missing signature";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "functions[%zu] missing signature", i);
     }
 
     iree_vm_FunctionDescriptor_struct_t function_descriptor =
@@ -221,13 +230,17 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
         function_descriptor->bytecode_offset +
                 function_descriptor->bytecode_length >
             flatbuffers_uint8_vec_len(bytecode_data)) {
-      LOG(ERROR) << "function descriptor bytecode span out of range";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "functions[%zu] descriptor bytecode span out of range (0 < %d < %zu)",
+          i, function_descriptor->bytecode_offset,
+          flatbuffers_uint8_vec_len(bytecode_data));
     }
     if (function_descriptor->i32_register_count > IREE_I32_REGISTER_COUNT ||
         function_descriptor->ref_register_count > IREE_REF_REGISTER_COUNT) {
-      LOG(ERROR) << "function descriptor register out of range";
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "functions[%zu] descriptor register count out of range", i);
     }
 
     // TODO(benvanik): run bytecode verifier on contents.
@@ -289,7 +302,10 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_BytecodeModuleDef_imported_functions(module->def);
     if (ordinal < 0 ||
         ordinal >= iree_vm_ImportFunctionDef_vec_len(imported_functions)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "import ordinal out of range (0 < %d < %zu)", ordinal,
+          iree_vm_ImportFunctionDef_vec_len(imported_functions));
     }
     iree_vm_ImportFunctionDef_table_t import_def =
         iree_vm_ImportFunctionDef_vec_at(imported_functions, ordinal);
@@ -305,7 +321,10 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
     if (ordinal < 0 ||
         ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "export ordinal out of range (0 < %d < %zu)", ordinal,
+          iree_vm_ExportFunctionDef_vec_len(exported_functions));
     }
     iree_vm_ExportFunctionDef_table_t export_def =
         iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
@@ -329,7 +348,10 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_BytecodeModuleDef_internal_functions(module->def);
     if (ordinal < 0 ||
         ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "function ordinal out of range (0 < %d < %zu)", ordinal,
+          iree_vm_InternalFunctionDef_vec_len(internal_functions));
     }
     iree_vm_InternalFunctionDef_table_t function_def =
         iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
@@ -368,8 +390,8 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
     int32_t index, iree_string_view_t* key, iree_string_view_t* value) {
   if (linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
     iree_vm_function_t internal_function;
-    iree_vm_bytecode_module_get_function(self, linkage, ordinal,
-                                         &internal_function, NULL, NULL);
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
+        self, linkage, ordinal, &internal_function, NULL, NULL));
     linkage = internal_function.linkage;
     ordinal = internal_function.ordinal;
   }
@@ -380,7 +402,10 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
 
   if (ordinal < 0 ||
       ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "function ordinal out of range (0 < %d < %zu)", ordinal,
+        iree_vm_InternalFunctionDef_vec_len(internal_functions));
   }
 
   iree_vm_InternalFunctionDef_table_t function_def =
@@ -391,7 +416,9 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
       iree_vm_FunctionSignatureDef_reflection_attrs(signature);
   if (index < 0 ||
       index >= iree_vm_ReflectionAttrDef_vec_len(reflection_attrs)) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND);
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "reflection attribute at index %d not found",
+                            index);
   }
   iree_vm_ReflectionAttrDef_table_t attr =
       iree_vm_ReflectionAttrDef_vec_at(reflection_attrs, index);
@@ -400,9 +427,10 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
   if (!flatbuffers_string_len(attr_key) ||
       !flatbuffers_string_len(attr_value)) {
     // Because reflection metadata should not impose any overhead for the
-    // non reflection case, we do not eagerly validate in on load -- instead
+    // non reflection case, we do not eagerly validate it on load -- instead
     // verify it structurally as needed.
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "reflection attribute missing fields");
   }
 
   key->data = attr_key;
@@ -416,11 +444,13 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
 static iree_status_t iree_vm_bytecode_module_lookup_function(
     void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
     iree_vm_function_t* out_function) {
-  if (!out_function) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(out_function);
   memset(out_function, 0, sizeof(iree_vm_function_t));
 
-  if (iree_string_view_is_empty(name))
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  if (iree_string_view_is_empty(name)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "function name required for query");
+  }
 
   // NOTE: we could organize imports/exports alphabetically so we could bsearch.
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
@@ -438,7 +468,8 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
                                                     out_function, NULL, NULL);
       }
     }
-    return iree_make_status(IREE_STATUS_NOT_FOUND);
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "import with the given name not found");
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
@@ -455,7 +486,8 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
             out_function, NULL, NULL);
       }
     }
-    return iree_make_status(IREE_STATUS_NOT_FOUND);
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "export with the given name not found");
   } else {
     iree_vm_InternalFunctionDef_vec_t internal_functions =
         iree_vm_BytecodeModuleDef_internal_functions(module->def);
@@ -472,7 +504,8 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
             NULL, NULL);
       }
     }
-    return iree_make_status(IREE_STATUS_NOT_FOUND);
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "function with the given name not found");
   }
 }
 
@@ -530,7 +563,7 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
 static iree_status_t iree_vm_bytecode_module_alloc_state(
     void* self, iree_allocator_t allocator,
     iree_vm_module_state_t** out_module_state) {
-  if (!out_module_state) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(out_module_state);
   *out_module_state = NULL;
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
@@ -584,11 +617,13 @@ static void iree_vm_bytecode_module_free_state(
 static iree_status_t iree_vm_bytecode_module_resolve_import(
     void* self, iree_vm_module_state_t* module_state, int32_t ordinal,
     iree_vm_function_t function) {
+  IREE_ASSERT_ARGUMENT(module_state);
   iree_vm_bytecode_module_state_t* state =
       (iree_vm_bytecode_module_state_t*)module_state;
-  if (!state) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   if (ordinal < 0 || ordinal >= state->import_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "import ordinal out of range (0 < %d < %d)",
+                            ordinal, state->import_count);
   }
   // TODO(benvanik): verify signature.
   state->import_table[ordinal] = function;
@@ -602,9 +637,8 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // much work or touching too many unlikely-to-be-cached structures (such as
   // walking the FlatBuffer, which may cause page faults).
 
-  if (!out_result) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(out_result);
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
-  if (!stack) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
 
   // Only internal functions store the information needed for execution. We
   // allow exports here as well to make things easier to call externally.
@@ -617,8 +651,10 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   if (function.ordinal < 0 ||
       function.ordinal >= module->function_descriptor_count) {
-    // Invalid function ordinal.
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "function ordinal out of range (0 < %d < %d)",
+                            function.ordinal,
+                            module->function_descriptor_count);
   }
 
   // Enter function (as this is the initial call).
@@ -640,7 +676,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
     iree_const_byte_span_t flatbuffer_data,
     iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {
-  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
 
   IREE_RETURN_IF_ERROR(
@@ -649,10 +685,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
   iree_vm_BytecodeModuleDef_table_t module_def =
       iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
   if (!module_def) {
-    LOG(ERROR) << "failed getting root from flatbuffer data; expected "
-                  "identifier " iree_vm_BytecodeModuleDef_file_identifier
-                  " not found";
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "failed getting root from flatbuffer; expected identifier "
+        "'" iree_vm_BytecodeModuleDef_file_identifier "' not found");
   }
 
   iree_vm_TypeDef_vec_t type_defs = iree_vm_BytecodeModuleDef_types(module_def);

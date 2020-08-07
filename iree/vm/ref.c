@@ -81,13 +81,16 @@ iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor) {
   }
   // Too many user-defined types registered; need to increase
   // IREE_VM_MAX_TYPE_ID.
-  return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+  return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                          "too many user-defined types registered; new type "
+                          "would exceed maximum of %d",
+                          IREE_VM_MAX_TYPE_ID);
 }
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_vm_ref_type_name(iree_vm_ref_type_t type) {
   if (type == 0 || type >= IREE_VM_MAX_TYPE_ID) {
-    return iree_make_cstring_view("");
+    return iree_string_view_empty();
   }
   return iree_vm_ref_type_descriptors[type]->type_name;
 }
@@ -109,8 +112,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
   const iree_vm_ref_type_descriptor_t* type_descriptor =
       iree_vm_ref_get_type_descriptor(type);
   if (!type_descriptor) {
-    // Type not registered.
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "type not registered");
   }
 
   if (out_ref->ptr != NULL) {
@@ -163,8 +166,8 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_checked(
     iree_vm_ref_t* ref, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
   if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type) {
-    // Make no changes on failure.
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "source ref type mismatch");
   }
   iree_vm_ref_retain(ref, out_ref);
   return iree_ok_status();
@@ -196,7 +199,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_or_move_checked(
     iree_vm_ref_t* out_ref) {
   if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type) {
     // Make no changes on failure.
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "source ref type mismatch");
   }
   iree_vm_ref_retain_or_move(is_move, ref, out_ref);
   return iree_ok_status();

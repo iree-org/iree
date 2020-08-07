@@ -142,7 +142,9 @@ class NativeModule {
     }
     auto* module = FromModulePointer(self);
     if (ordinal < 0 || ordinal > module->dispatch_table_.size()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "function out of bounds: 0 < %d < %zu", ordinal,
+                              module->dispatch_table_.size());
     }
     if (out_function) {
       out_function->module = module->interface();
@@ -160,10 +162,12 @@ class NativeModule {
                                             iree_vm_function_linkage_t linkage,
                                             iree_string_view_t name,
                                             iree_vm_function_t* out_function) {
-    if (!out_function) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    IREE_ASSERT_ARGUMENT(out_function);
     std::memset(out_function, 0, sizeof(*out_function));
-    if (!name.data || !name.size)
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    if (!name.data || !name.size) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "function name empty");
+    }
 
     auto* module = FromModulePointer(self);
     out_function->module = module->interface();
@@ -176,14 +180,14 @@ class NativeModule {
         return iree_ok_status();
       }
     }
-    return iree_make_status(IREE_STATUS_NOT_FOUND);
+    return iree_make_status(IREE_STATUS_NOT_FOUND, "function %.*s not exported",
+                            (int)name.size, name.data);
   }
 
   static iree_status_t ModuleAllocState(
       void* self, iree_allocator_t allocator,
       iree_vm_module_state_t** out_module_state) {
-    if (!out_module_state)
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    IREE_ASSERT_ARGUMENT(out_module_state);
     *out_module_state = nullptr;
 
     auto* module = FromModulePointer(self);
@@ -207,20 +211,22 @@ class NativeModule {
                                            iree_vm_module_state_t* module_state,
                                            int32_t ordinal,
                                            iree_vm_function_t function) {
-    // C++ API does not yet support imports.
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "C++ API does not support imports");
   }
 
   static iree_status_t ModuleBeginCall(void* self, iree_vm_stack_t* stack,
                                        const iree_vm_function_call_t* call,
                                        iree_vm_execution_result_t* out_result) {
-    if (!out_result) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    IREE_ASSERT_ARGUMENT(out_result);
     std::memset(out_result, 0, sizeof(*out_result));
-    if (!stack) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     auto* module = FromModulePointer(self);
     if (call->function.ordinal < 0 ||
         call->function.ordinal >= module->dispatch_table_.size()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "function ordinal out of bounds: 0 < %d < %zu",
+                              call->function.ordinal,
+                              module->dispatch_table_.size());
     }
     const auto& info = module->dispatch_table_[call->function.ordinal];
 

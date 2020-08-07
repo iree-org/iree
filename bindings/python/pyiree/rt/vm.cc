@@ -200,8 +200,10 @@ std::string VmVariantList::DebugString() const {
 
   for (iree_host_size_t i = 0, e = size(); i < e; ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    if (!iree_status_is_ok(
-            iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant))) {
+    iree_status_t status =
+        iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
       absl::StrAppend(&s, "Error");
       continue;
     }

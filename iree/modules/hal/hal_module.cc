@@ -822,9 +822,11 @@ class HALModuleState final {
   }
 
   Status SemaphoreFail(vm::ref<iree_hal_semaphore_t> semaphore,
-                       int32_t status) {
+                       int32_t status_code) {
     IREE_TRACE_SCOPE0("HALModuleState::SemaphoreFail");
-    iree_hal_semaphore_fail(semaphore.get(), iree_make_status(status));
+    iree_status_t status = iree_make_status(
+        static_cast<iree_status_code_t>(status_code & IREE_STATUS_CODE_MASK));
+    iree_hal_semaphore_fail(semaphore.get(), status);
     return OkStatus();
   }
 
@@ -836,7 +838,7 @@ class HALModuleState final {
     // TODO(benvanik): allow for deadline exceeded returns? We don't allow
     // setting deadlines now (and when we do in the future it'll be the fiber
     // manager that  handles them), so any failure indicates total failure.
-    return FromApiStatus(iree_make_status(wait_status), IREE_LOC);
+    return FromApiStatus(wait_status, IREE_LOC);
   }
 
  private:
@@ -988,7 +990,8 @@ class HALModule final : public vm::NativeModule<HALModuleState> {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
                        iree_vm_module_t** out_module) {
-  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_module);
   *out_module = nullptr;
   auto module = std::make_unique<HALModule>(
       allocator, add_ref(reinterpret_cast<Device*>(device)));

@@ -53,6 +53,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_custom_message, iree_custom_message_t);
 iree_status_t iree_custom_message_create(iree_string_view_t value,
                                          iree_allocator_t allocator,
                                          iree_custom_message_t** out_message) {
+  IREE_ASSERT_ARGUMENT(out_message);
   // Note that we allocate the message and the string value together.
   iree_custom_message_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
@@ -69,6 +70,7 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
 iree_status_t iree_custom_message_wrap(iree_string_view_t value,
                                        iree_allocator_t allocator,
                                        iree_custom_message_t** out_message) {
+  IREE_ASSERT_ARGUMENT(out_message);
   iree_custom_message_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_message_t), (void**)&message));
@@ -87,8 +89,10 @@ void iree_custom_message_destroy(void* ptr) {
 iree_status_t iree_custom_message_read_value(iree_custom_message_t* message,
                                              char* buffer,
                                              size_t buffer_capacity) {
+  IREE_ASSERT_ARGUMENT(message);
+  IREE_ASSERT_ARGUMENT(buffer);
   if (buffer_capacity < message->value.size + 1) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
+    return IREE_STATUS_OUT_OF_RANGE;  // Not an error; just a size query.
   }
   memcpy(buffer, message->value.data, message->value.size);
   buffer[message->value.size] = 0;
@@ -289,7 +293,7 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t iree_custom_native_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
       "custom", allocator, absl::MakeConstSpan(kCustomModuleFunctions));

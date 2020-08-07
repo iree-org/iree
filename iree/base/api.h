@@ -39,9 +39,7 @@
 //   iree_status_t status = \
 //       ((PFN_iree_api_version_check)dlsym(library, "iree_api_version_check"))(
 //       IREE_API_VERSION_LATEST, &actual_version);
-//   if (!iree_status_is_ok(status)) {
-//     LOG(FATAL) << "Unsupported runtime API version " << actual_version;
-//   }
+//   IREE_CHECK_OK(status);
 //   dlclose(library);
 //
 // Object Ownership and Lifetime
@@ -482,6 +480,7 @@ typedef uintptr_t iree_status_t;
 #define IREE_EXPECT_OK(expr) EXPECT_EQ(IREE_STATUS_OK, iree_status_code(expr))
 #define IREE_EXPECT_STATUS_IS(expected_code, expr) \
   EXPECT_EQ(expected_code, iree_status_code(expr))
+#define IREE_ASSERT_ARGUMENT(name) assert(name)
 
 #ifndef IREE_API_NO_PROTOTYPES
 

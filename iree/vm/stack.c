@@ -321,9 +321,13 @@ static inline iree_host_size_t iree_math_align(iree_host_size_t value,
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_state_resolver_t state_resolver,
     iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
+  IREE_ASSERT_ARGUMENT(out_stack);
   *out_stack = NULL;
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "stack storage under minimum required amount: %zu < %d",
+        storage.data_length, IREE_VM_STACK_MIN_SIZE);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -423,7 +427,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
 static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
                                         iree_host_size_t minimum_capacity) {
   if (stack->allocator.alloc == NULL) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "stack initialized on the host stack and cannot grow");
   }
 
   // Ensure we grow at least as much as required.
@@ -432,7 +438,10 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
     new_capacity *= IREE_VM_STACK_GROWTH_FACTOR;
   } while (new_capacity < minimum_capacity);
   if (new_capacity > IREE_VM_STACK_MAX_SIZE) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "new stack size would exceed maximum size: %zu > %d", new_capacity,
+        IREE_VM_STACK_MAX_SIZE);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -588,7 +597,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
       ref_register_count > IREE_REF_REGISTER_MASK) {
     // Register count overflow. A valid compiler should never produce files that
     // hit this.
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "register count overflow");
   }
   // NOTE: >> by the bit width is undefined so we use a 64bit mask here to
   // ensure we are ok.
@@ -684,7 +694,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
     iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers,
     iree_vm_stack_frame_t** out_caller_frame) {
   if (!stack->top) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack leave");
   }
 
   iree_vm_stack_frame_header_t* frame_header = stack->top;
@@ -742,9 +753,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_stack_external_leave(iree_vm_stack_t* stack) {
   if (!stack->top) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack leave");
   } else if (stack->top->type != IREE_VM_STACK_FRAME_EXTERNAL) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack leave (not external)");
   }
   return iree_vm_stack_function_leave(stack, NULL, NULL);
 }

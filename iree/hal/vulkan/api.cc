@@ -33,9 +33,7 @@ namespace vulkan {
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
     void* vkGetInstanceProcAddr_fn, iree_hal_vulkan_syms_t** out_syms) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_create");
-  if (!out_syms) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
   IREE_API_ASSIGN_OR_RETURN(
@@ -58,9 +56,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_vulkan_syms_create_from_system_loader(
     iree_hal_vulkan_syms_t** out_syms) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_create_from_system_loader");
-  if (!out_syms) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
   IREE_API_ASSIGN_OR_RETURN(auto syms,
@@ -72,10 +68,8 @@ iree_hal_vulkan_syms_create_from_system_loader(
 IREE_API_EXPORT iree_status_t
 iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_syms_release");
+  IREE_ASSERT_ARGUMENT(syms);
   auto* handle = reinterpret_cast<DynamicSymbols*>(syms);
-  if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
   handle->ReleaseReference();
   return iree_ok_status();
 }
@@ -134,9 +128,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features, iree_host_size_t extensions_capacity,
     const char** out_extensions, iree_host_size_t* out_extensions_count) {
-  if (!out_extensions_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(out_extensions_count);
   *out_extensions_count = 0;
 
   bool is_instance = extensibility_set & IREE_HAL_VULKAN_INSTANCE_BIT;
@@ -153,7 +145,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
   }
 
   if (extensions_capacity < *out_extensions_count) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
+    return IREE_STATUS_OUT_OF_RANGE;  // Not an error; just a size query.
   }
 
   const std::vector<const char*>& extensions =
@@ -169,14 +161,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features, iree_host_size_t layers_capacity,
     const char** out_layers, iree_host_size_t* out_layers_count) {
-  if (!out_layers_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(out_layers_count);
   *out_layers_count = 0;
 
   // Device layers are deprecated and unsupported here.
   if (!(extensibility_set & IREE_HAL_VULKAN_INSTANCE_BIT)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "device layers are deprecated in Vulkan");
   }
 
   bool is_required = extensibility_set & IREE_HAL_VULKAN_REQUIRED_BIT;
@@ -191,7 +182,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
   }
 
   if (layers_capacity < *out_layers_count) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
+    return IREE_STATUS_OUT_OF_RANGE;  // Not an error; just a size query.
   }
 
   const std::vector<const char*>& layers =
@@ -226,9 +217,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
     iree_hal_vulkan_driver_options_t options, iree_hal_vulkan_syms_t* syms,
     iree_hal_driver_t** out_driver) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_driver_create");
-  if (!out_driver) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = nullptr;
 
   IREE_API_ASSIGN_OR_RETURN(
@@ -244,9 +234,9 @@ iree_hal_vulkan_driver_create_using_instance(
     iree_hal_vulkan_driver_options_t options, iree_hal_vulkan_syms_t* syms,
     VkInstance instance, iree_hal_driver_t** out_driver) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_driver_create_using_instance");
-  if (!out_driver) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = nullptr;
 
   IREE_API_ASSIGN_OR_RETURN(
@@ -262,15 +252,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
                                              iree_hal_device_t** out_device) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_driver_create_default_device");
-  if (!out_device) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(out_device);
   *out_device = nullptr;
 
   auto* handle = reinterpret_cast<VulkanDriver*>(driver);
-  if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
 
   LOG(INFO) << "Enumerating available Vulkan devices...";
   IREE_API_ASSIGN_OR_RETURN(auto available_devices,
@@ -283,7 +269,6 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
-
   return iree_ok_status();
 }
 
@@ -293,15 +278,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
     iree_hal_vulkan_queue_set_t transfer_queue_set,
     iree_hal_device_t** out_device) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_driver_create_device");
-  if (!out_device) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
+  IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(physical_device);
+  IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(out_device);
   *out_device = nullptr;
 
   auto* handle = reinterpret_cast<VulkanDriver*>(driver);
-  if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  }
 
   LOG(INFO) << "Creating VulkanDevice...";
   QueueSet compute_qs;

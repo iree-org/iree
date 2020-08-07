@@ -117,6 +117,7 @@ absl::InlinedVector<T, 4> QueryListValues(
     values.resize(count);
     status = fn(args..., values.size(), values.data(), &count);
   } else if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
     return {};
   }
   values.resize(count);

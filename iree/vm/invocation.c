@@ -71,6 +71,9 @@ static iree_status_t iree_vm_invoke_within(
     iree_vm_context_t* context, iree_vm_stack_t* stack,
     iree_vm_function_t function, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs) {
+  IREE_ASSERT_ARGUMENT(context);
+  IREE_ASSERT_ARGUMENT(stack);
+
   // TODO(#2075): disabled because check_test is invoking native methods.
   // These checks should be nice and simple as we don't support variadic
   // args/results in bytecode.
@@ -88,7 +91,8 @@ static iree_status_t iree_vm_invoke_within(
   // this many things (such as for nested variadic lists/etc) we should instead
   // use list objects as they'll be significantly more efficient.
   if (input_count > 1024 || output_count > 1024) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "input/output count overflow");
   }
 
   // Allocate storage for marshaling arguments into the callee stack frame.

@@ -399,7 +399,7 @@ class CheckModule final : public vm::NativeModule<CheckModuleState> {
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t check_native_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CheckModule>(
       "check", allocator, absl::MakeConstSpan(kCheckModuleFunctions));

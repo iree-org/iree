@@ -349,14 +349,20 @@ iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
-  if (!allocator.alloc) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  if (!allocator.alloc) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocator has no alloc routine");
+  }
   return allocator.alloc(allocator.self, IREE_ALLOCATION_MODE_ZERO_CONTENTS,
                          byte_length, out_ptr);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
-  if (!allocator.alloc) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  if (!allocator.alloc) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocator has no alloc routine");
+  }
   return allocator.alloc(allocator.self,
                          IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING, byte_length,
                          out_ptr);
@@ -375,9 +381,11 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
   IREE_TRACE_SCOPE0("iree_allocator_system_allocate");
 
   if (!out_ptr) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  } else if (byte_length <= 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no out_ptr specified");
+  } else if (byte_length == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocations must be >0 bytes");
   }
 
   void* existing_ptr = *out_ptr;
@@ -396,7 +404,8 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
     }
   }
   if (!ptr) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "system allocator failed the request");
   }
 
   if (existing_ptr) {
@@ -427,7 +436,8 @@ iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
   IREE_TRACE_SCOPE0("iree_file_mapping_open_read");
 
   if (!out_file_mapping) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no out_file_mapping specified");
   }
   *out_file_mapping = nullptr;
 
@@ -446,7 +456,8 @@ iree_file_mapping_retain(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_retain");
   auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
   if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid file_mapping handle");
   }
   handle->AddReference();
   return iree_ok_status();
@@ -457,7 +468,8 @@ iree_file_mapping_release(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_release");
   auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
   if (!handle) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid file_mapping handle");
   }
   handle->ReleaseReference();
   return iree_ok_status();

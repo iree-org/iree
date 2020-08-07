@@ -297,8 +297,10 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];
     iree_vm_variant_t f_result = iree_vm_variant_empty();
-    if (!iree_status_is_ok(
-            iree_vm_list_get_variant(f_results.raw_ptr(), i, &f_result))) {
+    iree_status_t status =
+        iree_vm_list_get_variant(f_results.raw_ptr(), i, &f_result);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
       throw RaiseValueError("Could not get result from list");
     }
     switch (desc.type) {
@@ -318,13 +320,14 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
         // Extract dims from the buffer view.
         size_t rank = 0;
         absl::InlinedVector<int32_t, 6> dims(6);
-        if (ABSL_PREDICT_FALSE(!iree_status_is_ok(iree_hal_buffer_view_shape(
-                buffer_view, dims.capacity(), dims.data(), &rank)))) {
+        iree_status_t status = iree_hal_buffer_view_shape(
+            buffer_view, dims.capacity(), dims.data(), &rank);
+        if (iree_status_is_out_of_range(status)) {
           dims.resize(rank);
-          CheckApiStatus(iree_hal_buffer_view_shape(
-                             buffer_view, dims.capacity(), dims.data(), &rank),
-                         "Error extracting shape");
+          status = iree_hal_buffer_view_shape(buffer_view, dims.capacity(),
+                                              dims.data(), &rank);
         }
+        CheckApiStatus(status, "Error extracting shape");
         dims.resize(rank);
 
         // Deal with int32_t != int (but require 32bits). Happens on some
