@@ -22,6 +22,11 @@
 
 namespace iree {
 
+std::ostream& operator<<(std::ostream& os, const StatusCode& x) {
+  os << StatusCodeToString(x);
+  return os;
+}
+
 Status::Status(StatusCode code, absl::string_view message) {
   if (code != StatusCode::kOk) {
     state_ = absl::make_unique<State>();
@@ -72,12 +77,6 @@ std::string Status::ToString() const {
   // TODO(scotttodd): Payloads (stack traces)
   return text;
 }
-
-bool operator==(const Status& lhs, const Status& rhs) {
-  return lhs.code() == rhs.code();
-}
-
-bool operator!=(const Status& lhs, const Status& rhs) { return !(lhs == rhs); }
 
 std::ostream& operator<<(std::ostream& os, const Status& x) {
   os << x.ToString();

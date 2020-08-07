@@ -19,9 +19,9 @@
 #include <set>
 
 #include "iree/base/status.h"
-#include "iree/testing/status_matchers.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -95,7 +95,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     if (IsUnavailable(driver_or.status())) {
       unavailable_driver_names.insert(driver_name);
     }
-    RETURN_IF_ERROR(driver_or.status());
+    IREE_RETURN_IF_ERROR(driver_or.status());
     return std::move(driver_or.value());
   }
 };

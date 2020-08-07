@@ -77,6 +77,9 @@ static inline const char* StatusCodeToString(StatusCode code) {
   return iree_status_code_string(static_cast<iree_status_code_t>(code));
 }
 
+// Prints a human-readable representation of `x` to `os`.
+std::ostream& operator<<(std::ostream& os, const StatusCode& x);
+
 // A Status value can be either OK or not-OK
 //   * OK indicates that the operation succeeded.
 //   * A not-OK value indicates that the operation failed and contains details
@@ -104,11 +107,29 @@ class ABSL_MUST_USE_RESULT Status final {
   // Return a combination of the error code name and message.
   std::string ToString() const;
 
-  friend bool operator==(const Status&, const Status&);
-  friend bool operator!=(const Status&, const Status&);
-
   // Ignores any errors, potentially suppressing complaints from any tools.
   void IgnoreError() {}
+
+  friend bool operator==(const Status& lhs, const Status& rhs) {
+    return lhs.code() == rhs.code();
+  }
+  friend bool operator!=(const Status& lhs, const Status& rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend bool operator==(const Status& lhs, const StatusCode& rhs) {
+    return lhs.code() == rhs;
+  }
+  friend bool operator!=(const Status& lhs, const StatusCode& rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend bool operator==(const StatusCode& lhs, const Status& rhs) {
+    return lhs == rhs.code();
+  }
+  friend bool operator!=(const StatusCode& lhs, const Status& rhs) {
+    return !(lhs == rhs);
+  }
 
  private:
   // TODO(#265): remove message().
@@ -204,9 +225,9 @@ ABSL_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
   return status.code() == StatusCode::kUnknown;
 }
 
-#define CHECK_OK(val) CHECK_EQ(::iree::OkStatus(), (val))
-#define QCHECK_OK(val) QCHECK_EQ(::iree::OkStatus(), (val))
-#define DCHECK_OK(val) DCHECK_EQ(::iree::OkStatus(), (val))
+#define CHECK_OK(val) CHECK_EQ(::iree::StatusCode::kOk, (val))
+#define QCHECK_OK(val) QCHECK_EQ(::iree::StatusCode::kOk, (val))
+#define DCHECK_OK(val) DCHECK_EQ(::iree::StatusCode::kOk, (val))
 
 }  // namespace iree
 

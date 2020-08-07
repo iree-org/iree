@@ -60,10 +60,22 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   operator Status() const&;
   operator Status() &&;
 
+  friend bool operator==(const StatusBuilder& lhs, const StatusCode& rhs) {
+    return lhs.code() == rhs;
+  }
+  friend bool operator!=(const StatusBuilder& lhs, const StatusCode& rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend bool operator==(const StatusCode& lhs, const StatusBuilder& rhs) {
+    return lhs == rhs.code();
+  }
+  friend bool operator!=(const StatusCode& lhs, const StatusBuilder& rhs) {
+    return !(lhs == rhs);
+  }
+
  private:
   Status CreateStatus() &&;
-
-  static Status JoinMessageToStatus(Status s, absl::string_view msg);
 
   // The status that the result will be based on.
   Status status_;
@@ -109,6 +121,7 @@ StatusBuilder& StatusBuilder::operator<<(const T& value) & {
   rep_->stream << value;
   return *this;
 }
+
 template <typename T>
 StatusBuilder&& StatusBuilder::operator<<(const T& value) && {
   return std::move(operator<<(value));

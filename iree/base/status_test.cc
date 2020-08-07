@@ -64,11 +64,11 @@ TEST(StatusBuilder, StreamInsertionFlag) {
 
 TEST(StatusMacro, ReturnIfError) {
   auto returnIfError = [](Status status) -> Status {
-    RETURN_IF_ERROR(status) << "annotation";
+    RETURN_IF_ERROR(std::move(status)) << "annotation";
     return OkStatus();
   };
   Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
-  status = returnIfError(status);
+  status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(status.ToString(), HasSubstr("message"));
   EXPECT_THAT(status.ToString(), HasSubstr("annotation"));
@@ -84,7 +84,7 @@ TEST(StatusMacro, AssignOrReturn) {
   };
   StatusOr<std::string> statusOr = InvalidArgumentErrorBuilder(IREE_LOC)
                                    << "message";
-  Status status = assignOrReturn(statusOr);
+  Status status = assignOrReturn(std::move(statusOr));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(status.ToString(), HasSubstr("message"));
   EXPECT_THAT(status.ToString(), HasSubstr("annotation"));

@@ -53,7 +53,7 @@ Status CondVarSemaphore::Signal(uint64_t value) {
 
 void CondVarSemaphore::Fail(Status status) {
   absl::MutexLock lock(&mutex_);
-  status_ = status;
+  status_ = std::move(status);
   value_.store(UINT64_MAX, std::memory_order_release);
 }
 

@@ -50,17 +50,14 @@ StatusCode StatusBuilder::code() const { return status_.code(); }
 SourceLocation StatusBuilder::source_location() const { return loc_; }
 
 Status StatusBuilder::CreateStatus() && {
-  Status result = JoinMessageToStatus(status_, rep_->stream_message);
+  Status result = rep_->stream_message.empty()
+                      ? status_
+                      : Annotate(status_, rep_->stream_message);
 
   // Reset the status after consuming it.
   status_ = Status(StatusCode::kUnknown, "");
   rep_ = nullptr;
   return result;
-}
-
-Status StatusBuilder::JoinMessageToStatus(Status s, absl::string_view msg) {
-  if (msg.empty()) return s;
-  return Annotate(s, msg);
 }
 
 std::ostream& operator<<(std::ostream& os, const StatusBuilder& builder) {

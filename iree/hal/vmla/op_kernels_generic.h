@@ -972,10 +972,9 @@ Status GenericPooling(absl::Span<const T> src_buffer,
     for (int j = 0; j < rank; ++j) {
       src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];
     }
-    auto status = ComputePoolingWindow<T, KernelImpl>(
-        src_buffer, src_indices, src_shape, init_buffer[0], window_dimensions,
-        &dst_buffer[i]);
-    RETURN_IF_ERROR(status);
+    ComputePoolingWindow<T, KernelImpl>(src_buffer, src_indices, src_shape,
+                                        init_buffer[0], window_dimensions,
+                                        &dst_buffer[i]);
     IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
   }
   return OkStatus();
