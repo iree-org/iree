@@ -209,7 +209,9 @@ StatusOr<bool> EmulatedTimelineSemaphore::TryToAdvanceTimeline(
   // Inform the queue that some fences are known to have signaled. This should
   // happen here instead of inside the other TryToAdvanceTimeline to avoid
   // potential mutex deadlock, given here we are not holding a mutex anymore.
-  on_fence_signal_(absl::MakeSpan(signaled_fences));
+  if (!signaled_fences.empty()) {
+    on_fence_signal_(absl::MakeSpan(signaled_fences));
+  }
   return status;
 }
 
