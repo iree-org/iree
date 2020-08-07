@@ -16,7 +16,6 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
@@ -58,8 +57,8 @@ static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
     result.value_type = IREE_VM_VALUE_TYPE_I64;
   } else if (full_name[0] == '!') {
     // Note that we drop the ! prefix:
-    iree_string_view_t type_name = iree_string_view_t{
-        full_name + 1, flatbuffers_string_len(full_name) - 1};
+    iree_string_view_t type_name = {full_name + 1,
+                                    flatbuffers_string_len(full_name) - 1};
     if (strncmp(type_name.data, "vm.list<", strlen("vm.list<")) == 0) {
       // This is a !vm.list<...> type. We don't actually care about the type as
       // we allow list types to be widened. Rewrite to just vm.list as that's
@@ -254,8 +253,8 @@ static void iree_vm_bytecode_module_destroy(void* self) {
 
   iree_allocator_free(module->flatbuffer_allocator,
                       (void*)module->flatbuffer_data.data);
-  module->flatbuffer_data = {NULL, 0};
-  module->flatbuffer_allocator = IREE_ALLOCATOR_NULL;
+  module->flatbuffer_data = iree_make_const_byte_span(NULL, 0);
+  module->flatbuffer_allocator = iree_allocator_null();
 
   iree_allocator_free(module->allocator, module);
 }
@@ -263,7 +262,7 @@ static void iree_vm_bytecode_module_destroy(void* self) {
 static iree_string_view_t iree_vm_bytecode_module_name(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   flatbuffers_string_t name = iree_vm_BytecodeModuleDef_name(module->def);
-  return iree_string_view_t{name, flatbuffers_string_len(name)};
+  return iree_make_string_view(name, flatbuffers_string_len(name));
 }
 
 static iree_vm_module_signature_t iree_vm_bytecode_module_signature(
@@ -534,8 +533,8 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
       iree_align(sizeof(iree_vm_bytecode_module_state_t), 16);
 
   if (state) {
-    state->rwdata_storage = {(base_ptr + offset),
-                             (iree_host_size_t)rwdata_storage_capacity};
+    state->rwdata_storage =
+        iree_make_byte_span(base_ptr + offset, rwdata_storage_capacity);
   }
   offset += iree_align(rwdata_storage_capacity, 16);
 
@@ -709,8 +708,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
 
   flatbuffers_uint8_vec_t bytecode_data =
       iree_vm_BytecodeModuleDef_bytecode_data(module_def);
-  module->bytecode_data = iree_const_byte_span_t{
-      bytecode_data, flatbuffers_uint8_vec_len(bytecode_data)};
+  module->bytecode_data = iree_make_const_byte_span(
+      bytecode_data, flatbuffers_uint8_vec_len(bytecode_data));
 
   module->flatbuffer_data = flatbuffer_data;
   module->flatbuffer_allocator = flatbuffer_allocator;

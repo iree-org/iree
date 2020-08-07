@@ -223,8 +223,11 @@ typedef struct {
   iree_host_size_t data_length;
 } iree_byte_span_t;
 
-#define iree_make_byte_span(data, data_length) \
-  { (uint8_t*)(data), (data_length) }
+static inline iree_byte_span_t iree_make_byte_span(
+    void* data, iree_host_size_t data_length) {
+  iree_byte_span_t v = {(uint8_t*)data, data_length};
+  return v;
+}
 
 // A span of constant bytes (ala std::span of const uint8_t).
 typedef struct {
@@ -232,8 +235,11 @@ typedef struct {
   iree_host_size_t data_length;
 } iree_const_byte_span_t;
 
-#define iree_make_const_byte_span(data, data_length) \
-  { (const uint8_t*)(data), (data_length) }
+static inline iree_const_byte_span_t iree_make_const_byte_span(
+    const void* data, iree_host_size_t data_length) {
+  iree_const_byte_span_t v = {(const uint8_t*)data, data_length};
+  return v;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_string_view_t (like std::string_view/absl::string_view)
@@ -253,6 +259,12 @@ static inline iree_string_view_t iree_string_view_empty() {
 
 // Returns true if the given string view is the empty string.
 #define iree_string_view_is_empty(sv) (((sv).data == NULL) || ((sv).size == 0))
+
+static inline iree_string_view_t iree_make_string_view(
+    const char* str, iree_host_size_t str_length) {
+  iree_string_view_t v = {str, str_length};
+  return v;
+}
 
 // Returns a string view initialized with a reference to the given
 // NUL-terminated string literal.
@@ -661,18 +673,6 @@ typedef struct {
   void(IREE_API_PTR* free)(void* self, void* ptr);
 } iree_allocator_t;
 
-// Allocates using the iree_allocator_malloc and iree_allocator_free methods.
-// These will usually be backed by malloc and free.
-#define IREE_ALLOCATOR_SYSTEM                                     \
-  iree_allocator_t {                                              \
-    0, iree_allocator_system_allocate, iree_allocator_system_free \
-  }
-
-// Does not perform any allocation or deallocation; used to wrap objects that
-// are owned by external code/live in read-only memory/etc.
-#define IREE_ALLOCATOR_NULL \
-  iree_allocator_t { 0, 0, 0 }
-
 #ifndef IREE_API_NO_PROTOTYPES
 
 // Allocates a block of |byte_length| bytes from the given allocator.
@@ -699,6 +699,27 @@ IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
                                                               void* ptr);
 
 #endif  // IREE_API_NO_PROTOTYPES
+
+// Allocates using the iree_allocator_malloc and iree_allocator_free methods.
+// These will usually be backed by malloc and free.
+#define IREE_ALLOCATOR_SYSTEM                                     \
+  iree_allocator_t {                                              \
+    0, iree_allocator_system_allocate, iree_allocator_system_free \
+  }
+static inline iree_allocator_t iree_allocator_system() {
+  iree_allocator_t v = {0, iree_allocator_system_allocate,
+                        iree_allocator_system_free};
+  return v;
+}
+
+// Does not perform any allocation or deallocation; used to wrap objects that
+// are owned by external code/live in read-only memory/etc.
+#define IREE_ALLOCATOR_NULL \
+  iree_allocator_t { 0, 0, 0 }
+static inline iree_allocator_t iree_allocator_null() {
+  iree_allocator_t v = {0, 0, 0};
+  return v;
+}
 
 //===----------------------------------------------------------------------===//
 // iree::FileMapping
