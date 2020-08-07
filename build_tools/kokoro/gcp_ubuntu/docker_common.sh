@@ -88,7 +88,7 @@ function docker_setup() {
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
-      --mount="type=bind,src=${fake_home_dir?},dst=${HOME?}"
+      --mount="type=tmpfs,dst=${HOME?}"
     )
 
     # Make gcloud credentials available. This isn't necessary when running in
