@@ -26,7 +26,17 @@ namespace {
 using ::iree::testing::status::IsOkAndHolds;
 using ::testing::Eq;
 
-class CommandQueueTest : public CtsTestBase {};
+class CommandQueueTest : public CtsTestBase {
+ protected:
+  virtual void SetUp() {
+    CtsTestBase::SetUp();
+
+    // Disabled on Vulkan until tests pass with timeline semaphore emulation.
+    if (driver_->name() == "vulkan") {
+      GTEST_SKIP();
+    }
+  }
+};
 
 TEST_P(CommandQueueTest, EnumerateDeviceQueues) {
   // Log how many queues we have so future test cases have more context.
@@ -130,9 +140,9 @@ TEST_P(CommandQueueTest, WaitMultiple) {
   ASSERT_OK(command_queue->WaitIdle());
 }
 
-// Disabled on Vulkan until tests pass when using timeline semaphore emulation.
 INSTANTIATE_TEST_SUITE_P(AllDrivers, CommandQueueTest,
-                         ::testing::Values("vmla", "llvm", "dylib"),
+                         ::testing::ValuesIn(DriverRegistry::shared_registry()
+                                                 ->EnumerateAvailableDrivers()),
                          GenerateTestName());
 
 }  // namespace
