@@ -333,10 +333,10 @@ struct ref_type_descriptor<TensorList> {
 
 extern "C" iree_status_t iree_tensorlist_module_register_types() {
   static bool has_registered = false;
-  if (has_registered) return IREE_STATUS_OK;
+  if (has_registered) return iree_ok_status();
   IREE_VM_REGISTER_CC_TYPE(TensorList, "tensorlist.list",
                            iree_tensorlist_descriptor);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -472,12 +472,12 @@ class TensorListModule final : public vm::NativeModule<TensorListModuleState> {
 
 extern "C" iree_status_t iree_tensorlist_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   *out_module = NULL;
   auto module = std::make_unique<TensorListModule>(
       "tensorlist", allocator, absl::MakeConstSpan(kTensorListModuleFunctions));
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 }  // namespace iree

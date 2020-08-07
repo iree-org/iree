@@ -43,7 +43,7 @@ static iree_status_t IREE_API_CALL SimpleAddExecute(
     iree_vm_register_list_t list;
   } result_registers = {{1, 0}};
   iree_vm_stack_function_leave(stack, &result_registers.list, NULL);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Benchmarks the given exported function, optionally passing in arguments.
@@ -80,7 +80,7 @@ static iree_status_t RunFunction(benchmark::State& state,
       +[](void* state_resolver, iree_vm_module_t* module,
           iree_vm_module_state_t** out_module_state) -> iree_status_t {
         *out_module_state = (iree_vm_module_state_t*)state_resolver;
-        return IREE_STATUS_OK;
+        return iree_ok_status();
       }};
 
   iree_vm_function_t function;
@@ -131,7 +131,7 @@ static iree_status_t RunFunction(benchmark::State& state,
   module->free_state(module->self, module_state);
   module->destroy(module->self);
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static void BM_ModuleCreate(benchmark::State& state) {

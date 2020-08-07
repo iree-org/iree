@@ -73,8 +73,6 @@ static void check_vk_result(VkResult err) {
   LOG(FATAL) << "VkResult: " << err;
 }
 
-#define CHECK_IREE_OK(status) CHECK_EQ(IREE_STATUS_OK, (status))
-
 static std::vector<const char*> GetIreeLayers(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features) {
@@ -535,30 +533,30 @@ int iree::IreeMain(int argc, char** argv) {
   // Setup IREE.
   // This call to |iree_api_init| is not technically required, but it is
   // included for completeness.
-  CHECK_IREE_OK(iree_api_init(&argc, &argv));
+  IREE_CHECK_OK(iree_api_init(&argc, &argv));
 
   // Check API version.
   iree_api_version_t actual_version;
   iree_status_t status =
       iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version);
-  if (status != IREE_STATUS_OK) {
-    LOG(FATAL) << "Unsupported runtime API version " << actual_version;
-  } else {
+  if (iree_status_is_ok(status)) {
     LOG(INFO) << "IREE runtime API version " << actual_version;
+  } else {
+    LOG(FATAL) << "Unsupported runtime API version " << actual_version;
   }
 
   // Register HAL module types.
-  CHECK_IREE_OK(iree_hal_module_register_types());
+  IREE_CHECK_OK(iree_hal_module_register_types());
 
   // Create a runtime Instance.
   iree_vm_instance_t* iree_instance = nullptr;
-  CHECK_IREE_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &iree_instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &iree_instance));
 
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
   LOG(INFO) << "Creating Vulkan driver/device";
   // Load symbols from our static `vkGetInstanceProcAddr` for IREE to use.
   iree_hal_vulkan_syms_t* iree_vk_syms = nullptr;
-  CHECK_IREE_OK(iree_hal_vulkan_syms_create(
+  IREE_CHECK_OK(iree_hal_vulkan_syms_create(
       reinterpret_cast<void*>(&vkGetInstanceProcAddr), &iree_vk_syms));
   // Create the driver sharing our VkInstance.
   iree_hal_driver_t* iree_vk_driver = nullptr;
@@ -567,7 +565,7 @@ int iree::IreeMain(int argc, char** argv) {
   options.features = static_cast<iree_hal_vulkan_features_t>(
       IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
       IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
-  CHECK_IREE_OK(iree_hal_vulkan_driver_create_using_instance(
+  IREE_CHECK_OK(iree_hal_vulkan_driver_create_using_instance(
       options, iree_vk_syms, g_Instance, &iree_vk_driver));
   // Create a device sharing our VkDevice and queue.
   // We could also create a separate (possibly low priority) compute queue for
@@ -578,12 +576,12 @@ int iree::IreeMain(int argc, char** argv) {
   iree_hal_vulkan_queue_set_t transfer_queue_set;
   transfer_queue_set.queue_indices = 0;
   iree_hal_device_t* iree_vk_device = nullptr;
-  CHECK_IREE_OK(iree_hal_vulkan_driver_wrap_device(
+  IREE_CHECK_OK(iree_hal_vulkan_driver_wrap_device(
       iree_vk_driver, g_PhysicalDevice, g_Device, compute_queue_set,
       transfer_queue_set, &iree_vk_device));
   // Create a HAL module using the HAL device.
   iree_vm_module_t* hal_module = nullptr;
-  CHECK_IREE_OK(iree_hal_module_create(iree_vk_device, IREE_ALLOCATOR_SYSTEM,
+  IREE_CHECK_OK(iree_hal_module_create(iree_vk_device, IREE_ALLOCATOR_SYSTEM,
                                        &hal_module));
 
   // Load bytecode module from embedded data.
@@ -591,7 +589,7 @@ int iree::IreeMain(int argc, char** argv) {
   const auto* module_file_toc =
       iree::samples::vulkan::simple_mul_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
-  CHECK_IREE_OK(iree_vm_bytecode_module_create(
+  IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
@@ -600,7 +598,7 @@ int iree::IreeMain(int argc, char** argv) {
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* iree_context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-  CHECK_IREE_OK(iree_vm_context_create_with_modules(
+  IREE_CHECK_OK(iree_vm_context_create_with_modules(
       iree_instance, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
       &iree_context));
   LOG(INFO) << "Module loaded and context is ready for use";
@@ -608,7 +606,7 @@ int iree::IreeMain(int argc, char** argv) {
   // Lookup the entry point function.
   iree_vm_function_t main_function;
   const char kMainFunctionName[] = "module.simple_mul";
-  CHECK_IREE_OK(iree_vm_context_resolve_function(
+  IREE_CHECK_OK(iree_vm_context_resolve_function(
       iree_context,
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
       &main_function));
@@ -700,24 +698,24 @@ int iree::IreeMain(int argc, char** argv) {
         iree_hal_buffer_usage_t input_buffer_usage =
             static_cast<iree_hal_buffer_usage_t>(
                 IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT);
-        CHECK_IREE_OK(iree_hal_allocator_allocate_buffer(
+        IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
             allocator, input_memory_type, input_buffer_usage,
             sizeof(float) * kElementCount, &input0_buffer));
-        CHECK_IREE_OK(iree_hal_allocator_allocate_buffer(
+        IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
             allocator, input_memory_type, input_buffer_usage,
             sizeof(float) * kElementCount, &input1_buffer));
-        CHECK_IREE_OK(iree_hal_buffer_write_data(input0_buffer, 0, &input_x,
+        IREE_CHECK_OK(iree_hal_buffer_write_data(input0_buffer, 0, &input_x,
                                                  sizeof(input_x)));
-        CHECK_IREE_OK(iree_hal_buffer_write_data(input1_buffer, 0, &input_y,
+        IREE_CHECK_OK(iree_hal_buffer_write_data(input1_buffer, 0, &input_y,
                                                  sizeof(input_y)));
         // Wrap input buffers in buffer views.
         iree_hal_buffer_view_t* input0_buffer_view = nullptr;
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
-        CHECK_IREE_OK(iree_hal_buffer_view_create(
+        IREE_CHECK_OK(iree_hal_buffer_view_create(
             input0_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ALLOCATOR_SYSTEM,
             &input0_buffer_view));
-        CHECK_IREE_OK(iree_hal_buffer_view_create(
+        IREE_CHECK_OK(iree_hal_buffer_view_create(
             input1_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ALLOCATOR_SYSTEM,
             &input1_buffer_view));
@@ -725,25 +723,25 @@ int iree::IreeMain(int argc, char** argv) {
         iree_hal_buffer_release(input1_buffer);
         // Marshal input buffer views through a VM variant list.
         vm::ref<iree_vm_list_t> inputs;
-        CHECK_IREE_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
+        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
                                           IREE_ALLOCATOR_SYSTEM, &inputs));
         auto input0_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input0_buffer_view);
         auto input1_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input1_buffer_view);
-        CHECK_IREE_OK(
+        IREE_CHECK_OK(
             iree_vm_list_push_ref_move(inputs.get(), &input0_buffer_view_ref));
-        CHECK_IREE_OK(
+        IREE_CHECK_OK(
             iree_vm_list_push_ref_move(inputs.get(), &input1_buffer_view_ref));
 
         // Prepare outputs list to accept results from the invocation.
         vm::ref<iree_vm_list_t> outputs;
-        CHECK_IREE_OK(iree_vm_list_create(/*element_type=*/nullptr,
+        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
                                           kElementCount * sizeof(float),
                                           IREE_ALLOCATOR_SYSTEM, &outputs));
 
         // Synchronously invoke the function.
-        CHECK_IREE_OK(iree_vm_invoke(iree_context, main_function,
+        IREE_CHECK_OK(iree_vm_invoke(iree_context, main_function,
                                      /*policy=*/nullptr, inputs.get(),
                                      outputs.get(), IREE_ALLOCATOR_SYSTEM));
 
@@ -754,7 +752,7 @@ int iree::IreeMain(int argc, char** argv) {
                                        iree_hal_buffer_view_get_descriptor()));
         auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
         iree_hal_mapped_memory_t mapped_memory;
-        CHECK_IREE_OK(iree_hal_buffer_map(output_buffer,
+        IREE_CHECK_OK(iree_hal_buffer_map(output_buffer,
                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
                                           IREE_WHOLE_BUFFER, &mapped_memory));
         memcpy(&latest_output, mapped_memory.contents.data,

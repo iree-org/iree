@@ -76,12 +76,12 @@ iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor) {
     if (!iree_vm_ref_type_descriptors[i]) {
       iree_vm_ref_type_descriptors[i] = descriptor;
       descriptor->type = i;
-      return IREE_STATUS_OK;
+      return iree_ok_status();
     }
   }
   // Too many user-defined types registered; need to increase
   // IREE_VM_MAX_TYPE_ID.
-  return IREE_STATUS_RESOURCE_EXHAUSTED;
+  return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
 }
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
@@ -110,7 +110,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
       iree_vm_ref_get_type_descriptor(type);
   if (!type_descriptor) {
     // Type not registered.
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   if (out_ref->ptr != NULL) {
@@ -124,7 +124,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
   out_ref->offsetof_counter = type_descriptor->offsetof_counter;
   out_ref->type = type;
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
@@ -134,12 +134,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
     volatile iree_atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
     iree_atomic_fetch_add(counter, 1);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_ref_check(iree_vm_ref_t* ref, iree_vm_ref_type_t type) {
-  return ref->type == type ? IREE_STATUS_OK : IREE_STATUS_INVALID_ARGUMENT;
+  return ref->type == type ? iree_ok_status()
+                           : iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
@@ -163,10 +164,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_checked(
     iree_vm_ref_t* ref, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
   if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type) {
     // Make no changes on failure.
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   iree_vm_ref_retain(ref, out_ref);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain_or_move(
@@ -195,10 +196,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_or_move_checked(
     iree_vm_ref_t* out_ref) {
   if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type) {
     // Make no changes on failure.
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   iree_vm_ref_retain_or_move(is_move, ref, out_ref);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {

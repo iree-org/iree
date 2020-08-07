@@ -234,7 +234,7 @@ static const int kRegSize = sizeof(uint16_t);
 #define DISPATCH_UNHANDLED_CORE() \
   _dispatch_unhandled:            \
   VMCHECK(0);                     \
-  return IREE_STATUS_UNIMPLEMENTED;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 #define DISPATCH_UNHANDLED_EXT()
 
 #define DISPATCH_OP(ext, op_name, body)                             \
@@ -259,17 +259,20 @@ static const int kRegSize = sizeof(uint16_t);
 
 #define DEFINE_DISPATCH_TABLES()
 
-#define DISPATCH_UNHANDLED_CORE() \
-  default:                        \
-    VMCHECK(0);                   \
-    return IREE_STATUS_UNIMPLEMENTED;
+#define DISPATCH_UNHANDLED_CORE()                      \
+  default: {                                           \
+    VMCHECK(0);                                        \
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, \
+                            "unhandled core "          \
+                            "opcode");                 \
+  }
 #define DISPATCH_UNHANDLED_EXT DISPATCH_UNHANDLED_CORE
 
 #define DISPATCH_OP(ext, op_name, body) \
-  case IREE_VM_OP_##ext##_##op_name:    \
+  case IREE_VM_OP_##ext##_##op_name: {  \
     IREE_DISPATCH_LOG_OPCODE(#op_name); \
     body;                               \
-    break;
+  } break;
 
 #define BEGIN_DISPATCH_PREFIX(op_name, ext) \
   case IREE_VM_OP_CORE_##op_name: {         \

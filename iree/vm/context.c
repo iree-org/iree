@@ -51,7 +51,7 @@ static iree_status_t iree_vm_context_run_function(
   if (iree_status_is_not_found(status)) {
     // Function doesn't exist; that's ok as this was an optional call.
     IREE_TRACE_ZONE_END(z0);
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   } else if (!iree_status_is_ok(status)) {
     IREE_TRACE_ZONE_END(z0);
     return status;
@@ -69,7 +69,7 @@ static iree_status_t iree_vm_context_run_function(
 static iree_status_t iree_vm_context_query_module_state(
     void* state_resolver, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state) {
-  if (!state_resolver) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!state_resolver) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   iree_vm_context_t* context = (iree_vm_context_t*)state_resolver;
   // NOTE: this is a linear scan, but given that the list of modules should be
   // N<4 this is faster than just about anything else we could do.
@@ -77,10 +77,10 @@ static iree_status_t iree_vm_context_query_module_state(
   for (int i = 0; i < context->list.count; ++i) {
     if (context->list.modules[i] == module) {
       *out_module_state = context->list.module_states[i];
-      return IREE_STATUS_OK;
+      return iree_ok_status();
     }
   }
-  return IREE_STATUS_NOT_FOUND;
+  return iree_make_status(IREE_STATUS_NOT_FOUND);
 }
 
 static iree_status_t iree_vm_context_resolve_module_imports(
@@ -112,7 +112,7 @@ static iree_status_t iree_vm_context_resolve_module_imports(
     IREE_RETURN_IF_ERROR(
         module->resolve_import(module->self, module_state, i, import_function));
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static void iree_vm_context_release_modules(iree_vm_context_t* context,
@@ -168,19 +168,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
     iree_host_size_t module_count, iree_allocator_t allocator,
     iree_vm_context_t** out_context) {
   if (!out_context) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   *out_context = NULL;
 
   if (!instance) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   if (!modules && module_count > 0) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   for (int i = 0; i < module_count; ++i) {
     if (!modules[i]) {
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     }
   }
 
@@ -215,7 +215,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
   }
 
   *out_context = context;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static void iree_vm_context_destroy(iree_vm_context_t* context) {
@@ -286,21 +286,21 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
     iree_vm_context_t* context, iree_vm_module_t** modules,
     iree_host_size_t module_count) {
   if (!context) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   if (!modules && module_count > 1) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   for (int i = 0; i < module_count; ++i) {
     if (!modules[i]) {
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     }
   }
 
   // Try growing both our storage lists first, if needed.
   if (context->list.count + module_count > context->list.capacity) {
     if (context->is_static) {
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
     }
     iree_host_size_t new_capacity = context->list.capacity + module_count;
     if (new_capacity < context->list.capacity * 2) {
@@ -337,7 +337,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
   iree_host_size_t original_count = context->list.count;
-  iree_status_t status = IREE_STATUS_OK;
+  iree_status_t status = iree_ok_status();
   iree_host_size_t i = 0;
   for (i = 0; i < module_count; ++i) {
     iree_vm_module_t* module = modules[i];
@@ -394,7 +394,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function) {
   if (!out_function) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   memset(out_function, 0, sizeof(iree_vm_function_t));
 
@@ -402,7 +402,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
   iree_string_view_t function_name;
   if (iree_string_view_split(full_name, '.', &module_name, &function_name) ==
       -1) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   for (int i = (int)context->list.count - 1; i >= 0; --i) {
@@ -414,5 +414,5 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
     }
   }
 
-  return IREE_STATUS_NOT_FOUND;
+  return iree_make_status(IREE_STATUS_NOT_FOUND);
 }

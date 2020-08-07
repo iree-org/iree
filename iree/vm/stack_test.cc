@@ -36,13 +36,13 @@ static iree_status_t SentinelStateResolver(
   if (module == MODULE_A_SENTINEL) {
     ++module_a_state_resolve_count;
     *out_module_state = MODULE_A_STATE_SENTINEL;
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   } else if (module == MODULE_B_SENTINEL) {
     ++module_b_state_resolve_count;
     *out_module_state = MODULE_B_STATE_SENTINEL;
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   }
-  return IREE_STATUS_NOT_FOUND;
+  return iree_make_status(IREE_STATUS_NOT_FOUND);
 }
 
 // Tests simple stack usage, mainly just for demonstration.
@@ -187,7 +187,7 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
       +[](void* state_resolver, iree_vm_module_t* module,
           iree_vm_module_state_t** out_module_state) -> iree_status_t {
         // NOTE: always failing.
-        return IREE_STATUS_INTERNAL;
+        return iree_make_status(IREE_STATUS_INTERNAL);
       }};
   IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver, IREE_ALLOCATOR_SYSTEM);
 
@@ -195,8 +195,9 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   iree_vm_stack_frame_t* frame_a = nullptr;
-  EXPECT_EQ(IREE_STATUS_INTERNAL, iree_vm_stack_function_enter(
-                                      stack, function_a, NULL, NULL, &frame_a));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INTERNAL,
+                        ::iree::Status(iree_vm_stack_function_enter(
+                            stack, function_a, NULL, NULL, &frame_a)));
 
   iree_vm_stack_deinitialize(stack);
 }

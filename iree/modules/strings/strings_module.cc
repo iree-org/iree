@@ -199,7 +199,8 @@ class StringsModuleState final {
         break;
 
       default:
-        return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
+        return FromApiStatus(iree_make_status(IREE_STATUS_UNIMPLEMENTED),
+                             IREE_LOC);
     }
 
     // Unmap used buffer.
@@ -231,7 +232,8 @@ class StringsModuleState final {
     // The dict must be a simple list, and the indices must be integers.
     if (dict->rank != 1 || iree_hal_buffer_view_element_type(ids.get()) !=
                                IREE_HAL_ELEMENT_TYPE_SINT_32) {
-      return FromApiStatus(IREE_STATUS_INVALID_ARGUMENT, IREE_LOC);
+      return FromApiStatus(iree_make_status(IREE_STATUS_INVALID_ARGUMENT),
+                           IREE_LOC);
     }
 
     const size_t rank = iree_hal_buffer_view_shape_rank(ids.get());
@@ -375,7 +377,7 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 
 extern "C" iree_status_t iree_strings_module_register_types() {
   if (strings_string_descriptor.type) {
-    return IREE_STATUS_OK;  // Already registered.
+    return iree_ok_status();  // Already registered.
   }
 
   // Register strings.string
@@ -395,12 +397,12 @@ extern "C" iree_status_t iree_strings_module_register_types() {
   IREE_RETURN_IF_ERROR(
       iree_vm_ref_register_type(&strings_string_tensor_descriptor));
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 extern "C" iree_status_t iree_strings_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   *out_module = NULL;
   auto module = std::make_unique<iree::StringsModule>(
       "strings", allocator, absl::MakeConstSpan(iree::kStringsModuleFunctions));
@@ -409,5 +411,5 @@ extern "C" iree_status_t iree_strings_module_create(
     return iree::ToApiStatus(status);
   }
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }

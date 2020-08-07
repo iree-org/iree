@@ -130,7 +130,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
   iree_host_size_t required_storage_size =
       storage_offset + iree_align(capacity * element_size, 8);
   if (storage.data_length < required_storage_size) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   }
   memset(storage.data, 0, required_storage_size);
 
@@ -145,7 +145,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
   list->storage = storage.data + storage_offset;
 
   *out_list = list;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL
@@ -185,7 +185,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_create(
   }
 
   *out_list = list;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static void iree_vm_list_destroy(void* ptr) {
@@ -206,7 +206,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_list_release(iree_vm_list_t* list) {
 IREE_API_EXPORT iree_status_t iree_vm_list_element_type(
     const iree_vm_list_t* list, iree_vm_type_def_t* out_element_type) {
   *out_element_type = list->element_type;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL
@@ -217,7 +217,7 @@ iree_vm_list_capacity(const iree_vm_list_t* list) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_reserve(iree_vm_list_t* list, iree_host_size_t minimum_capacity) {
   if (list->capacity >= minimum_capacity) {
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   }
   iree_host_size_t old_capacity = list->capacity;
   iree_host_size_t new_capacity = iree_align(minimum_capacity, 64);
@@ -226,7 +226,7 @@ iree_vm_list_reserve(iree_vm_list_t* list, iree_host_size_t minimum_capacity) {
   memset((void*)((uintptr_t)list->storage + old_capacity * list->element_size),
          0, (new_capacity - old_capacity) * list->element_size);
   list->capacity = new_capacity;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL
@@ -237,7 +237,7 @@ iree_vm_list_size(const iree_vm_list_t* list) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_resize(iree_vm_list_t* list, iree_host_size_t new_size) {
   if (new_size == list->count) {
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   } else if (new_size < list->count) {
     // Truncating.
     iree_vm_list_reset_range(list, new_size + 1, list->count - new_size);
@@ -247,7 +247,7 @@ iree_vm_list_resize(iree_vm_list_t* list, iree_host_size_t new_size) {
     IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, new_size));
   }
   list->count = new_size;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static void iree_vm_list_convert_value_type(
@@ -324,7 +324,7 @@ static void iree_vm_list_convert_value_type(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_get_value(const iree_vm_list_t* list, iree_host_size_t i,
                        iree_vm_value_t* out_value) {
-  if (i >= list->count) return IREE_STATUS_OUT_OF_RANGE;
+  if (i >= list->count) return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   memset(out_value, 0, sizeof(*out_value));
   switch (list->storage_mode) {
@@ -350,7 +350,7 @@ iree_vm_list_get_value(const iree_vm_list_t* list, iree_host_size_t i,
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
       if (!iree_vm_type_def_is_value(&variant->type)) {
-        return IREE_STATUS_FAILED_PRECONDITION;
+        return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
       }
       out_value->type = variant->type.value_type;
       memcpy(out_value->value_storage, variant->value_storage,
@@ -358,15 +358,15 @@ iree_vm_list_get_value(const iree_vm_list_t* list, iree_host_size_t i,
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_value_as(
     const iree_vm_list_t* list, iree_host_size_t i,
     iree_vm_value_type_t value_type, iree_vm_value_t* out_value) {
-  if (i >= list->count) return IREE_STATUS_OUT_OF_RANGE;
+  if (i >= list->count) return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   iree_vm_value_t value;
   value.i64 = 0;
@@ -393,7 +393,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_value_as(
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
       if (!iree_vm_type_def_is_value(&variant->type)) {
-        return IREE_STATUS_FAILED_PRECONDITION;
+        return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
       }
       value.type = variant->type.value_type;
       memcpy(value.value_storage, variant->value_storage,
@@ -401,15 +401,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_value_as(
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
   iree_vm_list_convert_value_type(&value, value_type, out_value);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_value(
     iree_vm_list_t* list, iree_host_size_t i, const iree_vm_value_t* value) {
-  if (i >= list->count) return IREE_STATUS_OUT_OF_RANGE;
+  if (i >= list->count) return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   iree_vm_value_type_t target_type;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_VALUE: {
@@ -421,7 +421,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_value(
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
   iree_vm_value_t converted_value;
   iree_vm_list_convert_value_type(value, target_type, &converted_value);
@@ -457,9 +457,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_value(
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -484,7 +484,7 @@ IREE_API_EXPORT void* iree_vm_list_get_ref_deref(
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_assign(
     const iree_vm_list_t* list, iree_host_size_t i, iree_vm_ref_t* out_value) {
-  if (i >= list->count) return IREE_STATUS_OUT_OF_RANGE;
+  if (i >= list->count) return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_REF: {
@@ -495,29 +495,29 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_assign(
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
       if (!iree_vm_type_def_is_ref(&variant->type)) {
-        return IREE_STATUS_FAILED_PRECONDITION;
+        return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
       }
       iree_vm_ref_assign(&variant->ref, out_value);
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_get_ref_retain(
     const iree_vm_list_t* list, iree_host_size_t i, iree_vm_ref_t* out_value) {
   IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_assign(list, i, out_value));
   iree_vm_ref_retain(out_value, out_value);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static iree_status_t IREE_API_CALL iree_vm_list_set_ref(iree_vm_list_t* list,
                                                         iree_host_size_t i,
                                                         bool is_move,
                                                         iree_vm_ref_t* value) {
-  if (i >= list->count) return IREE_STATUS_OUT_OF_RANGE;
+  if (i >= list->count) return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_REF: {
@@ -537,9 +537,9 @@ static iree_status_t IREE_API_CALL iree_vm_list_set_ref(iree_vm_list_t* list,
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_ref_retain(
@@ -570,7 +570,7 @@ iree_vm_list_push_ref_move(iree_vm_list_t* list, iree_vm_ref_t* value) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
                          iree_vm_variant_t* out_value) {
-  if (i >= list->count) return IREE_STATUS_OUT_OF_RANGE;
+  if (i >= list->count) return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_VALUE: {
@@ -597,14 +597,14 @@ iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
       break;
     }
     default:
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_variant(
     iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant_t* value) {
-  return IREE_STATUS_UNIMPLEMENTED;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_push_variant(

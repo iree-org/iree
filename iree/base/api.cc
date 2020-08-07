@@ -290,14 +290,18 @@ iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version) {
   iree_api_version_t actual_version = IREE_API_VERSION_0;
   *out_actual_version = actual_version;
-  return expected_version == actual_version ? IREE_STATUS_OK
-                                            : IREE_STATUS_OUT_OF_RANGE;
+  return expected_version == actual_version
+             ? iree_ok_status()
+             : iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "IREE version mismatch; application expected "
+                                "%d but IREE is compiled as %d",
+                                expected_version, actual_version);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv) {
   InitializeEnvironment(argc, argv);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -345,14 +349,14 @@ iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
-  if (!allocator.alloc) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!allocator.alloc) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   return allocator.alloc(allocator.self, IREE_ALLOCATION_MODE_ZERO_CONTENTS,
                          byte_length, out_ptr);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
-  if (!allocator.alloc) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!allocator.alloc) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   return allocator.alloc(allocator.self,
                          IREE_ALLOCATION_MODE_TRY_REUSE_EXISTING, byte_length,
                          out_ptr);
@@ -371,9 +375,9 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
   IREE_TRACE_SCOPE0("iree_allocator_system_allocate");
 
   if (!out_ptr) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   } else if (byte_length <= 0) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   void* existing_ptr = *out_ptr;
@@ -392,7 +396,7 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
     }
   }
   if (!ptr) {
-    return IREE_STATUS_RESOURCE_EXHAUSTED;
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
   }
 
   if (existing_ptr) {
@@ -401,7 +405,7 @@ iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
   IREE_TRACE_ALLOC(ptr, byte_length);
 
   *out_ptr = ptr;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_allocator_system_free(void* self,
@@ -423,7 +427,7 @@ iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
   IREE_TRACE_SCOPE0("iree_file_mapping_open_read");
 
   if (!out_file_mapping) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   *out_file_mapping = nullptr;
 
@@ -434,7 +438,7 @@ iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
   *out_file_mapping =
       reinterpret_cast<iree_file_mapping_t*>(file_mapping.release());
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -442,10 +446,10 @@ iree_file_mapping_retain(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_retain");
   auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
   if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   handle->AddReference();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -453,10 +457,10 @@ iree_file_mapping_release(iree_file_mapping_t* file_mapping) {
   IREE_TRACE_SCOPE0("iree_file_mapping_release");
   auto* handle = reinterpret_cast<FileMapping*>(file_mapping);
   if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   handle->ReleaseReference();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_byte_span_t IREE_API_CALL

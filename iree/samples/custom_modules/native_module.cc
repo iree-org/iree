@@ -63,7 +63,7 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
   message->value.size = value.size;
   memcpy((void*)message->value.data, value.data, message->value.size);
   *out_message = message;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 iree_status_t iree_custom_message_wrap(iree_string_view_t value,
@@ -76,7 +76,7 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
   message->allocator = allocator;
   message->value = value;  // Unowned.
   *out_message = message;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 void iree_custom_message_destroy(void* ptr) {
@@ -88,16 +88,16 @@ iree_status_t iree_custom_message_read_value(iree_custom_message_t* message,
                                              char* buffer,
                                              size_t buffer_capacity) {
   if (buffer_capacity < message->value.size + 1) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   }
   memcpy(buffer, message->value.data, message->value.size);
   buffer[message->value.size] = 0;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 iree_status_t iree_custom_native_module_register_types() {
   if (iree_custom_message_descriptor.type) {
-    return IREE_STATUS_OK;  // Already registered.
+    return iree_ok_status();  // Already registered.
   }
   iree_custom_message_descriptor.type_name =
       iree_make_cstring_view("custom.message");
@@ -289,7 +289,7 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t iree_custom_native_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
       "custom", allocator, absl::MakeConstSpan(kCustomModuleFunctions));
@@ -298,7 +298,7 @@ extern "C" iree_status_t iree_custom_native_module_create(
     return ToApiStatus(status);
   }
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 }  // namespace samples

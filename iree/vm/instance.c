@@ -25,7 +25,7 @@ struct iree_vm_instance {
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
     iree_allocator_t allocator, iree_vm_instance_t** out_instance) {
   if (!out_instance) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   *out_instance = NULL;
 
@@ -38,7 +38,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
   iree_atomic_store(&instance->ref_count, 1);
 
   *out_instance = instance;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {

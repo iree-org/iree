@@ -33,10 +33,10 @@ void SetupVm() {
   int argc = 1;
   InitializeEnvironment(&argc, &aargv);
 
-  CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_tensorlist_module_register_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_strings_module_register_types());
+  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  IREE_CHECK_OK(iree_hal_module_register_types());
+  IREE_CHECK_OK(iree_tensorlist_module_register_types());
+  IREE_CHECK_OK(iree_strings_module_register_types());
 }
 
 }  // namespace

@@ -23,7 +23,7 @@ iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
   memset(module, 0, sizeof(iree_vm_module_t));
   module->self = self;
   iree_atomic_store(&module->ref_count, 1);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL
@@ -105,7 +105,7 @@ iree_vm_function_signature(const iree_vm_function_t* function) {
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_vm_function_reflection_attr(const iree_vm_function_t* function,
                                  iree_string_view_t key) {
-  iree_string_view_t empty_string = IREE_STRING_VIEW_EMPTY;
+  iree_string_view_t empty_string = iree_string_view_empty();
   iree_vm_module_t* module = function->module;
   if (!module->get_function_reflection_attr) {
     return empty_string;
@@ -128,7 +128,7 @@ iree_vm_get_function_reflection_attr(iree_vm_function_t function, int32_t index,
                                      iree_string_view_t* key,
                                      iree_string_view_t* value) {
   if (!function.module->get_function_reflection_attr) {
-    return IREE_STATUS_NOT_FOUND;
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
   return function.module->get_function_reflection_attr(
       function.module->self, function.linkage, function.ordinal, index, key,

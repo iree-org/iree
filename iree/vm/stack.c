@@ -323,7 +323,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
     iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
   *out_stack = NULL;
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -345,7 +345,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_initialize(
   *out_stack = stack;
 
   IREE_TRACE_ZONE_END(z0);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL
@@ -423,7 +423,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
 static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
                                         iree_host_size_t minimum_capacity) {
   if (stack->allocator.alloc == NULL) {
-    return IREE_STATUS_RESOURCE_EXHAUSTED;
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
   }
 
   // Ensure we grow at least as much as required.
@@ -432,7 +432,7 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
     new_capacity *= IREE_VM_STACK_GROWTH_FACTOR;
   } while (new_capacity < minimum_capacity);
   if (new_capacity > IREE_VM_STACK_MAX_SIZE) {
-    return IREE_STATUS_RESOURCE_EXHAUSTED;
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -484,7 +484,7 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Remaps argument/result registers from a source list in the caller/callee
@@ -588,7 +588,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
       ref_register_count > IREE_REF_REGISTER_MASK) {
     // Register count overflow. A valid compiler should never produce files that
     // hit this.
-    return IREE_STATUS_RESOURCE_EXHAUSTED;
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
   }
   // NOTE: >> by the bit width is undefined so we use a 64bit mask here to
   // ensure we are ok.
@@ -652,7 +652,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
   }
 
   if (out_callee_frame) *out_callee_frame = callee_frame;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // The external caller doesn't know the register types that it's going to be
@@ -684,7 +684,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
     iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers,
     iree_vm_stack_frame_t** out_caller_frame) {
   if (!stack->top) {
-    return IREE_STATUS_FAILED_PRECONDITION;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
 
   iree_vm_stack_frame_header_t* frame_header = stack->top;
@@ -721,7 +721,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
   stack->frame_storage_size -= frame_header->frame_size;
 
   if (out_caller_frame) *out_caller_frame = caller_frame;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
@@ -736,15 +736,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
       stack, external_function, NULL, NULL, out_callee_frame));
 
   stack->top->type = IREE_VM_STACK_FRAME_EXTERNAL;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_stack_external_leave(iree_vm_stack_t* stack) {
   if (!stack->top) {
-    return IREE_STATUS_FAILED_PRECONDITION;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   } else if (stack->top->type != IREE_VM_STACK_FRAME_EXTERNAL) {
-    return IREE_STATUS_FAILED_PRECONDITION;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
   return iree_vm_stack_function_leave(stack, NULL, NULL);
 }

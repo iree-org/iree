@@ -50,7 +50,7 @@ static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
   static bool has_registered = false;
-  if (has_registered) return IREE_STATUS_OK;
+  if (has_registered) return iree_ok_status();
 
   IREE_VM_REGISTER_CC_TYPE(Allocator, "hal.allocator",
                            iree_hal_allocator_descriptor);
@@ -74,7 +74,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
                            iree_hal_semaphore_descriptor);
 
   has_registered = true;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -988,13 +988,13 @@ class HALModule final : public vm::NativeModule<HALModuleState> {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
                        iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   *out_module = nullptr;
   auto module = std::make_unique<HALModule>(
       allocator, add_ref(reinterpret_cast<Device*>(device)));
   IREE_API_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 }  // namespace

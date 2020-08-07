@@ -57,9 +57,11 @@ pybind11::error_already_set StatusToPyExc(const Status& status) {
 
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message) {
-  assert(status != IREE_STATUS_OK);
-  auto full_message = absl::StrCat(message, ": ", static_cast<int>(status));
+  assert(!iree_status_is_ok(status));
+  auto full_message = absl::StrCat(
+      message, ": ", iree_status_code_string(iree_status_code(status)));
   PyErr_SetString(ApiStatusToPyExcClass(status), full_message.c_str());
+  iree_status_ignore(status);
   return pybind11::error_already_set();
 }
 

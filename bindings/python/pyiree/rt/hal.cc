@@ -32,7 +32,7 @@ class HalMappedMemory {
   ~HalMappedMemory() {
     if (bv_) {
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv_);
-      CHECK_EQ(iree_hal_buffer_unmap(buffer, &mapped_memory_), IREE_STATUS_OK);
+      IREE_CHECK_OK(iree_hal_buffer_unmap(buffer, &mapped_memory_));
       iree_hal_buffer_view_release(bv_);
     }
   }

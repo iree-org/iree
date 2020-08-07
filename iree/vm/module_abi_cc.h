@@ -142,7 +142,7 @@ class NativeModule {
     }
     auto* module = FromModulePointer(self);
     if (ordinal < 0 || ordinal > module->dispatch_table_.size()) {
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     }
     if (out_function) {
       out_function->module = module->interface();
@@ -153,16 +153,17 @@ class NativeModule {
       const auto& dispatch_function = module->dispatch_table_[ordinal];
       *out_name = iree_make_cstring_view(dispatch_function.name);
     }
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   }
 
   static iree_status_t ModuleLookupFunction(void* self,
                                             iree_vm_function_linkage_t linkage,
                                             iree_string_view_t name,
                                             iree_vm_function_t* out_function) {
-    if (!out_function) return IREE_STATUS_INVALID_ARGUMENT;
+    if (!out_function) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     std::memset(out_function, 0, sizeof(*out_function));
-    if (!name.data || !name.size) return IREE_STATUS_INVALID_ARGUMENT;
+    if (!name.data || !name.size)
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
 
     auto* module = FromModulePointer(self);
     out_function->module = module->interface();
@@ -172,16 +173,17 @@ class NativeModule {
               name, iree_make_cstring_view(module->dispatch_table_[i].name)) ==
           0) {
         out_function->ordinal = i;
-        return IREE_STATUS_OK;
+        return iree_ok_status();
       }
     }
-    return IREE_STATUS_NOT_FOUND;
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
 
   static iree_status_t ModuleAllocState(
       void* self, iree_allocator_t allocator,
       iree_vm_module_state_t** out_module_state) {
-    if (!out_module_state) return IREE_STATUS_INVALID_ARGUMENT;
+    if (!out_module_state)
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     *out_module_state = nullptr;
 
     auto* module = FromModulePointer(self);
@@ -193,7 +195,7 @@ class NativeModule {
 
     *out_module_state =
         reinterpret_cast<iree_vm_module_state_t*>(module_state.release());
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   }
 
   static void ModuleFreeState(void* self,
@@ -206,19 +208,19 @@ class NativeModule {
                                            int32_t ordinal,
                                            iree_vm_function_t function) {
     // C++ API does not yet support imports.
-    return IREE_STATUS_FAILED_PRECONDITION;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
   }
 
   static iree_status_t ModuleBeginCall(void* self, iree_vm_stack_t* stack,
                                        const iree_vm_function_call_t* call,
                                        iree_vm_execution_result_t* out_result) {
-    if (!out_result) return IREE_STATUS_INVALID_ARGUMENT;
+    if (!out_result) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     std::memset(out_result, 0, sizeof(*out_result));
-    if (!stack) return IREE_STATUS_INVALID_ARGUMENT;
+    if (!stack) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     auto* module = FromModulePointer(self);
     if (call->function.ordinal < 0 ||
         call->function.ordinal >= module->dispatch_table_.size()) {
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     }
     const auto& info = module->dispatch_table_[call->function.ordinal];
 
