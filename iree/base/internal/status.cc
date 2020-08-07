@@ -14,36 +14,13 @@
 
 #include "iree/base/internal/status.h"
 
-#include <atomic>
 #include <memory>
 
 #include "absl/base/attributes.h"
-#include "absl/debugging/stacktrace.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 
-ABSL_FLAG(bool, iree_status_save_stack_trace, false,
-          "Save and display the full stack trace of the point of error")
-    .OnUpdate([]() {
-      iree::StatusSavesStackTrace(
-          absl::GetFlag(FLAGS_iree_status_save_stack_trace));
-    });
-
 namespace iree {
-
-namespace status_internal {
-
-ABSL_CONST_INIT std::atomic<bool> iree_save_stack_trace{false};
-
-}  // namespace status_internal
-
-bool DoesStatusSaveStackTrace() {
-  return status_internal::iree_save_stack_trace.load(std::memory_order_relaxed);
-}
-void StatusSavesStackTrace(bool on_off) {
-  status_internal::iree_save_stack_trace.store(on_off,
-                                               std::memory_order_relaxed);
-}
 
 std::string StatusCodeToString(StatusCode code) {
   switch (code) {

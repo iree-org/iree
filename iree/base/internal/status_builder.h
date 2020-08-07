@@ -15,6 +15,7 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 #define IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/internal/ostringstream.h"
 #include "iree/base/internal/source_location.h"

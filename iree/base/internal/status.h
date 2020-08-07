@@ -19,21 +19,11 @@
 #include <string>
 
 #include "absl/base/attributes.h"
-#include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/internal/logging.h"
 #include "iree/base/target_platform.h"
 
-ABSL_DECLARE_FLAG(bool, iree_status_save_stack_trace);
-
 namespace iree {
-
-// True if Status objects will capture stack traces on init for non-ok Statuses.
-bool DoesStatusSaveStackTrace();
-
-// Enables/disables status stack trace saving. This is global for the process.
-// While useful for debugging, stack traces can impact performance severely.
-void StatusSavesStackTrace(bool on_off);
 
 enum class StatusCode : int {
   kOk = 0,

@@ -16,6 +16,7 @@
 #define IREE_BASE_INTERNAL_STATUSOR_H_
 
 #include "absl/base/attributes.h"
+#include "absl/utility/utility.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
 

@@ -128,9 +128,7 @@ iree_cc_library(
     ::logging_internal
     ::ostringstream
     absl::core_headers
-    absl::flags
     absl::memory
-    absl::stacktrace
     absl::strings
     iree::base::target_platform
   PUBLIC

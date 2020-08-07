@@ -19,6 +19,7 @@
 #include <tuple>
 #include <utility>
 
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"

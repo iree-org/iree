@@ -125,8 +125,6 @@ cc_library(
         ":ostringstream",
         "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/debugging:stacktrace",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
