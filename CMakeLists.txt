@@ -194,6 +194,17 @@ if(CMAKE_CROSSCOMPILING)
 endif()
 
 #-------------------------------------------------------------------------------
+# IREE compilation toolchain configuration
+#-------------------------------------------------------------------------------
+
+# Enable using lld as the linker for C/C++ targets. This affects IREE and all
+# dependency projects.
+option(IREE_ENABLE_LLD "Use lld when linking" OFF)
+option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
+option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
+option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
+
+#-------------------------------------------------------------------------------
 # IREE utility definitions
 #-------------------------------------------------------------------------------
 
@@ -220,14 +231,11 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
-# IREE compilation toolchain configuration
+# IREE compilation flags
 #-------------------------------------------------------------------------------
 
-# Enable using lld as the linker for C/C++ targets. This affects IREE and all
-# dependency projects.
-option(IREE_ENABLE_LLD "Use lld when linking" OFF)
-
-string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
+string(JOIN " " IREE_DEFAULT_COPTS_STR ${IREE_DEFAULT_COPTS})
+string(APPEND CMAKE_CXX_FLAGS " ${IREE_DEFAULT_COPTS_STR}")
 
 set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
 set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)
