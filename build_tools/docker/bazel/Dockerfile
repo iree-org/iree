@@ -20,7 +20,7 @@
 # Run interactively using the following, where IREE_WORKDIR is the path to your
 # local dev environment:
 # docker run -it --rm --entrypoint bash \
-#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
+#   --volume "$(pwd):/usr/src/iree/" \
 #   gcr.io/iree-oss/bazel
 
 # Set up the image and working directory.

@@ -90,7 +90,7 @@ bazel \
         --bazelrc=build_tools/bazel/iree.bazelrc \
           test \
           ${test_env_args[@]} \
-        --sandbox_base=/dev/shm/ \
+        # --sandbox_base=/dev/shm/ \
         --config=generic_clang \
         --build_tag_filters="${BUILD_TAG_FILTERS?}" \
         --test_tag_filters="${TEST_TAG_FILTERS?}" \

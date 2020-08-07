@@ -84,11 +84,11 @@ function docker_setup() {
     #      turns out that makes a huge difference in performance for Bazel
     #      running with local execution (not with RBE) because it is IO bound at
     #      64 cores.
-    local fake_home_dir="${KOKORO_ROOT?}/fake_home"
+    local fake_home_dir="/dev/shm/fake_home"
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
-      --volume="${fake_home_dir?}:${HOME?}"
+      --mount="type=bind,src=${fake_home_dir?},dst=${HOME?}"
     )
 
     # Make gcloud credentials available. This isn't necessary when running in

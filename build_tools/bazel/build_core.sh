@@ -85,10 +85,11 @@ bazel \
         --bazelrc=build_tools/bazel/iree.bazelrc \
           test \
             ${test_env_args[@]} \
+            --jobs=192 \
             --config=generic_clang \
             --build_tag_filters="${BUILD_TAG_FILTERS?}" \
             --test_tag_filters="${TEST_TAG_FILTERS?}" \
             --keep_going \
-            --test_output=errors \
-            --config=rs \
-            --config=rbe
+            --test_output=errors
+            # --config=rs \
+            # --config=rbe

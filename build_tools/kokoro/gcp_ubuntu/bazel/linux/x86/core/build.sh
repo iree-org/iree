@@ -22,7 +22,7 @@ set -e
 set -x
 
 # Print the UTC time when set -x is on
-export PS4='[$(date -u "+%T %Z")] '
+export PS4='\n[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging
 bazel --version
