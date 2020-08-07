@@ -264,9 +264,15 @@ endfunction()
 # Parameters:
 # TEST_NAME: the test name, e.g. iree/base:ref_ptr_test
 function(iree_add_test_environment_properties TEST_NAME)
-  # Can technically build just a target backend and run tests which don't
-  # require a corresponding HAL driver, but that's an edge case - just disable
-  # if either isn't being built.
+  # IREE_*_DISABLE environment variables may used to skip test cases which
+  # require both a compiler target backend and compatible runtime HAL driver.
+  #
+  # These variables may be set by the test environment, typically as a property
+  # of some continuous execution test runner or by an individual developer, or
+  # here by the build system.
+  #
+  # Tests which only depend on a compiler target backend or a runtime HAL
+  # driver, but not both, should generally use a different method of filtering.
   if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} OR NOT ${IREE_HAL_DRIVER_VULKAN})
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
   endif()
