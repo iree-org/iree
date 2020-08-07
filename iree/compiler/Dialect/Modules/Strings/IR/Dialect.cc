@@ -55,7 +55,7 @@ class StringsToVMConversionInterface : public VMConversionDialectInterface {
 }  // namespace
 
 StringsDialect::StringsDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<StringsDialect>()) {
   addInterfaces<StringsToVMConversionInterface>();
 
   addTypes<StringType, StringTensorType>();

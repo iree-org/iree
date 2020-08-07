@@ -33,7 +33,7 @@ static DialectRegistration<TFStringsDialect> tf_strings_dialect;
 }  // namespace
 
 TFStringsDialect::TFStringsDialect(MLIRContext* context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<TFStringsDialect>()) {
   addInterfaces<TfStringsToHALConversionInterface>();
   addTypes<StringType>();
 

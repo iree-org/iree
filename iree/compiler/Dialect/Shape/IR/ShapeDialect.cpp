@@ -44,7 +44,7 @@ struct ShapeInlinerInterface : public DialectInlinerInterface {
 };
 
 ShapeDialect::ShapeDialect(MLIRContext* context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<ShapeDialect>()) {
   addTypes<Shape::RankedShapeType>();
   addInterfaces<ShapeInlinerInterface>();
 #define GET_OP_LIST

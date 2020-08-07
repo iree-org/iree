@@ -45,7 +45,7 @@ struct FlowFolderInterface : public OpFolderDialectInterface {
 }  // namespace
 
 FlowDialect::FlowDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
   addInterfaces<FlowFolderInterface>();
 
 #define GET_OP_LIST
