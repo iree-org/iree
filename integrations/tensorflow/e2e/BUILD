@@ -58,9 +58,6 @@ SPECIAL_CASES = [
 
 # keep sorted
 VMLA_FAILING = [
-    "broadcasting_test.py",  # TODO(b/162816314)
-    "dynamic_mlp_relu_test.py",  # TODO(b/162816314)
-    "dynamic_mlp_test.py",  # TODO(b/162816314)
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)

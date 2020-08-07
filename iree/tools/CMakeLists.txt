@@ -12,17 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
+
 add_subdirectory(test)
 
-# TODO: iree_select_target_platform macros.
-# TODO: skip targets disabled by options.
-iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
-  ALL
-    "iree::hal::dylib::dylib_driver_module"
-    "iree::hal::llvmjit::llvmjit_driver_module"
-    "iree::hal::vmla::vmla_driver_module"
-    "iree::hal::vulkan::vulkan_driver_module"
-)
+# Enable compiler targets based on options.
+set(IREE_COMPILER_TARGETS "")
+set(IREE_COMPILER_TARGET_COPTS "")
+# TODO(#2645): Move LLVMAOT target under DYLIB-LLVM-AOT flag
+if(${IREE_TARGET_BACKEND_LLVM-IR})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMIR_TARGET")
+endif()
+if(${IREE_TARGET_BACKEND_VMLA})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
+endif()
+if(${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
+endif()
 
 if(IREE_ENABLE_EMITC)
   set(IREE_OPT_CONDITIONAL_DEPS
@@ -195,11 +206,12 @@ if(${IREE_BUILD_COMPILER})
       init_targets
     HDRS
       "init_targets.h"
+    SRCS
+      "init_targets.cc"
     DEPS
-      iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
-      iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
-      iree::compiler::Dialect::HAL::Target::VMLA
-      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+      ${IREE_COMPILER_TARGETS}
+    COPTS
+      ${IREE_COMPILER_TARGET_COPTS}
     PUBLIC
   )
 

@@ -91,3 +91,22 @@ func @f(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) {
   return
 }
 
+// -----
+// tensor_cast
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) {
+  // CHECK: %[[LHSRS:.+]] = shapex.get_ranked_shape %arg0 : tensor<?xf32> -> !shapex.ranked_shape<[?]>
+  // CHECK: %[[RHSRS:.+]] = shapex.get_ranked_shape %arg1 : tensor<?xf32> -> !shapex.ranked_shape<[?]>
+  %0 = shape.shape_of %arg0 : tensor<?xf32> -> tensor<?xindex>
+  %1 = shape.shape_of %arg1 : tensor<?xf32> -> tensor<?xindex>
+  // CHECK: %[[BROADCASTED:.+]] = "shapex.ranked_broadcast_shape"(%[[LHSRS]], %[[RHSRS]]) {
+  // CHECK-SAME: lhs_broadcast_dimensions = dense<0> : tensor<1xi64>,
+  // CHECK-SAME: rhs_broadcast_dimensions = dense<0> : tensor<1xi64>}
+  // CHECK-SAME: : (!shapex.ranked_shape<[?]>, !shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[?]>
+  %2 = shape.broadcast %0, %1 : tensor<?xindex>, tensor<?xindex> -> tensor<?xindex>
+  // CHECK: %[[EXTENTS:.+]] = "shapex.to_extent_tensor"(%[[BROADCASTED]]) : (!shapex.ranked_shape<[?]>) -> tensor<1xindex>
+  %3 = tensor_cast %2 : tensor<?xindex> to tensor<1xindex>
+  // CHECK: "foo.use"(%[[EXTENTS]])
+  "foo.use"(%3) : (tensor<1xindex>) -> ()
+  return
+}

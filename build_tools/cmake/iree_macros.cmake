@@ -252,3 +252,31 @@ function(iree_add_executable_dependencies EXECUTABLE DEPENDENCY)
     add_dependencies(${EXECUTABLE} ${DEPENDENCY})
   endif()
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Tests
+#-------------------------------------------------------------------------------
+
+# iree_add_test_environment_properties
+#
+# Adds test environment variable properties based on the current build options.
+#
+# Parameters:
+# TEST_NAME: the test name, e.g. iree/base:ref_ptr_test
+function(iree_add_test_environment_properties TEST_NAME)
+  # IREE_*_DISABLE environment variables may used to skip test cases which
+  # require both a compiler target backend and compatible runtime HAL driver.
+  #
+  # These variables may be set by the test environment, typically as a property
+  # of some continuous execution test runner or by an individual developer, or
+  # here by the build system.
+  #
+  # Tests which only depend on a compiler target backend or a runtime HAL
+  # driver, but not both, should generally use a different method of filtering.
+  if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
+  endif()
+  if(NOT ${IREE_TARGET_BACKEND_LLVM-IR} OR NOT ${IREE_HAL_DRIVER_LLVM})
+    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_LLVMJIT_DISABLE=1")
+  endif()
+endfunction()
