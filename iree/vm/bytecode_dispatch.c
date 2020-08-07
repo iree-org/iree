@@ -154,7 +154,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (global < 0 || global >= module_state->global_ref_count) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global ref ordinal out of range: %d (table=%d)", global,
+            "global ref ordinal out of range: %d (table=%zu)", global,
             module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
@@ -170,7 +170,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (global < 0 || global >= module_state->global_ref_count) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global ref ordinal out of range: %d (table=%d)", global,
+            "global ref ordinal out of range: %d (table=%zu)", global,
             module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
@@ -186,7 +186,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (global < 0 || global >= module_state->global_ref_count) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global ref ordinal out of range: %d (table=%d)", global,
+            "global ref ordinal out of range: %d (table=%zu)", global,
             module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
@@ -202,7 +202,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (global < 0 || global >= module_state->global_ref_count) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global ref ordinal out of range: %d (table=%d)", global,
+            "global ref ordinal out of range: %d (table=%zu)", global,
             module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
@@ -240,7 +240,7 @@ iree_status_t iree_vm_bytecode_dispatch(
           rodata_ordinal >= module_state->rodata_ref_count) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "rodata ref ordinal out of range: %d (table=%d)", rodata_ordinal,
+            "rodata ref ordinal out of range: %d (table=%zu)", rodata_ordinal,
             module_state->rodata_ref_count);
       }
       bool result_is_move;

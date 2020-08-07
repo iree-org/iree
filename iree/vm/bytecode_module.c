@@ -195,14 +195,13 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "exports[%zu] missing signature", i);
     }
-    int32_t internal_ordinal =
+    iree_host_size_t internal_ordinal =
         iree_vm_ExportFunctionDef_internal_ordinal(export_def);
-    if (internal_ordinal < 0 ||
-        internal_ordinal >=
-            iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
+    if (internal_ordinal >=
+        iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "exports[%zu] internal_ordinal out of bounds (0 < %d < %zu)", i,
+          "exports[%zu] internal_ordinal out of bounds (0 < %zu < %zu)", i,
           internal_ordinal,
           iree_vm_InternalFunctionDef_vec_len(internal_functions));
     }
@@ -280,7 +279,7 @@ static iree_vm_module_signature_t iree_vm_bytecode_module_signature(
 }
 
 static iree_status_t iree_vm_bytecode_module_get_function(
-    void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
+    void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
     iree_vm_function_t* out_function, iree_string_view_t* out_name,
     iree_vm_function_signature_t* out_signature) {
   if (out_function) {
@@ -299,11 +298,10 @@ static iree_status_t iree_vm_bytecode_module_get_function(
   if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT) {
     iree_vm_ImportFunctionDef_vec_t imported_functions =
         iree_vm_BytecodeModuleDef_imported_functions(module->def);
-    if (ordinal < 0 ||
-        ordinal >= iree_vm_ImportFunctionDef_vec_len(imported_functions)) {
+    if (ordinal >= iree_vm_ImportFunctionDef_vec_len(imported_functions)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "import ordinal out of range (0 < %d < %zu)", ordinal,
+          "import ordinal out of range (0 < %zu < %zu)", ordinal,
           iree_vm_ImportFunctionDef_vec_len(imported_functions));
     }
     iree_vm_ImportFunctionDef_table_t import_def =
@@ -313,16 +311,15 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     if (out_function) {
       out_function->module = &module->interface;
       out_function->linkage = linkage;
-      out_function->ordinal = ordinal;
+      out_function->ordinal = (uint16_t)ordinal;
     }
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
-    if (ordinal < 0 ||
-        ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
+    if (ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "export ordinal out of range (0 < %d < %zu)", ordinal,
+          "export ordinal out of range (0 < %zu < %zu)", ordinal,
           iree_vm_ExportFunctionDef_vec_len(exported_functions));
     }
     iree_vm_ExportFunctionDef_table_t export_def =
@@ -345,11 +342,10 @@ static iree_status_t iree_vm_bytecode_module_get_function(
   } else {
     iree_vm_InternalFunctionDef_vec_t internal_functions =
         iree_vm_BytecodeModuleDef_internal_functions(module->def);
-    if (ordinal < 0 ||
-        ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
+    if (ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "function ordinal out of range (0 < %d < %zu)", ordinal,
+          "function ordinal out of range (0 < %zu < %zu)", ordinal,
           iree_vm_InternalFunctionDef_vec_len(internal_functions));
     }
     iree_vm_InternalFunctionDef_table_t function_def =
@@ -359,7 +355,7 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     if (out_function) {
       out_function->module = &module->interface;
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-      out_function->ordinal = ordinal;
+      out_function->ordinal = (uint16_t)ordinal;
 
       const iree_vm_FunctionDescriptor_t* function_descriptor =
           &module->function_descriptor_table[ordinal];
@@ -385,13 +381,13 @@ static iree_status_t iree_vm_bytecode_module_get_function(
 }
 
 static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
-    void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
-    int32_t index, iree_string_view_t* key, iree_string_view_t* value) {
+    void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
+    iree_host_size_t index, iree_string_view_t* key,
+    iree_string_view_t* value) {
   if (linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
     iree_vm_function_t internal_function;
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
         self, linkage, ordinal, &internal_function, NULL, NULL));
-    linkage = internal_function.linkage;
     ordinal = internal_function.ordinal;
   }
 
@@ -399,11 +395,10 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
   iree_vm_InternalFunctionDef_vec_t internal_functions =
       iree_vm_BytecodeModuleDef_internal_functions(module->def);
 
-  if (ordinal < 0 ||
-      ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
+  if (ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "function ordinal out of range (0 < %d < %zu)", ordinal,
+        "function ordinal out of range (0 < %zu < %zu)", ordinal,
         iree_vm_InternalFunctionDef_vec_len(internal_functions));
   }
 
@@ -413,10 +408,9 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
       iree_vm_InternalFunctionDef_signature(function_def);
   iree_vm_ReflectionAttrDef_vec_t reflection_attrs =
       iree_vm_FunctionSignatureDef_reflection_attrs(signature);
-  if (index < 0 ||
-      index >= iree_vm_ReflectionAttrDef_vec_len(reflection_attrs)) {
+  if (index >= iree_vm_ReflectionAttrDef_vec_len(reflection_attrs)) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "reflection attribute at index %d not found",
+                            "reflection attribute at index %zu not found",
                             index);
   }
   iree_vm_ReflectionAttrDef_table_t attr =
@@ -516,16 +510,16 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
     iree_vm_bytecode_module_state_t* state) {
   iree_vm_ModuleStateDef_table_t module_state =
       iree_vm_BytecodeModuleDef_module_state(module_def);
-  int rwdata_storage_capacity = 0;
-  int global_ref_count = 0;
+  iree_host_size_t rwdata_storage_capacity = 0;
+  iree_host_size_t global_ref_count = 0;
   if (module_state) {
     rwdata_storage_capacity =
         iree_vm_ModuleStateDef_global_bytes_capacity(module_state);
     global_ref_count = iree_vm_ModuleStateDef_global_ref_count(module_state);
   }
-  int rodata_ref_count = iree_vm_RodataSegmentDef_vec_len(
+  iree_host_size_t rodata_ref_count = iree_vm_RodataSegmentDef_vec_len(
       iree_vm_BytecodeModuleDef_rodata_segments(module_def));
-  int import_function_count = iree_vm_ImportFunctionDef_vec_len(
+  iree_host_size_t import_function_count = iree_vm_ImportFunctionDef_vec_len(
       iree_vm_BytecodeModuleDef_imported_functions(module_def));
 
   uint8_t* base_ptr = (uint8_t*)state;
@@ -614,14 +608,14 @@ static void iree_vm_bytecode_module_free_state(
 }
 
 static iree_status_t iree_vm_bytecode_module_resolve_import(
-    void* self, iree_vm_module_state_t* module_state, int32_t ordinal,
+    void* self, iree_vm_module_state_t* module_state, iree_host_size_t ordinal,
     iree_vm_function_t function) {
   IREE_ASSERT_ARGUMENT(module_state);
   iree_vm_bytecode_module_state_t* state =
       (iree_vm_bytecode_module_state_t*)module_state;
-  if (ordinal < 0 || ordinal >= state->import_count) {
+  if (ordinal >= state->import_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "import ordinal out of range (0 < %d < %d)",
+                            "import ordinal out of range (0 < %zu < %zu)",
                             ordinal, state->import_count);
   }
   // TODO(benvanik): verify signature.
@@ -648,10 +642,9 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   }
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  if (function.ordinal < 0 ||
-      function.ordinal >= module->function_descriptor_count) {
+  if (function.ordinal >= module->function_descriptor_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "function ordinal out of range (0 < %d < %d)",
+                            "function ordinal out of range (0 < %u < %zu)",
                             function.ordinal,
                             module->function_descriptor_count);
   }

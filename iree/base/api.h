@@ -217,6 +217,10 @@ typedef uint64_t iree_device_size_t;
 // Whole length of the underlying buffer.
 #define IREE_WHOLE_BUFFER (iree_device_size_t(-1))
 
+//===----------------------------------------------------------------------===//
+// Byte buffers and memory utilities
+//===----------------------------------------------------------------------===//
+
 // A span of mutable bytes (ala std::span of uint8_t).
 typedef struct {
   uint8_t* data;

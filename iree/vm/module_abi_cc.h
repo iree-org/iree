@@ -127,7 +127,7 @@ class NativeModule {
   }
 
   static iree_status_t ModuleGetFunction(
-      void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
+      void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
       iree_vm_function_t* out_function, iree_string_view_t* out_name,
       iree_vm_function_signature_t* out_signature) {
     if (out_function) {
@@ -141,9 +141,9 @@ class NativeModule {
       std::memset(out_signature, 0, sizeof(*out_signature));
     }
     auto* module = FromModulePointer(self);
-    if (ordinal < 0 || ordinal > module->dispatch_table_.size()) {
+    if (ordinal > module->dispatch_table_.size()) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "function out of bounds: 0 < %d < %zu", ordinal,
+                              "function out of bounds: 0 < %zu < %zu", ordinal,
                               module->dispatch_table_.size());
     }
     if (out_function) {
@@ -209,7 +209,7 @@ class NativeModule {
 
   static iree_status_t ModuleResolveImport(void* self,
                                            iree_vm_module_state_t* module_state,
-                                           int32_t ordinal,
+                                           iree_host_size_t ordinal,
                                            iree_vm_function_t function) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "C++ API does not support imports");
@@ -221,10 +221,9 @@ class NativeModule {
     IREE_ASSERT_ARGUMENT(out_result);
     std::memset(out_result, 0, sizeof(*out_result));
     auto* module = FromModulePointer(self);
-    if (call->function.ordinal < 0 ||
-        call->function.ordinal >= module->dispatch_table_.size()) {
+    if (call->function.ordinal >= module->dispatch_table_.size()) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "function ordinal out of bounds: 0 < %d < %zu",
+                              "function ordinal out of bounds: 0 < %u < %zu",
                               call->function.ordinal,
                               module->dispatch_table_.size());
     }
