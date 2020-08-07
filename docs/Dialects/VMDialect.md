@@ -64,6 +64,31 @@ operation ::= `vm.add.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.add.i64` (IREE::VM::AddI64Op)
+
+integer add operation
+
+Syntax:
+
+```
+operation ::= `vm.add.i64` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.and.i32` (IREE::VM::AndI32Op)
 
 integer binary and operation
@@ -88,6 +113,31 @@ operation ::= `vm.and.i32` operands attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.and.i64` (IREE::VM::AndI64Op)
+
+integer binary and operation
+
+Syntax:
+
+```
+operation ::= `vm.and.i64` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.br` (IREE::VM::BranchOp)
 
@@ -349,6 +399,32 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.cmp.eq.i64` (IREE::VM::CmpEQI64Op)
+
+integer equality comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.eq.i64` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
 ### `vm.cmp.eq.ref` (IREE::VM::CmpEQRefOp)
 
 ref_ptr equality comparison operation
@@ -427,6 +503,58 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.cmp.gte.i64.s` (IREE::VM::CmpGTEI64SOp)
+
+signed integer greater-than-or-equal comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.gte.i64.s` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.gte.i64.u` (IREE::VM::CmpGTEI64UOp)
+
+unsigned integer greater-than-or-equal comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.gte.i64.u` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
 ### `vm.cmp.gt.i32.s` (IREE::VM::CmpGTI32SOp)
 
 signed integer greater-than comparison operation
@@ -472,6 +600,58 @@ Compares two operands with the specified predicate.
 | :-----: | ----------- |
 `lhs` | 32-bit signless integer
 `rhs` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.gt.i64.s` (IREE::VM::CmpGTI64SOp)
+
+signed integer greater-than comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.gt.i64.s` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.gt.i64.u` (IREE::VM::CmpGTI64UOp)
+
+unsigned integer greater-than comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.gt.i64.u` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
 
 #### Results:
 
@@ -531,6 +711,58 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.cmp.lte.i64.s` (IREE::VM::CmpLTEI64SOp)
+
+signed integer less-than-or-equal comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.lte.i64.s` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.lte.i64.u` (IREE::VM::CmpLTEI64UOp)
+
+unsigned integer less-than-or-equal comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.lte.i64.u` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
 ### `vm.cmp.lt.i32.s` (IREE::VM::CmpLTI32SOp)
 
 signed integer less-than comparison operation
@@ -583,6 +815,58 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.cmp.lt.i64.s` (IREE::VM::CmpLTI64SOp)
+
+signed integer less-than comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.lt.i64.s` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.lt.i64.u` (IREE::VM::CmpLTI64UOp)
+
+unsigned integer less-than comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.lt.i64.u` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
 ### `vm.cmp.ne.i32` (IREE::VM::CmpNEI32Op)
 
 integer inequality comparison operation
@@ -602,6 +886,32 @@ Compares two operands with the specified predicate.
 | :-----: | ----------- |
 `lhs` | 32-bit signless integer
 `rhs` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.ne.i64` (IREE::VM::CmpNEI64Op)
+
+integer inequality comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.ne.i64` operands attr-dict `:` type($lhs)
+```
+
+
+Compares two operands with the specified predicate.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
 
 #### Results:
 
@@ -653,6 +963,31 @@ Compares the given integer operand for a non-zero value.
 | Operand | Description |
 | :-----: | ----------- |
 `operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.cmp.nz.i64` (IREE::VM::CmpNZI64Op)
+
+integer non-zero comparison operation
+
+Syntax:
+
+```
+operation ::= `vm.cmp.nz.i64` $operand attr-dict `:` type($operand)
+```
+
+
+Compares the given integer operand for a non-zero value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
 
 #### Results:
 
@@ -802,7 +1137,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_435
+`value` | Attribute | anonymous_434
 
 #### Results:
 
@@ -821,13 +1156,50 @@ operation ::= `vm.const.i32.zero` `:` type($result) attr-dict
 ```
 
 
-Defines a constant zero 32-bit integer.
+Defines a constant zero integer.
 
 #### Results:
 
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.const.i64` (IREE::VM::ConstI64Op)
+
+64-bit integer constant operation
+
+Defines a constant value that is treated as a scalar literal at runtime.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`value` | Attribute | anonymous_438
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.const.i64.zero` (IREE::VM::ConstI64ZeroOp)
+
+64-bit integer constant zero operation
+
+Syntax:
+
+```
+operation ::= `vm.const.i64.zero` `:` type($result) attr-dict
+```
+
+
+Defines a constant zero integer.
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.const.ref.rodata` (IREE::VM::ConstRefRodataOp)
 
@@ -924,6 +1296,56 @@ operation ::= `vm.div.i32.u` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.div.i64.s` (IREE::VM::DivI64SOp)
+
+signed integer division operation
+
+Syntax:
+
+```
+operation ::= `vm.div.i64.s` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.div.i64.u` (IREE::VM::DivI64UOp)
+
+unsigned integer division operation
+
+Syntax:
+
+```
+operation ::= `vm.div.i64.u` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.export` (IREE::VM::ExportOp)
 
 exports a function from the module
@@ -946,7 +1368,7 @@ integer sign extend 16 bits to 32 bits
 Syntax:
 
 ```
-operation ::= `vm.ext.i16.i32.s` $operand attr-dict `:` type($result)
+operation ::= `vm.ext.i16.i32.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
 
 
@@ -970,7 +1392,7 @@ integer zero extend 16 bits to 32 bits
 Syntax:
 
 ```
-operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($result)
+operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
 
 
@@ -987,6 +1409,102 @@ operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.ext.i16.i64.s` (IREE::VM::ExtI16I64SOp)
+
+integer sign extend 16 bits to 64 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i16.i64.s` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.ext.i16.i64.u` (IREE::VM::ExtI16I64UOp)
+
+integer zero extend 16 bits to 64 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i16.i64.u` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.ext.i32.i64.s` (IREE::VM::ExtI32I64SOp)
+
+integer sign extend 32 bits to 64 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i32.i64.s` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.ext.i32.i64.u` (IREE::VM::ExtI32I64UOp)
+
+integer zero extend 32 bits to 64 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i32.i64.u` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.ext.i8.i32.s` (IREE::VM::ExtI8I32SOp)
 
 integer sign extend 8 bits to 32 bits
@@ -994,7 +1512,7 @@ integer sign extend 8 bits to 32 bits
 Syntax:
 
 ```
-operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($result)
+operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
 
 
@@ -1018,7 +1536,7 @@ integer zero extend 8 bits to 32 bits
 Syntax:
 
 ```
-operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($result)
+operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
 
 
@@ -1034,6 +1552,54 @@ operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.ext.i8.i64.s` (IREE::VM::ExtI8I64SOp)
+
+integer sign extend 8 bits to 64 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i8.i64.s` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.ext.i8.i64.u` (IREE::VM::ExtI8I64UOp)
+
+integer zero extend 8 bits to 64 bits
+
+Syntax:
+
+```
+operation ::= `vm.ext.i8.i64.u` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.fail` (IREE::VM::FailOp)
 
@@ -1129,7 +1695,25 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | ::mlir::TypeAttr | any type attribute
 `is_mutable` | ::mlir::UnitAttr | unit attribute
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_438
+`initial_value` | Attribute | anonymous_437
+`ordinal` | ::mlir::IntegerAttr | ordinal value
+
+### `vm.global.i64` (IREE::VM::GlobalI64Op)
+
+64-bit integer global declaration
+
+Defines a global value that is treated as a scalar literal at runtime.
+Initialized to zero unless a custom initializer function is specified.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
+`type` | ::mlir::TypeAttr | any type attribute
+`is_mutable` | ::mlir::UnitAttr | unit attribute
+`initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`initial_value` | Attribute | anonymous_441
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
@@ -1143,7 +1727,7 @@ operation ::= `vm.global.load.i32` $global attr-dict `:` type($value)
 ```
 
 
-Loads the value of a global containing a 32-bit integer.
+Loads the value of a global containing an primitive value.
 
 #### Attributes:
 
@@ -1157,6 +1741,31 @@ Loads the value of a global containing a 32-bit integer.
 | :----: | ----------- |
 `value` | 32-bit signless integer
 
+### `vm.global.load.i64` (IREE::VM::GlobalLoadI64Op)
+
+global 64-bit integer load operation
+
+Syntax:
+
+```
+operation ::= `vm.global.load.i64` $global attr-dict `:` type($value)
+```
+
+
+Loads the value of a global containing an primitive value.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`global` | FlatSymbolRefAttr | symbol reference attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`value` | 64-bit signless integer
+
 ### `vm.global.load.indirect.i32` (IREE::VM::GlobalLoadIndirectI32Op)
 
 global 32-bit integer load operation
@@ -1168,7 +1777,7 @@ operation ::= `vm.global.load.indirect.i32` $global attr-dict `:` type($global) 
 ```
 
 
-Loads the value of a global containing a 32-bit integer.
+Loads the value of a global containing a primitive value.
 
 #### Operands:
 
@@ -1181,6 +1790,31 @@ Loads the value of a global containing a 32-bit integer.
 | Result | Description |
 | :----: | ----------- |
 `value` | 32-bit signless integer
+
+### `vm.global.load.indirect.i64` (IREE::VM::GlobalLoadIndirectI64Op)
+
+global 64-bit integer load operation
+
+Syntax:
+
+```
+operation ::= `vm.global.load.indirect.i64` $global attr-dict `:` type($global) `->` type($value)
+```
+
+
+Loads the value of a global containing a primitive value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`global` | 32-bit signless integer or ptr<64-bit signless integer>
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`value` | 64-bit signless integer
 
 ### `vm.global.load.indirect.ref` (IREE::VM::GlobalLoadIndirectRefOp)
 
@@ -1262,7 +1896,7 @@ operation ::= `vm.global.store.i32` $value `,` $global attr-dict `:` type($value
 ```
 
 
-Stores the 32-bit integer value to a global.
+Stores a primitive value value to a global.
 
 #### Attributes:
 
@@ -1276,6 +1910,31 @@ Stores the 32-bit integer value to a global.
 | :-----: | ----------- |
 `value` | 32-bit signless integer
 
+### `vm.global.store.i64` (IREE::VM::GlobalStoreI64Op)
+
+global 64-bit integer store operation
+
+Syntax:
+
+```
+operation ::= `vm.global.store.i64` $value `,` $global attr-dict `:` type($value)
+```
+
+
+Stores a primitive value value to a global.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`global` | FlatSymbolRefAttr | symbol reference attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`value` | 64-bit signless integer
+
 ### `vm.global.store.indirect.i32` (IREE::VM::GlobalStoreIndirectI32Op)
 
 global 32-bit integer store operation
@@ -1287,7 +1946,7 @@ operation ::= `vm.global.store.indirect.i32` $value `,` $global attr-dict `:` ty
 ```
 
 
-Stores the 32-bit integer value to a global.
+Stores a primitive value to a global.
 
 #### Operands:
 
@@ -1295,6 +1954,26 @@ Stores the 32-bit integer value to a global.
 | :-----: | ----------- |
 `value` | 32-bit signless integer
 `global` | 32-bit signless integer or ptr<32-bit signless integer>
+
+### `vm.global.store.indirect.i64` (IREE::VM::GlobalStoreIndirectI64Op)
+
+global 64-bit integer store operation
+
+Syntax:
+
+```
+operation ::= `vm.global.store.indirect.i64` $value `,` $global attr-dict `:` type($value) `->` type($global)
+```
+
+
+Stores a primitive value to a global.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`value` | 64-bit signless integer
+`global` | 32-bit signless integer or ptr<64-bit signless integer>
 
 ### `vm.global.store.indirect.ref` (IREE::VM::GlobalStoreIndirectRefOp)
 
@@ -1405,6 +2084,32 @@ Returns the value of the element at the given index.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.list.get.i64` (IREE::VM::ListGetI64Op)
+
+primitive type element accessor
+
+Syntax:
+
+```
+operation ::= `vm.list.get.i64` operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
+```
+
+
+Returns the value of the element at the given index.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list<8/16/32/64-bit integer or 16/32/64-bit float>
+`index` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.list.get.ref` (IREE::VM::ListGetRefOp)
 
 ref type element accessor
@@ -1495,6 +2200,27 @@ Sets the element at the given index to the new value.
 `list` | list<8/16/32/64-bit integer or 16/32/64-bit float>
 `index` | 32-bit signless integer
 `value` | 32-bit signless integer
+
+### `vm.list.set.i64` (IREE::VM::ListSetI64Op)
+
+primitive type element mutator
+
+Syntax:
+
+```
+operation ::= `vm.list.set.i64` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
+```
+
+
+Sets the element at the given index to the new value.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`list` | list<8/16/32/64-bit integer or 16/32/64-bit float>
+`index` | 32-bit signless integer
+`value` | 64-bit signless integer
 
 ### `vm.list.set.ref` (IREE::VM::ListSetRefOp)
 
@@ -1592,6 +2318,31 @@ operation ::= `vm.mul.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.mul.i64` (IREE::VM::MulI64Op)
+
+integer multiplication operation
+
+Syntax:
+
+```
+operation ::= `vm.mul.i64` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.not.i32` (IREE::VM::NotI32Op)
 
 integer binary not operation
@@ -1615,6 +2366,30 @@ operation ::= `vm.not.i32` $operand attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.not.i64` (IREE::VM::NotI64Op)
+
+integer binary not operation
+
+Syntax:
+
+```
+operation ::= `vm.not.i64` $operand attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.or.i32` (IREE::VM::OrI32Op)
 
@@ -1640,6 +2415,31 @@ operation ::= `vm.or.i32` operands attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.or.i64` (IREE::VM::OrI64Op)
+
+integer binary or operation
+
+Syntax:
+
+```
+operation ::= `vm.or.i64` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.print` (IREE::VM::PrintOp)
 
@@ -1715,6 +2515,56 @@ operation ::= `vm.rem.i32.u` operands attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.rem.i64.s` (IREE::VM::RemI64SOp)
+
+signed integer division remainder operation
+
+Syntax:
+
+```
+operation ::= `vm.rem.i64.s` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.rem.i64.u` (IREE::VM::RemI64UOp)
+
+unsigned integer division remainder operation
+
+Syntax:
+
+```
+operation ::= `vm.rem.i64.u` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.return` (IREE::VM::ReturnOp)
 
@@ -1798,6 +2648,42 @@ combining "select" with "cmpi" as follows:
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.select.i64` (IREE::VM::SelectI64Op)
+
+integer select operation
+
+Syntax:
+
+```
+operation ::= `vm.select.i64` operands attr-dict `:` type($result)
+```
+
+
+Chooses one value based on a binary condition supplied as its first operand.
+If the value of the condition is true the `true_value` operand is chosen,
+otherwise the `false_value` operand is chosen. The true and false values
+must have the same types. For example, the maximum operation is obtained by
+combining "select" with "cmpi" as follows:
+
+```
+%2 = vm.cmp.gt.i32.s %0, %1 : i32
+%3 = vm.select.i32 %2, %0, %1 : i32
+```
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`condition` | 32-bit signless integer
+`true_value` | 64-bit signless integer
+`false_value` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.select.ref` (IREE::VM::SelectRefOp)
 
 ref_ptr select operation
@@ -1857,6 +2743,37 @@ Shifts the operand in a direction by the number of bits specified.
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.shl.i64` (IREE::VM::ShlI64Op)
+
+integer shift left operation
+
+Syntax:
+
+```
+operation ::= `vm.shl.i64` $operand `,` $amount attr-dict `:` type($operand)
+```
+
+
+Shifts the operand in a direction by the number of bits specified.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`amount` | ::mlir::IntegerAttr | 8-bit signless integer attribute within the range [0, 64] inclusive
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.shr.i32.s` (IREE::VM::ShrI32SOp)
 
@@ -1920,6 +2837,68 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.shr.i64.s` (IREE::VM::ShrI64SOp)
+
+signed integer (arithmetic) shift right operation
+
+Syntax:
+
+```
+operation ::= `vm.shr.i64.s` $operand `,` $amount attr-dict `:` type($operand)
+```
+
+
+Shifts the operand in a direction by the number of bits specified.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`amount` | ::mlir::IntegerAttr | 8-bit signless integer attribute within the range [0, 64] inclusive
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
+### `vm.shr.i64.u` (IREE::VM::ShrI64UOp)
+
+unsigned integer (logical) shift right operation
+
+Syntax:
+
+```
+operation ::= `vm.shr.i64.u` $operand `,` $amount attr-dict `:` type($operand)
+```
+
+
+Shifts the operand in a direction by the number of bits specified.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`amount` | ::mlir::IntegerAttr | 8-bit signless integer attribute within the range [0, 64] inclusive
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
+
 ### `vm.sub.i32` (IREE::VM::SubI32Op)
 
 integer subtract operation
@@ -1944,6 +2923,31 @@ operation ::= `vm.sub.i32` operands attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.sub.i64` (IREE::VM::SubI64Op)
+
+integer subtract operation
+
+Syntax:
+
+```
+operation ::= `vm.sub.i64` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.switch.i32` (IREE::VM::SwitchI32Op)
 
@@ -1978,6 +2982,40 @@ the index is out of bounds.
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.switch.i64` (IREE::VM::SwitchI64Op)
+
+integer switch operation
+
+Syntax:
+
+```
+operation ::= `vm.switch.i64` $index `[` $values `]` `else` $default_value attr-dict `:` type($result)
+```
+
+
+Returns the value with the given `index` in `values` or `default_value` if
+the index is out of bounds.
+
+```mlir
+// Switch %arg0 to cases of %c100/%c200/%c300 if arg0==0, ==1, ==2.
+// If %arg0 is out of range (<0 or >2) then default to %c5.
+%0 = vm.switch.i32 %index[%c100, %c200, %c300] else %c5 : i32
+```
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`index` | 32-bit signless integer
+`default_value` | 64-bit signless integer
+`values` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.switch.ref` (IREE::VM::SwitchRefOp)
 
@@ -2040,7 +3078,7 @@ integer truncate to 16 bits
 Syntax:
 
 ```
-operation ::= `vm.trunc.i32.i16` $operand attr-dict `:` type($result)
+operation ::= `vm.trunc.i32.i16` $operand attr-dict `:` type($operand) `->` type($result)
 ```
 
 
@@ -2064,7 +3102,7 @@ integer truncate to 8 bits
 Syntax:
 
 ```
-operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($result)
+operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($operand) `->` type($result)
 ```
 
 
@@ -2074,6 +3112,78 @@ operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($result)
 | Operand | Description |
 | :-----: | ----------- |
 `operand` | 32-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.trunc.i64.i16` (IREE::VM::TruncI64I16Op)
+
+integer truncate to 16 bits
+
+Syntax:
+
+```
+operation ::= `vm.trunc.i64.i16` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.trunc.i64.i32` (IREE::VM::TruncI64I32Op)
+
+integer truncate to 32 bits
+
+Syntax:
+
+```
+operation ::= `vm.trunc.i64.i32` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 32-bit signless integer
+
+### `vm.trunc.i64.i8` (IREE::VM::TruncI64I8Op)
+
+integer truncate to 8 bits
+
+Syntax:
+
+```
+operation ::= `vm.trunc.i64.i8` $operand attr-dict `:` type($operand) `->` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operand` | 64-bit signless integer
 
 #### Results:
 
@@ -2105,6 +3215,31 @@ operation ::= `vm.xor.i32` operands attr-dict `:` type($result)
 | Result | Description |
 | :----: | ----------- |
 `result` | 32-bit signless integer
+
+### `vm.xor.i64` (IREE::VM::XorI64Op)
+
+integer binary exclusive-or operation
+
+Syntax:
+
+```
+operation ::= `vm.xor.i64` operands attr-dict `:` type($result)
+```
+
+
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | 64-bit signless integer
+`rhs` | 64-bit signless integer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 64-bit signless integer
 
 ### `vm.yield` (IREE::VM::YieldOp)
 
