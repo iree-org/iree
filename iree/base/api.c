@@ -228,12 +228,12 @@ iree_status_code_string(iree_status_code_t code) {
 typedef enum {
   // Opaque; payload may still be formatted by a formatter but is not possible
   // to retrieve by the programmatic APIs.
-  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0,
+  IREE_STATUS_PAYLOAD_TYPE_OPAQUE = 0u,
   // A string message annotation of type iree_status_payload_message_t.
-  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1,
+  IREE_STATUS_PAYLOAD_TYPE_MESSAGE = 1u,
   // Starting type ID for user payloads. IREE reserves all payloads with types
   // less than this.
-  IREE_STATUS_PAYLOAD_TYPE_MIN_USER = 0x70000000,
+  IREE_STATUS_PAYLOAD_TYPE_MIN_USER = 0x70000000u,
 } iree_status_payload_type_t;
 
 typedef struct iree_status_payload_s iree_status_payload_t;
