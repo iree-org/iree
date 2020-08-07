@@ -630,27 +630,17 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f")\n\n")
 
-  def iree_cmake_extra_content(self, content, inline=False):
-    if inline:
-      self.converter.body += (f"\n{content}\n")
-    else:
-      self.converter.header += (f"\n{content}\n")
 
 class Converter(object):
   """Conversion state tracking and full file template substitution."""
 
   def __init__(self):
-    # Header appears after the license block but before `iree_add_all_subdirs`.
-    self.header = ""
-    # Body appears after `iree_add_all_subdirs`.
     self.body = ""
-
     self.first_error = None
 
   def convert(self, copyright_line):
     converted_content = (f"{copyright_line}\n"
                          f"{self.apache_license}\n\n"
-                         f"{self.header}\n\n"
                          f"iree_add_all_subdirs()\n\n"
                          f"{self.body}")
 

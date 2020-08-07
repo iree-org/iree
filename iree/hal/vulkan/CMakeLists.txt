@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_HAL_DRIVER_VULKAN})
-  return()
-endif()
-
 set(VMA_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
 )

@@ -14,20 +14,10 @@
 
 # A VMLA (VM-based Linear Algebra) runtime HAL backend.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_cmake_extra_content(
-    content = """
-if(NOT ${IREE_HAL_DRIVER_VMLA})
-  return()
-endif()
-""",
 )
 
 cc_library(
