@@ -46,3 +46,15 @@ cc_library(
     tags = ["keep_dep"],
     deps = platform_trampoline_deps("gtest_main", "testing"),
 )
+
+cc_library(
+    name = "status_matchers",
+    testonly = True,
+    hdrs = ["status_matchers.h"],
+    deps = [
+        "//iree/base:status",
+        "//iree/testing:gtest",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+    ],
+)

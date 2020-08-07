@@ -19,7 +19,6 @@
 #include "iree/base/file_path.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {

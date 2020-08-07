@@ -19,7 +19,7 @@
 #include <set>
 
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
 

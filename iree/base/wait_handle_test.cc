@@ -22,7 +22,6 @@
 
 #include "absl/time/time.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
 
 // StatusOr<bool> will be true if the status is ok, which is bad.

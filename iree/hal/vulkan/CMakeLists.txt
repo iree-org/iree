@@ -192,10 +192,10 @@ iree_cc_test(
   COPTS
     "-DVK_NO_PROTOTYPES"
   DEPS
-    iree::base::status_matchers
     iree::hal::vulkan::status_util
     iree::hal::vulkan::dynamic_symbols
     iree::testing::gtest_main
+    iree::testing::status_matchers
   LABELS
     "nokokoro"
 )

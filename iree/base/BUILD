@@ -152,9 +152,9 @@ cc_test(
         ":dynamic_library_test_library",
         ":file_io",
         ":status",
-        ":status_matchers",
         ":target_platform",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
     ],
 )
 
@@ -187,8 +187,8 @@ cc_test(
         ":file_path",
         ":logging",
         ":status",
-        ":status_matchers",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -384,20 +384,13 @@ cc_library(
     deps = platform_trampoline_deps("status"),
 )
 
-cc_library(
-    name = "status_matchers",
-    testonly = True,
-    hdrs = ["status_matchers.h"],
-    deps = platform_trampoline_deps("status_matchers"),
-)
-
 cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     deps = [
         ":status",
-        ":status_matchers",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
     ],
 )
 
@@ -456,9 +449,9 @@ cc_library(
 #     srcs = ["wait_handle_test.cc"],
 #     deps = [
 #         ":status",
-#         ":status_matchers",
 #         ":wait_handle",
 #         "@com_google_absl//absl/time",
 #         "//iree/testing:gtest_main",
+#         "//iree/testing:status_matchers",
 #     ],
 # )

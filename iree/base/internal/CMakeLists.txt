@@ -132,17 +132,3 @@ iree_cc_library(
     iree::base::target_platform
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    status_matchers_internal
-  HDRS
-    "status_matchers.h"
-  DEPS
-    absl::optional
-    absl::strings
-    iree::base::status
-    iree::testing::gtest
-  TESTONLY
-  PUBLIC
-)

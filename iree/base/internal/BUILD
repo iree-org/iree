@@ -129,18 +129,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "status_matchers_internal",
-    testonly = True,
-    hdrs = ["status_matchers.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/testing:gtest",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-    ],
-)
-
 iree_build_test(
     name = "internal_build_test",
     targets = [
@@ -150,6 +138,5 @@ iree_build_test(
         ":init_internal",
         ":logging_internal",
         ":status_internal",
-        ":status_matchers_internal",
     ],
 )

@@ -17,7 +17,7 @@
 #include "iree/base/api_util.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 

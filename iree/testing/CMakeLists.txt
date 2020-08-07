@@ -47,3 +47,17 @@ iree_cc_library(
   TESTONLY
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    status_matchers
+  HDRS
+    "status_matchers.h"
+  DEPS
+    absl::optional
+    absl::strings
+    iree::base::status
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
+)

@@ -79,8 +79,8 @@ cc_test(
         "//iree/base:api_util",
         "//iree/base:memory",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
     ],
@@ -111,8 +111,8 @@ cc_test(
         ":buffer",
         ":heap_buffer",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -184,9 +184,9 @@ cc_test(
     deps = [
         ":deferred_buffer",
         ":heap_buffer",
-        "//iree/base:status_matchers",
         "//iree/hal/testing:mock_allocator",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
         "@com_google_absl//absl/memory",
     ],
 )

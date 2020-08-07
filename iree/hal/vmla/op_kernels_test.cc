@@ -16,7 +16,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "iree/base/memory.h"
-#include "iree/base/status_matchers.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {

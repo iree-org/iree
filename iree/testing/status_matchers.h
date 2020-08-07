@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_INTERNAL_STATUS_MATCHERS_H_
-#define IREE_BASE_INTERNAL_STATUS_MATCHERS_H_
+#ifndef IREE_TESTING_STATUS_MATCHERS_H_
+#define IREE_TESTING_STATUS_MATCHERS_H_
 
 #include <memory>
 
@@ -349,4 +349,4 @@ void PrintTo(const StatusOr<T> &statusor, std::ostream *os) {
 
 }  // namespace iree
 
-#endif  // IREE_BASE_INTERNAL_STATUS_MATCHERS_H_
+#endif  // IREE_TESTING_STATUS_MATCHERS_H_

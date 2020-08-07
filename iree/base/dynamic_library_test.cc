@@ -19,7 +19,7 @@
 #include "iree/base/dynamic_library_test_library_embed.h"
 #include "iree/base/file_io.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/base/target_platform.h"
 #include "iree/testing/gtest.h"
 

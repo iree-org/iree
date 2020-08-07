@@ -34,6 +34,7 @@ if(${IREE_HAL_DRIVER_VMLA})
       iree::hal::vmla::vmla_driver_module
       iree::modules::hal
       iree::testing::gtest_main
+      iree::testing::status_matchers
       iree::vm
       iree::vm::bytecode_module
       iree::vm::ref_cc

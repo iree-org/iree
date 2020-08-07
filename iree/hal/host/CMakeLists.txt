@@ -41,8 +41,8 @@ iree_cc_test(
     ::condvar_semaphore
     iree::base::api
     iree::base::status
-    iree::base::status_matchers
     iree::testing::gtest_main
+    iree::testing::status_matchers
 )
 
 iree_cc_library(

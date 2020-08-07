@@ -20,7 +20,6 @@
 
 #include <vector>
 
-#include "iree/base/status_matchers.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/testing/gtest.h"
 

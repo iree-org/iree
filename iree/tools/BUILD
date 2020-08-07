@@ -369,11 +369,11 @@ cc_test(
     deps = [
         ":vm_util",
         "//iree/base:api",
-        "//iree/base:status_matchers",
         "//iree/hal:api",
         "//iree/hal/vmla:vmla_driver_module",
         "//iree/modules/hal",
         "//iree/testing:gtest_main",
+        "//iree/testing:status_matchers",
         "//iree/vm",
     ],
 )

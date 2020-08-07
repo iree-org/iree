@@ -41,13 +41,13 @@ iree_cc_test(
     ::async_command_queue
     absl::memory
     iree::base::status
-    iree::base::status_matchers
     iree::base::time
     iree::hal::command_queue
     iree::hal::host::serial::serial_submission_queue
     iree::hal::testing::mock_command_buffer
     iree::hal::testing::mock_command_queue
     iree::testing::gtest_main
+    iree::testing::status_matchers
 )
 
 iree_cc_library(
