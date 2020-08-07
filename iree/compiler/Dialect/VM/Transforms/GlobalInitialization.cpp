@@ -138,6 +138,8 @@ class GlobalInitializationPass
       switch (intValue.getValue().getBitWidth()) {
         case 32:
           return {success(), builder.createOrFold<ConstI32Op>(loc, intValue)};
+        case 64:
+          return {success(), builder.createOrFold<ConstI64Op>(loc, intValue)};
         default:
           return {failure(), {}};
       }
@@ -152,6 +154,9 @@ class GlobalInitializationPass
       switch (intType.getIntOrFloatBitWidth()) {
         case 32:
           builder.create<GlobalStoreI32Op>(loc, value, symName);
+          return success();
+        case 64:
+          builder.create<GlobalStoreI64Op>(loc, value, symName);
           return success();
         default:
           return failure();

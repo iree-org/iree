@@ -159,6 +159,30 @@ struct ParamUnpack {
 };
 
 template <>
+struct ParamUnpack<int64_t> {
+  using storage_type = int64_t;
+  static void Load(Unpacker* unpacker, storage_type& out_param) {
+    ++unpacker->segment_ordinal;
+    uint16_t reg =
+        unpacker->argument_list->registers[unpacker->argument_ordinal++];
+    out_param = static_cast<int64_t>(
+        unpacker->registers->i32[reg & (unpacker->registers->i32_mask & ~1)]);
+  }
+};
+
+template <>
+struct ParamUnpack<uint64_t> {
+  using storage_type = uint64_t;
+  static void Load(Unpacker* unpacker, storage_type& out_param) {
+    ++unpacker->segment_ordinal;
+    uint16_t reg =
+        unpacker->argument_list->registers[unpacker->argument_ordinal++];
+    out_param = static_cast<uint64_t>(
+        unpacker->registers->i32[reg & (unpacker->registers->i32_mask & ~1)]);
+  }
+};
+
+template <>
 struct ParamUnpack<opaque_ref> {
   using storage_type = opaque_ref;
   static void Load(Unpacker* unpacker, storage_type& out_param) {
@@ -391,6 +415,24 @@ struct ResultPack {
     uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
     packer->registers->i32[reg & packer->registers->i32_mask] =
         static_cast<int32_t>(value);
+  }
+};
+
+template <>
+struct ResultPack<int64_t> {
+  static void Store(Packer* packer, int64_t value) {
+    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
+    packer->registers->i32[reg & (packer->registers->i32_mask & ~1)] =
+        static_cast<int64_t>(value);
+  }
+};
+
+template <>
+struct ResultPack<uint64_t> {
+  static void Store(Packer* packer, uint64_t value) {
+    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
+    packer->registers->i32[reg & (packer->registers->i32_mask & ~1)] =
+        static_cast<uint64_t>(value);
   }
 };
 

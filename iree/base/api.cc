@@ -14,11 +14,11 @@
 
 #include "iree/base/api.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
-#include "absl/time/clock.h"
 #include "iree/base/api_util.h"
 #include "iree/base/file_mapping.h"
 #include "iree/base/init.h"
@@ -96,7 +96,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_time_t iree_time_now() {
-  return absl::GetCurrentTimeNanos();
+  auto now = std::chrono::system_clock::now();
+  auto now_nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+  auto now_nanos_since_epoch = now_nanos.time_since_epoch();
+  return now_nanos_since_epoch.count();
 }
 
 IREE_API_EXPORT iree_time_t

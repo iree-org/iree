@@ -38,7 +38,6 @@ iree_cc_library(
     ::file_mapping
     ::init
     ::tracing
-    absl::time
   PUBLIC
 )
 
@@ -61,7 +60,6 @@ iree_cc_library(
     ::status
     absl::core_headers
     absl::inlined_vector
-    absl::time
   PUBLIC
 )
 
