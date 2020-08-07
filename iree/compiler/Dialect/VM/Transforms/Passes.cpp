@@ -26,9 +26,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-void buildVMTransformPassPipeline(OpPassManager &passManager) {
+void buildVMTransformPassPipeline(OpPassManager &passManager,
+                                  TargetOptions targetOptions) {
   passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createConversionPass());
+  passManager.addPass(createConversionPass(targetOptions));
   passManager.addPass(createGlobalInitializationPass());
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());
@@ -40,7 +41,7 @@ void registerVMTransformPassPipeline() {
       "iree-vm-transformation-pipeline",
       "Runs the full IREE VM dialect transformation pipeline",
       [](OpPassManager &passManager) {
-        buildVMTransformPassPipeline(passManager);
+        buildVMTransformPassPipeline(passManager, getTargetOptionsFromFlags());
       });
 }
 

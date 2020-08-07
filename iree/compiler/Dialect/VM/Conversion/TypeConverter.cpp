@@ -25,8 +25,11 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VM {
 
-VMTypeConverter::VMTypeConverter() {
+TypeConverter::TypeConverter(TargetOptions targetOptions)
+    : targetOptions_(targetOptions) {
   // All ref_ptr types are passed through unmodified.
   addConversion([](IREE::VM::RefType type) { return type; });
   // Wrap ref types.
@@ -89,5 +92,7 @@ VMTypeConverter::VMTypeConverter() {
   });
 }
 
+}  // namespace VM
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

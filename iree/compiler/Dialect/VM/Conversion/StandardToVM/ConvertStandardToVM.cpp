@@ -153,7 +153,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     return success();
   }
 
-  mutable VMTypeConverter typeConverter;
+  mutable IREE::VM::TypeConverter typeConverter;
 };
 
 class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
@@ -365,7 +365,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
     CallOp::Adaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.
-    VMTypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter;
     SmallVector<Type, 4> resultTypes;
     for (auto resultType : srcOp.getResultTypes()) {
       resultType = typeConverter.convertType(resultType);
@@ -384,6 +384,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 }  // namespace
 
 void populateStandardToVMPatterns(MLIRContext *context,
+                                  TypeConverter &typeConverter,
                                   OwningRewritePatternList &patterns) {
   patterns
       .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,

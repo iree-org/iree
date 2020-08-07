@@ -31,6 +31,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/IREE/Transforms",
+        "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Transforms",

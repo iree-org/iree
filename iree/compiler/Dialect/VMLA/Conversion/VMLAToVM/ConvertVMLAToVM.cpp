@@ -254,9 +254,10 @@ class VMLAConvImportOpConversion
 };
 }  // namespace
 
-void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
-                              OwningRewritePatternList &patterns,
-                              TypeConverter &typeConverter) {
+void populateVMLAToVMPatterns(MLIRContext *context,
+                              TypeConverter &typeConverter,
+                              SymbolTable &importSymbols,
+                              OwningRewritePatternList &patterns) {
   patterns.insert<VMLAConstantOpConversion>(context, typeConverter);
   patterns.insert<EraseNonVMOp>(Shape::ConstRankedShapeOp::getOperationName(),
                                 context);
@@ -340,11 +341,16 @@ namespace {
 class ConvertVMLAToVMPass
     : public PassWrapper<ConvertVMLAToVMPass, OperationPass<ModuleOp>> {
  public:
+  ConvertVMLAToVMPass()
+      : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
+  explicit ConvertVMLAToVMPass(IREE::VM::TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
+
   void runOnOperation() override {
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
-    VMTypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter(targetOptions_);
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
@@ -355,11 +361,11 @@ class ConvertVMLAToVMPass
         innerModuleOp);
 
     OwningRewritePatternList conversionPatterns;
-    populateStandardToVMPatterns(context, conversionPatterns);
+    populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);
-    populateVMLAToVMPatterns(context, importSymbols, conversionPatterns,
-                             typeConverter);
+    populateVMLAToVMPatterns(context, typeConverter, importSymbols,
+                             conversionPatterns);
 
     // Usually shape conversion patterns come in at a higher level, but for
     // this standalone pass, they must be provided directly.
@@ -371,12 +377,16 @@ class ConvertVMLAToVMPass
       return signalPassFailure();
     }
   }
+
+ private:
+  IREE::VM::TargetOptions targetOptions_;
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertVMLAToVMPass() {
-  return std::make_unique<ConvertVMLAToVMPass>();  // NOLINT
+std::unique_ptr<OperationPass<ModuleOp>> createConvertVMLAToVMPass(
+    IREE::VM::TargetOptions targetOptions) {
+  return std::make_unique<ConvertVMLAToVMPass>(targetOptions);
 }
 
 static PassRegistration<ConvertVMLAToVMPass> pass(
