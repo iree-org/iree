@@ -188,7 +188,7 @@ Status DirectCommandQueue::WaitIdle(Time deadline_ns) {
       return DeadlineExceededErrorBuilder(IREE_LOC)
              << "Deadline exceeded waiting for idle";
     default:
-      return VkResultToStatus(result);
+      return VkResultToStatus(result, IREE_LOC);
   }
 }
 

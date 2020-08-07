@@ -52,7 +52,7 @@ Status StatusBuilder::CreateStatus() && {
   Status result = JoinMessageToStatus(status_, rep_->stream_message);
 
   // Reset the status after consuming it.
-  status_ = UnknownError("");
+  status_ = Status(StatusCode::kUnknown, "");
   rep_ = nullptr;
   return result;
 }

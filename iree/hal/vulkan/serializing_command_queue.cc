@@ -339,7 +339,7 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
         return DeadlineExceededErrorBuilder(IREE_LOC)
                << "Deadline exceeded waiting for idle";
       default:
-        return VkResultToStatus(result);
+        return VkResultToStatus(result, IREE_LOC);
     }
     // As long as there is submitted or deferred work still pending.
   } while (!pending_fences_.empty() || !deferred_submissions_.empty());

@@ -16,27 +16,9 @@
 #define IREE_BASE_INTERNAL_STATUS_ERRORS_H_
 
 #include "absl/base/attributes.h"
-#include "absl/strings/string_view.h"
 #include "iree/base/internal/status.h"
 
 namespace iree {
-
-Status AbortedError(absl::string_view message);
-Status AlreadyExistsError(absl::string_view message);
-Status CancelledError(absl::string_view message);
-Status DataLossError(absl::string_view message);
-Status DeadlineExceededError(absl::string_view message);
-Status FailedPreconditionError(absl::string_view message);
-Status InternalError(absl::string_view message);
-Status InvalidArgumentError(absl::string_view message);
-Status NotFoundError(absl::string_view message);
-Status OutOfRangeError(absl::string_view message);
-Status PermissionDeniedError(absl::string_view message);
-Status ResourceExhaustedError(absl::string_view message);
-Status UnauthenticatedError(absl::string_view message);
-Status UnavailableError(absl::string_view message);
-Status UnimplementedError(absl::string_view message);
-Status UnknownError(absl::string_view message);
 
 ABSL_MUST_USE_RESULT bool IsAborted(const Status& status);
 ABSL_MUST_USE_RESULT bool IsAlreadyExists(const Status& status);

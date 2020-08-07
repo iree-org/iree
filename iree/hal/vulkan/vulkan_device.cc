@@ -797,7 +797,7 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
       syms()->vkWaitSemaphores(*logical_device_, &wait_info, timeout_ns);
   if (result == VK_ERROR_DEVICE_LOST) {
     // Nothing we do now matters.
-    return VkResultToStatus(result);
+    return VkResultToStatus(result, IREE_LOC);
   }
 
   // TODO(benvanik): notify the resource timeline that it should check for the
