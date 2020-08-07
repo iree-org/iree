@@ -48,14 +48,6 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   template <typename T>
   StatusBuilder&& operator<<(const T& value) &&;
 
-  // No-op functions that may be added later.
-  StatusBuilder& LogError() & { return *this; }
-  StatusBuilder&& LogError() && { return std::move(LogError()); }
-  StatusBuilder& LogWarning() & { return *this; }
-  StatusBuilder&& LogWarning() && { return std::move(LogWarning()); }
-  StatusBuilder& LogInfo() & { return *this; }
-  StatusBuilder&& LogInfo() && { return std::move(LogInfo()); }
-
   // Returns true if the Status created by this builder will be ok().
   bool ok() const;
 
