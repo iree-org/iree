@@ -22,7 +22,13 @@
 #include "iree/base/api_util.h"
 #include "iree/base/file_mapping.h"
 #include "iree/base/init.h"
+#include "iree/base/platform_headers.h"
 #include "iree/base/tracing.h"
+
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
+    defined(IREE_PLATFORM_LINUX)
+#include <ctime>
+#endif
 
 namespace iree {
 
@@ -96,10 +102,28 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_time_t iree_time_now() {
-  auto now = std::chrono::system_clock::now();
-  auto now_nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
-  auto now_nanos_since_epoch = now_nanos.time_since_epoch();
-  return now_nanos_since_epoch.count();
+#if defined(IREE_PLATFORM_WINDOWS)
+  // GetSystemTimePreciseAsFileTime requires Windows 8, add a fallback
+  // (such as using std::chrono) if older support is needed.
+  FILETIME system_time;
+  ::GetSystemTimePreciseAsFileTime(&system_time);
+
+  constexpr int64_t kUnixEpochStartTicks = 116444736000000000i64;
+  constexpr int64_t kFtToMicroSec = 10;
+  LARGE_INTEGER li;
+  li.LowPart = system_time.dwLowDateTime;
+  li.HighPart = system_time.dwHighDateTime;
+  li.QuadPart -= kUnixEpochStartTicks;
+  li.QuadPart /= kFtToMicroSec;
+  return li.QuadPart;
+#elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
+    defined(IREE_PLATFORM_LINUX)
+  timespec clock_time;
+  clock_gettime(CLOCK_REALTIME, &clock_time);
+  return clock_time.tv_nsec;
+#else
+#error "IREE system clock needs to be set up for your platform"
+#endif
 }
 
 IREE_API_EXPORT iree_time_t
