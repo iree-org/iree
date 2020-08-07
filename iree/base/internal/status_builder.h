@@ -16,7 +16,6 @@
 #define IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 
 #include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
 #include "iree/base/internal/ostringstream.h"
 #include "iree/base/internal/status.h"
 
@@ -137,6 +136,18 @@ StatusBuilder ResourceExhaustedErrorBuilder(SourceLocation location);
 StatusBuilder UnavailableErrorBuilder(SourceLocation location);
 StatusBuilder UnimplementedErrorBuilder(SourceLocation location);
 StatusBuilder UnknownErrorBuilder(SourceLocation location);
+
+// Returns a StatusBuilder using a status code derived from |errno|.
+StatusBuilder ErrnoToCanonicalStatusBuilder(int error_number,
+                                            SourceLocation location);
+
+#if defined(IREE_PLATFORM_WINDOWS)
+
+// Returns a StatusBuilder with a status describing the |error| and |location|.
+StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
+                                                 SourceLocation location);
+
+#endif  // IREE_PLATFORM_WINDOWS
 
 }  // namespace iree
 

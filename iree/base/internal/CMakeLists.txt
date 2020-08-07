@@ -113,18 +113,13 @@ iree_cc_library(
   HDRS
     "status.h"
     "status_builder.h"
-    "status_errno.h"
     "status_macros.h"
-    "status_win32_errors.h"
     "statusor.h"
   SRCS
     "status.cc"
     "status_builder.cc"
-    "status_errno.cc"
-    "status_win32_errors.cc"
     "statusor.cc"
   DEPS
-    ::logging_internal
     ::ostringstream
     absl::core_headers
     absl::memory

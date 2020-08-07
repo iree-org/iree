@@ -107,20 +107,15 @@ cc_library(
     srcs = [
         "status.cc",
         "status_builder.cc",
-        "status_errno.cc",
-        "status_win32_errors.cc",
         "statusor.cc",
     ],
     hdrs = [
         "status.h",
         "status_builder.h",
-        "status_errno.h",
         "status_macros.h",
-        "status_win32_errors.h",
         "statusor.h",
     ],
     deps = [
-        ":logging_internal",
         ":ostringstream",
         "//iree/base:api",
         "//iree/base:logging",

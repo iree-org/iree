@@ -64,7 +64,7 @@ StatusOr<typename std::result_of<SyscallT(ParamsT...)>::type> Syscall(
       // Retry on EINTR.
       continue;
     } else {
-      return ErrnoToCanonicalStatus(errno, "");
+      return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC);
     }
   }
 }
@@ -194,7 +194,8 @@ Status ClearFd(WaitableObject::FdType fd_type, int fd) {
         // Retry.
         continue;
       } else {
-        return ErrnoToCanonicalStatus(errno, "ClearFd failed");
+        return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+               << "ClearFd failed";
       }
     }
   }

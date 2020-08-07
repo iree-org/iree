@@ -19,6 +19,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <vector>
+
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
