@@ -14,7 +14,6 @@
 
 #include "iree/base/api.h"
 
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <string>
