@@ -236,9 +236,10 @@ class NativeModule {
     auto* state = FromStatePointer(module_state);
     auto status = info.call(info.ptr, state, stack, call, out_result);
     if (!status.ok()) {
-      status = iree::Annotate(
-          status,
-          absl::StrCat("while executing ", module->name_, ".", info.name));
+      // TODO(#265): replace with direct annotation above.
+      // status = iree::Annotate(
+      //     status,
+      //     absl::StrCat("while executing ", module->name_, ".", info.name));
     }
     return ToApiStatus(status);
   }

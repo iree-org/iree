@@ -28,13 +28,6 @@ TEST(Status, ConstructedWithMessage) {
   EXPECT_THAT(status.ToString(), HasSubstr("message"));
 }
 
-TEST(Statue, Annotate) {
-  Status status = Status(StatusCode::kInvalidArgument, "message");
-  status = Annotate(status, "annotation");
-  EXPECT_THAT(status.ToString(), HasSubstr("message"));
-  EXPECT_THAT(status.ToString(), HasSubstr("annotation"));
-}
-
 TEST(Status, StreamInsertion) {
   Status status = Status(StatusCode::kInvalidArgument, "message");
   std::ostringstream os;
