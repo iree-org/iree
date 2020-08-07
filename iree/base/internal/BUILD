@@ -112,7 +112,6 @@ cc_library(
         "statusor.cc",
     ],
     hdrs = [
-        "source_location.h",
         "status.h",
         "status_builder.h",
         "status_errno.h",

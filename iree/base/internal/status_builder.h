@@ -18,7 +18,6 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/internal/ostringstream.h"
-#include "iree/base/internal/source_location.h"
 #include "iree/base/internal/status.h"
 
 namespace iree {
@@ -30,15 +29,13 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
  public:
   // Creates a `StatusBuilder` based on an original status.
   explicit StatusBuilder(const Status& original_status,
-                         SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-  explicit StatusBuilder(Status&& original_status,
-                         SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+                         SourceLocation location);
+  explicit StatusBuilder(Status&& original_status, SourceLocation location);
 
   // Creates a `StatusBuilder` from a status code.
   // A typical user will not specify `location`, allowing it to default to the
   // current location.
-  explicit StatusBuilder(StatusCode code,
-                         SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+  explicit StatusBuilder(StatusCode code, SourceLocation location);
 
   StatusBuilder(const StatusBuilder& sb);
   StatusBuilder& operator=(const StatusBuilder& sb);
@@ -132,38 +129,22 @@ std::ostream& operator<<(std::ostream& os, StatusBuilder&& builder);
 
 // Each of the functions below creates StatusBuilder with a canonical error.
 // The error code of the StatusBuilder matches the name of the function.
-StatusBuilder AbortedErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder AlreadyExistsErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder CancelledErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder DataLossErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder DeadlineExceededErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder FailedPreconditionErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder InternalErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder InvalidArgumentErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder NotFoundErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder OutOfRangeErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder PermissionDeniedErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder UnauthenticatedErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder ResourceExhaustedErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder UnavailableErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder UnimplementedErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
-StatusBuilder UnknownErrorBuilder(
-    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+StatusBuilder AbortedErrorBuilder(SourceLocation location);
+StatusBuilder AlreadyExistsErrorBuilder(SourceLocation location);
+StatusBuilder CancelledErrorBuilder(SourceLocation location);
+StatusBuilder DataLossErrorBuilder(SourceLocation location);
+StatusBuilder DeadlineExceededErrorBuilder(SourceLocation location);
+StatusBuilder FailedPreconditionErrorBuilder(SourceLocation location);
+StatusBuilder InternalErrorBuilder(SourceLocation location);
+StatusBuilder InvalidArgumentErrorBuilder(SourceLocation location);
+StatusBuilder NotFoundErrorBuilder(SourceLocation location);
+StatusBuilder OutOfRangeErrorBuilder(SourceLocation location);
+StatusBuilder PermissionDeniedErrorBuilder(SourceLocation location);
+StatusBuilder UnauthenticatedErrorBuilder(SourceLocation location);
+StatusBuilder ResourceExhaustedErrorBuilder(SourceLocation location);
+StatusBuilder UnavailableErrorBuilder(SourceLocation location);
+StatusBuilder UnimplementedErrorBuilder(SourceLocation location);
+StatusBuilder UnknownErrorBuilder(SourceLocation location);
 
 }  // namespace iree
 

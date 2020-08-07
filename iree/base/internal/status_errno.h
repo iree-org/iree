@@ -16,7 +16,6 @@
 #define IREE_BASE_INTERNAL_STATUS_ERRNO_H_
 
 #include "absl/strings/string_view.h"
-#include "iree/base/internal/source_location.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/statusor.h"
 

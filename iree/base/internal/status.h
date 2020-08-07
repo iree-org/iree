@@ -15,7 +15,7 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_H_
 #define IREE_BASE_INTERNAL_STATUS_H_
 
-#include <atomic>
+#include <cstdint>
 #include <string>
 
 #include "absl/base/attributes.h"
@@ -24,6 +24,32 @@
 #include "iree/base/target_platform.h"
 
 namespace iree {
+
+// Class representing a specific location in the source code of a program.
+class SourceLocation {
+ public:
+  // Avoid this constructor; it populates the object with dummy values.
+  constexpr SourceLocation() : line_(0), file_name_(nullptr) {}
+
+  // `file_name` must outlive all copies of the `iree::SourceLocation` object,
+  // so in practice it should be a string literal.
+  constexpr SourceLocation(std::uint_least32_t line, const char* file_name)
+      : line_(line), file_name_(file_name) {}
+
+  // The line number of the captured source location.
+  constexpr std::uint_least32_t line() const { return line_; }
+
+  // The file name of the captured source location.
+  constexpr const char* file_name() const { return file_name_; }
+
+ private:
+  std::uint_least32_t line_;
+  const char* file_name_;
+};
+
+// If a function takes an `iree::SourceLocation` parameter, pass this as the
+// argument.
+#define IREE_LOC ::iree::SourceLocation(__LINE__, __FILE__)
 
 enum class StatusCode : int {
   kOk = 0,

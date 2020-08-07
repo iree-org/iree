@@ -19,7 +19,6 @@
 #include "iree/base/google_internal/source_location_google.h"
 #include "iree/base/google_internal/status_google.h"
 #else
-#include "iree/base/internal/source_location.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
 #include "iree/base/internal/status_errno.h"
