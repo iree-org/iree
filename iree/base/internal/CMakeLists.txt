@@ -115,7 +115,6 @@ iree_cc_library(
     "status.h"
     "status_builder.h"
     "status_errno.h"
-    "status_errors.h"
     "status_macros.h"
     "status_win32_errors.h"
     "statusor.h"
@@ -123,7 +122,6 @@ iree_cc_library(
     "status.cc"
     "status_builder.cc"
     "status_errno.cc"
-    "status_errors.cc"
     "status_win32_errors.cc"
     "statusor.cc"
   DEPS

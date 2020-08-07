@@ -123,6 +123,76 @@ std::ostream& operator<<(std::ostream& os, const Status& x);
 // has been augmented by adding `msg` to the end of the original message.
 Status Annotate(const Status& s, absl::string_view msg);
 
+ABSL_MUST_USE_RESULT static inline bool IsAborted(const Status& status) {
+  return status.code() == StatusCode::kAborted;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsAlreadyExists(const Status& status) {
+  return status.code() == StatusCode::kAlreadyExists;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsCancelled(const Status& status) {
+  return status.code() == StatusCode::kCancelled;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsDataLoss(const Status& status) {
+  return status.code() == StatusCode::kDataLoss;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsDeadlineExceeded(
+    const Status& status) {
+  return status.code() == StatusCode::kDeadlineExceeded;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsFailedPrecondition(
+    const Status& status) {
+  return status.code() == StatusCode::kFailedPrecondition;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsInternal(const Status& status) {
+  return status.code() == StatusCode::kInternal;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsInvalidArgument(
+    const Status& status) {
+  return status.code() == StatusCode::kInvalidArgument;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsNotFound(const Status& status) {
+  return status.code() == StatusCode::kNotFound;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsOutOfRange(const Status& status) {
+  return status.code() == StatusCode::kOutOfRange;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsPermissionDenied(
+    const Status& status) {
+  return status.code() == StatusCode::kPermissionDenied;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsResourceExhausted(
+    const Status& status) {
+  return status.code() == StatusCode::kResourceExhausted;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsUnauthenticated(
+    const Status& status) {
+  return status.code() == StatusCode::kUnauthenticated;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsUnavailable(const Status& status) {
+  return status.code() == StatusCode::kUnavailable;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsUnimplemented(const Status& status) {
+  return status.code() == StatusCode::kUnimplemented;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
+  return status.code() == StatusCode::kUnknown;
+}
+
 #define CHECK_OK(val) CHECK_EQ(::iree::OkStatus(), (val))
 #define QCHECK_OK(val) QCHECK_EQ(::iree::OkStatus(), (val))
 #define DCHECK_OK(val) DCHECK_EQ(::iree::OkStatus(), (val))

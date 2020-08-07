@@ -14,8 +14,6 @@
 
 #include "iree/base/internal/statusor.h"
 
-#include "iree/base/internal/status_errors.h"
-
 namespace iree {
 
 namespace internal_statusor {

@@ -16,8 +16,6 @@
 
 #include <cstdio>
 
-#include "iree/base/internal/status_errors.h"
-
 namespace iree {
 
 StatusBuilder::Rep::Rep(const Rep& r)
