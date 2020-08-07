@@ -37,14 +37,18 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
       return success();
-    } else if (convertedType.isSignlessIntOrIndex()) {
-      // TODO(benvanik): support other types.
+    } else if (convertedType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
       return success();
+    } else if (convertedType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
+          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
+          op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
+      return success();
     }
-    return failure();
+    return op.emitOpError("unsupported variable type");
   }
 
  private:

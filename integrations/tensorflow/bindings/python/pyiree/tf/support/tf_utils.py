@@ -76,7 +76,7 @@ def get_shape_and_dtype(array, allow_non_mlir_dtype=False):
   elif allow_non_mlir_dtype:
     shape_dtype.append(f"<dtype '{array.dtype}'>")
   else:
-    raise TypeError(f"Expected integer or floating type, but got {dtype}")
+    raise TypeError(f"Expected integer or floating type, but got {array.dtype}")
   return "x".join(shape_dtype)
 
 
@@ -241,10 +241,11 @@ class IreeCompiledModule(CompiledModule):
 
     if _create_reinitialized_args is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(tf_module=module_class(),
-                                            backend_infos=[backend_info],
-                                            exported_names=exported_names,
-                                            artifacts_dir=artifacts_dir)
+      self._module_blob = compile_tf_module(
+          tf_module=module_class(),
+          backend_infos=[backend_info],
+          exported_names=exported_names,
+          artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
@@ -252,8 +253,8 @@ class IreeCompiledModule(CompiledModule):
       self._module_blob, self._module, self._config = _create_reinitialized_args
 
     # Holds all of the module's mutable state.
-    self._context = rt.SystemContext(modules=[self._module],
-                                     config=self._config)
+    self._context = rt.SystemContext(
+        modules=[self._module], config=self._config)
 
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
@@ -349,9 +350,8 @@ class _TfFunctionWrapper(object):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(self._convert_to_numpy,
-                                 *results,
-                                 check_types=False)
+    return tf.nest.map_structure(
+        self._convert_to_numpy, *results, check_types=False)
 
 
 class BackendInfo:

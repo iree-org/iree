@@ -43,7 +43,6 @@ cc_library(
         ":file_mapping",
         ":init",
         ":tracing",
-        "@com_google_absl//absl/time",
     ],
 )
 

@@ -31,6 +31,16 @@ using ::mlir::tblgen::Operator;
 bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
   llvm::emitSourceFileHeader("IREE VM Operation Encoder Definitions", os);
 
+  // Gather prefix opcodes:
+  DenseMap<StringRef, int> prefixOpcodes;
+  auto opcodes = recordKeeper.getAllDerivedDefinitions("VM_OPC");
+  for (const auto *opcode : opcodes) {
+    auto symbol = opcode->getValueAsString("symbol");
+    if (symbol.startswith("Prefix")) {
+      prefixOpcodes[symbol] = opcode->getValueAsInt("value");
+    }
+  }
+
   auto defs = recordKeeper.getAllDerivedDefinitions("VM_Op");
   for (const auto *def : defs) {
     if (def->isValueUnset("encoding")) continue;
@@ -41,6 +51,19 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
     os << formatv(
         "LogicalResult {0}::encode(SymbolTable &syms, VMFuncEncoder &e) {{\n",
         op.getQualCppClassName());
+
+    for (auto &pair : prefixOpcodes) {
+      std::string traitName = (StringRef("OpTrait::IREE::VM::") +
+                               pair.first.substr(strlen("Prefix")))
+                                  .str();
+      if (op.getTrait(traitName)) {
+        os << formatv(
+            "  if (failed(e.encodeOpcode(\"{0}\", {1}))) return emitOpError() "
+            "<< "
+            "\"failed to encode op prefix\";\n",
+            pair.first, pair.second);
+      }
+    }
 
     os << "  if (";
     interleave(

@@ -55,19 +55,19 @@ typedef struct iree_vm_value {
   };
 } iree_vm_value_t;
 
-#ifdef __cplusplus
-inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
+static inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
   iree_vm_value_t result;
   result.type = IREE_VM_VALUE_TYPE_I32;
   result.i32 = value;
   return result;
 }
-#else
-#define iree_vm_value_make_i32(value)                   \
-  {                                                     \
-    IREE_VM_VALUE_TYPE_I32, { .i32 = (int32_t)(value) } \
-  }
-#endif  // __cplusplus
+
+static inline iree_vm_value_t iree_vm_value_make_i64(int64_t value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_I64;
+  result.i64 = value;
+  return result;
+}
 
 #ifdef __cplusplus
 }  // extern "C"

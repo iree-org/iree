@@ -22,6 +22,12 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Options that can be used to configure SPIR-V codegeneration.
+struct SPIRVCodegenOptions {
+  SmallVector<int64_t, 3> workgroupSize = {};
+  bool useWorkgroupMemory = false;
+};
+
 /// Pass to tile and fuse linalg operations on buffers. The pass takes as
 /// argument the `workgroupSize` that the tiling should use. Note that the
 /// tile-sizes are the reverse of the workgroup size. So workgroup size along
@@ -61,7 +67,7 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 /// testing purposes only. The pass pipeline will set an appropriate workgroup
 /// size.
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
-                                     ArrayRef<int64_t> workGroupSize);
+                                     const SPIRVCodegenOptions &options);
 
 /// Poplate passes needed to lower loop.parallel to workgroups.
 void populateParallelLoopToWorkgroupPatterns(

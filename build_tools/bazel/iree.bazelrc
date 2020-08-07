@@ -187,7 +187,8 @@ build:rbe --remote_instance_name=projects/iree-oss/instances/default_instance
 # this higher can make builds faster by allowing more jobs to run in parallel.
 # Setting it too high can result in jobs that timeout, however, while waiting
 # for a remote machine to execute them.
-build:rbe --jobs=50
+# Our pool autoscales from 25 to 200 jobs
+build:rbe --jobs=150
 
 # Flags related to specifying the platform, toolchain and java properties.
 # These flags must be adapted to work with toolchain containers other than
