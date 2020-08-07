@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_HAL_DRIVER_VMLA})
-  return()
-endif()
-
 iree_add_all_subdirs()
 
 iree_bytecode_module(
