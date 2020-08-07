@@ -176,7 +176,9 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
     if (!integerAttr) {
       return srcOp.emitRemark() << "unsupported const type for dialect";
     }
-    auto targetType = getTypeConverter()->convertType(srcOp.getType());
+    // TODO(#2878): use getTypeConverter() when we pass it upon creation.
+    IREE::VM::TypeConverter typeConverter;
+    auto targetType = typeConverter.convertType(srcOp.getType());
     switch (targetType.getIntOrFloatBitWidth()) {
       case 1:
       case 32:
@@ -392,13 +394,14 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
                                   OwningRewritePatternList &patterns) {
-  patterns
-      .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-              CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
-              ModuleTerminatorOpConversion, FuncOpConversion,
-              ReturnOpConversion, CastingOpConversion<IndexCastOp>,
-              CastingOpConversion<TruncateIOp>, SelectI32OpConversion>(
-          typeConverter, context);
+  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
+                  CondBranchOpConversion, ModuleOpConversion,
+                  ModuleTerminatorOpConversion, FuncOpConversion,
+                  ReturnOpConversion, CastingOpConversion<IndexCastOp>,
+                  CastingOpConversion<TruncateIOp>, SelectI32OpConversion>(
+      typeConverter, context);
+  // TODO(#2878): pass typeConverter here.
+  patterns.insert<ConstantOpConversion>(context);
 
   // Binary arithmetic ops
   patterns
