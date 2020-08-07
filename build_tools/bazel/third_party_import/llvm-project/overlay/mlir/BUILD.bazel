@@ -1491,6 +1491,7 @@ cc_library(
         ":IR",
         ":LLVMDialect",
         ":Pass",
+        ":StandardToLLVM",
         ":Support",
         ":TargetNVVMIR",
         "@llvm-project//llvm:Core",
@@ -2837,7 +2838,6 @@ cc_library(
         ":Support",
         ":Translation",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir/test:TestLLVMTypeTranslation",
     ],
 )
 
