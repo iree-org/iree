@@ -82,7 +82,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
     }
     if (dim_value < 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "shape[%d] unsupported value %zu of '%.*s'",
+                              "shape[%zu] unsupported value %d of '%.*s'",
                               dims.size(), dim_value, (int)value.size,
                               value.data);
     }
@@ -908,7 +908,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_unmap(
   IREE_TRACE_SCOPE0("iree_hal_buffer_map");
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(mapped_memory);
-  auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
   auto* mapping =
       reinterpret_cast<MappedMemory<uint8_t>*>(mapped_memory->reserved);
   mapping->reset();

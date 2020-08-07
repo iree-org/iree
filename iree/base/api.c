@@ -15,6 +15,7 @@
 #include "iree/base/api.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 

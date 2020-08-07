@@ -16,6 +16,7 @@
 #define IREE_BASE_INTERNAL_STATUS_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "absl/base/attributes.h"

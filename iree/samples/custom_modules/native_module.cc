@@ -14,6 +14,7 @@
 
 #include "iree/samples/custom_modules/native_module.h"
 
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 
