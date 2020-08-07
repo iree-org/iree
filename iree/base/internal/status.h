@@ -20,7 +20,8 @@
 
 #include "absl/base/attributes.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/internal/logging.h"
+#include "iree/base/api.h"
+#include "iree/base/logging.h"
 #include "iree/base/target_platform.h"
 
 namespace iree {
@@ -51,28 +52,29 @@ class SourceLocation {
 // argument.
 #define IREE_LOC ::iree::SourceLocation(__LINE__, __FILE__)
 
-enum class StatusCode : int {
-  kOk = 0,
-  kCancelled = 1,
-  kUnknown = 2,
-  kInvalidArgument = 3,
-  kDeadlineExceeded = 4,
-  kNotFound = 5,
-  kAlreadyExists = 6,
-  kPermissionDenied = 7,
-  kResourceExhausted = 8,
-  kFailedPrecondition = 9,
-  kAborted = 10,
-  kOutOfRange = 11,
-  kUnimplemented = 12,
-  kInternal = 13,
-  kUnavailable = 14,
-  kDataLoss = 15,
-  kUnauthenticated = 16,
-  kDoNotUseReservedForFutureExpansionUseDefaultInSwitchInstead_ = 20
+enum class StatusCode : uint32_t {
+  kOk = IREE_STATUS_OK,
+  kCancelled = IREE_STATUS_CANCELLED,
+  kUnknown = IREE_STATUS_UNKNOWN,
+  kInvalidArgument = IREE_STATUS_INVALID_ARGUMENT,
+  kDeadlineExceeded = IREE_STATUS_DEADLINE_EXCEEDED,
+  kNotFound = IREE_STATUS_NOT_FOUND,
+  kAlreadyExists = IREE_STATUS_ALREADY_EXISTS,
+  kPermissionDenied = IREE_STATUS_PERMISSION_DENIED,
+  kResourceExhausted = IREE_STATUS_RESOURCE_EXHAUSTED,
+  kFailedPrecondition = IREE_STATUS_FAILED_PRECONDITION,
+  kAborted = IREE_STATUS_ABORTED,
+  kOutOfRange = IREE_STATUS_OUT_OF_RANGE,
+  kUnimplemented = IREE_STATUS_UNIMPLEMENTED,
+  kInternal = IREE_STATUS_INTERNAL,
+  kUnavailable = IREE_STATUS_UNAVAILABLE,
+  kDataLoss = IREE_STATUS_DATA_LOSS,
+  kUnauthenticated = IREE_STATUS_UNAUTHENTICATED,
 };
 
-std::string StatusCodeToString(StatusCode code);
+static inline const char* StatusCodeToString(StatusCode code) {
+  return iree_status_code_string(static_cast<iree_status_code_t>(code));
+}
 
 class ABSL_MUST_USE_RESULT Status;
 
@@ -83,7 +85,7 @@ class ABSL_MUST_USE_RESULT Status;
 class Status final {
  public:
   // Creates an OK status with no message.
-  Status();
+  Status() = default;
 
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.

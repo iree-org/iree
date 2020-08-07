@@ -129,6 +129,8 @@ iree_cc_library(
     absl::core_headers
     absl::memory
     absl::strings
+    iree::base::api
+    iree::base::logging
     iree::base::target_platform
   PUBLIC
 )
