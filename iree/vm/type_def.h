@@ -36,35 +36,28 @@ typedef struct {
   iree_vm_ref_type_t ref_type : 24;
 } iree_vm_type_def_t;
 
-#ifdef __cplusplus
-inline iree_vm_type_def_t iree_vm_type_def_make_variant_type() {
+static inline iree_vm_type_def_t iree_vm_type_def_make_variant_type() {
   iree_vm_type_def_t result;
   result.value_type = IREE_VM_VALUE_TYPE_NONE;
   result.ref_type = IREE_VM_REF_TYPE_NULL;
   return result;
 }
-inline iree_vm_type_def_t iree_vm_type_def_make_value_type(
+
+static inline iree_vm_type_def_t iree_vm_type_def_make_value_type(
     iree_vm_value_type_t value_type) {
   iree_vm_type_def_t result;
   result.value_type = value_type;
   result.ref_type = IREE_VM_REF_TYPE_NULL;
   return result;
 }
-inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
+
+static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
     iree_vm_ref_type_t ref_type) {
   iree_vm_type_def_t result;
   result.value_type = IREE_VM_VALUE_TYPE_NONE;
   result.ref_type = ref_type;
   return result;
 }
-#else
-#define iree_vm_type_def_make_variant_type() \
-  { .value_type = IREE_VM_VALUE_TYPE_NONE, .ref_type = IREE_VM_REF_TYPE_NULL, }
-#define iree_vm_type_def_make_value_type(value_type) \
-  { .value_type = (value_type), .ref_type = IREE_VM_REF_TYPE_NULL, }
-#define iree_vm_type_def_make_ref_type(ref_type) \
-  { .value_type = IREE_VM_VALUE_TYPE_NONE, .ref_type = (ref_type), }
-#endif  // __cplusplus
 
 #define iree_vm_type_def_is_value(v) \
   ((v)->value_type != IREE_VM_VALUE_TYPE_NONE)
