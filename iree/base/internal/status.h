@@ -76,13 +76,11 @@ static inline const char* StatusCodeToString(StatusCode code) {
   return iree_status_code_string(static_cast<iree_status_code_t>(code));
 }
 
-class ABSL_MUST_USE_RESULT Status;
-
 // A Status value can be either OK or not-OK
 //   * OK indicates that the operation succeeded.
 //   * A not-OK value indicates that the operation failed and contains details
 //     about the error.
-class Status final {
+class ABSL_MUST_USE_RESULT Status final {
  public:
   // Creates an OK status with no message.
   Status() = default;
@@ -102,25 +100,19 @@ class Status final {
   // Returns the error code.
   StatusCode code() const;
 
-  // Returns the error message. Note: prefer ToString() for debug logging.
-  // This message rarely describes the error code. It is not unusual for the
-  // error message to be the empty string.
-  absl::string_view message() const;
-
   // Return a combination of the error code name and message.
   std::string ToString() const;
-
-  // Compatibility with upstream API. Equiv to ToString().
-  std::string error_message() const { return ToString(); }
 
   friend bool operator==(const Status&, const Status&);
   friend bool operator!=(const Status&, const Status&);
 
   // Ignores any errors, potentially suppressing complaints from any tools.
-  void IgnoreError() const;
+  void IgnoreError() {}
 
  private:
-  static bool EqualsSlow(const Status& a, const Status& b);
+  // TODO(#265): remove message().
+  absl::string_view message() const;
+  friend Status Annotate(const Status& s, absl::string_view msg);
 
   struct State {
     StatusCode code;

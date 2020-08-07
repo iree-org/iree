@@ -51,7 +51,7 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
 
 pybind11::error_already_set StatusToPyExc(const Status& status) {
   assert(!status.ok());
-  PyErr_SetString(StatusToPyExcClass(status), status.error_message().c_str());
+  PyErr_SetString(StatusToPyExcClass(status), status.ToString().c_str());
   return pybind11::error_already_set();
 }
 

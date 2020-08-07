@@ -153,7 +153,7 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
   }
 
   absl::string_view GetMessage(const Status &status) const {
-    return status.message();
+    return status.ToString();
   }
 
   // Expected error code.

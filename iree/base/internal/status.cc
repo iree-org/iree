@@ -73,19 +73,8 @@ std::string Status::ToString() const {
   return text;
 }
 
-void Status::IgnoreError() const {
-  // no-op
-}
-
-bool Status::EqualsSlow(const Status& a, const Status& b) {
-  if (a.code() != b.code()) return false;
-  if (a.message() != b.message()) return false;
-  // TODO(scotttodd): Payloads
-  return true;
-}
-
 bool operator==(const Status& lhs, const Status& rhs) {
-  return lhs.state_ == rhs.state_ || Status::EqualsSlow(lhs, rhs);
+  return lhs.code() == rhs.code();
 }
 
 bool operator!=(const Status& lhs, const Status& rhs) { return !(lhs == rhs); }
