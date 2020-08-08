@@ -526,8 +526,8 @@ struct DispatchFunctor {
                      const iree_vm_function_call_t* call,
                      iree_vm_execution_result_t* out_result) {
     iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
-    ASSIGN_OR_RETURN(auto params,
-                     Unpacker::LoadSequence<Params...>(
+    IREE_ASSIGN_OR_RETURN(
+        auto params, Unpacker::LoadSequence<Params...>(
                          &caller_frame->registers, call->argument_registers,
                          call->variadic_segment_size_list));
 
@@ -563,8 +563,8 @@ struct DispatchFunctorVoid {
     }
 
     iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
-    ASSIGN_OR_RETURN(auto params,
-                     Unpacker::LoadSequence<Params...>(
+    IREE_ASSIGN_OR_RETURN(
+        auto params, Unpacker::LoadSequence<Params...>(
                          &caller_frame->registers, call->argument_registers,
                          call->variadic_segment_size_list));
 

@@ -88,7 +88,7 @@ StatusOr<ref_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
 
   // Open the file for reading. Note that we only need to keep it open long
   // enough to map it and we can close the descriptor after that.
-  ASSIGN_OR_RETURN(auto file, FileDescriptor::OpenRead(std::move(path)));
+  IREE_ASSIGN_OR_RETURN(auto file, FileDescriptor::OpenRead(std::move(path)));
 
   // Map the file from the file descriptor.
   void* data =

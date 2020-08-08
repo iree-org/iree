@@ -154,7 +154,7 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
 StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantListFromFile(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator, const std::string& filename) {
-  ASSIGN_OR_RETURN(auto file_string, file_io::GetFileContents(filename));
+  IREE_ASSIGN_OR_RETURN(auto file_string, file_io::GetFileContents(filename));
   absl::InlinedVector<absl::string_view, 4> input_views(
       absl::StrSplit(file_string, '\n', absl::SkipEmpty()));
   return ParseToVariantList(descs, allocator, input_views);

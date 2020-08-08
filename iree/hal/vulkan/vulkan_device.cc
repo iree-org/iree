@@ -238,15 +238,15 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
 
   // Find the extensions we need (or want) that are also available
   // on the device. This will fail when required ones are not present.
-  ASSIGN_OR_RETURN(auto enabled_extension_names,
-                   MatchAvailableDeviceExtensions(physical_device,
-                                                  extensibility_spec, *syms));
+  IREE_ASSIGN_OR_RETURN(auto enabled_extension_names,
+                        MatchAvailableDeviceExtensions(
+                            physical_device, extensibility_spec, *syms));
   auto enabled_device_extensions =
       PopulateEnabledDeviceExtensions(enabled_extension_names);
 
   // Find queue families we will expose as HAL queues.
-  ASSIGN_OR_RETURN(auto queue_family_info,
-                   SelectQueueFamilies(physical_device, syms));
+  IREE_ASSIGN_OR_RETURN(auto queue_family_info,
+                        SelectQueueFamilies(physical_device, syms));
 
   // Limit the number of queues we create (for now).
   // We may want to allow this to grow, but each queue adds overhead and we
@@ -342,22 +342,23 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
 
   // Create the device memory allocator.
   // TODO(benvanik): allow other types to be plugged in.
-  ASSIGN_OR_RETURN(auto allocator,
-                   VmaAllocator::Create(physical_device, logical_device));
+  IREE_ASSIGN_OR_RETURN(auto allocator,
+                        VmaAllocator::Create(physical_device, logical_device));
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
   // If we wanted to expose the pools through the HAL to allow the VM to more
   // effectively manage them (pool per fiber, etc) we could, however I doubt
   // the overhead of locking the pool will be even a blip.
-  ASSIGN_OR_RETURN(auto dispatch_command_pool,
-                   CreateTransientCommandPool(
-                       logical_device, queue_family_info.dispatch_index));
+  IREE_ASSIGN_OR_RETURN(auto dispatch_command_pool,
+                        CreateTransientCommandPool(
+                            logical_device, queue_family_info.dispatch_index));
   ref_ptr<VkCommandPoolHandle> transfer_command_pool;
   if (has_dedicated_transfer_queues) {
-    ASSIGN_OR_RETURN(transfer_command_pool,
-                     CreateTransientCommandPool(
-                         logical_device, queue_family_info.transfer_index));
+    IREE_ASSIGN_OR_RETURN(
+        transfer_command_pool,
+        CreateTransientCommandPool(logical_device,
+                                   queue_family_info.transfer_index));
   }
 
   // Select queue indices and create command queues with them.
@@ -382,10 +383,10 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
   if (syms->vkGetSemaphoreCounterValue == nullptr ||
       absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
-    ASSIGN_OR_RETURN(semaphore_pool,
-                     TimePointSemaphorePool::Create(add_ref(logical_device)));
-    ASSIGN_OR_RETURN(fence_pool,
-                     TimePointFencePool::Create(add_ref(logical_device)));
+    IREE_ASSIGN_OR_RETURN(semaphore_pool, TimePointSemaphorePool::Create(
+                                              add_ref(logical_device)));
+    IREE_ASSIGN_OR_RETURN(fence_pool,
+                          TimePointFencePool::Create(add_ref(logical_device)));
   }
 
   auto command_queues =
@@ -423,9 +424,9 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   // Since the device is already created, we can't actually enable any
   // extensions or query if they are really enabled - we just have to trust
   // that the caller already enabled them for us (or we may fail later).
-  ASSIGN_OR_RETURN(auto enabled_extension_names,
-                   MatchAvailableDeviceExtensions(physical_device,
-                                                  extensibility_spec, *syms));
+  IREE_ASSIGN_OR_RETURN(auto enabled_extension_names,
+                        MatchAvailableDeviceExtensions(
+                            physical_device, extensibility_spec, *syms));
   auto enabled_device_extensions =
       PopulateEnabledDeviceExtensions(enabled_extension_names);
 
@@ -437,8 +438,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
 
   // Create the device memory allocator.
   // TODO(benvanik): allow other types to be plugged in.
-  ASSIGN_OR_RETURN(auto allocator,
-                   VmaAllocator::Create(physical_device, device_handle));
+  IREE_ASSIGN_OR_RETURN(auto allocator,
+                        VmaAllocator::Create(physical_device, device_handle));
 
   bool has_dedicated_transfer_queues = transfer_queue_count > 0;
 
@@ -447,14 +448,16 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   // If we wanted to expose the pools through the HAL to allow the VM to more
   // effectively manage them (pool per fiber, etc) we could, however I doubt
   // the overhead of locking the pool will be even a blip.
-  ASSIGN_OR_RETURN(auto dispatch_command_pool,
-                   CreateTransientCommandPool(
-                       device_handle, compute_queue_set.queue_family_index));
+  IREE_ASSIGN_OR_RETURN(
+      auto dispatch_command_pool,
+      CreateTransientCommandPool(device_handle,
+                                 compute_queue_set.queue_family_index));
   ref_ptr<VkCommandPoolHandle> transfer_command_pool;
   if (has_dedicated_transfer_queues) {
-    ASSIGN_OR_RETURN(transfer_command_pool,
-                     CreateTransientCommandPool(
-                         device_handle, transfer_queue_set.queue_family_index));
+    IREE_ASSIGN_OR_RETURN(
+        transfer_command_pool,
+        CreateTransientCommandPool(device_handle,
+                                   transfer_queue_set.queue_family_index));
   }
 
   // Emulate timeline semaphores if associated functions are not defined.
@@ -462,10 +465,10 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
   if (syms->vkGetSemaphoreCounterValue == nullptr ||
       absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
-    ASSIGN_OR_RETURN(semaphore_pool,
-                     TimePointSemaphorePool::Create(add_ref(device_handle)));
-    ASSIGN_OR_RETURN(fence_pool,
-                     TimePointFencePool::Create(add_ref(device_handle)));
+    IREE_ASSIGN_OR_RETURN(
+        semaphore_pool, TimePointSemaphorePool::Create(add_ref(device_handle)));
+    IREE_ASSIGN_OR_RETURN(fence_pool,
+                          TimePointFencePool::Create(add_ref(device_handle)));
   }
 
   auto command_queues =
@@ -715,8 +718,9 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
           // clang-format on
           IREE_TRACE_SCOPE0("<lambda>::OnSemaphoreSignal");
           for (const auto& queue : command_queues_) {
-            IREE_RETURN_IF_ERROR(static_cast<SerializingCommandQueue*>(queue.get())
-                                ->AdvanceQueueSubmission());
+            IREE_RETURN_IF_ERROR(
+                static_cast<SerializingCommandQueue*>(queue.get())
+                    ->AdvanceQueueSubmission());
           }
           return OkStatus();
         },

@@ -50,7 +50,7 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
       *::flatbuffers::GetRoot<SpirVExecutableDef>(spec.executable_data.data());
 
   // Create the executable (which may itself own many pipelines).
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto executable,
       PipelineExecutable::Create(
           add_ref(logical_device_),

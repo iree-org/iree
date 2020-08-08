@@ -154,8 +154,8 @@ StatusOr<absl::FixedArray<pollfd>> AcquireWaitHandles(
     // This may block (if |deadline| allows it) if the fd is not yet available.
     // This is like a pre-wait for the actual poll operation. It can be bad with
     // WaitAny, though we could handle that better here.
-    ASSIGN_OR_RETURN(auto fd_info,
-                     wait_handles[i]->object()->AcquireFdForWait(deadline));
+    IREE_ASSIGN_OR_RETURN(
+        auto fd_info, wait_handles[i]->object()->AcquireFdForWait(deadline));
     poll_fds[i].fd = fd_info.second;
 
     // Abort if deadline exceeded.
@@ -234,7 +234,7 @@ Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
   // Pass handles to ppoll.
   // http://man7.org/linux/man-pages/man2/poll.2.html
   if (any_valid_fds) {
-    ASSIGN_OR_RETURN(int rv, SystemPoll(poll_fds, deadline));
+    IREE_ASSIGN_OR_RETURN(int rv, SystemPoll(poll_fds, deadline));
     if (rv == 0) {
       // Call timed out and no descriptors were ready.
       // If this was just a poll then that's fine.
@@ -253,7 +253,7 @@ Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
     if (poll_fds[i].fd == kSignaledFd || poll_fds[i].revents == POLLIN) {
       // First attempt any resolve actions. If these fail we can't consider the
       // fd as having been signaled.
-      ASSIGN_OR_RETURN(
+      IREE_ASSIGN_OR_RETURN(
           bool resolved,
           wait_handles[i]->object()->TryResolveWakeOnFd(poll_fds[i].fd));
       if (!resolved) {
@@ -324,14 +324,16 @@ Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, Time deadline_ns) {
   if (wait_handles.empty()) return OkStatus();
 
   // Build the list of pollfds to wait on.
-  ASSIGN_OR_RETURN(auto poll_fds, AcquireWaitHandles(wait_handles, deadline));
+  IREE_ASSIGN_OR_RETURN(auto poll_fds,
+                        AcquireWaitHandles(wait_handles, deadline));
 
   // Loop until all handles have been signaled or the deadline is exceeded.
   int unsignaled_count = 0;
   do {
     int any_signaled_index = 0;
-    IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
-                              &any_signaled_index, &unsignaled_count));
+    IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds),
+                                   deadline, &any_signaled_index,
+                                   &unsignaled_count));
   } while (unsignaled_count > 0 && Now() < deadline);
 
   if (unsignaled_count == 0) {
@@ -363,13 +365,15 @@ StatusOr<int> WaitHandle::WaitAny(WaitHandleSpan wait_handles,
   }
 
   // Build the list of pollfds to wait on.
-  ASSIGN_OR_RETURN(auto poll_fds, AcquireWaitHandles(wait_handles, deadline));
+  IREE_ASSIGN_OR_RETURN(auto poll_fds,
+                        AcquireWaitHandles(wait_handles, deadline));
 
   // Poll once; this makes a WaitAny just a WaitMulti that doesn't loop.
   int any_signaled_index = -1;
   int unsignaled_count = 0;
-  IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
-                            &any_signaled_index, &unsignaled_count));
+  IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds),
+                                 deadline, &any_signaled_index,
+                                 &unsignaled_count));
   if (any_signaled_index == -1) {
     // No wait handles were valid. Pretend 0 was signaled.
     return 0;

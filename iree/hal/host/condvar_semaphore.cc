@@ -71,7 +71,7 @@ Status CondVarSemaphore::WaitForSemaphores(
   for (auto& semaphore_value : semaphores) {
     auto* semaphore =
         reinterpret_cast<CondVarSemaphore*>(semaphore_value.semaphore);
-    ASSIGN_OR_RETURN(uint64_t current_value, semaphore->Query());
+    IREE_ASSIGN_OR_RETURN(uint64_t current_value, semaphore->Query());
     if (current_value < semaphore_value.value) {
       // Semaphore has not yet hit the required value; wait for it.
       waitable_semaphores.push_back({semaphore, semaphore_value.value});

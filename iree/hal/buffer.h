@@ -424,7 +424,7 @@ class Buffer : public Resource {
   // arguments, or unsupported memory types.
   //
   // Example:
-  //  ASSIGN_OR_RETURN(auto mapping, buffer->MapForRead<MyStruct>());
+  //  IREE_ASSIGN_OR_RETURN(auto mapping, buffer->MapForRead<MyStruct>());
   //  mapping[5].foo = 3;
   //  std::memcpy(mapping.data(), source_data, mapping.size());
   //  mapping.reset();
@@ -747,8 +747,8 @@ StatusOr<MappedMemory<T>> Buffer::MapMemory(MemoryAccessBitfield memory_access,
                                   ? kWholeBuffer
                                   : element_length * sizeof(T);
   void* data = nullptr;
-  IREE_RETURN_IF_ERROR(MapMemory(MappingMode::kScoped, memory_access, &byte_offset,
-                            &byte_length, &data));
+  IREE_RETURN_IF_ERROR(MapMemory(MappingMode::kScoped, memory_access,
+                                 &byte_offset, &byte_length, &data));
   return MappedMemory<T>{
       memory_access, add_ref(this),           byte_offset,
       byte_length,   byte_length / sizeof(T), static_cast<T*>(data)};
@@ -857,7 +857,7 @@ inline StatusOr<absl::Span<const T>> MappedMemory<T>::Subspan(
     device_size_t element_offset, device_size_t element_length) const noexcept {
   IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kRead));
   IREE_RETURN_IF_ERROR(CalculateDataRange(element_offset, element_length,
-                                     &element_offset, &element_length));
+                                          &element_offset, &element_length));
   return absl::Span<const T>(data_ + element_offset, element_length);
 }
 
@@ -866,7 +866,7 @@ inline StatusOr<absl::Span<T>> MappedMemory<T>::MutableSubspan(
     device_size_t element_offset, device_size_t element_length) noexcept {
   IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
   IREE_RETURN_IF_ERROR(CalculateDataRange(element_offset, element_length,
-                                     &element_offset, &element_length));
+                                          &element_offset, &element_length));
   return absl::Span<T>(data_ + element_offset, element_length);
 }
 
@@ -875,7 +875,7 @@ Status MappedMemory<T>::Invalidate(device_size_t element_offset,
                                    device_size_t element_length) const {
   IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kRead));
   IREE_RETURN_IF_ERROR(CalculateDataRange(element_offset, element_length,
-                                     &element_offset, &element_length));
+                                          &element_offset, &element_length));
   if (!element_length) return OkStatus();
   return buffer_->InvalidateMappedMemory(
       byte_offset_ + element_offset * sizeof(T), element_length * sizeof(T));
@@ -886,7 +886,7 @@ Status MappedMemory<T>::Flush(device_size_t element_offset,
                               device_size_t element_length) {
   IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
   IREE_RETURN_IF_ERROR(CalculateDataRange(element_offset, element_length,
-                                     &element_offset, &element_length));
+                                          &element_offset, &element_length));
   if (!element_length) return OkStatus();
   return buffer_->FlushMappedMemory(byte_offset_ + element_offset * sizeof(T),
                                     element_length * sizeof(T));

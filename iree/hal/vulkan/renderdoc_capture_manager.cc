@@ -55,8 +55,9 @@ Status RenderDocCaptureManager::Connect() {
     return OkStatus();
   }
 
-  ASSIGN_OR_RETURN(renderdoc_library_,
-                   DynamicLibrary::Load(absl::MakeSpan(kRenderDocSearchNames)));
+  IREE_ASSIGN_OR_RETURN(
+      renderdoc_library_,
+      DynamicLibrary::Load(absl::MakeSpan(kRenderDocSearchNames)));
 
   auto renderdoc_get_api_fn =
       renderdoc_library_->GetSymbol<pRENDERDOC_GetAPI>("RENDERDOC_GetAPI");

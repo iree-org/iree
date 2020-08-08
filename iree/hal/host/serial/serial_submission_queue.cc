@@ -33,7 +33,7 @@ StatusOr<bool> SerialSubmissionQueue::CheckBatchReady(
     const PendingBatch& batch) const {
   for (auto& wait_point : batch.wait_semaphores) {
     auto* semaphore = reinterpret_cast<CondVarSemaphore*>(wait_point.semaphore);
-    ASSIGN_OR_RETURN(uint64_t value, semaphore->Query());
+    IREE_ASSIGN_OR_RETURN(uint64_t value, semaphore->Query());
     if (value < wait_point.value) {
       return false;
     }

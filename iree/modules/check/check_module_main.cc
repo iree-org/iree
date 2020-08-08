@@ -94,7 +94,8 @@ StatusOr<int> Run(std::string input_file_path) {
     module_data = std::string{std::istreambuf_iterator<char>(std::cin),
                               std::istreambuf_iterator<char>()};
   } else {
-    ASSIGN_OR_RETURN(module_data, file_io::GetFileContents(input_file_path));
+    IREE_ASSIGN_OR_RETURN(module_data,
+                          file_io::GetFileContents(input_file_path));
   }
 
   iree_vm_module_t* input_module = nullptr;
@@ -133,8 +134,8 @@ StatusOr<int> Run(std::string input_file_path) {
     }
 
     IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-    ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
-    ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+    IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+    IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
     if (!input_descs.empty() || !output_descs.empty()) {
       iree_string_view_t sig_f = iree_vm_function_reflection_attr(
           &function, iree_make_cstring_view("f"));

@@ -78,7 +78,7 @@ TEST(StatusMacro, ReturnIfError) {
 
 TEST(StatusMacro, AssignOrReturn) {
   auto assignOrReturn = [](StatusOr<std::string> statusOr) -> Status {
-    ASSIGN_OR_RETURN(auto ret, statusOr, _ << "annotation");
+    IREE_ASSIGN_OR_RETURN(auto ret, std::move(statusOr), _ << "annotation");
     (void)ret;
     return OkStatus();
   };

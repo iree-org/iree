@@ -76,7 +76,7 @@ Status Run(::benchmark::State& state) {
       iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
-  ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
+  IREE_ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
@@ -102,7 +102,7 @@ Status Run(::benchmark::State& state) {
       << "looking up function '" << function_name << "'";
 
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
   vm::ref<iree_vm_list_t> inputs;
   if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
@@ -110,16 +110,18 @@ Status Run(::benchmark::State& state) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Expected only one of inputs and inputs_file to be set";
     }
-    ASSIGN_OR_RETURN(inputs, ParseToVariantListFromFile(
-                                 input_descs, iree_hal_device_allocator(device),
-                                 absl::GetFlag(FLAGS_inputs_file)));
+    IREE_ASSIGN_OR_RETURN(
+        inputs, ParseToVariantListFromFile(input_descs,
+                                           iree_hal_device_allocator(device),
+                                           absl::GetFlag(FLAGS_inputs_file)));
   } else {
-    ASSIGN_OR_RETURN(inputs, ParseToVariantList(
-                                 input_descs, iree_hal_device_allocator(device),
-                                 absl::GetFlag(FLAGS_inputs)));
+    IREE_ASSIGN_OR_RETURN(
+        inputs,
+        ParseToVariantList(input_descs, iree_hal_device_allocator(device),
+                           absl::GetFlag(FLAGS_inputs)));
   }
 
-  ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
 
   // Execute once to make sure any first-iteration outliers are eliminated (e.g.
   // JITing the SPIR-V) and clearly separate out benchmark-related problems in

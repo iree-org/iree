@@ -36,8 +36,8 @@ namespace iree {
 //
 // Usage:
 //   static const char* kSearchNames[] = {"libfoo.so"};
-//   ASSIGN_OR_RETURN(library,
-//                    DynamicLibrary::Load(absl::MakeSpan(kSearchNames)));
+//   IREE_ASSIGN_OR_RETURN(library,
+//                         DynamicLibrary::Load(absl::MakeSpan(kSearchNames)));
 //   void* library_symbol_bar = library->GetSymbol("bar");
 //   void* library_symbol_baz = library->GetSymbol("baz");
 class DynamicLibrary {

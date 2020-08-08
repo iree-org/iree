@@ -224,8 +224,8 @@ Status SerialCommandProcessor::DispatchGrid(
   params.set_bindings = descriptor_sets;
 
   auto* host_executable = reinterpret_cast<HostExecutable*>(executable);
-  ASSIGN_OR_RETURN(auto dispatch_state,
-                   host_executable->PrepareDispatch(params));
+  IREE_ASSIGN_OR_RETURN(auto dispatch_state,
+                        host_executable->PrepareDispatch(params));
   for (uint32_t z = 0; z < params.workgroup_count[2]; ++z) {
     for (uint32_t y = 0; y < params.workgroup_count[1]; ++y) {
       for (uint32_t x = 0; x < params.workgroup_count[0]; ++x) {

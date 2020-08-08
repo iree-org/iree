@@ -39,8 +39,8 @@ StatusOr<ref_ptr<Executable>> LLVMJITExecutableCache::PrepareExecutable(
   // Wrap the data (or copy it).
   bool allow_aliasing_data =
       AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
-  ASSIGN_OR_RETURN(auto executable,
-                   LLVMJITExecutable::Load(spec, !allow_aliasing_data));
+  IREE_ASSIGN_OR_RETURN(auto executable,
+                        LLVMJITExecutable::Load(spec, !allow_aliasing_data));
 
   return executable;
 }

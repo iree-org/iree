@@ -354,8 +354,8 @@ class TensorListModuleState final {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape;
     TensorList* tensorlist = new TensorList;
-    ASSIGN_OR_RETURN(int32_t num_elements,
-                     ReadInt32FromScalarBufferView(num_elements_buf.get()));
+    IREE_ASSIGN_OR_RETURN(int32_t num_elements, ReadInt32FromScalarBufferView(
+                                                    num_elements_buf.get()));
     tensorlist->Resize(num_elements);
     return tensorlist;
   }
@@ -366,8 +366,8 @@ class TensorListModuleState final {
       vm::ref<iree_hal_buffer_view_t> element_shape) {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape;
-    ASSIGN_OR_RETURN(int32_t index,
-                     ReadInt32FromScalarBufferView(index_buf.get()));
+    IREE_ASSIGN_OR_RETURN(int32_t index,
+                          ReadInt32FromScalarBufferView(index_buf.get()));
     return vm::retain_ref(tensorlist->GetItem(index).get());
   }
 
@@ -376,8 +376,8 @@ class TensorListModuleState final {
       vm::ref<TensorList> list, vm::ref<iree_hal_buffer_view_t> index_buf,
       vm::ref<iree_hal_buffer_view_t> item) {
     TensorList* new_list = new TensorList;
-    ASSIGN_OR_RETURN(int32_t index,
-                     ReadInt32FromScalarBufferView(index_buf.get()));
+    IREE_ASSIGN_OR_RETURN(int32_t index,
+                          ReadInt32FromScalarBufferView(index_buf.get()));
     new_list->CopyFrom(list);
     new_list->SetItem(index, vm::retain_ref(item));
     return new_list;
@@ -404,8 +404,9 @@ class TensorListModuleState final {
       vm::ref<iree_hal_buffer_view_t> num_elements_buffer_view) {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape_buffer_view;
-    ASSIGN_OR_RETURN(int32_t num_elements, ReadInt32FromScalarBufferView(
-                                               num_elements_buffer_view.get()));
+    IREE_ASSIGN_OR_RETURN(
+        int32_t num_elements,
+        ReadInt32FromScalarBufferView(num_elements_buffer_view.get()));
     if (num_elements != -1 && list->Size() != num_elements) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "num_elements arg to tesorlist.stack doesn't match the list "

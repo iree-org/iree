@@ -59,8 +59,8 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
   // library APIs work with files. We could instead use in-memory files on
   // platforms where that is convenient.
   std::string base_name = "dylib_executable";
-  ASSIGN_OR_RETURN(executable_library_temp_path_,
-                   file_io::GetTempFile(base_name));
+  IREE_ASSIGN_OR_RETURN(executable_library_temp_path_,
+                        file_io::GetTempFile(base_name));
   // Add platform-specific file extensions so opinionated dynamic library
   // loaders are more likely to find the file:
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -74,10 +74,11 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
           dylib_executable_def->library_embedded()->data()),
       dylib_executable_def->library_embedded()->size());
   IREE_RETURN_IF_ERROR(file_io::SetFileContents(executable_library_temp_path_,
-                                           embedded_library_data));
+                                                embedded_library_data));
 
-  ASSIGN_OR_RETURN(executable_library_,
-                   DynamicLibrary::Load(executable_library_temp_path_.c_str()));
+  IREE_ASSIGN_OR_RETURN(
+      executable_library_,
+      DynamicLibrary::Load(executable_library_temp_path_.c_str()));
 
   const auto& entry_points = *dylib_executable_def->entry_points();
   entry_functions_.resize(entry_points.size());
@@ -116,9 +117,10 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
     for (size_t binding = 0; binding < params.set_bindings[set].size();
          ++binding) {
       const auto& io_binding = params.set_bindings[set][binding];
-      ASSIGN_OR_RETURN(auto memory, io_binding.buffer->MapMemory<uint8_t>(
-                                        MemoryAccessBitfield::kWrite,
-                                        io_binding.offset, io_binding.length));
+      IREE_ASSIGN_OR_RETURN(auto memory,
+                            io_binding.buffer->MapMemory<uint8_t>(
+                                MemoryAccessBitfield::kWrite, io_binding.offset,
+                                io_binding.length));
       auto data = memory.mutable_data();
 
       dispatch_state->args.push_back(data);

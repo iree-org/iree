@@ -207,7 +207,8 @@ class VMLAModuleState final {
   StatusOr<vm::ref<Buffer>> InterfaceBinding(vm::ref<Interface> interface,
                                              int32_t set, int32_t binding) {
     IREE_TRACE_SCOPE0("VMLAModuleState::InterfaceBinding");
-    ASSIGN_OR_RETURN(const auto& value, interface->GetBinding(set, binding));
+    IREE_ASSIGN_OR_RETURN(const auto& value,
+                          interface->GetBinding(set, binding));
     return vm::retain_ref(value.buffer);
   }
 
@@ -234,7 +235,7 @@ class VMLAModuleState final {
 
   StatusOr<vm::ref<Buffer>> BufferClone(vm::ref<Buffer> src) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferClone");
-    ASSIGN_OR_RETURN(auto dst, Buffer::Allocate(src->size(), allocator_));
+    IREE_ASSIGN_OR_RETURN(auto dst, Buffer::Allocate(src->size(), allocator_));
     std::memcpy(dst->data(), src->data(), dst->size());
     return std::move(dst);
   }
@@ -289,10 +290,10 @@ class VMLAModuleState final {
     if (byte_length == kVMLAWholeBuffer) {
       byte_length = src->size() - src_byte_offset;
     }
-    ASSIGN_OR_RETURN(auto src_bytes,
-                     src->RangeAs<const uint8_t>(src_byte_offset, byte_length));
-    ASSIGN_OR_RETURN(auto dst_bytes,
-                     dst->RangeAs<uint8_t>(dst_byte_offset, byte_length));
+    IREE_ASSIGN_OR_RETURN(auto src_bytes, src->RangeAs<const uint8_t>(
+                                              src_byte_offset, byte_length));
+    IREE_ASSIGN_OR_RETURN(auto dst_bytes,
+                          dst->RangeAs<uint8_t>(dst_byte_offset, byte_length));
     std::memcpy(dst_bytes.data(), src_bytes.data(), dst_bytes.size());
     return OkStatus();
   }
@@ -320,8 +321,8 @@ class VMLAModuleState final {
   StatusOr<int32_t> BufferLoadI32(vm::ref<Buffer> src,
                                   iree_vmla_size_t byte_offset) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferLoadI32");
-    ASSIGN_OR_RETURN(auto data,
-                     src->RangeAs<int32_t>(byte_offset, sizeof(int32_t)));
+    IREE_ASSIGN_OR_RETURN(auto data,
+                          src->RangeAs<int32_t>(byte_offset, sizeof(int32_t)));
     return data[0];
   }
 

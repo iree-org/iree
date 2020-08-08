@@ -699,7 +699,7 @@ void StatusOr<T>::IgnoreError() const {
 // Executes an expression `rexpr` that returns a `iree::StatusOr<T>`. On OK,
 // moves its value into the variable defined by `lhs`, otherwise returns
 // from the current function.
-#define ASSIGN_OR_RETURN(...)                                    \
+#define IREE_ASSIGN_OR_RETURN(...)                               \
   IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
       (__VA_ARGS__, IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_, \
        IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_))             \

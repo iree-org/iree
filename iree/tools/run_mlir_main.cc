@@ -272,7 +272,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
   IREE_TRACE_SCOPE0("EvaluateFunction");
 
   std::cout << "EXEC @" << export_name << std::endl;
-  ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   vm::ref<iree_vm_list_t> inputs;
   if (!input_values_file_flag.empty()) {
     if (!input_values_flag.empty()) {
@@ -280,18 +280,18 @@ Status EvaluateFunction(iree_vm_context_t* context,
              << "Expected only one of input_values and "
                 "input_values_file to be set";
     }
-    ASSIGN_OR_RETURN(inputs,
-                     ParseToVariantListFromFile(input_descs, allocator,
-                                                input_values_file_flag));
+    IREE_ASSIGN_OR_RETURN(inputs,
+                          ParseToVariantListFromFile(input_descs, allocator,
+                                                     input_values_file_flag));
   } else {
     auto input_values_list = absl::MakeConstSpan(
         input_values_flag.empty() ? nullptr : &input_values_flag.front(),
         input_values_flag.size());
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         inputs, ParseToVariantList(input_descs, allocator, input_values_list));
   }
 
-  ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
@@ -399,13 +399,13 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
       iree_vm_instance_create(iree_allocator_system(), &instance))
       << "Create instance";
 
-  ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
+  IREE_ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
   for (const auto& target_backend : target_backends) {
     // Prepare the module for execution and evaluate it.
     IREE_TRACE_FRAME_MARK();
     auto cloned_file_buffer = llvm::MemoryBuffer::getMemBufferCopy(
         file_buffer->getBuffer(), file_buffer->getBufferIdentifier());
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         auto flatbuffer_data,
         PrepareModule(target_backend + '*', std::move(cloned_file_buffer)),
         _ << "Translating module");

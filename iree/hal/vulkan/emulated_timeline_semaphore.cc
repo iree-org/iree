@@ -90,7 +90,8 @@ Status EmulatedTimelineSemaphore::Wait(uint64_t value, Time deadline_ns) {
     IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::Wait#loop");
     // First try to advance the timeline without blocking to see whether we've
     // already reached the desired value.
-    ASSIGN_OR_RETURN(bool reached_desired_value, TryToAdvanceTimeline(value));
+    IREE_ASSIGN_OR_RETURN(bool reached_desired_value,
+                          TryToAdvanceTimeline(value));
     if (reached_desired_value) return OkStatus();
 
     // We must wait now. Find the first emulated time point that has a value >=
@@ -186,7 +187,8 @@ StatusOr<VkSemaphore> EmulatedTimelineSemaphore::GetSignalSemaphore(
     if ((*insertion_point)->value > value) break;
   }
 
-  ASSIGN_OR_RETURN(TimePointSemaphore * semaphore, semaphore_pool_->Acquire());
+  IREE_ASSIGN_OR_RETURN(TimePointSemaphore * semaphore,
+                        semaphore_pool_->Acquire());
   semaphore->value = value;
   semaphore->signal_fence = add_ref(signal_fence);
   if (semaphore->wait_fence) {

@@ -96,10 +96,10 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
 
   // Find the layers and extensions we need (or want) that are also available
   // on the instance. This will fail when required ones are not present.
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto enabled_layer_names,
       MatchAvailableInstanceLayers(options.instance_extensibility, *syms));
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto enabled_extension_names,
       MatchAvailableInstanceExtensions(options.instance_extensibility, *syms));
   auto instance_extensions =
@@ -153,13 +153,14 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   // TODO(benvanik): strip in release builds.
   std::unique_ptr<DebugReporter> debug_reporter;
   if (instance_extensions.debug_utils) {
-    ASSIGN_OR_RETURN(debug_reporter, DebugReporter::CreateDebugUtilsMessenger(
-                                         instance, syms,
-                                         /*allocation_callbacks=*/nullptr));
+    IREE_ASSIGN_OR_RETURN(debug_reporter,
+                          DebugReporter::CreateDebugUtilsMessenger(
+                              instance, syms,
+                              /*allocation_callbacks=*/nullptr));
   } else if (instance_extensions.debug_report) {
-    ASSIGN_OR_RETURN(debug_reporter,
-                     DebugReporter::CreateDebugReportCallback(
-                         instance, syms, /*allocation_callbacks=*/nullptr));
+    IREE_ASSIGN_OR_RETURN(
+        debug_reporter, DebugReporter::CreateDebugReportCallback(
+                            instance, syms, /*allocation_callbacks=*/nullptr));
   }
 
   return assign_ref(new VulkanDriver(std::move(syms), instance,
@@ -185,7 +186,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
   // Since the instance is already created, we can't actually enable any
   // extensions or query if they are really enabled - we just have to trust
   // that the caller already enabled them for us (or we may fail later).
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto enabled_extension_names,
       MatchAvailableInstanceExtensions(options.instance_extensibility, *syms));
   auto instance_extensions =
@@ -196,13 +197,14 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
   // TODO(benvanik): strip in release builds.
   std::unique_ptr<DebugReporter> debug_reporter;
   if (instance_extensions.debug_utils) {
-    ASSIGN_OR_RETURN(debug_reporter, DebugReporter::CreateDebugUtilsMessenger(
-                                         instance, syms,
-                                         /*allocation_callbacks=*/nullptr));
+    IREE_ASSIGN_OR_RETURN(debug_reporter,
+                          DebugReporter::CreateDebugUtilsMessenger(
+                              instance, syms,
+                              /*allocation_callbacks=*/nullptr));
   } else if (instance_extensions.debug_report) {
-    ASSIGN_OR_RETURN(debug_reporter,
-                     DebugReporter::CreateDebugReportCallback(
-                         instance, syms, /*allocation_callbacks=*/nullptr));
+    IREE_ASSIGN_OR_RETURN(
+        debug_reporter, DebugReporter::CreateDebugReportCallback(
+                            instance, syms, /*allocation_callbacks=*/nullptr));
   }
 
   // Note: no RenderDocCaptureManager here since the VkInstance is already
@@ -253,8 +255,8 @@ StatusOr<std::vector<DeviceInfo>> VulkanDriver::EnumerateAvailableDevices() {
   device_infos.reserve(physical_device_count);
   for (auto physical_device : physical_devices) {
     // TODO(benvanik): if we fail should we just ignore the device in the list?
-    ASSIGN_OR_RETURN(auto device_info,
-                     PopulateDeviceInfo(physical_device, syms()));
+    IREE_ASSIGN_OR_RETURN(auto device_info,
+                          PopulateDeviceInfo(physical_device, syms()));
     device_infos.push_back(std::move(device_info));
   }
   return device_infos;
@@ -264,7 +266,7 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDefaultDevice");
 
   // Query available devices.
-  ASSIGN_OR_RETURN(auto available_devices, EnumerateAvailableDevices());
+  IREE_ASSIGN_OR_RETURN(auto available_devices, EnumerateAvailableDevices());
   int default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
   if (default_device_index < 0 ||
       default_device_index >= available_devices.size()) {
@@ -281,16 +283,17 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDevice");
 
   auto physical_device = reinterpret_cast<VkPhysicalDevice>(device_id);
-  ASSIGN_OR_RETURN(auto device_info,
-                   PopulateDeviceInfo(physical_device, syms()));
+  IREE_ASSIGN_OR_RETURN(auto device_info,
+                        PopulateDeviceInfo(physical_device, syms()));
 
   // Attempt to create the device.
   // This may fail if the device was enumerated but is in exclusive use,
   // disabled by the system, or permission is denied.
-  ASSIGN_OR_RETURN(auto device, VulkanDevice::Create(
-                                    add_ref(this), instance(), device_info,
-                                    physical_device, device_extensibility_spec_,
-                                    syms(), renderdoc_capture_manager_.get()));
+  IREE_ASSIGN_OR_RETURN(
+      auto device,
+      VulkanDevice::Create(add_ref(this), instance(), device_info,
+                           physical_device, device_extensibility_spec_, syms(),
+                           renderdoc_capture_manager_.get()));
 
   LOG(INFO) << "Created Vulkan Device: " << device->info().name();
 
@@ -302,12 +305,12 @@ StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set) {
   IREE_TRACE_SCOPE0("VulkanDriver::WrapDevice");
 
-  ASSIGN_OR_RETURN(auto device_info,
-                   PopulateDeviceInfo(physical_device, syms()));
+  IREE_ASSIGN_OR_RETURN(auto device_info,
+                        PopulateDeviceInfo(physical_device, syms()));
 
   // Attempt to create the device.
   // This may fail if the VkDevice does not support all necessary features.
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto device,
       VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
                          logical_device, device_extensibility_spec_,

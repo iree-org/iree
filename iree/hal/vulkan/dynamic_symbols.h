@@ -57,7 +57,7 @@ struct FunctionPtrInfo;
 // https://github.com/KhronosGroup/Vulkan-Hpp#extensions--per-device-function-pointers
 //
 // Usage:
-//  ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
+//  IREE_ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
 //  VkInstance instance = VK_NULL_HANDLE;
 //  syms->vkCreateInstance(..., &instance);
 //  IREE_RETURN_IF_ERROR(syms->LoadFromInstance(instance));

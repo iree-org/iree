@@ -80,7 +80,7 @@ class Buffer final : public RefObject<Buffer> {
   template <typename T>
   StatusOr<absl::Span<T>> RangeAs(iree_vmla_size_t byte_offset,
                                   iree_vmla_size_t byte_length) {
-    ASSIGN_OR_RETURN(auto byte_range, MakeRange(byte_offset, byte_length));
+    IREE_ASSIGN_OR_RETURN(auto byte_range, MakeRange(byte_offset, byte_length));
     return ReinterpretSpan<T>(byte_range);
   }
 

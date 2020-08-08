@@ -246,13 +246,13 @@ class CheckModuleState final {
       os << "\n"
             "  lhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
+      IREE_ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
       os << lhs_str;
 
       os << "\n"
             "  rhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
+      IREE_ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
       os << rhs_str;
 
       // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
@@ -297,7 +297,7 @@ class CheckModuleState final {
     // Only check contents if shape and element type match. Otherwise we can't.
     bool contents_could_be_almost_eq = true;
     if (element_types_eq && shape_eq) {
-      ASSIGN_OR_RETURN(
+      IREE_ASSIGN_OR_RETURN(
           contents_could_be_almost_eq,
           AlmostEqByteSpan(lhs_mapped_memory.contents,
                            rhs_mapped_memory.contents, lhs_element_type));
@@ -321,13 +321,13 @@ class CheckModuleState final {
       os << "\n"
             "  lhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
+      IREE_ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
       os << lhs_str;
 
       os << "\n"
             "  rhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
+      IREE_ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
       os << rhs_str;
 
       // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.

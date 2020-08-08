@@ -150,7 +150,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceVisibleBuffer(
   memory_type |= MemoryType::kDeviceVisible;
 
   // Find an allocator that works for device-visible buffers.
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto* allocator,
       FindCompatibleAllocator(memory_type, buffer_usage, device_placements));
   return allocator->Allocate(memory_type, buffer_usage, allocation_size);
@@ -169,7 +169,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceLocalBuffer(
   }
 
   // Find an allocator that works for device-local buffers.
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto* allocator,
       FindCompatibleAllocator(memory_type, buffer_usage, device_placements));
   return allocator->Allocate(memory_type, buffer_usage, allocation_size);
