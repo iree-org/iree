@@ -20,11 +20,11 @@
 #include "iree/base/api_util.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
-#include "iree/testing/status_matchers.h"
 #include "iree/hal/api.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -47,7 +47,8 @@ class CheckTest : public ::testing::Test {
         iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
     iree_hal_driver_release(hal_driver);
 
-    IREE_ASSERT_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_ASSERT_OK(
+        iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_ASSERT_OK(
         check_native_module_create(iree_allocator_system(), &check_module_))
@@ -125,10 +126,10 @@ class CheckTest : public ::testing::Test {
            static_cast<const void*>(contents.data()),
            mapped_memory.contents.data_length);
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
-    IREE_ASSERT_OK(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
-                                    IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-                                    iree_allocator_system(), &*out_buffer_view));
+    IREE_ASSERT_OK(iree_hal_buffer_view_create(
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, iree_allocator_system(),
+        &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(absl::Span<const double> contents,
@@ -154,52 +155,42 @@ class CheckTest : public ::testing::Test {
            static_cast<const void*>(contents.data()),
            mapped_memory.contents.data_length);
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
-    IREE_ASSERT_OK(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
-                                    IREE_HAL_ELEMENT_TYPE_FLOAT_64,
-                                    iree_allocator_system(), &*out_buffer_view));
+    IREE_ASSERT_OK(iree_hal_buffer_view_create(
+        buffer.get(), shape.data(), shape.size(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_64, iree_allocator_system(),
+        &*out_buffer_view));
   }
 
   Status Invoke(absl::string_view function_name) {
     iree_vm_function_t function;
-    RETURN_IF_ERROR(FromApiStatus(
-        check_module_->lookup_function(
-            check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-            iree_string_view_t{function_name.data(), function_name.size()},
-            &function),
-        IREE_LOC))
+    RETURN_IF_ERROR(check_module_->lookup_function(
+        check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        iree_string_view_t{function_name.data(), function_name.size()},
+        &function))
         << "Exported function '" << function_name << "' not found";
     // TODO(#2075): don't directly invoke native functions like this.
-    return FromApiStatus(
-        iree_vm_invoke(context_, function,
-                       /*policy=*/nullptr, inputs_.get(),
-                       /*outputs=*/nullptr, iree_allocator_system()),
-        IREE_LOC);
+    return iree_vm_invoke(context_, function,
+                          /*policy=*/nullptr, inputs_.get(),
+                          /*outputs=*/nullptr, iree_allocator_system());
   }
 
   Status Invoke(absl::string_view function_name,
                 std::vector<iree_vm_value> args) {
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
-                                          iree_allocator_system(), &inputs_),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+                                        iree_allocator_system(), &inputs_));
     for (iree_vm_value& arg : args) {
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_vm_list_push_value(inputs_.get(), &arg), IREE_LOC));
+      RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
     }
     return Invoke(function_name);
   }
 
   Status Invoke(absl::string_view function_name,
                 std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
-                                          iree_allocator_system(), &inputs_),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+                                        iree_allocator_system(), &inputs_));
     for (auto& arg : args) {
       iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_vm_list_push_ref_retain(inputs_.get(), &arg_ref), IREE_LOC));
+      RETURN_IF_ERROR(iree_vm_list_push_ref_retain(inputs_.get(), &arg_ref));
     }
     return Invoke(function_name);
   }

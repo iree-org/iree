@@ -31,12 +31,11 @@ static iree_vm_ref_type_descriptor_t Interface_descriptor = {0};
 IREE_VM_DEFINE_TYPE_ADAPTERS(Buffer, iree::hal::vmla::Buffer);
 IREE_VM_DEFINE_TYPE_ADAPTERS(Interface, iree::hal::vmla::Interface);
 
-#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor)             \
-  descriptor.type_name = iree_make_cstring_view(name);                 \
-  descriptor.offsetof_counter = type::offsetof_counter();              \
-  descriptor.destroy = type::DirectDestroy;                            \
-  RETURN_IF_ERROR(                                                     \
-      FromApiStatus(iree_vm_ref_register_type(&descriptor), IREE_LOC)) \
+#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor) \
+  descriptor.type_name = iree_make_cstring_view(name);     \
+  descriptor.offsetof_counter = type::offsetof_counter();  \
+  descriptor.destroy = type::DirectDestroy;                \
+  RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor))  \
       << "Failed to register type " << name;
 
 namespace iree {
@@ -62,8 +61,7 @@ Status ModuleRegisterTypes() {
 StatusOr<vm::ref<Buffer>> Buffer::Allocate(size_t byte_length,
                                            iree_allocator_t allocator) {
   void* data = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_allocator_malloc(allocator, byte_length, &data), IREE_LOC))
+  RETURN_IF_ERROR(iree_allocator_malloc(allocator, byte_length, &data))
       << "Failed to allocate buffer of size " << byte_length;
 
   auto buffer = vm::assign_ref(new Buffer());

@@ -160,10 +160,8 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
   if (target_backends.empty()) {
     iree_string_view_t* driver_names = nullptr;
     iree_host_size_t driver_count = 0;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_driver_registry_query_available_drivers(
-                          iree_allocator_system(), &driver_names, &driver_count),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
+        iree_allocator_system(), &driver_names, &driver_count));
     for (int i = 0; i < driver_count; ++i) {
       target_backends.push_back(
           std::string(driver_names[i].data, driver_names[i].size));
@@ -296,16 +294,14 @@ Status EvaluateFunction(iree_vm_context_t* context,
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
-                          iree_allocator_system(), &outputs),
-      IREE_LOC));
+  RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
+                                      output_descs.size(),
+                                      iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                     outputs.get(), iree_allocator_system()),
-      IREE_LOC));
+  RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
+                                 inputs.get(), outputs.get(),
+                                 iree_allocator_system()));
 
   // Print outputs.
   RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
@@ -343,11 +339,9 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
     iree_string_view_t export_name_isv;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
-                          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                          ordinal, &function, &export_name_isv),
-                      IREE_LOC))
+    RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+        bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
+        &export_name_isv))
         << "Looking up function export " << ordinal;
     absl::string_view export_name(export_name_isv.data, export_name_isv.size);
     if (absl::StartsWith(export_name, "__") ||
@@ -362,10 +356,9 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     // runner).
     iree_vm_context_t* context = nullptr;
     std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-    RETURN_IF_ERROR(FromApiStatus(iree_vm_context_create_with_modules(
-                                      instance, modules.data(), modules.size(),
-                                      iree_allocator_system(), &context),
-                                  IREE_LOC))
+    RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+        instance, modules.data(), modules.size(), iree_allocator_system(),
+        &context))
         << "Creating context";
 
     // Invoke the function and print results.
@@ -398,12 +391,10 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
   IREE_TRACE_SCOPE0("EvaluateFile");
 
   // TODO(benvanik): move to instance-based registration.
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
-      << "Registering HAL types";
+  RETURN_IF_ERROR(iree_hal_module_register_types()) << "Registering HAL types";
 
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC))
+  RETURN_IF_ERROR(iree_vm_instance_create(iree_allocator_system(), &instance))
       << "Create instance";
 
   ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());

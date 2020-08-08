@@ -69,11 +69,9 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
 Status Run(::benchmark::State& state) {
   IREE_TRACE_SCOPE0("iree-benchmark-module");
 
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
-      << "registering HAL types";
+  RETURN_IF_ERROR(iree_hal_module_register_types()) << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC))
+  RETURN_IF_ERROR(iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
   ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
@@ -88,20 +86,17 @@ Status Run(::benchmark::State& state) {
   iree_vm_context_t* context = nullptr;
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_context_create_with_modules(
-                                    instance, modules.data(), modules.size(),
-                                    iree_allocator_system(), &context),
-                                IREE_LOC))
+  RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+      instance, modules.data(), modules.size(), iree_allocator_system(),
+      &context))
       << "creating context";
 
   std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
-  RETURN_IF_ERROR(FromApiStatus(
-      input_module->lookup_function(
-          input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-          iree_string_view_t{function_name.data(), function_name.size()},
-          &function),
-      IREE_LOC))
+  RETURN_IF_ERROR(input_module->lookup_function(
+      input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      iree_string_view_t{function_name.data(), function_name.size()},
+      &function))
       << "looking up function '" << function_name << "'";
 
   RETURN_IF_ERROR(ValidateFunctionAbi(function));
@@ -129,14 +124,12 @@ Status Run(::benchmark::State& state) {
   // future debugging.
   {
     vm::ref<iree_vm_list_t> outputs;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
-                            iree_allocator_system(), &outputs),
-        IREE_LOC));
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                       outputs.get(), iree_allocator_system()),
-        IREE_LOC));
+    RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
+                                        output_descs.size(),
+                                        iree_allocator_system(), &outputs));
+    RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
+                                   inputs.get(), outputs.get(),
+                                   iree_allocator_system()));
   }
 
   for (auto _ : state) {

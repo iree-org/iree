@@ -80,29 +80,25 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
 
   // Load bytecode module from the executable spec.
   iree_vm_module_t* bytecode_module = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_bytecode_module_create(
-          iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(
-                                     executable_def->bytecode_module()->data()),
-                                 executable_def->bytecode_module()->size()},
-          iree_allocator_null(), iree_allocator_system(), &bytecode_module),
-      IREE_LOC))
+  RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+      iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(
+                                 executable_def->bytecode_module()->data()),
+                             executable_def->bytecode_module()->size()},
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module))
       << "Failed to load executable bytecode module";
 
   entry_functions_.resize(
       iree_vm_module_signature(bytecode_module).export_function_count);
   for (int i = 0; i < entry_functions_.size(); ++i) {
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
-                          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-                          &entry_functions_[i], nullptr),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+        bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
+        &entry_functions_[i], nullptr));
   }
 
   // Create context and initialize shared state. Note that each executable here
   // has its own context (and thus its own vmla.interface instance).
   std::array<iree_vm_module_t*, 2> modules = {vmla_module, bytecode_module};
-  auto result = FromApiStatus(iree_vm_context_create_with_modules(
+  auto result = StatusBuilder(iree_vm_context_create_with_modules(
                                   instance, modules.data(), modules.size(),
                                   iree_allocator_system(), &context_),
                               IREE_LOC)
@@ -165,24 +161,20 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
 
   auto* input_list_storage = alloca(dispatch_state->input_list_size);
   iree_vm_list_t* input_list = nullptr;
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_list_initialize(
-                        iree_make_byte_span(input_list_storage,
-                                            dispatch_state->input_list_size),
-                        /*element_type=*/nullptr,
-                        /*interface*/ 1 + /*workgroup_xyz[3]*/ 3, &input_list),
-                    IREE_LOC));
+  RETURN_IF_ERROR(iree_vm_list_initialize(
+      iree_make_byte_span(input_list_storage, dispatch_state->input_list_size),
+      /*element_type=*/nullptr,
+      /*interface*/ 1 + /*workgroup_xyz[3]*/ 3, &input_list));
   iree_vm_list_push_ref_retain(input_list, &dispatch_state->interface_ref);
   for (int i = 0; i < workgroup_xyz.size(); ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(workgroup_xyz[i]);
     iree_vm_list_push_value(input_list, &value);
   }
 
-  auto status = FromApiStatus(
-      iree_vm_invoke(context(), dispatch_state->function,
-                     /*policy=*/nullptr, input_list,
-                     /*outputs=*/nullptr, iree_allocator_system()),
-      IREE_LOC);
+  auto status =
+      Status(iree_vm_invoke(context(), dispatch_state->function,
+                            /*policy=*/nullptr, input_list,
+                            /*outputs=*/nullptr, iree_allocator_system()));
 
   iree_vm_list_deinitialize(input_list);
 

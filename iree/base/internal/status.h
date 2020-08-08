@@ -89,6 +89,8 @@ class ABSL_MUST_USE_RESULT Status final {
   // Creates an OK status with no message.
   Status() = default;
 
+  Status(iree_status_t status);
+
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.
   Status(StatusCode code, absl::string_view message);
@@ -154,6 +156,14 @@ std::ostream& operator<<(std::ostream& os, const Status& x);
 // Returns a Status that is identical to `s` except that the message()
 // has been augmented by adding `msg` to the end of the original message.
 Status Annotate(const Status& s, absl::string_view msg);
+
+ABSL_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
+  return status.code() == StatusCode::kOk;
+}
+
+ABSL_MUST_USE_RESULT static inline bool IsOk(iree_status_t status) {
+  return iree_status_is_ok(status);
+}
 
 ABSL_MUST_USE_RESULT static inline bool IsAborted(const Status& status) {
   return status.code() == StatusCode::kAborted;

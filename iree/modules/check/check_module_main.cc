@@ -82,11 +82,9 @@ class CheckModuleTest : public ::testing::Test {
 StatusOr<int> Run(std::string input_file_path) {
   IREE_TRACE_SCOPE0("iree-check-module");
 
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
-      << "registering HAL types";
+  RETURN_IF_ERROR(iree_hal_module_register_types()) << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(iree_allocator_system(), &instance), IREE_LOC))
+  RETURN_IF_ERROR(iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
   std::string module_data;
@@ -114,11 +112,9 @@ StatusOr<int> Run(std::string input_file_path) {
        ++ordinal) {
     iree_vm_function_t function;
     iree_string_view_t export_name_sv;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
-                          input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                          ordinal, &function, &export_name_sv),
-                      IREE_LOC))
+    RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+        input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
+        &export_name_sv))
         << "Looking up function export " << ordinal;
 
     // TODO(gcmn): Implicit conversion from iree to absl string view.

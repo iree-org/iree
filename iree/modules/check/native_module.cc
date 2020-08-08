@@ -56,9 +56,7 @@ StatusOr<std::string> BufferViewToString(iree_hal_buffer_view_t* buffer_view) {
         &result_str[0], &actual_length);
     result_str.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC);
-  }
+  RETURN_IF_ERROR(std::move(status));
   return std::move(result_str);
 }
 
@@ -113,10 +111,8 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
     }
   }
   char element_type_str[16];
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_format_element_type(element_type, sizeof(element_type_str),
-                                   element_type_str, nullptr),
-      IREE_LOC));
+  RETURN_IF_ERROR(iree_hal_format_element_type(
+      element_type, sizeof(element_type_str), element_type_str, nullptr));
   return InvalidArgumentErrorBuilder(IREE_LOC)
          << "Unsupported element type " << element_type_str;
 }
@@ -154,10 +150,8 @@ Status ExpectAllTrue(iree_byte_span_t bytes,
     }
   }
   char element_type_str[16];
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_format_element_type(element_type, sizeof(element_type_str),
-                                   element_type_str, nullptr),
-      IREE_LOC));
+  RETURN_IF_ERROR(iree_hal_format_element_type(
+      element_type, sizeof(element_type_str), element_type_str, nullptr));
   return InvalidArgumentErrorBuilder(IREE_LOC)
          << "Unsupported element type " << element_type_str;
 }
@@ -190,10 +184,9 @@ class CheckModuleState final {
         iree_hal_buffer_view_element_type(view);
     iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
     iree_hal_mapped_memory_t mapped_memory;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_map(buf, IREE_HAL_MEMORY_ACCESS_READ, /*byte_offset=*/0,
-                            IREE_WHOLE_BUFFER, &mapped_memory),
-        IREE_LOC));
+    RETURN_IF_ERROR(iree_hal_buffer_map(buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                        /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                        &mapped_memory));
     RETURN_IF_ERROR(
         ::iree::ExpectAllTrue(mapped_memory.contents, element_type));
     iree_hal_buffer_unmap(buf, &mapped_memory);
@@ -206,15 +199,13 @@ class CheckModuleState final {
     auto* rhs = rhs_ref.get();
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
     absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr),
-        IREE_LOC));
+    RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
 
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
     absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr),
-        IREE_LOC));
+    RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr));
 
     iree_hal_element_type_t lhs_element_type =
         iree_hal_buffer_view_element_type(lhs);
@@ -223,18 +214,14 @@ class CheckModuleState final {
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
     iree_hal_mapped_memory_t lhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &lhs_mapped_memory),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                        /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                        &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
     iree_hal_mapped_memory_t rhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &rhs_mapped_memory),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                        /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                        &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;
@@ -281,15 +268,13 @@ class CheckModuleState final {
     auto* rhs = rhs_ref.get();
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
     absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr),
-        IREE_LOC));
+    RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
 
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
     absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr),
-        IREE_LOC));
+    RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr));
 
     iree_hal_element_type_t lhs_element_type =
         iree_hal_buffer_view_element_type(lhs);
@@ -298,18 +283,14 @@ class CheckModuleState final {
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
     iree_hal_mapped_memory_t lhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &lhs_mapped_memory),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                        /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                        &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
     iree_hal_mapped_memory_t rhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &rhs_mapped_memory),
-                      IREE_LOC));
+    RETURN_IF_ERROR(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                        /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                        &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;

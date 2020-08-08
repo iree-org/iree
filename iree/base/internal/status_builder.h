@@ -35,6 +35,10 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   // current location.
   explicit StatusBuilder(StatusCode code, SourceLocation location);
 
+  explicit StatusBuilder(iree_status_t status, SourceLocation location)
+      : status_(static_cast<StatusCode>(iree_status_code(status)), ""),
+        loc_(location) {}
+
   StatusBuilder(const StatusBuilder& sb);
   StatusBuilder& operator=(const StatusBuilder& sb);
   StatusBuilder(StatusBuilder&&) = default;
@@ -58,6 +62,13 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   // Implicit conversion to Status.
   operator Status() const&;
   operator Status() &&;
+
+  // TODO(#265): toll-free result.
+  operator iree_status_t() && {
+    return iree_status_allocate(static_cast<iree_status_code_t>(status_.code()),
+                                loc_.file_name(), loc_.line(),
+                                iree_string_view_empty());
+  }
 
   friend bool operator==(const StatusBuilder& lhs, const StatusCode& rhs) {
     return lhs.code() == rhs;
@@ -171,7 +182,10 @@ StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
 
 #define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_(var, expr) \
   auto var = (expr);                                        \
-  if (IREE_UNLIKELY(!var.ok()))                             \
+  if (IREE_UNLIKELY(!::iree::IsOk(var)))                    \
   return ::iree::StatusBuilder(std::move(var), IREE_LOC)
+
+#undef IREE_RETURN_IF_ERROR
+#define IREE_RETURN_IF_ERROR(expr, ...) RETURN_IF_ERROR(expr)
 
 #endif  // IREE_BASE_INTERNAL_STATUS_BUILDER_H_

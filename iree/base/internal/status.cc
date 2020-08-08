@@ -26,6 +26,16 @@ std::ostream& operator<<(std::ostream& os, const StatusCode& x) {
   return os;
 }
 
+Status::Status(iree_status_t status) {
+  // TODO(#265): just store status.
+  if (!iree_status_is_ok(status)) {
+    state_ = std::make_unique<State>();
+    state_->code = static_cast<StatusCode>(iree_status_code(status));
+    state_->message = std::string("TODO");
+    iree_status_ignore(status);
+  }
+}
+
 Status::Status(StatusCode code, absl::string_view message) {
   if (code != StatusCode::kOk) {
     state_ = std::make_unique<State>();

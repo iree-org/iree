@@ -2073,7 +2073,7 @@ iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_fail");
   IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  handle->Fail(FromApiStatus(status, IREE_LOC));
+  handle->Fail(std::move(status));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL

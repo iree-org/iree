@@ -381,7 +381,9 @@ cc_test(
 cc_library(
     name = "status",
     hdrs = ["status.h"],
-    deps = platform_trampoline_deps("status"),
+    deps = [
+        "//iree/base/internal:status",
+    ],
 )
 
 cc_test(

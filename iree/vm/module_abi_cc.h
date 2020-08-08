@@ -79,8 +79,7 @@ class NativeModule {
   NativeModule(const char* name, iree_allocator_t allocator,
                absl::Span<const NativeFunction<State>> dispatch_table)
       : name_(name), allocator_(allocator), dispatch_table_(dispatch_table) {
-    CHECK_OK(
-        FromApiStatus(iree_vm_module_initialize(&interface_, this), IREE_LOC));
+    IREE_CHECK_OK(iree_vm_module_initialize(&interface_, this));
     interface_.destroy = NativeModule::ModuleDestroy;
     interface_.name = NativeModule::ModuleName;
     interface_.signature = NativeModule::ModuleSignature;

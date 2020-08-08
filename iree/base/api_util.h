@@ -30,11 +30,6 @@ inline iree_status_t ToApiStatus(const Status& status) {
   return iree_make_status(static_cast<iree_status_code_t>(status.code()));
 }
 
-inline StatusBuilder FromApiStatus(iree_status_t status_code,
-                                   SourceLocation loc) {
-  return StatusBuilder(static_cast<StatusCode>(status_code), loc);
-}
-
 // Internal helper for concatenating macro values.
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \

@@ -21,11 +21,9 @@ namespace java {
 
 Status ModuleWrapper::Create(const uint8_t* flatbuffer_data,
                              iree_host_size_t length) {
-  return FromApiStatus(
-      iree_vm_bytecode_module_create(
-          iree_const_byte_span_t{flatbuffer_data, length},
-          iree_allocator_null(), iree_allocator_system(), &module_),
-      IREE_LOC);
+  return iree_vm_bytecode_module_create(
+      iree_const_byte_span_t{flatbuffer_data, length}, iree_allocator_null(),
+      iree_allocator_system(), &module_);
 }
 
 iree_vm_module_t* ModuleWrapper::module() const { return module_; }
