@@ -50,7 +50,11 @@ class SourceLocation {
 
 // If a function takes an `iree::SourceLocation` parameter, pass this as the
 // argument.
+#if IREE_STATUS_FEATURES == 0
+#define IREE_LOC ::iree::SourceLocation(0, NULL)
+#else
 #define IREE_LOC ::iree::SourceLocation(__LINE__, __FILE__)
+#endif  // IREE_STATUS_FEATURES == 0
 
 enum class StatusCode : uint32_t {
   kOk = IREE_STATUS_OK,

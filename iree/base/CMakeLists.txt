@@ -34,7 +34,6 @@ iree_cc_library(
     "api_time.cc"
   DEPS
     ::api_hdrs
-    ::api_util
     ::tracing
   PUBLIC
 )

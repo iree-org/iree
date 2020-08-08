@@ -127,6 +127,13 @@ inline StatusBuilder& StatusBuilder::operator=(const StatusBuilder& sb) {
   return *this;
 }
 
+// Disable << streaming when status messages are disabled.
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
+template <typename T>
+StatusBuilder& StatusBuilder::operator<<(const T& value) & {
+  return *this;
+}
+#else
 template <typename T>
 StatusBuilder& StatusBuilder::operator<<(const T& value) & {
   if (status_.ok()) return *this;
@@ -134,6 +141,7 @@ StatusBuilder& StatusBuilder::operator<<(const T& value) & {
   rep_->stream << value;
   return *this;
 }
+#endif  // (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
 
 template <typename T>
 StatusBuilder&& StatusBuilder::operator<<(const T& value) && {

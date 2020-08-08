@@ -41,7 +41,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":api_hdrs",
-        ":api_util",
         ":tracing",
     ],
 )
