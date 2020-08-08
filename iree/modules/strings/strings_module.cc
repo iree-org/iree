@@ -58,8 +58,8 @@ class StringsModuleState final {
   StatusOr<vm::ref<strings_string_t>> I32ToString(int32_t value) {
     vm::ref<strings_string_t> new_string;
     std::string str = std::to_string(value);
-    RETURN_IF_ERROR(strings_string_create(iree_make_cstring_view(str.c_str()),
-                                          allocator_, &new_string));
+    IREE_RETURN_IF_ERROR(strings_string_create(
+        iree_make_cstring_view(str.c_str()), allocator_, &new_string));
     return new_string;
   }
 
@@ -115,8 +115,8 @@ class StringsModuleState final {
     StringTensorToStringHelper(str_tensor->values, str_tensor->shape,
                                str_tensor->rank, &str);
 
-    RETURN_IF_ERROR(strings_string_create(iree_make_cstring_view(str.c_str()),
-                                          allocator_, &new_string));
+    IREE_RETURN_IF_ERROR(strings_string_create(
+        iree_make_cstring_view(str.c_str()), allocator_, &new_string));
     return new_string;
   }
 
@@ -125,8 +125,8 @@ class StringsModuleState final {
       vm::ref<iree_hal_buffer_view_t> hal_buffer_view) {
     const size_t rank = iree_hal_buffer_view_shape_rank(hal_buffer_view.get());
     absl::InlinedVector<int32_t, 6> shape(rank);
-    RETURN_IF_ERROR(iree_hal_buffer_view_shape(hal_buffer_view.get(), rank,
-                                               shape.data(), nullptr));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(hal_buffer_view.get(), rank,
+                                                    shape.data(), nullptr));
 
     size_t num_elements = 1;
     for (auto val : shape) {
@@ -140,9 +140,9 @@ class StringsModuleState final {
     iree_hal_buffer_t* hal_buffer =
         iree_hal_buffer_view_buffer(hal_buffer_view.get());
     iree_hal_mapped_memory_t tensor_mapping;
-    RETURN_IF_ERROR(iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                        /*byte_offset=*/0, tensor_size,
-                                        &tensor_mapping));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                            /*byte_offset=*/0, tensor_size, &tensor_mapping));
 
     iree_hal_element_type_t type =
         iree_hal_buffer_view_element_type(hal_buffer_view.get());
@@ -196,7 +196,7 @@ class StringsModuleState final {
     }
 
     // Unmap used buffer.
-    RETURN_IF_ERROR(iree_hal_buffer_unmap(hal_buffer, &tensor_mapping));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(hal_buffer, &tensor_mapping));
 
     // Place into iree_string_views.
     std::vector<iree_string_view_t> string_views;
@@ -207,7 +207,7 @@ class StringsModuleState final {
     }
 
     strings_string_tensor_t* string_tensor;
-    RETURN_IF_ERROR(strings_string_tensor_create(
+    IREE_RETURN_IF_ERROR(strings_string_tensor_create(
         allocator_, string_views.data(), string_views.size(), shape.data(),
         rank, &string_tensor));
 
@@ -226,7 +226,7 @@ class StringsModuleState final {
 
     const size_t rank = iree_hal_buffer_view_shape_rank(ids.get());
     absl::InlinedVector<int32_t, 6> shape(rank);
-    RETURN_IF_ERROR(
+    IREE_RETURN_IF_ERROR(
         iree_hal_buffer_view_shape(ids.get(), rank, shape.data(), nullptr));
 
     size_t num_elements = 1;
@@ -239,9 +239,9 @@ class StringsModuleState final {
     size_t tensor_size = element_size * num_elements;
     iree_hal_buffer_t* hal_buffer = iree_hal_buffer_view_buffer(ids.get());
     iree_hal_mapped_memory_t tensor_mapping;
-    RETURN_IF_ERROR(iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                        /*byte_offset=*/0, tensor_size,
-                                        &tensor_mapping));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                            /*byte_offset=*/0, tensor_size, &tensor_mapping));
     iree_string_view_t str;
     const auto& contents = tensor_mapping.contents;
     std::vector<iree_string_view_t> string_views;
@@ -250,16 +250,16 @@ class StringsModuleState final {
     for (int32_t *p = (int32_t*)contents.data,
                  *s = (int32_t*)(contents.data + contents.data_length);
          p < s; p++) {
-      RETURN_IF_ERROR(
+      IREE_RETURN_IF_ERROR(
           strings_string_tensor_get_element(dict.get(), p, 1, &str));
       string_views.push_back(str);
     }
 
     // Unmap used buffer.
-    RETURN_IF_ERROR(iree_hal_buffer_unmap(hal_buffer, &tensor_mapping));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(hal_buffer, &tensor_mapping));
 
     strings_string_tensor_t* string_tensor;
-    RETURN_IF_ERROR(strings_string_tensor_create(
+    IREE_RETURN_IF_ERROR(strings_string_tensor_create(
         allocator_, string_views.data(), string_views.size(), shape.data(),
         rank, &string_tensor));
     return string_tensor;
@@ -298,7 +298,7 @@ class StringsModuleState final {
     }
 
     strings_string_tensor_t* string_tensor;
-    RETURN_IF_ERROR(strings_string_tensor_create(
+    IREE_RETURN_IF_ERROR(strings_string_tensor_create(
         allocator_, string_views.data(), string_views.size(), shape, new_rank,
         &string_tensor));
     return string_tensor;
@@ -348,7 +348,7 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
   StatusOr<std::unique_ptr<StringsModuleState>> CreateState(
       iree_allocator_t allocator) override {
     auto state = std::make_unique<StringsModuleState>(allocator);
-    RETURN_IF_ERROR(state->Initialize());
+    IREE_RETURN_IF_ERROR(state->Initialize());
     return state;
   }
 };

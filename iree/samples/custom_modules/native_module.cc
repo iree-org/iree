@@ -135,13 +135,13 @@ class CustomModuleState final {
   Status Initialize(int32_t unique_id) {
     // Allocate a unique ID to demonstrate per-context state.
     auto str_buffer = "ctx_" + std::to_string(unique_id);
-    RETURN_IF_ERROR(
+    IREE_RETURN_IF_ERROR(
         iree_custom_message_create(iree_make_cstring_view(str_buffer.c_str()),
                                    allocator_, &unique_message_));
 
     // Setup a host-local allocator we can use because this sample doesn't have
     // a real device allocator.
-    RETURN_IF_ERROR(iree_hal_allocator_create_host_local(
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_create_host_local(
         allocator_, &host_local_allocator_));
 
     return OkStatus();
@@ -160,11 +160,11 @@ class CustomModuleState final {
           string_value.size() + 1, &string_value[0], &actual_length);
       string_value.resize(actual_length);
     } while (iree_status_is_out_of_range(status));
-    RETURN_IF_ERROR(std::move(status));
+    IREE_RETURN_IF_ERROR(std::move(status));
 
     // Pack the string contents into a message.
     vm::ref<iree_custom_message_t> message;
-    RETURN_IF_ERROR(iree_custom_message_create(
+    IREE_RETURN_IF_ERROR(iree_custom_message_create(
         iree_string_view_t{string_value.data(), string_value.size()},
         iree_allocator_system(), &message));
     return std::move(message);
@@ -177,7 +177,7 @@ class CustomModuleState final {
     auto input_string =
         absl::string_view(message->value.data, message->value.size);
     vm::ref<iree_hal_buffer_view_t> buffer_view;
-    RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
         iree_string_view_t{input_string.data(), input_string.size()},
         host_local_allocator_.get(), allocator_, &buffer_view))
         << "Parsing value '" << input_string << "'";
@@ -198,7 +198,7 @@ class CustomModuleState final {
   StatusOr<vm::ref<iree_custom_message_t>> Reverse(
       vm::ref<iree_custom_message_t> message) {
     vm::ref<iree_custom_message_t> reversed_message;
-    RETURN_IF_ERROR(iree_custom_message_create(
+    IREE_RETURN_IF_ERROR(iree_custom_message_create(
         message->value, message->allocator, &reversed_message));
     char* str_ptr = const_cast<char*>(reversed_message->value.data);
     for (int low = 0, high = reversed_message->value.size - 1; low < high;
@@ -266,7 +266,7 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
   StatusOr<std::unique_ptr<CustomModuleState>> CreateState(
       iree_allocator_t allocator) override {
     auto state = std::make_unique<CustomModuleState>(allocator);
-    RETURN_IF_ERROR(state->Initialize(next_unique_id_++));
+    IREE_RETURN_IF_ERROR(state->Initialize(next_unique_id_++));
     return state;
   }
 

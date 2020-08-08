@@ -233,7 +233,7 @@ void* InProcCommandBuffer::AppendCmdData(const void* source_buffer,
 Status InProcCommandBuffer::Process(CommandBuffer* command_processor) const {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::Process");
 
-  RETURN_IF_ERROR(command_processor->Begin());
+  IREE_RETURN_IF_ERROR(command_processor->Begin());
 
   // Process each command in the order they were recorded.
   auto* cmd_list = &current_cmd_list_;
@@ -248,7 +248,7 @@ Status InProcCommandBuffer::Process(CommandBuffer* command_processor) const {
     }
   }
 
-  RETURN_IF_ERROR(command_processor->End());
+  IREE_RETURN_IF_ERROR(command_processor->End());
 
   return OkStatus();
 }

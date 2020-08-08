@@ -191,7 +191,7 @@ Status DeviceManager::WaitIdle(Time deadline_ns) {
   IREE_TRACE_SCOPE0("DeviceManager::WaitIdle");
   absl::MutexLock lock(&device_mutex_);
   for (const auto& device : devices_) {
-    RETURN_IF_ERROR(device->WaitIdle(deadline_ns));
+    IREE_RETURN_IF_ERROR(device->WaitIdle(deadline_ns));
   }
   return OkStatus();
 }

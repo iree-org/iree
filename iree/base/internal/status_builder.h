@@ -26,16 +26,17 @@ namespace iree {
 class ABSL_MUST_USE_RESULT StatusBuilder {
  public:
   // Creates a `StatusBuilder` based on an original status.
-  explicit StatusBuilder(const Status& original_status,
-                         SourceLocation location);
-  explicit StatusBuilder(Status&& original_status, SourceLocation location);
+  explicit StatusBuilder(const Status& original_status, SourceLocation location,
+                         ...);
+  explicit StatusBuilder(Status&& original_status, SourceLocation location,
+                         ...);
 
   // Creates a `StatusBuilder` from a status code.
   // A typical user will not specify `location`, allowing it to default to the
   // current location.
-  explicit StatusBuilder(StatusCode code, SourceLocation location);
+  explicit StatusBuilder(StatusCode code, SourceLocation location, ...);
 
-  explicit StatusBuilder(iree_status_t status, SourceLocation location)
+  explicit StatusBuilder(iree_status_t status, SourceLocation location, ...)
       : status_(static_cast<StatusCode>(iree_status_code(status)), ""),
         loc_(location) {}
 
@@ -174,18 +175,22 @@ StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
 
 }  // namespace iree
 
+// Override the C macro with our C++ one.
+// For files that only include the C API header they'll only support
+// iree_status_t results, while those including this header will support both.
+// StatusBuilder can take varargs to support the printf-style formatting of the
+// C macros.
+#undef IREE_RETURN_IF_ERROR
+
 // Evaluates an expression that produces a `iree::Status`. If the status is not
 // ok, returns it from the current function.
-#define RETURN_IF_ERROR(expr)               \
+#define IREE_RETURN_IF_ERROR(...)           \
   IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_( \
-      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), expr)
+      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), __VA_ARGS__)
 
-#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_(var, expr) \
-  auto var = (expr);                                        \
-  if (IREE_UNLIKELY(!::iree::IsOk(var)))                    \
-  return ::iree::StatusBuilder(std::move(var), IREE_LOC)
-
-#undef IREE_RETURN_IF_ERROR
-#define IREE_RETURN_IF_ERROR(expr, ...) RETURN_IF_ERROR(expr)
+#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_(var, expr, ...) \
+  auto var = (expr);                                             \
+  if (IREE_UNLIKELY(!::iree::IsOk(var)))                         \
+  return ::iree::StatusBuilder(std::move(var), IREE_LOC, __VA_ARGS__)
 
 #endif  // IREE_BASE_INTERNAL_STATUS_BUILDER_H_

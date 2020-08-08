@@ -52,7 +52,7 @@ StatusOr<ref_ptr<Buffer>> Allocator::AllocateConstant(
                                                 source_buffer->byte_length()));
   ASSIGN_OR_RETURN(auto source_mapping,
                    source_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
-  RETURN_IF_ERROR(device_buffer->WriteData(0, source_mapping.data(),
+  IREE_RETURN_IF_ERROR(device_buffer->WriteData(0, source_mapping.data(),
                                            source_mapping.byte_length()));
   return device_buffer;
 }

@@ -47,7 +47,7 @@ StatusOr<ref_ptr<TimePointFencePool>> TimePointFencePool::Create(
   IREE_TRACE_SCOPE0("TimePointFencePool::Create");
   ref_ptr<TimePointFencePool> pool(
       new TimePointFencePool(std::move(logical_device)));
-  RETURN_IF_ERROR(pool->PreallocateFences());
+  IREE_RETURN_IF_ERROR(pool->PreallocateFences());
   return pool;
 }
 
@@ -142,7 +142,7 @@ StatusOr<ref_ptr<TimePointSemaphorePool>> TimePointSemaphorePool::Create(
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::Create");
   ref_ptr<TimePointSemaphorePool> pool(
       new TimePointSemaphorePool(std::move(logical_device)));
-  RETURN_IF_ERROR(pool->PreallocateSemaphores());
+  IREE_RETURN_IF_ERROR(pool->PreallocateSemaphores());
   return pool;
 }
 

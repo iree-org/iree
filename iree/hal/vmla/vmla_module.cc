@@ -31,11 +31,11 @@ static iree_vm_ref_type_descriptor_t Interface_descriptor = {0};
 IREE_VM_DEFINE_TYPE_ADAPTERS(Buffer, iree::hal::vmla::Buffer);
 IREE_VM_DEFINE_TYPE_ADAPTERS(Interface, iree::hal::vmla::Interface);
 
-#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor) \
-  descriptor.type_name = iree_make_cstring_view(name);     \
-  descriptor.offsetof_counter = type::offsetof_counter();  \
-  descriptor.destroy = type::DirectDestroy;                \
-  RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor))  \
+#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor)     \
+  descriptor.type_name = iree_make_cstring_view(name);         \
+  descriptor.offsetof_counter = type::offsetof_counter();      \
+  descriptor.destroy = type::DirectDestroy;                    \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor)) \
       << "Failed to register type " << name;
 
 namespace iree {
@@ -61,7 +61,7 @@ Status ModuleRegisterTypes() {
 StatusOr<vm::ref<Buffer>> Buffer::Allocate(size_t byte_length,
                                            iree_allocator_t allocator) {
   void* data = nullptr;
-  RETURN_IF_ERROR(iree_allocator_malloc(allocator, byte_length, &data))
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, byte_length, &data))
       << "Failed to allocate buffer of size " << byte_length;
 
   auto buffer = vm::assign_ref(new Buffer());
@@ -671,7 +671,7 @@ class VMLAModuleState final {
           absl::MakeConstSpan(raw_inputs_data + i * input_stride, input_stride);
       auto output_example =
           absl::MakeSpan(raw_dst_data + i * output_stride, output_stride);
-      RETURN_IF_ERROR(kernels::Conv2D::Execute(
+      IREE_RETURN_IF_ERROR(kernels::Conv2D::Execute(
           input_example, input_example_shape, filter_buffer, filter_shape_4d,
           output_example, output_example_shape, window_strides_2d, pad_h, pad_w,
           dilation, feature_group_count));
@@ -718,7 +718,7 @@ class VMLAModuleState final {
                                           dst_batch_stride);
       buffers.dst_shape = dst_batch_element_shape2;
 
-      RETURN_IF_ERROR(kernels::MatMul::Execute(
+      IREE_RETURN_IF_ERROR(kernels::MatMul::Execute(
           kernel_state_->mat_mul_state.get(), buffers));
     }
     return OkStatus();
@@ -1001,7 +1001,7 @@ Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module) {
   }
   *out_module = nullptr;
   auto module = std::make_unique<VMLAModule>(allocator);
-  RETURN_IF_ERROR(module->Initialize());
+  IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return OkStatus();
 }

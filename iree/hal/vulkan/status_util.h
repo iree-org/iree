@@ -23,13 +23,13 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
-// RETURN_IF_ERROR but implicitly converts the VkResult return value to
+// IREE_RETURN_IF_ERROR but implicitly converts the VkResult return value to
 // a Status.
 //
 // Usage:
 //   VK_RETURN_IF_ERROR(vkDoThing(...));
 #define VK_RETURN_IF_ERROR(expr) \
-  RETURN_IF_ERROR(               \
+  IREE_RETURN_IF_ERROR(               \
       ::iree::hal::vulkan::VkResultToStatus(__FILE__, __LINE__, expr))
 
 // CHECK_OK but implicitly converts the VkResults return value to a

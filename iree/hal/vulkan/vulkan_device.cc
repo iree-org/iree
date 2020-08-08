@@ -336,7 +336,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   VK_RETURN_IF_ERROR(syms->vkCreateDevice(physical_device, &device_create_info,
                                           logical_device->allocator(),
                                           logical_device->mutable_value()));
-  RETURN_IF_ERROR(logical_device->syms()->LoadFromDevice(
+  IREE_RETURN_IF_ERROR(logical_device->syms()->LoadFromDevice(
       instance, logical_device->value()));
   IREE_ENABLE_LEAK_CHECKS();
 
@@ -715,7 +715,7 @@ StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
           // clang-format on
           IREE_TRACE_SCOPE0("<lambda>::OnSemaphoreSignal");
           for (const auto& queue : command_queues_) {
-            RETURN_IF_ERROR(static_cast<SerializingCommandQueue*>(queue.get())
+            IREE_RETURN_IF_ERROR(static_cast<SerializingCommandQueue*>(queue.get())
                                 ->AdvanceQueueSubmission());
           }
           return OkStatus();
@@ -763,7 +763,7 @@ Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
     for (int i = 0; i < semaphores.size(); ++i) {
       auto* semaphore =
           static_cast<EmulatedTimelineSemaphore*>(semaphores[i].semaphore);
-      RETURN_IF_ERROR(semaphore->Wait(semaphores[i].value, deadline_ns));
+      IREE_RETURN_IF_ERROR(semaphore->Wait(semaphores[i].value, deadline_ns));
       if (wait_flags & VK_SEMAPHORE_WAIT_ANY_BIT) return OkStatus();
     }
 
@@ -817,7 +817,7 @@ Status VulkanDevice::WaitIdle(Time deadline_ns) {
 
   IREE_TRACE_SCOPE0("VulkanDevice::WaitIdle#Semaphores");
   for (auto& command_queue : command_queues_) {
-    RETURN_IF_ERROR(command_queue->WaitIdle(deadline_ns));
+    IREE_RETURN_IF_ERROR(command_queue->WaitIdle(deadline_ns));
   }
   return OkStatus();
 }

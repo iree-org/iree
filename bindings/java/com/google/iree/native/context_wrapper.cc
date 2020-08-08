@@ -34,11 +34,11 @@ std::vector<iree_vm_module_t*> GetModulesFromModuleWrappers(
 }  // namespace
 
 Status ContextWrapper::Create(const InstanceWrapper& instance_wrapper) {
-  RETURN_IF_ERROR(iree_vm_context_create(instance_wrapper.instance(),
-                                         iree_allocator_system(), &context_));
-  RETURN_IF_ERROR(CreateDefaultModules());
+  IREE_RETURN_IF_ERROR(iree_vm_context_create(
+      instance_wrapper.instance(), iree_allocator_system(), &context_));
+  IREE_RETURN_IF_ERROR(CreateDefaultModules());
   std::vector<iree_vm_module_t*> default_modules = {hal_module_};
-  RETURN_IF_ERROR(iree_vm_context_register_modules(
+  IREE_RETURN_IF_ERROR(iree_vm_context_register_modules(
       context_, default_modules.data(), default_modules.size()));
   return OkStatus();
 }
@@ -47,13 +47,13 @@ Status ContextWrapper::CreateWithModules(
     const InstanceWrapper& instance_wrapper,
     const std::vector<ModuleWrapper*>& module_wrappers) {
   auto modules = GetModulesFromModuleWrappers(module_wrappers);
-  RETURN_IF_ERROR(CreateDefaultModules());
+  IREE_RETURN_IF_ERROR(CreateDefaultModules());
 
   // The ordering of modules matters, so default modules need to be at the
   // beginning of the vector.
   modules.insert(modules.begin(), hal_module_);
 
-  RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+  IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
       instance_wrapper.instance(), modules.data(), modules.size(),
       iree_allocator_system(), &context_));
   return OkStatus();
@@ -62,8 +62,8 @@ Status ContextWrapper::CreateWithModules(
 Status ContextWrapper::RegisterModules(
     const std::vector<ModuleWrapper*>& module_wrappers) {
   auto modules = GetModulesFromModuleWrappers(module_wrappers);
-  RETURN_IF_ERROR(iree_vm_context_register_modules(context_, modules.data(),
-                                                   modules.size()));
+  IREE_RETURN_IF_ERROR(iree_vm_context_register_modules(
+      context_, modules.data(), modules.size()));
   return OkStatus();
 }
 
@@ -84,11 +84,11 @@ ContextWrapper::~ContextWrapper() {
 
 // TODO(jennik): Also create default string and tensorlist modules.
 Status ContextWrapper::CreateDefaultModules() {
-  RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
       iree_make_cstring_view("vmla"), iree_allocator_system(), &driver_));
-  RETURN_IF_ERROR(iree_hal_driver_create_default_device(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
       driver_, iree_allocator_system(), &device_));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
   return OkStatus();
 }

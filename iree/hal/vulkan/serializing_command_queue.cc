@@ -73,7 +73,7 @@ StatusOr<bool> TryToPrepareSemaphores(
 
       // Cancel the wait so others may make progress.
       for (VkSemaphore semaphore : *wait_semaphores) {
-        RETURN_IF_ERROR(emulated_semaphore->CancelWaitSemaphore(semaphore));
+        IREE_RETURN_IF_ERROR(emulated_semaphore->CancelWaitSemaphore(semaphore));
       }
 
       // This batch cannot be submitted to GPU yet.
@@ -302,7 +302,7 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
 
   // Keep trying to submit more workload to the GPU until reaching the deadline.
   do {
-    RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
+    IREE_RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
 
     uint64_t timeout_ns;
     if (deadline_ns == InfiniteFuture()) {

@@ -157,7 +157,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
   IREE_TRACE_SCOPE0("DynamicSymbols::Create");
 
   auto syms = make_ref<DynamicSymbols>();
-  RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
+  IREE_RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
   syms->FixupExtensionFunctions();
   return syms;
 }
@@ -173,7 +173,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   syms->loader_library_ = std::move(loader_library);
 
   auto* loader_library_ptr = syms->loader_library_.get();
-  RETURN_IF_ERROR(ResolveFunctions(
+  IREE_RETURN_IF_ERROR(ResolveFunctions(
       syms.get(), [loader_library_ptr](const char* function_name) {
         return loader_library_ptr->GetSymbol<PFN_vkVoidFunction>(function_name);
       }));

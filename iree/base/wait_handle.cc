@@ -330,7 +330,7 @@ Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, Time deadline_ns) {
   int unsignaled_count = 0;
   do {
     int any_signaled_index = 0;
-    RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
+    IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
                               &any_signaled_index, &unsignaled_count));
   } while (unsignaled_count > 0 && Now() < deadline);
 
@@ -368,7 +368,7 @@ StatusOr<int> WaitHandle::WaitAny(WaitHandleSpan wait_handles,
   // Poll once; this makes a WaitAny just a WaitMulti that doesn't loop.
   int any_signaled_index = -1;
   int unsignaled_count = 0;
-  RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
+  IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
                             &any_signaled_index, &unsignaled_count));
   if (any_signaled_index == -1) {
     // No wait handles were valid. Pretend 0 was signaled.

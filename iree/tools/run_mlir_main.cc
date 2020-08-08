@@ -160,7 +160,7 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
   if (target_backends.empty()) {
     iree_string_view_t* driver_names = nullptr;
     iree_host_size_t driver_count = 0;
-    RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
+    IREE_RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
         iree_allocator_system(), &driver_names, &driver_count));
     for (int i = 0; i < driver_count; ++i) {
       target_backends.push_back(
@@ -294,17 +294,17 @@ Status EvaluateFunction(iree_vm_context_t* context,
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
-  RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                      output_descs.size(),
-                                      iree_allocator_system(), &outputs));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
+                                           output_descs.size(),
+                                           iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                 inputs.get(), outputs.get(),
-                                 iree_allocator_system()));
+  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
+                                      inputs.get(), outputs.get(),
+                                      iree_allocator_system()));
 
   // Print outputs.
-  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
+  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
 
   return OkStatus();
 }
@@ -322,7 +322,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   // We do this first so that if we fail validation we know prior to dealing
   // with devices.
   iree_vm_module_t* bytecode_module = nullptr;
-  RETURN_IF_ERROR(LoadBytecodeModule(flatbuffer_data, &bytecode_module));
+  IREE_RETURN_IF_ERROR(LoadBytecodeModule(flatbuffer_data, &bytecode_module));
 
   if (!run_flag) {
     // Just wanted verification; return without running.
@@ -331,15 +331,15 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   iree_hal_device_t* device = nullptr;
-  RETURN_IF_ERROR(CreateDevice(driver_name, &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(driver_name, &device));
   iree_vm_module_t* hal_module = nullptr;
-  RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
     iree_string_view_t export_name_isv;
-    RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
         bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
         &export_name_isv))
         << "Looking up function export " << ordinal;
@@ -349,21 +349,21 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       // Skip internal or special functions.
       return OkStatus();
     }
-    RETURN_IF_ERROR(ValidateFunctionAbi(function));
+    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test
     // runner).
     iree_vm_context_t* context = nullptr;
     std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-    RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+    IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
         instance, modules.data(), modules.size(), iree_allocator_system(),
         &context))
         << "Creating context";
 
     // Invoke the function and print results.
-    RETURN_IF_ERROR(EvaluateFunction(context, iree_hal_device_allocator(device),
-                                     function, export_name))
+    IREE_RETURN_IF_ERROR(EvaluateFunction(
+        context, iree_hal_device_allocator(device), function, export_name))
         << "Evaluating export function " << ordinal;
 
     iree_vm_context_release(context);
@@ -391,10 +391,12 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
   IREE_TRACE_SCOPE0("EvaluateFile");
 
   // TODO(benvanik): move to instance-based registration.
-  RETURN_IF_ERROR(iree_hal_module_register_types()) << "Registering HAL types";
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
+      << "Registering HAL types";
 
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(iree_vm_instance_create(iree_allocator_system(), &instance))
+  IREE_RETURN_IF_ERROR(
+      iree_vm_instance_create(iree_allocator_system(), &instance))
       << "Create instance";
 
   ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
@@ -408,7 +410,7 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
         PrepareModule(target_backend + '*', std::move(cloned_file_buffer)),
         _ << "Translating module");
     IREE_TRACE_FRAME_MARK();
-    RETURN_IF_ERROR(EvaluateFunctions(
+    IREE_RETURN_IF_ERROR(EvaluateFunctions(
         instance, BackendToDriverName(target_backend), flatbuffer_data))
         << "Evaluating functions";
   }

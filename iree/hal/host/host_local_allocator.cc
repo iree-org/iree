@@ -93,7 +93,7 @@ StatusOr<ref_ptr<Buffer>> HostLocalAllocator::Allocate(
   }
 
   // Make compatible with our requirements.
-  RETURN_IF_ERROR(MakeCompatible(&memory_type, &buffer_usage));
+  IREE_RETURN_IF_ERROR(MakeCompatible(&memory_type, &buffer_usage));
 
   void* malloced_data = std::calloc(1, allocation_size);
   if (!malloced_data) {

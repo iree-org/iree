@@ -163,7 +163,7 @@ class CheckTest : public ::testing::Test {
 
   Status Invoke(absl::string_view function_name) {
     iree_vm_function_t function;
-    RETURN_IF_ERROR(check_module_->lookup_function(
+    IREE_RETURN_IF_ERROR(check_module_->lookup_function(
         check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_string_view_t{function_name.data(), function_name.size()},
         &function))
@@ -176,21 +176,24 @@ class CheckTest : public ::testing::Test {
 
   Status Invoke(absl::string_view function_name,
                 std::vector<iree_vm_value> args) {
-    RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
-                                        iree_allocator_system(), &inputs_));
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+                            iree_allocator_system(), &inputs_));
     for (iree_vm_value& arg : args) {
-      RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
+      IREE_RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
     }
     return Invoke(function_name);
   }
 
   Status Invoke(absl::string_view function_name,
                 std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
-    RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, args.size(),
-                                        iree_allocator_system(), &inputs_));
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+                            iree_allocator_system(), &inputs_));
     for (auto& arg : args) {
       iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());
-      RETURN_IF_ERROR(iree_vm_list_push_ref_retain(inputs_.get(), &arg_ref));
+      IREE_RETURN_IF_ERROR(
+          iree_vm_list_push_ref_retain(inputs_.get(), &arg_ref));
     }
     return Invoke(function_name);
   }

@@ -118,8 +118,8 @@ Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
   auto timeline_submit_infos =
       arena.AllocateSpan<VkTimelineSemaphoreSubmitInfo>(batches.size());
   for (int i = 0; i < batches.size(); ++i) {
-    RETURN_IF_ERROR(TranslateBatchInfo(batches[i], &submit_infos[i],
-                                       &timeline_submit_infos[i], &arena));
+    IREE_RETURN_IF_ERROR(TranslateBatchInfo(batches[i], &submit_infos[i],
+                                            &timeline_submit_infos[i], &arena));
   }
 
   {

@@ -90,9 +90,9 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
            << " buffer strings but received " << input_strings.size();
   }
   vm::ref<iree_vm_list_t> variant_list;
-  RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
-                                      input_strings.size(),
-                                      iree_allocator_system(), &variant_list));
+  IREE_RETURN_IF_ERROR(
+      iree_vm_list_create(/*element_type=*/nullptr, input_strings.size(),
+                          iree_allocator_system(), &variant_list));
   for (size_t i = 0; i < input_strings.size(); ++i) {
     auto input_string = input_strings[i];
     auto desc = descs[i];
@@ -118,17 +118,17 @@ StatusOr<vm::ref<iree_vm_list_t>> ParseToVariantList(
                  << "Converting '" << input_view << "' to i32 when parsing '"
                  << input_string << "'";
         }
-        RETURN_IF_ERROR(iree_vm_list_push_value(variant_list.get(), &val));
+        IREE_RETURN_IF_ERROR(iree_vm_list_push_value(variant_list.get(), &val));
         break;
       }
       case RawSignatureParser::Type::kBuffer: {
         iree_hal_buffer_view_t* buffer_view = nullptr;
-        RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+        IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
             iree_string_view_t{input_string.data(), input_string.size()},
             allocator, iree_allocator_system(), &buffer_view))
             << "Parsing value '" << input_string << "'";
         auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-        RETURN_IF_ERROR(
+        IREE_RETURN_IF_ERROR(
             iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref));
         break;
       }
@@ -164,7 +164,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_list_t* variant_list, std::ostream* os) {
   for (int i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant))
+    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant))
         << "variant " << i << "not present";
 
     const auto& desc = descs[i];
@@ -209,7 +209,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
               &result_str[0], &actual_length);
           result_str.resize(actual_length);
         } while (iree_status_is_out_of_range(status));
-        RETURN_IF_ERROR(status);
+        IREE_RETURN_IF_ERROR(status);
 
         *os << result_str << "\n";
         break;
@@ -227,11 +227,11 @@ Status CreateDevice(absl::string_view driver_name,
                     iree_hal_device_t** out_device) {
   LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
       iree_string_view_t{driver_name.data(), driver_name.size()},
       iree_allocator_system(), &driver))
       << "Creating driver '" << driver_name << "'";
-  RETURN_IF_ERROR(iree_hal_driver_create_default_device(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
       driver, iree_allocator_system(), out_device))
       << "Creating default device for driver '" << driver_name << "'";
   iree_hal_driver_release(driver);
@@ -240,7 +240,7 @@ Status CreateDevice(absl::string_view driver_name,
 
 Status CreateHalModule(iree_hal_device_t* device,
                        iree_vm_module_t** out_module) {
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), out_module))
       << "Creating HAL module";
   return OkStatus();
@@ -248,7 +248,7 @@ Status CreateHalModule(iree_hal_device_t* device,
 
 Status LoadBytecodeModule(absl::string_view module_data,
                           iree_vm_module_t** out_module) {
-  RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_data.data()),
           module_data.size()},

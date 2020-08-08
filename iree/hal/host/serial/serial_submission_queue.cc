@@ -139,13 +139,13 @@ Status SerialSubmissionQueue::ProcessBatch(const PendingBatch& batch,
   // need to check the wait semaphores here.
 
   // Let the caller handle execution of the command buffers.
-  RETURN_IF_ERROR(execute_fn(batch.command_buffers));
+  IREE_RETURN_IF_ERROR(execute_fn(batch.command_buffers));
 
   // Signal all semaphores to allow them to unblock waiters.
   for (auto& signal_point : batch.signal_semaphores) {
     auto* semaphore =
         reinterpret_cast<CondVarSemaphore*>(signal_point.semaphore);
-    RETURN_IF_ERROR(semaphore->Signal(signal_point.value));
+    IREE_RETURN_IF_ERROR(semaphore->Signal(signal_point.value));
   }
 
   return OkStatus();

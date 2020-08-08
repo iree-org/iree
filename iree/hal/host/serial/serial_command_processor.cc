@@ -202,7 +202,7 @@ Status SerialCommandProcessor::DispatchIndirect(
   IREE_TRACE_SCOPE0("SerialCommandProcessor::DispatchIndirect");
 
   std::array<uint32_t, 3> workgroup_count;
-  RETURN_IF_ERROR(workgroups_buffer->ReadData(
+  IREE_RETURN_IF_ERROR(workgroups_buffer->ReadData(
       workgroups_offset, workgroup_count.data(), sizeof(uint32_t) * 3));
 
   return DispatchGrid(executable, entry_point, workgroup_count);
@@ -229,7 +229,7 @@ Status SerialCommandProcessor::DispatchGrid(
   for (uint32_t z = 0; z < params.workgroup_count[2]; ++z) {
     for (uint32_t y = 0; y < params.workgroup_count[1]; ++y) {
       for (uint32_t x = 0; x < params.workgroup_count[0]; ++x) {
-        RETURN_IF_ERROR(
+        IREE_RETURN_IF_ERROR(
             host_executable->DispatchTile(dispatch_state.get(), {x, y, z}));
       }
     }

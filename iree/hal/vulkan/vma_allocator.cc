@@ -233,7 +233,7 @@ StatusOr<ref_ptr<Buffer>> VmaAllocator::AllocateConstant(
                        MemoryAccess::kRead | MemoryAccess::kDiscardWrite,
                        source_buffer->byte_length(),
                        /*flags=*/0));
-  RETURN_IF_ERROR(buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
+  IREE_RETURN_IF_ERROR(buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
   buffer->set_allowed_access(MemoryAccess::kRead);
   return buffer;
 }

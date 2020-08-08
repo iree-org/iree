@@ -45,7 +45,7 @@ StatusOr<Shape> ParseShape(absl::string_view value) {
                              shape.size(), shape.data(), &actual_rank);
     shape.resize(actual_rank);
   } while (iree_status_is_out_of_range(status));
-  RETURN_IF_ERROR(std::move(status));
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(shape);
 }
 
@@ -60,7 +60,7 @@ StatusOr<std::string> FormatShape(absl::Span<const iree_hal_dim_t> value) {
                               &buffer[0], &actual_length);
     buffer.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  RETURN_IF_ERROR(std::move(status));
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(buffer);
 }
 
@@ -70,7 +70,7 @@ StatusOr<iree_hal_element_type_t> ParseElementType(absl::string_view value) {
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_status_t status = iree_hal_parse_element_type(
       iree_string_view_t{value.data(), value.size()}, &element_type);
-  RETURN_IF_ERROR(std::move(status))
+  IREE_RETURN_IF_ERROR(std::move(status))
       << "Failed to parse element type '" << value << "'";
   return element_type;
 }
@@ -86,7 +86,7 @@ StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
                                           &actual_length);
     buffer.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  RETURN_IF_ERROR(std::move(status));
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(buffer);
 }
 
@@ -102,7 +102,7 @@ Status ParseElement(absl::string_view value,
       iree_string_view_t{value.data(), value.size()}, element_type,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
                        buffer.size() * sizeof(T)});
-  RETURN_IF_ERROR(std::move(status))
+  IREE_RETURN_IF_ERROR(std::move(status))
       << "Failed to parse element '" << value << "'";
   return OkStatus();
 }
@@ -121,7 +121,7 @@ StatusOr<std::string> FormatElement(T value,
         element_type, result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  RETURN_IF_ERROR(std::move(status))
+  IREE_RETURN_IF_ERROR(std::move(status))
       << "Failed to format buffer element '" << value << "'";
   return std::move(result);
 }
@@ -135,7 +135,7 @@ template <typename T>
 Status ParseBufferElements(absl::string_view value,
                            iree_hal_element_type_t element_type,
                            absl::Span<T> buffer) {
-  RETURN_IF_ERROR(iree_hal_parse_buffer_elements(
+  IREE_RETURN_IF_ERROR(iree_hal_parse_buffer_elements(
       iree_string_view_t{value.data(), value.size()}, element_type,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
                        buffer.size() * sizeof(T)}))
@@ -165,7 +165,7 @@ StatusOr<std::string> FormatBufferElements(absl::Span<const T> data,
         result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  RETURN_IF_ERROR(std::move(status));
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(result);
 }
 
@@ -228,8 +228,8 @@ struct ElementTypeFromCType<double> {
 template <typename T>
 inline StatusOr<T> ParseElement(absl::string_view value) {
   T result = T();
-  RETURN_IF_ERROR(ParseElement(value, ElementTypeFromCType<T>::value,
-                               absl::MakeSpan(&result, 1)));
+  IREE_RETURN_IF_ERROR(ParseElement(value, ElementTypeFromCType<T>::value,
+                                    absl::MakeSpan(&result, 1)));
   return result;
 }
 
@@ -262,7 +262,7 @@ inline StatusOr<std::vector<T>> ParseBufferElements(absl::string_view value,
     element_count *= shape[i];
   }
   std::vector<T> result(element_count);
-  RETURN_IF_ERROR(ParseBufferElements(value, absl::MakeSpan(result)));
+  IREE_RETURN_IF_ERROR(ParseBufferElements(value, absl::MakeSpan(result)));
   return std::move(result);
 }
 
@@ -393,7 +393,7 @@ struct Allocator final
     Allocator allocator;
     iree_status_t status = iree_hal_allocator_create_host_local(
         iree_allocator_system(), &allocator);
-    RETURN_IF_ERROR(std::move(status));
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(allocator);
   }
 };
@@ -416,7 +416,7 @@ struct Buffer final : public Handle<iree_hal_buffer_t, iree_hal_buffer_retain,
     std::vector<T> result(total_byte_length / sizeof(T));
     iree_status_t status =
         iree_hal_buffer_read_data(get(), 0, result.data(), total_byte_length);
-    RETURN_IF_ERROR(std::move(status));
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(result);
   }
 };
@@ -435,7 +435,7 @@ struct BufferView final
     iree_status_t status = iree_hal_buffer_view_create(
         buffer, shape.data(), shape.size(), element_type,
         iree_allocator_system(), &buffer_view);
-    RETURN_IF_ERROR(std::move(status));
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }
 
@@ -486,7 +486,7 @@ struct BufferView final
     iree_status_t status = iree_hal_buffer_view_parse(
         iree_string_view_t{value.data(), value.size()}, allocator,
         iree_allocator_system(), &buffer_view);
-    RETURN_IF_ERROR(std::move(status));
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }
 
@@ -506,7 +506,7 @@ struct BufferView final
                                            &actual_length);
       result.resize(actual_length);
     } while (iree_status_is_out_of_range(status));
-    RETURN_IF_ERROR(std::move(status));
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(result);
   }
 };

@@ -26,7 +26,7 @@ namespace dylib {
 // static
 StatusOr<ref_ptr<DyLibExecutable>> DyLibExecutable::Load(ExecutableSpec spec) {
   auto executable = make_ref<DyLibExecutable>();
-  RETURN_IF_ERROR(executable->Initialize(spec));
+  IREE_RETURN_IF_ERROR(executable->Initialize(spec));
   return executable;
 }
 
@@ -73,7 +73,7 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
       reinterpret_cast<const char*>(
           dylib_executable_def->library_embedded()->data()),
       dylib_executable_def->library_embedded()->size());
-  RETURN_IF_ERROR(file_io::SetFileContents(executable_library_temp_path_,
+  IREE_RETURN_IF_ERROR(file_io::SetFileContents(executable_library_temp_path_,
                                            embedded_library_data));
 
   ASSIGN_OR_RETURN(executable_library_,

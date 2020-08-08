@@ -91,7 +91,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager;
   if (absl::GetFlag(FLAGS_vulkan_renderdoc)) {
     renderdoc_capture_manager = std::make_unique<RenderDocCaptureManager>();
-    RETURN_IF_ERROR(renderdoc_capture_manager->Connect());
+    IREE_RETURN_IF_ERROR(renderdoc_capture_manager->Connect());
   }
 
   // Find the layers and extensions we need (or want) that are also available
@@ -146,7 +146,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
 
   // Now that the instance has been created we can fetch all of the instance
   // symbols.
-  RETURN_IF_ERROR(syms->LoadFromInstance(instance));
+  IREE_RETURN_IF_ERROR(syms->LoadFromInstance(instance));
 
   // The real debug messenger (not just the static one used above) can now be
   // created as we've loaded all the required symbols.
@@ -191,7 +191,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
   auto instance_extensions =
       PopulateEnabledInstanceExtensions(enabled_extension_names);
 
-  RETURN_IF_ERROR(syms->LoadFromInstance(instance));
+  IREE_RETURN_IF_ERROR(syms->LoadFromInstance(instance));
 
   // TODO(benvanik): strip in release builds.
   std::unique_ptr<DebugReporter> debug_reporter;

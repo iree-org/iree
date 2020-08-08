@@ -163,7 +163,7 @@ Status DirectCommandBuffer::Begin() {
 
   // NOTE: we require that command buffers not be recorded while they are
   // in-flight so this is safe.
-  RETURN_IF_ERROR(descriptor_set_group_.Reset());
+  IREE_RETURN_IF_ERROR(descriptor_set_group_.Reset());
 
   VkCommandBufferBeginInfo begin_info;
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

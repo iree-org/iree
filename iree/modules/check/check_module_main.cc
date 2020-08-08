@@ -82,9 +82,11 @@ class CheckModuleTest : public ::testing::Test {
 StatusOr<int> Run(std::string input_file_path) {
   IREE_TRACE_SCOPE0("iree-check-module");
 
-  RETURN_IF_ERROR(iree_hal_module_register_types()) << "registering HAL types";
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
+      << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(iree_vm_instance_create(iree_allocator_system(), &instance))
+  IREE_RETURN_IF_ERROR(
+      iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
   std::string module_data;
@@ -96,12 +98,12 @@ StatusOr<int> Run(std::string input_file_path) {
   }
 
   iree_vm_module_t* input_module = nullptr;
-  RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
+  IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
   iree_vm_module_t* hal_module = nullptr;
-  RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
   iree_vm_module_t* check_module = nullptr;
   check_native_module_create(iree_allocator_system(), &check_module);
 
@@ -112,7 +114,7 @@ StatusOr<int> Run(std::string input_file_path) {
        ++ordinal) {
     iree_vm_function_t function;
     iree_string_view_t export_name_sv;
-    RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
         input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
         &export_name_sv))
         << "Looking up function export " << ordinal;
@@ -130,7 +132,7 @@ StatusOr<int> Run(std::string input_file_path) {
       continue;
     }
 
-    RETURN_IF_ERROR(ValidateFunctionAbi(function));
+    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
     ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
     ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
     if (!input_descs.empty() || !output_descs.empty()) {

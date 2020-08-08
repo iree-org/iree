@@ -41,11 +41,11 @@ namespace hal {
 //
 //  // Now allocate a real buffer to serve as storage for the data.
 //  ASSIGN_OR_RETURN(auto allocated_buffer, Buffer::Allocate(..., 200));
-//  RETURN_IF_ERROR(deferred_buffer->BindAllocation(
+//  IREE_RETURN_IF_ERROR(deferred_buffer->BindAllocation(
 //      allocated_buffer, 0, kWholeBuffer));
 //
 //  // And now we can use the spans.
-//  RETURN_IF_ERROR(span0->Fill(false));
+//  IREE_RETURN_IF_ERROR(span0->Fill(false));
 //
 //  // If at some point we want to detach the buffer from the allocation (so we
 //  // can use a different allocation, reuse the memory, etc).

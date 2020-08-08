@@ -56,7 +56,7 @@ Status DeferredBuffer::BindAllocation(ref_ptr<Buffer> allocated_buffer,
   }
 
   // Calculate the range in the allocated_buffer that we are interested in.
-  RETURN_IF_ERROR(Buffer::CalculateRange(0, allocated_buffer->byte_length(),
+  IREE_RETURN_IF_ERROR(Buffer::CalculateRange(0, allocated_buffer->byte_length(),
                                          byte_offset, byte_length, &byte_offset,
                                          &byte_length));
 

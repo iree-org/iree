@@ -25,13 +25,14 @@ StatusBuilder::Rep::Rep(const Rep& r)
     : stream_message(r.stream_message), stream(&stream_message) {}
 
 StatusBuilder::StatusBuilder(const Status& original_status,
-                             SourceLocation location)
+                             SourceLocation location, ...)
     : status_(original_status), loc_(location) {}
 
-StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location)
+StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location,
+                             ...)
     : status_(original_status), loc_(location) {}
 
-StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location)
+StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location, ...)
     : status_(code, ""), loc_(location) {}
 
 StatusBuilder::operator Status() const& {

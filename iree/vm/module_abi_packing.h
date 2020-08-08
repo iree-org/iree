@@ -123,7 +123,7 @@ struct Unpacker {
     Unpacker unpacker(registers, argument_list, variadic_segment_size_list);
     ApplyLoad<Ts...>(&unpacker, params,
                      std::make_index_sequence<sizeof...(Ts)>());
-    RETURN_IF_ERROR(std::move(unpacker.status));
+    IREE_RETURN_IF_ERROR(std::move(unpacker.status));
     return std::move(params);
   }
 
