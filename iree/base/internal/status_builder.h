@@ -15,7 +15,6 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 #define IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 
-#include "absl/memory/memory.h"
 #include "iree/base/internal/ostringstream.h"
 #include "iree/base/internal/status.h"
 
@@ -99,7 +98,7 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
 inline StatusBuilder::StatusBuilder(const StatusBuilder& sb)
     : status_(sb.status_), loc_(sb.loc_) {
   if (sb.rep_ != nullptr) {
-    rep_ = absl::make_unique<Rep>(*sb.rep_);
+    rep_ = std::make_unique<Rep>(*sb.rep_);
   }
 }
 
@@ -107,7 +106,7 @@ inline StatusBuilder& StatusBuilder::operator=(const StatusBuilder& sb) {
   status_ = sb.status_;
   loc_ = sb.loc_;
   if (sb.rep_ != nullptr) {
-    rep_ = absl::make_unique<Rep>(*sb.rep_);
+    rep_ = std::make_unique<Rep>(*sb.rep_);
   } else {
     rep_ = nullptr;
   }
@@ -117,7 +116,7 @@ inline StatusBuilder& StatusBuilder::operator=(const StatusBuilder& sb) {
 template <typename T>
 StatusBuilder& StatusBuilder::operator<<(const T& value) & {
   if (status_.ok()) return *this;
-  if (rep_ == nullptr) rep_ = absl::make_unique<Rep>();
+  if (rep_ == nullptr) rep_ = std::make_unique<Rep>();
   rep_->stream << value;
   return *this;
 }
@@ -163,5 +162,16 @@ StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
 #endif  // IREE_PLATFORM_WINDOWS
 
 }  // namespace iree
+
+// Evaluates an expression that produces a `iree::Status`. If the status is not
+// ok, returns it from the current function.
+#define RETURN_IF_ERROR(expr)               \
+  IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_( \
+      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), expr)
+
+#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_(var, expr) \
+  auto var = (expr);                                        \
+  if (IREE_UNLIKELY(!var.ok()))                             \
+  return ::iree::StatusBuilder(std::move(var), IREE_LOC)
 
 #endif  // IREE_BASE_INTERNAL_STATUS_BUILDER_H_

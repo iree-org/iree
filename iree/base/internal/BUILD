@@ -112,7 +112,6 @@ cc_library(
     hdrs = [
         "status.h",
         "status_builder.h",
-        "status_macros.h",
         "statusor.h",
     ],
     deps = [
@@ -121,7 +120,6 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
 )

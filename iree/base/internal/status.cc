@@ -17,7 +17,6 @@
 #include <memory>
 
 #include "absl/base/attributes.h"
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 
 namespace iree {
@@ -29,7 +28,7 @@ std::ostream& operator<<(std::ostream& os, const StatusCode& x) {
 
 Status::Status(StatusCode code, absl::string_view message) {
   if (code != StatusCode::kOk) {
-    state_ = absl::make_unique<State>();
+    state_ = std::make_unique<State>();
     state_->code = code;
     state_->message = std::string(message);
   }
@@ -38,7 +37,7 @@ Status::Status(StatusCode code, absl::string_view message) {
 Status::Status(const Status& x) {
   if (x.ok()) return;
 
-  state_ = absl::make_unique<State>();
+  state_ = std::make_unique<State>();
   state_->code = x.state_->code;
   state_->message = x.state_->message;
 }
@@ -47,7 +46,7 @@ Status& Status::operator=(const Status& x) {
   if (x.ok()) {
     state_ = nullptr;
   } else {
-    state_ = absl::make_unique<State>();
+    state_ = std::make_unique<State>();
     state_->code = x.state_->code;
     state_->message = x.state_->message;
   }

@@ -21,7 +21,6 @@
 #else
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
-#include "iree/base/internal/status_macros.h"
 #include "iree/base/internal/statusor.h"
 #endif  // IREE_CONFIG_GOOGLE_INTERNAL
 

@@ -696,4 +696,36 @@ void StatusOr<T>::IgnoreError() const {
 
 }  // namespace iree
 
+// Executes an expression `rexpr` that returns a `iree::StatusOr<T>`. On OK,
+// moves its value into the variable defined by `lhs`, otherwise returns
+// from the current function.
+#define ASSIGN_OR_RETURN(...)                                    \
+  IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
+      (__VA_ARGS__, IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_, \
+       IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_))             \
+  (__VA_ARGS__)
+
+// MSVC incorrectly expands variadic macros, splice together a macro call to
+// work around the bug.
+#define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_(_1, _2, _3, NAME, ...) NAME
+#define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(args) \
+  IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_ args
+
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_(lhs, rexpr) \
+  IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(lhs, rexpr, std::move(_))
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(lhs, rexpr,         \
+                                                    error_expression)   \
+  IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(                            \
+      IREE_STATUS_IMPL_CONCAT_(_status_or_value, __LINE__), lhs, rexpr, \
+      error_expression)
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(statusor, lhs, rexpr, \
+                                                  error_expression)     \
+  auto statusor = std::move(rexpr);                                     \
+  if (IREE_UNLIKELY(!statusor.ok())) {                                  \
+    ::iree::StatusBuilder _(std::move(statusor).status(), IREE_LOC);    \
+    (void)_; /* error_expression is allowed to not use this variable */ \
+    return (error_expression);                                          \
+  }                                                                     \
+  lhs = std::move(statusor).value()
+
 #endif  // IREE_BASE_INTERNAL_STATUSOR_H_

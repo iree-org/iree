@@ -113,7 +113,6 @@ iree_cc_library(
   HDRS
     "status.h"
     "status_builder.h"
-    "status_macros.h"
     "statusor.h"
   SRCS
     "status.cc"
@@ -122,7 +121,6 @@ iree_cc_library(
   DEPS
     ::ostringstream
     absl::core_headers
-    absl::memory
     absl::strings
     iree::base::api
     iree::base::logging
