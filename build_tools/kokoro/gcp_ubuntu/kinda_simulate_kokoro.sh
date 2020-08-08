@@ -21,28 +21,24 @@
 #
 # Just does the part of the Kokoro setup that we care about and invokes the
 # given build script.
-# An optional second parameter can be used to specify a different repo to clone
-# from. Especially useful for cloning the current git repo.
-# ./kokoro/gcp_ubuntu/simulate_kokoro.sh \
-#   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86/core/build.sh \
-#  "$PWD/.git"
 
 set -x
 set -e
 set -o pipefail
 
 RELATIVE_KOKORO_BUILD_SCRIPT="${1?}"
-REPO_TO_CLONE="${2:-git@github.com:google/iree.git}"
 
 # Set up the temporary Kokoro directories
-# export KOKORO_ROOT="$(mktemp --directory --tmpdir kokoro-root-XXXXXX)"
-export KOKORO_ROOT="/tmp/kokoro-root-ARQhn0/"
+kokoro_base="/dev/shm"
+kokoro_dir="$(mktemp --directory --tmpdir kokoro-root-XXXXXX)"
+kokoro_dir="$(echo $kokoro_dir | rev | cut -d/ -f1 | rev)"
+export KOKORO_ROOT="${kokoro_base}/${kokoro_dir}"
 mkdir -p "${KOKORO_ROOT?}/src/github"
 export KOKORO_ARTIFACTS_DIR="${KOKORO_ROOT?}/src"
-cd "${KOKORO_ARTIFACTS_DIR?}/github"
 
-# Clone the repo
-git clone "${REPO_TO_CLONE?}"
+# "Clone" the repo
+ln -s $(pwd) "${KOKORO_ARTIFACTS_DIR}/github/iree"
+cd "${KOKORO_ARTIFACTS_DIR?}/github"
 
 # The build script is assumed to be relative to the iree repo root.
 KOKORO_BUILD_SCRIPT="${KOKORO_ARTIFACTS_DIR?}/github/iree/${RELATIVE_KOKORO_BUILD_SCRIPT?}"

@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+export SHM_ROOT="/dev/shm/kokoro"
+sudo rm -rf ${SHM_ROOT}
+export SHM_ARTIFACTS_DIR="${SHM_ROOT?}/src"
+mkdir -p "${SHM_ROOT?}/src/github"
+cd "${SHM_ARTIFACTS_DIR?}"
+
+ln -s "${KOKORO_ARTIFACTS_DIR}/github/iree" "${SHM_ARTIFACTS_DIR}/github/iree"
+
 # Functions for setting up Docker containers to run on Kokoro
 
 # Sets up files and environment to enable running all our Kokoro docker scripts.
@@ -24,7 +33,7 @@
 function docker_setup() {
     # Make the source repository available and launch containers in that
     # directory.
-    local workdir="${KOKORO_ARTIFACTS_DIR?}/github/iree"
+    local workdir="${SHM_ARTIFACTS_DIR?}/github/iree"
     DOCKER_RUN_ARGS=(
       --volume="${workdir?}:${workdir?}"
       --workdir="${workdir?}"
@@ -56,7 +65,7 @@ function docker_setup() {
     # such that they don't contain the information about normal users and we
     # want these scripts to be runnable locally for debugging.
     # Instead we dump the results of `getent` to some fake files.
-    local fake_etc_dir="${KOKORO_ROOT?}/fake_etc"
+    local fake_etc_dir="${SHM_ROOT?}/fake_etc"
     mkdir -p "${fake_etc_dir?}"
 
     local fake_group="${fake_etc_dir?}/group"
@@ -84,7 +93,7 @@ function docker_setup() {
     #      turns out that makes a huge difference in performance for Bazel
     #      running with local execution (not with RBE) because it is IO bound at
     #      64 cores.
-    local fake_home_dir="${KOKORO_ROOT?}/fake_home"
+    local fake_home_dir="${SHM_ROOT?}/fake_home"
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
