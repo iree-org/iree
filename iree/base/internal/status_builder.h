@@ -20,10 +20,12 @@
 
 namespace iree {
 
+class IREE_MUST_USE_RESULT StatusBuilder;
+
 // Creates a status based on an original_status, but enriched with additional
 // information. The builder implicitly converts to Status and StatusOr<T>
 // allowing for it to be returned directly.
-class ABSL_MUST_USE_RESULT StatusBuilder {
+class StatusBuilder {
  public:
   // Creates a `StatusBuilder` based on an original status.
   explicit StatusBuilder(const Status& original_status, SourceLocation location,

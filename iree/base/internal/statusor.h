@@ -23,7 +23,7 @@
 namespace iree {
 
 template <typename T>
-class ABSL_MUST_USE_RESULT StatusOr;
+class IREE_MUST_USE_RESULT StatusOr;
 
 namespace internal_statusor {
 
@@ -247,11 +247,11 @@ class StatusOrData {
   }
 
   void EnsureOk() const {
-    if (!ok()) Helper::Crash(status_);
+    if (IREE_UNLIKELY(!ok())) Helper::Crash(status_);
   }
 
   void EnsureNotOk() {
-    if (ok()) Helper::HandleInvalidStatusCtorArg(&status_);
+    if (IREE_UNLIKELY(ok())) Helper::HandleInvalidStatusCtorArg(&status_);
   }
 
   // Construct the value (data_) through placement new with the passed arg.
@@ -476,7 +476,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   explicit operator bool() const { return ok(); }
 
   // Returns this->status().ok()
-  ABSL_MUST_USE_RESULT bool ok() const { return this->status_.ok(); }
+  IREE_MUST_USE_RESULT bool ok() const { return this->status_.ok(); }
 
   // Returns a reference to our status. If this contains a T, then
   // returns OkStatus().

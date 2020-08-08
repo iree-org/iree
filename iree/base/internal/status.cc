@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "absl/base/attributes.h"
 #include "absl/strings/str_cat.h"
 
 namespace iree {

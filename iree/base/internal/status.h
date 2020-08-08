@@ -19,7 +19,6 @@
 #include <memory>
 #include <string>
 
-#include "absl/base/attributes.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
@@ -80,11 +79,13 @@ static inline const char* StatusCodeToString(StatusCode code) {
 // Prints a human-readable representation of `x` to `os`.
 std::ostream& operator<<(std::ostream& os, const StatusCode& x);
 
+class IREE_MUST_USE_RESULT Status;
+
 // A Status value can be either OK or not-OK
 //   * OK indicates that the operation succeeded.
 //   * A not-OK value indicates that the operation failed and contains details
 //     about the error.
-class ABSL_MUST_USE_RESULT Status final {
+class Status final {
  public:
   // Creates an OK status with no message.
   Status() = default;
@@ -101,7 +102,7 @@ class ABSL_MUST_USE_RESULT Status final {
   ~Status();
 
   // Returns true if the Status is OK.
-  ABSL_MUST_USE_RESULT bool ok() const;
+  IREE_MUST_USE_RESULT bool ok() const;
 
   // Returns the error code.
   StatusCode code() const;
@@ -157,84 +158,85 @@ std::ostream& operator<<(std::ostream& os, const Status& x);
 // has been augmented by adding `msg` to the end of the original message.
 Status Annotate(const Status& s, absl::string_view msg);
 
-ABSL_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
   return status.code() == StatusCode::kOk;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsOk(iree_status_t status) {
+IREE_MUST_USE_RESULT static inline bool IsOk(iree_status_t status) {
   return iree_status_is_ok(status);
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsAborted(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsAborted(const Status& status) {
   return status.code() == StatusCode::kAborted;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsAlreadyExists(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsAlreadyExists(const Status& status) {
   return status.code() == StatusCode::kAlreadyExists;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsCancelled(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsCancelled(const Status& status) {
   return status.code() == StatusCode::kCancelled;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsDataLoss(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsDataLoss(const Status& status) {
   return status.code() == StatusCode::kDataLoss;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsDeadlineExceeded(
+IREE_MUST_USE_RESULT static inline bool IsDeadlineExceeded(
     const Status& status) {
   return status.code() == StatusCode::kDeadlineExceeded;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsFailedPrecondition(
+IREE_MUST_USE_RESULT static inline bool IsFailedPrecondition(
     const Status& status) {
   return status.code() == StatusCode::kFailedPrecondition;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsInternal(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsInternal(const Status& status) {
   return status.code() == StatusCode::kInternal;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsInvalidArgument(
+IREE_MUST_USE_RESULT static inline bool IsInvalidArgument(
     const Status& status) {
   return status.code() == StatusCode::kInvalidArgument;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsNotFound(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsNotFound(const Status& status) {
   return status.code() == StatusCode::kNotFound;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsOutOfRange(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsOutOfRange(const Status& status) {
   return status.code() == StatusCode::kOutOfRange;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsPermissionDenied(
+IREE_MUST_USE_RESULT static inline bool IsPermissionDenied(
     const Status& status) {
   return status.code() == StatusCode::kPermissionDenied;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsResourceExhausted(
+IREE_MUST_USE_RESULT static inline bool IsResourceExhausted(
     const Status& status) {
   return status.code() == StatusCode::kResourceExhausted;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsUnauthenticated(
+IREE_MUST_USE_RESULT static inline bool IsUnauthenticated(
     const Status& status) {
   return status.code() == StatusCode::kUnauthenticated;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsUnavailable(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsUnavailable(const Status& status) {
   return status.code() == StatusCode::kUnavailable;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsUnimplemented(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsUnimplemented(const Status& status) {
   return status.code() == StatusCode::kUnimplemented;
 }
 
-ABSL_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
+IREE_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
   return status.code() == StatusCode::kUnknown;
 }
 
+// TODO(#265): rename to IREE_CHECK_OK and make compatible with C API macros.
 #define CHECK_OK(val) CHECK_EQ(::iree::StatusCode::kOk, (val))
 #define QCHECK_OK(val) QCHECK_EQ(::iree::StatusCode::kOk, (val))
 #define DCHECK_OK(val) DCHECK_EQ(::iree::StatusCode::kOk, (val))

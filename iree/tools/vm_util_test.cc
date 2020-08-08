@@ -16,11 +16,12 @@
 
 #include <sstream>
 
+#include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
-#include "iree/testing/status_matchers.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 
 namespace iree {
