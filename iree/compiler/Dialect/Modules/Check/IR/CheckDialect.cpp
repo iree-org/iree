@@ -63,7 +63,7 @@ class CheckToHalConversionInterface : public HALConversionDialectInterface {
 }  // namespace
 
 CheckDialect::CheckDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<CheckDialect>()) {
   addInterfaces<CheckToVmConversionInterface>();
   addInterfaces<CheckToHalConversionInterface>();
 #define GET_OP_LIST

@@ -187,7 +187,7 @@ struct VMFolderInterface : public OpFolderDialectInterface {
 }  // namespace
 
 VMDialect::VMDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()) {
   addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
   addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
 
