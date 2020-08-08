@@ -276,8 +276,8 @@ static void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000 * ABSL_ARRAYSIZE(pool_sizes);
-    pool_info.poolSizeCount = (uint32_t)ABSL_ARRAYSIZE(pool_sizes);
+    pool_info.maxSets = 1000 * IREE_ARRAYSIZE(pool_sizes);
+    pool_info.poolSizeCount = (uint32_t)IREE_ARRAYSIZE(pool_sizes);
     pool_info.pPoolSizes = pool_sizes;
     err = vkCreateDescriptorPool(g_Device, &pool_info, g_Allocator,
                                  &g_DescriptorPool);
@@ -306,7 +306,7 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd,
       VK_COLORSPACE_SRGB_NONLINEAR_KHR;
   wd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
       g_PhysicalDevice, wd->Surface, requestSurfaceImageFormat,
-      (size_t)ABSL_ARRAYSIZE(requestSurfaceImageFormat),
+      (size_t)IREE_ARRAYSIZE(requestSurfaceImageFormat),
       requestSurfaceColorSpace);
 
   // Select Present Mode
@@ -319,7 +319,7 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd,
 #endif
   wd->PresentMode = ImGui_ImplVulkanH_SelectPresentMode(
       g_PhysicalDevice, wd->Surface, &present_modes[0],
-      ABSL_ARRAYSIZE(present_modes));
+      IREE_ARRAYSIZE(present_modes));
 
   // Create SwapChain, RenderPass, Framebuffer, etc.
   IM_ASSERT(g_MinImageCount >= 2);

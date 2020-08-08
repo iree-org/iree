@@ -210,6 +210,30 @@ typedef uint64_t iree_device_size_t;
 // Whole length of the underlying buffer.
 #define IREE_WHOLE_BUFFER (iree_device_size_t(-1))
 
+// TODO(benvanik): switch to static_cast/reinterpret_cast when in C++.
+// TODO(benvanik): see if we can shove in static_asserts somehow?
+#define iree_static_cast(type, value) (type)(value)
+#define iree_reinterpret_cast(type, value) (type)(value)
+
+// Returns the number of elements in an array as a compile-time constant, which
+// can be used in defining new arrays. Fails at compile-time if |arr| is not a
+// static array (such as if used on a pointer type).
+//
+// Example:
+//  uint8_t kConstantArray[512];
+//  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
+#define IREE_ARRAYSIZE(arr) \
+  (sizeof(arr) / sizeof((arr)[0]) + IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr))
+
+#if defined(__GNUC__) || defined(__clang__)
+#define IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr)                         \
+  (sizeof(typeof(int[1 - 2 * !!__builtin_types_compatible_p(        \
+                                 typeof(arr), typeof(&arr[0]))])) * \
+   0)
+#else
+#define IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr) 0
+#endif  // GCC / Clang
+
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities
 //===----------------------------------------------------------------------===//

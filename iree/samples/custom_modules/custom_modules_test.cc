@@ -128,7 +128,7 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
   ASSERT_NE(nullptr, reversed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(reversed_message, result_buffer,
-                                                ABSL_ARRAYSIZE(result_buffer)));
+                                                IREE_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("!dlrow olleh", result_buffer);
 }
 
@@ -168,7 +168,7 @@ TEST_F(CustomModulesTest, PrintTensor) {
   ASSERT_NE(nullptr, printed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(printed_message, result_buffer,
-                                                ABSL_ARRAYSIZE(result_buffer)));
+                                                IREE_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("2x4xf32=[0 1 2 3][4 5 6 7]", result_buffer);
 }
 
@@ -208,7 +208,7 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
   ASSERT_NE(nullptr, printed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(printed_message, result_buffer,
-                                                ABSL_ARRAYSIZE(result_buffer)));
+                                                IREE_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("2x4xf32=[0 1 2 3][4 5 6 7]", result_buffer);
 }
 
