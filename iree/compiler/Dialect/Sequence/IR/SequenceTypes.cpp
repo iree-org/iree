@@ -24,8 +24,7 @@ namespace Sequence {
 namespace detail {
 
 struct SequenceTypeStorage : public TypeStorage {
-  SequenceTypeStorage(Type targetType, unsigned subclassData = 0)
-      : TypeStorage(subclassData), targetType(targetType) {}
+  SequenceTypeStorage(Type targetType) : targetType(targetType) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
