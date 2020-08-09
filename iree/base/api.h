@@ -234,6 +234,13 @@ typedef uint64_t iree_device_size_t;
 #define IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr) 0
 #endif  // GCC / Clang
 
+// Aligns |value| up to the given power-of-two |alignment| if required.
+// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
+static inline iree_host_size_t iree_math_align(iree_host_size_t value,
+                                               iree_host_size_t alignment) {
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities
 //===----------------------------------------------------------------------===//
@@ -597,11 +604,14 @@ typedef uintptr_t iree_status_t;
       IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
 
 // TODO(#265): better logging of status checks.
-#define IREE_CHECK_OK(expr) CHECK_EQ(IREE_STATUS_OK, iree_status_code(expr))
-#define IREE_ASSERT_OK(expr) ASSERT_EQ(IREE_STATUS_OK, iree_status_code(expr))
-#define IREE_EXPECT_OK(expr) EXPECT_EQ(IREE_STATUS_OK, iree_status_code(expr))
+#define IREE_CHECK_OK(expr) \
+  CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
+#define IREE_ASSERT_OK(expr) \
+  ASSERT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
+#define IREE_EXPECT_OK(expr) \
+  EXPECT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
 #define IREE_EXPECT_STATUS_IS(expected_code, expr) \
-  EXPECT_EQ(expected_code, iree_status_code(expr))
+  EXPECT_EQ(expected_code, iree_status_consume_code(expr))
 #define IREE_ASSERT_ARGUMENT(name) assert(name)
 
 // Returns a NUL-terminated string constant for the given status code, such as
@@ -633,7 +643,12 @@ IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status);
 
 // Ignores |status| regardless of its value and frees any associated payloads.
 // Returns an OK status that can be used when chaining.
-IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_status_ignore(iree_status_t status);
+
+// Consumes the |status| by freeing its storage and returning its code.
+IREE_API_EXPORT iree_status_code_t IREE_API_CALL
+iree_status_consume_code(iree_status_t status);
 
 // Annotates a status message with the given constant string message.
 // Ignored if |base_status| is OK.

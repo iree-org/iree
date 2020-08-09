@@ -307,13 +307,6 @@ static inline uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
   return n;
 }
 
-// Aligns |value| up to the given power-of-two |alignment| if required.
-// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
-static inline iree_host_size_t iree_math_align(iree_host_size_t value,
-                                               iree_host_size_t alignment) {
-  return (value + (alignment - 1)) & ~(alignment - 1);
-}
-
 //===----------------------------------------------------------------------===//
 // Stack implementation
 //===----------------------------------------------------------------------===//

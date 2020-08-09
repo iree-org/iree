@@ -136,9 +136,14 @@ TEST_P(VMBytecodeDispatchTest, Check) {
     if (expect_failure) {
       GTEST_SUCCEED();
     } else {
-      GTEST_FAIL() << "Function expected success but failed with error "
-                   << iree_status_code_string(iree_status_code(result));
-      iree_status_ignore(result);
+      // TODO(#265): wrap up in a macro.
+      iree_string_view_t status_str = iree_string_view_empty();
+      ASSERT_TRUE(iree_status_to_string(
+          result, const_cast<char**>(&status_str.data), &status_str.size));
+      iree_status_free(result);
+      GTEST_FAIL() << "Function expected success but failed with error: "
+                   << absl::string_view(status_str.data, status_str.size - 1);
+      free(const_cast<char*>(status_str.data));
     }
   }
 }
