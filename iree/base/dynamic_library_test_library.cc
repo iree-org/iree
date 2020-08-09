@@ -21,7 +21,7 @@
 #if defined(_WIN32)
 #define IREE_SYM_EXPORT __declspec(dllexport)
 #else
-#define IREE_SYM_EXPORT
+#define IREE_SYM_EXPORT __attribute__ ((visibility ("default")))
 #endif  // _WIN32
 
 IREE_API_EXPORT int IREE_SYM_EXPORT times_two(int value) { return value * 2; }
