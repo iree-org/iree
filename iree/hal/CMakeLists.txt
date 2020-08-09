@@ -80,8 +80,8 @@ iree_cc_test(
     iree::base::api_util
     iree::base::memory
     iree::base::status
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(
@@ -113,8 +113,8 @@ iree_cc_test(
     ::heap_buffer
     absl::span
     iree::base::status
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(
@@ -201,8 +201,8 @@ iree_cc_test(
     ::heap_buffer
     absl::memory
     iree::hal::testing::mock_allocator
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(

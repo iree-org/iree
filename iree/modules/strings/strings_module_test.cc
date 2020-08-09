@@ -26,6 +26,7 @@
 #include "iree/modules/strings/api_detail.h"
 #include "iree/modules/strings/strings_module_test_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -120,9 +121,9 @@ class StringsModuleTest : public ::testing::Test {
            static_cast<const void*>(contents.data()),
            mapped_memory.contents.data_length);
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
-    IREE_ASSERT_OK(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(), E,
-                                    iree_allocator_system(), &*out_buffer_view));
+    IREE_ASSERT_OK(iree_hal_buffer_view_create(
+        buffer.get(), shape.data(), shape.size(), E, iree_allocator_system(),
+        &*out_buffer_view));
   }
 
   void TestStringTensorToString(

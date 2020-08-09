@@ -21,6 +21,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"

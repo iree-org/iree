@@ -194,8 +194,8 @@ iree_cc_test(
   DEPS
     iree::hal::vulkan::status_util
     iree::hal::vulkan::dynamic_symbols
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
   LABELS
     "nokokoro"
 )

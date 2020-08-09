@@ -309,6 +309,13 @@ inline internal::IsOkMatcherGenerator IsOk() {
 #define EXPECT_OK(rexpr) EXPECT_THAT(rexpr, ::iree::testing::status::IsOk())
 #define ASSERT_OK(rexpr) ASSERT_THAT(rexpr, ::iree::testing::status::IsOk())
 
+#define IREE_ASSERT_OK(expr) \
+  ASSERT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
+#define IREE_EXPECT_OK(expr) \
+  EXPECT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
+#define IREE_EXPECT_STATUS_IS(expected_code, expr) \
+  EXPECT_EQ(expected_code, iree_status_consume_code(expr))
+
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.
 // If the Status is non-OK, generates a test failure and returns from the

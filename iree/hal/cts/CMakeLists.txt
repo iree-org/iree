@@ -26,8 +26,8 @@ iree_cc_library(
   DEPS
     iree::base::status
     iree::hal::driver_registry
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
     ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
   PUBLIC
@@ -43,7 +43,6 @@ iree_cc_test(
     iree::base::status
     iree::hal::driver_registry
     iree::testing::gtest
-    iree::testing::status_matchers
 )
 
 iree_cc_test(
@@ -56,7 +55,6 @@ iree_cc_test(
     iree::base::status
     iree::hal::driver_registry
     iree::testing::gtest
-    iree::testing::status_matchers
 )
 
 iree_cc_test(
@@ -69,7 +67,6 @@ iree_cc_test(
     iree::base::status
     iree::hal::driver_registry
     iree::testing::gtest
-    iree::testing::status_matchers
 )
 
 iree_cc_test(

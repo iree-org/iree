@@ -606,12 +606,6 @@ typedef uintptr_t iree_status_t;
 // TODO(#265): better logging of status checks.
 #define IREE_CHECK_OK(expr) \
   CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
-#define IREE_ASSERT_OK(expr) \
-  ASSERT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
-#define IREE_EXPECT_OK(expr) \
-  EXPECT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
-#define IREE_EXPECT_STATUS_IS(expected_code, expr) \
-  EXPECT_EQ(expected_code, iree_status_consume_code(expr))
 #define IREE_ASSERT_ARGUMENT(name) assert(name)
 
 // Returns a NUL-terminated string constant for the given status code, such as

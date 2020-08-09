@@ -43,8 +43,8 @@ cc_test(
         ":condvar_semaphore",
         "//iree/base:api",
         "//iree/base:status",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "//iree/testing:status_matchers",
     ],
 )
 

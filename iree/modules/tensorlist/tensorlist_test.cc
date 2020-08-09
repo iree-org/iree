@@ -25,6 +25,7 @@
 #include "iree/modules/tensorlist/native_module.h"
 #include "iree/modules/tensorlist/tensorlist_test_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -149,7 +150,8 @@ TEST_F(TensorListModulesTest, IdentityThroughSetItemGetItem) {
   // Synchronously invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(
       context_, LookupFunction("identity_through_set_item_get_item"),
-      /*policy=*/nullptr, inputs.get(), outputs.get(), iree_allocator_system()));
+      /*policy=*/nullptr, inputs.get(), outputs.get(),
+      iree_allocator_system()));
 
   auto* returned_buffer_view =
       reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
@@ -190,9 +192,10 @@ TEST_F(TensorListModulesTest, IdentityThroughConcat) {
                                      iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  IREE_ASSERT_OK(iree_vm_invoke(
-      context_, LookupFunction("identity_through_concat"),
-      /*policy=*/nullptr, inputs.get(), outputs.get(), iree_allocator_system()));
+  IREE_ASSERT_OK(iree_vm_invoke(context_,
+                                LookupFunction("identity_through_concat"),
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
 
   auto* returned_buffer_view =
       reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
@@ -244,9 +247,10 @@ TEST_F(TensorListModulesTest, IdentityThroughStack) {
                                      iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  IREE_ASSERT_OK(iree_vm_invoke(
-      context_, LookupFunction("identity_through_stack"),
-      /*policy=*/nullptr, inputs.get(), outputs.get(), iree_allocator_system()));
+  IREE_ASSERT_OK(iree_vm_invoke(context_,
+                                LookupFunction("identity_through_stack"),
+                                /*policy=*/nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
 
   auto* returned_buffer_view =
       reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(

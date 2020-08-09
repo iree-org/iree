@@ -58,8 +58,8 @@ cc_test(
     deps = [
         ":op_kernels",
         "//iree/base:memory",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "//iree/testing:status_matchers",
         "@com_google_absl//absl/container:inlined_vector",
     ],
 )

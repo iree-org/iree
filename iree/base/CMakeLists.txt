@@ -181,8 +181,8 @@ iree_cc_test(
     ::file_io
     ::status
     ::target_platform
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(
@@ -222,8 +222,8 @@ iree_cc_test(
     ::logging
     ::status
     absl::strings
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(
@@ -461,8 +461,8 @@ iree_cc_test(
     "status_test.cc"
   DEPS
     ::status
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(
@@ -550,8 +550,8 @@ endif()
 #     "wait_handle_test.cc"
 #   DEPS
 #     absl::time
-#     iree::testing::gtest_main
 #     iree::base::status
 #     iree::base::wait_handle
-#     iree::testing::status_matchers
+#     iree::testing::gtest
+#     iree::testing::gtest_main
 # )

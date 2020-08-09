@@ -32,7 +32,6 @@ cc_library(
     ],
     deps = [
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
 
         # HAL driver modules.
@@ -49,7 +48,6 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
     ],
@@ -61,7 +59,6 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
     ],
@@ -73,7 +70,6 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
     ],

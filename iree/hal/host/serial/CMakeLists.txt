@@ -46,8 +46,8 @@ iree_cc_test(
     iree::hal::host::serial::serial_submission_queue
     iree::hal::testing::mock_command_buffer
     iree::hal::testing::mock_command_queue
+    iree::testing::gtest
     iree::testing::gtest_main
-    iree::testing::status_matchers
 )
 
 iree_cc_library(

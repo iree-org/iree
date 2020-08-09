@@ -152,8 +152,8 @@ cc_test(
         ":file_io",
         ":status",
         ":target_platform",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "//iree/testing:status_matchers",
     ],
 )
 
@@ -186,8 +186,8 @@ cc_test(
         ":file_path",
         ":logging",
         ":status",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "//iree/testing:status_matchers",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -390,8 +390,8 @@ cc_test(
     srcs = ["status_test.cc"],
     deps = [
         ":status",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "//iree/testing:status_matchers",
     ],
 )
 
@@ -452,7 +452,7 @@ cc_library(
 #         ":status",
 #         ":wait_handle",
 #         "@com_google_absl//absl/time",
+#         "//iree/testing:gtest",
 #         "//iree/testing:gtest_main",
-#         "//iree/testing:status_matchers",
 #     ],
 # )
