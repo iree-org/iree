@@ -25,6 +25,7 @@ namespace iree_compiler {
 // Options that can be used to configure SPIR-V codegeneration.
 struct SPIRVCodegenOptions {
   SmallVector<int64_t, 3> workgroupSize = {};
+  SmallVector<int64_t, 3> tileSizes = {};
   bool useWorkgroupMemory = false;
 };
 
@@ -35,7 +36,8 @@ struct SPIRVCodegenOptions {
 /// it exists) and along "z" for the next loop (if it exists). The workgroup
 /// size is expected to be of size at-most 3.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
-    ArrayRef<int64_t> workGroupSize = {}, bool useWorkgroupMem = false);
+    ArrayRef<int64_t> workGroupSize = {}, ArrayRef<int64_t> tileSizes = {},
+    bool useWorkgroupMem = false);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.

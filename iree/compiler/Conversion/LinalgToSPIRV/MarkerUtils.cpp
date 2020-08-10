@@ -26,30 +26,36 @@ struct VectorTransforms {
 };
 const StringLiteral VectorTransforms::kVectorTransformMarker =
     "__internal_vector_transform__";
-/// Checks if the operation has the `marker` If `marker` is null string, checks
-/// if any marker is set.
-static bool checkMarkerValue(Operation *op, StringRef marker = "") {
+
+StringRef getWorkgroupMarker() { return "workgroup"; }
+
+StringRef getWorkgroupMemoryMarker() { return "workgroup_memory"; }
+
+StringRef getWorkgroupNumProcsGENumItersMarker() {
+  return "workgroup_numprocs_ge_numiters";
+}
+
+StringRef getWorkgroupMemoryNumProcsGENumItersMarker() {
+  return "workgroup_memory_numprocs_ge_numiters";
+}
+
+StringRef getCopyToWorkgroupMemoryMarker() {
+  return "copy_to_workgroup_memory";
+}
+
+bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
       linalg::LinalgTransforms::kLinalgTransformMarker);
-  return attr && (marker.empty() || attr.getValue() == marker);
-}
-
-StringRef getWorkGroupMarker() { return "workgroup"; }
-
-bool hasMarker(Operation *op, StringRef marker) {
-  return checkMarkerValue(op, marker);
-}
-
-bool hasWorkGroupMarker(Operation *op) {
-  return checkMarkerValue(op, getWorkGroupMarker());
+  return attr && (marker.empty() ||
+                  llvm::any_of(marker, [&attr](StringRef markerValue) {
+                    return attr.getValue() == markerValue;
+                  }));
 }
 
 void setMarker(Operation *op, StringRef marker) {
   op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
               StringAttr::get(marker, op->getContext()));
 }
-
-void setWorkGroupMarker(Operation *op) { setMarker(op, getWorkGroupMarker()); }
 
 }  // namespace iree_compiler
 }  // namespace mlir
