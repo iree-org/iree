@@ -260,7 +260,7 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
     }
     p.printType(op.getType().getInput(i));
     if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
-      p << "...";
+      p << " ...";
     }
     if (i < op.getNumFuncArguments() - 1) {
       p << ", ";
@@ -970,7 +970,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
           p.printType(segmentType);
         } else {
           p.printType(segmentType);
-          p << "...";
+          p << " ...";
         }
       });
   p << ")";
