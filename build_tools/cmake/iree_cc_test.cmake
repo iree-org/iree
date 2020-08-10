@@ -146,6 +146,7 @@ function(iree_cc_test)
         "${CMAKE_BINARY_DIR}"
       )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
+    iree_add_test_environment_properties(${_TEST_NAME})
   endif(ANDROID)
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")

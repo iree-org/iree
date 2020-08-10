@@ -143,7 +143,14 @@ cc_library(
 
 cc_library(
     name = "init_targets",
+    srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
+    copts = [
+        "-DIREE_HAVE_LLVMAOT_TARGET",
+        "-DIREE_HAVE_LLVMIR_TARGET",
+        "-DIREE_HAVE_VMLA_TARGET",
+        "-DIREE_HAVE_VULKANSPIRV_TARGET",
+    ],
     deps = [
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMAOT",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMIR",

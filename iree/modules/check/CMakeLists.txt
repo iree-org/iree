@@ -14,28 +14,31 @@
 
 iree_add_all_subdirs()
 
-iree_cc_test(
-  NAME
-    check_test
-  SRCS
-    "check_test.cc"
-  DEPS
-    ::native_module
-    absl::core_headers
-    absl::strings
-    iree::base::api
-    iree::base::api_util
-    iree::base::logging
-    iree::base::status
-    iree::base::status_matchers
-    iree::hal::api
-    iree::hal::vmla::vmla_driver_module
-    iree::modules::hal
-    iree::testing::gtest_main
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::ref_cc
-)
+# bazel_to_cmake: DO NOT EDIT, IREE_HAL_DRIVER_VMLA filtering is custom logic
+if(${IREE_HAL_DRIVER_VMLA})
+  iree_cc_test(
+    NAME
+      check_test
+    SRCS
+      "check_test.cc"
+    DEPS
+      ::native_module
+      absl::core_headers
+      absl::strings
+      iree::base::api
+      iree::base::api_util
+      iree::base::logging
+      iree::base::status
+      iree::base::status_matchers
+      iree::hal::api
+      iree::hal::vmla::vmla_driver_module
+      iree::modules::hal
+      iree::testing::gtest_main
+      iree::vm
+      iree::vm::bytecode_module
+      iree::vm::ref_cc
+  )
+endif()
 
 iree_cc_binary(
   NAME
@@ -57,13 +60,11 @@ iree_cc_binary(
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
     iree::modules::hal
     iree::testing::gtest
     iree::tools::vm_util
     iree::vm::bytecode_module
+    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
 )
 
