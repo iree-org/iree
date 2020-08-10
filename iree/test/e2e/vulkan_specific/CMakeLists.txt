@@ -32,7 +32,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan_wgmem
   SRCS
-    "conv.mlir"
     "gemm.mlir"
   TARGET_BACKEND
     vulkan-spirv

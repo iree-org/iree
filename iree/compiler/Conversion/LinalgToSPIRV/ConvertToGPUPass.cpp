@@ -44,9 +44,9 @@ namespace mlir {
 namespace iree_compiler {
 
 /// In some cases the iterations of the loops when partitioned to workgroups
-/// need to be distributed in a cyclic manner. The main use cases here is when
+/// need to be distributed in a cyclic manner. The main use case here is when
 /// the number of workgroups is constrained such that the number of iterations
-/// is greater than equal to number of processors (along any dimension). In
+/// is greater than or equal to number of processors (along any dimension). In
 /// those cases, distribute the iterations in a cyclic manner. This adds
 /// additional control flow, but isn't too detrimental to performance since they
 /// are convergent for the most part.
@@ -433,7 +433,7 @@ static void getGPUProcessorIdsAndCounts(Location loc,
 template <typename GPUIdOp, typename GPUCountOp>
 static ProcessorIdAndCount getLinearizedGPUProcessorIdAndCount(
     Location loc, ConversionPatternRewriter &rewriter) {
-  SmallVector<Value, 3> ids(3), counts(3);
+  std::array<Value, 3> ids, counts;
   getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(loc, rewriter, 3, ids,
                                                    counts);
   ProcessorIdAndCount linearized;
@@ -521,7 +521,7 @@ static LogicalResult mapToGlobalInvocationId(
 }
 
 /// Compute the number of bytes copied when load/storing to/from workgorup
-/// memory. It is appsoximated as the size of the underlying allocation being
+/// memory. It is approximated to be the size of the underlying allocation being
 /// copied into/from.
 static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
   Value src = copyOp.input();
