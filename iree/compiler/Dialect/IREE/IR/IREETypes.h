@@ -143,7 +143,6 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
  public:
   static PtrType get(Type targetType);
   static PtrType getChecked(Type targetType, Location location);
-  static bool kindof(unsigned kind) { return kind == TypeKind::Ptr; }
 
   using Base::Base;
 
@@ -156,8 +155,6 @@ class ByteBufferType
  public:
   using Base::Base;
 
-  static bool kindof(unsigned kind) { return kind == TypeKind::ByteBuffer; }
-
   static ByteBufferType get(MLIRContext *context) {
     return Base::get(context, TypeKind::ByteBuffer);
   }
@@ -168,10 +165,6 @@ class MutableByteBufferType
     : public Type::TypeBase<MutableByteBufferType, Type, TypeStorage> {
  public:
   using Base::Base;
-
-  static bool kindof(unsigned kind) {
-    return kind == TypeKind::MutableByteBuffer;
-  }
 
   static MutableByteBufferType get(MLIRContext *context) {
     return Base::get(context, TypeKind::MutableByteBuffer);

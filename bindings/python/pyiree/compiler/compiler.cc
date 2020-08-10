@@ -31,6 +31,7 @@
 #include "iree/tools/init_mlir_dialects.h"
 #include "iree/tools/init_mlir_passes.h"
 #include "iree/tools/init_targets.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -185,71 +186,61 @@ DiagnosticCapture::DiagnosticCapture(DiagnosticCapture&& other) {
 // doesn't do any path shortening, which seems to make long Python stack traces
 // a bit easier to scan.
 void PrintLocation(Location loc, raw_ostream& out) {
-  switch (loc->getKind()) {
-    case StandardAttributes::OpaqueLocation:
-      PrintLocation(loc.cast<OpaqueLoc>().getFallbackLocation(), out);
-      break;
-    case StandardAttributes::UnknownLocation:
-      out << "  [unknown location]\n";
-      break;
-    case StandardAttributes::FileLineColLocation: {
-      auto line_col_loc = loc.cast<FileLineColLoc>();
-      StringRef this_filename = line_col_loc.getFilename();
-      auto slash_pos = this_filename.find_last_of("/\\");
-      // We print both the basename and extended names with a structure like
-      // `foo.py:35:4`. Even though technically the line/col
-      // information is redundant to include in both names, having it on both
-      // makes it easier to paste the paths into an editor and jump to the exact
-      // location.
-      std::string line_col_suffix =
-          ":" + std::to_string(line_col_loc.getLine()) + ":" +
-          std::to_string(line_col_loc.getColumn());
-      bool has_basename = false;
-      StringRef basename = this_filename;
-      if (slash_pos != StringRef::npos) {
-        has_basename = true;
-        basename = this_filename.substr(slash_pos + 1);
-      }
-      out << "  at: " << basename << line_col_suffix;
-      if (has_basename) {
-        // When running through bazel, such as in our e2e test suite,
-        // the paths involved can be quite large, and will have a very long
-        // prefix before the sandboxed "runfiles" directory that the program
-        // runs in. Trim off that long prefix. By convention, the path names
-        // with this prefix dropped will correspond to the path in the source
-        // directory, which is probably what we want anyway.
-        StringRef kRunfiles(".runfiles/");
-        StringRef extended_name = this_filename;
-        auto runfiles_pos = extended_name.rfind(kRunfiles);
-        if (runfiles_pos != StringRef::npos) {
-          extended_name =
-              extended_name.drop_front(runfiles_pos + kRunfiles.size());
+  TypeSwitch<Location>(loc)
+      .Case<OpaqueLoc>(
+          [&](OpaqueLoc loc) { PrintLocation(loc.getFallbackLocation(), out); })
+      .Case<UnknownLoc>([&](UnknownLoc) { out << "  [unknown location]\n"; })
+      .Case<FileLineColLoc>([&](FileLineColLoc line_col_loc) {
+        StringRef this_filename = line_col_loc.getFilename();
+        auto slash_pos = this_filename.find_last_of("/\\");
+        // We print both the basename and extended names with a structure like
+        // `foo.py:35:4`. Even though technically the line/col
+        // information is redundant to include in both names, having it on both
+        // makes it easier to paste the paths into an editor and jump to the
+        // exact location.
+        std::string line_col_suffix =
+            ":" + std::to_string(line_col_loc.getLine()) + ":" +
+            std::to_string(line_col_loc.getColumn());
+        bool has_basename = false;
+        StringRef basename = this_filename;
+        if (slash_pos != StringRef::npos) {
+          has_basename = true;
+          basename = this_filename.substr(slash_pos + 1);
         }
-        // Print out two tabs, as basenames usually vary in length by more than
-        // one tab width.
-        out << "\t\t( " << extended_name << line_col_suffix << " )";
-      }
-      out << "\n";
-      break;
-    }
-    case StandardAttributes::NameLocation: {
-      auto nameLoc = loc.cast<NameLoc>();
-      out << "  @'" << nameLoc.getName() << "':\n";
-      auto childLoc = nameLoc.getChildLoc();
-      if (!childLoc.isa<UnknownLoc>()) {
-        out << "(...\n";
-        PrintLocation(childLoc, out);
-        out << ")\n";
-      }
-      break;
-    }
-    case StandardAttributes::CallSiteLocation: {
-      auto call_site = loc.cast<CallSiteLoc>();
-      PrintLocation(call_site.getCaller(), out);
-      PrintLocation(call_site.getCallee(), out);
-      break;
-    }
-  }
+        out << "  at: " << basename << line_col_suffix;
+        if (has_basename) {
+          // When running through bazel, such as in our e2e test suite,
+          // the paths involved can be quite large, and will have a very long
+          // prefix before the sandboxed "runfiles" directory that the program
+          // runs in. Trim off that long prefix. By convention, the path names
+          // with this prefix dropped will correspond to the path in the source
+          // directory, which is probably what we want anyway.
+          StringRef kRunfiles(".runfiles/");
+          StringRef extended_name = this_filename;
+          auto runfiles_pos = extended_name.rfind(kRunfiles);
+          if (runfiles_pos != StringRef::npos) {
+            extended_name =
+                extended_name.drop_front(runfiles_pos + kRunfiles.size());
+          }
+          // Print out two tabs, as basenames usually vary in length by more
+          // than one tab width.
+          out << "\t\t( " << extended_name << line_col_suffix << " )";
+        }
+        out << "\n";
+      })
+      .Case<NameLoc>([&](NameLoc name_loc) {
+        out << "  @'" << name_loc.getName() << "':\n";
+        auto child_loc = name_loc.getChildLoc();
+        if (!child_loc.isa<UnknownLoc>()) {
+          out << "(...\n";
+          PrintLocation(child_loc, out);
+          out << ")\n";
+        }
+      })
+      .Case<CallSiteLoc>([&](CallSiteLoc call_site) {
+        PrintLocation(call_site.getCaller(), out);
+        PrintLocation(call_site.getCallee(), out);
+      });
 }
 
 std::string DiagnosticCapture::ConsumeDiagnosticsAsString(

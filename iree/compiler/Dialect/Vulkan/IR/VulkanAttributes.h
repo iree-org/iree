@@ -70,8 +70,6 @@ class TargetEnvAttr
   /// bits.
   CapabilitiesAttr getCapabilitiesAttr();
 
-  static bool kindof(unsigned kind) { return kind == AttrKind::TargetEnv; }
-
   static LogicalResult verifyConstructionInvariants(
       Location loc, IntegerAttr version, IntegerAttr revision,
       ArrayAttr extensions, DictionaryAttr capabilities);

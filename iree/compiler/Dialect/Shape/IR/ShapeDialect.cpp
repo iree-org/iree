@@ -164,13 +164,9 @@ Type ShapeDialect::parseType(DialectAsmParser& parser) const {
 }
 
 void ShapeDialect::printType(Type type, DialectAsmPrinter& os) const {
-  switch (type.getKind()) {
-    case Shape::TypeKind::RankedShape:
-      printRankedShape(type.cast<Shape::RankedShapeType>(), os);
-      break;
-    default:
-      llvm_unreachable("unhandled Shape type");
-  }
+  if (auto rankedShapeTy = type.dyn_cast<Shape::RankedShapeType>())
+    return printRankedShape(type.cast<Shape::RankedShapeType>(), os);
+  llvm_unreachable("unhandled Shape type");
 }
 
 }  // namespace iree_compiler
