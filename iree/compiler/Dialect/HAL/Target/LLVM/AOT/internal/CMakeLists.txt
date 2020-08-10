@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    features = ["layering_check"],
-    licenses = ["notice"],  # Apache 2.0
-)
+iree_add_all_subdirs()
 
-cc_library(
-    name = "LLVMAOTTargetLinker_internal",
-    srcs = ["LLVMAOTTargetLinker.cpp"],
-    deps = [
-        "//iree/base:status",
-        "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMAOTTargetLinker_hdrs",
-        "@llvm-project//llvm:Support",
-    ],
+iree_cc_library(
+  NAME
+    LLVMAOTTargetLinker_internal
+  SRCS
+    "LLVMAOTTargetLinker.cpp"
+  DEPS
+    LLVMSupport
+    iree::base::status
+    iree::compiler::Dialect::HAL::Target::LLVM::AOT::LLVMAOTTargetLinker_hdrs
+  PUBLIC
 )

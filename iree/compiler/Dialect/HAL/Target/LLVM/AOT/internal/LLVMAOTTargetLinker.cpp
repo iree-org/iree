@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTargetLinker.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTargetLinker.h"
 
 #include "iree/base/status.h"
 #include "llvm/Support/ToolOutputFile.h"

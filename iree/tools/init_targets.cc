@@ -15,10 +15,10 @@
 #include "iree/tools/init_targets.h"
 
 #ifdef IREE_HAVE_LLVMAOT_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTarget.h"
 #endif
 #ifdef IREE_HAVE_LLVMIR_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/IR/LLVMIRTarget.h"
 #endif
 #ifdef IREE_HAVE_VMLA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"

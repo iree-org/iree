@@ -20,7 +20,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(scotttodd): also return if IREE_TARGET_BACKEND_DYLIB-LLVM-AOT is false
 iree_cmake_extra_content(
     content = """
 if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
@@ -30,34 +29,23 @@ endif()
 )
 
 cc_library(
-    name = "LLVMIRPasses",
+    name = "LLVMIR",
     srcs = [
-        "LLVMIRPasses.cpp",
+        "LLVMIRTarget.cpp",
     ],
     hdrs = [
-        "LLVMIRPasses.h",
+        "LLVMIRTarget.h",
     ],
     deps = [
-        ":LLVMTargetOptions",
+        "//iree/compiler/Conversion/LinalgToLLVM",
+        "//iree/compiler/Dialect/HAL/Target",
+        "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMIRPasses",
+        "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMTargetOptions",
+        "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@llvm-project//llvm:Core",
-        "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
-        "@llvm-project//llvm:Target",
-        "@llvm-project//mlir:Support",
-    ],
-)
-
-cc_library(
-    name = "LLVMTargetOptions",
-    srcs = [
-        "LLVMTargetOptions.cpp",
-    ],
-    hdrs = [
-        "LLVMTargetOptions.h",
-    ],
-    deps = [
-        "@llvm-project//llvm:Passes",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//llvm:Target",
+        # TODO(ataei): Link with native target dep.
+        "@llvm-project//llvm:X86CodeGen",
+        "@llvm-project//mlir:TargetLLVMIR",
     ],
 )
