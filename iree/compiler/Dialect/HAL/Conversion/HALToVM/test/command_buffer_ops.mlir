@@ -27,7 +27,7 @@ func @command_buffer_execution_barrier(%arg0 : !hal.command_buffer, %arg1 : !hal
   %memory_barrier = hal.make_memory_barrier "HostRead|HostWrite", "MemoryRead|MemoryWrite" : tuple<i32, i32>
   // TODO(benvanik): buffer barriers.
   // %buffer_barrier = hal.make_buffer_barrier "HostRead|HostWrite", "MemoryRead|MemoryWrite", %0, %1, %2 : tuple<i32, i32, !vm.ref<!hal.buffer>, i32, i32>
-  // CHECK: vm.call.variadic @hal.command_buffer.execution_barrier(%arg0, %c1, %c2, [%c192, %c768], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32..., i32...)
+  // CHECK: vm.call.variadic @hal.command_buffer.execution_barrier(%arg0, %c1, %c2, [%c192, %c768], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
   hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess",
       memory_barriers=[%memory_barrier, %memory_barrier]
   return
@@ -65,9 +65,9 @@ func @command_buffer_bind_descriptor_set(
     %arg1 : !hal.executable_layout,
     %arg2 : !hal.descriptor_set) {
   %c100 = constant 100 : index
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, []) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32...)
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, []) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
   hal.command_buffer.bind_descriptor_set %arg0, %arg1, set=0, %arg2
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero_0, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32...)
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero_0, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
   hal.command_buffer.bind_descriptor_set %arg0, %arg1, set=0, %arg2, offsets=[%c100]
   return
 }

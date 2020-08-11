@@ -42,6 +42,8 @@ cc_library(
         ":api_util",
         ":file_mapping",
         ":init",
+        ":platform_headers",
+        ":target_platform",
         ":tracing",
     ],
 )
