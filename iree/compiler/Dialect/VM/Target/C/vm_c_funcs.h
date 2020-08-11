@@ -17,8 +17,6 @@
 
 #include <stdint.h>
 
-inline int32_t vm_add_i32(int32_t a, int32_t b) {
-    return a + b;
-}
+inline int32_t vm_add_i32(int32_t a, int32_t b) { return a + b; }
 
 #endif  // IREE_COMPILER_DIALECT_VM_TARGET_C_VM_C_FUNCS_H_
