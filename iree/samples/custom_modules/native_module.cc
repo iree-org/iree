@@ -19,7 +19,6 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/module_abi_cc.h"
@@ -287,10 +286,7 @@ extern "C" iree_status_t iree_custom_native_module_create(
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
       "custom", allocator, absl::MakeConstSpan(kCustomModuleFunctions));
-  auto status = module->Initialize();
-  if (!status.ok()) {
-    return ToApiStatus(status);
-  }
+  IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

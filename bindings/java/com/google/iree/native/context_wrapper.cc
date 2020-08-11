@@ -14,7 +14,6 @@
 
 #include "bindings/java/com/google/iree/native/context_wrapper.h"
 
-#include "iree/base/api_util.h"
 #include "iree/base/logging.h"
 
 namespace iree {

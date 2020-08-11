@@ -16,8 +16,8 @@
 
 #include "absl/base/macros.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"

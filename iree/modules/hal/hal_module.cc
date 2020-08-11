@@ -19,7 +19,6 @@
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/api_detail.h"
@@ -927,7 +926,7 @@ iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
   *out_module = nullptr;
   auto module = std::make_unique<HALModule>(
       allocator, add_ref(reinterpret_cast<Device*>(device)));
-  IREE_API_RETURN_IF_ERROR(module->Initialize());
+  IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

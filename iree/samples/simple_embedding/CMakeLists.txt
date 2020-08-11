@@ -45,7 +45,6 @@ iree_cc_test(
     absl::core_headers
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::logging
     iree::hal::api
     iree::hal::vmla::vmla_driver_module

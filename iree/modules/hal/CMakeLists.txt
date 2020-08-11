@@ -27,7 +27,6 @@ iree_cc_library(
     absl::memory
     absl::span
     iree::base::api
-    iree::base::api_util
     iree::base::tracing
     iree::hal::api
     iree::hal::device

@@ -21,7 +21,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
-#include "iree/base/api_util.h"
 #include "iree/base/file_io.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/base/status.h"

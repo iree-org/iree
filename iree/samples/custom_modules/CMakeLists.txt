@@ -62,7 +62,6 @@ iree_cc_library(
     "native_module.cc"
   DEPS
     iree::base::api
-    iree::base::api_util
     iree::hal::api
     iree::modules::hal
     iree::vm

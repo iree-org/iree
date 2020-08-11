@@ -48,20 +48,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    api_util
-  HDRS
-    "api_util.h"
-  DEPS
-    ::api_hdrs
-    ::logging
-    ::status
-    absl::core_headers
-    absl::inlined_vector
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     arena
   HDRS
     "arena.h"

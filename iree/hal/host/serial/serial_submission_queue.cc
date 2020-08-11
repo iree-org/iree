@@ -109,7 +109,7 @@ Status SerialSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
       if (!batch_status.ok()) {
         // Batch failed; set the permanent error flag and abort so we don't
         // try to process anything else.
-        permanent_error_ = batch_status;
+        permanent_error_ = Status(batch_status);
         CompleteSubmission(submission, batch_status);
         FailAllPending(permanent_error_);
         return permanent_error_;

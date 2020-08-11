@@ -57,7 +57,6 @@ iree_cc_binary(
     absl::flags
     absl::strings
     benchmark
-    iree::base::api_util
     iree::base::file_io
     iree::base::localfile
     iree::base::status
@@ -97,7 +96,6 @@ iree_cc_binary(
     ::vm_util
     absl::flags
     absl::strings
-    iree::base::api_util
     iree::base::file_io
     iree::base::init
     iree::base::localfile
@@ -338,7 +336,6 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       absl::strings
       iree::base::api
-      iree::base::api_util
       iree::base::init
       iree::base::localfile
       iree::base::source_location
@@ -385,7 +382,6 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
-    iree::base::api_util
     iree::base::file_io
     iree::base::signature_mangle
     iree::base::status

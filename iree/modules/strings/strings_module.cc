@@ -387,10 +387,7 @@ extern "C" iree_status_t iree_strings_module_create(
   *out_module = NULL;
   auto module = std::make_unique<iree::StringsModule>(
       "strings", allocator, absl::MakeConstSpan(iree::kStringsModuleFunctions));
-  auto status = module->Initialize();
-  if (!status.ok()) {
-    return iree::ToApiStatus(status);
-  }
+  IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

@@ -53,7 +53,6 @@ cc_library(
         ":heap_buffer",
         ":semaphore",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:memory",
         "//iree/base:ref_ptr",
         "//iree/base:tracing",
@@ -76,7 +75,6 @@ cc_test(
     srcs = ["api_string_util_test.cc"],
     deps = [
         ":api",
-        "//iree/base:api_util",
         "//iree/base:memory",
         "//iree/base:status",
         "//iree/testing:gtest",

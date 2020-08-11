@@ -31,7 +31,6 @@ cc_test(
     deps = [
         ":native_module",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:logging",
         "//iree/base:status",
         "//iree/hal:api",
@@ -56,7 +55,6 @@ iree_cc_binary(
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:file_io",
         "//iree/base:init",
         "//iree/base:localfile",
@@ -77,7 +75,6 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:status",
         "//iree/hal:api",
         "//iree/modules/hal",

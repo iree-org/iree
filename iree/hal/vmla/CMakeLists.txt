@@ -106,7 +106,6 @@ iree_cc_library(
   DEPS
     ::vmla_device
     ::vmla_module
-    iree::base::api_util
     iree::base::tracing
     iree::hal::device_info
     iree::hal::driver
@@ -141,7 +140,6 @@ iree_cc_library(
     ::vmla_module
     absl::inlined_vector
     absl::span
-    iree::base::api_util
     iree::base::status
     iree::base::tracing
     iree::hal::executable

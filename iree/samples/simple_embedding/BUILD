@@ -54,7 +54,6 @@ cc_test(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:logging",
         "//iree/hal:api",
         "//iree/modules/hal",

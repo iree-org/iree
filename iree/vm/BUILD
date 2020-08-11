@@ -223,7 +223,6 @@ cc_library(
         ":ref_cc",
         ":stack",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/strings",

@@ -14,7 +14,6 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/api_util.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"

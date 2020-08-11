@@ -31,7 +31,6 @@ iree_cc_library(
     "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::api
-    iree::base::api_util
     iree::base::tracing
     iree::hal::api
     iree::hal::vulkan::dynamic_symbols

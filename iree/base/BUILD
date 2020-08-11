@@ -51,18 +51,6 @@ cc_library(
 )
 
 cc_library(
-    name = "api_util",
-    hdrs = ["api_util.h"],
-    deps = [
-        ":api_hdrs",
-        ":logging",
-        ":status",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
     name = "arena",
     srcs = ["arena.cc"],
     hdrs = ["arena.h"],

@@ -21,7 +21,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/status.h"
 #include "iree/vm/module.h"
 #include "iree/vm/module_abi_packing.h"
@@ -190,11 +189,7 @@ class NativeModule {
     *out_module_state = nullptr;
 
     auto* module = FromModulePointer(self);
-    auto module_state_or = module->CreateState(allocator);
-    if (!module_state_or.ok()) {
-      return ToApiStatus(module_state_or.status());
-    }
-    auto module_state = std::move(module_state_or).value();
+    IREE_ASSIGN_OR_RETURN(auto module_state, module->CreateState(allocator));
 
     *out_module_state =
         reinterpret_cast<iree_vm_module_state_t*>(module_state.release());

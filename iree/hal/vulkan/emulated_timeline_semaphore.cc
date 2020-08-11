@@ -59,7 +59,7 @@ EmulatedTimelineSemaphore::~EmulatedTimelineSemaphore() {
 }
 
 StatusOr<uint64_t> EmulatedTimelineSemaphore::Query() {
-  IREE_RETURN_IF_ERROR(TryToAdvanceTimeline(UINT64_MAX).status());
+  IREE_ASSIGN_OR_RETURN(bool _, TryToAdvanceTimeline(UINT64_MAX));
   uint64_t value = signaled_value_.load();
   if (value == UINT64_MAX) {
     absl::MutexLock lock(&mutex_);
@@ -126,8 +126,7 @@ Status EmulatedTimelineSemaphore::Wait(uint64_t value, Time deadline_ns) {
       *logical_device_, /*fenceCount=*/1, &fence, /*waitAll=*/true,
       timeout_ns));
 
-  IREE_RETURN_IF_ERROR(TryToAdvanceTimeline(value).status());
-  return OkStatus();
+  return TryToAdvanceTimeline(value).status();
 }
 
 void EmulatedTimelineSemaphore::Fail(Status status) {

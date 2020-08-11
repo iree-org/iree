@@ -50,7 +50,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::memory
     iree::base::ref_ptr
     iree::base::tracing
@@ -77,7 +76,6 @@ iree_cc_test(
     ::api
     absl::inlined_vector
     absl::strings
-    iree::base::api_util
     iree::base::memory
     iree::base::status
     iree::testing::gtest

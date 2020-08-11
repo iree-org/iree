@@ -26,7 +26,6 @@ if(${IREE_HAL_DRIVER_VMLA})
       absl::core_headers
       absl::strings
       iree::base::api
-      iree::base::api_util
       iree::base::logging
       iree::base::status
       iree::hal::api
@@ -52,7 +51,6 @@ iree_cc_binary(
     absl::flags
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::file_io
     iree::base::init
     iree::base::localfile
@@ -78,7 +76,6 @@ iree_cc_library(
     absl::inlined_vector
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::status
     iree::hal::api
     iree::modules::hal

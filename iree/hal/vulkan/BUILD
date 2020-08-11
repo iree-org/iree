@@ -49,7 +49,6 @@ cc_library(
         ":vulkan_device",
         ":vulkan_driver",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:tracing",
         "//iree/hal:api",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",

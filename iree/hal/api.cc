@@ -18,6 +18,7 @@
 #include <cinttypes>
 #include <cstdio>
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -27,7 +28,6 @@
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api_detail.h"
@@ -756,7 +756,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
   *out_buffer = nullptr;
 
   auto* handle = reinterpret_cast<Allocator*>(allocator);
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto buffer,
       handle->Allocate(static_cast<MemoryTypeBitfield>(memory_type),
                        static_cast<BufferUsageBitfield>(buffer_usage),
@@ -777,7 +777,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
   *out_buffer = nullptr;
 
   auto* handle = reinterpret_cast<Allocator*>(allocator);
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto buffer,
       handle->WrapMutable(static_cast<MemoryTypeBitfield>(memory_type),
                           static_cast<MemoryAccessBitfield>(allowed_access),
@@ -804,8 +804,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
   *out_buffer = nullptr;
 
   auto handle = add_ref(reinterpret_cast<Buffer*>(buffer));
-  IREE_API_ASSIGN_OR_RETURN(auto new_handle,
-                            Buffer::Subspan(handle, byte_offset, byte_length));
+  IREE_ASSIGN_OR_RETURN(auto new_handle,
+                        Buffer::Subspan(handle, byte_offset, byte_length));
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(new_handle.release());
 
@@ -832,8 +832,7 @@ iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   IREE_TRACE_SCOPE0("iree_hal_buffer_zero");
   IREE_ASSERT_ARGUMENT(buffer);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_API_RETURN_IF_ERROR(handle->Fill8(byte_offset, byte_length, 0));
-  return iree_ok_status();
+  return handle->Fill8(byte_offset, byte_length, 0);
 }
 
 IREE_API_EXPORT iree_status_t
@@ -844,9 +843,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(pattern);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_API_RETURN_IF_ERROR(
-      handle->Fill(byte_offset, byte_length, pattern, pattern_length));
-  return iree_ok_status();
+  return handle->Fill(byte_offset, byte_length, pattern, pattern_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
@@ -856,9 +853,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_API_RETURN_IF_ERROR(
-      handle->ReadData(source_offset, target_buffer, data_length));
-  return iree_ok_status();
+  return handle->ReadData(source_offset, target_buffer, data_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
@@ -868,9 +863,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(source_buffer);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_API_RETURN_IF_ERROR(
-      handle->WriteData(target_offset, source_buffer, data_length));
-  return iree_ok_status();
+  return handle->WriteData(target_offset, source_buffer, data_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
@@ -884,10 +877,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
   std::memset(out_mapped_memory, 0, sizeof(*out_mapped_memory));
 
   auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_API_ASSIGN_OR_RETURN(
-      auto mapping, buffer_handle->MapMemory<uint8_t>(
-                        static_cast<MemoryAccessBitfield>(memory_access),
-                        byte_offset, byte_length));
+  IREE_ASSIGN_OR_RETURN(auto mapping,
+                        buffer_handle->MapMemory<uint8_t>(
+                            static_cast<MemoryAccessBitfield>(memory_access),
+                            byte_offset, byte_length));
 
   static_assert(sizeof(iree_hal_mapped_memory_t::reserved) >=
                     sizeof(MappedMemory<uint8_t>),
@@ -1361,7 +1354,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
   *out_command_buffer = nullptr;
   auto* handle = reinterpret_cast<Device*>(device);
 
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto command_buffer,
       handle->CreateCommandBuffer(
           static_cast<CommandBufferModeBitfield>(mode),
@@ -1377,7 +1370,7 @@ iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_begin");
   IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->Begin());
+  return handle->Begin();
 }
 
 IREE_API_EXPORT iree_status_t
@@ -1385,7 +1378,7 @@ iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_end");
   IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->End());
+  return handle->End();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1407,7 +1400,7 @@ iree_hal_command_buffer_execution_barrier(
                 "Expecting identical layout");
   static_assert(sizeof(BufferBarrier) == sizeof(iree_hal_buffer_barrier_t),
                 "Expecting identical layout");
-  return ToApiStatus(handle->ExecutionBarrier(
+  return handle->ExecutionBarrier(
       static_cast<ExecutionStageBitfield>(source_stage_mask),
       static_cast<ExecutionStageBitfield>(target_stage_mask),
       absl::MakeConstSpan(
@@ -1415,7 +1408,7 @@ iree_hal_command_buffer_execution_barrier(
           memory_barrier_count),
       absl::MakeConstSpan(
           reinterpret_cast<const BufferBarrier*>(buffer_barriers),
-          buffer_barrier_count)));
+          buffer_barrier_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
@@ -1426,9 +1419,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(
-      handle->FillBuffer(reinterpret_cast<Buffer*>(target_buffer),
-                         target_offset, length, pattern, pattern_length));
+  return handle->FillBuffer(reinterpret_cast<Buffer*>(target_buffer),
+                            target_offset, length, pattern, pattern_length);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1443,9 +1435,9 @@ iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(target_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->UpdateBuffer(
-      source_buffer, source_offset, reinterpret_cast<Buffer*>(target_buffer),
-      target_offset, length));
+  return handle->UpdateBuffer(source_buffer, source_offset,
+                              reinterpret_cast<Buffer*>(target_buffer),
+                              target_offset, length);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
@@ -1455,9 +1447,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_copy_buffer");
   IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->CopyBuffer(
+  return handle->CopyBuffer(
       reinterpret_cast<Buffer*>(source_buffer), source_offset,
-      reinterpret_cast<Buffer*>(target_buffer), target_offset, length));
+      reinterpret_cast<Buffer*>(target_buffer), target_offset, length);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1478,10 +1470,10 @@ iree_hal_command_buffer_push_constants(
                             values_length);
   }
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->PushConstants(
+  return handle->PushConstants(
       reinterpret_cast<ExecutableLayout*>(executable_layout), offset,
       absl::MakeConstSpan(reinterpret_cast<const uint32_t*>(values),
-                          values_length / sizeof(uint32_t))));
+                          values_length / sizeof(uint32_t)));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1505,11 +1497,11 @@ iree_hal_command_buffer_push_descriptor_set(
   static_assert(sizeof(DescriptorSet::Binding) ==
                     sizeof(iree_hal_descriptor_set_binding_t),
                 "Expecting identical layout");
-  return ToApiStatus(handle->PushDescriptorSet(
+  return handle->PushDescriptorSet(
       reinterpret_cast<ExecutableLayout*>(executable_layout), set,
       absl::MakeConstSpan(
           reinterpret_cast<const DescriptorSet::Binding*>(bindings),
-          binding_count)));
+          binding_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1530,10 +1522,10 @@ iree_hal_command_buffer_bind_descriptor_set(
   }
   static_assert(sizeof(iree_device_size_t) == sizeof(device_size_t),
                 "Device sizes must match");
-  return ToApiStatus(handle->BindDescriptorSet(
+  return handle->BindDescriptorSet(
       reinterpret_cast<ExecutableLayout*>(executable_layout), set,
       reinterpret_cast<DescriptorSet*>(descriptor_set),
-      absl::MakeConstSpan(dynamic_offsets, dynamic_offset_count)));
+      absl::MakeConstSpan(dynamic_offsets, dynamic_offset_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
@@ -1544,9 +1536,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(executable);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->Dispatch(reinterpret_cast<Executable*>(executable),
-                                      entry_point,
-                                      {workgroup_x, workgroup_y, workgroup_z}));
+  return handle->Dispatch(reinterpret_cast<Executable*>(executable),
+                          entry_point, {workgroup_x, workgroup_y, workgroup_z});
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1560,9 +1551,9 @@ iree_hal_command_buffer_dispatch_indirect(
   IREE_ASSERT_ARGUMENT(executable);
   IREE_ASSERT_ARGUMENT(workgroups_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  return ToApiStatus(handle->DispatchIndirect(
+  return handle->DispatchIndirect(
       reinterpret_cast<Executable*>(executable), entry_point,
-      reinterpret_cast<Buffer*>(workgroups_buffer), workgroups_offset));
+      reinterpret_cast<Buffer*>(workgroups_buffer), workgroups_offset);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1594,7 +1585,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
   static_assert(sizeof(DescriptorSet::Binding) ==
                     sizeof(iree_hal_descriptor_set_binding_t),
                 "Expecting identical layout");
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto descriptor_set,
       handle->CreateDescriptorSet(
           reinterpret_cast<DescriptorSetLayout*>(set_layout),
@@ -1637,7 +1628,7 @@ iree_hal_descriptor_set_layout_create(
   static_assert(sizeof(DescriptorSetLayout::Binding) ==
                     sizeof(iree_hal_descriptor_set_layout_binding_t),
                 "Expecting identical layout");
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto descriptor_set_layout,
       handle->CreateDescriptorSetLayout(
           static_cast<DescriptorSetLayout::UsageType>(usage_type),
@@ -1679,9 +1670,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   IREE_TRACE_SCOPE0("iree_hal_device_queue_submit");
   IREE_ASSERT_ARGUMENT(device);
   auto* handle = reinterpret_cast<Device*>(device);
-  if (batch_count > 0 && !batches)
+  if (batch_count > 0 && !batches) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "batch_count/batches mismatch");
+  }
 
   // We need to allocate storage to marshal in the semaphores. Ideally we'd
   // change the C++ API to make this 1:1 with a reinterpret_cast, however that
@@ -1729,7 +1721,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   // the number and types of queues they support.
   uint64_t queue_index = queue_affinity % handle->dispatch_queues().size();
   auto* command_queue = handle->dispatch_queues()[queue_index];
-  return ToApiStatus(command_queue->Submit(dst_batches));
+  return command_queue->Submit(dst_batches);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1749,28 +1741,21 @@ iree_hal_device_wait_semaphores_with_deadline(
         semaphore_list->payload_values[i]};
   }
 
-  Status wait_status;
   switch (wait_mode) {
-    case IREE_HAL_WAIT_MODE_ALL:
-      wait_status =
-          handle->WaitAllSemaphores(semaphore_values, Time(deadline_ns));
-      break;
-    case IREE_HAL_WAIT_MODE_ANY:
-      wait_status = std::move(handle->WaitAnySemaphore(semaphore_values,
-                                                       Time(deadline_ns)))
-                        .status();
-      break;
-    default:
+    case IREE_HAL_WAIT_MODE_ALL: {
+      return handle->WaitAllSemaphores(semaphore_values, Time(deadline_ns));
+    }
+    case IREE_HAL_WAIT_MODE_ANY: {
+      IREE_ASSIGN_OR_RETURN(
+          int wake_index,
+          handle->WaitAnySemaphore(semaphore_values, Time(deadline_ns)));
+      return iree_ok_status();
+    }
+    default: {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "unhandled wait_mode");
+    }
   }
-
-  // NOTE: we avoid capturing stack traces on deadline exceeded as it's not a
-  // real error.
-  if (IsDeadlineExceeded(wait_status)) {
-    return IREE_STATUS_DEADLINE_EXCEEDED;
-  }
-  return ToApiStatus(wait_status);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1801,8 +1786,7 @@ iree_hal_driver_query_available_devices(
   *out_device_info_count = 0;
   auto* handle = reinterpret_cast<Driver*>(driver);
 
-  IREE_API_ASSIGN_OR_RETURN(auto device_infos,
-                            handle->EnumerateAvailableDevices());
+  IREE_ASSIGN_OR_RETURN(auto device_infos, handle->EnumerateAvailableDevices());
   size_t total_string_size = 0;
   for (const auto& device_info : device_infos) {
     total_string_size += device_info.name().size();
@@ -1840,7 +1824,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_create_device(
   *out_device = nullptr;
   auto* handle = reinterpret_cast<Driver*>(driver);
 
-  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDevice(device_id));
+  IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDevice(device_id));
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
   return iree_ok_status();
@@ -1855,7 +1839,7 @@ iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = nullptr;
   auto* handle = reinterpret_cast<Driver*>(driver);
-  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
+  IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
   return iree_ok_status();
 }
@@ -1917,9 +1901,8 @@ iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
   *out_driver = nullptr;
 
   auto* registry = DriverRegistry::shared_registry();
-  IREE_API_ASSIGN_OR_RETURN(
-      auto driver,
-      registry->Create(absl::string_view(driver_name.data, driver_name.size)));
+  IREE_ASSIGN_OR_RETURN(auto driver, registry->Create(absl::string_view(
+                                         driver_name.data, driver_name.size)));
 
   *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver.release());
   return iree_ok_status();
@@ -1977,7 +1960,7 @@ iree_hal_executable_cache_prepare_executable(
 
   ExecutableSpec spec;
   spec.executable_data = {executable_data.data, executable_data.data_length};
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto executable,
       handle->PrepareExecutable(
           reinterpret_cast<ExecutableLayout*>(executable_layout),
@@ -2009,7 +1992,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
   }
 
   auto* handle = reinterpret_cast<Device*>(device);
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto executable_layout,
       handle->CreateExecutableLayout(
           absl::MakeConstSpan(
@@ -2037,8 +2020,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_create(
   *out_semaphore = nullptr;
 
   auto* handle = reinterpret_cast<Device*>(device);
-  IREE_API_ASSIGN_OR_RETURN(auto semaphore,
-                            handle->CreateSemaphore(initial_value));
+  IREE_ASSIGN_OR_RETURN(auto semaphore, handle->CreateSemaphore(initial_value));
 
   *out_semaphore = reinterpret_cast<iree_hal_semaphore_t*>(semaphore.release());
   return iree_ok_status();
@@ -2051,12 +2033,8 @@ iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
   *out_value = 0;
 
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  auto result = handle->Query();
-  if (!result.ok()) {
-    // TODO(benvanik): don't capture stacks unless required.
-    return ToApiStatus(std::move(result).status());
-  }
-  *out_value = result.value();
+  IREE_ASSIGN_OR_RETURN(uint64_t value, handle->Query());
+  *out_value = value;
   return iree_ok_status();
 }
 
@@ -2065,7 +2043,7 @@ iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_signal");
   IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  return ToApiStatus(handle->Signal(new_value));
+  return handle->Signal(new_value);
 }
 
 IREE_API_EXPORT void IREE_API_CALL
@@ -2082,7 +2060,7 @@ iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
   IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_deadline");
   IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  return ToApiStatus(handle->Wait(value, Time(deadline_ns)));
+  return handle->Wait(value, Time(deadline_ns));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -2092,7 +2070,7 @@ iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
   IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_timeout");
   IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  return ToApiStatus(handle->Wait(value, Duration(timeout_ns)));
+  return handle->Wait(value, Duration(timeout_ns));
 }
 
 }  // namespace hal

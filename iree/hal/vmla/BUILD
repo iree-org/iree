@@ -109,7 +109,6 @@ cc_library(
     deps = [
         ":vmla_device",
         ":vmla_module",
-        "//iree/base:api_util",
         "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",
@@ -137,7 +136,6 @@ cc_library(
     hdrs = ["vmla_executable.h"],
     deps = [
         ":vmla_module",
-        "//iree/base:api_util",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:executable",

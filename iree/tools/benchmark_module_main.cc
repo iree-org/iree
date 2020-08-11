@@ -15,7 +15,6 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
-#include "iree/base/api_util.h"
 #include "iree/base/file_io.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

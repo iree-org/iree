@@ -44,7 +44,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

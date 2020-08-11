@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
 #include "iree/hal/host/serial/serial_scheduling_model.h"

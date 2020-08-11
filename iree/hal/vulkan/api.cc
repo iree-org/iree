@@ -15,7 +15,6 @@
 #include "iree/hal/vulkan/api.h"
 
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
@@ -36,7 +35,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_syms_create(
   IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto syms, DynamicSymbols::Create([&vkGetInstanceProcAddr_fn](
                                             const char* function_name) {
         // Only resolve vkGetInstanceProcAddr, rely on syms->LoadFromInstance()
@@ -59,8 +58,7 @@ iree_hal_vulkan_syms_create_from_system_loader(
   IREE_ASSERT_ARGUMENT(out_syms);
   *out_syms = nullptr;
 
-  IREE_API_ASSIGN_OR_RETURN(auto syms,
-                            DynamicSymbols::CreateFromSystemLoader());
+  IREE_ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
   *out_syms = reinterpret_cast<iree_hal_vulkan_syms_t*>(syms.release());
   return iree_ok_status();
 }
@@ -221,7 +219,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = nullptr;
 
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto driver,
       VulkanDriver::Create(ConvertDriverOptions(options),
                            add_ref(reinterpret_cast<DynamicSymbols*>(syms))));
@@ -239,7 +237,7 @@ iree_hal_vulkan_driver_create_using_instance(
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = nullptr;
 
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto driver,
       VulkanDriver::CreateUsingInstance(
           ConvertDriverOptions(options),
@@ -259,13 +257,13 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
   auto* handle = reinterpret_cast<VulkanDriver*>(driver);
 
   LOG(INFO) << "Enumerating available Vulkan devices...";
-  IREE_API_ASSIGN_OR_RETURN(auto available_devices,
-                            handle->EnumerateAvailableDevices());
+  IREE_ASSIGN_OR_RETURN(auto available_devices,
+                        handle->EnumerateAvailableDevices());
   for (const auto& device_info : available_devices) {
     LOG(INFO) << "  Device: " << device_info.name();
   }
   LOG(INFO) << "Creating default device...";
-  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
+  IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
@@ -293,9 +291,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
   QueueSet transfer_qs;
   transfer_qs.queue_family_index = transfer_queue_set.queue_family_index;
   transfer_qs.queue_indices = transfer_queue_set.queue_indices;
-  IREE_API_ASSIGN_OR_RETURN(auto device,
-                            handle->WrapDevice(physical_device, logical_device,
-                                               compute_qs, transfer_qs));
+  IREE_ASSIGN_OR_RETURN(auto device,
+                        handle->WrapDevice(physical_device, logical_device,
+                                           compute_qs, transfer_qs));
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
