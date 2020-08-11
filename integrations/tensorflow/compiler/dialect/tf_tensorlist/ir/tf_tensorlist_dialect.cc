@@ -27,7 +27,8 @@ static DialectRegistration<TfTensorListDialect> registration;
 //===----------------------------------------------------------------------===//
 
 TfTensorListDialect::TfTensorListDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context,
+              TypeID::get<TfTensorListDialect>()) {
   addInterfaces<iree_compiler::TfTensorListToHALConversionInterface>();
   addOperations<
 #define GET_OP_LIST

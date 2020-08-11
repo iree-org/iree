@@ -54,7 +54,7 @@ class VMLAToVMConversionInterface : public VMConversionDialectInterface {
 }  // namespace
 
 VMLADialect::VMLADialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<VMLADialect>()) {
   addInterfaces<VMLAToVMConversionInterface>();
 
   addTypes<BufferType, InterfaceType>();

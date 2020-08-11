@@ -71,7 +71,7 @@ class CustomToVMConversionInterface : public VMConversionDialectInterface {
 }  // namespace
 
 CustomDialect::CustomDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<CustomDialect>()) {
   addInterfaces<CustomToHALConversionInterface,
                 CustomToVMConversionInterface>();
 

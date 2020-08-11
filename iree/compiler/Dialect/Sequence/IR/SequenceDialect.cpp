@@ -31,7 +31,7 @@ namespace Sequence {
 static DialectRegistration<SequenceDialect> sequence_dialect;
 
 SequenceDialect::SequenceDialect(MLIRContext* context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<SequenceDialect>()) {
   addTypes<SequenceType>();
 
 #define GET_OP_LIST
