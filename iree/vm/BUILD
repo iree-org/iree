@@ -31,6 +31,7 @@ cc_test(
         ":invocation",
         ":module",
         "//iree/base:logging",
+        "//iree/base:status",
         "//iree/testing:gtest_main",
         "//iree/vm/test:all_bytecode_modules_cc",
         "@com_google_absl//absl/strings",

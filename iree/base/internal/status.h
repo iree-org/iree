@@ -26,6 +26,13 @@
 
 namespace iree {
 
+template <class T, class U = T>
+constexpr T exchange(T& obj, U&& new_value) {
+  T old_value = std::move(obj);
+  obj = std::forward<U>(new_value);
+  return old_value;
+}
+
 // Class representing a specific location in the source code of a program.
 class SourceLocation {
  public:
@@ -94,28 +101,92 @@ class Status final {
   // Creates an OK status with no message.
   Status() = default;
 
-  Status(iree_status_t status);
+  // Takes ownership of a C API status instance.
+  Status(iree_status_t&& status) noexcept
+      : value_(exchange(status, iree_status_code(status))) {}
+
+  // Takes ownership of a C API status instance wrapped in a Status.
+  Status(Status&& other) noexcept
+      : value_(exchange(other.value_,
+                        static_cast<iree_status_code_t>(other.code()))) {}
+  Status& operator=(Status&& other) {
+    if (this != &other) {
+      if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
+      value_ =
+          exchange(other.value_, static_cast<iree_status_code_t>(other.code()));
+    }
+    return *this;
+  }
+
+  Status(iree_status_code_t code) : value_(static_cast<iree_status_t>(code)) {}
+  Status& operator=(const iree_status_code_t& code) {
+    if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
+    value_ = static_cast<iree_status_t>(code);
+    return *this;
+  }
+
+  Status(StatusCode code) : value_(static_cast<iree_status_t>(code)) {}
+  Status& operator=(const StatusCode& code) {
+    if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
+    value_ = static_cast<iree_status_t>(code);
+    return *this;
+  }
+
+  // TODO(benvanik): remove if possible; we don't want to be cloning things.
+  // Currently some of our status usage for sticky errors requires this.
+  Status(const Status& other) {
+    value_ = other.value_ ? iree_status_clone(other.value_) : IREE_STATUS_OK;
+  }
 
   // Creates a status with the specified code and error message.
   // If `code` is kOk, `message` is ignored.
-  Status(StatusCode code, absl::string_view message);
+  Status(StatusCode code, absl::string_view message) {
+    if (IREE_UNLIKELY(code != StatusCode::kOk)) {
+      value_ = message.empty()
+                   ? static_cast<iree_status_t>(code)
+                   : iree_status_allocate(
+                         static_cast<iree_status_code_t>(code),
+                         /*file=*/nullptr, /*line=*/0,
+                         iree_make_string_view(message.data(), message.size()));
+    }
+  }
+  Status(StatusCode code, SourceLocation location, absl::string_view message) {
+    if (IREE_UNLIKELY(code != StatusCode::kOk)) {
+      value_ = iree_status_allocate(
+          static_cast<iree_status_code_t>(code), location.file_name(),
+          location.line(),
+          iree_make_string_view(message.data(), message.size()));
+    }
+  }
 
-  Status(const Status&);
-  Status& operator=(const Status& x);
-
-  ~Status();
+  ~Status() {
+    if (IREE_UNLIKELY((value_ & ~IREE_STATUS_CODE_MASK))) {
+      iree_status_free(value_);
+    }
+  }
 
   // Returns true if the Status is OK.
-  IREE_MUST_USE_RESULT bool ok() const;
+  IREE_MUST_USE_RESULT bool ok() const { return iree_status_is_ok(value_); }
 
   // Returns the error code.
-  StatusCode code() const;
+  IREE_MUST_USE_RESULT StatusCode code() const {
+    return static_cast<StatusCode>(iree_status_code(value_));
+  }
 
   // Return a combination of the error code name and message.
-  std::string ToString() const;
+  IREE_MUST_USE_RESULT std::string ToString() const;
 
   // Ignores any errors, potentially suppressing complaints from any tools.
-  void IgnoreError() {}
+  void IgnoreError() { value_ = iree_status_ignore(value_); }
+
+  // Converts to a C API status instance and transfers ownership.
+  IREE_MUST_USE_RESULT operator iree_status_t() && {
+    return exchange(value_, iree_status_code(value_));
+  }
+
+  IREE_MUST_USE_RESULT iree_status_t release() {
+    return exchange(value_, IREE_STATUS_OK);
+  }
 
   friend bool operator==(const Status& lhs, const Status& rhs) {
     return lhs.code() == rhs.code();
@@ -139,34 +210,22 @@ class Status final {
   }
 
  private:
-  // TODO(#265): remove message().
-  absl::string_view message() const;
-  friend Status Annotate(const Status& s, absl::string_view msg);
+  friend class StatusBuilder;
 
-  struct State {
-    StatusCode code;
-    std::string message;
-  };
-  // OK status has a nullptr state_.  Otherwise, 'state_' points to
-  // a 'State' structure containing the error code and message(s).
-  std::unique_ptr<State> state_;
+  iree_status_t value_ = IREE_STATUS_OK;
 };
 
 // Returns an OK status, equivalent to a default constructed instance.
-Status OkStatus();
+IREE_MUST_USE_RESULT static inline Status OkStatus() { return Status(); }
 
 // Prints a human-readable representation of `x` to `os`.
 std::ostream& operator<<(std::ostream& os, const Status& x);
-
-// Returns a Status that is identical to `s` except that the message()
-// has been augmented by adding `msg` to the end of the original message.
-Status Annotate(const Status& s, absl::string_view msg);
 
 IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
   return status.code() == StatusCode::kOk;
 }
 
-IREE_MUST_USE_RESULT static inline bool IsOk(iree_status_t status) {
+IREE_MUST_USE_RESULT static inline bool IsOk(const iree_status_t& status) {
   return iree_status_is_ok(status);
 }
 

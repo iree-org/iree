@@ -28,24 +28,19 @@ class IREE_MUST_USE_RESULT StatusBuilder;
 class StatusBuilder {
  public:
   // Creates a `StatusBuilder` based on an original status.
-  explicit StatusBuilder(const Status& original_status, SourceLocation location,
-                         ...);
+  explicit StatusBuilder(Status&& original_status, SourceLocation location);
   explicit StatusBuilder(Status&& original_status, SourceLocation location,
-                         ...);
+                         const char* format, ...);
 
   // Creates a `StatusBuilder` from a status code.
-  // A typical user will not specify `location`, allowing it to default to the
-  // current location.
-  explicit StatusBuilder(StatusCode code, SourceLocation location, ...);
+  explicit StatusBuilder(StatusCode code, SourceLocation location);
+  explicit StatusBuilder(StatusCode code, SourceLocation location,
+                         const char* format, ...);
 
-  explicit StatusBuilder(iree_status_t status, SourceLocation location, ...)
-      : status_(static_cast<StatusCode>(iree_status_code(status)), ""),
-        loc_(location) {}
-
-  StatusBuilder(const StatusBuilder& sb);
-  StatusBuilder& operator=(const StatusBuilder& sb);
-  StatusBuilder(StatusBuilder&&) = default;
-  StatusBuilder& operator=(StatusBuilder&&) = default;
+  StatusBuilder(const StatusBuilder& sb) = delete;
+  StatusBuilder& operator=(const StatusBuilder& sb) = delete;
+  StatusBuilder(StatusBuilder&&) noexcept;
+  StatusBuilder& operator=(StatusBuilder&&) noexcept;
 
   // Appends to the extra message that will be added to the original status.
   template <typename T>
@@ -56,21 +51,20 @@ class StatusBuilder {
   // Returns true if the Status created by this builder will be ok().
   bool ok() const;
 
-  // Returns the error code for the Status created by this builder.
-  StatusCode code() const;
+  StatusCode code() const { return status_.code(); }
 
-  // Returns the source location used to create this builder.
-  SourceLocation source_location() const;
+  // Implicit conversion to Status. Eats the status object but preserves the
+  // status code so the builder remains !ok().
+  operator Status() && {
+    if (!status_.ok()) Flush();
+    return exchange(status_, status_.code());
+  }
 
-  // Implicit conversion to Status.
-  operator Status() const&;
-  operator Status() &&;
-
-  // TODO(#265): toll-free result.
+  // Implicit conversion to iree_status_t.
   operator iree_status_t() && {
-    return iree_status_allocate(static_cast<iree_status_code_t>(status_.code()),
-                                loc_.file_name(), loc_.line(),
-                                iree_string_view_empty());
+    if (!status_.ok()) Flush();
+    Status status = exchange(status_, status_.code());
+    return static_cast<iree_status_t>(std::move(status));
   }
 
   friend bool operator==(const StatusBuilder& lhs, const StatusCode& rhs) {
@@ -88,13 +82,12 @@ class StatusBuilder {
   }
 
  private:
-  Status CreateStatus() &&;
+  void Flush();
 
-  // The status that the result will be based on.
+  // The status that is being built.
+  // This may be an existing status that we are appending an annotation to or
+  // just a code that we are building from scratch.
   Status status_;
-
-  // The location to record if this status is logged.
-  SourceLocation loc_;
 
   // Lazy construction of the expensive stream.
   struct Rep {
@@ -105,25 +98,15 @@ class StatusBuilder {
     std::string stream_message;
     iree::OStringStream stream{&stream_message};
   };
-
   std::unique_ptr<Rep> rep_;
 };
 
-inline StatusBuilder::StatusBuilder(const StatusBuilder& sb)
-    : status_(sb.status_), loc_(sb.loc_) {
-  if (sb.rep_ != nullptr) {
-    rep_ = std::make_unique<Rep>(*sb.rep_);
-  }
-}
+inline StatusBuilder::StatusBuilder(StatusBuilder&& sb) noexcept
+    : status_(exchange(sb.status_, sb.code())), rep_(std::move(sb.rep_)) {}
 
-inline StatusBuilder& StatusBuilder::operator=(const StatusBuilder& sb) {
-  status_ = sb.status_;
-  loc_ = sb.loc_;
-  if (sb.rep_ != nullptr) {
-    rep_ = std::make_unique<Rep>(*sb.rep_);
-  } else {
-    rep_ = nullptr;
-  }
+inline StatusBuilder& StatusBuilder::operator=(StatusBuilder&& sb) noexcept {
+  status_ = exchange(sb.status_, sb.code());
+  rep_ = std::move(sb.rep_);
   return *this;
 }
 
@@ -147,10 +130,6 @@ template <typename T>
 StatusBuilder&& StatusBuilder::operator<<(const T& value) && {
   return std::move(operator<<(value));
 }
-
-// Implicitly converts `builder` to `Status` and write it to `os`.
-std::ostream& operator<<(std::ostream& os, const StatusBuilder& builder);
-std::ostream& operator<<(std::ostream& os, StatusBuilder&& builder);
 
 // Each of the functions below creates StatusBuilder with a canonical error.
 // The error code of the StatusBuilder matches the name of the function.
@@ -194,13 +173,13 @@ StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
 
 // Evaluates an expression that produces a `iree::Status`. If the status is not
 // ok, returns it from the current function.
-#define IREE_RETURN_IF_ERROR(...)           \
-  IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_( \
-      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), __VA_ARGS__)
+#define IREE_RETURN_IF_ERROR(expr, ...)            \
+  IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_FORMAT_( \
+      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), expr, __VA_ARGS__)
 
-#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_(var, expr, ...) \
-  auto var = (expr);                                             \
-  if (IREE_UNLIKELY(!::iree::IsOk(var)))                         \
+#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_FORMAT_(var, expr, ...) \
+  auto var = std::move(expr);                                           \
+  if (IREE_UNLIKELY(!::iree::IsOk(var)))                                \
   return ::iree::StatusBuilder(std::move(var), IREE_LOC, __VA_ARGS__)
 
 #endif  // IREE_BASE_INTERNAL_STATUS_BUILDER_H_

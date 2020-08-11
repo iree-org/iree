@@ -76,6 +76,22 @@ TEST(StatusMacro, ReturnIfError) {
   EXPECT_OK(returnIfError(OkStatus()));
 }
 
+TEST(StatusMacro, ReturnIfErrorFormat) {
+  auto returnIfError = [](Status& status) -> Status {
+    IREE_RETURN_IF_ERROR(status, "annotation %d %d %d", 1, 2, 3)
+        << "extra annotation";
+    return OkStatus();
+  };
+  Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
+  status = returnIfError(std::move(status));
+  EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(status.ToString(), HasSubstr("message"));
+  EXPECT_THAT(status.ToString(), HasSubstr("annotation 1 2 3"));
+  EXPECT_THAT(status.ToString(), HasSubstr("extra annotation"));
+
+  EXPECT_OK(returnIfError(OkStatus()));
+}
+
 TEST(StatusMacro, AssignOrReturn) {
   auto assignOrReturn = [](StatusOr<std::string> statusOr) -> Status {
     IREE_ASSIGN_OR_RETURN(auto ret, std::move(statusOr), _ << "annotation");

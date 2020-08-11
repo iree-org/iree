@@ -391,9 +391,23 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
 #endif  // has any IREE_STATUS_FEATURES
 }
 
-IREE_MUST_USE_RESULT static iree_status_t iree_status_allocate_vf(
-    iree_status_code_t code, const char* file, uint32_t line,
-    const char* format, va_list varargs_0, va_list varargs_1) {
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
+                       const char* format, ...) {
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  iree_status_t ret =
+      iree_status_allocate_vf(code, file, line, format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
+  return ret;
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate_vf(iree_status_code_t code, const char* file,
+                        uint32_t line, const char* format, va_list varargs_0,
+                        va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   // Annotations disabled; ignore the format string/args.
   return iree_status_allocate(code, file, line, iree_string_view_empty());
@@ -441,16 +455,34 @@ IREE_MUST_USE_RESULT static iree_status_t iree_status_allocate_vf(
 }
 
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
-iree_status_allocate_f(iree_status_code_t code, const char* file, uint32_t line,
-                       const char* format, ...) {
-  va_list varargs_0, varargs_1;
-  va_start(varargs_0, format);
-  va_start(varargs_1, format);
-  iree_status_t ret =
-      iree_status_allocate_vf(code, file, line, format, varargs_0, varargs_1);
-  va_end(varargs_0);
-  va_end(varargs_1);
-  return ret;
+iree_status_clone(iree_status_t status) {
+#if IREE_STATUS_FEATURES == 0
+  // Statuses are just codes; nothing to do.
+  return status;
+#else
+  iree_status_storage_t* storage =
+      (iree_status_storage_t*)(status & ~IREE_STATUS_CODE_MASK);
+  if (!storage) return status;
+
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
+  const char* file = storage->file;
+  uint32_t line = storage->line;
+#else
+  const char* file = NULL;
+  uint32_t line = 0;
+#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
+
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+  iree_string_view_t message = storage->message;
+#else
+  iree_string_view_t message = iree_string_view_empty();
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+
+  // Always copy the message by performing the formatting as we don't know
+  // whether the original status has ownership or not.
+  return iree_status_allocate_f(iree_status_code(status), file, line, "%.*s",
+                                (int)message.size, message.data);
+#endif  // has no IREE_STATUS_FEATURES
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
@@ -465,7 +497,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
     payload = next;
   }
   iree_aligned_free(storage);
-#endif  // IREE_STATUS_FEATURES != 0
+#endif  // has any IREE_STATUS_FEATURES
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -499,6 +531,9 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
   if (!storage) {
     return iree_status_allocate(iree_status_code(base_status), NULL, 0,
                                 message);
+  } else if (iree_string_view_is_empty(storage->message)) {
+    storage->message = message;
+    return base_status;
   }
   iree_status_payload_message_t* payload =
       (iree_status_payload_message_t*)malloc(
@@ -517,6 +552,19 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
 IREE_PRINTF_ATTRIBUTE(2, 3)
     iree_status_annotate_f(iree_status_t base_status, const char* format, ...) {
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  iree_status_t ret =
+      iree_status_annotate_vf(base_status, format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
+  return ret;
+}
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_annotate_vf(iree_status_t base_status, const char* format,
+                        va_list varargs_0, va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0
   return base_status;
 #else
@@ -525,20 +573,12 @@ IREE_PRINTF_ATTRIBUTE(2, 3)
   iree_status_storage_t* storage =
       (iree_status_storage_t*)(base_status & ~IREE_STATUS_CODE_MASK);
   if (!storage) {
-    va_list varargs_0, varargs_1;
-    va_start(varargs_0, format);
-    va_start(varargs_1, format);
-    iree_status_t ret = iree_status_allocate_vf(
-        iree_status_code(base_status), NULL, 0, format, varargs_0, varargs_1);
-    va_end(varargs_0);
-    va_end(varargs_1);
-    return ret;
+    return iree_status_allocate_vf(iree_status_code(base_status), NULL, 0,
+                                   format, varargs_0, varargs_1);
   }
 
   // Compute the total number of bytes (including NUL) required to store the
   // message.
-  va_list varargs_0;
-  va_start(varargs_0, format);
   size_t message_size =
       vsnprintf(/*buffer=*/NULL, /*buffer_count=*/0, format, varargs_0);
   va_end(varargs_0);
@@ -561,11 +601,8 @@ IREE_PRINTF_ATTRIBUTE(2, 3)
   payload->message.size = message_size - 1;
   payload->message.data =
       (const char*)payload + sizeof(iree_status_payload_message_t);
-  va_list varargs_1;
-  va_start(varargs_1, format);
-  int ret =
-      vsnprintf((char*)payload->message.data, message_size, format, varargs_1);
-  va_end(varargs_1);
+  int ret = vsnprintf((char*)payload->message.data, payload->message.size + 1,
+                      format, varargs_1);
   if (IREE_UNLIKELY(ret < 0)) {
     iree_aligned_free(payload);
     return base_status;
@@ -589,11 +626,16 @@ iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
   iree_status_code_t status_code = iree_status_code(status);
   int n = 0;
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
-  n = snprintf(buffer ? buffer + buffer_length : NULL,
-               buffer ? buffer_capacity - buffer_length : 0, "%s:%d: %s",
-               storage ? storage->file : "<unknown>",
-               storage ? storage->line : 0,
-               iree_status_code_string(status_code));
+  if (storage && storage->file) {
+    n = snprintf(buffer ? buffer + buffer_length : NULL,
+                 buffer ? buffer_capacity - buffer_length : 0, "%s:%d: %s",
+                 storage->file, storage->line,
+                 iree_status_code_string(status_code));
+  } else {
+    n = snprintf(buffer ? buffer + buffer_length : NULL,
+                 buffer ? buffer_capacity - buffer_length : 0, "%s",
+                 iree_status_code_string(status_code));
+  }
 #else
   n = snprintf(buffer ? buffer + buffer_length : NULL,
                buffer ? buffer_capacity - buffer_length : 0, "%s",

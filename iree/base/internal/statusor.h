@@ -118,7 +118,7 @@ class StatusOrData {
       MakeValue(std::move(other.data_));
       MakeStatus();
     } else {
-      MakeStatus(std::move(other.status_));
+      MakeStatus(exchange(other.status_, other.status_.code()));
     }
   }
 
@@ -138,7 +138,7 @@ class StatusOrData {
       MakeValue(std::move(other.data_));
       MakeStatus();
     } else {
-      MakeStatus(std::move(other.status_));
+      MakeStatus(exchange(other.status_, other.status_.code()));
     }
   }
 
@@ -154,30 +154,28 @@ class StatusOrData {
   explicit StatusOrData(const Status& status) : status_(status) {
     EnsureNotOk();
   }
-  explicit StatusOrData(Status&& status) : status_(status) { EnsureNotOk(); }
-
-  explicit StatusOrData(const StatusBuilder& builder) : status_(builder) {
-    EnsureNotOk();
-  }
-  explicit StatusOrData(StatusBuilder&& builder) : status_(std::move(builder)) {
+  explicit StatusOrData(Status&& status)
+      : status_(exchange(status, status.code())) {
     EnsureNotOk();
   }
 
   StatusOrData& operator=(const StatusOrData& other) {
     if (this == &other) return *this;
-    if (other.ok())
+    if (other.ok()) {
       Assign(other.data_);
-    else
+    } else {
       Assign(other.status_);
+    }
     return *this;
   }
 
   StatusOrData& operator=(StatusOrData&& other) {
     if (this == &other) return *this;
-    if (other.ok())
+    if (other.ok()) {
       Assign(std::move(other.data_));
-    else
-      Assign(std::move(other.status_));
+    } else {
+      Assign(exchange(other.status_, other.status_.code()));
+    }
     return *this;
   }
 
@@ -196,7 +194,7 @@ class StatusOrData {
       MakeValue(value);
     } else {
       MakeValue(value);
-      status_ = OkStatus();
+      status_ = StatusCode::kOk;
     }
   }
 
@@ -206,7 +204,7 @@ class StatusOrData {
       MakeValue(std::move(value));
     } else {
       MakeValue(std::move(value));
-      status_ = OkStatus();
+      status_ = StatusCode::kOk;
     }
   }
 
@@ -218,7 +216,7 @@ class StatusOrData {
 
   void Assign(Status&& status) {
     Clear();
-    status_ = std::move(status);
+    status_ = exchange(status, status.code());
     EnsureNotOk();
   }
 
@@ -423,8 +421,8 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // constructor, this->ok() will be false and calls to value() will CHECK-fail.
   StatusOr(const Status& status);
   StatusOr& operator=(const Status& status);
-  StatusOr(const StatusBuilder& builder);
-  StatusOr& operator=(const StatusBuilder& builder);
+  StatusOr(const StatusBuilder& builder) = delete;
+  StatusOr& operator=(const StatusBuilder& builder) = delete;
 
   // Similar to the `const T&` overload.
   //
@@ -536,30 +534,23 @@ template <typename T>
 StatusOr<T>::StatusOr(const T& value) : Base(value) {}
 
 template <typename T>
+StatusOr<T>::StatusOr(T&& value) : Base(std::move(value)) {}
+
+template <typename T>
 StatusOr<T>::StatusOr(const Status& status) : Base(status) {}
 
 template <typename T>
-StatusOr<T>::StatusOr(const StatusBuilder& builder) : Base(builder) {}
+StatusOr<T>::StatusOr(Status&& status) : Base(std::move(status)) {}
+
+template <typename T>
+StatusOr<T>::StatusOr(StatusBuilder&& builder)
+    : Base(static_cast<Status&&>(std::move(builder))) {}
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(const Status& status) {
   this->Assign(status);
   return *this;
 }
-
-template <typename T>
-StatusOr<T>& StatusOr<T>::operator=(const StatusBuilder& builder) {
-  return *this = static_cast<Status>(builder);
-}
-
-template <typename T>
-StatusOr<T>::StatusOr(T&& value) : Base(std::move(value)) {}
-
-template <typename T>
-StatusOr<T>::StatusOr(Status&& status) : Base(std::move(status)) {}
-
-template <typename T>
-StatusOr<T>::StatusOr(StatusBuilder&& builder) : Base(std::move(builder)) {}
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
@@ -569,7 +560,8 @@ StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(StatusBuilder&& builder) {
-  return *this = static_cast<Status>(std::move(builder));
+  this->Assign(std::forward<Status>(builder));
+  return *this;
 }
 
 template <typename T>
@@ -606,9 +598,14 @@ template <typename T>
 const Status& StatusOr<T>::status() const& {
   return this->status_;
 }
+
 template <typename T>
 Status StatusOr<T>::status() && {
-  return ok() ? OkStatus() : std::move(this->status_);
+  if (ok()) {
+    return OkStatus();
+  } else {
+    return exchange(this->status_, this->status_.code());
+  }
 }
 
 template <typename T>
@@ -691,7 +688,12 @@ T StatusOr<T>::value_or(U&& default_value) && {
 
 template <typename T>
 void StatusOr<T>::IgnoreError() const {
-  // no-op
+  status_.IgnoreError();
+}
+
+template <typename T>
+IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
+  return status_or.ok();
 }
 
 }  // namespace iree
@@ -721,10 +723,11 @@ void StatusOr<T>::IgnoreError() const {
 #define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(statusor, lhs, rexpr, \
                                                   error_expression)     \
   auto statusor = std::move(rexpr);                                     \
-  if (IREE_UNLIKELY(!statusor.ok())) {                                  \
-    ::iree::StatusBuilder _(std::move(statusor).status(), IREE_LOC);    \
+  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                         \
+    ::iree::StatusBuilder _(std::move(std::move(statusor).status()),    \
+                            IREE_LOC);                                  \
     (void)_; /* error_expression is allowed to not use this variable */ \
-    return (error_expression);                                          \
+    return std::move(error_expression);                                 \
   }                                                                     \
   lhs = std::move(statusor).value()
 

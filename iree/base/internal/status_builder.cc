@@ -24,50 +24,50 @@ namespace iree {
 StatusBuilder::Rep::Rep(const Rep& r)
     : stream_message(r.stream_message), stream(&stream_message) {}
 
-StatusBuilder::StatusBuilder(const Status& original_status,
-                             SourceLocation location, ...)
-    : status_(original_status), loc_(location) {}
+StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location)
+    : status_(exchange(original_status, original_status.code())) {}
 
 StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location,
-                             ...)
-    : status_(original_status), loc_(location) {}
-
-StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location, ...)
-    : status_(code, ""), loc_(location) {}
-
-StatusBuilder::operator Status() const& {
-  if (rep_ == nullptr) return status_;
-  return StatusBuilder(*this).CreateStatus();
+                             const char* format, ...)
+    : status_(exchange(original_status, original_status.code())) {
+  if (status_.ok()) return;
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  status_ =
+      iree_status_annotate_vf(status_.release(), format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
 }
-StatusBuilder::operator Status() && {
-  if (rep_ == nullptr) return status_;
-  return std::move(*this).CreateStatus();
+
+StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location)
+    : status_(code, location, "") {}
+
+StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location,
+                             const char* format, ...) {
+  if (code == StatusCode::kOk) {
+    status_ = StatusCode::kOk;
+    return;
+  }
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  status_ = iree_status_allocate_vf(static_cast<iree_status_code_t>(code),
+                                    location.file_name(), location.line(),
+                                    format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
+}
+
+void StatusBuilder::Flush() {
+  if (!rep_ || rep_->stream_message.empty()) return;
+  auto rep = std::move(rep_);
+  status_ = iree_status_annotate_f(status_.release(), "%.*s",
+                                   static_cast<int>(rep->stream_message.size()),
+                                   rep->stream_message.data());
 }
 
 bool StatusBuilder::ok() const { return status_.ok(); }
-
-StatusCode StatusBuilder::code() const { return status_.code(); }
-
-SourceLocation StatusBuilder::source_location() const { return loc_; }
-
-Status StatusBuilder::CreateStatus() && {
-  Status result = rep_->stream_message.empty()
-                      ? status_
-                      : Annotate(status_, rep_->stream_message);
-
-  // Reset the status after consuming it.
-  status_ = Status(StatusCode::kUnknown, "");
-  rep_ = nullptr;
-  return result;
-}
-
-std::ostream& operator<<(std::ostream& os, const StatusBuilder& builder) {
-  return os << static_cast<Status>(builder);
-}
-
-std::ostream& operator<<(std::ostream& os, StatusBuilder&& builder) {
-  return os << static_cast<Status>(std::move(builder));
-}
 
 StatusBuilder AbortedErrorBuilder(SourceLocation location) {
   return StatusBuilder(StatusCode::kAborted, location);

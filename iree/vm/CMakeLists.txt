@@ -42,6 +42,7 @@ iree_cc_test(
     ::module
     absl::strings
     iree::base::logging
+    iree::base::status
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_cc
 )

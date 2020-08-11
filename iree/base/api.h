@@ -104,6 +104,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <varargs.h>
 
 #if defined(_WIN32)
 // The safe malloca that may fall back to heap in the case of stack overflows:
@@ -632,6 +633,16 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
         iree_status_allocate_f(iree_status_code_t code, const char* file,
                                uint32_t line, const char* format, ...);
 
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_allocate_vf(iree_status_code_t code, const char* file,
+                        uint32_t line, const char* format, va_list varargs_0,
+                        va_list varargs_1);
+
+// Clones |status| into a new status instance.
+// No payloads, if present, will be cloned.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_clone(iree_status_t status);
+
 // Frees |status| if it has any associated storage.
 IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status);
 
@@ -655,6 +666,10 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
     IREE_PRINTF_ATTRIBUTE(2, 3)
         iree_status_annotate_f(iree_status_t base_status, const char* format,
                                ...);
+
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_API_CALL
+iree_status_annotate_vf(iree_status_t base_status, const char* format,
+                        va_list varargs_0, va_list varargs_1);
 
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for

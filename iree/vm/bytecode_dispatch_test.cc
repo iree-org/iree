@@ -21,6 +21,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 #include "iree/base/logging.h"
+#include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/builtin_types.h"
 #include "iree/vm/bytecode_module.h"
@@ -125,8 +126,8 @@ TEST_P(VMBytecodeDispatchTest, Check) {
   const auto& test_params = GetParam();
   bool expect_failure = absl::StartsWith(test_params.function_name, "fail_");
 
-  iree_status_t result = RunFunction(test_params.function_name);
-  if (iree_status_is_ok(result)) {
+  iree::Status result = RunFunction(test_params.function_name);
+  if (result.ok()) {
     if (expect_failure) {
       GTEST_FAIL() << "Function expected failure but succeeded";
     } else {
@@ -136,14 +137,8 @@ TEST_P(VMBytecodeDispatchTest, Check) {
     if (expect_failure) {
       GTEST_SUCCEED();
     } else {
-      // TODO(#265): wrap up in a macro.
-      iree_string_view_t status_str = iree_string_view_empty();
-      ASSERT_TRUE(iree_status_to_string(
-          result, const_cast<char**>(&status_str.data), &status_str.size));
-      iree_status_free(result);
       GTEST_FAIL() << "Function expected success but failed with error: "
-                   << absl::string_view(status_str.data, status_str.size - 1);
-      free(const_cast<char*>(status_str.data));
+                   << result.ToString();
     }
   }
 }
