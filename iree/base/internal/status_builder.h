@@ -53,6 +53,11 @@ class StatusBuilder {
 
   StatusCode code() const { return status_.code(); }
 
+  IREE_MUST_USE_RESULT Status ToStatus() {
+    if (!status_.ok()) Flush();
+    return exchange(status_, status_.code());
+  }
+
   // Implicit conversion to Status. Eats the status object but preserves the
   // status code so the builder remains !ok().
   operator Status() && {
@@ -173,13 +178,35 @@ StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
 
 // Evaluates an expression that produces a `iree::Status`. If the status is not
 // ok, returns it from the current function.
-#define IREE_RETURN_IF_ERROR(expr, ...)            \
-  IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_FORMAT_( \
-      IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), expr, __VA_ARGS__)
+#define IREE_RETURN_IF_ERROR(...)                                  \
+  IREE_STATUS_IMPL_IDENTITY_(                                      \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_MACRO_)(     \
+          __VA_ARGS__, IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_, \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_,              \
+          IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_))               \
+  (IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__),               \
+   IREE_STATUS_IMPL_GET_EXPR_(__VA_ARGS__),                        \
+   IREE_STATUS_IMPL_GET_ARGS_(__VA_ARGS__))
 
-#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_FORMAT_(var, expr, ...) \
-  auto var = std::move(expr);                                           \
-  if (IREE_UNLIKELY(!::iree::IsOk(var)))                                \
+#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_(var, expr, ...) \
+  auto var = expr;                                               \
+  if (IREE_UNLIKELY(!::iree::IsOk(var)))                         \
+  return ::iree::StatusBuilder(std::move(var), IREE_LOC)
+#define IREE_STATUS_MACROS_IMPL_RETURN_IF_ERROR_F_(var, expr, ...) \
+  auto var = expr;                                                 \
+  if (IREE_UNLIKELY(!::iree::IsOk(var)))                           \
   return ::iree::StatusBuilder(std::move(var), IREE_LOC, __VA_ARGS__)
 
 #endif  // IREE_BASE_INTERNAL_STATUS_BUILDER_H_

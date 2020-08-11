@@ -49,7 +49,12 @@ cc_library(
 cc_library(
     name = "gtest_main",
     testonly = True,
-    hdrs = ["gtest.h"],
+    hdrs = [
+        "gtest.h",
+        "status_matchers.h",
+    ],
     tags = ["keep_dep"],
-    deps = platform_trampoline_deps("gtest_main", "testing"),
+    deps = platform_trampoline_deps("gtest_main", "testing") + [
+        ":gtest",
+    ],
 )

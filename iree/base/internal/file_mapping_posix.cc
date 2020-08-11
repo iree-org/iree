@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <memory>
 
 namespace iree {
 
@@ -47,7 +48,7 @@ class FileDescriptor {
              << "Unable to open file " << path << ": " << ::strerror(errno);
     }
 
-    return absl::make_unique<FileDescriptor>(std::move(path), fd, file_size);
+    return std::make_unique<FileDescriptor>(std::move(path), fd, file_size);
   }
 
   FileDescriptor(std::string path, int fd, size_t size)

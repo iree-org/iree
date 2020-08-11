@@ -16,6 +16,7 @@
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {

@@ -177,7 +177,7 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
 
   iree_vm_list_deinitialize(input_list);
 
-  return std::move(status);
+  return status;
 }
 
 }  // namespace vmla

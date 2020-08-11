@@ -20,6 +20,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace file_io {

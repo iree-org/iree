@@ -47,6 +47,7 @@ iree_cc_library(
     ::driver_registry
     ::heap_buffer
     ::semaphore
+    absl::inlined_vector
     absl::span
     absl::strings
     iree::base::api

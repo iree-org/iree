@@ -51,8 +51,6 @@ cc_test(
     tags = ["driver=vulkan"],
     deps = [
         ":simple_embedding_test_bytecode_module_cc",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/hal:api",
@@ -60,6 +58,9 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.

@@ -85,7 +85,7 @@ StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
                                           &actual_length);
     buffer.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  IREE_RETURN_IF_ERROR(std::move(status));
+  IREE_RETURN_IF_ERROR(status);
   return std::move(buffer);
 }
 

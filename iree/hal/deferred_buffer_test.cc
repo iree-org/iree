@@ -18,6 +18,7 @@
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/testing/mock_allocator.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {

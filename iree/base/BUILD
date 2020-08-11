@@ -34,7 +34,7 @@ cc_library(
 cc_library(
     name = "api",
     srcs = [
-      "api.c",
+        "api.c",
     ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
@@ -369,7 +369,7 @@ cc_library(
     name = "status",
     hdrs = ["status.h"],
     deps = [
-        "//iree/base/internal:status",
+        "//iree/base/internal:status_internal",
     ],
 )
 

@@ -57,6 +57,7 @@ cc_library(
         "//iree/base:ref_ptr",
         "//iree/base:tracing",
         "//iree/hal/host:host_local_allocator",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],

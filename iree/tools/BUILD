@@ -371,5 +371,6 @@ cc_test(
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm",
+        "@com_google_absl//absl/strings",
     ],
 )

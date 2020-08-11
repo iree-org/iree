@@ -109,6 +109,9 @@ class Status final {
       : value_(exchange(status, iree_status_code(status))) {}
 
   // Takes ownership of a C API status instance wrapped in a Status.
+  Status(Status& other) noexcept
+      : value_(exchange(other.value_,
+                        static_cast<iree_status_code_t>(other.code()))) {}
   Status(Status&& other) noexcept
       : value_(exchange(other.value_,
                         static_cast<iree_status_code_t>(other.code()))) {}

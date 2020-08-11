@@ -39,7 +39,7 @@ IREE_MUST_USE_RESULT std::string Status::ToString(const iree_status_t& status) {
                                         &buffer_length))) {
     return "<!>";
   }
-  return std::move(result);
+  return result;
 }
 
 std::ostream& operator<<(std::ostream& os, const Status& x) {

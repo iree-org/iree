@@ -1749,6 +1749,7 @@ iree_hal_device_wait_semaphores_with_deadline(
       IREE_ASSIGN_OR_RETURN(
           int wake_index,
           handle->WaitAnySemaphore(semaphore_values, Time(deadline_ns)));
+      (void)wake_index;
       return iree_ok_status();
     }
     default: {

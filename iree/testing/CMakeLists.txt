@@ -46,7 +46,9 @@ iree_cc_library(
     gtest_main
   HDRS
     "gtest.h"
+    "status_matchers.h"
   DEPS
+    ::gtest
     iree::testing::internal::gtest_main_internal
   TESTONLY
   PUBLIC

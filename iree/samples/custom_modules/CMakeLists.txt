@@ -41,6 +41,7 @@ iree_cc_test(
     ::custom_modules_test_module_cc
     ::native_module
     absl::core_headers
+    absl::span
     absl::strings
     iree::base::api
     iree::base::logging

@@ -118,7 +118,7 @@ std::unique_ptr<FunctionAbi> VmContext::CreateFunctionAbi(
     attrs.push_back({});
     auto status = iree_vm_get_function_reflection_attr(
         f, i, &attrs.back().first, &attrs.back().second);
-    if (iree_status_is_not_found(status) {
+    if (iree_status_is_not_found(status)) {
       iree_status_ignore(status);
       attrs.pop_back();
       break;

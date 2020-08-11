@@ -64,7 +64,7 @@ TEST(StatusBuilder, StreamInsertionFlag) {
 
 TEST(StatusMacro, ReturnIfError) {
   auto returnIfError = [](Status status) -> Status {
-    IREE_RETURN_IF_ERROR(std::move(status)) << "annotation";
+    IREE_RETURN_IF_ERROR(status) << "annotation";
     return OkStatus();
   };
   Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
@@ -77,7 +77,7 @@ TEST(StatusMacro, ReturnIfError) {
 }
 
 TEST(StatusMacro, ReturnIfErrorFormat) {
-  auto returnIfError = [](Status& status) -> Status {
+  auto returnIfError = [](Status status) -> Status {
     IREE_RETURN_IF_ERROR(status, "annotation %d %d %d", 1, 2, 3)
         << "extra annotation";
     return OkStatus();

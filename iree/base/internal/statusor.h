@@ -208,12 +208,6 @@ class StatusOrData {
     }
   }
 
-  void Assign(const Status& status) {
-    Clear();
-    status_ = status;
-    EnsureNotOk();
-  }
-
   void Assign(Status&& status) {
     Clear();
     status_ = exchange(status, status.code());
@@ -560,7 +554,7 @@ StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(StatusBuilder&& builder) {
-  this->Assign(std::forward<Status>(builder));
+  this->Assign(builder.ToStatus());
   return *this;
 }
 
@@ -688,7 +682,7 @@ T StatusOr<T>::value_or(U&& default_value) && {
 
 template <typename T>
 void StatusOr<T>::IgnoreError() const {
-  status_.IgnoreError();
+  this->status_.IgnoreError();
 }
 
 template <typename T>
@@ -705,7 +699,7 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
   IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
       (__VA_ARGS__, IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_, \
        IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_))             \
-  (__VA_ARGS__)
+  (IREE_STATUS_IMPL_CONCAT_(_status_or_value, __LINE__), __VA_ARGS__)
 
 // MSVC incorrectly expands variadic macros, splice together a macro call to
 // work around the bug.
@@ -713,22 +707,21 @@ IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
 #define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(args) \
   IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_ args
 
-#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_(lhs, rexpr) \
-  IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(lhs, rexpr, std::move(_))
-#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(lhs, rexpr,         \
-                                                    error_expression)   \
-  IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(                            \
-      IREE_STATUS_IMPL_CONCAT_(_status_or_value, __LINE__), lhs, rexpr, \
-      error_expression)
-#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(statusor, lhs, rexpr, \
-                                                  error_expression)     \
-  auto statusor = std::move(rexpr);                                     \
-  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                         \
-    ::iree::StatusBuilder _(std::move(std::move(statusor).status()),    \
-                            IREE_LOC);                                  \
-    (void)_; /* error_expression is allowed to not use this variable */ \
-    return std::move(error_expression);                                 \
-  }                                                                     \
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_(statusor, lhs, rexpr) \
+  auto statusor = rexpr;                                                  \
+  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                           \
+    return std::move(statusor).status();                                  \
+  }                                                                       \
+  lhs = std::move(statusor).value()
+
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(statusor, lhs, rexpr, \
+                                                    error_expression)     \
+  auto statusor = rexpr;                                                  \
+  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                           \
+    ::iree::StatusBuilder _(std::move(statusor).status(), IREE_LOC);      \
+    (void)_; /* error_expression is allowed to not use this variable */   \
+    return std::move(error_expression);                                   \
+  }                                                                       \
   lhs = std::move(statusor).value()
 
 #endif  // IREE_BASE_INTERNAL_STATUSOR_H_

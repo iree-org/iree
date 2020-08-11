@@ -224,17 +224,7 @@ typedef uint64_t iree_device_size_t;
 // Example:
 //  uint8_t kConstantArray[512];
 //  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
-#define IREE_ARRAYSIZE(arr) \
-  (sizeof(arr) / sizeof((arr)[0]) + IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr))
-
-#if defined(__GNUC__) || defined(__clang__)
-#define IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr)                         \
-  (sizeof(typeof(int[1 - 2 * !!__builtin_types_compatible_p(        \
-                                 typeof(arr), typeof(&arr[0]))])) * \
-   0)
-#else
-#define IREE_IMPL_ARRAYSIZE_PTR_CHECK_(arr) 0
-#endif  // GCC / Clang
+#define IREE_ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
 // Aligns |value| up to the given power-of-two |alignment| if required.
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding

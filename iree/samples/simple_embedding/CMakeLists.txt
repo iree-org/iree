@@ -43,6 +43,7 @@ iree_cc_test(
   DEPS
     ::simple_embedding_test_bytecode_module_cc
     absl::core_headers
+    absl::span
     absl::strings
     iree::base::api
     iree::base::logging

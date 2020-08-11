@@ -35,7 +35,7 @@ PyObject* StatusToPyExcClass(const Status& status) {
 }
 
 PyObject* ApiStatusToPyExcClass(iree_status_t status) {
-  switch (status) {
+  switch (iree_status_code(status)) {
     case IREE_STATUS_INVALID_ARGUMENT:
       return PyExc_ValueError;
     case IREE_STATUS_OUT_OF_RANGE:
