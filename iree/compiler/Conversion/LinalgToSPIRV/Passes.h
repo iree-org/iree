@@ -60,6 +60,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createSplitDispatchFunctionPass();
 /// vector size equal to subgroup size are distributed across the subgroup.
 std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 
+/// Pass to apply tiling and vectorization transformations on linagl::MatMulOp.
+std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
+
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
 /// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
