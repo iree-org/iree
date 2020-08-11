@@ -138,7 +138,7 @@ class BoundFunction:
   def __call__(self, *args):
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy
-    # flag that can allow it to be overriden.
+    # flag that can allow it to be overridden.
     inputs = self._abi.raw_pack_inputs(args)
     results = self._abi.allocate_results(inputs, static_alloc=False)
     self._context._vm_context.invoke(self._vm_function, inputs, results)
