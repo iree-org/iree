@@ -31,9 +31,9 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.c"
-    "api_time.cc"
   DEPS
     ::api_hdrs
+    ::target_platform
     ::tracing
   PUBLIC
 )

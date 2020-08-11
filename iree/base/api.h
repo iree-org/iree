@@ -100,11 +100,12 @@
 #define IREE_BASE_API_H_
 
 #include <memory.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
-#include <varargs.h>
 
 #if defined(_WIN32)
 // The safe malloca that may fall back to heap in the case of stack overflows:

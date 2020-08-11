@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -752,8 +753,30 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
 // iree_time_t and iree_duration_t
 //===----------------------------------------------------------------------===//
 
-// In api_time.cc until we have our own portable C implementation:
-// IREE_API_EXPORT iree_time_t iree_time_now();
+IREE_API_EXPORT iree_time_t iree_time_now() {
+#if defined(IREE_PLATFORM_WINDOWS)
+  // GetSystemTimePreciseAsFileTime requires Windows 8, add a fallback
+  // (such as using std::chrono) if older support is needed.
+  FILETIME system_time;
+  GetSystemTimePreciseAsFileTime(&system_time);
+
+  const int64_t kUnixEpochStartTicks = 116444736000000000i64;
+  const int64_t kFtToMicroSec = 10;
+  LARGE_INTEGER li;
+  li.LowPart = system_time.dwLowDateTime;
+  li.HighPart = system_time.dwHighDateTime;
+  li.QuadPart -= kUnixEpochStartTicks;
+  li.QuadPart /= kFtToMicroSec;
+  return li.QuadPart;
+#elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
+    defined(IREE_PLATFORM_LINUX)
+  struct timespec clock_time;
+  clock_gettime(CLOCK_REALTIME, &clock_time);
+  return clock_time.tv_nsec;
+#else
+#error "IREE system clock needs to be set up for your platform"
+#endif  // IREE_PLATFORM_*
+}
 
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {

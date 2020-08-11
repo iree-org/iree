@@ -35,12 +35,12 @@ cc_library(
     name = "api",
     srcs = [
       "api.c",
-      "api_time.cc",
     ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":api_hdrs",
+        ":target_platform",
         ":tracing",
     ],
 )
