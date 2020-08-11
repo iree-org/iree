@@ -49,7 +49,7 @@ func @shapeExpansion(%arg0 : !vmla.buffer, %arg1 : index, %arg2 : !vmla.buffer, 
   // CHECK-DAG: %c1 = vm.const.i32 1 : i32
   // CHECK-DAG: %c4 = vm.const.i32 4 : i32
   // CHECK-DAG: %c8 = vm.const.i32 8 : i32
-  // CHECK-NEXT: vm.call.variadic @vmla.transpose.x16(%arg0, [%c4, %arg1, %c8], [%c1], %arg2, [%arg3, %c4, %c8]) : (!vm.ref<!vmla.buffer>, i32..., i32..., !vm.ref<!vmla.buffer>, i32...)
+  // CHECK-NEXT: vm.call.variadic @vmla.transpose.x16(%arg0, [%c4, %arg1, %c8], [%c1], %arg2, [%arg3, %c4, %c8]) : (!vm.ref<!vmla.buffer>, i32 ..., i32 ..., !vm.ref<!vmla.buffer>, i32 ...)
   vmla.transpose %arg0(%rs0 : !shapex.ranked_shape<[4,?,8]>),
                  out %arg2(%rs1 : !shapex.ranked_shape<[?,4,8]>)
                  {permutation = dense<[1]> : tensor<1xi32>} : i16

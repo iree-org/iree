@@ -119,7 +119,7 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:           %ref_0 = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:           %ref_1 = vm.call @vmla.buffer.view(%ref_0, %zero, %c128) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:           %ref_2 = vm.call @vmla.buffer.alloc(%c16) : (i32) -> !vm.ref<!vmla.buffer>
-//  CHECK-NEXT:           vm.call.variadic @vmla.reduce.sum.f32(%ref_1, [%c4, %c8], %ref, [], %c1, %ref_2, [%c4]) : (!vm.ref<!vmla.buffer>, i32..., !vm.ref<!vmla.buffer>, i32..., i32, !vm.ref<!vmla.buffer>, i32...)
+//  CHECK-NEXT:           vm.call.variadic @vmla.reduce.sum.f32(%ref_1, [%c4, %c8], %ref, [], %c1, %ref_2, [%c4]) : (!vm.ref<!vmla.buffer>, i32 ..., !vm.ref<!vmla.buffer>, i32 ..., i32, !vm.ref<!vmla.buffer>, i32 ...)
 //  CHECK-NEXT:           %ref_3 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:           vm.call @vmla.buffer.copy(%ref_2, %zero, %ref_3, %zero, %c16) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
 //  CHECK-NEXT:           vm.return
@@ -130,4 +130,4 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:         vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:         vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:         vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32)
-//  CHECK-NEXT:         vm.import @vmla.reduce.sum.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32...)
+//  CHECK-NEXT:         vm.import @vmla.reduce.sum.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ..., %dimension : i32, %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...)
