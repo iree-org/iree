@@ -46,7 +46,7 @@ git push -f "${FORK_REMOTE?}" "${PR_BRANCH?}"
 TITLE="Merge google -> main"
 
 git fetch "${UPSTREAM_REMOTE?}" main
-BODY="$(git log ${UPSTREAM_REMOTE?}/main.. --decorate=no --pretty='format:* %h %<(80,trunc)%s')"
+BODY="$(./scripts/git/summarize_changes.sh ${UPSTREAM_REMOTE?}/main"
 
 if [[ -z "$(which gh)" ]]; then
   echo "gh not found on path."
