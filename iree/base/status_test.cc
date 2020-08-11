@@ -73,7 +73,7 @@ TEST(StatusMacro, ReturnIfError) {
   EXPECT_THAT(status.ToString(), HasSubstr("message"));
   EXPECT_THAT(status.ToString(), HasSubstr("annotation"));
 
-  EXPECT_OK(returnIfError(OkStatus()));
+  IREE_EXPECT_OK(returnIfError(OkStatus()));
 }
 
 TEST(StatusMacro, ReturnIfErrorFormat) {
@@ -89,7 +89,7 @@ TEST(StatusMacro, ReturnIfErrorFormat) {
   EXPECT_THAT(status.ToString(), HasSubstr("annotation 1 2 3"));
   EXPECT_THAT(status.ToString(), HasSubstr("extra annotation"));
 
-  EXPECT_OK(returnIfError(OkStatus()));
+  IREE_EXPECT_OK(returnIfError(OkStatus()));
 }
 
 TEST(StatusMacro, AssignOrReturn) {
@@ -105,7 +105,7 @@ TEST(StatusMacro, AssignOrReturn) {
   EXPECT_THAT(status.ToString(), HasSubstr("message"));
   EXPECT_THAT(status.ToString(), HasSubstr("annotation"));
 
-  EXPECT_OK(assignOrReturn("foo"));
+  IREE_EXPECT_OK(assignOrReturn("foo"));
 }
 
 }  // namespace

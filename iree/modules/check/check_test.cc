@@ -214,28 +214,28 @@ iree_vm_module_t* CheckTest::check_module_ = nullptr;
 iree_vm_module_t* CheckTest::hal_module_ = nullptr;
 
 TEST_F(CheckTest, ExpectTrueSuccess) {
-  ASSERT_OK(Invoke("expect_true", {iree_vm_value_make_i32(1)}));
+  IREE_ASSERT_OK(Invoke("expect_true", {iree_vm_value_make_i32(1)}));
 }
 
 TEST_F(CheckTest, ExpectTrueFailure) {
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_true", {iree_vm_value_make_i32(0)})),
+      IREE_ASSERT_OK(Invoke("expect_true", {iree_vm_value_make_i32(0)})),
       "Expected 0 to be nonzero");
 }
 
 TEST_F(CheckTest, ExpectFalseSuccess) {
-  ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(0)}));
+  IREE_ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(0)}));
 }
 
 TEST_F(CheckTest, ExpectFalseFailure) {
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(1)})),
+      IREE_ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(1)})),
       "Expected 1 to be zero");
 }
 
 TEST_F(CheckTest, ExpectFalseNotOneFailure) {
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(42)})),
+      IREE_ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(42)})),
       "Expected 42 to be zero");
 }
 
@@ -245,7 +245,7 @@ TEST_F(CheckTest, ExpectAllTrueSuccess) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
+  IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
 }
 
 TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
@@ -254,7 +254,7 @@ TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
   int32_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
+  IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
 }
 
 TEST_F(CheckTest, ExpectAllTrueFailure) {
@@ -264,7 +264,7 @@ TEST_F(CheckTest, ExpectAllTrueFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})), "0");
+      IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})), "0");
 }
 
 TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
@@ -274,7 +274,7 @@ TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
+      IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
       "1, 2, 3, 0, 4");
 }
 
@@ -285,7 +285,7 @@ TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
+      IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
       "1, 2, 3, 4, 5, 6, 0, 8");
 }
 
@@ -295,7 +295,7 @@ TEST_F(CheckTest, ExpectEqSameBufferSuccess) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  ASSERT_OK(Invoke("expect_eq", {input_buffer_view, input_buffer_view}));
+  IREE_ASSERT_OK(Invoke("expect_eq", {input_buffer_view, input_buffer_view}));
 }
 
 TEST_F(CheckTest, ExpectEqIdenticalBufferSuccess) {
@@ -305,7 +305,7 @@ TEST_F(CheckTest, ExpectEqIdenticalBufferSuccess) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
-  ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
+  IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
 }
 
 TEST_F(CheckTest, ExpectEqIdentical3DBufferSuccess) {
@@ -315,7 +315,7 @@ TEST_F(CheckTest, ExpectEqIdentical3DBufferSuccess) {
   int32_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
-  ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
+  IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
 }
 
 TEST_F(CheckTest, ExpectEqDifferentShapeFailure) {
@@ -326,7 +326,7 @@ TEST_F(CheckTest, ExpectEqDifferentShapeFailure) {
   int32_t rhs_shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, lhs_shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, rhs_shape, &rhs));
-  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+  EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
                           "Shapes do not match");
 }
 
@@ -338,7 +338,7 @@ TEST_F(CheckTest, ExpectEqDifferentElementTypeFailure) {
   int32_t shape[] = {2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
-  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+  EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
                           "Element types do not match");
 }
 
@@ -350,7 +350,7 @@ TEST_F(CheckTest, ExpectEqDifferentContentsFailure) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
-  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+  EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
                           "Contents does not match");
 }
 
@@ -365,7 +365,7 @@ TEST_F(CheckTest, ExpectEqDifferentEverythingFullMessageFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(rhs_contents, rhs_shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+      IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
       "Expected equality of these values. Element types do not match."
       " Shapes do not match. Contents does not match.\n"
       "  lhs:\n"
@@ -383,7 +383,7 @@ TEST_F(CheckTest, ExpectEqDifferentContents3DFullMessageFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+      IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
       "Expected equality of these values. Contents does not match.\n"
       "  lhs:\n"
       "    2x2x2xi32=[[1 2][3 4]][[5 6][7 8]]\n"
@@ -397,7 +397,8 @@ TEST_F(CheckTest, ExpectAlmostEqSameBufferSuccess) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(contents, shape, &input_buffer_view));
-  ASSERT_OK(Invoke("expect_almost_eq", {input_buffer_view, input_buffer_view}));
+  IREE_ASSERT_OK(
+      Invoke("expect_almost_eq", {input_buffer_view, input_buffer_view}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
@@ -407,7 +408,7 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
-  ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
@@ -418,7 +419,7 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
   int32_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
-  ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
@@ -428,7 +429,7 @@ TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
   int32_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
-  ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
@@ -439,8 +440,9 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
   int32_t rhs_shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, lhs_shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, rhs_shape, &rhs));
-  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
-                          "Shapes do not match");
+  EXPECT_NONFATAL_FAILURE(
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
+      "Shapes do not match");
 }
 
 TEST_F(CheckTest, ExpectAlmostEqSmallerLhsElementCountFailure) {
@@ -455,7 +457,7 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerLhsElementCountFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(bigger_contents, bigger_shape, &bigger));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_almost_eq", {smaller, bigger})),
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {smaller, bigger})),
       "Shapes do not match");
 }
 
@@ -471,7 +473,7 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerRhsElementCountFailure) {
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(bigger_contents, bigger_shape, &bigger));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_almost_eq", {bigger, smaller})),
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {bigger, smaller})),
       "Shapes do not match");
 }
 
@@ -483,8 +485,9 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentElementTypeFailure) {
   int32_t shape[] = {2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateFloat64BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
-  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
-                          "Element types do not match");
+  EXPECT_NONFATAL_FAILURE(
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
+      "Element types do not match");
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentContentsFailure) {
@@ -495,8 +498,9 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsFailure) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
-  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
-                          "Contents does not match");
+  EXPECT_NONFATAL_FAILURE(
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
+      "Contents does not match");
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentEverythingFullMessageFailure) {
@@ -513,7 +517,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentEverythingFullMessageFailure) {
   // Note no comment on contents. Cannot compare different shapes and element
   // types.
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
       "Expected near equality of these values. Element types do not match."
       " Shapes do not match.\n"
       "  lhs:\n"
@@ -531,7 +535,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
+      IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
       "Expected near equality of these values. Contents does not match.\n"
       "  lhs:\n"
       "    2x2x2xf32=[[1 2][3 4]][[5 6][7 8]]\n"

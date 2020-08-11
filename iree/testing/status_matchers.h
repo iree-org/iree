@@ -22,10 +22,6 @@
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"
 
-#undef EXPECT_OK
-#undef ASSERT_OK
-#undef ASSERT_OK_AND_ASSIGN
-
 namespace iree {
 
 namespace internal {
@@ -145,14 +141,26 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
     return GetCode(matchee.status());
   }
 
+  StatusCode GetCode(const iree_status_code_t &status_code) const {
+    return static_cast<StatusCode>(status_code);
+  }
+
+  StatusCode GetCode(const iree_status_t &status) const {
+    return static_cast<StatusCode>(iree_status_code(status));
+  }
+
   StatusCode GetCode(const Status &status) const { return status.code(); }
 
   template <typename T>
-  absl::string_view GetMessage(const T &matchee) const {
+  std::string GetMessage(const T &matchee) const {
     return GetMessage(matchee.status());
   }
 
-  absl::string_view GetMessage(const Status &status) const {
+  std::string GetMessage(const iree_status_t &status) const {
+    return Status::ToString(status);
+  }
+
+  std::string GetMessage(const Status &status) const {
     return status.ToString();
   }
 
@@ -175,13 +183,22 @@ class StatusIsMatcherGenerator {
   StatusIsMatcherGenerator(Enum code, absl::optional<absl::string_view> message)
       : code_(code), message_(message) {}
 
-  // Type-cast operator for Matcher<const iree::Status &>.
+  operator ::testing::Matcher<const StatusCode &>() const {
+    return ::testing::MakeMatcher(
+        new internal::StatusMatcher<Enum, const StatusCode &>(code_, message_));
+  }
+
+  operator ::testing::Matcher<const iree_status_t &>() const {
+    return ::testing::MakeMatcher(
+        new internal::StatusMatcher<Enum, const iree_status_t &>(code_,
+                                                                 message_));
+  }
+
   operator ::testing::Matcher<const Status &>() const {
     return ::testing::MakeMatcher(
         new internal::StatusMatcher<Enum, const Status &>(code_, message_));
   }
 
-  // Type-cast operator for Matcher<const iree::StatusOr<T> &>.
   template <class T>
   operator ::testing::Matcher<const StatusOr<T> &>() const {
     return ::testing::MakeMatcher(
@@ -223,7 +240,7 @@ class IsOkMatcherImpl : public ::testing::MatcherInterface<T> {
   bool MatchAndExplain(
       const T &status_container,
       ::testing::MatchResultListener *listener) const override {
-    if (!status_container.ok()) {
+    if (!::iree::IsOk(status_container)) {
       *listener << "which is not OK";
       return false;
     }
@@ -238,13 +255,16 @@ class IsOkMatcherImpl : public ::testing::MatcherInterface<T> {
 // container.
 class IsOkMatcherGenerator {
  public:
-  // Type-cast operator for Matcher<const iree::Status &>.
+  operator ::testing::Matcher<const iree_status_t &>() const {
+    return ::testing::MakeMatcher(
+        new internal::IsOkMatcherImpl<const iree_status_t &>());
+  }
+
   operator ::testing::Matcher<const Status &>() const {
     return ::testing::MakeMatcher(
         new internal::IsOkMatcherImpl<const Status &>());
   }
 
-  // Type-cast operator for Matcher<const iree::StatusOr<T> &>.
   template <class T>
   operator ::testing::Matcher<const StatusOr<T> &>() const {
     return ::testing::MakeMatcher(
@@ -306,15 +326,13 @@ inline internal::IsOkMatcherGenerator IsOk() {
 
 // Macros for testing the results of functions that return iree::Status or
 // iree::StatusOr<T> (for any type T).
-#define EXPECT_OK(rexpr) EXPECT_THAT(rexpr, ::iree::testing::status::IsOk())
-#define ASSERT_OK(rexpr) ASSERT_THAT(rexpr, ::iree::testing::status::IsOk())
-
-#define IREE_ASSERT_OK(expr) \
-  ASSERT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
-#define IREE_EXPECT_OK(expr) \
-  EXPECT_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
-#define IREE_EXPECT_STATUS_IS(expected_code, expr) \
-  EXPECT_EQ(expected_code, iree_status_consume_code(expr))
+#define IREE_EXPECT_OK(rexpr) \
+  EXPECT_THAT(rexpr, ::iree::testing::status::IsOk())
+#define IREE_ASSERT_OK(rexpr) \
+  ASSERT_THAT(rexpr, ::iree::testing::status::IsOk())
+#define IREE_EXPECT_STATUS_IS(expected_code, expr)     \
+  EXPECT_THAT(expr, ::iree::testing::status::StatusIs( \
+                        static_cast<::iree::StatusCode>(expected_code)))
 
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.
@@ -322,20 +340,20 @@ inline internal::IsOkMatcherGenerator IsOk() {
 // current function, which must have a void return type.
 //
 // Example: Assigning to an existing value
-//   ASSERT_OK_AND_ASSIGN(ValueType value, MaybeGetValue(arg));
+//   IREE_ASSERT_OK_AND_ASSIGN(ValueType value, MaybeGetValue(arg));
 //
 // The value assignment example might expand into:
 //   StatusOr<ValueType> status_or_value = MaybeGetValue(arg);
-//   ASSERT_OK(status_or_value.status());
+//   IREE_ASSERT_OK(status_or_value.status());
 //   ValueType value = status_or_value.value();
-#define ASSERT_OK_AND_ASSIGN(lhs, rexpr)                                  \
+#define IREE_ASSERT_OK_AND_ASSIGN(lhs, rexpr)                             \
   IREE_ASSERT_OK_AND_ASSIGN_IMPL(                                         \
       IREE_STATUS_MACROS_CONCAT_NAME(_status_or_value, __COUNTER__), lhs, \
       rexpr);
 
 #define IREE_ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr) \
   auto statusor = (rexpr);                                   \
-  ASSERT_OK(statusor.status()) << statusor.status();         \
+  IREE_ASSERT_OK(statusor.status());                         \
   lhs = std::move(statusor.value())
 #define IREE_STATUS_MACROS_CONCAT_NAME(x, y) \
   IREE_STATUS_MACROS_CONCAT_IMPL(x, y)

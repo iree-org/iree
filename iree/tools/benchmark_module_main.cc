@@ -157,7 +157,7 @@ Status Run(::benchmark::State& state) {
 
 void BM_RunModule(benchmark::State& state) {
   // Delegate to a status-returning function so we can use the status macros.
-  CHECK_OK(Run(state));
+  IREE_CHECK_OK(Run(state));
 }
 
 BENCHMARK(BM_RunModule)

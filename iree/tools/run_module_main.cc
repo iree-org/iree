@@ -151,7 +151,7 @@ Status Run() {
 
 extern "C" int main(int argc, char** argv) {
   iree::InitializeEnvironment(&argc, &argv);
-  CHECK_OK(Run());
+  IREE_CHECK_OK(Run());
   return 0;
 }
 

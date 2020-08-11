@@ -231,7 +231,7 @@ iree_status_code_string(iree_status_code_t code) {
   }
 }
 
-// TODO(#265): move payload methods/types to header when API is stabilized.
+// TODO(#55): move payload methods/types to header when API is stabilized.
 
 // Defines the type of an iree_status_payload_t.
 typedef enum {
@@ -343,7 +343,7 @@ static void IREE_API_CALL iree_status_payload_message_formatter(
 static void iree_status_attach_stack_trace(iree_status_storage_t* storage,
                                            int skip_frames) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_STACK_TRACE) != 0
-  // TODO(#265): backtrace or other magic.
+  // TODO(#55): backtrace or other magic.
 #endif  // has IREE_STATUS_FEATURE_STACK_TRACE
 }
 

@@ -23,17 +23,18 @@ std::ostream& operator<<(std::ostream& os, const StatusCode& x) {
   return os;
 }
 
-std::string Status::ToString() const {
-  if (ok()) {
+// static
+IREE_MUST_USE_RESULT std::string Status::ToString(const iree_status_t& status) {
+  if (iree_status_is_ok(status)) {
     return "OK";
   }
   iree_host_size_t buffer_length = 0;
-  if (IREE_UNLIKELY(!iree_status_format(value_, /*buffer_capacity=*/0,
+  if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
                                         /*buffer=*/NULL, &buffer_length))) {
     return "<!>";
   }
   std::string result(buffer_length, '\0');
-  if (IREE_UNLIKELY(!iree_status_format(value_, result.size() + 1,
+  if (IREE_UNLIKELY(!iree_status_format(status, result.size() + 1,
                                         const_cast<char*>(result.data()),
                                         &buffer_length))) {
     return "<!>";

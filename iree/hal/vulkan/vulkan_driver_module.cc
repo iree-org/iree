@@ -107,7 +107,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 }  // namespace iree
 
 IREE_REGISTER_MODULE_INITIALIZER(iree_hal_vulkan_driver, {
-  QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
+  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
       "vulkan", ::iree::hal::vulkan::CreateVulkanDriver));
 });
 IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_vulkan_driver);

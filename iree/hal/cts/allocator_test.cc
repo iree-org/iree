@@ -53,7 +53,7 @@ TEST_P(AllocatorTest, Allocate) {
   BufferUsage usage = BufferUsage::kMapping;
   size_t allocation_size = 1024;
 
-  ASSERT_OK_AND_ASSIGN(
+  IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer, allocator_->Allocate(memory_type, usage, allocation_size));
 
   EXPECT_EQ(allocator_, buffer->allocator());

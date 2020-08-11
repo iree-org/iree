@@ -24,9 +24,10 @@ namespace cts {
 class CommandBufferTest : public CtsTestBase {};
 
 TEST_P(CommandBufferTest, CreateCommandBuffer) {
-  ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
-                                                CommandBufferMode::kOneShot,
-                                                CommandCategory::kDispatch));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto command_buffer,
+      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
+                                   CommandCategory::kDispatch));
 
   EXPECT_TRUE((command_buffer->mode() & CommandBufferMode::kOneShot) ==
               CommandBufferMode::kOneShot);

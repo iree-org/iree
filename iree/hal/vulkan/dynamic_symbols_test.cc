@@ -49,7 +49,7 @@ VkInstanceCreateInfo GetInstanceCreateInfo(VkApplicationInfo* app_info) {
 
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   auto status_or_syms = DynamicSymbols::CreateFromSystemLoader();
-  ASSERT_OK(status_or_syms);
+  IREE_ASSERT_OK(status_or_syms);
   ref_ptr<DynamicSymbols> syms = std::move(status_or_syms.value());
 
   // Create and destroy a VkInstance using the symbols. This is mainly testing
@@ -60,7 +60,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   VK_CHECK_OK(
       syms->vkCreateInstance(&create_info, /*pAllocator=*/nullptr, &instance));
 
-  ASSERT_OK(syms->LoadFromInstance(instance));
+  IREE_ASSERT_OK(syms->LoadFromInstance(instance));
 
   syms->vkDestroyInstance(instance, /*pAllocator=*/nullptr);
 }

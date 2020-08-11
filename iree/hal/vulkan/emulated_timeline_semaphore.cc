@@ -51,7 +51,7 @@ EmulatedTimelineSemaphore::EmulatedTimelineSemaphore(
 
 EmulatedTimelineSemaphore::~EmulatedTimelineSemaphore() {
   IREE_TRACE_SCOPE0("EmulatedTimelineSemaphore::dtor");
-  CHECK_OK(TryToAdvanceTimeline(UINT64_MAX).status());
+  IREE_CHECK_OK(TryToAdvanceTimeline(UINT64_MAX).status());
   absl::MutexLock lock(&mutex_);
   CHECK(outstanding_semaphores_.empty())
       << "Destroying an emulated timeline semaphore without first waiting on "

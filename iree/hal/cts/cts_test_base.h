@@ -62,9 +62,9 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
       GTEST_SKIP();
       return;
     }
-    ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
+    IREE_ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
     LOG(INFO) << "Creating default device...";
-    ASSERT_OK_AND_ASSIGN(device_, driver_->CreateDefaultDevice());
+    IREE_ASSERT_OK_AND_ASSIGN(device_, driver_->CreateDefaultDevice());
     LOG(INFO) << "Created device '" << device_->info().name() << "'";
   }
 

@@ -29,16 +29,15 @@ namespace vulkan {
 // Usage:
 //   VK_RETURN_IF_ERROR(vkDoThing(...));
 #define VK_RETURN_IF_ERROR(expr) \
-  IREE_RETURN_IF_ERROR(               \
-      ::iree::hal::vulkan::VkResultToStatus(__FILE__, __LINE__, expr))
+  IREE_RETURN_IF_ERROR(::iree::hal::vulkan::VkResultToStatus(expr, IREE_LOC))
 
-// CHECK_OK but implicitly converts the VkResults return value to a
+// IREE_CHECK_OK but implicitly converts the VkResults return value to a
 // Status and checks that it is OkStatus.
 //
 // Usage:
 //   VK_CHECK_OK(vkDoThing(...));
 #define VK_CHECK_OK(expr) \
-  CHECK_OK(::iree::hal::vulkan::VkResultToStatus(__FILE__, __LINE__, expr))
+  IREE_CHECK_OK(::iree::hal::vulkan::VkResultToStatus(expr, IREE_LOC))
 
 // Converts a VkResult to a Status object.
 //

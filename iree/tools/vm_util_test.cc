@@ -31,7 +31,7 @@ class VmUtilTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    ASSERT_OK(CreateDevice("vmla", &device_));
+    IREE_ASSERT_OK(CreateDevice("vmla", &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 
@@ -48,10 +48,10 @@ TEST_F(VmUtilTest, ParsePrintBuffer) {
   desc.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
   desc.dims = {2, 2};
 
-  ASSERT_OK_AND_ASSIGN(auto variant_list,
-                       ParseToVariantList({desc}, allocator_, {buf_string}));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto variant_list, ParseToVariantList({desc}, allocator_, {buf_string}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
+  IREE_ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
 }
 
@@ -61,10 +61,11 @@ TEST_F(VmUtilTest, ParsePrintScalar) {
   desc.type = RawSignatureParser::Type::kScalar;
   desc.scalar.type = AbiConstants::ScalarType::kSint32;
 
-  ASSERT_OK_AND_ASSIGN(auto variant_list,
-                       ParseToVariantList({desc}, allocator_, {input_string}));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto variant_list,
+      ParseToVariantList({desc}, allocator_, {input_string}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
+  IREE_ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(input_string, "\n"));
 }
 
@@ -74,10 +75,10 @@ TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
   desc.type = RawSignatureParser::Type::kBuffer;
   desc.buffer.scalar_type = AbiConstants::ScalarType::kSint32;
 
-  ASSERT_OK_AND_ASSIGN(auto variant_list,
-                       ParseToVariantList({desc}, allocator_, {buf_string}));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto variant_list, ParseToVariantList({desc}, allocator_, {buf_string}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
+  IREE_ASSERT_OK(PrintVariantList({desc}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string, "\n"));
 }
 
@@ -94,11 +95,11 @@ TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
   desc2.buffer.scalar_type = AbiConstants::ScalarType::kIeeeFloat64;
   desc2.dims = {2, 3};
 
-  ASSERT_OK_AND_ASSIGN(auto variant_list,
-                       ParseToVariantList({desc1, desc2}, allocator_,
-                                          {buf_string1, buf_string2}));
+  IREE_ASSERT_OK_AND_ASSIGN(auto variant_list,
+                            ParseToVariantList({desc1, desc2}, allocator_,
+                                               {buf_string1, buf_string2}));
   std::stringstream os;
-  ASSERT_OK(PrintVariantList({desc1, desc2}, variant_list.get(), &os));
+  IREE_ASSERT_OK(PrintVariantList({desc1, desc2}, variant_list.get(), &os));
   EXPECT_EQ(os.str(), absl::StrCat(buf_string1, "\n", buf_string2, "\n"));
 }
 

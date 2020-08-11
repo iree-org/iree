@@ -467,7 +467,7 @@ void ManualResetEvent::Initialize() {
 void ManualResetEvent::Dispose() {
   if (fd_ != kInvalidFd) {
     // Always signal, as we need to ensure waiters are woken.
-    CHECK_OK(Set());
+    IREE_CHECK_OK(Set());
     Syscall(::close, fd_).value();
     fd_ = kInvalidFd;
   }

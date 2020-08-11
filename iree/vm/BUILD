@@ -247,6 +247,7 @@ cc_test(
         ":ref",
         "//iree/base:api",
         "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -282,6 +283,7 @@ cc_test(
         ":stack",
         "//iree/base:api",
         "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )

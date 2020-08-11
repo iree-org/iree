@@ -92,8 +92,8 @@ TEST(MemoryMappingTest, MapWholeBuffer) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mapping,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mapping,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
   EXPECT_CALL(*buffer, UnmapMemoryImpl(0, 128, kValidPtr))
       .WillOnce(Return(OkStatus()));
   mapping.reset();
@@ -106,8 +106,8 @@ TEST(MemoryMappingTest, MapPartialBuffer) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 4, 12, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mapping,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 4, 12));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 4, 12));
   EXPECT_CALL(*buffer, UnmapMemoryImpl(4, 12, kValidPtr))
       .WillOnce(Return(OkStatus()));
   mapping.reset();
@@ -139,8 +139,8 @@ TEST(MemoryMappingTest, MoveHandle) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_a,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_a,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Should be able to move the handle around without having any calls.
   auto mm_b = std::move(mm_a);
@@ -161,12 +161,12 @@ TEST(MemoryMappingTest, ReadOnlyAccess) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_r,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_r,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Non-mutable access is fine.
   EXPECT_EQ(kValidPtr, mm_r.data());
-  ASSERT_OK_AND_ASSIGN(auto span, mm_r.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto span, mm_r.Subspan());
   (void)span;
 
   // Read-only mappings should not be able to get mutable access.
@@ -195,15 +195,15 @@ TEST(MemoryMappingTest, ReadWriteAccess) {
                                      MemoryAccess::kRead | MemoryAccess::kWrite,
                                      0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(
+  IREE_ASSERT_OK_AND_ASSIGN(
       auto mm_rw,
       buffer->MapMemory<uint8_t>(MemoryAccess::kRead | MemoryAccess::kWrite));
 
   // Everything valid.
   EXPECT_EQ(kValidPtr, mm_rw.data());
-  ASSERT_OK_AND_ASSIGN(auto span, mm_rw.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto span, mm_rw.Subspan());
   EXPECT_EQ(kValidPtr, mm_rw.mutable_data());
-  ASSERT_OK_AND_ASSIGN(span, mm_rw.MutableSubspan());
+  IREE_ASSERT_OK_AND_ASSIGN(span, mm_rw.MutableSubspan());
 
   EXPECT_CALL(*buffer, UnmapMemoryImpl(0, 128, kValidPtr))
       .WillOnce(Return(OkStatus()));
@@ -223,12 +223,12 @@ TEST(MemoryMappingTest, WriteOnlyAccess) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_w,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_w,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
 
   // Mutable access is valid.
   EXPECT_EQ(kValidPtr, mm_w.mutable_data());
-  ASSERT_OK_AND_ASSIGN(auto span, mm_w.MutableSubspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto span, mm_w.MutableSubspan());
   (void)span;
 
   // Write-only mappings should not be able to get non-mutable access.
@@ -260,8 +260,8 @@ TEST(MemoryMappingTest, WriteDiscardAccess) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kDiscardWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_dw,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kDiscardWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mm_dw, buffer->MapMemory<uint8_t>(MemoryAccess::kDiscardWrite));
   EXPECT_CALL(*buffer, UnmapMemoryImpl(0, 128, kValidPtr))
       .WillOnce(Return(OkStatus()));
   mm_dw.reset();
@@ -270,8 +270,8 @@ TEST(MemoryMappingTest, WriteDiscardAccess) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_w,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_w,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
   EXPECT_CALL(*buffer, UnmapMemoryImpl(0, 128, kValidPtr))
       .WillOnce(Return(OkStatus()));
   mm_w.reset();
@@ -288,28 +288,28 @@ TEST(MemoryMappingTest, Subspan) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_r,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_r,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Request some valid ranges and ensure the byte offsets are correct.
-  ASSERT_OK_AND_ASSIGN(auto ss, mm_r.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto ss, mm_r.Subspan());
   EXPECT_EQ(kValidPtr, ss.data());
   EXPECT_EQ(128, ss.size());
-  ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(100, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(100, 2));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 100, ss.data());
   EXPECT_EQ(2, ss.size());
-  ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(100, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(100, kWholeBuffer));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 100, ss.data());
   EXPECT_EQ(28, ss.size());
 
   // Zero length ranges are fine.
-  ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(0, 0));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(0, 0));
   EXPECT_EQ(kValidPtr, ss.data());
   EXPECT_TRUE(ss.empty());
-  ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(128, 0));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(128, 0));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 128, ss.data());
   EXPECT_TRUE(ss.empty());
-  ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(128, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_r.Subspan(128, kWholeBuffer));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 128, ss.data());
   EXPECT_TRUE(ss.empty());
 
@@ -325,8 +325,8 @@ TEST(MemoryMappingTest, SubspanOutOfRange) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_r,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_r,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Try some invalid ranges that would overrun the span.
   EXPECT_TRUE(IsOutOfRange(mm_r.Subspan(1234, 0).status()));
@@ -346,28 +346,28 @@ TEST(MemoryMappingTest, MutableSubspan) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_w,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_w,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
 
   // Request some valid ranges and ensure the byte offsets are correct.
-  ASSERT_OK_AND_ASSIGN(auto ss, mm_w.MutableSubspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto ss, mm_w.MutableSubspan());
   EXPECT_EQ(kValidPtr, ss.data());
   EXPECT_EQ(128, ss.size());
-  ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(100, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(100, 2));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 100, ss.data());
   EXPECT_EQ(2, ss.size());
-  ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(100, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(100, kWholeBuffer));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 100, ss.data());
   EXPECT_EQ(28, ss.size());
 
   // Zero length ranges are fine.
-  ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(0, 0));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(0, 0));
   EXPECT_EQ(kValidPtr, ss.data());
   EXPECT_TRUE(ss.empty());
-  ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(128, 0));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(128, 0));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 128, ss.data());
   EXPECT_TRUE(ss.empty());
-  ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(128, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(ss, mm_w.MutableSubspan(128, kWholeBuffer));
   EXPECT_EQ(static_cast<const uint8_t*>(kValidPtr) + 128, ss.data());
   EXPECT_TRUE(ss.empty());
 
@@ -383,8 +383,8 @@ TEST(MemoryMappingTest, MutableSubspanOutOfRange) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_w,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_w,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
 
   // Try some invalid ranges that would overrun the span.
   EXPECT_TRUE(IsOutOfRange(mm_w.MutableSubspan(1234, 0).status()));
@@ -404,8 +404,8 @@ TEST(MemoryMappingTest, ElementOperator) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_r,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_r,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Just verify we are getting the expected pointer back.
   EXPECT_EQ(kValidPtr, &mm_r[0]);
@@ -422,19 +422,19 @@ TEST(MemoryMappingTest, Invalidate) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_r,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_r,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Invalidate a few ways.
   EXPECT_CALL(*buffer, InvalidateMappedMemoryImpl(0, 128))
       .WillOnce(Return(OkStatus()));
-  EXPECT_OK(mm_r.Invalidate());
+  IREE_EXPECT_OK(mm_r.Invalidate());
   EXPECT_CALL(*buffer, InvalidateMappedMemoryImpl(100, 2))
       .WillOnce(Return(OkStatus()));
-  EXPECT_OK(mm_r.Invalidate(100, 2));
+  IREE_EXPECT_OK(mm_r.Invalidate(100, 2));
   EXPECT_CALL(*buffer, InvalidateMappedMemoryImpl(100, 28))
       .WillOnce(Return(OkStatus()));
-  EXPECT_OK(mm_r.Invalidate(100, kWholeBuffer));
+  IREE_EXPECT_OK(mm_r.Invalidate(100, kWholeBuffer));
 
   EXPECT_CALL(*buffer, UnmapMemoryImpl(0, 128, kValidPtr))
       .WillOnce(Return(OkStatus()));
@@ -448,8 +448,8 @@ TEST(MemoryMappingTest, InvalidateOutOfRange) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_r,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_r,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
 
   // Try to invalidate invalid ranges.
   EXPECT_TRUE(IsOutOfRange(mm_r.Invalidate(1234, 0)));
@@ -470,7 +470,7 @@ TEST(MemoryMappingTest, InvalidateBadMode) {
   EXPECT_CALL(*coherent_buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                               MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(
+  IREE_ASSERT_OK_AND_ASSIGN(
       auto mm_r, coherent_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
   EXPECT_TRUE(IsPermissionDenied(mm_r.Invalidate()));
   EXPECT_CALL(*coherent_buffer, UnmapMemoryImpl(0, 128, kValidPtr))
@@ -485,19 +485,19 @@ TEST(MemoryMappingTest, Flush) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_w,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_w,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
 
   // Flush a few ways.
   EXPECT_CALL(*buffer, FlushMappedMemoryImpl(0, 128))
       .WillOnce(Return(OkStatus()));
-  EXPECT_OK(mm_w.Flush());
+  IREE_EXPECT_OK(mm_w.Flush());
   EXPECT_CALL(*buffer, FlushMappedMemoryImpl(100, 2))
       .WillOnce(Return(OkStatus()));
-  EXPECT_OK(mm_w.Flush(100, 2));
+  IREE_EXPECT_OK(mm_w.Flush(100, 2));
   EXPECT_CALL(*buffer, FlushMappedMemoryImpl(100, 28))
       .WillOnce(Return(OkStatus()));
-  EXPECT_OK(mm_w.Flush(100, kWholeBuffer));
+  IREE_EXPECT_OK(mm_w.Flush(100, kWholeBuffer));
 
   EXPECT_CALL(*buffer, UnmapMemoryImpl(0, 128, kValidPtr))
       .WillOnce(Return(OkStatus()));
@@ -511,8 +511,8 @@ TEST(MemoryMappingTest, FlushOutOfRange) {
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(auto mm_w,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mm_w,
+                            buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
 
   // Try to flush invalid ranges.
   EXPECT_TRUE(IsOutOfRange(mm_w.Flush(1234, 0)));
@@ -533,7 +533,7 @@ TEST(MemoryMappingTest, FlushBadMode) {
   EXPECT_CALL(*uncached_buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                               MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
-  ASSERT_OK_AND_ASSIGN(
+  IREE_ASSERT_OK_AND_ASSIGN(
       auto mm_w, uncached_buffer->MapMemory<uint8_t>(MemoryAccess::kWrite));
   EXPECT_TRUE(IsPermissionDenied(mm_w.Flush()));
   EXPECT_CALL(*uncached_buffer, UnmapMemoryImpl(0, 128, kValidPtr))

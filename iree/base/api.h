@@ -604,7 +604,7 @@ typedef uintptr_t iree_status_t;
   IREE_STATUS_IMPL_IGNORE_ERROR_( \
       IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
 
-// TODO(#265): better logging of status checks.
+// TODO(#2843): better logging of status checks.
 #define IREE_CHECK_OK(expr) \
   CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
 #define IREE_ASSERT_ARGUMENT(name) assert(name)

@@ -98,6 +98,9 @@ class IREE_MUST_USE_RESULT Status;
 //     about the error.
 class Status final {
  public:
+  // Return a combination of the error code name and message.
+  static IREE_MUST_USE_RESULT std::string ToString(const iree_status_t& status);
+
   // Creates an OK status with no message.
   Status() = default;
 
@@ -174,7 +177,9 @@ class Status final {
   }
 
   // Return a combination of the error code name and message.
-  IREE_MUST_USE_RESULT std::string ToString() const;
+  IREE_MUST_USE_RESULT std::string ToString() const {
+    return Status::ToString(value_);
+  }
 
   // Ignores any errors, potentially suppressing complaints from any tools.
   void IgnoreError() { value_ = iree_status_ignore(value_); }
@@ -299,10 +304,13 @@ IREE_MUST_USE_RESULT static inline bool IsUnknown(const Status& status) {
   return status.code() == StatusCode::kUnknown;
 }
 
-// TODO(#265): rename to IREE_CHECK_OK and make compatible with C API macros.
-#define CHECK_OK(val) CHECK_EQ(::iree::StatusCode::kOk, (val))
-#define QCHECK_OK(val) QCHECK_EQ(::iree::StatusCode::kOk, (val))
-#define DCHECK_OK(val) DCHECK_EQ(::iree::StatusCode::kOk, (val))
+// TODO(#2843): better logging of status checks.
+#undef IREE_CHECK_OK
+#undef IREE_QCHECK_OK
+#undef IREE_DCHECK_OK
+#define IREE_CHECK_OK(val) CHECK(::iree::IsOk(val)) << (val)
+#define IREE_QCHECK_OK(val) QCHECK_EQ(::iree::StatusCode::kOk, (val))
+#define IREE_DCHECK_OK(val) DCHECK_EQ(::iree::StatusCode::kOk, (val))
 
 }  // namespace iree
 

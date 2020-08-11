@@ -673,23 +673,24 @@ TEST(ElementStringUtilTest, ParseElementInvalid) {
 
 TEST(ElementStringUtilTest, ParseOpaqueElement) {
   std::vector<uint8_t> buffer1(1);
-  EXPECT_OK(ParseElement("FF", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
-                         absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseElement("FF", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
+                              absl::MakeSpan(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<uint8_t>{0xFF}));
 
   std::vector<uint16_t> buffer2(1);
-  EXPECT_OK(ParseElement("FFCD", IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
-                         absl::MakeSpan(buffer2)));
+  IREE_EXPECT_OK(ParseElement("FFCD", IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
+                              absl::MakeSpan(buffer2)));
   EXPECT_THAT(buffer2, Eq(std::vector<uint16_t>{0xCDFFu}));
 
   std::vector<uint32_t> buffer4(1);
-  EXPECT_OK(ParseElement("FFCDAABB", IREE_HAL_ELEMENT_TYPE_OPAQUE_32,
-                         absl::MakeSpan(buffer4)));
+  IREE_EXPECT_OK(ParseElement("FFCDAABB", IREE_HAL_ELEMENT_TYPE_OPAQUE_32,
+                              absl::MakeSpan(buffer4)));
   EXPECT_THAT(buffer4, Eq(std::vector<uint32_t>{0xBBAACDFFu}));
 
   std::vector<uint64_t> buffer8(1);
-  EXPECT_OK(ParseElement("FFCDAABBCCDDEEFF", IREE_HAL_ELEMENT_TYPE_OPAQUE_64,
-                         absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseElement("FFCDAABBCCDDEEFF",
+                              IREE_HAL_ELEMENT_TYPE_OPAQUE_64,
+                              absl::MakeSpan(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<uint64_t>{0xFFEEDDCCBBAACDFFull}));
 }
 
@@ -754,36 +755,36 @@ TEST(ElementStringUtilTest, FormatOpaqueElement) {
 TEST(BufferElementsStringUtilTest, ParseBufferElements) {
   // Empty:
   std::vector<int8_t> buffer0(0);
-  EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer0)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer0)));
   EXPECT_THAT(buffer0, Eq(std::vector<int8_t>{}));
   std::vector<int8_t> buffer8(8, 123);
-  EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<int8_t>{0, 0, 0, 0, 0, 0, 0, 0}));
   // Scalar:
   std::vector<int8_t> buffer1(1);
-  EXPECT_OK(ParseBufferElements<int8_t>("1", absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("1", absl::MakeSpan(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<int8_t>{1}));
   // Splat:
-  EXPECT_OK(ParseBufferElements<int8_t>("3", absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("3", absl::MakeSpan(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<int8_t>{3, 3, 3, 3, 3, 3, 3, 3}));
   // 1:1:
-  EXPECT_OK(ParseBufferElements<int8_t>("2", absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("2", absl::MakeSpan(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<int8_t>{2}));
   std::vector<int16_t> buffer8i16(8);
-  EXPECT_OK(ParseBufferElements<int16_t>("0 1 2 3 4 5 6 7",
-                                         absl::MakeSpan(buffer8i16)));
+  IREE_EXPECT_OK(ParseBufferElements<int16_t>("0 1 2 3 4 5 6 7",
+                                              absl::MakeSpan(buffer8i16)));
   EXPECT_THAT(buffer8i16, Eq(std::vector<int16_t>{0, 1, 2, 3, 4, 5, 6, 7}));
   std::vector<int32_t> buffer8i32(8);
-  EXPECT_OK(ParseBufferElements<int32_t>("[0 1 2 3] [4 5 6 7]",
-                                         absl::MakeSpan(buffer8i32)));
+  IREE_EXPECT_OK(ParseBufferElements<int32_t>("[0 1 2 3] [4 5 6 7]",
+                                              absl::MakeSpan(buffer8i32)));
   EXPECT_THAT(buffer8i32, Eq(std::vector<int32_t>{0, 1, 2, 3, 4, 5, 6, 7}));
 }
 
 TEST(BufferElementsStringUtilTest, ParseBufferElementsOpaque) {
   std::vector<uint16_t> buffer3i16(3);
-  EXPECT_OK(ParseBufferElements("0011 2233 4455",
-                                IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
-                                absl::MakeSpan(buffer3i16)));
+  IREE_EXPECT_OK(ParseBufferElements("0011 2233 4455",
+                                     IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
+                                     absl::MakeSpan(buffer3i16)));
   EXPECT_THAT(buffer3i16, Eq(std::vector<uint16_t>{0x1100, 0x3322, 0x5544}));
 }
 
@@ -895,44 +896,44 @@ TEST(BufferElementsStringUtilTest, FormatBufferElementsElided) {
 }
 
 TEST(BufferViewStringUtilTest, Parse) {
-  ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
+  IREE_ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
 
   // Zero fill.
-  ASSERT_OK_AND_ASSIGN(auto bv0, BufferView::Parse("i8", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv0, BufferView::Parse("i8", allocator));
   EXPECT_THAT(bv0.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{0})));
 
   // Zero fill (empty value).
-  ASSERT_OK_AND_ASSIGN(auto bv1, BufferView::Parse("2x2xi8=", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv1, BufferView::Parse("2x2xi8=", allocator));
   EXPECT_THAT(bv1.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{0, 0, 0, 0})));
 
   // Splat.
-  ASSERT_OK_AND_ASSIGN(auto bv2, BufferView::Parse("2x2xi8=3", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv2, BufferView::Parse("2x2xi8=3", allocator));
   EXPECT_THAT(bv2.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{3, 3, 3, 3})));
 
   // Flat list.
-  ASSERT_OK_AND_ASSIGN(auto bv3,
-                       BufferView::Parse("2x2xi8=1 2 3 4", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv3,
+                            BufferView::Parse("2x2xi8=1 2 3 4", allocator));
   EXPECT_THAT(bv3.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{1, 2, 3, 4})));
 
   // Whitespace and separators shouldn't matter.
-  ASSERT_OK_AND_ASSIGN(auto bv4,
-                       BufferView::Parse("  2x2xi8 =  1,\n2 3\t,4", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto bv4, BufferView::Parse("  2x2xi8 =  1,\n2 3\t,4", allocator));
   EXPECT_THAT(bv4.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{1, 2, 3, 4})));
 
   // Brackets are optional.
-  ASSERT_OK_AND_ASSIGN(auto bv5,
-                       BufferView::Parse("4xi16=[[0][1][2]][3]", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto bv5, BufferView::Parse("4xi16=[[0][1][2]][3]", allocator));
   EXPECT_THAT(bv5.buffer().CloneData<int16_t>(),
               IsOkAndHolds(Eq(std::vector<int16_t>{0, 1, 2, 3})));
 }
 
 TEST(BufferViewStringUtilTest, ParseInvalid) {
-  ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
+  IREE_ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
 
   // Incomplete.
   EXPECT_THAT(BufferView::Parse("", allocator),
@@ -986,10 +987,10 @@ TEST(BufferViewStringUtilTest, ToString) {
 }
 
 TEST(BufferViewStringUtilTest, RoundTrip) {
-  ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
+  IREE_ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
   auto expect_round_trip = [&](std::string source_value) {
-    ASSERT_OK_AND_ASSIGN(auto buffer_view,
-                         BufferView::Parse(source_value, allocator));
+    IREE_ASSERT_OK_AND_ASSIGN(auto buffer_view,
+                              BufferView::Parse(source_value, allocator));
     EXPECT_THAT(buffer_view.ToString(), IsOkAndHolds(source_value));
   };
 
