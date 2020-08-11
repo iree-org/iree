@@ -35,7 +35,7 @@ NEW_REF="${2:-HEAD}"
 # commit title. Use awk to trim the trailing whitespace introduced by git log
 
 git log \
-  "${BASE_REF?}..${NEW_REF?}"
+  "${BASE_REF?}..${NEW_REF?}" \
   --decorate=no \
   --pretty='format:* %h %<(80,trunc)%s' \
   | awk '{$1=$1;print}'
