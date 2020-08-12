@@ -81,7 +81,7 @@ module attributes {
 //       CHECK:     %[[VIEW1:.+]] = subview %[[ARG1]]
 //       CHECK:     %[[VIEW2:.+]] = subview %[[ARG2]]
 //       CHECK:     linalg.matmul
-//  CHECK-SAME:       "workgroup"
+//  CHECK-SAME:       "workgroup_numprocs_ge_numiters"
 //  CHECK-SAME:       %[[VIEW0]], %[[VIEW1]], %[[VIEW2]]
 
 // -----

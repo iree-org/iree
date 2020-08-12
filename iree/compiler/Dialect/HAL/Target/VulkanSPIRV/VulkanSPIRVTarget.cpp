@@ -63,6 +63,11 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
           "Workgroup size to use for XLA-HLO to Linalg to SPIR-V path"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
+  static llvm::cl::list<unsigned> clTileSizes(
+      "iree-spirv-tile-size",
+      llvm::cl::desc("Tile size to use for tiling Linalg operations"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
   static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
       llvm::cl::desc(
@@ -70,9 +75,10 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(Vulkan::swiftShaderTargetEnvAssembly));
 
   VulkanSPIRVTargetOptions targetOptions;
-  for (unsigned dim : clWorkgroupSize) {
-    targetOptions.codegenOptions.workgroupSize.push_back(dim);
-  }
+  targetOptions.codegenOptions.workgroupSize.assign(clWorkgroupSize.begin(),
+                                                    clWorkgroupSize.end());
+  targetOptions.codegenOptions.tileSizes.assign(clTileSizes.begin(),
+                                                clTileSizes.end());
   targetOptions.codegenOptions.useWorkgroupMemory = clUseWorkgroupMemory;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   return targetOptions;
