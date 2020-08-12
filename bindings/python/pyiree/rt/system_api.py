@@ -269,8 +269,7 @@ class SystemContext:
 def load_modules(*modules, config: Optional[Config] = None):
   """Loads modules into a new or shared context and returns them."""
   context = SystemContext(modules=modules, config=config)
-  context_modules = context.modules
-  bound_modules = [context_modules[m.name] for m in modules]
+  bound_modules = [context.modules[m.name] for m in modules]
   return bound_modules
 
 
