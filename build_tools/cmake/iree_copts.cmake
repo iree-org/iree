@@ -249,6 +249,8 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
 )
 
 #-------------------------------------------------------------------------------
