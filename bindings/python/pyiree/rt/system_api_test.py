@@ -17,6 +17,7 @@
 
 import re
 
+from absl import logging
 from absl.testing import absltest
 import numpy as np
 from pyiree import compiler
@@ -68,7 +69,7 @@ class SystemApiTest(absltest.TestCase):
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     f_repr = repr(f)
-    print(f_repr)
+    logging.info("f_repr: %s", f_repr)
     self.assertRegex(
         f_repr,
         re.escape(
