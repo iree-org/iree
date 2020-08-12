@@ -31,11 +31,11 @@ StringRef getWorkgroupMarker() { return "workgroup"; }
 
 StringRef getWorkgroupMemoryMarker() { return "workgroup_memory"; }
 
-StringRef getWorkgroupNumProcsGENumItersMarker() {
+StringRef getWorkgroupNumItemsGENumItersMarker() {
   return "workgroup_numprocs_ge_numiters";
 }
 
-StringRef getWorkgroupMemoryNumProcsGENumItersMarker() {
+StringRef getWorkgroupMemoryNumItemsGENumItersMarker() {
   return "workgroup_memory_numprocs_ge_numiters";
 }
 

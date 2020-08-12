@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <array>
+#include <numeric>
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
@@ -42,6 +43,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static constexpr int kNumDims = 3;
 
 /// In some cases the iterations of the loops when partitioned to workgroups
 /// need to be distributed in a cyclic manner. The main use case here is when
@@ -419,7 +422,7 @@ static void getGPUProcessorIdsAndCounts(Location loc,
                                         unsigned numDims,
                                         MutableArrayRef<Value> id,
                                         MutableArrayRef<Value> count) {
-  std::array<StringRef, 3> dims{"x", "y", "z"};
+  std::array<StringRef, kNumDims> dims{"x", "y", "z"};
   assert(id.size() == numDims);
   assert(count.size() == numDims);
   for (unsigned i = 0; i < numDims; ++i) {
@@ -433,14 +436,14 @@ static void getGPUProcessorIdsAndCounts(Location loc,
 template <typename GPUIdOp, typename GPUCountOp>
 static ProcessorIdAndCount getLinearizedGPUProcessorIdAndCount(
     Location loc, ConversionPatternRewriter &rewriter) {
-  std::array<Value, 3> ids, counts;
-  getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(loc, rewriter, 3, ids,
+  std::array<Value, kNumDims> ids, counts;
+  getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(loc, rewriter, kNumDims, ids,
                                                    counts);
   ProcessorIdAndCount linearized;
   linearized.id = ids[0];
   linearized.count = counts[0];
-  for (unsigned i = 0; i < 2; ++i) {
-    linearized.id = rewriter.create<MulIOp>(loc, linearized.id, counts[i]);
+  for (unsigned i = 0; i < kNumDims - 1; ++i) {
+    linearized.id = rewriter.create<MulIOp>(loc, linearized.id, counts[i + 1]);
     linearized.id = rewriter.create<AddIOp>(loc, linearized.id, ids[i + 1]);
     linearized.count =
         rewriter.create<MulIOp>(loc, linearized.count, counts[i + 1]);
@@ -491,9 +494,10 @@ static LogicalResult distributeSingleIterationPerProcessor(
 static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
                                      scf::ParallelOp pLoopOp,
                                      bool useCyclicDistribution = false) {
-  if (useCyclicDistribution)
+  if (useCyclicDistribution) {
     return distributeCyclicallyToProcessors<gpu::BlockIdOp, gpu::GridDimOp>(
         rewriter, pLoopOp);
+  }
   return distributeSingleIterationPerProcessor<gpu::BlockIdOp, gpu::GridDimOp>(
       rewriter, pLoopOp, false);
 }
@@ -502,13 +506,13 @@ static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
 static LogicalResult mapToLocalInvocationId(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
     bool useCyclicDistribution = false) {
-  if (useCyclicDistribution)
+  if (useCyclicDistribution) {
     return distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
         rewriter, pLoopOp);
-  else
-    return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
-                                                 gpu::BlockDimOp>(rewriter,
-                                                                  pLoopOp);
+  }
+  return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
+                                               gpu::BlockDimOp>(rewriter,
+                                                                pLoopOp);
 }
 
 /// Distributes scf.parallel to workitems using global invocation ID. The GPU
@@ -520,7 +524,7 @@ static LogicalResult mapToGlobalInvocationId(
       rewriter, pLoopOp);
 }
 
-/// Compute the number of bytes copied when load/storing to/from workgorup
+/// Returns the number of bytes copied when loading to/storing from workgorup
 /// memory. It is approximated to be the size of the underlying allocation being
 /// copied into/from.
 static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
@@ -641,20 +645,17 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
   ProcessorIdAndCount idAndCount =
       getLinearizedGPUProcessorIdAndCount<gpu::ThreadIdOp, gpu::BlockDimOp>(
           copyOp.getLoc(), rewriter);
-  SmallVector<int64_t, 3> workgroupSize = llvm::to_vector<3>(llvm::map_range(
-      spirv::lookupLocalWorkGroupSize(copyOp).getValues<APInt>(),
-      [](APInt v) -> int64_t { return v.getSExtValue(); }));
-  auto reduceSum = [](ArrayRef<int64_t> values) {
-    int64_t reducedVal = 1;
-    for (int64_t v : values) reducedVal *= v;
-    return reducedVal;
-  };
+  auto workgroupSize =
+      spirv::lookupLocalWorkGroupSize(copyOp).getValues<APInt>();
+  int64_t linearizedWorkgroupSize = std::accumulate(
+      workgroupSize.begin(), workgroupSize.end(), 1,
+      [](int64_t total, APInt value) { return total * value.getSExtValue(); });
 
   if (copyLength.hasValue() && !workgroupSize.empty() &&
-      copyLength.getValue() <= reduceSum(workgroupSize))
-    return distributeSingleIterationPerProcessor(rewriter, pLoopOp,
-                                                 idAndCount.id, true);
-
+      copyLength.getValue() <= linearizedWorkgroupSize) {
+    return distributeSingleIterationPerProcessor(
+        rewriter, pLoopOp, idAndCount.id, /*generateGuard=*/true);
+  }
   return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount.id,
                                           idAndCount.count);
 }

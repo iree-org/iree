@@ -37,10 +37,10 @@ StringRef getWorkgroupMarker();
 StringRef getWorkgroupMemoryMarker();
 
 /// Marker to denote that a linalg operation is to be partitioned to workitems
-/// with the assumption that the number of woritems in the workgroup is greater
+/// with the assumption that the number of workitems in the workgroup is greater
 /// than equal to the number of iterations.
-StringRef getWorkgroupNumProcsGENumItersMarker();
-StringRef getWorkgroupMemoryNumProcsGENumItersMarker();
+StringRef getWorkgroupNumItemsGENumItersMarker();
+StringRef getWorkgroupMemoryNumItemsGENumItersMarker();
 
 /// Marker for copy operations that are moving data from StorageClass to
 /// Workgroup memory.

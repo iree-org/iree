@@ -250,7 +250,7 @@ struct TileMatmulPattern
       : Base(context, options,
              linalg::LinalgMarker(
                  ArrayRef<Identifier>(),
-                 Identifier::get(getWorkgroupNumProcsGENumItersMarker(),
+                 Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
                                  context)),
              benefit),
         workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
@@ -329,9 +329,9 @@ struct PromoteMatmulSubviewsPattern
             options.setOperandsToPromote({0, 1}).setUseFullTileBuffers(
                 {false, false}),
             linalg::LinalgMarker(
-                Identifier::get(getWorkgroupNumProcsGENumItersMarker(),
+                Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
                                 context),
-                Identifier::get(getWorkgroupMemoryNumProcsGENumItersMarker(),
+                Identifier::get(getWorkgroupMemoryNumItemsGENumItersMarker(),
                                 context)),
             benefit) {}
 };
