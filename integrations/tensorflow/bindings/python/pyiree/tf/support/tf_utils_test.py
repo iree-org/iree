@@ -49,36 +49,6 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters([
       {
-          'testcase_name': 'single_backend',
-          'backend_infos': [tf_utils.BackendInfo('iree_vmla')],
-      },
-      {
-          'testcase_name':
-              'multiple_backends',
-          'backend_infos': [
-              tf_utils.BackendInfo('iree_vmla'),
-              tf_utils.BackendInfo('iree_llvmjit')
-          ],
-      },
-  ])
-  def test_artifact_saving(self, backend_infos):
-    with tempfile.TemporaryDirectory() as artifacts_dir:
-      tf_module = ConstantModule()
-      iree_compiled_module = tf_utils.compile_tf_module(
-          tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
-
-      artifacts_to_check = [
-          'tf_input.mlir',
-          'iree_input.mlir',
-          f'compiled__{tf_utils.backends_to_str(backend_infos)}.vmfb',
-      ]
-      for artifact in artifacts_to_check:
-        artifact_path = os.path.join(artifacts_dir, artifact)
-        logging.info('Checking path: %s', artifact_path)
-        self.assertTrue(os.path.exists(artifact_path))
-
-  @parameterized.named_parameters([
-      {
           'testcase_name': 'tensorflow',
           'backend_name': 'tf',
       },
