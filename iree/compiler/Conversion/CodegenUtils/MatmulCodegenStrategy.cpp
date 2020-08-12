@@ -228,10 +228,16 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   stage2Patterns.insert<AffineMinCanonicalizationPattern>(context);
 
-  auto stage3Transforms = [this](Operation *op) {
-    // Some of these may be too aggressive as a stage 3 that is applied on each
-    // stage 1 application and may have to be split out to post staged patterns
-    // application (in which case they could just be passes, TBD).
+  auto stage3Transforms = [](Operation *op) {
+    promoteSingleIterationLoops(cast<FuncOp>(op));
+    return success();
+  };
+  linalg::applyStagedPatterns(func, stage1Patterns, stage2Patterns,
+                              stage3Transforms);
+
+  auto postStageTransforms = [this](Operation *op) {
+    // Run LICM and hoisting patterns after all the stages as we want to
+    // unrolling before moving transfer ops out of the loop.
     if (hoistInvariantCode) {
       PassManager pm(op->getContext());
       pm.addPass(createLoopInvariantCodeMotionPass());
@@ -241,11 +247,8 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
       hoistRedundantVectorTransfers(cast<FuncOp>(op));
       hoistRedundantCopies(cast<FuncOp>(op));
     }
-    promoteSingleIterationLoops(cast<FuncOp>(op));
-    return success();
   };
-  linalg::applyStagedPatterns(func, stage1Patterns, stage2Patterns,
-                              stage3Transforms);
+  postStageTransforms(func);
   if (lowering != nullptr) lowering(func);
 }
 
