@@ -46,9 +46,8 @@ flags.DEFINE_string(
 flags.DEFINE_bool(
     "summarize", True,
     "Summarize the inputs and outputs of each module trace logged to disk.")
-flags.DEFINE_bool(
-    "log_all_traces", False,
-    "Log all traces to logging.info, even if comparison passes.")
+flags.DEFINE_bool("log_all_traces", False,
+                  "Log all traces to logging.info, even if comparison passes.")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
