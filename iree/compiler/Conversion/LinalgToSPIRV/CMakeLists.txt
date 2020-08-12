@@ -30,6 +30,7 @@ iree_cc_library(
     "CooperativeMatrixAnalysis.cpp"
     "LinalgTileAndFusePass.cpp"
     "MarkerUtils.cpp"
+    "MatMulVectorizationTest.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
     "Utils.cpp"

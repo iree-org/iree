@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+from absl import logging
 from absl.testing import absltest
 
 import numpy as np
@@ -25,8 +22,8 @@ from pyiree import rt
 class HalTest(absltest.TestCase):
 
   def testEnums(self):
-    print("MemoryType =", rt.MemoryType)
-    print("HOST_VISIBLE =", int(rt.MemoryType.HOST_VISIBLE))
+    logging.info("MemoryType: %s", rt.MemoryType)
+    logging.info("HOST_VISIBLE: %s", int(rt.MemoryType.HOST_VISIBLE))
 
   def testAllocateHeap(self):
     b = rt.HalBuffer.allocate_heap(
