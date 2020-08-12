@@ -314,7 +314,8 @@ class Trace:
     return True
 
   def _get_trace_dir(self, artifacts_dir):
-    trace_dir = os.path.join(artifacts_dir, "traces")
+    trace_dir = os.path.join(artifacts_dir, self.backend, "traces",
+                             self.function_name)
     if not os.path.exists(trace_dir):
       os.makedirs(trace_dir)
     return trace_dir
@@ -335,7 +336,7 @@ class Trace:
         edgeitems=10)  # Can show more items since they won't clutter the logs.
 
     trace_dir = self._get_trace_dir(artifacts_dir)
-    path = os.path.join(trace_dir, f"{self.function_name}__{self.backend}.txt")
+    path = os.path.join(trace_dir, "log.txt")
     with open(path, "w") as f:
       f.write(str(self))
       f.write("\n")
