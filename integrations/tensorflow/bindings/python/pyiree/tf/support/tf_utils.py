@@ -130,6 +130,16 @@ def compile_tf_module(tf_module,
     A compiled IREE module blob.
   """
 
+  def _specify_backends(artifact_name):
+    # Put the artifact in a directory if there's only one backend.
+    if len(backend_infos) == 1:
+      backend_dir = os.path.join(artifacts_dir, backends_string)
+      if not os.path.exists(backend_dir):
+        os.makedirs(backend_dir)
+      return os.path.join(backends_string, artifact_name)
+    else:
+      return f"{artifact_name}__{backends_string}"
+
   def _compile_from_path(sm_path):
     """Helper function for compile_tf_module."""
     if artifacts_dir is not None:
@@ -168,7 +178,7 @@ def compile_tf_module(tf_module,
       compiled_module = compiler_module.compile(target_backends=target_backends)
 
       if artifacts_dir is not None:
-        compiled_name = f"compiled__{backends_string}.vmfb"
+        compiled_name = f"{_specify_backends('compiled')}.vmfb"
         compiled_path = os.path.join(artifacts_dir, compiled_name)
         logging.info("Saving compiled IREE module to: %s", compiled_path)
         with open(compiled_path, "wb") as f:
@@ -187,7 +197,7 @@ def compile_tf_module(tf_module,
     # Create a saved model for these target backends to avoid a race condition
     # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
+    sm_path = os.path.join(artifacts_dir, _specify_backends("saved_model"))
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
@@ -241,11 +251,10 @@ class IreeCompiledModule(CompiledModule):
 
     if _create_reinitialized_args is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(
-          tf_module=module_class(),
-          backend_infos=[backend_info],
-          exported_names=exported_names,
-          artifacts_dir=artifacts_dir)
+      self._module_blob = compile_tf_module(tf_module=module_class(),
+                                            backend_infos=[backend_info],
+                                            exported_names=exported_names,
+                                            artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
@@ -253,8 +262,8 @@ class IreeCompiledModule(CompiledModule):
       self._module_blob, self._module, self._config = _create_reinitialized_args
 
     # Holds all of the module's mutable state.
-    self._context = rt.SystemContext(
-        modules=[self._module], config=self._config)
+    self._context = rt.SystemContext(modules=[self._module],
+                                     config=self._config)
 
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
@@ -350,8 +359,9 @@ class _TfFunctionWrapper(object):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(
-        self._convert_to_numpy, *results, check_types=False)
+    return tf.nest.map_structure(self._convert_to_numpy,
+                                 *results,
+                                 check_types=False)
 
 
 class BackendInfo:
