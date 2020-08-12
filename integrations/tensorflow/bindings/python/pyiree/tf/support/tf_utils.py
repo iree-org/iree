@@ -107,16 +107,21 @@ def compile_tf_module(tf_module,
   that returns a module that can be called without any further steps.
 
   If artifacts_dir is provided then the following artifacts will be saved:
-    saved_model:
+    backend_name/saved_model:
       A TF SavedModel directory containing the files used translate the
-      tf.Module into an IREE module.
+      tf.Module into an IREE module. Only saved if '--keep_saved_model=True'.
     tf_input.mlir:
       MLIR for the module in TF's input dialect.
     iree_input.mlir:
       The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
-    compiled__backends.vmfb:
+    backend_name/compiled.vmfb:
       A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
-  Here 'backends' is a '__' delimited list of iree backends (e.g. vmla__llvm_ir)
+
+  If multiple backends are specified, then instead of saving the SavedModel and
+  compiled 'vmfb' under 'backend_name/', they will be saved as follows:
+    - 'saved_model__{backends}'
+    - 'compiled__{backends}.vmfb'
+  where 'backends' is a '__' delimited list (e.g. iree_vmla__iree_llvmjit).
 
   Args:
     tf_module: A tf.Module.
