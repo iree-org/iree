@@ -16,6 +16,7 @@
 
 import re
 
+from absl import logging
 from absl.testing import absltest
 
 import numpy as np
@@ -40,7 +41,7 @@ class HostTypeFactory(absltest.TestCase):
 
   def test_baseclass(self):
     htf = rt.HostTypeFactory()
-    print(htf)
+    logging.info("HostTypeFactory: %s", htf)
 
 
 class FunctionAbiTest(absltest.TestCase):
@@ -50,12 +51,12 @@ class FunctionAbiTest(absltest.TestCase):
     super().setUpClass()
     driver_names = rt.HalDriver.query()
     for driver_name in driver_names:
-      print("Try create driver:", driver_name)
+      logging.info("Try to create driver: %s", driver_name)
       try:
         cls.driver = rt.HalDriver.create(driver_name)
         cls.device = cls.driver.create_default_device()
       except Exception:
-        print("Could not create driver:", driver_name)
+        logging.error("Could not create driver: %s", driver_name)
       else:
         break
 
@@ -66,7 +67,7 @@ class FunctionAbiTest(absltest.TestCase):
   def test_static_arg_success(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
                           ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
-    print(fabi)
+    logging.info("fabi: %s", fabi)
     self.assertEqual(
         "<FunctionAbi (Buffer<float32[10x128x64]>) -> "
         "(Buffer<sint32[32x8x64]>)>", repr(fabi))
@@ -75,7 +76,7 @@ class FunctionAbiTest(absltest.TestCase):
 
     arg = np.zeros((10, 128, 64), dtype=np.float32)
     packed = fabi.raw_pack_inputs([arg])
-    print(packed)
+    logging.info("packed: %s", packed)
     self.assertEqual("<VmVariantList(1): [HalBufferView(10x128x64:0x3000020)]>",
                      repr(packed))
 
@@ -85,7 +86,7 @@ class FunctionAbiTest(absltest.TestCase):
     arg = np.zeros((10, 128, 64), dtype=np.float32)
     f_args = fabi.raw_pack_inputs([arg])
     f_results = fabi.allocate_results(f_args)
-    print(f_results)
+    logging.info("f_results: %s", f_results)
     self.assertEqual("<VmVariantList(1): [HalBufferView(32x8x64:0x1000020)]>",
                      repr(f_results))
     py_result, = fabi.raw_unpack_results(f_results)
@@ -98,13 +99,13 @@ class FunctionAbiTest(absltest.TestCase):
     arg = np.zeros((10, 128, 64), dtype=np.float32)
     f_args = fabi.raw_pack_inputs([arg])
     f_results = fabi.allocate_results(f_args, static_alloc=False)
-    print(f_results)
+    logging.info("f_results: %s", f_results)
     self.assertEqual("<VmVariantList(0): []>", repr(f_results))
 
   def test_dynamic_arg_success(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
                           ATTRS_1ARG_FLOAT32_DYNX128X64_TO_SINT32_DYNX8X64_V1)
-    print(fabi)
+    logging.info("fabi: %s", fabi)
     self.assertEqual(
         "<FunctionAbi (Buffer<float32[?x128x64]>) -> "
         "(Buffer<sint32[?x8x64]>)>", repr(fabi))
@@ -113,14 +114,14 @@ class FunctionAbiTest(absltest.TestCase):
 
     arg = np.zeros((10, 128, 64), dtype=np.float32)
     packed = fabi.raw_pack_inputs([arg])
-    print(packed)
+    logging.info("packed: %s", packed)
     self.assertEqual("<VmVariantList(1): [HalBufferView(10x128x64:0x3000020)]>",
                      repr(packed))
 
   def test_static_arg_rank_mismatch(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
                           ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
-    print(fabi)
+    logging.info("fabi: %s", fabi)
     arg = np.zeros((10,), dtype=np.float32)
     with self.assertRaisesRegex(
         ValueError,
@@ -130,7 +131,7 @@ class FunctionAbiTest(absltest.TestCase):
   def test_static_arg_eltsize_mismatch(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
                           ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
-    print(fabi)
+    logging.info("fabi: %s", fabi)
     arg = np.zeros((10, 128, 64), dtype=np.float64)
     with self.assertRaisesRegex(
         ValueError,
@@ -140,7 +141,7 @@ class FunctionAbiTest(absltest.TestCase):
   def test_static_arg_dtype_mismatch(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
                           ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
-    print(fabi)
+    logging.info("fabi: %s", fabi)
     arg = np.zeros((10, 128, 64), dtype=np.int32)
     with self.assertRaisesRegex(
         ValueError,
@@ -150,7 +151,7 @@ class FunctionAbiTest(absltest.TestCase):
   def test_static_arg_static_dim_mismatch(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
                           ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
-    print(fabi)
+    logging.info("fabi: %s", fabi)
     arg = np.zeros((10, 32, 64), dtype=np.float32)
     with self.assertRaisesRegex(
         ValueError,
