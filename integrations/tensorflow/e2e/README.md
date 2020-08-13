@@ -13,7 +13,7 @@ that TensorFlow should be version 2.0+. This can be checked with
 See [Install TensorFlow with pip](https://www.tensorflow.org/install/pip) for
 instructions.
 
-## Vulkan setup
+## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
 [the doc](../../../docs/vulkan_and_spirv.md)), then you can run the manual test
@@ -48,7 +48,7 @@ vmla_module.predict(...)
 By default the TensorFlow SavedModels will not be kept. This can be overridden
 via the `--keep_saved_model` flag.
 
-## Running tests
+## Running Tests
 
 For locally running tests and iterating on backend development, `bazel run` is
 preferred.
@@ -150,7 +150,33 @@ bazel test :e2e_tests_failing
 bazel test :e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ```
 
-## Debugging tests
+## Generated Artifacts
+
+By default, running an E2E test generates a number of compilation, debugging and
+benchmarking artifacts in `/tmp/iree/modules/`. The location of these artifacts
+can be changed via the `--artifacts_dir` flag. The generated directory structure
+for each module is as follows:
+
+```
+/tmp/iree/modules/ModuleName
+├── tf_input.mlir          # MLIR for ModuleName in TF's input dialect
+├── iree_input.mlir        # tf_input.mlir translated to IREE MLIR
+├── backend_name           # e.g. iree_vmla, tf or tf_ref
+│   ├── compiled.vmfb      # flatbuffer of ModuleName compiled to this backend
+│   ├── saved_model
+│   └── traces
+│       ├── trace_function
+│       │   └── log.txt    # A more detailed version of the test logs
+│       └── trace_function
+│           └── log.txt
+└── backend_name
+    └── ...
+```
+
+The `saved_model` directory is only created if `--keep_saved_model` is
+specified.
+
+## Debugging Tests
 
 If the compiler fails to compile the program, then it will create a crash
 reproducer (see [MLIR documentation](https://mlir.llvm.org/docs/WritingAPass/)),
@@ -159,7 +185,7 @@ debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
 
-## Test harnesses
+## Test Harnesses
 
 ### Simple function tests
 

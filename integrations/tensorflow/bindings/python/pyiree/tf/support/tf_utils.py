@@ -48,16 +48,6 @@ def ndarange(shape, dtype=np.float32):
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
-def backends_to_str(backend_infos):
-  """Creates a normalized string representing the provided backends."""
-  normalized_names = []
-  for backend_info in backend_infos:
-    # Remove unusual characters and ensure names don't end or start in "_".
-    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
-    normalized_names.append(name.strip("_"))
-  return "__".join(normalized_names)
-
-
 def to_mlir_type(dtype):
   """Returns a string that denotes the type `dtype` in MLIR style."""
   bits = dtype.itemsize * 8
@@ -97,6 +87,28 @@ def save_input_values(inputs, artifacts_dir=None):
   return result
 
 
+def backends_to_str(backend_infos):
+  """Creates a normalized string representing the provided backends."""
+  normalized_names = []
+  for backend_info in backend_infos:
+    # Remove unusual characters and ensure names don't end or start in "_".
+    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
+    normalized_names.append(name.strip("_"))
+  return "__".join(normalized_names)
+
+
+def _get_backends_path(artifact_name, backend_infos, artifacts_dir):
+  backends_string = backends_to_str(backend_infos)
+  # Put the artifact in a directory if there's only one backend.
+  if len(backend_infos) == 1:
+    backend_dir = os.path.join(artifacts_dir, backends_string)
+    if not os.path.exists(backend_dir):
+      os.makedirs(backend_dir)
+    return os.path.join(artifacts_dir, backends_string, artifact_name)
+  else:
+    return os.path.join(artifacts_dir, f"{artifact_name}__{backends_string}")
+
+
 def compile_tf_module(tf_module,
                       backend_infos=(),
                       exported_names=(),
@@ -107,16 +119,21 @@ def compile_tf_module(tf_module,
   that returns a module that can be called without any further steps.
 
   If artifacts_dir is provided then the following artifacts will be saved:
-    saved_model:
+    backend_name/saved_model:
       A TF SavedModel directory containing the files used translate the
-      tf.Module into an IREE module.
+      tf.Module into an IREE module. Only saved if '--keep_saved_model=True'.
     tf_input.mlir:
       MLIR for the module in TF's input dialect.
     iree_input.mlir:
       The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
-    compiled__backends.vmfb:
+    backend_name/compiled.vmfb:
       A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
-  Here 'backends' is a '__' delimited list of iree backends (e.g. vmla__llvm_ir)
+
+  If multiple backends are specified, then instead of saving the SavedModel and
+  compiled 'vmfb' under 'backend_name/', they will be saved as follows:
+    - 'saved_model__{backends}'
+    - 'compiled__{backends}.vmfb'
+  where 'backends' is a '__' delimited list (e.g. iree_vmla__iree_llvmjit).
 
   Args:
     tf_module: A tf.Module.
@@ -168,8 +185,9 @@ def compile_tf_module(tf_module,
       compiled_module = compiler_module.compile(target_backends=target_backends)
 
       if artifacts_dir is not None:
-        compiled_name = f"compiled__{backends_string}.vmfb"
-        compiled_path = os.path.join(artifacts_dir, compiled_name)
+        compiled_path = _get_backends_path("compiled", backend_infos,
+                                           artifacts_dir)
+        compiled_path = f"{compiled_path}.vmfb"
         logging.info("Saving compiled IREE module to: %s", compiled_path)
         with open(compiled_path, "wb") as f:
           f.write(compiled_module)
@@ -187,7 +205,7 @@ def compile_tf_module(tf_module,
     # Create a saved model for these target backends to avoid a race condition
     # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
+    sm_path = _get_backends_path("saved_model", backend_infos, artifacts_dir)
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
@@ -241,11 +259,10 @@ class IreeCompiledModule(CompiledModule):
 
     if _create_reinitialized_args is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(
-          tf_module=module_class(),
-          backend_infos=[backend_info],
-          exported_names=exported_names,
-          artifacts_dir=artifacts_dir)
+      self._module_blob = compile_tf_module(tf_module=module_class(),
+                                            backend_infos=[backend_info],
+                                            exported_names=exported_names,
+                                            artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
@@ -253,8 +270,8 @@ class IreeCompiledModule(CompiledModule):
       self._module_blob, self._module, self._config = _create_reinitialized_args
 
     # Holds all of the module's mutable state.
-    self._context = rt.SystemContext(
-        modules=[self._module], config=self._config)
+    self._context = rt.SystemContext(modules=[self._module],
+                                     config=self._config)
 
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
@@ -350,8 +367,9 @@ class _TfFunctionWrapper(object):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(
-        self._convert_to_numpy, *results, check_types=False)
+    return tf.nest.map_structure(self._convert_to_numpy,
+                                 *results,
+                                 check_types=False)
 
 
 class BackendInfo:
