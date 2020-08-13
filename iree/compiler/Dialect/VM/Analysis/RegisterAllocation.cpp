@@ -340,19 +340,18 @@ struct FeedbackArcSet {
       int indegree = 0;
       int outdegree = 0;
     };
-    SmallVector<FASNode, 8> nodeStorage;
-    llvm::SmallDenseMap<NodeID, FASNode *> nodes;
+    // This should not be modified after creation in this loop. We take pointers
+    // to its entries so do not want to invalidate them with reallocation.
+    llvm::SmallDenseMap<NodeID, FASNode> nodes;
     for (auto &edge : inputEdges) {
       NodeID sourceID = edge.first.asBaseRegister();
       NodeID sinkID = edge.second.asBaseRegister();
       assert(sourceID != sinkID && "self-cycles not supported");
       if (nodes.count(sourceID) == 0) {
-        nodeStorage.push_back({sourceID, 0, 0});
-        nodes.insert({sourceID, &nodeStorage.back()});
+        nodes.insert({sourceID, {sourceID, 0, 0}});
       }
       if (nodes.count(sinkID) == 0) {
-        nodeStorage.push_back({sinkID, 0, 0});
-        nodes.insert({sinkID, &nodeStorage.back()});
+        nodes.insert({sinkID, {sinkID, 0, 0}});
       }
     }
 
@@ -366,13 +365,13 @@ struct FeedbackArcSet {
     for (auto &edge : inputEdges) {
       NodeID sourceID = edge.first.asBaseRegister();
       NodeID sinkID = edge.second.asBaseRegister();
-      auto *sourceNode = nodes[sourceID];
-      ++sourceNode->outdegree;
-      maxOutdegree = std::max(maxOutdegree, sourceNode->outdegree);
-      auto *sinkNode = nodes[sinkID];
-      ++sinkNode->indegree;
-      maxIndegree = std::max(maxIndegree, sinkNode->indegree);
-      edges.push_back({sourceNode, sinkNode});
+      auto &sourceNode = nodes[sourceID];
+      ++sourceNode.outdegree;
+      maxOutdegree = std::max(maxOutdegree, sourceNode.outdegree);
+      auto &sinkNode = nodes[sinkID];
+      ++sinkNode.indegree;
+      maxIndegree = std::max(maxIndegree, sinkNode.indegree);
+      edges.push_back({&sourceNode, &sinkNode});
     }
 
     std::vector<SmallVector<FASNode *, 2>> buckets;
@@ -392,8 +391,10 @@ struct FeedbackArcSet {
         buckets[index].erase(it);
       }
     };
+    llvm::SmallPtrSet<FASNode *, 8> remainingNodes;
     for (auto &nodeEntry : nodes) {
-      assignBucket(nodeEntry.second);
+      assignBucket(&nodeEntry.getSecond());
+      remainingNodes.insert(&nodeEntry.getSecond());
     }
 
     auto removeNode = [&](FASNode *node) {
@@ -416,6 +417,7 @@ struct FeedbackArcSet {
         }
         removeBucket(edge.source);
         --edge.source->outdegree;
+        assert(edge.source->outdegree >= 0 && "outdegree has become negative");
         assignBucket(edge.source);
       }
       for (auto &edge : outEdges) {
@@ -425,10 +427,11 @@ struct FeedbackArcSet {
         }
         removeBucket(edge.sink);
         --edge.sink->indegree;
+        assert(edge.sink->indegree >= 0 && "indegree has become negative");
         assignBucket(edge.sink);
       }
 
-      nodes.erase(node->id);
+      remainingNodes.erase(node);
       edges.erase(std::remove_if(edges.begin(), edges.end(),
                                  [&](const FASEdge &edge) {
                                    return edge.source == node ||
@@ -438,13 +441,13 @@ struct FeedbackArcSet {
       return results;
     };
     auto ends = buckets.back();
-    while (!nodes.empty()) {
+    while (!remainingNodes.empty()) {
       while (!ends.empty()) {
         auto *node = ends.front();
         ends.erase(ends.begin());
         removeNode(node);
       }
-      if (nodes.empty()) break;
+      if (remainingNodes.empty()) break;
       for (ssize_t i = buckets.size() - 1; i >= 0; --i) {
         if (buckets[i].empty()) continue;
         auto *bucket = buckets[i].front();

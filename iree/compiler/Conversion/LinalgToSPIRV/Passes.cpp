@@ -59,6 +59,9 @@ struct SPIRVCodegenClOpts : public PassPipelineOptions<SPIRVCodegenClOpts> {
           "three integers standarding for the x, y, and z dimension; "
           "additional arguments will be ignored (used only for testing)"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+  ListOption<int64_t> tileSizes{
+      *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
   Option<bool> useWorkgroupMemory{
       *this, "use-workgroup-memory",
       llvm::cl::desc(
@@ -97,8 +100,8 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   afterwards. This gives each Linalg op a second chance to be tiled,
   //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
-  pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
-                                         options.useWorkgroupMemory));
+  pm.addPass(createLinalgTileAndFusePass(
+      options.workgroupSize, options.tileSizes, options.useWorkgroupMemory));
   pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
                                          options.useWorkgroupMemory));
@@ -221,6 +224,7 @@ static SPIRVCodegenOptions getSPIRVCodegenOptions(
   SPIRVCodegenOptions options;
   options.workgroupSize.assign(clOpts.workgroupSize.begin(),
                                clOpts.workgroupSize.end());
+  options.tileSizes.assign(clOpts.tileSizes.begin(), clOpts.tileSizes.end());
   options.useWorkgroupMemory = clOpts.useWorkgroupMemory;
   return options;
 }
