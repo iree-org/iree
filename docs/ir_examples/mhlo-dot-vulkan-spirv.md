@@ -679,7 +679,7 @@ func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<
       %9 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
       %10 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
       %11 = subview %0[%arg0, %arg1] [%9, %10] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      linalg.matmul  {__internal_linalg_transform__ = "workgroup"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
+      linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
     }
     scf.yield
   }
@@ -712,7 +712,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
         %9 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
         %10 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
         %11 = subview %0[%arg0, %arg1] [%9, %10] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-        linalg.matmul  {__internal_linalg_transform__ = "workgroup"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
+        linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
       }
       scf.yield
     }
@@ -756,7 +756,7 @@ func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_si
       %9 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
       %10 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
       %11 = subview %0[%arg0, %arg1] [%9, %10] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      linalg.matmul  {__internal_linalg_transform__ = "workgroup"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
+      linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
     }
     scf.yield
   }
@@ -798,7 +798,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
         %9 = affine.min affine_map<(d0) -> (8, -d0 + 32)>(%arg0)
         %10 = affine.min affine_map<(d0) -> (8, -d0 + 64)>(%arg1)
         %11 = subview %0[%arg0, %arg1] [%9, %10] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        linalg.matmul  {__internal_linalg_transform__ = "workgroup"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
+        linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
       }
       scf.yield
     }
