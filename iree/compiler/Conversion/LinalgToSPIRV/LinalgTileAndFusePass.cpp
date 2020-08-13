@@ -132,7 +132,7 @@ LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
     Operation *op = linalgOp.getOperation();
     if (isa<linalg::ConvOp>(op))
       opInfo |= OpInfo::Convolution;
-    else if (isa<linalg::MatmulOp>(op))
+    else if (isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op))
       opInfo |= OpInfo::Matmul;
     else if (isa<linalg::PoolingMaxOp>(op))
       opInfo |= OpInfo::Pooling;
@@ -272,6 +272,35 @@ struct TileMatmulPattern
   SmallVector<int64_t, 3> workgroupSize;
 };
 
+struct TileBatchMatmulPattern
+    : public linalg::LinalgTilingPattern<linalg::BatchMatmulOp> {
+  using Base = linalg::LinalgTilingPattern<linalg::BatchMatmulOp>;
+  TileBatchMatmulPattern(MLIRContext *context,
+                         linalg::LinalgTilingOptions options,
+                         ArrayRef<int64_t> workgroupSize,
+                         PatternBenefit benefit = 1)
+      : Base(context, options,
+             linalg::LinalgMarker(
+                 ArrayRef<Identifier>(),
+                 Identifier::get(getWorkgroupMarker(), context)),
+             benefit),
+        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    FuncOp funcOp = op->getParentOfType<FuncOp>();
+    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
+        failed(updateWorkGroupSize(funcOp, this->workgroupSize)))
+      return failure();
+    funcOp.setAttr(getWorkgroupCountAttrName(),
+                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                       WorkgroupCountMethodology::Default)));
+    return success();
+  }
+
+  SmallVector<int64_t, 3> workgroupSize;
+};
+
 /// Pattern for tiling convolution and pooling operations. Currently is just a
 /// way to not tile when the operation has padding.
 template <typename OpTy>
@@ -400,7 +429,9 @@ void LinalgTileAndFusePass::runOnFunction() {
   });
 
   OwningRewritePatternList tilingPatterns;
-  tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>, TileMatmulPattern,
+  tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>,
+                        TileMatmulPattern,
+                        TileBatchMatmulPattern,
                         TileConvPoolPattern<linalg::PoolingMaxOp>,
                         TileConvPoolPattern<linalg::PoolingMinOp>,
                         TileConvPoolPattern<linalg::PoolingSumOp>>(

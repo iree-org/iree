@@ -775,6 +775,7 @@ void ConvertToGPUPass::runOnFunction() {
                   MapLinalgOpToLocalInvocationId<linalg::ConvOp>,
                   MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
                   MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
+                  MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>,
