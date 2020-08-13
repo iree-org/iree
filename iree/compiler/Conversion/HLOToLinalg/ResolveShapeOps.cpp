@@ -99,8 +99,9 @@ void ResolveShapeOpsPass::runOnFunction() {
   ConversionTarget target(*context);
   target.addIllegalOp<DimOp>();
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-  if (failed(applyFullConversion(getFunction(), target, dimPatterns)))
+  if (failed(applyFullConversion(getFunction(), target, dimPatterns))) {
     return signalPassFailure();
+  }
 
   OwningRewritePatternList shapePatterns;
   shapePatterns.insert<TieShapeElider>(context);
