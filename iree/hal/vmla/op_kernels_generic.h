@@ -937,10 +937,10 @@ Status ReduceMax::Execute(absl::Span<const T> src_buffer,
 namespace impl {
 
 template <typename T, typename KernelImpl>
-Status ComputePoolingWindow(absl::Span<const T> src_buffer,
-                            absl::Span<const int> src_indices,
-                            ShapeSpan src_shape, T init_value,
-                            ShapeSpan window_dimensions, T* dst_value) {
+void ComputePoolingWindow(absl::Span<const T> src_buffer,
+                          absl::Span<const int> src_indices,
+                          ShapeSpan src_shape, T init_value,
+                          ShapeSpan window_dimensions, T* dst_value) {
   int rank = src_shape.size();
   absl::InlinedVector<int, 8> window_indices(rank, 0);
   auto getSrcValue = [&]() -> T {
@@ -958,7 +958,6 @@ Status ComputePoolingWindow(absl::Span<const T> src_buffer,
     KernelImpl()(dst_value, getSrcValue());
     IncrementShapeIndex(absl::MakeSpan(window_indices), window_dimensions);
   }
-  return OkStatus();
 }
 
 template <typename T, typename KernelImpl>
