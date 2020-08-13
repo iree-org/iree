@@ -19,9 +19,9 @@ import tempfile
 
 from absl import logging
 from absl.testing import parameterized
+import numpy as np
 from pyiree.tf.support import tf_utils
 import tensorflow as tf
-import numpy as np
 
 
 class ConstantModule(tf.Module):
@@ -46,6 +46,39 @@ class StatefulCountingModule(tf.Module):
 
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
+
+  @parameterized.named_parameters([
+      {
+          'testcase_name': 'single_backend',
+          'backend_infos': [tf_utils.BackendInfo('iree_vmla')],
+      },
+      {
+          'testcase_name':
+              'multiple_backends',
+          'backend_infos': [
+              tf_utils.BackendInfo('iree_vmla'),
+              tf_utils.BackendInfo('iree_llvmjit')
+          ],
+      },
+  ])
+  def test_artifact_saving(self, backend_infos):
+    with tempfile.TemporaryDirectory() as artifacts_dir:
+      tf_module = ConstantModule()
+      iree_compiled_module = tf_utils.compile_tf_module(
+          tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
+
+      compiled_path = tf_utils._get_backends_path('compiled', backend_infos,
+                                                  artifacts_dir)
+      compiled_path = f'{compiled_path}.vmfb'
+      artifacts_to_check = [
+          'tf_input.mlir',
+          'iree_input.mlir',
+          compiled_path,
+      ]
+      for artifact in artifacts_to_check:
+        artifact_path = os.path.join(artifacts_dir, artifact)
+        logging.info('Checking path: %s', artifact_path)
+        self.assertTrue(os.path.exists(artifact_path))
 
   @parameterized.named_parameters([
       {

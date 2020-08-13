@@ -48,16 +48,6 @@ def ndarange(shape, dtype=np.float32):
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
-def backends_to_str(backend_infos):
-  """Creates a normalized string representing the provided backends."""
-  normalized_names = []
-  for backend_info in backend_infos:
-    # Remove unusual characters and ensure names don't end or start in "_".
-    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
-    normalized_names.append(name.strip("_"))
-  return "__".join(normalized_names)
-
-
 def to_mlir_type(dtype):
   """Returns a string that denotes the type `dtype` in MLIR style."""
   bits = dtype.itemsize * 8
@@ -95,6 +85,28 @@ def save_input_values(inputs, artifacts_dir=None):
       f.write(result)
       f.write("\n")
   return result
+
+
+def backends_to_str(backend_infos):
+  """Creates a normalized string representing the provided backends."""
+  normalized_names = []
+  for backend_info in backend_infos:
+    # Remove unusual characters and ensure names don't end or start in "_".
+    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
+    normalized_names.append(name.strip("_"))
+  return "__".join(normalized_names)
+
+
+def _get_backends_path(artifact_name, backend_infos, artifacts_dir):
+  backends_string = backends_to_str(backend_infos)
+  # Put the artifact in a directory if there's only one backend.
+  if len(backend_infos) == 1:
+    backend_dir = os.path.join(artifacts_dir, backends_string)
+    if not os.path.exists(backend_dir):
+      os.makedirs(backend_dir)
+    return os.path.join(artifacts_dir, backends_string, artifact_name)
+  else:
+    return os.path.join(artifacts_dir, f"{artifact_name}__{backends_string}")
 
 
 def compile_tf_module(tf_module,
@@ -135,16 +147,6 @@ def compile_tf_module(tf_module,
     A compiled IREE module blob.
   """
 
-  def _specify_backends(artifact_name):
-    # Put the artifact in a directory if there's only one backend.
-    if len(backend_infos) == 1:
-      backend_dir = os.path.join(artifacts_dir, backends_string)
-      if not os.path.exists(backend_dir):
-        os.makedirs(backend_dir)
-      return os.path.join(backends_string, artifact_name)
-    else:
-      return f"{artifact_name}__{backends_string}"
-
   def _compile_from_path(sm_path):
     """Helper function for compile_tf_module."""
     if artifacts_dir is not None:
@@ -183,8 +185,9 @@ def compile_tf_module(tf_module,
       compiled_module = compiler_module.compile(target_backends=target_backends)
 
       if artifacts_dir is not None:
-        compiled_name = f"{_specify_backends('compiled')}.vmfb"
-        compiled_path = os.path.join(artifacts_dir, compiled_name)
+        compiled_path = _get_backends_path("compiled", backend_infos,
+                                           artifacts_dir)
+        compiled_path = f"{compiled_path}.vmfb"
         logging.info("Saving compiled IREE module to: %s", compiled_path)
         with open(compiled_path, "wb") as f:
           f.write(compiled_module)
@@ -202,7 +205,7 @@ def compile_tf_module(tf_module,
     # Create a saved model for these target backends to avoid a race condition
     # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir, _specify_backends("saved_model"))
+    sm_path = _get_backends_path("saved_model", backend_infos, artifacts_dir)
     tf.saved_model.save(tf_module, sm_path, options=options)
     return _compile_from_path(sm_path)
   else:
