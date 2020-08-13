@@ -102,20 +102,10 @@ def _get_backends_path(artifact_name, backend_infos, artifacts_dir):
   # Put the artifact in a directory if there's only one backend.
   if len(backend_infos) == 1:
     backend_dir = os.path.join(artifacts_dir, backends_string)
-    _makedirs(backend_dir)
+    os.makedirs(backend_dir, exist_ok=True)
     return os.path.join(artifacts_dir, backends_string, artifact_name)
   else:
     return os.path.join(artifacts_dir, f"{artifact_name}__{backends_string}")
-
-
-def _makedirs(path):
-  # If the artifacts already exist then we overwrite/update them.
-  try:
-    # Use try/except instead of os.path.exists to address any race conditions
-    # that might arise between multiple tests targets.
-    os.makedirs(path)
-  except IOError:
-    pass
 
 
 def compile_tf_module(tf_module,
