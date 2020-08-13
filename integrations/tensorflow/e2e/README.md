@@ -159,18 +159,18 @@ for each module is as follows:
 
 ```
 /tmp/iree/modules/ModuleName
+├── tf_input.mlir          # MLIR for ModuleName in TF's input dialect
 ├── iree_input.mlir        # tf_input.mlir translated to IREE MLIR
-├── backend_name_1         # e.g. iree_vmla, tf or tf_ref
+├── backend_name           # e.g. iree_vmla, tf or tf_ref
 │   ├── compiled.vmfb      # flatbuffer of ModuleName compiled to this backend
 │   ├── saved_model
 │   └── traces
 │       ├── trace_function
 │       │   └── log.txt    # A more detailed version of the test logs
-│       └── simple_mul
+│       └── trace_function
 │           └── log.txt
-├── backend_name_2
-│   └── ...
-└── tf_input.mlir          # MLIR for ModuleName in TF's input dialect
+└── backend_name
+    └── ...
 ```
 
 The `saved_model` directory is only created if `--keep_saved_model` is
