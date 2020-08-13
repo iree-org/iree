@@ -162,7 +162,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
         %12 = dim %arg2, %c1 : memref<?x?xf32>
         %13 = affine.min #map0(%arg4)[%12]
         %14 = subview %arg2[%arg3, %arg4] [%11, %13] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map2>
-        linalg.matmul %5, %9, %14 {__internal_linalg_transform__ = "workgroup"} : (memref<?x?xf32, #map2>, memref<?x?xf32, #map2>, memref<?x?xf32, #map2>)
+        linalg.matmul %5, %9, %14 {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} : (memref<?x?xf32, #map2>, memref<?x?xf32, #map2>, memref<?x?xf32, #map2>)
       }
       scf.yield
     }
@@ -285,57 +285,6 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //       CHECK:                   scf.for
 //       CHECK:                     scf.for
 //   CHECK-NOT:                       linalg.conv
-
-// -----
-
-#map0 = affine_map<(d0, d1, d2) -> (32, d1 - d2)>
-#map1 = affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3, s4] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3 * s4)>
-
-
-module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @conv_padding(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?xf32>, %arg2: memref<?x?x?x?xf32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
-    linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], padding = dense<[[1, 1], [0, 1]]> : tensor<2x2xi64>, strides = [1, 1]} : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
-    return
-  }
-}
-
-// CHECK-LABEL: func @conv_padding
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
-//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
-//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
-//   CHECK-DAG:   %[[C3:.+]] = constant 3 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[UB0:.+]] = dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[UB1:.+]] = dim %[[ARG0]], %[[C1]]
-//   CHECK-DAG:   %[[UB2:.+]] = dim %[[ARG0]], %[[C2]]
-//   CHECK-DAG:   %[[UB3:.+]] = dim %[[ARG0]], %[[C3]]
-//   CHECK-DAG:   %[[UB4:.+]] = dim %[[ARG1]], %[[C0]]
-//   CHECK-DAG:   %[[UB5:.+]] = dim %[[ARG2]], %[[C1]]
-//   CHECK-DAG:   %[[UB6:.+]] = dim %[[ARG2]], %[[C2]]
-//       CHECK:   %[[T7:.+]] = muli %[[UB3]], %[[UB6]]
-//       CHECK:   %[[T8:.+]] = muli %[[T7]], %[[UB5]]
-//       CHECK:   %[[UB:.+]] = muli %[[T8]], %[[UB4]]
-//   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//       CHECK:   %[[T13:.+]] = muli %[[BIDX]], %[[NTHREADSX]]
-//       CHECK:   %[[PROCID:.+]] = addi %[[T13]], %[[TIDX]]
-//       CHECK:   %[[COND:.+]] = cmpi "slt", %[[PROCID]], %[[UB]]
-//       CHECK:   scf.if %[[COND]]
-//       CHECK:     %[[IV0:.+]] = divi_signed %[[PROCID]], %[[T8]]
-//       CHECK:     %[[T17:.+]] = remi_signed %[[PROCID]], %[[T8]]
-//       CHECK:     %[[IV1:.+]] = divi_signed %[[T17]], %[[T7]]
-//       CHECK:     %[[T19:.+]] = remi_signed %[[T17]], %[[T7]]
-//       CHECK:     %[[IV2:.+]] = divi_signed %[[T19]], %[[UB3]]
-//       CHECK:     %[[T21:.+]] = remi_signed %[[T19]], %[[UB3]]
-//       CHECK:     scf.for %[[IV3:.+]] = %[[C0]] to %[[UB2]] step %[[C1]]
-//       CHECK:       scf.for %[[IV4:.+]] = %[[C0]] to %[[UB0]] step %[[C1]]
-//       CHECK:         scf.for %[[IV5:.+]]= %[[C0]] to %[[UB1]] step %[[C1]]
-//   CHECK-NOT:           linalg.conv
 
 // -----
 
