@@ -58,14 +58,7 @@ def _setup_artifacts_dir(module_name):
     parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
-
-  # If the artifacts already exist then we overwrite/update them.
-  try:
-    # Use try/except instead of os.path.exists to address a race condition
-    # between multiple tests targets.
-    os.makedirs(artifacts_dir)
-  except IOError:
-    pass
+  tf_utils._makedirs(artifacts_dir)
   return artifacts_dir
 
 
@@ -316,8 +309,7 @@ class Trace:
   def _get_trace_dir(self, artifacts_dir):
     trace_dir = os.path.join(artifacts_dir, self.backend, "traces",
                              self.function_name)
-    if not os.path.exists(trace_dir):
-      os.makedirs(trace_dir)
+    tf_utils._makedirs(trace_dir)
     return trace_dir
 
   def save_plaintext(self, artifacts_dir, summarize=True):
