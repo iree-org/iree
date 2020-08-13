@@ -21,7 +21,7 @@ import tensorflow.compat.v2 as tf
 class SimpleStatefulModule(tf.Module):
 
   def __init__(self):
-    super(Stateful, self).__init__()
+    super(SimpleStatefulModule, self).__init__()
     self.counter = tf.Variable(0.0)
 
   @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
