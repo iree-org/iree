@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/debug_capture_manager.h"

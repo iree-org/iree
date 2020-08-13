@@ -17,6 +17,7 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"

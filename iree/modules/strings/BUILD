@@ -29,6 +29,7 @@ cc_library(
         "//iree/vm:ref",
         "//iree/vm:stack",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@com_google_benchmark//:benchmark",

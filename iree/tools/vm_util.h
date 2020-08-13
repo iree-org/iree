@@ -18,6 +18,7 @@
 #include <iostream>
 #include <ostream>
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/base/status.h"

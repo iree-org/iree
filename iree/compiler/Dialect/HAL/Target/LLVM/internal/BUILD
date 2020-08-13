@@ -24,6 +24,7 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMAOTTargetLinker_hdrs",
+        "@com_google_absl//absl/status:statusor",
         "@llvm-project//llvm:Support",
     ],
 )

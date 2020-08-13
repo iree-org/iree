@@ -15,6 +15,7 @@
 #include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/utility/utility.h"
 #include "iree/base/time.h"

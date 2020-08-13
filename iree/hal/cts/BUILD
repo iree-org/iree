@@ -31,6 +31,7 @@ cc_library(
         "//iree/tools:sanitizer_suppressions.txt",
     ],
     deps = [
+        "@com_google_absl//absl/status:statusor",
         "//iree/base:status",
         "//iree/base:status_matchers",
         "//iree/hal:driver_registry",

@@ -21,6 +21,7 @@
 #include <memory>
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
 #include "iree/hal/allocator.h"

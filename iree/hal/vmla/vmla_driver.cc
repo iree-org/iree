@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"

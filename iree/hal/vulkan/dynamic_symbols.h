@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "iree/base/dynamic_library.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"

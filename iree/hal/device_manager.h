@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"

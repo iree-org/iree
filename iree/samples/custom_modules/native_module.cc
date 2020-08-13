@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "absl/status/statusor.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/hal/api.h"

@@ -20,6 +20,7 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/math.h"

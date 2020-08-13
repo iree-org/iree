@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"

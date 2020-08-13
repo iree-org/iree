@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_HOST_INPROC_COMMAND_BUFFER_H_
 #define IREE_HAL_HOST_INPROC_COMMAND_BUFFER_H_
 
+#include "absl/status/statusor.h"
 #include "iree/base/arena.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"

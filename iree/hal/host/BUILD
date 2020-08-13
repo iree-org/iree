@@ -31,6 +31,7 @@ cc_library(
         "//iree/hal:semaphore",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
     ],
@@ -78,6 +79,7 @@ cc_library(
         "//iree/base:status",
         "//iree/hal:descriptor_set",
         "//iree/hal:executable",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -104,6 +106,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:allocator",
         "//iree/hal:buffer",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -124,6 +127,7 @@ cc_library(
         "//iree/hal:device",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -138,6 +142,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -155,5 +160,6 @@ cc_library(
     hdrs = ["scheduling_model.h"],
     deps = [
         "//iree/hal:command_queue",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

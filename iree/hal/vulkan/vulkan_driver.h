@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "iree/hal/driver.h"
 #include "iree/hal/vulkan/debug_reporter.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"

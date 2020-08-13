@@ -14,6 +14,7 @@
 
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/alignment.h"
 #include "iree/base/math.h"
 #include "iree/base/tracing.h"

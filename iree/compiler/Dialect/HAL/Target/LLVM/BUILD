@@ -115,7 +115,7 @@ cc_library(
 cc_library(
     name = "LLVMAOTTargetLinker",
     hdrs = ["LLVMAOTTargetLinker.h"],
-    deps = platform_trampoline_deps("LLVMAOTTargetLinker", "compiler/Dialect/HAL/Target/LLVM"),
+    deps = platform_trampoline_deps("LLVMAOTTargetLinker", "compiler/Dialect/HAL/Target/LLVM") + ["@com_google_absl//absl/status:statusor"],
 )
 
 cc_library(
@@ -124,5 +124,6 @@ cc_library(
     deps = [
         ":LLVMTargetOptions",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

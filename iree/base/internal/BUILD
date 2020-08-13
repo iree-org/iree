@@ -50,6 +50,7 @@ cc_library(
         "//iree/base:target_platform",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -67,6 +68,7 @@ cc_library(
         "//iree/base:target_platform",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )

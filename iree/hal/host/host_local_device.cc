@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "absl/memory/memory.h"
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"

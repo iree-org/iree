@@ -15,6 +15,7 @@
 #include <iostream>
 
 #include "absl/flags/flag.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api_util.h"
 #include "iree/base/file_io.h"

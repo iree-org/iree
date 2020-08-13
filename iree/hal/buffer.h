@@ -58,6 +58,7 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "absl/types/variant.h"
 #include "iree/base/bitfield.h"

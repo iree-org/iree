@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "absl/base/thread_annotations.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/initializer.h"
 #include "iree/base/ref_ptr.h"

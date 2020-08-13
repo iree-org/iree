@@ -54,6 +54,7 @@ iree_cc_binary(
     deps = [
         ":native_module",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//iree/base:api",
         "//iree/base:api_util",
@@ -86,6 +87,7 @@ cc_library(
         "//iree/vm",
         "//iree/vm:module_abi_cc",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )

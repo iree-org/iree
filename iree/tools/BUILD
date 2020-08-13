@@ -40,6 +40,7 @@ iree_cc_binary(
     deps = [
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
         "//iree/base:api_util",
@@ -246,6 +247,7 @@ iree_cc_binary(
         ":init_targets",
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "//iree/base:api",
@@ -281,6 +283,7 @@ iree_cc_binary(
     deps = [
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "//iree/base:api_util",
         "//iree/base:file_io",
@@ -361,6 +364,7 @@ cc_library(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],

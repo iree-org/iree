@@ -16,6 +16,7 @@
 
 #include <array>
 
+#include "absl/status/statusor.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 

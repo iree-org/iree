@@ -68,5 +68,6 @@ cc_library(
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:module_abi_cc",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

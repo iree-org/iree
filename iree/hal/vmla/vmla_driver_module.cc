@@ -14,6 +14,7 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"

@@ -127,6 +127,7 @@ cc_library(
         ":target_platform",
         ":tracing",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -169,6 +170,7 @@ cc_library(
         ":status",
         ":target_platform",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ] + platform_trampoline_deps("file_io"),
@@ -179,6 +181,7 @@ cc_library(
     hdrs = ["file_io.h"],
     deps = [
         ":status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -204,6 +207,7 @@ cc_library(
         ":ref_ptr",
         ":status",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ] + platform_trampoline_deps("file_mapping"),
@@ -215,6 +219,7 @@ cc_library(
     deps = [
         ":ref_ptr",
         ":status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -252,6 +257,7 @@ cc_library(
         ":tracing",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
@@ -420,6 +426,7 @@ cc_test(
         ":status",
         ":status_matchers",
         "//iree/testing:gtest_main",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

@@ -14,6 +14,7 @@
 
 #include "iree/hal/deferred_buffer.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 
 namespace iree {

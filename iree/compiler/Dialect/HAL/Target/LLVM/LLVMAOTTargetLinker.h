@@ -18,6 +18,7 @@
 
 #include <string>
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
@@ -27,10 +28,10 @@ namespace IREE {
 namespace HAL {
 
 // Calls linker tool to link objData and returns shared library blob.
-iree::StatusOr<std::string> linkLLVMAOTObjects(
+absl::StatusOr<std::string> linkLLVMAOTObjects(
     const std::string& linkerToolPath, const std::string& objData);
 // Use lld::elf::link for linking objData and returns shared library blob.
-iree::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
+absl::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
     const std::string& objData);
 
 }  // namespace HAL

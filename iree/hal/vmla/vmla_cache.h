@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_VMLA_VMLA_CACHE_H_
 #define IREE_HAL_VMLA_VMLA_CACHE_H_
 
+#include "absl/status/statusor.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"

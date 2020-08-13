@@ -35,6 +35,7 @@ pybind_cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ],

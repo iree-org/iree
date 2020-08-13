@@ -16,6 +16,7 @@
 #define IREE_HAL_HOST_SERIAL_SERIAL_SCHEDULING_MODEL_H_
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "iree/base/memory.h"
 #include "iree/hal/host/scheduling_model.h"
 

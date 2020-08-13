@@ -50,6 +50,7 @@ cc_library(
         "//iree/hal:device_info",
         "//iree/hal:driver",
         "//iree/hal/host/serial:serial_scheduling_model",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -61,6 +62,7 @@ cc_library(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/hal:driver_registry",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )
@@ -80,6 +82,7 @@ cc_library(
         "//iree/schemas:dylib_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -96,5 +99,6 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

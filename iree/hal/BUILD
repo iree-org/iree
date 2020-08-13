@@ -32,6 +32,7 @@ cc_library(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -83,6 +84,7 @@ cc_test(
         "//iree/base:status_matchers",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -97,6 +99,7 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:source_location",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
@@ -177,6 +180,7 @@ cc_library(
         ":allocator",
         ":buffer",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -230,6 +234,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:target_platform",
         "//iree/base:time",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -259,6 +264,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:time",
         "//iree/base:tracing",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
     ],
@@ -278,6 +284,7 @@ cc_library(
         ":device_info",
         "//iree/base:ref_ptr",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -291,6 +298,7 @@ cc_library(
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/synchronization",
     ],
 )
@@ -321,6 +329,7 @@ cc_library(
         "//iree/base:bitfield",
         "//iree/base:ref_ptr",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -355,6 +364,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_buffer",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -373,6 +383,7 @@ cc_library(
         ":resource",
         "//iree/base:status",
         "//iree/base:time",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

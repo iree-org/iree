@@ -16,6 +16,7 @@
 #define IREE_HAL_VULKAN_DESCRIPTOR_POOL_CACHE_H_
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"

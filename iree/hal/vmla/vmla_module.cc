@@ -16,6 +16,7 @@
 
 #include <cstdint>
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vmla/op_kernels.h"

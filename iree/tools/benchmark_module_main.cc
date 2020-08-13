@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "absl/flags/flag.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/api_util.h"

@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/hal/executable_spec.h"
 #include "iree/hal/host/host_executable.h"

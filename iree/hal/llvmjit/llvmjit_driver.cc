@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "iree/hal/device_info.h"
 #include "iree/hal/host/serial/serial_scheduling_model.h"
 #include "iree/hal/llvmjit/llvmjit_device.h"

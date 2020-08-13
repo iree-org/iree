@@ -18,6 +18,7 @@
 #include <array>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "iree/base/arena.h"
 #include "iree/base/status.h"
 #include "iree/hal/command_buffer.h"

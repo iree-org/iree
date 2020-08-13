@@ -27,6 +27,7 @@ cc_library(
     deps = [
         "//iree/hal:allocator",
         "//iree/testing:gtest",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

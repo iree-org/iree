@@ -17,6 +17,7 @@
 #include <atomic>
 #include <cstdint>
 
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

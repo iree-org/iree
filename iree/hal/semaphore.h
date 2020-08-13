@@ -17,6 +17,7 @@
 
 #include <cstdint>
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/hal/resource.h"

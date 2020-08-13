@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/memory.h"

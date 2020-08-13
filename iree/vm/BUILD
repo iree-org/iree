@@ -226,6 +226,7 @@ cc_library(
         "//iree/base:api_util",
         "//iree/base:ref_ptr",
         "//iree/base:status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],

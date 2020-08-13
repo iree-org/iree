@@ -14,6 +14,7 @@
 
 #include "iree/hal/host/serial/serial_scheduling_model.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/host/condvar_semaphore.h"
 #include "iree/hal/host/inproc_command_buffer.h"

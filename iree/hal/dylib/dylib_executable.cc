@@ -14,6 +14,7 @@
 
 #include "iree/hal/dylib/dylib_executable.h"
 
+#include "absl/status/statusor.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
 #include "iree/base/tracing.h"

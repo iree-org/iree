@@ -19,6 +19,7 @@
 #include <string>
 #include <utility>
 
+#include "absl/status/statusor.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

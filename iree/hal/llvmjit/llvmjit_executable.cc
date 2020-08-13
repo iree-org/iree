@@ -17,6 +17,7 @@
 #include <iostream>
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"

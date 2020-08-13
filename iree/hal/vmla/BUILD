@@ -79,6 +79,7 @@ cc_library(
         "//iree/hal:executable_format",
         "//iree/vm:instance",
         "//iree/vm:module",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -117,6 +118,7 @@ cc_library(
         "//iree/hal/host/serial:serial_scheduling_model",
         "//iree/vm:instance",
         "//iree/vm:module",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -128,6 +130,7 @@ cc_library(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/hal:driver_registry",
+        "@com_google_absl//absl/status:statusor",
     ],
     alwayslink = 1,
 )
@@ -153,6 +156,7 @@ cc_library(
         "//iree/vm:list",
         "//iree/vm:module",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -170,6 +174,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/vm",
         "//iree/vm:module_abi_cc",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
 )

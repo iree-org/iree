@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"

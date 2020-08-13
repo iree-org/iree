@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "absl/memory/memory.h"
+#include "absl/status/statusor.h"
 #include "iree/base/dynamic_library.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"

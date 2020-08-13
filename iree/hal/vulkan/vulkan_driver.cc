@@ -18,6 +18,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/flags/flag.h"
+#include "absl/status/statusor.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/utility/utility.h"
 #include "iree/base/time.h"

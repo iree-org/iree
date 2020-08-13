@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "absl/status/statusor.h"
 #include "iree/base/file_mapping.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"

@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"

@@ -17,6 +17,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "absl/status/statusor.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"

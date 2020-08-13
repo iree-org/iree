@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTargetLinker.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "llvm/Support/ToolOutputFile.h"
 
@@ -22,7 +23,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-iree::StatusOr<std::string> linkLLVMAOTObjects(
+absl::StatusOr<std::string> linkLLVMAOTObjects(
     const std::string& linkerToolPath, const std::string& objData) {
   llvm::SmallString<32> objFilePath, dylibFilePath;
   if (std::error_code error = llvm::sys::fs::createTemporaryFile(
@@ -67,7 +68,7 @@ iree::StatusOr<std::string> linkLLVMAOTObjects(
   return dylibData.get()->getBuffer().str();
 }
 
-iree::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
+absl::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
     const std::string& objData) {
   return iree::UnimplementedErrorBuilder(IREE_LOC)
          << "linkLLVMAOTObjectsWithLLD not implemented yet!";

@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_HOST_HOST_EXECUTABLE_H_
 #define IREE_HAL_HOST_HOST_EXECUTABLE_H_
 
+#include "absl/status/statusor.h"
 #include "iree/base/status.h"
 #include "iree/hal/descriptor_set.h"
 #include "iree/hal/executable.h"

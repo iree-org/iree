@@ -18,6 +18,7 @@
 #include <vulkan/vulkan.h>
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/vulkan/handle_util.h"

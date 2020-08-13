@@ -16,6 +16,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/math.h"
 #include "iree/base/source_location.h"

@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_EXECUTABLE_CACHE_H_
 #define IREE_HAL_EXECUTABLE_CACHE_H_
 
+#include "absl/status/statusor.h"
 #include "iree/base/bitfield.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"

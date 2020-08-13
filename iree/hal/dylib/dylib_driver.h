@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_DYLIB_DYLIB_DRIVER_H_
 #define IREE_HAL_DYLIB_DYLIB_DRIVER_H_
 
+#include "absl/status/statusor.h"
 #include "iree/hal/driver.h"
 
 namespace iree {

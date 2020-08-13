@@ -50,6 +50,7 @@ cc_library(
         "//iree/hal:device_info",
         "//iree/hal:driver",
         "//iree/hal/host/serial:serial_scheduling_model",
+        "@com_google_absl//absl/status:statusor",
         "@llvm-project//llvm:ExecutionEngine",
     ],
 )
@@ -59,6 +60,7 @@ cc_library(
     srcs = ["llvmjit_driver_module.cc"],
     deps = [
         ":llvmjit_driver",
+        "@com_google_absl//absl/status:statusor",
         "//iree/base:init",
         "//iree/base:status",
         "//iree/hal:driver_registry",
@@ -82,6 +84,7 @@ cc_library(
         "//iree/hal/host:host_executable",
         "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:AsmParser",
         "@llvm-project//llvm:Core",
@@ -102,5 +105,6 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
+        "@com_google_absl//absl/status:statusor",
     ],
 )

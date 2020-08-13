@@ -14,6 +14,7 @@
 
 #include "iree/hal/vmla/vmla_executable.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/api_util.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

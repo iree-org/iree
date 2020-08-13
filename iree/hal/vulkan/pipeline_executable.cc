@@ -15,6 +15,7 @@
 #include "iree/hal/vulkan/pipeline_executable.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/statusor.h"
 #include "iree/base/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"

@@ -14,6 +14,7 @@
 
 #include "iree/hal/vulkan/native_timeline_semaphore.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
 

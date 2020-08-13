@@ -15,6 +15,7 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_COMMON_STATUS_UTILS_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_COMMON_STATUS_UTILS_H_
 
+#include "absl/status/statusor.h"
 #include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "pybind11/pybind11.h"
@@ -46,7 +47,7 @@ inline pybind11::error_already_set RaiseValueError(const char* message) {
 // Consumes a StatusOr<T>, returning an rvalue reference to the T if the
 // status is ok(). Otherwise, throws an exception.
 template <typename T>
-T&& PyConsumeStatusOr(iree::StatusOr<T>&& sor) {
+T&& PyConsumeStatusOr(absl::StatusOr<T>&& sor) {
   if (sor.ok()) {
     return std::move(*sor);
   }

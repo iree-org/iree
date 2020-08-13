@@ -17,6 +17,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/hal/semaphore.h"
 #include "iree/hal/vulkan/handle_util.h"

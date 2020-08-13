@@ -14,6 +14,7 @@
 
 #include "iree/base/status.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
 

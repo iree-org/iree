@@ -14,6 +14,7 @@
 
 #include "iree/hal/vulkan/pipeline_cache.h"
 
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/source_location.h"

@@ -14,6 +14,7 @@
 
 #include "iree/hal/vulkan/extensibility_util.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

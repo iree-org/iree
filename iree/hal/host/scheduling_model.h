@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_HOST_SCHEDULING_MODEL_H_
 #define IREE_HAL_HOST_SCHEDULING_MODEL_H_
 
+#include "absl/status/statusor.h"
 #include "iree/hal/command_queue.h"
 
 namespace iree {

@@ -14,6 +14,7 @@
 
 #include "iree/hal/llvmjit/llvmjit_executable_cache.h"
 
+#include "absl/status/statusor.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"

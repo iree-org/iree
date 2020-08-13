@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_VMLA_VMLA_DRIVER_H_
 #define IREE_HAL_VMLA_VMLA_DRIVER_H_
 
+#include "absl/status/statusor.h"
 #include "iree/hal/driver.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"

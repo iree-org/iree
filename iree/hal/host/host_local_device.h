@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_HOST_HOST_LOCAL_DEVICE_H_
 #define IREE_HAL_HOST_HOST_LOCAL_DEVICE_H_
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
 #include "iree/hal/device.h"

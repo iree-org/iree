@@ -18,6 +18,7 @@
 #include <cstring>
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
