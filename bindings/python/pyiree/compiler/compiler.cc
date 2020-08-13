@@ -287,7 +287,9 @@ std::string DiagnosticCapture::ConsumeDiagnosticsAsString(
 void DiagnosticCapture::ClearDiagnostics() { diagnostics_.clear(); }
 
 CompilerContextBundle::CompilerContextBundle()
-    : default_capture_(&mlir_context_, nullptr) {}
+    : default_capture_(&mlir_context_, nullptr) {
+  mlir_context_.loadAllGloballyRegisteredDialects();
+}
 CompilerContextBundle::~CompilerContextBundle() = default;
 
 CompilerModuleBundle CompilerContextBundle::ParseAsm(
