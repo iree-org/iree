@@ -30,7 +30,6 @@ class TensorListType
     : public Type::TypeBase<TensorListType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static bool kindof(unsigned kind) { return kind == TypeKind::kTensorList; }
   static TensorListType get(MLIRContext *context) {
     return Base::get(context, TypeKind::kTensorList);
   }

@@ -32,7 +32,6 @@ class SequenceType
  public:
   using Base::Base;
 
-  static bool kindof(unsigned kind) { return kind == TypeKind::Sequence; }
   static SequenceType get(Type targetType);
   static SequenceType getChecked(Type targetType, Location location);
 

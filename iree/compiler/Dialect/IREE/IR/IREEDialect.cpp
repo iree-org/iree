@@ -65,21 +65,14 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
 }
 
 void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
-  switch (type.getKind()) {
-    case IREE::TypeKind::Ptr: {
-      auto targetType = type.cast<IREE::PtrType>().getTargetType();
-      os << "ptr<" << targetType << ">";
-      break;
-    }
-    case IREE::TypeKind::ByteBuffer:
-      os << "byte_buffer";
-      break;
-    case IREE::TypeKind::MutableByteBuffer:
-      os << "mutable_byte_buffer";
-      break;
-    default:
-      llvm_unreachable("unhandled IREE type");
-  }
+  if (auto ptrType = type.dyn_cast<IREE::PtrType>())
+    os << "ptr<" << ptrType.getTargetType() << ">";
+  else if (type.isa<IREE::ByteBufferType>())
+    os << "byte_buffer";
+  else if (type.isa<IREE::MutableByteBufferType>())
+    os << "mutable_byte_buffer";
+  else
+    llvm_unreachable("unhandled IREE type");
 }
 
 }  // namespace iree_compiler
