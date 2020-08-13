@@ -60,6 +60,10 @@ static llvm::cl::list<int> workgroupSize(
     "workgroup-size", llvm::cl::desc("Workgroup size to use"),
     llvm::cl::CommaSeparated);
 
+static llvm::cl::list<int> tileSizes("tile-sizes",
+                                     llvm::cl::desc("Tile sizes to use"),
+                                     llvm::cl::CommaSeparated);
+
 using namespace mlir;                    // NOLINT
 using namespace mlir::edsc;              // NOLINT
 using namespace mlir::edsc::intrinsics;  // NOLINT
@@ -96,9 +100,10 @@ void testMatMul() {
   SmallVector<Type, 3> args = {typeA, typeB, typeC};
   SmallVector<int64_t, 4> vWorkgroupSizes(workgroupSize.begin(),
                                           workgroupSize.end());
+  SmallVector<int64_t, 4> vTileSizes(tileSizes.begin(), tileSizes.end());
   auto lowering = [&](mlir::PassManager &pm) {
     pm.addPass(mlir::iree_compiler::createLinalgTileAndFusePass(
-        vWorkgroupSizes, useWorkgroupMemory));
+        vWorkgroupSizes, vTileSizes, useWorkgroupMemory));
     pm.addPass(mlir::iree_compiler::createConvertToGPUPass());
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
