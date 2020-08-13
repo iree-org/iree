@@ -37,6 +37,10 @@ class MathModule(tf.Module):
   def mod(self, x):
     return tf.math.mod(x, 2.0)
 
+  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  def ceil(self, x):
+    return tf.math.ceil(x)
+
 
 @tf_test_utils.compile_module(MathModule)
 class MathTest(tf_test_utils.TracedModuleTestCase):
@@ -68,6 +72,14 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
       module.mod(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
     self.compare_backends(mod)
+
+  def test_ceil(self):
+
+    def ceil(module):
+      module.ceil(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+
+    self.compare_backends(ceil)
+
 
 
 if __name__ == "__main__":
