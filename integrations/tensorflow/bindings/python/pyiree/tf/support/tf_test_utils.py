@@ -23,6 +23,7 @@
 #   tar: target - for one of the target CompiledModules
 
 import copy
+import glob
 import inspect
 import json
 import os
@@ -422,7 +423,7 @@ class Trace:
       _load_kwargs = json.load(f)
     calls = [ModuleCall.load(call_dir) for call_dir in glob.glob("call_*")]
     _load_kwargs['calls'] = calls
-    return Trace(module=None, function=None, _load_kwargs=load_kwargs)
+    return Trace(module=None, function=None, _load_kwargs=_load_kwargs)
 
 class TracedModule:
 

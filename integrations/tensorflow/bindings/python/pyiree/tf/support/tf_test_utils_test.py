@@ -77,27 +77,24 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   ])
   def test_recursive_check_same(self, array_c, array_d, array_e, tar_same):
 
+    # yapf: disable
     ref = {
-        'a':
-            1,
-        'b': [{
-            'c': np.array([0, 1, 2])
-        }, {
-            'd': np.array(['0', '1', '2'])
-        }, {
-            'e': np.array([0.0, 0.1, 0.2])
-        }],
+        'a': 1,
+        'b': [
+            {'c': np.array([0, 1, 2])},
+            {'d': np.array(['0', '1', '2'])},
+            {'e': np.array([0.0, 0.1, 0.2])}
+        ],
     }
     tar = {
         'a': 1,
-        'b': [{
-            'c': array_c
-        }, {
-            'd': array_d
-        }, {
-            'e': array_e
-        }],
+        'b': [
+            {'c': array_c},
+            {'d': array_d},
+            {'e': array_e}
+        ],
     }
+    # yapf: enable
     same = tf_test_utils.Trace._check_same(ref, tar, rtol=1e-6, atol=1e-6)
     self.assertEqual(tar_same, same)
 
