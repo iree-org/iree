@@ -261,6 +261,67 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    native_module
+  HDRS
+    "native_module.h"
+  SRCS
+    "native_module.c"
+  DEPS
+    ::module
+    ::stack
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    native_module_benchmark
+  SRCS
+    "native_module_benchmark.cc"
+  DEPS
+    ::native_module_test_hdrs
+    ::vm
+    benchmark
+    iree::base::api
+    iree::base::logging
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    native_module_test
+  SRCS
+    "native_module_test.cc"
+  DEPS
+    ::context
+    ::instance
+    ::invocation
+    ::list
+    ::native_module_test_hdrs
+    ::ref_cc
+    iree::base::api
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    native_module_test_hdrs
+  HDRS
+    "native_module_test.h"
+  DEPS
+    ::context
+    ::instance
+    ::native_module
+    ::ref
+    ::stack
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     ref
   HDRS
     "ref.h"
@@ -358,6 +419,7 @@ iree_cc_library(
     ::invocation
     ::list
     ::module
+    ::native_module
     ::ref
     ::stack
     ::type_def

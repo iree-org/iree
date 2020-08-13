@@ -35,6 +35,12 @@ typedef struct iree_vm_stack_frame iree_vm_stack_frame_t;
 // to hash codes.
 typedef int64_t iree_vm_source_offset_t;
 
+// A key-value pair of module/function reflection information.
+typedef struct {
+  iree_string_view_t key;
+  iree_string_view_t value;
+} iree_vm_reflection_attr_t;
+
 // A variable-length list of registers.
 //
 // This structure is an overlay for the bytecode that is serialized in a

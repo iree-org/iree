@@ -175,8 +175,12 @@ enum {
   // These frames have no source location and are tracked so that we know when
   // transitions occur into/out-of external code.
   IREE_VM_STACK_FRAME_EXTERNAL = 0,
+  // Represents a `[native]` frame that has no persistent register storage.
+  // These frames may have source location information provided by the
+  // implementation.
+  IREE_VM_STACK_FRAME_NATIVE = 1,
   // Normal VM stack frame using the internal register storage.
-  IREE_VM_STACK_FRAME_INTERNAL = 1,
+  IREE_VM_STACK_FRAME_INTERNAL = 2,
 };
 typedef uint8_t iree_vm_stack_frame_type_t;
 
@@ -726,6 +730,32 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
 
   if (out_caller_frame) *out_caller_frame = caller_frame;
   return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_native_enter(
+    iree_vm_stack_t* stack, const iree_vm_function_t* function,
+    iree_vm_module_state_t** out_module_state,
+    iree_vm_stack_frame_t** out_caller_frame) {
+  iree_vm_stack_frame_t* callee_frame = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(stack, *function, NULL,
+                                                    NULL, &callee_frame));
+
+  stack->top->type = IREE_VM_STACK_FRAME_NATIVE;
+  *out_module_state = callee_frame->module_state;
+  *out_caller_frame = iree_vm_stack_parent_frame(stack);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_native_leave(
+    iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers) {
+  if (!stack->top) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack leave");
+  } else if (stack->top->type != IREE_VM_STACK_FRAME_NATIVE) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack leave (not native)");
+  }
+  return iree_vm_stack_function_leave(stack, result_registers, NULL);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(

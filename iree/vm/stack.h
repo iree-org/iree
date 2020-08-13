@@ -216,6 +216,18 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
     iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers,
     iree_vm_stack_frame_t** out_caller_frame);
 
+// Enters into a `[native]` frame and returns the caller stack frame.
+// May invalidate any existing pointers to stack frames and the only pointer
+// that can be assumed valid after return is the one in |out_callee_frame|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_native_enter(
+    iree_vm_stack_t* stack, const iree_vm_function_t* function,
+    iree_vm_module_state_t** out_module_state,
+    iree_vm_stack_frame_t** out_caller_frame);
+
+// Leaves the current native stack frame.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_native_leave(
+    iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers);
+
 // Enters into an `[external]` frame and returns the external stack frame.
 // May invalidate any existing pointers to stack frames and the only pointer
 // that can be assumed valid after return is the one in |out_callee_frame|.

@@ -231,6 +231,62 @@ cc_library(
 )
 
 cc_library(
+    name = "native_module",
+    srcs = ["native_module.c"],
+    hdrs = ["native_module.h"],
+    deps = [
+        ":module",
+        ":stack",
+        "//iree/base:api",
+    ],
+)
+
+cc_test(
+    name = "native_module_benchmark",
+    srcs = ["native_module_benchmark.cc"],
+    deps = [
+        ":native_module_test_hdrs",
+        ":vm",
+        "//iree/base:api",
+        "//iree/base:logging",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "native_module_test",
+    srcs = ["native_module_test.cc"],
+    deps = [
+        ":context",
+        ":instance",
+        ":invocation",
+        ":list",
+        ":native_module_test_hdrs",
+        ":ref_cc",
+        "//iree/base:api",
+        "//iree/base:status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "native_module_test_hdrs",
+    hdrs = [
+        "native_module_test.h",
+    ],
+    deps = [
+        ":context",
+        ":instance",
+        ":native_module",
+        ":ref",
+        ":stack",
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
     name = "ref",
     srcs = ["ref.c"],
     hdrs = ["ref.h"],
@@ -314,6 +370,7 @@ cc_library(
         ":invocation",
         ":list",
         ":module",
+        ":native_module",
         ":ref",
         ":stack",
         ":type_def",
