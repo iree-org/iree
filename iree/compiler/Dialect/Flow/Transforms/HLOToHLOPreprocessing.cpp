@@ -37,7 +37,7 @@ static llvm::cl::opt<bool> extractPadFromConv(
 static llvm::cl::opt<bool> conv1x1toDot(
     "iree-flow-1x1-conv-to-dot",
     llvm::cl::desc("Rewrites mhlo.conv with 1x1 filter into mhlo.dot"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static bool isAllZero(DenseIntElementsAttr attr) {
   if (!attr.isSplat()) return false;
@@ -225,11 +225,24 @@ class Lower1x1ConvolutionToDotOp : public OpRewritePattern<mhlo::ConvOp> {
       if (filterShape[dim.getZExtValue()] != 1) return failure();
     }
 
+    // Check dilation & strides are ones.
+    if (op.window_strides()) {
+      auto window_strides = op.window_strides().getValue();
+      for (auto stride : window_strides) {
+        if (stride.getZExtValue() != 1) return failure();
+      }
+    }
+    if (op.rhs_dilation()) {
+      auto rhs_dialtion = op.rhs_dilation().getValue();
+      for (auto dilation : rhs_dialtion) {
+        if (dilation.getZExtValue() != 1) return failure();
+      }
+    }
+
     int64_t spatialSize = inputShape[0];
     for (auto dim : op.dimension_numbers().input_spatial_dimensions()) {
       spatialSize *= inputShape[dim.getZExtValue()];
     }
-
     Type reshapedInputType =
         RankedTensorType::get({spatialSize, inputShape[inputFeatureDim]},
                               inputShapeType.getElementType());

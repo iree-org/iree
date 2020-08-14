@@ -23,6 +23,10 @@ namespace mlir {
 namespace iree_compiler {
 
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
+  // HLO -> HLO passes.
+  pm.addPass(createBroadcastInDimToReshapePass());
+
+  // HLO -> Linalg passes
   pm.addPass(createHLOToLinalgOnTensorsPass());
   pm.addPass(createLinalgFusionOfTensorOpsPass());
   pm.addPass(createLinalgFoldUnitExtentDimsPass());

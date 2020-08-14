@@ -33,6 +33,8 @@ namespace iree_compiler {
 /// Creates a pass to decompose XLA-HLO clamp ops into primitive ops.
 std::unique_ptr<OperationPass<FuncOp>> createDecomposeHLOClampPass();
 
+std::unique_ptr<OperationPass<FuncOp>> createBroadcastInDimToReshapePass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

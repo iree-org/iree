@@ -28,6 +28,7 @@ namespace iree_compiler {
 // automatically.
 
 inline void registerHLOToLinalgPasses() {
+  createBroadcastInDimToReshapePass();
   createDecomposeHLOClampPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();

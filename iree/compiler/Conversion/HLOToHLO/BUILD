@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "HLOToHLO",
     srcs = [
+        "BroadcastInDimToReshape.cpp",
         "DecomposeHLOClamp.cpp",
     ],
     hdrs = [
