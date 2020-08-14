@@ -159,14 +159,14 @@ for each module is as follows:
 
 ```
 /tmp/iree/modules/ModuleName
-├── tf_input.mlir          # MLIR for ModuleName in TF's input dialect
-├── iree_input.mlir        # tf_input.mlir translated to IREE MLIR
-├── backend_name           # e.g. iree_vmla, tf or tf_ref
-│   ├── compiled.vmfb      # flatbuffer of ModuleName compiled to this backend
+├── tf_input.mlir           # MLIR for ModuleName in TF's input dialect
+├── iree_input.mlir         # tf_input.mlir translated to IREE MLIR
+├── backend_name            # e.g. iree_vmla, tf or tf_ref
+│   ├── compiled.vmfb       # flatbuffer of ModuleName compiled to this backend
 │   ├── saved_model
 │   └── traces
-│       ├── trace_function
-│       │   └── log.txt    # A more detailed version of the test logs
+│       ├── trace_function  # Directory storing logs and serialization for each trace.
+│       │   └── log.txt     # A more detailed version of the test logs
 │       └── trace_function
 │           └── log.txt
 └── backend_name
@@ -175,6 +175,16 @@ for each module is as follows:
 
 The `saved_model` directory is only created if `--keep_saved_model` is
 specified.
+
+Traces for a particular test can be loaded via the `Trace.load(trace_dir)`
+method. For example:
+
+```python
+ref_trace = Trace.load("/tmp/iree/modules/ModuleName/tf_ref/traces/trace_function/")
+tar_trace = Trace.load("/tmp/iree/modules/ModuleName/iree_vmla/traces/trace_function/")
+abs_diff = np.abs(ref_trace.calls[0].outputs[0] - tar_trace.calls[0].outputs[0])
+print(np.mean(abs_diff))
+```
 
 ## Debugging Tests
 
