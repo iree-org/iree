@@ -34,4 +34,13 @@ if(${IREE_ENABLE_EMITC})
       iree::compiler::Dialect::VM::Conversion::VMToEmitC
     PUBLIC
   )
+
+  iree_cc_library(
+    NAME
+      VMCFuncs
+    HDRS
+      vm_c_funcs.h
+    PUBLIC
+  )
+  
 endif()
