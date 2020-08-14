@@ -150,7 +150,7 @@ class ModuleCall:
     return self.rtol, self.atol
 
   def _get_shape_and_dtype(self, value: Any) -> str:
-    if isinstance(value, np.ndarray):
+    if isinstance(value, (int, float, np.ndarray)):
       return tf_utils.get_shape_and_dtype(value, allow_non_mlir_dtype=True)
     else:
       return str(type(value))
@@ -248,7 +248,9 @@ class Trace:
     if _load_dict is None:
       # Extract metadata from module and function.
       self.module_name = module.module_name
+      self.compiled_path = module.compiled_path
       self.backend = module.backend
+      self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
       source, start_line = inspect.getsourcelines(function)
@@ -258,7 +260,9 @@ class Trace:
       self.calls = []
     else:
       self.module_name = _load_dict["module_name"]
+      self.compiled_path = _load_dict["compiled_path"]
       self.backend = _load_dict["backend"]
+      self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
       self.function_line_numbers = _load_dict["function_line_numbers"]
@@ -411,9 +415,13 @@ class Trace:
     Args:
       trace_dir: str, path to the directory to serialize the trace to.
     """
+
+    # Python serialization.
     metadata = {
         "module_name": self.module_name,
+        "compiled_path": self.compiled_path,
         "backend": self.backend,
+        "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
         "function_line_numbers": self.function_line_numbers,
@@ -426,6 +434,22 @@ class Trace:
     for i, call in enumerate(self.calls):
       call_dir = os.path.join(trace_dir, f"call_{str(i).zfill(width)}")
       call.serialize(call_dir)
+
+    # C++ Serialization.
+    flagfile = []
+    if self.compiled_path is not None:
+      # Can be overridden with another flag after the flagfile.
+      flagfile.append(f"--input_file={self.compiled_path}")
+    flagfile.append(f"--driver={self.backend_driver}")
+    inputs_str = ", ".join(
+        [tf_utils.to_iree_data_string(value) for value in self.calls[0].inputs])
+    flagfile.append(f"--inputs={inputs_str}")
+    flagfile.append(f"--entry_function={self.calls[0].method}")
+    flagfile = "\n".join(flagfile)
+
+    with open(os.path.join(trace_dir, "flagfile"), "w") as f:
+      f.write(flagfile)
+      f.write("\n")
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":

@@ -20,7 +20,7 @@ import os
 import random
 import re
 import tempfile
-from typing import Any, Callable, Sequence, Type
+from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -89,7 +89,6 @@ def save_input_values(inputs: Sequence[np.ndarray],
       f.write("\n")
   return result
 
-
 def backends_to_str(backend_infos: Sequence["BackendInfo"]) -> str:
   """Creates a normalized string representing the provided backends."""
   normalized_names = []
@@ -114,10 +113,12 @@ def _get_backends_path(artifact_name: str,
     return os.path.join(artifacts_dir, f"{artifact_name}__{backends_string}")
 
 
-def compile_tf_module(tf_module: Type[tf.Module],
-                      backend_infos: Sequence["BackendInfo"] = (),
-                      exported_names: Sequence[str] = (),
-                      artifacts_dir: str = None) -> compiler.binding.OpaqueBlob:
+def compile_tf_module(
+    tf_module: Type[tf.Module],
+    backend_infos: Sequence["BackendInfo"] = (),
+    exported_names: Sequence[str] = (),
+    artifacts_dir: str = None
+) -> Tuple[compiler.binding.OpaqueBlob, Union[str, None]]:
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
   The artifact this creates is not callable. See IreeCompiledModule for an API
@@ -149,7 +150,8 @@ def compile_tf_module(tf_module: Type[tf.Module],
       should be saved.
 
   Returns:
-    A compiled IREE module blob.
+    A compiled IREE module blob and the path to the compiled VM FlatBuffer if
+    artifacts_dir is provided.
   """
 
   def _compile_from_path(sm_path: str) -> compiler.binding.OpaqueBlob:
@@ -189,6 +191,7 @@ def compile_tf_module(tf_module: Type[tf.Module],
         target_backends.extend(backend_info.compiler_targets)
       compiled_module = compiler_module.compile(target_backends=target_backends)
 
+      compiled_path = None
       if artifacts_dir is not None:
         compiled_path = _get_backends_path("compiled", backend_infos,
                                            artifacts_dir)
@@ -197,7 +200,7 @@ def compile_tf_module(tf_module: Type[tf.Module],
         with open(compiled_path, "wb") as f:
           f.write(compiled_module)
 
-      return compiled_module
+      return compiled_module, compiled_path
     except Exception:  # pylint: disable=broad-except
       if artifacts_dir is not None:
         # Disable the crash reproducer (to avoid inadvertently overwriting it).
@@ -233,7 +236,9 @@ class CompiledModule(object):
 
     # Public attributes:
     self.backend = self._backend_info.name
+    self.backend_driver = self._backend_info.driver
     self.module_name = self._module_class.__name__
+    self.compiled_path = None
 
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
@@ -259,7 +264,7 @@ class IreeCompiledModule(CompiledModule):
                backend_info: "BackendInfo",
                exported_names: Sequence[str] = (),
                artifacts_dir: str = None,
-               _create_reinitialized_args: Sequence[Any] = None):
+               _create_reinitialized_dict: Dict[str, Any] = None):
     """Compile a tf.Module to the target backend in backend_info.
 
     Args:
@@ -270,13 +275,13 @@ class IreeCompiledModule(CompiledModule):
         module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
-      _create_reinitialized_args: used internally.
+      _create_reinitialized_dict: used internally.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
-    if _create_reinitialized_args is None:
+    if _create_reinitialized_dict is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(
+      self._module_blob, self.compiled_path = compile_tf_module(
           tf_module=module_class(),
           backend_infos=[backend_info],
           exported_names=exported_names,
@@ -285,7 +290,10 @@ class IreeCompiledModule(CompiledModule):
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
       # Called from self.create_reinitialized()
-      self._module_blob, self._module, self._config = _create_reinitialized_args
+      self._module_blob = _create_reinitialized_dict["_module_blob"]
+      self._module = _create_reinitialized_dict["_module"]
+      self._config = _create_reinitialized_dict["_config"]
+      self.compiled_path = _create_reinitialized_dict["compiled_path"]
 
     # Holds all of the module's mutable state.
     self._context = rt.SystemContext(
@@ -297,8 +305,13 @@ class IreeCompiledModule(CompiledModule):
         self._module_class, self._backend_info, self._exported_names,
         self._artifacts_dir
     ]
-    create_reinitialized_args = [self._module_blob, self._module, self._config]
-    return IreeCompiledModule(*default_args, create_reinitialized_args)
+    create_reinitialized_dict = {
+        "_module_blob": self._module_blob,
+        "_module": self._module,
+        "_config": self._config,
+        "compiled_path": self.compiled_path
+    }
+    return IreeCompiledModule(*default_args, create_reinitialized_dict)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.
