@@ -415,6 +415,13 @@ class VMLAModuleState final {
   IREE_VMLA_SELECT_OP(SelectX16, uint16_t);
   IREE_VMLA_SELECT_OP(SelectX32, uint32_t);
 
+#define IREE_VMLA_UNARY_PREDICATE_OP(name, kernel, type)            \
+  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
+    return kernel::Execute<type>(src->As<type>(), dst->As<bool>()); \
+  }
+  IREE_VMLA_UNARY_PREDICATE_OP(FiniteF32, kernels::Finite, float);
+
   //===--------------------------------------------------------------------===//
   // VMLA Ops: shape/structure
   //===--------------------------------------------------------------------===//
@@ -931,6 +938,7 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("clamp.f32", &VMLAModuleState::ClampF32),
     vm::MakeNativeFunction("floor.f32", &VMLAModuleState::FloorF32),
     vm::MakeNativeFunction("ceil.f32", &VMLAModuleState::CeilF32),
+    vm::MakeNativeFunction("finite.f32", &VMLAModuleState::FiniteF32),
 
     vm::MakeNativeFunction("convert.i8.i16", &VMLAModuleState::ConvertI8I16),
     vm::MakeNativeFunction("convert.i8.i32", &VMLAModuleState::ConvertI8I32),

@@ -120,6 +120,12 @@ struct Select {
                         absl::Span<T> dst_buffer);
 };
 
+struct Finite {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<bool> dst_buffer);
+};
+
 struct Transpose {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
