@@ -571,9 +571,21 @@ class TracedModuleTestCase(tf.test.TestCase):
     self._ref_module = self._compile(ref_backend_info)
 
     tar_backend_infos = get_target_backends()
-    self._tar_modules = [
-        self._compile(backend_info) for backend_info in tar_backend_infos
+    cls._tar_modules = [
+        cls._compile(backend_info) for backend_info in tar_backend_infos
     ]
+
+  @classmethod
+  def _reinitialize_modules(cls):
+    cls._ref_module.create_reinitialized()
+    cls._tar_modules = [
+        module.create_reinitialized() for module in cls._tar_modules
+    ]
+
+  def setUp(self) -> None:
+    # Ran before each unit test.
+    super().setUp()
+    self._reinitialize_modules()
 
   def compare_backends(self, trace_function: callable) -> None:
     """Run the reference and target backends on trace_function and compare them.
