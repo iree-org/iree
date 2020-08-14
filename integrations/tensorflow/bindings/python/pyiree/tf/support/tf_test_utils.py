@@ -25,7 +25,6 @@
 import copy
 import glob
 import inspect
-import json
 import os
 import pickle
 import sys
@@ -34,7 +33,6 @@ import tempfile
 from absl import flags
 from absl import logging
 import numpy as np
-from pyiree.tf import compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
@@ -54,15 +52,6 @@ flags.DEFINE_bool("log_all_traces", False,
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
-
-def _makedirs(path):
-  # If the artifacts already exist then we overwrite/update them.
-  try:
-    # Use try/except instead of os.path.exists to address any race conditions
-    # between multiple tests targets.
-    os.makedirs(path)
-  except IOError:
-    pass
 
 def _setup_artifacts_dir(module_name):
   parent_dir = FLAGS.artifacts_dir
@@ -130,9 +119,9 @@ def _zfill_width(length):
 
 class ModuleCall:
 
-  def __init__(self, method_name, inputs, outputs, rtol=1e-6, atol=1e-6):
+  def __init__(self, method, inputs, outputs, rtol=1e-6, atol=1e-6):
     """Records the details of a call to a CompiledModule."""
-    self.method = method_name
+    self.method = method
 
     # Deepcopy to safegard against mutation.
     self.inputs = copy.deepcopy(inputs)
@@ -178,43 +167,60 @@ class ModuleCall:
     return result
 
   def serialize(self, call_dir):
-    # module_call/
-    #   metadata.json
-    #   input_0.pkl
-    #   input_1.pkl
-    #   output_0.pkl
-    _makedirs(call_dir)
+    """Stores a serialized copy of this call in call_dir.
 
-    # Python serialization.
+    Can be loaded via ModuleCall.load(call_dir)
+    """
+    os.makedirs(call_dir, exist_ok=True)
+
     metadata = {"method": self.method, "rtol": self.rtol, "atol": self.atol}
-    with open(os.path.join(call_dir, "metadata.json"), "w") as f:
-      json.dump(metadata, f, indent=2)
+    with open(os.path.join(call_dir, "metadata.pkl"), "wb") as f:
+      pickle.dump(metadata, f)
 
     width = _zfill_width(len(self.inputs))
     for i, value in enumerate(self.inputs):
       path = os.path.join(call_dir, f"input_{str(i).zfill(width)}.pkl")
-      pickle.dump(value, open(path, "wb"))
+      with open(path, "wb") as f:
+        pickle.dump(value, f)
 
     width = _zfill_width(len(self.outputs))
     for i, value in enumerate(self.outputs):
       path = os.path.join(call_dir, f"output_{str(i).zfill(width)}.pkl")
-      pickle.dump(value, open(path, "wb"))
+      with open(path, "wb") as f:
+        pickle.dump(value, f)
 
   @staticmethod
   def load(call_dir):
-    with open(os.path.join(call_dir, "metadata.json"), "r") as f:
-      metadata = json.load(f)
-    input_files = sorted(glob.glob("input_*.pkl"))
-    inputs = [pickle.load(open(filename, "rb")) for filename in input_files]
-    output_files = sorted(glob.glob("output_*.pkl"))
-    outputs = [pickle.load(open(filename, "rb")) for filename in output_files]
-    return ModuleCall(inputs, outputs, **metadata)
+    """Loads and returns a trace serialized with ModuleCall.serialize."""
+    with open(os.path.join(call_dir, "metadata.pkl"), "rb") as f:
+      kwargs = pickle.load(f)
+
+    for result_type in ["input", "output"]:
+      key = f"{result_type}s"  # inputs or outputs
+      kwargs[key] = []
+
+      files = glob.glob(os.path.join(call_dir, f"{result_type}_*.pkl"))
+      for filename in sorted(files):
+        with open(filename, "rb") as f:
+          kwargs[key].append(pickle.load(f))
+
+      # Convert to tuple to match python's return type for multiple results.
+      kwargs[key] = tuple(kwargs[key])
+
+    return ModuleCall(**kwargs)
+
+
+def _get_trace_dir(artifacts_dir, trace):
+  trace_dir = os.path.join(artifacts_dir, trace.backend, "traces",
+                           trace.function_name)
+  os.makedirs(trace_dir, exist_ok=True)
+  return trace_dir
 
 
 class Trace:
   """Stores the inputs and outputs of a series of calls to a module."""
 
-  def __init__(self, module, function, _load_kwargs=None):
+  def __init__(self, module, function, _load_dict=None):
     """Extracts metadata from module and function and initializes.
 
     Example usage:
@@ -227,9 +233,9 @@ class Trace:
     Args:
       module: the module who's outputs this trace will record.
       function: the function that module will be traced on.
-      _load_kwargs: used internally
+      _load_dict: used internally
     """
-    if _load_kwargs is None:
+    if _load_dict is None:
       # Extract metadata from module and function.
       self.module_name = module.module_name
       self.backend = module.backend
@@ -241,13 +247,13 @@ class Trace:
 
       self.calls = []
     else:
-      self.module_name = _load_kwargs["module_name"]
-      self.backend = _load_kwargs["backend"]
-      self.function_name = _load_kwargs["function_nae"]
-      self.function_sourcefile = _load_kwargs["function_sourcefile"]
-      self.function_line_numbers = _load_kwargs["function_line_numbers"]
-      self.function_source = _load_kwargs["function_source"]
-      self.calls = _load_kwargs["calls"]
+      self.module_name = _load_dict["module_name"]
+      self.backend = _load_dict["backend"]
+      self.function_name = _load_dict["function_name"]
+      self.function_sourcefile = _load_dict["function_sourcefile"]
+      self.function_line_numbers = _load_dict["function_line_numbers"]
+      self.function_source = _load_dict["function_source"]
+      self.calls = _load_dict["calls"]
 
   def __str__(self):
     header = (f"Trace of {self.module_name} compiled to '{self.backend}' "
@@ -365,17 +371,11 @@ class Trace:
       raise TypeError(f"Encountered results with unexpected type {type(ref)}")
     return True
 
-  def _get_trace_dir(self, artifacts_dir):
-    trace_dir = os.path.join(artifacts_dir, self.backend, "traces",
-                             self.function_name)
-    os.makedirs(trace_dir, exist_ok=True)
-    return trace_dir
-
-  def save_plaintext(self, artifacts_dir, summarize=True):
+  def save_plaintext(self, trace_dir, summarize=True):
     """Saves a human-readable string representation of this trace to disk.
 
     Args:
-      artifacts_dir: the base directory to save the trace in.
+      trace_dir: str, path to the directory to save the trace in.
       summarize: a bool controlling whether numpy should summarize the inputs
         and outputs if they're large. Setting this to False is very slow for
         large outputs.
@@ -386,7 +386,6 @@ class Trace:
         threshold=None if summarize else sys.maxsize,
         edgeitems=10)  # Can show more items since they won't clutter the logs.
 
-    trace_dir = self._get_trace_dir(artifacts_dir)
     path = os.path.join(trace_dir, "log.txt")
     with open(path, "w") as f:
       f.write(str(self))
@@ -394,13 +393,14 @@ class Trace:
 
     np.set_printoptions(**prior_printoptions)
 
-  def serialize(self, artifacts_dir):
-    # SimpleArithmeticModule/iree_vmla/traces/
-    #   simple_mul/
-    #     call_0/
-    #     call_1/
-    #     metadata.json
-    trace_dir = self._get_trace_dir(artifacts_dir)
+  def serialize(self, trace_dir):
+    """Stores a serialized copy of this trace in trace_dir.
+
+    It can be loaded via `Trace.load(trace_dir)`.
+
+    Args:
+      trace_dir: str, path to the directory to serialize the trace to.
+    """
     metadata = {
         "module_name": self.module_name,
         "backend": self.backend,
@@ -409,8 +409,8 @@ class Trace:
         "function_line_numbers": self.function_line_numbers,
         "function_source": self.function_source
     }
-    with open(os.path.join(trace_dir, "metadata.json"), "w") as f:
-      json.dump(metadata, f, indent=2)
+    with open(os.path.join(trace_dir, "metadata.pkl"), "wb") as f:
+      pickle.dump(metadata, f)
 
     width = _zfill_width(len(self.calls))
     for i, call in enumerate(self.calls):
@@ -418,12 +418,19 @@ class Trace:
       call.serialize(call_dir)
 
   @staticmethod
-  def load(trace_function_dir):
-    with open(os.path.join(trace_function_dir, "metadata.json"), "r") as f:
-      _load_kwargs = json.load(f)
-    calls = [ModuleCall.load(call_dir) for call_dir in glob.glob("call_*")]
-    _load_kwargs['calls'] = calls
-    return Trace(module=None, function=None, _load_kwargs=_load_kwargs)
+  def load(trace_dir):
+    """Loads and returns a trace serialized with Trace.serialize.
+
+    Args:
+      trace_dir: str, path to the directory of the serialized trace.
+    """
+    with open(os.path.join(trace_dir, "metadata.pkl"), "rb") as f:
+      load_dict = pickle.load(f)
+    call_dirs = sorted(glob.glob(os.path.join(trace_dir, "call_*")))
+    calls = [ModuleCall.load(call_dir) for call_dir in call_dirs]
+    load_dict["calls"] = calls
+    return Trace(module=None, function=None, _load_dict=load_dict)
+
 
 class TracedModule:
 
@@ -585,11 +592,13 @@ class TracedModuleTestCase(tf.test.TestCase):
         failed_backend_indices.append(i)
 
     # Save the results to disk before validating.
-    ref_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
-    ref_trace.serialize(self._artifacts_dir)
+    ref_trace_dir = _get_trace_dir(self._artifacts_dir, ref_trace)
+    ref_trace.save_plaintext(ref_trace_dir, FLAGS.summarize)
+    ref_trace.serialize(ref_trace_dir)
     for tar_trace in tar_traces:
-      tar_trace.serialize(self._artifacts_dir)
-      tar_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
+      tar_trace_dir = _get_trace_dir(self._artifacts_dir, tar_trace)
+      tar_trace.save_plaintext(tar_trace_dir, FLAGS.summarize)
+      tar_trace.serialize(tar_trace_dir)
 
     # Validate results.
     if failed_backend_indices:
