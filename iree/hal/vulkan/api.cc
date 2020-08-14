@@ -143,7 +143,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
   }
 
   if (extensions_capacity < *out_extensions_count) {
-    return IREE_STATUS_OUT_OF_RANGE;  // Not an error; just a size query.
+    // Not an error; just a size query.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
 
   const std::vector<const char*>& extensions =
@@ -180,7 +181,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
   }
 
   if (layers_capacity < *out_layers_count) {
-    return IREE_STATUS_OUT_OF_RANGE;  // Not an error; just a size query.
+    // Not an error; just a size query.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
 
   const std::vector<const char*>& layers =

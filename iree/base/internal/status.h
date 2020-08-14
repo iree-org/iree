@@ -99,49 +99,47 @@ class IREE_MUST_USE_RESULT Status;
 class Status final {
  public:
   // Return a combination of the error code name and message.
-  static IREE_MUST_USE_RESULT std::string ToString(const iree_status_t& status);
+  static IREE_MUST_USE_RESULT std::string ToString(iree_status_t status);
 
   // Creates an OK status with no message.
   Status() = default;
 
   // Takes ownership of a C API status instance.
   Status(iree_status_t&& status) noexcept
-      : value_(exchange(status, iree_status_code(status))) {}
+      : value_(exchange(status,
+                        iree_status_from_code(iree_status_code(status)))) {}
 
   // Takes ownership of a C API status instance wrapped in a Status.
   Status(Status& other) noexcept
-      : value_(exchange(other.value_,
-                        static_cast<iree_status_code_t>(other.code()))) {}
+      : value_(exchange(other.value_, iree_status_from_code(other.code()))) {}
   Status(Status&& other) noexcept
-      : value_(exchange(other.value_,
-                        static_cast<iree_status_code_t>(other.code()))) {}
+      : value_(exchange(other.value_, iree_status_from_code(other.code()))) {}
   Status& operator=(Status&& other) {
     if (this != &other) {
       if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
-      value_ =
-          exchange(other.value_, static_cast<iree_status_code_t>(other.code()));
+      value_ = exchange(other.value_, iree_status_from_code(other.code()));
     }
     return *this;
   }
 
-  Status(iree_status_code_t code) : value_(static_cast<iree_status_t>(code)) {}
+  Status(iree_status_code_t code) : value_(iree_status_from_code(code)) {}
   Status& operator=(const iree_status_code_t& code) {
     if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
-    value_ = static_cast<iree_status_t>(code);
+    value_ = iree_status_from_code(code);
     return *this;
   }
 
-  Status(StatusCode code) : value_(static_cast<iree_status_t>(code)) {}
+  Status(StatusCode code) : value_(iree_status_from_code(code)) {}
   Status& operator=(const StatusCode& code) {
     if (IREE_UNLIKELY(value_)) iree_status_ignore(value_);
-    value_ = static_cast<iree_status_t>(code);
+    value_ = iree_status_from_code(code);
     return *this;
   }
 
   // TODO(benvanik): remove if possible; we don't want to be cloning things.
   // Currently some of our status usage for sticky errors requires this.
   Status(const Status& other) {
-    value_ = other.value_ ? iree_status_clone(other.value_) : IREE_STATUS_OK;
+    value_ = other.value_ ? iree_status_clone(other.value_) : iree_ok_status();
   }
 
   // Creates a status with the specified code and error message.
@@ -149,7 +147,7 @@ class Status final {
   Status(StatusCode code, absl::string_view message) {
     if (IREE_UNLIKELY(code != StatusCode::kOk)) {
       value_ = message.empty()
-                   ? static_cast<iree_status_t>(code)
+                   ? iree_status_from_code(code)
                    : iree_status_allocate(
                          static_cast<iree_status_code_t>(code),
                          /*file=*/nullptr, /*line=*/0,
@@ -166,7 +164,7 @@ class Status final {
   }
 
   ~Status() {
-    if (IREE_UNLIKELY((value_ & ~IREE_STATUS_CODE_MASK))) {
+    if (IREE_UNLIKELY((uintptr_t)(value_) & ~IREE_STATUS_CODE_MASK)) {
       iree_status_free(value_);
     }
   }
@@ -189,11 +187,11 @@ class Status final {
 
   // Converts to a C API status instance and transfers ownership.
   IREE_MUST_USE_RESULT operator iree_status_t() && {
-    return exchange(value_, iree_status_code(value_));
+    return exchange(value_, iree_status_from_code(iree_status_code(value_)));
   }
 
   IREE_MUST_USE_RESULT iree_status_t release() {
-    return exchange(value_, IREE_STATUS_OK);
+    return exchange(value_, iree_ok_status());
   }
 
   friend bool operator==(const Status& lhs, const Status& rhs) {
@@ -220,7 +218,7 @@ class Status final {
  private:
   friend class StatusBuilder;
 
-  iree_status_t value_ = IREE_STATUS_OK;
+  iree_status_t value_ = iree_ok_status();
 };
 
 // Returns an OK status, equivalent to a default constructed instance.

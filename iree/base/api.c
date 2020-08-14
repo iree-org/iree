@@ -302,6 +302,9 @@ typedef struct {
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 } iree_status_storage_t;
 
+#define iree_status_storage(status) \
+  ((iree_status_storage_t*)(((uintptr_t)(status) & ~IREE_STATUS_CODE_MASK)))
+
 // Appends a payload to the storage doubly-linked list.
 static iree_status_t iree_status_append_payload(
     iree_status_t status, iree_status_storage_t* storage,
@@ -374,7 +377,7 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
       iree_math_align(sizeof(iree_status_storage_t), storage_alignment);
   iree_status_storage_t* storage = (iree_status_storage_t*)iree_aligned_alloc(
       storage_alignment, storage_size);
-  if (IREE_UNLIKELY(!storage)) return code;
+  if (IREE_UNLIKELY(!storage)) return iree_status_from_code(code);
   memset(storage, 0, sizeof(*storage));
 
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
@@ -421,7 +424,7 @@ iree_status_allocate_vf(iree_status_code_t code, const char* file,
   // message.
   size_t message_size =
       vsnprintf(/*buffer=*/NULL, /*buffer_count=*/0, format, varargs_0);
-  if (message_size < 0) return (iree_status_t)(code & IREE_STATUS_CODE_MASK);
+  if (message_size < 0) return iree_status_from_code(code);
   ++message_size;  // NUL byte
 
   // Allocate storage with the additional room to store the formatted message.
@@ -432,7 +435,7 @@ iree_status_allocate_vf(iree_status_code_t code, const char* file,
       sizeof(iree_status_storage_t) + message_size, storage_alignment);
   iree_status_storage_t* storage = (iree_status_storage_t*)iree_aligned_alloc(
       storage_alignment, storage_size);
-  if (IREE_UNLIKELY(!storage)) return code;
+  if (IREE_UNLIKELY(!storage)) return iree_status_from_code(code);
   memset(storage, 0, sizeof(*storage));
 
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
@@ -461,8 +464,7 @@ iree_status_clone(iree_status_t status) {
   // Statuses are just codes; nothing to do.
   return status;
 #else
-  iree_status_storage_t* storage =
-      (iree_status_storage_t*)(status & ~IREE_STATUS_CODE_MASK);
+  iree_status_storage_t* storage = iree_status_storage(status);
   if (!storage) return status;
 
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
@@ -488,8 +490,7 @@ iree_status_clone(iree_status_t status) {
 
 IREE_API_EXPORT void IREE_API_CALL iree_status_free(iree_status_t status) {
 #if IREE_STATUS_FEATURES != 0
-  iree_status_storage_t* storage =
-      (iree_status_storage_t*)(status & ~IREE_STATUS_CODE_MASK);
+  iree_status_storage_t* storage = iree_status_storage(status);
   if (!storage) return;
   iree_status_payload_t* payload = storage->payload_head;
   while (payload) {
@@ -527,8 +528,7 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
   if (iree_string_view_is_empty(message)) return base_status;
   // If there's no storage yet we can just reuse normal allocation. Both that
   // and this do not copy |message|.
-  iree_status_storage_t* storage =
-      (iree_status_storage_t*)(base_status & ~IREE_STATUS_CODE_MASK);
+  iree_status_storage_t* storage = iree_status_storage(base_status);
   if (!storage) {
     return iree_status_allocate(iree_status_code(base_status), NULL, 0,
                                 message);
@@ -571,8 +571,7 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
 #else
   // If there's no storage yet we can just reuse normal allocation. Both that
   // and this do not copy |message|.
-  iree_status_storage_t* storage =
-      (iree_status_storage_t*)(base_status & ~IREE_STATUS_CODE_MASK);
+  iree_status_storage_t* storage = iree_status_storage(base_status);
   if (!storage) {
     return iree_status_allocate_vf(iree_status_code(base_status), NULL, 0,
                                    format, varargs_0, varargs_1);
@@ -619,8 +618,7 @@ iree_status_format(iree_status_t status, iree_host_size_t buffer_capacity,
   *out_buffer_length = 0;
 
   // Grab storage which may have a message and zero or more payloads.
-  iree_status_storage_t* storage =
-      (iree_status_storage_t*)(status & ~IREE_STATUS_CODE_MASK);
+  iree_status_storage_t* storage = iree_status_storage(status);
 
   // Prefix with source location and status code string (may be 'OK').
   iree_host_size_t buffer_length = 0;
@@ -733,7 +731,9 @@ iree_status_to_string(iree_status_t status, char** out_buffer,
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_api_version_check(iree_api_version_t expected_version,
                        iree_api_version_t* out_actual_version) {
-  if (!out_actual_version) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_actual_version) {
+    return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+  }
   iree_api_version_t actual_version = IREE_API_VERSION_0;
   *out_actual_version = actual_version;
   return expected_version == actual_version

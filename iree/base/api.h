@@ -434,16 +434,22 @@ typedef enum {
 // An OK status will always be bit-equivalent to 0 to make success/failure
 // checks as cheap as an integer non-zero comparison. As the payload is optional
 // it's legal to construct an iree_status_t from an iree_status_code_t directly
-// meaning `return IREE_STATUS_INTERNAL;` (etc) is valid, though not as useful
-// as constructing via iree_make_status (which captures additional info).
+// meaning `return iree_status_from_code(IREE_STATUS_INTERNAL);` (etc) is valid,
+// though not as useful as constructing via iree_make_status (which captures
+// additional info).
 typedef uintptr_t iree_status_t;
+
+// Returns an iree_status_t from the an iree_status_code_t.
+#define iree_status_from_code(code)                          \
+  ((iree_status_t)((uintptr_t)((iree_status_code_t)(code)) & \
+                   IREE_STATUS_CODE_MASK))
 
 // Returns the iree_status_code_t from an iree_status_t.
 #define iree_status_code(value) \
-  ((iree_status_code_t)((value)&IREE_STATUS_CODE_MASK))
+  ((iree_status_code_t)(((uintptr_t)(value)) & IREE_STATUS_CODE_MASK))
 
 // Macros to check the value of a status code.
-#define iree_status_is_ok(value) ((value) == IREE_STATUS_OK)
+#define iree_status_is_ok(value) ((uintptr_t)(value) == IREE_STATUS_OK)
 #define iree_status_is_cancelled(value) \
   (iree_status_code(value) == IREE_STATUS_CANCELLED)
 #define iree_status_is_unknown(value) \
@@ -556,7 +562,7 @@ typedef uintptr_t iree_status_t;
 #endif  // !IREE_STATUS_FEATURES
 
 // Returns an IREE_STATUS_OK.
-#define iree_ok_status() ((iree_status_t)IREE_STATUS_OK)
+#define iree_ok_status() iree_status_from_code(IREE_STATUS_OK)
 
 // Makes an iree_status_t with the given iree_status_code_t code and records
 // the current source location.

@@ -92,7 +92,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
     *out_shape_rank = dims.size();
   }
   if (dims.size() > shape_capacity) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
   if (out_shape) {
     std::memcpy(out_shape, dims.data(), dims.size() * sizeof(*out_shape));
@@ -123,7 +123,8 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
   if (out_buffer_length) {
     *out_buffer_length = buffer_length;
   }
-  return buffer ? iree_ok_status() : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
@@ -194,7 +195,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
   if (out_buffer_length) {
     *out_buffer_length = n;
   }
-  return n >= buffer_capacity ? IREE_STATUS_OUT_OF_RANGE : iree_ok_status();
+  return n >= buffer_capacity ? iree_status_from_code(IREE_STATUS_OUT_OF_RANGE)
+                              : iree_ok_status();
 }
 
 // Parses a string of two character pairs representing hex numbers into bytes.
@@ -237,7 +239,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > INT8_MAX) {
-        return IREE_STATUS_INVALID_ARGUMENT;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<int8_t*>(out_data) = static_cast<int8_t>(temp);
       return iree_ok_status();
@@ -247,7 +249,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > UINT8_MAX) {
-        return IREE_STATUS_INVALID_ARGUMENT;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<uint8_t*>(out_data) = static_cast<uint8_t>(temp);
       return iree_ok_status();
@@ -257,7 +259,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > INT16_MAX) {
-        return IREE_STATUS_INVALID_ARGUMENT;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<int16_t*>(out_data) = static_cast<int16_t>(temp);
       return iree_ok_status();
@@ -267,7 +269,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > UINT16_MAX) {
-        return IREE_STATUS_INVALID_ARGUMENT;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<uint16_t*>(out_data) = static_cast<uint16_t>(temp);
       return iree_ok_status();
@@ -276,22 +278,22 @@ static iree_status_t iree_hal_parse_element_unsafe(
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<int32_t*>(out_data))
                  ? iree_ok_status()
-                 : IREE_STATUS_INVALID_ARGUMENT;
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<uint32_t*>(out_data))
                  ? iree_ok_status()
-                 : IREE_STATUS_INVALID_ARGUMENT;
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<int64_t*>(out_data))
                  ? iree_ok_status()
-                 : IREE_STATUS_INVALID_ARGUMENT;
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<uint64_t*>(out_data))
                  ? iree_ok_status()
-                 : IREE_STATUS_INVALID_ARGUMENT;
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "float16 parsing not implemented");
@@ -299,12 +301,12 @@ static iree_status_t iree_hal_parse_element_unsafe(
       return absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<float*>(out_data))
                  ? iree_ok_status()
-                 : IREE_STATUS_INVALID_ARGUMENT;
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       return absl::SimpleAtod(absl::string_view(data_str.data, data_str.size),
                               reinterpret_cast<double*>(out_data))
                  ? iree_ok_status()
-                 : IREE_STATUS_INVALID_ARGUMENT;
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     default: {
       // Treat any unknown format as binary.
       iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
@@ -432,7 +434,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
   if (out_buffer_length) {
     *out_buffer_length = n;
   }
-  return buffer ? iree_ok_status() : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
@@ -599,7 +602,8 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
   if (out_buffer_length) {
     *out_buffer_length = buffer_length;
   }
-  return buffer ? iree_ok_status() : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
@@ -1096,7 +1100,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
     *out_shape_rank = buffer_view->shape_rank;
   }
   if (rank_capacity < buffer_view->shape_rank) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    // Not an error; just a size query.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
 
   for (iree_host_size_t i = 0; i < buffer_view->shape_rank; ++i) {
@@ -1335,7 +1340,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
   if (out_buffer_length) {
     *out_buffer_length = buffer_length;
   }
-  return buffer ? iree_ok_status() : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 //===----------------------------------------------------------------------===//

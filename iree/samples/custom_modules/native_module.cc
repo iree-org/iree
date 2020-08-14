@@ -92,7 +92,8 @@ iree_status_t iree_custom_message_read_value(iree_custom_message_t* message,
   IREE_ASSERT_ARGUMENT(message);
   IREE_ASSERT_ARGUMENT(buffer);
   if (buffer_capacity < message->value.size + 1) {
-    return IREE_STATUS_OUT_OF_RANGE;  // Not an error; just a size query.
+    // Not an error; just a size query.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
   memcpy(buffer, message->value.data, message->value.size);
   buffer[message->value.size] = 0;

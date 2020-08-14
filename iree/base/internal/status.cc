@@ -24,7 +24,7 @@ std::ostream& operator<<(std::ostream& os, const StatusCode& x) {
 }
 
 // static
-IREE_MUST_USE_RESULT std::string Status::ToString(const iree_status_t& status) {
+IREE_MUST_USE_RESULT std::string Status::ToString(iree_status_t status) {
   if (iree_status_is_ok(status)) {
     return "OK";
   }
