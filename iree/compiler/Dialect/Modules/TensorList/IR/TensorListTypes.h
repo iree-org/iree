@@ -37,7 +37,6 @@ class TensorListType
   static TensorListType get(MLIRContext *context) {
     return Base::get(context, TypeKind::kTensorList);
   }
-  static bool kindof(unsigned kind) { return kind == TypeKind::kTensorList; }
 };
 
 }  // namespace TensorList

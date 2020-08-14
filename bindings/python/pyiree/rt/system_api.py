@@ -138,7 +138,7 @@ class BoundFunction:
   def __call__(self, *args):
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy
-    # flag that can allow it to be overriden.
+    # flag that can allow it to be overridden.
     inputs = self._abi.raw_pack_inputs(args)
     results = self._abi.allocate_results(inputs, static_alloc=False)
     self._context._vm_context.invoke(self._vm_function, inputs, results)
@@ -269,8 +269,7 @@ class SystemContext:
 def load_modules(*modules, config: Optional[Config] = None):
   """Loads modules into a new or shared context and returns them."""
   context = SystemContext(modules=modules, config=config)
-  context_modules = context.modules
-  bound_modules = [context_modules[m.name] for m in modules]
+  bound_modules = [context.modules[m.name] for m in modules]
   return bound_modules
 
 

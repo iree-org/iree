@@ -49,7 +49,6 @@ class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage> {
   static BufferType get(MLIRContext *context) {
     return Base::get(context, TypeKind::Buffer);
   }
-  static bool kindof(unsigned kind) { return kind == TypeKind::Buffer; }
 };
 
 class InterfaceType : public Type::TypeBase<InterfaceType, Type, TypeStorage> {
@@ -58,7 +57,6 @@ class InterfaceType : public Type::TypeBase<InterfaceType, Type, TypeStorage> {
   static InterfaceType get(MLIRContext *context) {
     return Base::get(context, TypeKind::Interface);
   }
-  static bool kindof(unsigned kind) { return kind == TypeKind::Interface; }
 };
 
 }  // namespace VMLA

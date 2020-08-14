@@ -100,11 +100,16 @@ namespace {
 class ConvertHALToVMPass
     : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
+  ConvertHALToVMPass()
+      : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
+  explicit ConvertHALToVMPass(IREE::VM::TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
+
   void runOnOperation() override {
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
-    VMTypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter(targetOptions_);
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
@@ -115,7 +120,7 @@ class ConvertHALToVMPass
         innerModuleOp);
 
     OwningRewritePatternList conversionPatterns;
-    populateStandardToVMPatterns(context, conversionPatterns);
+    populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);
     populateHALToVMPatterns(context, importSymbols, conversionPatterns,
@@ -127,12 +132,16 @@ class ConvertHALToVMPass
       return signalPassFailure();
     }
   }
+
+ private:
+  IREE::VM::TargetOptions targetOptions_;
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass() {
-  return std::make_unique<ConvertHALToVMPass>();  // NOLINT
+std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
+    IREE::VM::TargetOptions targetOptions) {
+  return std::make_unique<ConvertHALToVMPass>(targetOptions);
 }
 
 static PassRegistration<ConvertHALToVMPass> pass(

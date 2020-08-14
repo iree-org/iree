@@ -21,10 +21,12 @@ iree_cc_library(
     "ConversionDialectInterface.h"
     "ConversionTarget.h"
     "ImportUtils.h"
+    "TargetOptions.h"
     "TypeConverter.h"
   SRCS
     "ConversionTarget.cpp"
     "ImportUtils.cpp"
+    "TargetOptions.cpp"
     "TypeConverter.cpp"
   DEPS
     LLVMSupport

@@ -29,7 +29,7 @@ namespace Vulkan {
 static DialectRegistration<VulkanDialect> vkDialect;
 
 VulkanDialect::VulkanDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<VulkanDialect>()) {
   addAttributes<TargetEnvAttr>();
 }
 

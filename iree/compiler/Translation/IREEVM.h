@@ -16,6 +16,7 @@
 #define IREE_COMPILER_TRANSLATION_IREEVM_H_
 
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Module.h"
@@ -40,7 +41,8 @@ LogicalResult convertToHALModule(ModuleOp moduleOp,
 // Converts the lowered module to a canonical vm.module containing only vm ops.
 // This uses patterns to convert from standard ops and other dialects to their
 // vm ABI form.
-LogicalResult convertToVMModule(ModuleOp moduleOp);
+LogicalResult convertToVMModule(ModuleOp moduleOp,
+                                IREE::VM::TargetOptions targetOptions);
 
 // Translates an MLIR module containing a set of supported IREE input dialects
 // to an IREE VM bytecode module for loading at runtime.
@@ -51,6 +53,7 @@ LogicalResult convertToVMModule(ModuleOp moduleOp);
 // Exposed via the --iree-mlir-to-vm-bytecode-module translation.
 LogicalResult translateFromMLIRToVMBytecodeModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::TargetOptions targetOptions,
     IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
 
 #ifdef IREE_HAVE_EMITC_DIALECT
@@ -60,7 +63,7 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
 // Exposed via the --iree-mlir-to-vm-c-module translation.
 LogicalResult translateFromMLIRToVMCModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
-    llvm::raw_ostream &output);
+    IREE::VM::TargetOptions targetOptions, llvm::raw_ostream &output);
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 // TODO(benvanik): versions with multiple targets, etc.

@@ -39,9 +39,6 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
  public:
   using Base::Base;
 
-  /// Support method to enable LLVM-style type casting.
-  static bool kindof(unsigned kind) { return kind == TypeKind::RankedShape; }
-
   // Gets an instance of a RankedShapeType given an array of dimensions.
   // Any dynamic dim should be -1.
   static RankedShapeType get(ArrayRef<int64_t> dims, MLIRContext *context);

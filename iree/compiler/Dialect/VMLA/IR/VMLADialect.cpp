@@ -46,15 +46,15 @@ class VMLAToVMConversionInterface : public VMConversionDialectInterface {
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, OwningRewritePatternList &patterns,
       TypeConverter &typeConverter) const override {
-    populateVMLAToVMPatterns(getDialect()->getContext(), importSymbols,
-                             patterns, typeConverter);
+    populateVMLAToVMPatterns(getDialect()->getContext(), typeConverter,
+                             importSymbols, patterns);
   }
 };
 
 }  // namespace
 
 VMLADialect::VMLADialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<VMLADialect>()) {
   addInterfaces<VMLAToVMConversionInterface>();
 
   addTypes<BufferType, InterfaceType>();

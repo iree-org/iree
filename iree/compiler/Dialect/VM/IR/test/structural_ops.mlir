@@ -64,6 +64,6 @@ vm.module @import_funcs {
   // CHECK-NEXT: vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
   vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
 
-  // CHECK-NEXT: vm.import @my.fn_varargs(%foo : vector<3xi32>..., %bar : tuple<i32, i32>...) -> i32
-  vm.import @my.fn_varargs(%foo : vector<3xi32>..., %bar : tuple<i32, i32>...) -> i32
+  // CHECK-NEXT: vm.import @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
+  vm.import @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
 }

@@ -636,6 +636,7 @@ class BuildFileFunctions(object):
     else:
       self.converter.header += (f"\n{content}\n")
 
+
 class Converter(object):
   """Conversion state tracking and full file template substitution."""
 

@@ -46,6 +46,8 @@ flags.DEFINE_string(
 flags.DEFINE_bool(
     "summarize", True,
     "Summarize the inputs and outputs of each module trace logged to disk.")
+flags.DEFINE_bool("log_all_traces", False,
+                  "Log all traces to logging.info, even if comparison passes.")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
@@ -56,14 +58,7 @@ def _setup_artifacts_dir(module_name):
     parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
-
-  # If the artifacts already exist then we overwrite/update them.
-  try:
-    # Use try/except instead of os.path.exists to address a race condition
-    # between multiple tests targets.
-    os.makedirs(artifacts_dir)
-  except IOError:
-    pass
+  tf_utils._makedirs(artifacts_dir)
   return artifacts_dir
 
 
@@ -312,9 +307,9 @@ class Trace:
     return True
 
   def _get_trace_dir(self, artifacts_dir):
-    trace_dir = os.path.join(artifacts_dir, "traces")
-    if not os.path.exists(trace_dir):
-      os.makedirs(trace_dir)
+    trace_dir = os.path.join(artifacts_dir, self.backend, "traces",
+                             self.function_name)
+    tf_utils._makedirs(trace_dir)
     return trace_dir
 
   def save_plaintext(self, artifacts_dir, summarize=True):
@@ -333,7 +328,7 @@ class Trace:
         edgeitems=10)  # Can show more items since they won't clutter the logs.
 
     trace_dir = self._get_trace_dir(artifacts_dir)
-    path = os.path.join(trace_dir, f"{self.function_name}__{self.backend}.txt")
+    path = os.path.join(trace_dir, "log.txt")
     with open(path, "w") as f:
       f.write(str(self))
       f.write("\n")
@@ -483,9 +478,13 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Run the traces through trace_function with their associated modules.
     tf_utils.set_random_seed()
     trace_function(TracedModule(self._ref_module, ref_trace))
+    if FLAGS.log_all_traces:
+      logging.info(ref_trace)
     for module, trace in zip(self._tar_modules, tar_traces):
       tf_utils.set_random_seed()
       trace_function(TracedModule(module, trace))
+      if FLAGS.log_all_traces:
+        logging.info(trace)
 
     # Compare each target trace of trace_function with the reference trace.
     failed_backend_indices = []
@@ -505,13 +504,10 @@ class TracedModuleTestCase(tf.test.TestCase):
     if failed_backend_indices:
       # Extract info for logging.
       failed_backends = [tar_traces[i].backend for i in failed_backend_indices]
-      failure_info = (
+      self.fail(
           "Comparision between the reference backend and the following targets "
           f"failed: {failed_backends}. The errors above show the inputs and "
-          "outputs the non-matching calls.")
-
-      # This condition is always True, but is useful for context in the logs.
-      self.assertEmpty(failed_backends, failure_info)
+          "outputs of the non-matching calls.")
 
   @classmethod
   def tearDownClass(cls):

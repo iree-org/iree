@@ -41,10 +41,7 @@ class TFStringsType : public Type {
  public:
   using Type::Type;
 
-  static bool classof(Type type) {
-    return type.getKind() >= TFStringsTypes::FIRST_USED_STRINGS_TYPE &&
-           type.getKind() <= TFStringsTypes::LAST_USED_STRINGS_TYPE;
-  }
+  static bool classof(Type type);
 };
 
 class StringType
@@ -54,8 +51,6 @@ class StringType
   static StringType get(MLIRContext* context) {
     return Base::get(context, TFStringsTypes::String);
   }
-
-  static bool kindof(unsigned kind) { return kind == TFStringsTypes::String; }
 };
 
 }  // namespace tf_strings

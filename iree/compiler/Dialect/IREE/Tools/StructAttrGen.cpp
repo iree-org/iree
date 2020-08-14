@@ -106,7 +106,6 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, {3}Storage> {
   using Base::Base;
 
   static StringRef getKindName() { return "{2}"; }
-  static bool kindof(unsigned kind) { return kind == AttrKind::{1}; }
 
 )",
                 structAttr.getDescription(), structAttr.getStructClassName(),

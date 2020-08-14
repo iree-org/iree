@@ -356,7 +356,7 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                                   VmVariantList& f_args,
                                   VmVariantList& f_results) {
   if (f_args.size() != raw_config().inputs.size()) {
-    throw RaiseValueError("Mismatched AllocatResults() input arity");
+    throw RaiseValueError("Mismatched AllocateResults() input arity");
   }
 
   for (size_t i = 0, e = descs.size(); i < e; ++i) {

@@ -47,7 +47,6 @@ class MessageType : public Type::TypeBase<MessageType, Type, TypeStorage> {
   static MessageType get(MLIRContext *context) {
     return Base::get(context, TypeKind::Message);
   }
-  static bool kindof(unsigned kind) { return kind == TypeKind::Message; }
 };
 
 #define GET_OP_CLASSES

@@ -33,7 +33,7 @@ static DialectRegistration<TFStringsDialect> tf_strings_dialect;
 }  // namespace
 
 TFStringsDialect::TFStringsDialect(MLIRContext* context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<TFStringsDialect>()) {
   addInterfaces<TfStringsToHALConversionInterface>();
   addTypes<StringType>();
 
@@ -54,13 +54,14 @@ Type TFStringsDialect::parseType(DialectAsmParser& parser) const {
 }
 
 void TFStringsDialect::printType(Type type, DialectAsmPrinter& os) const {
-  switch (type.getKind()) {
-    case TFStringsTypes::String:
-      os << "string";
-      break;
-    default:
-      llvm_unreachable("unhandled string type");
-  }
+  if (type.isa<tf_strings::StringType>())
+    os << "string";
+  else
+    llvm_unreachable("unhandled string type");
+}
+
+bool TFStringsType::classof(Type type) {
+  return llvm::isa<TFStringsDialect>(type.getDialect());
 }
 
 }  // namespace tf_strings

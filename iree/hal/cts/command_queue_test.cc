@@ -130,9 +130,22 @@ TEST_P(CommandQueueTest, WaitMultiple) {
   ASSERT_OK(command_queue->WaitIdle());
 }
 
-// Disabled on Vulkan until tests pass when using timeline semaphore emulation.
+std::vector<std::string> GetSupportedDrivers() {
+  auto drivers = DriverRegistry::shared_registry()->EnumerateAvailableDrivers();
+  auto it = drivers.begin();
+  while (it != drivers.end()) {
+    // Disabled on Vulkan until tests pass with timeline semaphore emulation.
+    if (*it == "vulkan") {
+      it = drivers.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  return drivers;
+}
+
 INSTANTIATE_TEST_SUITE_P(AllDrivers, CommandQueueTest,
-                         ::testing::Values("vmla", "llvm", "dylib"),
+                         ::testing::ValuesIn(GetSupportedDrivers()),
                          GenerateTestName());
 
 }  // namespace

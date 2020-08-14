@@ -46,26 +46,14 @@ Attribute zeroOfType(Type type) {
 /// Creates a constant one attribute matching the given type.
 Attribute oneOfType(Type type) {
   Builder builder(type.getContext());
-  switch (type.getKind()) {
-    case StandardTypes::BF16:
-    case StandardTypes::F16:
-    case StandardTypes::F32:
-    case StandardTypes::F64:
-      return builder.getFloatAttr(type, 1.0);
-    case StandardTypes::Integer: {
-      auto width = type.cast<IntegerType>().getWidth();
-      if (width == 1) return builder.getBoolAttr(true);
-      return builder.getIntegerAttr(type, APInt(width, 1));
-    }
-    case StandardTypes::Vector:
-    case StandardTypes::RankedTensor: {
-      auto vtType = type.cast<ShapedType>();
-      auto element = oneOfType(vtType.getElementType());
-      if (!element) return {};
-      return DenseElementsAttr::get(vtType, element);
-    }
-    default:
-      break;
+  if (type.isa<FloatType>()) return builder.getFloatAttr(type, 1.0);
+  if (auto integerTy = type.dyn_cast<IntegerType>())
+    return builder.getIntegerAttr(integerTy, APInt(integerTy.getWidth(), 1));
+  if (type.isa<RankedTensorType, VectorType>()) {
+    auto vtType = type.cast<ShapedType>();
+    auto element = oneOfType(vtType.getElementType());
+    if (!element) return {};
+    return DenseElementsAttr::get(vtType, element);
   }
   return {};
 }

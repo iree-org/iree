@@ -30,7 +30,6 @@ class StringType : public Type::TypeBase<StringType, Type, TypeStorage> {
   static StringType get(MLIRContext *context) {
     return Base::get(context, TypeKind::String);
   }
-  static bool kindof(unsigned kind) { return kind == TypeKind::String; }
 };
 
 class StringTensorType
@@ -40,7 +39,6 @@ class StringTensorType
   static StringTensorType get(MLIRContext *context) {
     return Base::get(context, TypeKind::StringTensor);
   }
-  static bool kindof(unsigned kind) { return kind == TypeKind::StringTensor; }
 };
 
 }  // namespace Strings

@@ -76,3 +76,12 @@ func @reduce_window(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
   } : (tensor<1x16x16x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
   return %0 : tensor<1x8x8x64xf32>
 }
+
+// -----
+
+func @log_plus_one(%input: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: mhlo.add
+  // CHECK: mhlo.log
+  %0 = "mhlo.log_plus_one"(%input) : (tensor<4xf32>) -> tensor<4xf32>
+  return %0: tensor<4xf32>
+}

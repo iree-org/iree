@@ -15,6 +15,7 @@
 
 # pylint: disable=unused-variable
 
+from absl import logging
 from absl.testing import absltest
 import numpy as np
 from pyiree import compiler
@@ -70,7 +71,7 @@ class VmTest(absltest.TestCase):
   def setUpClass(cls):
     super().setUpClass()
     driver_names = rt.HalDriver.query()
-    print("DRIVER_NAMES =", driver_names)
+    logging.info("driver_names: %s", driver_names)
     cls.driver = rt.HalDriver.create("vmla")
     cls.device = cls.driver.create_default_device()
     cls.hal_module = rt.create_hal_module(cls.device)
@@ -78,7 +79,7 @@ class VmTest(absltest.TestCase):
 
   def test_variant_list(self):
     l = rt.VmVariantList(5)
-    print(l)
+    logging.info("variant_list: %s", l)
     self.assertEqual(l.size, 0)
 
   def test_context_id(self):
@@ -102,19 +103,19 @@ class VmTest(absltest.TestCase):
 
   def test_static_module_context(self):
     m = create_simple_static_mul_module()
-    print(m)
+    logging.info("module: %s", m)
     instance = rt.VmInstance()
-    print(instance)
+    logging.info("instance: %s", instance)
     context = rt.VmContext(instance, modules=[self.hal_module, m])
-    print(context)
+    logging.info("context: %s", context)
 
   def test_dynamic_shape_compile(self):
     m = create_simple_dynamic_abs_module()
-    print(m)
+    logging.info("module: %s", m)
     instance = rt.VmInstance()
-    print(instance)
+    logging.info("instance: %s", instance)
     context = rt.VmContext(instance, modules=[self.hal_module, m])
-    print(context)
+    logging.info("context: %s", context)
 
   def test_add_scalar(self):
     m = create_add_scalar_module()
@@ -122,18 +123,19 @@ class VmTest(absltest.TestCase):
     context = rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
     abi = context.create_function_abi(self.device, self.htf, f)
-    print("INVOKING:", abi)
-    arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
-    arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+    logging.info("abi: %s", abi)
+
     inputs = abi.raw_pack_inputs((5, 6))
-    print("INPUTS:", inputs)
+    logging.info("inputs: %s", inputs)
+
     allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    print("ALLOCATED RESULTS:", allocated_results)
-    print("--- INVOKE:")
+    logging.info("allocated_results: %s", allocated_results)
+    logging.info("Invoking...")
     context.invoke(f, inputs, allocated_results)
-    print("--- DONE.")
+    logging.info("...done")
+
     results = abi.raw_unpack_results(allocated_results)
-    print("RESULTS:", results)
+    logging.info("results: %s", results)
     self.assertEqual(results[0], 11)
 
   def test_synchronous_dynamic_shape_invoke_function(self):
@@ -142,17 +144,20 @@ class VmTest(absltest.TestCase):
     context = rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     abi = context.create_function_abi(self.device, self.htf, f)
-    print("INVOKING:", abi)
+    logging.info("abi: %s", abi)
+
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
     inputs = abi.raw_pack_inputs((arg0,))
-    print("INPUTS:", inputs)
+    logging.info("inputs: %s", inputs)
+
     allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    print("ALLOCATED RESULTS:", allocated_results)
-    print("--- INVOKE:")
+    logging.info("allocated_results: %s", allocated_results)
+    logging.info("Invoking...")
     context.invoke(f, inputs, allocated_results)
-    print("--- DONE.")
+    logging.info("...done")
+
     results = abi.raw_unpack_results(allocated_results)
-    print("RESULTS:", results)
+    logging.info("results: %s", results)
     np.testing.assert_allclose(results[0], [[1., 2.], [3., 4.]])
 
   def test_synchronous_invoke_function(self):
@@ -161,18 +166,21 @@ class VmTest(absltest.TestCase):
     context = rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     abi = context.create_function_abi(self.device, self.htf, f)
-    print("INVOKING:", abi)
+    logging.info("abi: %s", abi)
+
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     inputs = abi.raw_pack_inputs((arg0, arg1))
-    print("INPUTS:", inputs)
+    logging.info("inputs: %s", inputs)
+
     allocated_results = abi.allocate_results(inputs, static_alloc=False)
-    print("ALLOCATED RESULTS:", allocated_results)
-    print("--- INVOKE:")
+    logging.info("allocated_results: %s", allocated_results)
+    logging.info("Invoking...")
     context.invoke(f, inputs, allocated_results)
-    print("--- DONE.")
+    logging.info("...done")
+
     results = abi.raw_unpack_results(allocated_results)
-    print("RESULTS:", results)
+    logging.info("results: %s", results)
     np.testing.assert_allclose(results[0], [4., 10., 18., 28.])
 
 

@@ -187,7 +187,7 @@ struct VMFolderInterface : public OpFolderDialectInterface {
 }  // namespace
 
 VMDialect::VMDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()) {
   addTypes<IREE::VM::ListType, IREE::VM::OpaqueType, IREE::VM::RefType>();
   addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
 
@@ -246,26 +246,21 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
-  switch (type.getKind()) {
-    case IREE::VM::TypeKind::Ref: {
-      auto objectType = type.cast<IREE::VM::RefType>().getObjectType();
-      if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
-        printType(listType, os);
-      } else if (objectType.isa<IREE::VM::OpaqueType>()) {
-        os << "ref<?>";
-      } else {
-        os << "ref<" << objectType << ">";
-      }
-      break;
+  if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
+    auto objectType = refType.getObjectType();
+    if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
+      printType(listType, os);
+    } else if (objectType.isa<IREE::VM::OpaqueType>()) {
+      os << "ref<?>";
+    } else {
+      os << "ref<" << objectType << ">";
     }
-    case IREE::VM::TypeKind::Opaque:
-      os << "opaque";
-      break;
-    case IREE::VM::TypeKind::List:
-      os << "list<" << type.cast<IREE::VM::ListType>().getElementType() << ">";
-      break;
-    default:
-      llvm_unreachable("unhandled VM type");
+  } else if (type.isa<IREE::VM::OpaqueType>()) {
+    os << "opaque";
+  } else if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
+    os << "list<" << listType.getElementType() << ">";
+  } else {
+    llvm_unreachable("unhandled VM type");
   }
 }
 
