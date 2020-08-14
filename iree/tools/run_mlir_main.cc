@@ -201,15 +201,18 @@ StatusOr<std::string> PrepareModule(
 
   // Translate from MLIR to IREE bytecode.
   LOG(INFO) << "Compiling for target backend '" << target_backend << "'...";
-  auto executable_options =
+  auto hal_target_options =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
-  executable_options.targets = {std::move(target_backend)};
+  hal_target_options.targets = {std::move(target_backend)};
+  auto vm_target_options =
+      mlir::iree_compiler::IREE::VM::getTargetOptionsFromFlags();
   mlir::PassManager pass_manager(mlir_module->getContext());
   mlir::applyPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
-      pass_manager, executable_options);
-  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(pass_manager);
+      pass_manager, hal_target_options);
+  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(
+      pass_manager, vm_target_options);
   pass_manager.addPass(
       mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(pass_manager.run(mlir_module.get()))) {

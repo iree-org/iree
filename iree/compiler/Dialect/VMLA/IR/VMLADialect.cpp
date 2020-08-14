@@ -46,8 +46,8 @@ class VMLAToVMConversionInterface : public VMConversionDialectInterface {
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, OwningRewritePatternList &patterns,
       TypeConverter &typeConverter) const override {
-    populateVMLAToVMPatterns(getDialect()->getContext(), importSymbols,
-                             patterns, typeConverter);
+    populateVMLAToVMPatterns(getDialect()->getContext(), typeConverter,
+                             importSymbols, patterns);
   }
 };
 

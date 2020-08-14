@@ -18,10 +18,10 @@ from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 
-class Stateful(tf.Module):
+class SimpleStatefulModule(tf.Module):
 
   def __init__(self):
-    super(Stateful, self).__init__()
+    super(SimpleStatefulModule, self).__init__()
     self.counter = tf.Variable(0.0)
 
   @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
@@ -33,7 +33,7 @@ class Stateful(tf.Module):
     return self.counter
 
 
-@tf_test_utils.compile_module(Stateful)
+@tf_test_utils.compile_module(SimpleStatefulModule)
 class StatefulTest(tf_test_utils.TracedModuleTestCase):
 
   def test_stateful(self):

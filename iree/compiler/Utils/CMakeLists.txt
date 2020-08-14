@@ -20,10 +20,8 @@ iree_cc_library(
   HDRS
     "GraphUtils.h"
     "PatternUtils.h"
-    "TypeConversionUtils.h"
   SRCS
     "GraphUtils.cpp"
-    "TypeConversionUtils.cpp"
   DEPS
     LLVMSupport
     MLIRIR

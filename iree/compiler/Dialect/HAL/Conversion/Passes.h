@@ -15,16 +15,18 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSIONS_PASSES_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSIONS_PASSES_H_
 
+#include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
+    IREE::VM::TargetOptions targetOptions);
 std::unique_ptr<OperationPass<ModuleOp>> createConvertFlowToHALPass();
 
 inline void registerHALConversionPasses() {
-  createConvertHALToVMPass();
+  createConvertHALToVMPass(IREE::VM::getTargetOptionsFromFlags());
   createConvertFlowToHALPass();
 }
 

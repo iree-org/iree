@@ -49,6 +49,23 @@ static bool hasPadding(OpTy op) {
                       [](APInt v) -> bool { return !v.isNullValue(); });
 }
 
+class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
+ public:
+  using OpRewritePattern<mhlo::Log1pOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::Log1pOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto type = op.operand().getType().cast<TensorType>();
+    DenseElementsAttr attr =
+        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
+    auto one = rewriter.create<ConstantOp>(loc, attr);
+    auto x = rewriter.create<mhlo::AddOp>(loc, op.operand(), one);
+    rewriter.replaceOpWithNewOp<mhlo::LogOp>(op, x);
+    return success();
+  }
+};
+
 class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
@@ -198,7 +215,7 @@ struct HLOToHLOPreprocessing
     // whether it was legalized away at a higher level.
     chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape>(context);
+                    AdjustDepthwiseFilterShape, DecomposeLog1PPattern>(context);
     if (extractPadFromConv) {
       patterns.insert<ExtractConvOpPaddingAttributes>(context);
     }

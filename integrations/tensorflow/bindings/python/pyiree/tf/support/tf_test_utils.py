@@ -58,7 +58,7 @@ def _setup_artifacts_dir(module_name):
     parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
-  tf_utils._makedirs(artifacts_dir)
+  os.makedirs(artifacts_dir, exist_ok=True)
   return artifacts_dir
 
 
@@ -309,7 +309,7 @@ class Trace:
   def _get_trace_dir(self, artifacts_dir):
     trace_dir = os.path.join(artifacts_dir, self.backend, "traces",
                              self.function_name)
-    tf_utils._makedirs(trace_dir)
+    os.makedirs(trace_dir, exist_ok=True)
     return trace_dir
 
   def save_plaintext(self, artifacts_dir, summarize=True):
@@ -504,13 +504,10 @@ class TracedModuleTestCase(tf.test.TestCase):
     if failed_backend_indices:
       # Extract info for logging.
       failed_backends = [tar_traces[i].backend for i in failed_backend_indices]
-      failure_info = (
+      self.fail(
           "Comparision between the reference backend and the following targets "
           f"failed: {failed_backends}. The errors above show the inputs and "
-          "outputs the non-matching calls.")
-
-      # This condition is always True, but is useful for context in the logs.
-      self.assertEmpty(failed_backends, failure_info)
+          "outputs of the non-matching calls.")
 
   @classmethod
   def tearDownClass(cls):

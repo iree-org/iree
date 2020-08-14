@@ -23,9 +23,10 @@ namespace mlir {
 namespace iree_compiler {
 
 // Populates conversion patterns from the VMLA dialect to the VM dialect.
-void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
-                              OwningRewritePatternList &patterns,
-                              TypeConverter &typeConverter);
+void populateVMLAToVMPatterns(MLIRContext *context,
+                              TypeConverter &typeConverter,
+                              SymbolTable &importSymbols,
+                              OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir
