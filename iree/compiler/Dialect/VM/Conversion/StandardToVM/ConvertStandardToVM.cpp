@@ -93,16 +93,16 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Convert function arguments.
     for (unsigned i = 0, e = srcFuncType.getNumInputs(); i < e; ++i) {
-      if (failed(typeConverter.convertSignatureArg(i, srcFuncType.getInput(i),
-                                                   signatureConversion))) {
+      if (failed(getTypeConverter()->convertSignatureArg(
+              i, srcFuncType.getInput(i), signatureConversion))) {
         return failure();
       }
     }
 
     // Convert function results.
     SmallVector<Type, 1> convertedResultTypes;
-    if (failed(typeConverter.convertTypes(srcFuncType.getResults(),
-                                          convertedResultTypes))) {
+    if (failed(getTypeConverter()->convertTypes(srcFuncType.getResults(),
+                                                convertedResultTypes))) {
       return failure();
     }
 
@@ -129,6 +129,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     }
 
     // Tell the rewriter to convert the region signature.
+    TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
                                            &signatureConversion))) {
       return failure();
@@ -152,8 +153,6 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.replaceOp(srcOp, llvm::None);
     return success();
   }
-
-  mutable VMTypeConverter typeConverter;
 };
 
 class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
@@ -174,24 +173,33 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
-    // Only 32bit integer supported for now.
     if (!integerAttr) {
-      srcOp.emitRemark() << "unsupported const type for dialect";
-      return failure();
+      return srcOp.emitRemark() << "unsupported const type for dialect";
     }
-    if (integerAttr.getType().isIntOrFloat()) {
-      int numBits = integerAttr.getType().getIntOrFloatBitWidth();
-      if (numBits != 1 && numBits != 32) {
-        srcOp.emitRemark() << "unsupported bit width for dialect constant";
-        return failure();
-      }
-    }
-
-    auto intValue = integerAttr.getInt();
-    if (intValue == 0) {
-      rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
-    } else {
-      rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(srcOp, intValue);
+    // TODO(#2878): use getTypeConverter() when we pass it upon creation.
+    IREE::VM::TypeConverter typeConverter;
+    auto targetType = typeConverter.convertType(srcOp.getType());
+    switch (targetType.getIntOrFloatBitWidth()) {
+      case 1:
+      case 32:
+        if (integerAttr.getInt()) {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
+              srcOp, integerAttr.getInt());
+        } else {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
+        }
+        break;
+      case 64:
+        if (integerAttr.getInt()) {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI64Op>(
+              srcOp, integerAttr.getInt());
+        } else {
+          rewriter.replaceOpWithNewOp<IREE::VM::ConstI64ZeroOp>(srcOp);
+        }
+        break;
+      default:
+        return srcOp.emitRemark()
+               << "unsupported const integer bit width for dialect";
     }
     return success();
   }
@@ -319,8 +327,9 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
     // (Otherwise, the dialect converter may report the error as a failure to
     // legalize the select op depending on order of resolution).
     auto actualType = srcAdaptor.true_value().getType();
-    if (actualType != requiredType && actualType.isa<IndexType>())
+    if (actualType != requiredType && actualType.isa<IndexType>()) {
       return failure();
+    }
 
     rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
         srcOp, requiredType, srcAdaptor.condition(), srcAdaptor.true_value(),
@@ -365,10 +374,9 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
     CallOp::Adaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.
-    VMTypeConverter typeConverter;
     SmallVector<Type, 4> resultTypes;
     for (auto resultType : srcOp.getResultTypes()) {
-      resultType = typeConverter.convertType(resultType);
+      resultType = getTypeConverter()->convertType(resultType);
       if (!resultType) {
         return failure();
       }
@@ -384,13 +392,16 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 }  // namespace
 
 void populateStandardToVMPatterns(MLIRContext *context,
+                                  TypeConverter &typeConverter,
                                   OwningRewritePatternList &patterns) {
-  patterns
-      .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-              CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
-              ModuleTerminatorOpConversion, FuncOpConversion,
-              ReturnOpConversion, CastingOpConversion<IndexCastOp>,
-              CastingOpConversion<TruncateIOp>, SelectI32OpConversion>(context);
+  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
+                  CondBranchOpConversion, ModuleOpConversion,
+                  ModuleTerminatorOpConversion, FuncOpConversion,
+                  ReturnOpConversion, CastingOpConversion<IndexCastOp>,
+                  CastingOpConversion<TruncateIOp>, SelectI32OpConversion>(
+      typeConverter, context);
+  // TODO(#2878): pass typeConverter here.
+  patterns.insert<ConstantOpConversion>(context);
 
   // Binary arithmetic ops
   patterns
@@ -403,12 +414,13 @@ void populateStandardToVMPatterns(MLIRContext *context,
               BinaryArithmeticOpConversion<SubIOp, IREE::VM::SubI32Op>,
               BinaryArithmeticOpConversion<AndOp, IREE::VM::AndI32Op>,
               BinaryArithmeticOpConversion<OrOp, IREE::VM::OrI32Op>,
-              BinaryArithmeticOpConversion<XOrOp, IREE::VM::XorI32Op>>(context);
+              BinaryArithmeticOpConversion<XOrOp, IREE::VM::XorI32Op>>(
+          typeConverter, context);
 
   // Shift ops
   // TODO(laurenzo): The standard dialect is missing shr ops. Add once in place.
   patterns.insert<ShiftArithmeticOpConversion<ShiftLeftOp, IREE::VM::ShlI32Op>>(
-      context);
+      typeConverter, context);
 }
 
 }  // namespace iree_compiler

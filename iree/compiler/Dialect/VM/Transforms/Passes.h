@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/Pass.h"
@@ -40,7 +41,8 @@ namespace VM {
 //   <run conversion to HAL/etc>
 //   buildVMTransformPassPipeline & run
 //   <run target serialization/etc>
-void buildVMTransformPassPipeline(OpPassManager &passManager);
+void buildVMTransformPassPipeline(OpPassManager &passManager,
+                                  TargetOptions targetOptions);
 
 void registerVMTransformPassPipeline();
 
@@ -56,7 +58,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMarkPublicSymbolsExportedPass();
 
 // Converts from various dialects (standard, HAL, etc) to the VM dialect.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
+    TargetOptions targetOptions);
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Assignment
@@ -84,13 +87,17 @@ createConvertStandardToVMTestPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerVMPasses() {
+  auto targetOptions = getTargetOptionsFromFlags();
   registerVMTransformPassPipeline();
-  createConversionPass();
+  createConversionPass(targetOptions);
   createGlobalInitializationPass();
   createOrdinalAllocationPass();
 }
 
-inline void registerVMTestPasses() { createConvertStandardToVMTestPass(); }
+inline void registerVMTestPasses() {
+  getTargetOptionsFromFlags();
+  createConvertStandardToVMTestPass();
+}
 
 }  // namespace VM
 }  // namespace IREE

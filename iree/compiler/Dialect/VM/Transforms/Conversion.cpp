@@ -78,10 +78,14 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 class ConversionPass
     : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
  public:
+  ConversionPass() : targetOptions_(getTargetOptionsFromFlags()) {}
+  explicit ConversionPass(TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
+
   void runOnOperation() override {
     auto *context = &getContext();
     VMConversionTarget conversionTarget(context);
-    VMTypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter(targetOptions_);
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
@@ -105,7 +109,7 @@ class ConversionPass
 
     OwningRewritePatternList conversionPatterns;
     populateIREEToVMPatterns(context, conversionPatterns);
-    populateStandardToVMPatterns(context, conversionPatterns);
+    populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
     conversionPatterns.insert<ElideTieShapeOp>(context);
 
     // Populate patterns from all used dialects, providing the imports they
@@ -125,10 +129,14 @@ class ConversionPass
       return signalPassFailure();
     }
   }
+
+ private:
+  TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
-  return std::make_unique<ConversionPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
+    TargetOptions targetOptions) {
+  return std::make_unique<ConversionPass>(targetOptions);
 }
 
 static PassRegistration<ConversionPass> pass(

@@ -55,7 +55,8 @@ class VMLATargetBackend final : public TargetBackend {
     // iree.module.export.
     passManager.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
 
-    IREE::VM::buildVMTransformPassPipeline(passManager);
+    IREE::VM::buildVMTransformPassPipeline(
+        passManager, IREE::VM::getTargetOptionsFromFlags());
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,

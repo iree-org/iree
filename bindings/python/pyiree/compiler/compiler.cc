@@ -331,18 +331,22 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
     pass_manager.enableCrashReproducerGeneration(*crash_reproducer_path, true);
   }
 
-  mlir::iree_compiler::IREE::HAL::TargetOptions executable_options;
+  mlir::iree_compiler::IREE::HAL::TargetOptions hal_target_options;
   if (target_backends.empty()) {
-    executable_options.targets =
+    hal_target_options.targets =
         mlir::iree_compiler::IREE::HAL::getRegisteredTargetBackends();
   } else {
-    executable_options.targets = std::move(target_backends);
+    hal_target_options.targets = std::move(target_backends);
   }
+
+  auto vm_target_options =
+      mlir::iree_compiler::IREE::VM::getTargetOptionsFromFlags();
 
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
-      pass_manager, executable_options);
-  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(pass_manager);
+      pass_manager, hal_target_options);
+  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(
+      pass_manager, vm_target_options);
 
   // Run primary passes.
   auto diag_capture = context_->CaptureDiagnostics();
