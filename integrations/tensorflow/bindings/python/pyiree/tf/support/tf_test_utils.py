@@ -23,6 +23,7 @@
 #   tar: target - for one of the target CompiledModules
 
 import copy
+import gc
 import glob
 import inspect
 import os
@@ -634,3 +635,9 @@ class TracedModuleTestCase(tf.test.TestCase):
   def tearDownClass(cls) -> None:
     # Ran after all unit tests are completed.
     super().tearDownClass()
+    # For each test case, we are actually holding two contexts alive:
+    # one in cls._tar_modules (via setUpClass()) and one in self._tar_modules
+    # (via setUp()). The class one somehow is not properly released and
+    # that causes issues with Vulkan driver DSO deallocation.
+    cls._tar_modules = None
+    gc.collect()
