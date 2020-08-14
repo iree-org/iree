@@ -25,10 +25,10 @@ DYNAMIC_SHAPE = [None, None, NUM_UNITS]
 INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 
 
-class Lstm(tf.Module):
+class LstmModule(tf.Module):
 
   def __init__(self):
-    super(Lstm, self).__init__()
+    super(LstmModule, self).__init__()
     tf_utils.set_random_seed()
     inputs = tf.keras.layers.Input(batch_size=None, shape=DYNAMIC_SHAPE[1:])
     outputs = tf.keras.layers.LSTM(
@@ -40,7 +40,7 @@ class Lstm(tf.Module):
             self.m.call)
 
 
-@tf_test_utils.compile_module(Lstm, exported_names=["predict"])
+@tf_test_utils.compile_module(LstmModule, exported_names=["predict"])
 class LstmTest(tf_test_utils.TracedModuleTestCase):
 
   def test_lstm(self):
