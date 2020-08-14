@@ -437,7 +437,7 @@ typedef enum {
 // meaning `return iree_status_from_code(IREE_STATUS_INTERNAL);` (etc) is valid,
 // though not as useful as constructing via iree_make_status (which captures
 // additional info).
-typedef uintptr_t iree_status_t;
+typedef void* iree_status_t;
 
 // Returns an iree_status_t from the an iree_status_code_t.
 #define iree_status_from_code(code)                          \

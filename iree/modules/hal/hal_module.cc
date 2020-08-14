@@ -767,9 +767,10 @@ class HALModuleState final {
     IREE_TRACE_SCOPE0("HALModuleState::SemaphoreAwait");
     // TODO(benvanik): allow for deadline exceeded returns? We don't allow
     // setting deadlines now (and when we do in the future it'll be the fiber
-    // manager that  handles them), so any failure indicates total failure.
-    return iree_hal_semaphore_wait_with_deadline(semaphore.get(), new_value,
-                                                 IREE_TIME_INFINITE_FUTURE);
+    // manager that handles them), so any failure indicates total failure.
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait_with_deadline(
+        semaphore.get(), new_value, IREE_TIME_INFINITE_FUTURE));
+    return OkStatus();
   }
 
  private:
