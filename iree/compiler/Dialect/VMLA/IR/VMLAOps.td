@@ -186,6 +186,16 @@ def VMLA_SelectOp : VMLA_ElementTypeOp<"select"> {
   }];
 }
 
+def VMLA_FiniteOp : VMLA_Op<"finite", [VMLA_OpInterface]> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Buffer:$dst,
+    VMLA_FloatTypeAttr:$element_type
+  );
+
+  let assemblyFormat = "$src`,` `out` $dst attr-dict `:` $element_type";
+}
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: shape/structure
 //===----------------------------------------------------------------------===//
