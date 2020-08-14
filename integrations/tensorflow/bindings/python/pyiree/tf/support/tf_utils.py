@@ -20,6 +20,7 @@ import os
 import random
 import re
 import tempfile
+from typing import Any, Sequence, Type
 
 from absl import flags
 from absl import logging
@@ -33,22 +34,22 @@ flags.DEFINE_bool("keep_saved_model", False,
 FLAGS = flags.FLAGS
 
 
-def set_random_seed(seed=0):
+def set_random_seed(seed: int = 0) -> None:
   """Set random seed for tf, np and random."""
   tf.random.set_seed(seed)
   random.seed(seed)
   np.random.seed(seed)
 
 
-def uniform(shape, dtype=np.float32):
+def uniform(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
   return np.random.uniform(size=shape).astype(dtype)
 
 
-def ndarange(shape, dtype=np.float32):
+def ndarange(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
-def to_mlir_type(dtype):
+def to_mlir_type(dtype: np.dtype) -> str:
   """Returns a string that denotes the type `dtype` in MLIR style."""
   bits = dtype.itemsize * 8
   if np.issubdtype(dtype, np.integer):
@@ -59,7 +60,8 @@ def to_mlir_type(dtype):
     raise TypeError(f"Expected integer or floating type, but got {dtype}")
 
 
-def get_shape_and_dtype(array, allow_non_mlir_dtype=False):
+def get_shape_and_dtype(array: np.ndarray,
+                        allow_non_mlir_dtype: bool = False) -> str:
   shape_dtype = [str(dim) for dim in list(array.shape)]
   if np.issubdtype(array.dtype, np.number):
     shape_dtype.append(to_mlir_type(array.dtype))
@@ -70,7 +72,8 @@ def get_shape_and_dtype(array, allow_non_mlir_dtype=False):
   return "x".join(shape_dtype)
 
 
-def save_input_values(inputs, artifacts_dir=None):
+def save_input_values(inputs: Sequence[np.ndarray],
+                      artifacts_dir: str = None) -> str:
   """Saves input values with IREE tools format if `artifacts_dir` is set."""
   result = []
   for array in inputs:
@@ -87,7 +90,7 @@ def save_input_values(inputs, artifacts_dir=None):
   return result
 
 
-def backends_to_str(backend_infos):
+def backends_to_str(backend_infos: Sequence["BackendInfo"]) -> str:
   """Creates a normalized string representing the provided backends."""
   normalized_names = []
   for backend_info in backend_infos:
@@ -97,7 +100,10 @@ def backends_to_str(backend_infos):
   return "__".join(normalized_names)
 
 
-def _get_backends_path(artifact_name, backend_infos, artifacts_dir):
+def _get_backends_path(artifact_name: str,
+                       backend_infos: Sequence["BackendInfo"],
+                       artifacts_dir: str) -> str:
+  """Gets the path to save artifact_name under for the specified backend(s)."""
   backends_string = backends_to_str(backend_infos)
   # Put the artifact in a directory if there's only one backend.
   if len(backend_infos) == 1:
@@ -108,10 +114,10 @@ def _get_backends_path(artifact_name, backend_infos, artifacts_dir):
     return os.path.join(artifacts_dir, f"{artifact_name}__{backends_string}")
 
 
-def compile_tf_module(tf_module,
-                      backend_infos=(),
-                      exported_names=(),
-                      artifacts_dir=None):
+def compile_tf_module(tf_module: Type[tf.Module],
+                      backend_infos: Sequence["BackendInfo"] = (),
+                      exported_names: Sequence[str] = (),
+                      artifacts_dir: str = None) -> compiler.binding.OpaqueBlob:
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
   The artifact this creates is not callable. See IreeCompiledModule for an API
@@ -146,7 +152,7 @@ def compile_tf_module(tf_module,
     A compiled IREE module blob.
   """
 
-  def _compile_from_path(sm_path):
+  def _compile_from_path(sm_path: str) -> compiler.binding.OpaqueBlob:
     """Helper function for compile_tf_module."""
     if artifacts_dir is not None:
       # Set up a crash reproducer for debugging.
@@ -217,7 +223,8 @@ def compile_tf_module(tf_module,
 class CompiledModule(object):
   """Base class for the TF and IREE compiled modules."""
 
-  def __init__(self, module_class, backend_info, exported_names, artifacts_dir):
+  def __init__(self, module_class: Type[tf.Module], backend_info: "BackendInfo",
+               exported_names: Sequence[str], artifacts_dir: str):
     """Shared base constructor – not useful on its own."""
     self._module_class = module_class
     self._backend_info = backend_info
@@ -233,15 +240,26 @@ class CompiledModule(object):
     raise NotImplementedError()
 
 
+class _IreeFunctionWrapper(object):
+  """Wraps an IREE function, making it callable."""
+
+  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction):
+    self._context = context
+    self._f = f
+
+  def __call__(self, *args):
+    return self._f(*args)
+
+
 class IreeCompiledModule(CompiledModule):
   """Iree compiled module."""
 
   def __init__(self,
-               module_class,
-               backend_info,
-               exported_names=(),
-               artifacts_dir=None,
-               _create_reinitialized_args=None):
+               module_class: Type[tf.Module],
+               backend_info: "BackendInfo",
+               exported_names: Sequence[str] = (),
+               artifacts_dir: str = None,
+               _create_reinitialized_args: Sequence[Any] = None):
     """Compile a tf.Module to the target backend in backend_info.
 
     Args:
@@ -258,11 +276,10 @@ class IreeCompiledModule(CompiledModule):
 
     if _create_reinitialized_args is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(
-          tf_module=module_class(),
-          backend_infos=[backend_info],
-          exported_names=exported_names,
-          artifacts_dir=artifacts_dir)
+      self._module_blob = compile_tf_module(tf_module=module_class(),
+                                            backend_infos=[backend_info],
+                                            exported_names=exported_names,
+                                            artifacts_dir=artifacts_dir)
       self._module = rt.VmModule.from_flatbuffer(self._module_blob)
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
@@ -270,10 +287,10 @@ class IreeCompiledModule(CompiledModule):
       self._module_blob, self._module, self._config = _create_reinitialized_args
 
     # Holds all of the module's mutable state.
-    self._context = rt.SystemContext(
-        modules=[self._module], config=self._config)
+    self._context = rt.SystemContext(modules=[self._module],
+                                     config=self._config)
 
-  def create_reinitialized(self):
+  def create_reinitialized(self) -> "IreeCompiledModule":
     """Duplicates this module with its initial state without recompiling."""
     default_args = [
         self._module_class, self._backend_info, self._exported_names,
@@ -282,75 +299,20 @@ class IreeCompiledModule(CompiledModule):
     create_reinitialized_args = [self._module_blob, self._module, self._config]
     return IreeCompiledModule(*default_args, create_reinitialized_args)
 
-  def __getattr__(self, attr):
+  def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.
     m = self._context.modules[self._module.name]
     f = m[attr]
     return _IreeFunctionWrapper(self._context, f)
 
 
-class _IreeFunctionWrapper(object):
-  """Wraps an IREE function, making it callable."""
-
-  def __init__(self, context, f):
-    self._context = context
-    self._f = f
-
-  def __call__(self, *args):
-    return self._f(*args)
-
-
-class TfCompiledModule(CompiledModule):
-  """TensorFlow 'compiled' module.
-
-  This facade exists to provide a complimentary API to IreeCompiledModule and
-  normalize TensorFlow's output to Numpy.
-  """
-
-  def __init__(self,
-               module_class,
-               backend_info,
-               exported_names=(),
-               artifacts_dir=None):
-    """Wrap a tf.Module in a TFCompiledModule facade.
-
-    Args:
-      module_class: the tf.Module subclass to 'compile'.
-      backend_info: one of the 'tf*' elements in BackendInfo.
-      exported_names: an optional iterable of strings representing which of the
-        module_class's functions should be callable. If exported_names is empty
-        then all functions will be callable.
-      artifacts_dir: an optional path to save compilation artifacts to. Has no
-        effect for this subclass as nothing is compiled.
-    """
-    super().__init__(module_class, backend_info, exported_names, artifacts_dir)
-    set_random_seed()
-    self._tf_module = module_class()
-
-  def create_reinitialized(self):
-    """Duplicates this module with the starting state of module_class."""
-    return TfCompiledModule(self._module_class, self._backend_info,
-                            self._exported_names, self._artifacts_dir)
-
-  def __getattr__(self, attr):
-    # Try to resolve it as a function.
-    exported = not self._exported_names or attr in self._exported_names
-    if not hasattr(self._tf_module, attr) or not exported:
-      raise AttributeError(f"The TensorFlow module does not have attr '{attr}'")
-    f = getattr(self._tf_module, attr)
-    if not f or not hasattr(f, "__call__"):
-      raise AttributeError(
-          f"The TensorFlow module does not have a callable attr '{attr}'")
-    return _TfFunctionWrapper(f)
-
-
 class _TfFunctionWrapper(object):
   """Wraps a TF function, normalizing it to numpy."""
 
-  def __init__(self, f):
+  def __init__(self, f: callable):
     self._f = f
 
-  def _convert_to_numpy(self, tensor):
+  def _convert_to_numpy(self, tensor: Any) -> Any:
     if not isinstance(tensor, tf.Tensor):
       return tensor
     result = tensor.numpy()
@@ -367,11 +329,57 @@ class _TfFunctionWrapper(object):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(
-        self._convert_to_numpy, *results, check_types=False)
+    return tf.nest.map_structure(self._convert_to_numpy,
+                                 *results,
+                                 check_types=False)
+
+
+class TfCompiledModule(CompiledModule):
+  """TensorFlow 'compiled' module.
+
+  This facade exists to provide a complimentary API to IreeCompiledModule and
+  normalize TensorFlow's output to Numpy.
+  """
+
+  def __init__(self,
+               module_class: Type[tf.Module],
+               backend_info: Sequence["BackendInfo"],
+               exported_names: Sequence[str] = (),
+               artifacts_dir: str = None):
+    """Wrap a tf.Module in a TFCompiledModule facade.
+
+    Args:
+      module_class: the tf.Module subclass to 'compile'.
+      backend_info: one of the 'tf*' elements in BackendInfo.
+      exported_names: an optional iterable of strings representing which of the
+        module_class's functions should be callable. If exported_names is empty
+        then all functions will be callable.
+      artifacts_dir: an optional path to save compilation artifacts to. Has no
+        effect for this subclass as nothing is compiled.
+    """
+    super().__init__(module_class, backend_info, exported_names, artifacts_dir)
+    set_random_seed()
+    self._tf_module = module_class()
+
+  def create_reinitialized(self) -> "TfCompiledModule":
+    """Duplicates this module with the starting state of module_class."""
+    return TfCompiledModule(self._module_class, self._backend_info,
+                            self._exported_names, self._artifacts_dir)
+
+  def __getattr__(self, attr: str) -> _TfFunctionWrapper:
+    # Try to resolve it as a function.
+    exported = not self._exported_names or attr in self._exported_names
+    if not hasattr(self._tf_module, attr) or not exported:
+      raise AttributeError(f"The TensorFlow module does not have attr '{attr}'")
+    f = getattr(self._tf_module, attr)
+    if not f or not hasattr(f, "__call__"):
+      raise AttributeError(
+          f"The TensorFlow module does not have a callable attr '{attr}'")
+    return _TfFunctionWrapper(f)
 
 
 class BackendInfo:
+  """Contains information for compiling the specified backend."""
 
   _name_to_info = {
       "tf": {
@@ -396,8 +404,8 @@ class BackendInfo:
       },
   }
 
-  def __init__(self, backend_name, artifact_name=None):
-    """Contains information for compiling the specified backend.
+  def __init__(self, backend_name: str, artifact_name: str = None):
+    """Creates a BackendInfo with the compilation details for backend_name.
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
@@ -419,12 +427,15 @@ class BackendInfo:
     self.compiler_targets = info["compiler_targets"]
     self.name = backend_name if artifact_name is None else artifact_name
 
-  def compile(self, module, exported_names=(), artifacts_dir=None):
+  def compile(self,
+              module: Type[tf.Module],
+              exported_names: Sequence[str] = (),
+              artifacts_dir: str = None) -> CompiledModule:
     """Creates a `CompiledModule` for this backend."""
     return self._compiled_module_class(module, self, exported_names,
                                        artifacts_dir)
 
   @classmethod
-  def get_all_backends(cls):
+  def get_all_backends(cls) -> Sequence["BackendInfo"]:
     """Returns a list of all BackendInfo configurations."""
     return [BackendInfo(backend_name) for backend_name in cls._name_to_info]
