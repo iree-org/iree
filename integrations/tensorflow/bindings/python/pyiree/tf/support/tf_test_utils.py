@@ -507,7 +507,7 @@ class TracedModuleTestCase(tf.test.TestCase):
       self.fail(
           "Comparision between the reference backend and the following targets "
           f"failed: {failed_backends}. The errors above show the inputs and "
-          "outputs the non-matching calls.")
+          "outputs of the non-matching calls.")
 
   @classmethod
   def tearDownClass(cls):
