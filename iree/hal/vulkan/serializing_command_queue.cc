@@ -187,6 +187,7 @@ Status SerializingCommandQueue::Submit(
         {batches[i].signal_semaphores.begin(),
          batches[i].signal_semaphores.end()}};
     submission->fence = std::move(fence);
+    deferred_submissions_.push_back(std::move(submission));
   }
 
   return ProcessDeferredSubmissions().status();
