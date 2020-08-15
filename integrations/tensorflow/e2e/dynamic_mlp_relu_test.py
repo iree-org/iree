@@ -28,7 +28,7 @@ INPUT_DIM = 728  # 28 * 28
 CLASSES = 10
 
 
-class MlpRelu(tf.Module):
+class DynamicMlpReluModule(tf.Module):
 
   def __init__(self,
                hidden_1_dim=256,
@@ -65,7 +65,7 @@ class MlpRelu(tf.Module):
     return tf.nn.softmax(self.mlp(x))
 
 
-@tf_test_utils.compile_module(MlpRelu, exported_names=["predict"])
+@tf_test_utils.compile_module(DynamicMlpReluModule, exported_names=["predict"])
 class DynamicMlpReluTest(tf_test_utils.TracedModuleTestCase):
 
   def test_dynamic_batch(self):
