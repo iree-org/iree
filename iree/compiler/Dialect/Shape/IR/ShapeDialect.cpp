@@ -25,6 +25,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Interfaces/FoldInterfaces.h"
 #include "mlir/Parser.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -43,17 +44,13 @@ struct ShapeInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-ShapeDialect::ShapeDialect(MLIRContext* context)
-    : Dialect(getDialectNamespace(), context, TypeID::get<ShapeDialect>()) {
-  addTypes<Shape::RankedShapeType>();
-  addInterfaces<ShapeInlinerInterface>();
-#define GET_OP_LIST
-  addOperations<
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"
-      >();
+// Used to control constant folding behavior as a fallback on the dialect when
+// individual op folder does not match.
+struct ShapeConstantFoldInterface : public DialectFoldInterface {
+  using DialectFoldInterface::DialectFoldInterface;
 
-  constantFoldHook = [](Operation* op, ArrayRef<Attribute> operands,
-                        SmallVectorImpl<Attribute>& results) -> LogicalResult {
+  LogicalResult Fold(Operation* op, ArrayRef<Attribute> operands,
+                     SmallVectorImpl<OpFoldResult>& results) const final {
     bool foundConstantRankedShape = false;
     for (Value result : op->getResults()) {
       auto rankedShape = result.getType().dyn_cast<Shape::RankedShapeType>();
@@ -65,7 +62,17 @@ ShapeDialect::ShapeDialect(MLIRContext* context)
       }
     }
     return success(foundConstantRankedShape);
-  };
+  }
+};
+
+ShapeDialect::ShapeDialect(MLIRContext* context)
+    : Dialect(getDialectNamespace(), context, TypeID::get<ShapeDialect>()) {
+  addTypes<Shape::RankedShapeType>();
+  addInterfaces<ShapeConstantFoldInterface, ShapeInlinerInterface>();
+#define GET_OP_LIST
+  addOperations<
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"
+      >();
 }
 
 Operation* ShapeDialect::materializeConstant(OpBuilder& builder,

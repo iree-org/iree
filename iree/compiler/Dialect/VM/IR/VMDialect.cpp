@@ -175,8 +175,8 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-struct VMFolderInterface : public OpFolderDialectInterface {
-  using OpFolderDialectInterface::OpFolderDialectInterface;
+struct VMFolderInterface : public DialectFoldInterface {
+  using DialectFoldInterface::DialectFoldInterface;
 
   bool shouldMaterializeInto(Region *region) const override {
     // TODO(benvanik): redirect to scope.
