@@ -234,7 +234,8 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
 
   OwningRewritePatternList stage2Patterns =
       linalg::getLinalgTilingCanonicalizationPatterns(context);
-  stage2Patterns.insert<AffineMinCanonicalizationPattern>(context);
+  stage2Patterns.insert<AffineMinCanonicalizationPattern,
+                        AffineMinSCFCanonicalizationPattern>(context);
 
   auto stage3Transforms = [](Operation *op) {
     promoteSingleIterationLoops(cast<FuncOp>(op));
