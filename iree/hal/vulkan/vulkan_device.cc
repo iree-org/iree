@@ -311,6 +311,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   device_create_info.ppEnabledExtensionNames = enabled_extension_names.data();
   device_create_info.queueCreateInfoCount = queue_create_info.size();
   device_create_info.pQueueCreateInfos = queue_create_info.data();
+  device_create_info.pEnabledFeatures = nullptr;
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
   std::memset(&semaphore_features, 0, sizeof(semaphore_features));
@@ -321,11 +322,13 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   std::memset(&features2, 0, sizeof(features2));
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   features2.pNext = &semaphore_features;
-  VkPhysicalDeviceFeatures features;
-  std::memset(&features, 0, sizeof(features));
 
-  device_create_info.pNext = &features2;
-  device_create_info.pEnabledFeatures = nullptr;
+  if (!enabled_device_extensions.timeline_semaphore ||
+      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
+    device_create_info.pNext = nullptr;
+  } else {
+    device_create_info.pNext = &features2;
+  }
 
   auto logical_device =
       make_ref<VkDeviceHandle>(syms, enabled_device_extensions,
