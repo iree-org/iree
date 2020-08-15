@@ -561,22 +561,17 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Setup the directory for saving compilation artifacts and traces.
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
+  def setUp(self):
+    # Ran before each unit test.
+    super().setUp()
     # Create a CompiledModule for the reference backend and each target backend.
     ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
                                             f"{FLAGS.reference_backend}_ref")
-    cls._ref_module = cls._compile(ref_backend_info)
+    self._ref_module = self._compile(ref_backend_info)
 
     tar_backend_infos = get_target_backends()
-    cls._tar_modules = [
-        cls._compile(backend_info) for backend_info in tar_backend_infos
-    ]
-
-  def setUp(self) -> None:
-    # Ran before each unit test.
-    super().setUp()
-    self._ref_module.create_reinitialized()
     self._tar_modules = [
-        module.create_reinitialized() for module in self._tar_modules
+        self._compile(backend_info) for backend_info in tar_backend_infos
     ]
 
   def compare_backends(self, trace_function: callable) -> None:
