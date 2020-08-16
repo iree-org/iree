@@ -52,7 +52,6 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:Parser",
