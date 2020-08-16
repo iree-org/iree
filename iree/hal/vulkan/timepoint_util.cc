@@ -29,6 +29,7 @@ namespace vulkan {
 
 // static
 void TimePointFence::Delete(TimePointFence* ptr) {
+  ptr->ResetStatus();
   ptr->pool()->ReleaseResolved(ptr);
 }
 
@@ -39,6 +40,11 @@ VkResult TimePointFence::GetStatus() {
     status_ = device->syms()->vkGetFenceStatus(*device, fence_);
   }
   return status_;
+}
+
+void TimePointFence::ResetStatus() {
+  absl::MutexLock lock(&status_mutex_);
+  status_ = VK_NOT_READY;
 }
 
 // static
