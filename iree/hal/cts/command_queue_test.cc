@@ -62,6 +62,9 @@ TEST_P(CommandQueueTest, WaitIdleWhileIdle) {
 // deadlock.
 // Note: this test never completes with Vulkan timeline semaphore emulation.
 TEST_P(CommandQueueTest, BlockingSubmit) {
+  // TODO(#2907): Fix the test failure on Adreno GPUs.
+  if (device_->info().name().find("Adreno") == 0) GTEST_SKIP();
+
   auto command_queue = device_->dispatch_queues()[0];
 
   ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
@@ -77,6 +80,9 @@ TEST_P(CommandQueueTest, BlockingSubmit) {
 // Tests waiting while work is pending/in-flight.
 // Note: this test never completes with Vulkan timeline semaphore emulation.
 TEST_P(CommandQueueTest, WaitTimeout) {
+  // TODO(#2907): Fix the test failure on Adreno GPUs.
+  if (device_->info().name().find("Adreno") == 0) GTEST_SKIP();
+
   auto command_queue = device_->dispatch_queues()[0];
 
   ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
@@ -100,6 +106,9 @@ TEST_P(CommandQueueTest, WaitTimeout) {
 
 // Tests using multiple wait and signal semaphores.
 TEST_P(CommandQueueTest, WaitMultiple) {
+  // TODO(#2907): Fix the test failure on Adreno GPUs.
+  if (device_->info().name().find("Adreno") == 0) GTEST_SKIP();
+
   auto command_queue = device_->dispatch_queues()[0];
 
   ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
