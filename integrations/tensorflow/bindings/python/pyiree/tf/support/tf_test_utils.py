@@ -535,15 +535,15 @@ def compile_module(
   return decorator
 
 
+_global_ref_module = None
+_global_tar_modules = None
+
+
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
   # Will be initialized by the @compile_module decorator.
   _module_class = None
   _exported_names = ()
-
-  # Will be initialized in setUpClass.
-  _ref_module = None
-  _tar_modules = None
 
   @classmethod
   def _compile(cls, backend_info: tf_utils.BackendInfo):
@@ -566,26 +566,28 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Ran before each unit test.
     super().setUp()
     # Create a CompiledModule for the reference backend and each target backend.
-    ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
-                                            f"{FLAGS.reference_backend}_ref")
-    self._ref_module = self._compile(ref_backend_info)
-
-    tar_backend_infos = get_target_backends()
-    cls._tar_modules = [
-        cls._compile(backend_info) for backend_info in tar_backend_infos
-    ]
-
-  @classmethod
-  def _reinitialize_modules(cls):
-    cls._ref_module.create_reinitialized()
-    cls._tar_modules = [
-        module.create_reinitialized() for module in cls._tar_modules
-    ]
+    cls._ref_backend_info = tf_utils.BackendInfo(
+        FLAGS.reference_backend, f"{FLAGS.reference_backend}_ref")
+    cls._tar_backend_infos = get_target_backends()
+    cls._compiled = False
 
   def setUp(self) -> None:
     # Ran before each unit test.
     super().setUp()
-    self._reinitialize_modules()
+    global _global_ref_module
+    global _global_tar_modules
+    if _global_ref_module is None:
+      logging.info("Compiling.")
+      _global_ref_module = self._compile(self._ref_backend_info)
+      _global_tar_modules = [
+          self._compile(backend_info)
+          for backend_info in self._tar_backend_infos
+      ]
+    else:
+      _global_ref_module = _global_ref_module.create_reinitialized()
+      _global_tar_modules = [
+          module.create_reinitialized() for module in _global_tar_modules
+      ]
 
   def compare_backends(self, trace_function: callable) -> None:
     """Run the reference and target backends on trace_function and compare them.
@@ -597,15 +599,17 @@ class TracedModuleTestCase(tf.test.TestCase):
       trace_function: a function accepting a TracedModule as its argument.
     """
     # Create Traces for each backend.
-    ref_trace = Trace(self._ref_module, trace_function)
-    tar_traces = [Trace(module, trace_function) for module in self._tar_modules]
+    ref_trace = Trace(_global_ref_module, trace_function)
+    tar_traces = [
+        Trace(module, trace_function) for module in _global_tar_modules
+    ]
 
     # Run the traces through trace_function with their associated modules.
     tf_utils.set_random_seed()
-    trace_function(TracedModule(self._ref_module, ref_trace))
+    trace_function(TracedModule(_global_ref_module, ref_trace))
     if FLAGS.log_all_traces:
       logging.info(ref_trace)
-    for module, trace in zip(self._tar_modules, tar_traces):
+    for module, trace in zip(_global_tar_modules, tar_traces):
       tf_utils.set_random_seed()
       trace_function(TracedModule(module, trace))
       if FLAGS.log_all_traces:
