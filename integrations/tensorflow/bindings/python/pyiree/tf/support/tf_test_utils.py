@@ -535,6 +535,11 @@ def compile_module(
   return decorator
 
 
+# Will be initialized by TracedModuleTestCase.setUpClass
+# Global variables are used because storing the compiler context on the cls
+# causes cleaning up refcounts to fail, and tf.test.TestCase wipes the variables
+# on the class instance (self.*) before each unittest. See this for more info:
+# https://github.com/google/iree/issues/2900
 _global_ref_module = None
 _global_tar_modules = None
 
@@ -562,22 +567,18 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Setup the directory for saving compilation artifacts and traces.
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
-  def setUp(self):
-    # Ran before each unit test.
-    super().setUp()
-    # Create a CompiledModule for the reference backend and each target backend.
+    # Get the backend information for this test.
     cls._ref_backend_info = tf_utils.BackendInfo(
         FLAGS.reference_backend, f"{FLAGS.reference_backend}_ref")
     cls._tar_backend_infos = get_target_backends()
-    cls._compiled = False
 
   def setUp(self) -> None:
-    # Ran before each unit test.
+    # Runs before each unit test.
     super().setUp()
     global _global_ref_module
     global _global_tar_modules
     if _global_ref_module is None:
-      logging.info("Compiling.")
+      # Compile if this is the first unittest.
       _global_ref_module = self._compile(self._ref_backend_info)
       _global_tar_modules = [
           self._compile(backend_info)
