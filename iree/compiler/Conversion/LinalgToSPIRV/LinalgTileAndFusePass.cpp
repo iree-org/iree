@@ -438,17 +438,16 @@ void LinalgTileAndFusePass::runOnFunction() {
   });
 
   OwningRewritePatternList tilingPatterns;
-  tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>,
-                        TileMatmulPattern,
-                        TileBatchMatmulPattern,
-                        TileConvPoolPattern<linalg::PoolingMaxOp>,
-                        TileConvPoolPattern<linalg::PoolingMinOp>,
-                        TileConvPoolPattern<linalg::PoolingSumOp>>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setTileSizes(tileSizeCalculator.getTileSizes())
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      tileSizeCalculator.getWorkgroupSize());
+  tilingPatterns
+      .insert<TileConvPoolPattern<linalg::ConvOp>, TileMatmulPattern,
+              TileBatchMatmulPattern, TileConvPoolPattern<linalg::PoolingMaxOp>,
+              TileConvPoolPattern<linalg::PoolingMinOp>,
+              TileConvPoolPattern<linalg::PoolingSumOp>>(
+          context,
+          linalg::LinalgTilingOptions()
+              .setTileSizes(tileSizeCalculator.getTileSizes())
+              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
+          tileSizeCalculator.getWorkgroupSize());
   applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
   if (useWorkgroupMemory) {
