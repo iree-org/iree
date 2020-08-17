@@ -29,7 +29,7 @@ import os
 import pickle
 import sys
 import tempfile
-from typing import Any, Dict, Sequence, Tuple, Type
+from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -114,7 +114,7 @@ def _indent(input_str: str, indentation: int = 2) -> str:
   return "\n".join(lines)
 
 
-def _zfill_width(length: int) -> int:
+def _zfill_width(length: int) -> Union[int, None]:
   return int(np.ceil(np.log10(length))) if length else None
 
 
@@ -229,7 +229,7 @@ class Trace:
 
   def __init__(self,
                module: tf_utils.CompiledModule,
-               function: callable,
+               function: Union[Callable[["TracedModule"], None], None],
                _load_dict: Dict[str, Any] = None):
     """Extracts metadata from module and function and initializes.
 
@@ -471,7 +471,7 @@ class TracedModule:
     self._module = module
     self._trace = trace
 
-  def _trace_call(self, method: callable, method_name: str):
+  def _trace_call(self, method: Callable[..., Any], method_name: str):
     """Decorates a CompiledModule method to capture its inputs and outputs."""
 
     def call(*args, **kwargs):
@@ -504,8 +504,8 @@ class TracedModule:
 
 
 def compile_module(
-    module_class: Type[tf.Module],
-    exported_names: Sequence[str] = ()) -> callable:
+    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
+) -> Callable[[Any], Any]:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
@@ -575,7 +575,8 @@ class TracedModuleTestCase(tf.test.TestCase):
         self._compile(backend_info) for backend_info in tar_backend_infos
     ]
 
-  def compare_backends(self, trace_function: callable) -> None:
+  def compare_backends(self, trace_function: Callable[[TracedModule],
+                                                      None]) -> None:
     """Run the reference and target backends on trace_function and compare them.
 
     Random seeds for tensorflow, numpy and python are set before each invocation
