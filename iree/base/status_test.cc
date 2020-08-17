@@ -26,15 +26,11 @@ using ::testing::HasSubstr;
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
 #define CHECK_STATUS_MESSAGE_SUBSTR(status, message_substr) \
   EXPECT_THAT(status.ToString(), HasSubstr(message_substr))
-#else
-#define CHECK_STATUS_MESSAGE_SUBSTR(status, message_substr) \
-  EXPECT_THAT(status.ToString(), HasSubstr(StatusCodeToString(status.code())));
-#endif
-
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
 #define CHECK_STREAM_SUBSTR(status, os, message_substr) \
   EXPECT_THAT(os.str(), HasSubstr(message_substr));
 #else
+#define CHECK_STATUS_MESSAGE_SUBSTR(status, message_substr) \
+  EXPECT_THAT(status.ToString(), HasSubstr(StatusCodeToString(status.code())));
 #define CHECK_STREAM_SUBSTR(status, os, message_substr) \
   EXPECT_THAT(os.str(), HasSubstr(StatusCodeToString(status.code())));
 #endif
