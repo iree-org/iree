@@ -23,29 +23,46 @@ namespace {
 using ::iree::testing::status::StatusIs;
 using ::testing::HasSubstr;
 
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+#define CHECK_STATUS_MESSAGE_SUBSTR(status, message_substr) \
+  EXPECT_THAT(status.ToString(), HasSubstr(message_substr))
+#else
+#define CHECK_STATUS_MESSAGE_SUBSTR(status, message_substr) \
+  EXPECT_THAT(status.ToString(), HasSubstr(StatusCodeToString(status.code())));
+#endif
+
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+#define CHECK_STREAM_SUBSTR(status, os, message_substr) \
+  EXPECT_THAT(os.str(), HasSubstr(message_substr));
+#else
+#define CHECK_STREAM_SUBSTR(status, os, message_substr) \
+  EXPECT_THAT(os.str(), HasSubstr(StatusCodeToString(status.code())));
+#endif
+
 TEST(Status, ConstructedWithMessage) {
   Status status = Status(StatusCode::kInvalidArgument, "message");
-  EXPECT_THAT(status.ToString(), HasSubstr("message"));
+
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message");
 }
 
 TEST(Status, StreamInsertion) {
   Status status = Status(StatusCode::kInvalidArgument, "message");
   std::ostringstream os;
   os << status;
-  EXPECT_THAT(os.str(), HasSubstr("message"));
+  CHECK_STREAM_SUBSTR(status, os, "message");
 }
 
 TEST(Status, StreamInsertionContinued) {
   Status status = Status(StatusCode::kInvalidArgument, "message");
   std::ostringstream os;
   os << status << " annotation";
-  EXPECT_THAT(os.str(), HasSubstr("message"));
-  EXPECT_THAT(os.str(), HasSubstr("annotation"));
+  CHECK_STREAM_SUBSTR(status, os, "message");
+  CHECK_STREAM_SUBSTR(status, os, "annotation");
 }
 
 TEST(StatusBuilder, StreamInsertion) {
   Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
-  EXPECT_THAT(status.ToString(), HasSubstr("message"));
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message");
 }
 
 TEST(StatusBuilder, StreamInsertionMultiple) {
@@ -53,13 +70,13 @@ TEST(StatusBuilder, StreamInsertionMultiple) {
                                                         << " goes"
                                                         << " like"
                                                         << " this.";
-  EXPECT_THAT(status.ToString(), HasSubstr("message goes like this."));
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message goes like this.");
 }
 
 TEST(StatusBuilder, StreamInsertionFlag) {
   Status status = InvalidArgumentErrorBuilder(IREE_LOC)
                   << "message " << std::hex << 32;
-  EXPECT_THAT(status.ToString(), HasSubstr("message 20"));
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message 20");
 }
 
 TEST(StatusMacro, ReturnIfError) {
@@ -70,8 +87,8 @@ TEST(StatusMacro, ReturnIfError) {
   Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
   status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
-  EXPECT_THAT(status.ToString(), HasSubstr("message"));
-  EXPECT_THAT(status.ToString(), HasSubstr("annotation"));
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message");
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "annotation");
 
   IREE_EXPECT_OK(returnIfError(OkStatus()));
 }
@@ -85,9 +102,9 @@ TEST(StatusMacro, ReturnIfErrorFormat) {
   Status status = InvalidArgumentErrorBuilder(IREE_LOC) << "message";
   status = returnIfError(std::move(status));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
-  EXPECT_THAT(status.ToString(), HasSubstr("message"));
-  EXPECT_THAT(status.ToString(), HasSubstr("annotation 1 2 3"));
-  EXPECT_THAT(status.ToString(), HasSubstr("extra annotation"));
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message");
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "annotation 1 2 3");
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "extra annotation");
 
   IREE_EXPECT_OK(returnIfError(OkStatus()));
 }
@@ -102,8 +119,8 @@ TEST(StatusMacro, AssignOrReturn) {
                                    << "message";
   Status status = assignOrReturn(std::move(statusOr));
   EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
-  EXPECT_THAT(status.ToString(), HasSubstr("message"));
-  EXPECT_THAT(status.ToString(), HasSubstr("annotation"));
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "message");
+  CHECK_STATUS_MESSAGE_SUBSTR(status, "annotation");
 
   IREE_EXPECT_OK(assignOrReturn("foo"));
 }
