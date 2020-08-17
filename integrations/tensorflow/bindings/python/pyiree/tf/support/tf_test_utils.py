@@ -568,27 +568,27 @@ class TracedModuleTestCase(tf.test.TestCase):
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
     # Get the backend information for this test.
-    cls._ref_backend_info = tf_utils.BackendInfo(
+    ref_backend_info = tf_utils.BackendInfo(
         FLAGS.reference_backend, f"{FLAGS.reference_backend}_ref")
-    cls._tar_backend_infos = get_target_backends()
+    tar_backend_infos = get_target_backends()
+
+    global _global_ref_module
+    global _global_tar_modules
+    _global_ref_module = cls._compile(ref_backend_info)
+    _global_tar_modules = [
+        cls._compile(backend_info)
+        for backend_info in tar_backend_infos
+    ]
 
   def setUp(self) -> None:
     # Runs before each unit test.
     super().setUp()
     global _global_ref_module
     global _global_tar_modules
-    if _global_ref_module is None:
-      # Compile if this is the first unittest.
-      _global_ref_module = self._compile(self._ref_backend_info)
-      _global_tar_modules = [
-          self._compile(backend_info)
-          for backend_info in self._tar_backend_infos
-      ]
-    else:
-      _global_ref_module = _global_ref_module.create_reinitialized()
-      _global_tar_modules = [
-          module.create_reinitialized() for module in _global_tar_modules
-      ]
+    _global_ref_module = _global_ref_module.create_reinitialized()
+    _global_tar_modules = [
+        module.create_reinitialized() for module in _global_tar_modules
+    ]
 
   def compare_backends(self, trace_function: callable) -> None:
     """Run the reference and target backends on trace_function and compare them.
@@ -645,5 +645,5 @@ class TracedModuleTestCase(tf.test.TestCase):
 
   @classmethod
   def tearDownClass(cls) -> None:
-    # Ran after all unit tests are completed.
+    # Runs after all unit tests are completed.
     super().tearDownClass()
