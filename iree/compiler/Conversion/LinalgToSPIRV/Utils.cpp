@@ -20,8 +20,14 @@
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 
+#include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Identifier.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -44,6 +50,36 @@ LogicalResult updateWorkGroupSize(FuncOp funcOp,
   funcOp.setAttr(
       spirv::getEntryPointABIAttrName(),
       spirv::getEntryPointABIAttr(workGroupSizeVec, funcOp.getContext()));
+  return success();
+}
+
+LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
+  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
+  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
+  return success();
+}
+
+Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
+                                        ArrayRef<Value> boundingSubViewSize,
+                                        OperationFolder *folder) {
+  // The bounding subview size is expected to be constant. This specified the
+  // shape of the allocation.
+  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
+      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
+        APInt value;
+        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
+        return -1;
+      }));
+  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
+  MemRefType allocType = MemRefType::get(
+      shape, subview.getType().getElementType(), {}, getWorkgroupMemorySpace());
+  Value buffer = b.create<AllocOp>(subview.getLoc(), allocType);
+  return buffer;
+}
+
+LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
+  auto allocOp = buffer.getDefiningOp<AllocOp>();
+  b.create<DeallocOp>(allocOp.getLoc(), buffer);
   return success();
 }
 

@@ -20,6 +20,7 @@
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
@@ -90,44 +91,10 @@ static void addLoweringPasses(mlir::PassManager &pm,
   pm.addPass(mlir::createConvertVulkanLaunchFuncToVulkanCallsPass());
 }
 
-/// Allocation callback for allocation workgroup local memory.
-static Value allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
-                                     ArrayRef<Value> boundingSubViewSize,
-                                     OperationFolder *folder) {
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape(boundingSubViewSize.size(),
-                                ShapedType::kDynamicSize);
-  return b.create<AllocOp>(
-      subview.getLoc(),
-      MemRefType::get(shape, subview.getType().getElementType(), {},
-                      mlir::iree_compiler::getWorkgroupMemorySpace()),
-      boundingSubViewSize);
-}
-
-/// Deallocation callback for allocation workgroup local memory.
-static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  auto allocOp = buffer.getDefiningOp<AllocOp>();
-  b.create<DeallocOp>(allocOp.getLoc(), buffer);
-  return success();
-}
-
 static void insertBarrier(OpBuilder &b, Location loc) {
   b.create<spirv::ControlBarrierOp>(loc, spirv::Scope::Workgroup,
                                     spirv::Scope::Workgroup,
                                     spirv::MemorySemantics::AcquireRelease);
-}
-
-/// Function used as callback for copyin/copyout in promotion pattern used to
-/// promote subviews to workgroup memory.
-static LogicalResult copyToFromWorkgroupMemory(OpBuilder &b, Value src,
-                                               Value dst) {
-  // TODO(thomasraoux): Find a better solution to insert barriers only where it
-  // is needed.
-  insertBarrier(b, src.getLoc());
-  b.create<linalg::CopyOp>(src.getLoc(), src, dst);
-  insertBarrier(b, src.getLoc());
-  return success();
 }
 
 template <typename IdOp, typename NProcsOp>
@@ -246,10 +213,11 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
       strategy
           .promote<linalg::MatmulOp>(
               linalg::LinalgPromotionOptions()
-                  .setAllocationDeallocationFns(allocateWorkgroupMemory,
-                                                deallocateWorkgroupMemory)
-                  .setCopyInOutFns(copyToFromWorkgroupMemory,
-                                   copyToFromWorkgroupMemory)
+                  .setAllocationDeallocationFns(
+                      mlir::iree_compiler::allocateWorkgroupMemory,
+                      mlir::iree_compiler::deallocateWorkgroupMemory)
+                  .setCopyInOutFns(mlir::iree_compiler::copyToWorkgroupMemory,
+                                   mlir::iree_compiler::copyToWorkgroupMemory)
                   .setOperandsToPromote({0, 1})
                   .setUseFullTileBuffers({false, false}))
           .tile<linalg::MatmulOp>(

@@ -183,32 +183,6 @@ LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
 // Pass and patterns
 //===----------------------------------------------------------------------===//
 
-/// Allocation callback for allocation workgroup local memory.
-static Optional<Value> allocateWorkgroupMemory(
-    OpBuilder &b, SubViewOp subview, ArrayRef<Value> boundingSubViewSize,
-    OperationFolder *folder) {
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
-      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
-        APInt value;
-        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
-        return -1;
-      }));
-  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  MemRefType allocType = MemRefType::get(
-      shape, subview.getType().getElementType(), {}, getWorkgroupMemorySpace());
-  Value buffer = b.create<AllocOp>(subview.getLoc(), allocType);
-  return buffer;
-}
-
-/// Deallocation callback for allocation workgroup local memory.
-static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  auto allocOp = buffer.getDefiningOp<AllocOp>();
-  b.create<DeallocOp>(allocOp.getLoc(), buffer);
-  return success();
-}
-
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 struct LinalgTileAndFusePass
