@@ -173,7 +173,7 @@ LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
   }
   if (opInfo & OpInfo::BatchMatmul) {
     tileSizes = {2, 8, 8, 4};
-    workgroupSize = {2, 8, 8};
+    workgroupSize = {8, 8, 2};
     return success();
   }
   if (opInfo & OpInfo::Pooling) {
