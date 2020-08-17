@@ -24,7 +24,6 @@ cc_library(
     hdrs = ["hal_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:tracing",
         "//iree/hal:api",
         "//iree/hal:device",

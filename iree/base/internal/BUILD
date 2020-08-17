@@ -27,7 +27,6 @@ cc_library(
     srcs = ["file_handle_win32.cc"],
     hdrs = ["file_handle_win32.h"],
     deps = [
-        "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:target_platform",
         "@com_google_absl//absl/memory",
@@ -45,7 +44,6 @@ cc_library(
         ":file_handle_win32",
         "//iree/base:file_io_hdrs",
         "//iree/base:file_path",
-        "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:target_platform",
         "//iree/base:tracing",
@@ -63,7 +61,6 @@ cc_library(
     deps = [
         ":file_handle_win32",
         "//iree/base:file_mapping_hdrs",
-        "//iree/base:platform_headers",
         "//iree/base:target_platform",
         "//iree/base:tracing",
         "@com_google_absl//absl/memory",
@@ -87,7 +84,7 @@ cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     deps = [
-        "//iree/base:platform_headers",
+        "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/flags:flag",
     ],
@@ -106,52 +103,24 @@ cc_library(
 )
 
 cc_library(
-    name = "source_location_internal",
-    hdrs = ["source_location.h"],
-)
-
-cc_library(
     name = "status_internal",
     srcs = [
         "status.cc",
         "status_builder.cc",
-        "status_errno.cc",
-        "status_errors.cc",
-        "status_win32_errors.cc",
         "statusor.cc",
     ],
     hdrs = [
         "status.h",
         "status_builder.h",
-        "status_errno.h",
-        "status_errors.h",
-        "status_macros.h",
-        "status_win32_errors.h",
         "statusor.h",
     ],
     deps = [
-        ":logging_internal",
         ":ostringstream",
-        "//iree/base:platform_headers",
-        "//iree/base:source_location",
+        "//iree/base:api",
+        "//iree/base:logging",
         "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/debugging:stacktrace",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "status_matchers_internal",
-    testonly = True,
-    hdrs = ["status_matchers.h"],
-    deps = [
-        "//iree/base:status",
-        "//iree/testing:gtest",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -163,8 +132,6 @@ iree_build_test(
         ":file_mapping_internal",
         ":init_internal",
         ":logging_internal",
-        ":source_location_internal",
         ":status_internal",
-        ":status_matchers_internal",
     ],
 )

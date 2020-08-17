@@ -509,8 +509,6 @@ typedef int32_t iree_hal_dim_t;
 // Utilities
 //===----------------------------------------------------------------------===//
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by iree_hal_format_shape).
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
@@ -590,13 +588,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::Allocator
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates a host-local heap allocator that can be used when buffers are
 // required that will not interact with a real hardware device (such as those
@@ -666,13 +660,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
     iree_hal_buffer_usage_t buffer_usage, iree_byte_span_t data,
     iree_hal_buffer_t** out_buffer);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Returns a reference to a subspan of the |buffer|.
 // If |byte_length| is IREE_WHOLE_BUFFER the remaining bytes in the buffer after
@@ -737,13 +727,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map(
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_unmap(
     iree_hal_buffer_t* buffer, iree_hal_mapped_memory_t* mapped_memory);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::HeapBuffer
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Allocates a zeroed host heap buffer of the given size.
 // The buffer contents will be allocated with |contents_allocator| while
@@ -787,13 +773,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 
 // TODO(benvanik): add a wrap that takes an allocator just for the buffer.
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.
@@ -894,13 +876,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates a command buffer ready to begin recording, possibly reusing an
 // existing one from the |device| pool.
@@ -1053,13 +1031,9 @@ iree_hal_command_buffer_dispatch_indirect(
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::DescriptorSet
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates a descriptor set of the given layout and bindings.
 // Descriptor sets are immutable and retain their bindings.
@@ -1077,13 +1051,9 @@ iree_hal_descriptor_set_retain(iree_hal_descriptor_set_t* descriptor_set);
 IREE_API_EXPORT void IREE_API_CALL
 iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::DescriptorSetLayout
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates a descriptor set layout with the given bindings.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1103,13 +1073,9 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_retain(
 IREE_API_EXPORT void IREE_API_CALL iree_hal_descriptor_set_layout_release(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::Device
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Retains the given |device| for the caller.
 IREE_API_EXPORT void IREE_API_CALL
@@ -1179,13 +1145,9 @@ iree_hal_device_wait_semaphores_with_timeout(
     const iree_hal_semaphore_list_t* semaphore_list,
     iree_duration_t timeout_ns);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::Driver
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Retains the given |driver| for the caller.
 IREE_API_EXPORT void IREE_API_CALL
@@ -1217,13 +1179,9 @@ iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
                                       iree_allocator_t allocator,
                                       iree_hal_device_t** out_device);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::DriverRegistry
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Returns true if the given |driver_name| is registered.
 // If this returns false when unexpected ensure that the driver is linked into
@@ -1246,13 +1204,9 @@ iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
                                        iree_allocator_t allocator,
                                        iree_hal_driver_t** out_driver);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::Executable
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Retains the given |executable| for the caller.
 IREE_API_EXPORT void IREE_API_CALL
@@ -1262,13 +1216,9 @@ iree_hal_executable_retain(iree_hal_executable_t* executable);
 IREE_API_EXPORT void IREE_API_CALL
 iree_hal_executable_release(iree_hal_executable_t* executable);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::ExecutableCache
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates an executable cache using the given identifier.
 // The identifier is provided to the backing cache API as way to partition
@@ -1309,13 +1259,9 @@ iree_hal_executable_cache_prepare_executable(
     iree_const_byte_span_t executable_data, iree_allocator_t allocator,
     iree_hal_executable_t** out_executable);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::ExecutableLayout
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates an executable layout composed of the given descriptor set layouts.
 // The returned executable layout can be used by multiple executables with the
@@ -1334,13 +1280,9 @@ IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_retain(
 IREE_API_EXPORT void IREE_API_CALL iree_hal_executable_layout_release(
     iree_hal_executable_layout_t* executable_layout);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must
@@ -1402,8 +1344,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
                                      uint64_t value,
                                      iree_duration_t timeout_ns);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

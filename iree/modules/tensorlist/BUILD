@@ -55,7 +55,6 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/hal:api",

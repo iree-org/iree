@@ -124,11 +124,11 @@ StatusOr<std::vector<const char*>> MatchAvailableInstanceLayers(
   std::vector<VkLayerProperties> layer_properties(layer_property_count);
   VK_RETURN_IF_ERROR(syms.vkEnumerateInstanceLayerProperties(
       &layer_property_count, layer_properties.data()));
-  ASSIGN_OR_RETURN(auto enabled_layers,
-                   MatchAvailableLayers(extensibility_spec.required_layers,
-                                        extensibility_spec.optional_layers,
-                                        layer_properties),
-                   _ << "Unable to find all required instance layers");
+  IREE_ASSIGN_OR_RETURN(auto enabled_layers,
+                        MatchAvailableLayers(extensibility_spec.required_layers,
+                                             extensibility_spec.optional_layers,
+                                             layer_properties),
+                        _ << "Unable to find all required instance layers");
   return enabled_layers;
 }
 
@@ -143,7 +143,7 @@ StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
       extension_property_count);
   VK_RETURN_IF_ERROR(syms.vkEnumerateInstanceExtensionProperties(
       nullptr, &extension_property_count, extension_properties.data()));
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto enabled_extensions,
       MatchAvailableExtensions(extensibility_spec.required_extensions,
                                extensibility_spec.optional_extensions,
@@ -164,7 +164,7 @@ StatusOr<std::vector<const char*>> MatchAvailableDeviceExtensions(
   VK_RETURN_IF_ERROR(syms.vkEnumerateDeviceExtensionProperties(
       physical_device, nullptr, &extension_property_count,
       extension_properties.data()));
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto enabled_extensions,
       MatchAvailableExtensions(extensibility_spec.required_extensions,
                                extensibility_spec.optional_extensions,

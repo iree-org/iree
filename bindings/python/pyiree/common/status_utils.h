@@ -57,7 +57,7 @@ pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message);
 
 inline void CheckApiStatus(iree_status_t status, const char* message) {
-  if (status == IREE_STATUS_OK) {
+  if (iree_status_is_ok(status)) {
     return;
   }
   throw ApiStatusToPyExc(status, message);

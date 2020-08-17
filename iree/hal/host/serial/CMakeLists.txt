@@ -41,12 +41,12 @@ iree_cc_test(
     ::async_command_queue
     absl::memory
     iree::base::status
-    iree::base::status_matchers
     iree::base::time
     iree::hal::command_queue
     iree::hal::host::serial::serial_submission_queue
     iree::hal::testing::mock_command_buffer
     iree::hal::testing::mock_command_queue
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -59,7 +59,6 @@ iree_cc_library(
     "serial_command_processor.cc"
   DEPS
     absl::inlined_vector
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
@@ -82,7 +81,6 @@ iree_cc_library(
     ::serial_submission_queue
     absl::inlined_vector
     iree::base::memory
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::host::condvar_semaphore

@@ -56,9 +56,9 @@ Status DeferredBuffer::BindAllocation(ref_ptr<Buffer> allocated_buffer,
   }
 
   // Calculate the range in the allocated_buffer that we are interested in.
-  RETURN_IF_ERROR(Buffer::CalculateRange(0, allocated_buffer->byte_length(),
-                                         byte_offset, byte_length, &byte_offset,
-                                         &byte_length));
+  IREE_RETURN_IF_ERROR(
+      Buffer::CalculateRange(0, allocated_buffer->byte_length(), byte_offset,
+                             byte_length, &byte_offset, &byte_length));
 
   // Verify that we have enough bytes for what we've promised.
   if (byte_length < byte_length_) {
@@ -98,21 +98,21 @@ StatusOr<Buffer*> DeferredBuffer::ResolveAllocation() const {
 Status DeferredBuffer::FillImpl(device_size_t byte_offset,
                                 device_size_t byte_length, const void* pattern,
                                 device_size_t pattern_length) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->FillImpl(byte_offset, byte_length, pattern,
                                     pattern_length);
 }
 
 Status DeferredBuffer::ReadDataImpl(device_size_t source_offset, void* data,
                                     device_size_t data_length) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->ReadDataImpl(source_offset, data, data_length);
 }
 
 Status DeferredBuffer::WriteDataImpl(device_size_t target_offset,
                                      const void* data,
                                      device_size_t data_length) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->WriteDataImpl(target_offset, data, data_length);
 }
 
@@ -120,7 +120,7 @@ Status DeferredBuffer::CopyDataImpl(device_size_t target_offset,
                                     Buffer* source_buffer,
                                     device_size_t source_offset,
                                     device_size_t data_length) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->CopyDataImpl(target_offset, source_buffer,
                                         source_offset, data_length);
 }
@@ -130,7 +130,7 @@ Status DeferredBuffer::MapMemoryImpl(MappingMode mapping_mode,
                                      device_size_t local_byte_offset,
                                      device_size_t local_byte_length,
                                      void** out_data) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->MapMemoryImpl(mapping_mode, memory_access,
                                          local_byte_offset, local_byte_length,
                                          out_data);
@@ -139,21 +139,21 @@ Status DeferredBuffer::MapMemoryImpl(MappingMode mapping_mode,
 Status DeferredBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
                                        device_size_t local_byte_length,
                                        void* data) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->UnmapMemoryImpl(local_byte_offset, local_byte_length,
                                            data);
 }
 
 Status DeferredBuffer::InvalidateMappedMemoryImpl(
     device_size_t local_byte_offset, device_size_t local_byte_length) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->InvalidateMappedMemoryImpl(local_byte_offset,
                                                       local_byte_length);
 }
 
 Status DeferredBuffer::FlushMappedMemoryImpl(device_size_t local_byte_offset,
                                              device_size_t local_byte_length) {
-  ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
+  IREE_ASSIGN_OR_RETURN(auto* allocated_buffer, ResolveAllocation());
   return allocated_buffer->FlushMappedMemoryImpl(local_byte_offset,
                                                  local_byte_length);
 }

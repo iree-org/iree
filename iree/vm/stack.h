@@ -120,7 +120,7 @@ typedef struct iree_vm_stack iree_vm_stack_t;
 //  IREE_VM_INLINE_STACK_INITIALIZE(
 //      stack,
 //      iree_vm_context_state_resolver(context),
-//      IREE_ALLOCATOR_SYSTEM);
+//      iree_allocator_system());
 //  ...
 //  iree_vm_stack_deinitialize(stack);
 #define IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver, allocator) \
@@ -135,9 +135,9 @@ typedef struct iree_vm_stack iree_vm_stack_t;
 // The contents of the |storage| can be anything upon initialization and the
 // stack must be deinitialized with iree_vm_stack_deinitialize before the
 // storage is freed. The provided |allocator| is only used for stack growth
-// beyond the intial storage capacity and may be IREE_ALLOCATOR_NULL to prevent
-// growth. Use IREE_VM_STACK_DEFAULT_SIZE for a reasonable default or use
-// iree_vm_stack_allocate if the input programs may exceed reason.
+// beyond the intial storage capacity and may be iree_allocator_null() to
+// prevent growth. Use IREE_VM_STACK_DEFAULT_SIZE for a reasonable default or
+// use iree_vm_stack_allocate if the input programs may exceed reason.
 //
 // The provided |state_resolver| will be used to resolve a module to a module
 // state within a context. This will be called on function entry whenever module
@@ -170,7 +170,7 @@ iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 //
 // Example:
 //  iree_vm_stack_t* stack = NULL;
-//  iree_vm_stack_allocate(..., IREE_ALLOCATOR_SYSTEM, &stack);
+//  iree_vm_stack_allocate(..., iree_allocator_system(), &stack);
 //  ...
 //  iree_vm_stack_free(stack);
 IREE_API_EXPORT iree_status_t IREE_API_CALL

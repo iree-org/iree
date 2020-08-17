@@ -82,7 +82,7 @@ class VmVariantList {
   static VmVariantList Create(iree_host_size_t capacity) {
     iree_vm_list_t* list;
     CheckApiStatus(iree_vm_list_create(/*element_type=*/nullptr, capacity,
-                                       IREE_ALLOCATOR_SYSTEM, &list),
+                                       iree_allocator_system(), &list),
                    "Error allocating variant list");
     return VmVariantList(list);
   }

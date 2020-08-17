@@ -47,7 +47,7 @@ StatusOr<ref_ptr<TimePointFencePool>> TimePointFencePool::Create(
   IREE_TRACE_SCOPE0("TimePointFencePool::Create");
   ref_ptr<TimePointFencePool> pool(
       new TimePointFencePool(std::move(logical_device)));
-  RETURN_IF_ERROR(pool->PreallocateFences());
+  IREE_RETURN_IF_ERROR(pool->PreallocateFences());
   return pool;
 }
 
@@ -92,7 +92,7 @@ void TimePointFencePool::ReleaseResolved(TimePointFence* fence) {
   VkFence f = fence->value();
   syms()->vkResetFences(*logical_device_, 1, &f);
   absl::MutexLock lock(&mutex_);
-  free_fences_.push_back(absl::WrapUnique(fence));
+  free_fences_.push_back(std::unique_ptr<TimePointFence>(fence));
 }
 
 TimePointFencePool::TimePointFencePool(ref_ptr<VkDeviceHandle> logical_device)
@@ -118,7 +118,7 @@ Status TimePointFencePool::PreallocateFences() {
       VK_RETURN_IF_ERROR(syms()->vkCreateFence(*logical_device_, &create_info,
                                                logical_device_->allocator(),
                                                &fence));
-      fences[i] = absl::make_unique<TimePointFence>(this, fence);
+      fences[i] = std::make_unique<TimePointFence>(this, fence);
     }
   }
 
@@ -142,7 +142,7 @@ StatusOr<ref_ptr<TimePointSemaphorePool>> TimePointSemaphorePool::Create(
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::Create");
   ref_ptr<TimePointSemaphorePool> pool(
       new TimePointSemaphorePool(std::move(logical_device)));
-  RETURN_IF_ERROR(pool->PreallocateSemaphores());
+  IREE_RETURN_IF_ERROR(pool->PreallocateSemaphores());
   return pool;
 }
 

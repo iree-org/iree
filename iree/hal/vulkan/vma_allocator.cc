@@ -16,7 +16,6 @@
 
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
@@ -227,14 +226,15 @@ StatusOr<ref_ptr<Buffer>> VmaAllocator::AllocateConstant(
     BufferUsageBitfield buffer_usage, ref_ptr<Buffer> source_buffer) {
   IREE_TRACE_SCOPE0("VmaAllocator::AllocateConstant");
   // TODO(benvanik): import memory to avoid the copy.
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto buffer,
       AllocateInternal(MemoryType::kDeviceLocal | MemoryType::kHostVisible,
                        buffer_usage,
                        MemoryAccess::kRead | MemoryAccess::kDiscardWrite,
                        source_buffer->byte_length(),
                        /*flags=*/0));
-  RETURN_IF_ERROR(buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
+  IREE_RETURN_IF_ERROR(
+      buffer->CopyData(0, source_buffer.get(), 0, kWholeBuffer));
   buffer->set_allowed_access(MemoryAccess::kRead);
   return buffer;
 }

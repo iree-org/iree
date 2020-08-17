@@ -41,42 +41,6 @@ inline absl::Span<T*> RawPtrSpan(absl::Span<std::unique_ptr<T>> value) {
   return absl::MakeSpan(reinterpret_cast<T**>(value.data()), value.size());
 }
 
-// A helper wrapper that moves the wrapped object on copy.
-// This is particularly handy for capturing unique_ptrs in lambdas.
-// Usage example:
-//
-//  std::unique_ptr<Foo> foo_ptr(new Foo());
-//  move_on_copy<std::unique_ptr<Foo>> foo(std::move(foo_ptr));
-//  auto some_lambda = [bar]() { ... }
-//
-template <typename T>
-struct move_on_copy {
-  explicit move_on_copy(T&& t) : value(std::move(t)) {}
-
-  move_on_copy(move_on_copy const& other) : value(std::move(other.value)) {}
-
-  move_on_copy(move_on_copy&& other) : value(std::move(other.value)) {}
-
-  move_on_copy& operator=(move_on_copy const& other) {
-    value = std::move(other.value);
-    return *this;
-  }
-
-  move_on_copy& operator=(move_on_copy&& other) {
-    value = std::move(other.value);
-    return *this;
-  }
-
-  mutable T value;
-};
-
-// Utility to aid in moving ref_ptr's into closures.
-//
-// Usage:
-//   auto baton = MoveToLambda(my_ref);
-//   DoSomething([baton] () { baton.value; });
-#define IreeMoveToLambda(p) ::iree::move_on_copy<decltype(p)>(std::move(p))
-
 // TODO(benvanik): replace with an absl version when it exists.
 // A move-only RAII object that calls a stored cleanup functor when
 // destroyed. Cleanup<F> is the return type of iree::MakeCleanup(F).

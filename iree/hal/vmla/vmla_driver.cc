@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
 #include "iree/hal/host/serial/serial_scheduling_model.h"
@@ -50,14 +49,15 @@ StatusOr<ref_ptr<Driver>> VMLADriver::Create() {
   // NOTE: we could use our own allocator here to hide these from any default
   // tracing we have.
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC));
+  IREE_RETURN_IF_ERROR(
+      iree_vm_instance_create(iree_allocator_system(), &instance));
 
   // TODO(benvanik): move to instance-based registration.
-  RETURN_IF_ERROR(ModuleRegisterTypes()) << "VMLA type registration failed";
+  IREE_RETURN_IF_ERROR(ModuleRegisterTypes())
+      << "VMLA type registration failed";
 
   iree_vm_module_t* vmla_module = nullptr;
-  RETURN_IF_ERROR(ModuleCreate(IREE_ALLOCATOR_SYSTEM, &vmla_module))
+  IREE_RETURN_IF_ERROR(ModuleCreate(iree_allocator_system(), &vmla_module))
       << "VMLA shared module creation failed";
 
   return make_ref<VMLADriver>(instance, vmla_module);

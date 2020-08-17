@@ -17,6 +17,7 @@
 #include "iree/base/api.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/builtin_types.h"
 
 class A : public iree::RefObject<A> {
@@ -86,7 +87,7 @@ TEST_F(VMListTest, UsageI32) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
-                                     IREE_ALLOCATOR_SYSTEM, &list));
+                                     iree_allocator_system(), &list));
 
   iree_vm_type_def_t queried_element_type;
   IREE_ASSERT_OK(iree_vm_list_element_type(list, &queried_element_type));
@@ -123,7 +124,7 @@ TEST_F(VMListTest, UsageRef) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
-                                     IREE_ALLOCATOR_SYSTEM, &list));
+                                     iree_allocator_system(), &list));
 
   iree_vm_type_def_t queried_element_type;
   IREE_ASSERT_OK(iree_vm_list_element_type(list, &queried_element_type));
@@ -160,7 +161,7 @@ TEST_F(VMListTest, UsageVariant) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
-                                     IREE_ALLOCATOR_SYSTEM, &list));
+                                     iree_allocator_system(), &list));
 
   iree_vm_type_def_t queried_element_type;
   IREE_ASSERT_OK(iree_vm_list_element_type(list, &queried_element_type));
@@ -206,7 +207,7 @@ TEST_F(VMListTest, Reserve) {
   iree_host_size_t initial_capacity = 0;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
-                                     IREE_ALLOCATOR_SYSTEM, &list));
+                                     iree_allocator_system(), &list));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
 

@@ -19,8 +19,8 @@
 #include "iree/base/file_path.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace file_io {
@@ -45,8 +45,8 @@ TEST(FileIo, GetSetContents) {
   ASSERT_THAT(FileExists(path), StatusIs(StatusCode::kNotFound));
   auto to_write = GetUniqueContents(unique_name);
 
-  ASSERT_OK(SetFileContents(path, to_write));
-  ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(path));
+  IREE_ASSERT_OK(SetFileContents(path, to_write));
+  IREE_ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(path));
   EXPECT_EQ(to_write, read);
 }
 
@@ -56,9 +56,9 @@ TEST(FileIo, SetDeleteExists) {
   ASSERT_THAT(FileExists(path), StatusIs(StatusCode::kNotFound));
   auto to_write = GetUniqueContents(unique_name);
 
-  ASSERT_OK(SetFileContents(path, to_write));
-  ASSERT_OK(FileExists(path));
-  ASSERT_OK(DeleteFile(path));
+  IREE_ASSERT_OK(SetFileContents(path, to_write));
+  IREE_ASSERT_OK(FileExists(path));
+  IREE_ASSERT_OK(DeleteFile(path));
   EXPECT_THAT(FileExists(path), StatusIs(StatusCode::kNotFound));
 }
 
@@ -69,12 +69,12 @@ TEST(FileIo, MoveFile) {
   ASSERT_THAT(FileExists(to_path), StatusIs(StatusCode::kNotFound));
   auto to_write = GetUniqueContents("MoveFile");
 
-  ASSERT_OK(SetFileContents(from_path, to_write));
-  ASSERT_OK(FileExists(from_path));
-  EXPECT_OK(MoveFile(from_path, to_path));
+  IREE_ASSERT_OK(SetFileContents(from_path, to_write));
+  IREE_ASSERT_OK(FileExists(from_path));
+  IREE_EXPECT_OK(MoveFile(from_path, to_path));
   EXPECT_THAT(FileExists(from_path), StatusIs(StatusCode::kNotFound));
-  EXPECT_OK(FileExists(to_path));
-  ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(to_path));
+  IREE_EXPECT_OK(FileExists(to_path));
+  IREE_ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(to_path));
   EXPECT_EQ(to_write, read);
 }
 
@@ -84,7 +84,7 @@ TEST(FileIo, GetTempPath) {
 }
 
 TEST(FileIo, GetTempFile) {
-  ASSERT_OK_AND_ASSIGN(std::string path1, GetTempFile("foo"));
+  IREE_ASSERT_OK_AND_ASSIGN(std::string path1, GetTempFile("foo"));
   EXPECT_TRUE(path1.find("foo") != std::string::npos);
 
   // Should be able to set file contents at the given path.
@@ -92,10 +92,10 @@ TEST(FileIo, GetTempFile) {
   // a file must be created at the path before calling GetTempFile again, or
   // else the same path may be returned.
   auto to_write = GetUniqueContents("GetTempFile");
-  ASSERT_OK(SetFileContents(path1, to_write));
+  IREE_ASSERT_OK(SetFileContents(path1, to_write));
 
   // Create another temp file with the same base name, check for a unique path.
-  ASSERT_OK_AND_ASSIGN(std::string path2, GetTempFile("foo"));
+  IREE_ASSERT_OK_AND_ASSIGN(std::string path2, GetTempFile("foo"));
   EXPECT_TRUE(path2.find("foo") != std::string::npos);
   EXPECT_NE(path1, path2);
 }

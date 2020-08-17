@@ -18,7 +18,6 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/math.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -164,7 +163,7 @@ Status DirectCommandBuffer::Begin() {
 
   // NOTE: we require that command buffers not be recorded while they are
   // in-flight so this is safe.
-  RETURN_IF_ERROR(descriptor_set_group_.Reset());
+  IREE_RETURN_IF_ERROR(descriptor_set_group_.Reset());
 
   VkCommandBufferBeginInfo begin_info;
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -185,7 +184,7 @@ Status DirectCommandBuffer::End() {
   VK_RETURN_IF_ERROR(syms()->vkEndCommandBuffer(command_buffer_));
 
   // Flush all pending descriptor set writes (if any).
-  ASSIGN_OR_RETURN(descriptor_set_group_, descriptor_set_arena_.Flush());
+  IREE_ASSIGN_OR_RETURN(descriptor_set_group_, descriptor_set_arena_.Flush());
 
   is_recording_ = false;
 
@@ -221,7 +220,8 @@ Status DirectCommandBuffer::ExecutionBarrier(
     info.dstAccessMask = ConvertAccessMask(buffer_barrier.target_scope);
     info.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     info.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    ASSIGN_OR_RETURN(auto* device_buffer, CastBuffer(buffer_barrier.buffer));
+    IREE_ASSIGN_OR_RETURN(auto* device_buffer,
+                          CastBuffer(buffer_barrier.buffer));
     info.buffer = device_buffer->handle();
     info.offset = buffer_barrier.offset;
     info.size = buffer_barrier.length;
@@ -239,7 +239,7 @@ Status DirectCommandBuffer::ExecutionBarrier(
 Status DirectCommandBuffer::SignalEvent(
     Event* event, ExecutionStageBitfield source_stage_mask) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::SignalEvent");
-  ASSIGN_OR_RETURN(auto* device_event, CastEvent(event));
+  IREE_ASSIGN_OR_RETURN(auto* device_event, CastEvent(event));
   syms()->vkCmdSetEvent(command_buffer_, device_event->handle(),
                         ConvertPipelineStageFlags(source_stage_mask));
   return OkStatus();
@@ -248,7 +248,7 @@ Status DirectCommandBuffer::SignalEvent(
 Status DirectCommandBuffer::ResetEvent(
     Event* event, ExecutionStageBitfield source_stage_mask) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::ResetEvent");
-  ASSIGN_OR_RETURN(auto* device_event, CastEvent(event));
+  IREE_ASSIGN_OR_RETURN(auto* device_event, CastEvent(event));
   syms()->vkCmdResetEvent(command_buffer_, device_event->handle(),
                           ConvertPipelineStageFlags(source_stage_mask));
   return OkStatus();
@@ -263,7 +263,7 @@ Status DirectCommandBuffer::WaitEvents(
 
   absl::InlinedVector<VkEvent, 4> event_handles(events.size());
   for (int i = 0; i < events.size(); ++i) {
-    ASSIGN_OR_RETURN(auto* device_event, CastEvent(events[i]));
+    IREE_ASSIGN_OR_RETURN(auto* device_event, CastEvent(events[i]));
     event_handles[i] = device_event->handle();
   }
 
@@ -289,7 +289,8 @@ Status DirectCommandBuffer::WaitEvents(
     info.dstAccessMask = ConvertAccessMask(buffer_barrier.target_scope);
     info.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     info.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    ASSIGN_OR_RETURN(auto* device_buffer, CastBuffer(buffer_barrier.buffer));
+    IREE_ASSIGN_OR_RETURN(auto* device_buffer,
+                          CastBuffer(buffer_barrier.buffer));
     info.buffer = device_buffer->handle();
     info.offset = buffer_barrier.offset;
     info.size = buffer_barrier.length;
@@ -310,7 +311,7 @@ Status DirectCommandBuffer::FillBuffer(Buffer* target_buffer,
                                        const void* pattern,
                                        size_t pattern_length) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::FillBuffer");
-  ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
 
   // Note that fill only accepts 4-byte aligned values so we need to splat out
   // our variable-length pattern.
@@ -334,7 +335,7 @@ Status DirectCommandBuffer::UpdateBuffer(const void* source_buffer,
                                          device_size_t target_offset,
                                          device_size_t length) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::UpdateBuffer");
-  ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
 
   // Vulkan only allows updates of <= 65536 because you really, really, really
   // shouldn't do large updates like this (as it wastes command buffer space and
@@ -362,8 +363,8 @@ Status DirectCommandBuffer::CopyBuffer(Buffer* source_buffer,
                                        device_size_t target_offset,
                                        device_size_t length) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::CopyBuffer");
-  ASSIGN_OR_RETURN(auto* source_device_buffer, CastBuffer(source_buffer));
-  ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+  IREE_ASSIGN_OR_RETURN(auto* source_device_buffer, CastBuffer(source_buffer));
+  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
 
   VkBufferCopy region;
   region.srcOffset = source_buffer->byte_offset() + source_offset;
@@ -379,8 +380,8 @@ Status DirectCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
                                           size_t offset,
                                           absl::Span<const uint32_t> values) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::PushConstants");
-  ASSIGN_OR_RETURN(auto* device_executable_layout,
-                   CastExecutableLayout(executable_layout));
+  IREE_ASSIGN_OR_RETURN(auto* device_executable_layout,
+                        CastExecutableLayout(executable_layout));
 
   syms()->vkCmdPushConstants(
       command_buffer_, device_executable_layout->handle(),
@@ -394,8 +395,8 @@ Status DirectCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     absl::Span<const DescriptorSet::Binding> bindings) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::PushDescriptorSet");
-  ASSIGN_OR_RETURN(auto* device_executable_layout,
-                   CastExecutableLayout(executable_layout));
+  IREE_ASSIGN_OR_RETURN(auto* device_executable_layout,
+                        CastExecutableLayout(executable_layout));
 
   // Either allocate, update, and bind a descriptor set or use push descriptor
   // sets to use the command buffer pool when supported.
@@ -408,10 +409,10 @@ Status DirectCommandBuffer::BindDescriptorSet(
     DescriptorSet* descriptor_set,
     absl::Span<const device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::BindDescriptorSet");
-  ASSIGN_OR_RETURN(auto* device_executable_layout,
-                   CastExecutableLayout(executable_layout));
-  ASSIGN_OR_RETURN(auto* device_descriptor_set,
-                   CastDescriptorSet(descriptor_set));
+  IREE_ASSIGN_OR_RETURN(auto* device_executable_layout,
+                        CastExecutableLayout(executable_layout));
+  IREE_ASSIGN_OR_RETURN(auto* device_descriptor_set,
+                        CastDescriptorSet(descriptor_set));
 
   // Vulkan takes uint32_t as the size here, unlike everywhere else.
   absl::InlinedVector<uint32_t, 4> dynamic_offsets_i32(dynamic_offsets.size());
@@ -437,9 +438,10 @@ Status DirectCommandBuffer::Dispatch(Executable* executable,
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
-  ASSIGN_OR_RETURN(auto* device_executable, CastExecutable(executable));
-  ASSIGN_OR_RETURN(VkPipeline pipeline,
-                   device_executable->GetPipelineForEntryPoint(entry_point));
+  IREE_ASSIGN_OR_RETURN(auto* device_executable, CastExecutable(executable));
+  IREE_ASSIGN_OR_RETURN(
+      VkPipeline pipeline,
+      device_executable->GetPipelineForEntryPoint(entry_point));
   syms()->vkCmdBindPipeline(command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipeline);
 
@@ -456,14 +458,15 @@ Status DirectCommandBuffer::DispatchIndirect(Executable* executable,
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
-  ASSIGN_OR_RETURN(auto* device_executable, CastExecutable(executable));
-  ASSIGN_OR_RETURN(VkPipeline pipeline,
-                   device_executable->GetPipelineForEntryPoint(entry_point));
+  IREE_ASSIGN_OR_RETURN(auto* device_executable, CastExecutable(executable));
+  IREE_ASSIGN_OR_RETURN(
+      VkPipeline pipeline,
+      device_executable->GetPipelineForEntryPoint(entry_point));
   syms()->vkCmdBindPipeline(command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipeline);
 
-  ASSIGN_OR_RETURN(auto* workgroups_device_buffer,
-                   CastBuffer(workgroups_buffer));
+  IREE_ASSIGN_OR_RETURN(auto* workgroups_device_buffer,
+                        CastBuffer(workgroups_buffer));
   syms()->vkCmdDispatchIndirect(
       command_buffer_, workgroups_device_buffer->handle(), workgroups_offset);
   return OkStatus();
