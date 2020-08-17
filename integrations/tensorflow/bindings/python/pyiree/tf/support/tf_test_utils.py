@@ -503,8 +503,9 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-def compile_module(module_class: Type[tf.Module],
-                   exported_names: Sequence[str] = ()) -> callable:
+def compile_module(
+    module_class: Type[tf.Module],
+    exported_names: Sequence[str] = ()) -> callable:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
