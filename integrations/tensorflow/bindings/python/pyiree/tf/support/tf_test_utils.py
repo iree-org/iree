@@ -538,8 +538,9 @@ def compile_module(
 # Will be initialized by TracedModuleTestCase.setUpClass
 # Global variables are used because storing the compiler context on the cls
 # causes cleaning up refcounts to fail, and tf.test.TestCase wipes the variables
-# on the class instance (self.*) before each unittest. See this for more info:
-# https://github.com/google/iree/issues/2900
+# on the class instance (self.*) before each unittest.
+# TODO(#2900): Move these back to class variables when we figure out issues with
+# refcounting.
 _global_ref_module = None
 _global_tar_modules = None
 
