@@ -234,6 +234,8 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
 
   OwningRewritePatternList stage2Patterns =
       linalg::getLinalgTilingCanonicalizationPatterns(context);
+  // Add extra patterns to canonicalize AffineMin in combination with scf loops
+  // operations after tiling.
   stage2Patterns.insert<AffineMinCanonicalizationPattern,
                         AffineMinSCFCanonicalizationPattern>(context);
 
