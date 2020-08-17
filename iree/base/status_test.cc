@@ -33,7 +33,7 @@ using ::testing::HasSubstr;
   EXPECT_THAT(status.ToString(), HasSubstr(StatusCodeToString(status.code())));
 #define CHECK_STREAM_SUBSTR(status, os, message_substr) \
   EXPECT_THAT(os.str(), HasSubstr(StatusCodeToString(status.code())));
-#endif
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
 TEST(Status, ConstructedWithMessage) {
   Status status = Status(StatusCode::kInvalidArgument, "message");
