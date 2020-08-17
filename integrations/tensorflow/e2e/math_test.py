@@ -26,6 +26,10 @@ class MathModule(tf.Module):
     return tf.math.abs(x)
 
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  def ceil(self, x):
+    return tf.math.ceil(x)
+
+  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
   def cos(self, x):
     return tf.math.cos(x)
 
@@ -47,6 +51,13 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
       module.abs(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
 
     self.compare_backends(abs)
+
+  def test_ceil(self):
+
+    def ceil(module):
+      module.ceil(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+
+    self.compare_backends(ceil)
 
   def test_cos(self):
 

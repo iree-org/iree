@@ -14,6 +14,9 @@
 # limitations under the License.
 """Tests for pyiree.tf.support.tf_test_utils."""
 
+import os
+import tempfile
+
 from absl.testing import parameterized
 import numpy as np
 from pyiree.tf.support import tf_test_utils
@@ -37,6 +40,12 @@ class StatefulCountingModule(tf.Module):
   @tf.function(input_signature=[tf.TensorSpec([1])])
   def increment_by(self, value):
     self.count.assign_add(value)
+
+  @tf.function(input_signature=[tf.TensorSpec([1]), tf.TensorSpec([1])])
+  def increment_by_max(self, a, b):
+    result = tf.maximum(a, b)
+    self.count.assign_add(result)
+    return result
 
   @tf.function(input_signature=[])
   def decrement(self):
@@ -77,34 +86,31 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   ])
   def test_recursive_check_same(self, array_c, array_d, array_e, tar_same):
 
+    # yapf: disable
     ref = {
-        'a':
-            1,
-        'b': [{
-            'c': np.array([0, 1, 2])
-        }, {
-            'd': np.array(['0', '1', '2'])
-        }, {
-            'e': np.array([0.0, 0.1, 0.2])
-        }],
+        'a': 1,
+        'b': [
+            {'c': np.array([0, 1, 2])},
+            {'d': np.array(['0', '1', '2'])},
+            {'e': np.array([0.0, 0.1, 0.2])}
+        ],
     }
     tar = {
         'a': 1,
-        'b': [{
-            'c': array_c
-        }, {
-            'd': array_d
-        }, {
-            'e': array_e
-        }],
+        'b': [
+            {'c': array_c},
+            {'d': array_d},
+            {'e': array_e}
+        ],
     }
+    # yapf: enable
     same = tf_test_utils.Trace._check_same(ref, tar, rtol=1e-6, atol=1e-6)
     self.assertEqual(tar_same, same)
 
   def test_trace_inputs_and_outputs(self):
 
     def trace_function(module):
-      # No inputs or outpus
+      # No inputs or outputs
       module.increment()
       # Only inputs
       module.increment_by(np.array([81.], dtype=np.float32))
@@ -166,6 +172,34 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 
     self.assertFalse(tf_test_utils.Trace.compare_traces(tf_trace, vmla_trace))
+
+  def test_trace_serialize_and_load(self):
+
+    def trace_function(module):
+      module.increment()
+      module.increment_by(np.array([81.], dtype=np.float32))
+      module.increment_by_max(
+          np.array([81], dtype=np.float32), np.array([92], dtype=np.float32))
+      module.get_count()
+
+    module = tf_utils.TfCompiledModule(StatefulCountingModule,
+                                       tf_utils.BackendInfo('tf'))
+    trace = tf_test_utils.Trace(module, trace_function)
+    trace_function(tf_test_utils.TracedModule(module, trace))
+
+    with tempfile.TemporaryDirectory() as artifacts_dir:
+      trace_function_dir = tf_test_utils._get_trace_dir(artifacts_dir, trace)
+      trace.serialize(trace_function_dir)
+      loaded_trace = tf_test_utils.Trace.load(trace_function_dir)
+
+      # Check all calls match.
+      self.assertTrue(tf_test_utils.Trace.compare_traces(trace, loaded_trace))
+
+      # Check all other metadata match.
+      self.assertAllEqual(trace.__dict__.keys(), loaded_trace.__dict__.keys())
+      for key in trace.__dict__.keys():
+        if key != 'calls':
+          self.assertEqual(trace.__dict__[key], loaded_trace.__dict__[key])
 
 
 if __name__ == '__main__':

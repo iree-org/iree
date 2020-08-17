@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-hlo-to-hlo-preprocessing -iree-extract-pad-from-conv %s | IreeFileCheck %s
+// RUN: iree-opt -iree-flow-hlo-to-hlo-preprocessing -iree-flow-extract-pad-from-conv %s | IreeFileCheck %s
 
 // CHECK-LABEL: @conv
 //       CHECK: mhlo.pad
