@@ -22,6 +22,7 @@
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
@@ -83,5 +84,60 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
   return success();
 }
 
+template <typename GPUIdOp, typename GPUCountOp>
+static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
+                                                      Location loc,
+                                                      StringRef dim) {
+  Type indexType = builder.getIndexType();
+  return {
+      builder.create<GPUIdOp>(loc, indexType, builder.getStringAttr(dim)),
+      builder.create<GPUCountOp>(loc, indexType, builder.getStringAttr(dim))};
+}
+
+template <>
+linalg::ProcInfo getGPUProcessorIdAndCountImpl<GPUGlobalId, GPUGlobalCount>(
+    OpBuilder &builder, Location loc, StringRef dim) {
+  Type indexType = builder.getIndexType();
+  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType,
+                                                 builder.getStringAttr(dim));
+  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType,
+                                                 builder.getStringAttr(dim));
+  Value blockDim = builder.create<gpu::BlockDimOp>(loc, indexType,
+                                                   builder.getStringAttr(dim));
+  Value threadId = builder.create<gpu::ThreadIdOp>(loc, indexType,
+                                                   builder.getStringAttr(dim));
+  return {builder.create<AddIOp>(
+              loc, builder.create<MulIOp>(loc, blockId, blockDim), threadId),
+          builder.create<MulIOp>(loc, blockDim, gridDim)};
+}
+
+template <typename GPUIdOp, typename GPUCountOp>
+static SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCountsImpl(
+    OpBuilder &builder, Location loc, unsigned numDims) {
+  SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
+  std::array<StringRef, kNumDims> dims{"x", "y", "z"};
+  for (unsigned i = 0; i < numDims; ++i) {
+    procInfo[numDims - 1 - i] =
+        getGPUProcessorIdAndCountImpl<GPUIdOp, GPUCountOp>(builder, loc,
+                                                           dims[i]);
+  }
+  return procInfo;
+}
+
+#define DEFINE_PROCINFO_CALLBACK_FNS(IdOp, CountOp)                            \
+  template <>                                                                  \
+  SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts<IdOp, CountOp>( \
+      OpBuilder & builder, Location loc, unsigned numDims) {                   \
+    return getGPUProcessorIdsAndCountsImpl<IdOp, CountOp>(builder, loc,        \
+                                                          numDims);            \
+  }
+
+// clang-format off
+DEFINE_PROCINFO_CALLBACK_FNS(gpu::BlockIdOp, gpu::GridDimOp)
+DEFINE_PROCINFO_CALLBACK_FNS(gpu::ThreadIdOp, gpu::BlockDimOp)
+DEFINE_PROCINFO_CALLBACK_FNS(GPUGlobalId, GPUGlobalCount)
+// clang-format on
+
+#undef DEFINE_PROCINFO_CALLBACK_FNS
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -222,6 +222,15 @@ struct LinalgTileAndFusePass
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
 
+static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
+    [](OpBuilder &builder, Location loc,
+       ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+      return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
+          builder, loc, parallelLoopRanges.size());
+    },
+    {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+     linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+
 /// Pattern for tiling operations. Updates the workgroup size in the surrounding
 /// function operation if tiling succeeds.
 struct TileMatmulPattern
@@ -229,7 +238,7 @@ struct TileMatmulPattern
   using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
   TileMatmulPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
                     ArrayRef<int64_t> workgroupSize, PatternBenefit benefit = 1)
-      : Base(context, options,
+      : Base(context, options.setDistributionOptions(matmulDistributionOptions),
              linalg::LinalgMarker(
                  ArrayRef<Identifier>(),
                  Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
@@ -284,6 +293,15 @@ struct TileBatchMatmulPattern
   SmallVector<int64_t, 3> workgroupSize;
 };
 
+static linalg::LinalgLoopDistributionOptions convPoolDistributionOptions = {
+    [](OpBuilder &builder, Location loc,
+       ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+      return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
+          builder, loc, parallelLoopRanges.size());
+    },
+    {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
+     linalg::DistributionMethod::Cyclic}};
+
 /// Pattern for tiling convolution and pooling operations. Currently is just a
 /// way to not tile when the operation has padding.
 template <typename OpTy>
@@ -292,7 +310,8 @@ struct TileConvPoolPattern : public linalg::LinalgTilingPattern<OpTy> {
   TileConvPoolPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
                       ArrayRef<int64_t> workgroupSize,
                       PatternBenefit benefit = 1)
-      : Base(context, options,
+      : Base(context,
+             options.setDistributionOptions(convPoolDistributionOptions),
              linalg::LinalgMarker(
                  ArrayRef<Identifier>(),
                  Identifier::get(getWorkgroupMarker(), context)),
