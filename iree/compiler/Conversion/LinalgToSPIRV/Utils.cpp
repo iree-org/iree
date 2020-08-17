@@ -107,6 +107,11 @@ linalg::ProcInfo getGPUProcessorIdAndCountImpl<GPUGlobalId, GPUGlobalCount>(
   Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType, attr);
   Value blockDim = builder.create<gpu::BlockDimOp>(loc, indexType, attr);
   Value threadId = builder.create<gpu::ThreadIdOp>(loc, indexType, attr);
+  // TODO(ravishankarm): Using affine_maps here would be beneficial, and we can
+  // do this because the blockDim is constant. But this would lead to an
+  // ordering issue cause it assumes that the workgroup size has already been
+  // set. If using affine_map can help, make sure that the workgroup size is set
+  // before.
   return {builder.create<AddIOp>(
               loc, builder.create<MulIOp>(loc, blockId, blockDim), threadId),
           builder.create<MulIOp>(loc, blockDim, gridDim)};

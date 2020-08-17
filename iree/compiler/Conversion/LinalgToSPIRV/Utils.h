@@ -62,7 +62,6 @@ template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
                                                              Location loc,
                                                              unsigned numDims);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

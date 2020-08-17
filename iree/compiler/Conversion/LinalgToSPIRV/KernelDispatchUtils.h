@@ -22,17 +22,26 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_KERNELDISPATCHUTILS_H_
 
+#include <array>
+
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
 class FuncOp;
 class LogicalResult;
+class Operation;
 class PatternRewriter;
 class ShapedType;
 class Value;
 
 namespace linalg {
 class LinalgOp;
+}
+namespace iree_compiler {
+struct SPIRVCodegenOptions;
 }
 
 namespace iree_compiler {
@@ -60,6 +69,68 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
 /// For a given `entryPointFn` return the function that computes the number of
 /// workgroups to use at launch time.
 FuncOp getNumWorkgroupsFn(FuncOp entryPointFn);
+
+/// Store the tile sizes to use at different levels of tiling as a vector of
+/// vectors.
+/// - First level tiling maps to workgroups.
+/// - Second level tiling maps to subgroups.
+using TileSizesListType = SmallVector<SmallVector<int64_t, 4>, 1>;
+
+/// Based on the linalg operations in a dispatch region, the number of levels of
+/// tiling, the tile sizes needed, the workgroup size, etc. need to be
+/// decided. These parameters are called `LaunchConfig`. This class implements
+/// one heuristic to compute these for the different linalg operations on
+/// buffers. This can be adapted later to support multiple configurations that
+/// can be picked based on device information/problem size information. It
+/// exposes the information needed by the codegenerators, and hides the
+/// implementation from the rest of the pipeline.
+class LaunchConfig {
+ public:
+  LaunchConfig() : workgroupSize({1, 1, 1}), numSubgroups({1, 1, 1}) {}
+
+  /// Given the sequence of `linalgOps` (and `options`), decide the launch
+  /// configuration by deciding
+  /// - the number of levels of tiling,
+  /// - tile sizes for each level,
+  /// - the workgroup size, and
+  /// - number of subgroups to use.
+  LogicalResult init(const SPIRVCodegenOptions &options,
+                     ArrayRef<linalg::LinalgOp> linalgOps);
+
+  /// Gets the tile size computed for an operation at all levels.
+  TileSizesListType getTileSizes(Operation *op) const {
+    return tileSizes.lookup(op->getName().getStringRef());
+  }
+
+  /// Gets the tile size computed for an operation for an level.
+  ArrayRef<int64_t> getTileSizes(Operation *op, size_t level) const {
+    auto it = tileSizes.find(op->getName().getStringRef());
+    if (it == tileSizes.end() || level >= it->second.size()) return {};
+    return it->second[level];
+  }
+
+  /// Returns the workgroup size to use based on the tile sizes.
+  ArrayRef<int64_t> getWorkgroupSize() const { return workgroupSize; }
+
+  /// Returns the number of subgroups to use.
+  ArrayRef<int64_t> getNumSubgroups() const { return numSubgroups; }
+
+ protected:
+  /// Current tile size configuration per operation.
+
+  // TODO: For now just use the operation name for the mapping. The tile sizes
+  // will be selected only for operations like matmul, conv, pool, etc. and
+  // assume that there is only one such operation per dispatch
+  // region. Eventually this might need to be relaxed, and some name-marker
+  // based mechanism might be needed.
+  llvm::StringMap<TileSizesListType> tileSizes;
+
+  /// Workgroup size to use.
+  std::array<int64_t, 3> workgroupSize;
+
+  /// Number of subgroups that are logically distributed along x, y & z.
+  std::array<int64_t, 3> numSubgroups;
+};
 
 }  // namespace iree_compiler
 }  // namespace mlir
