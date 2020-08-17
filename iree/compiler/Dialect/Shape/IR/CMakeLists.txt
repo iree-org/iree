@@ -35,6 +35,7 @@ iree_cc_library(
     "ShapeTypes.cpp"
   DEPS
     LLVMSupport
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRParser
