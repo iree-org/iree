@@ -37,7 +37,6 @@ using ::testing::HasSubstr;
 
 TEST(Status, ConstructedWithMessage) {
   Status status = Status(StatusCode::kInvalidArgument, "message");
-
   CHECK_STATUS_MESSAGE_SUBSTR(status, "message");
 }
 
