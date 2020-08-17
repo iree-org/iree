@@ -117,9 +117,9 @@ TEST(VMStackTest, StackOverflow) {
   bool did_overflow = false;
   for (int i = 0; i < 99999; ++i) {
     iree_vm_stack_frame_t* frame_a = nullptr;
-    iree_status_t status =
+    ::iree::Status status =
         iree_vm_stack_function_enter(stack, function_a, NULL, NULL, &frame_a);
-    if (iree_status_is_resource_exhausted(status)) {
+    if (::iree::IsResourceExhausted(status)) {
       // Hit the stack overflow, as expected.
       did_overflow = true;
       break;
@@ -137,8 +137,9 @@ TEST(VMStackTest, UnbalancedPop) {
   IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver,
                                   iree_allocator_system());
 
-  EXPECT_TRUE(iree_status_is_failed_precondition(
-      iree_vm_stack_function_leave(stack, NULL, NULL)));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      ::iree::Status(iree_vm_stack_function_leave(stack, NULL, NULL)));
 
   iree_vm_stack_deinitialize(stack);
 }
