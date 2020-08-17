@@ -60,7 +60,6 @@ TEST_P(CommandQueueTest, WaitIdleWhileIdle) {
 
 // Tests that submitting a command buffer and immediately waiting will not
 // deadlock.
-// Note: this test never completes with Vulkan timeline semaphore emulation.
 TEST_P(CommandQueueTest, BlockingSubmit) {
   // TODO(#2907): Fix the test failure on Adreno GPUs.
   if (device_->info().name().find("Adreno") == 0) GTEST_SKIP();
@@ -78,7 +77,6 @@ TEST_P(CommandQueueTest, BlockingSubmit) {
 }
 
 // Tests waiting while work is pending/in-flight.
-// Note: this test never completes with Vulkan timeline semaphore emulation.
 TEST_P(CommandQueueTest, WaitTimeout) {
   // TODO(#2907): Fix the test failure on Adreno GPUs.
   if (device_->info().name().find("Adreno") == 0) GTEST_SKIP();
@@ -127,7 +125,6 @@ TEST_P(CommandQueueTest, WaitMultiple) {
   // Work shouldn't start until the wait semaphore reaches its payload value.
   EXPECT_THAT(signal_semaphore_1->Query(), IsOkAndHolds(Eq(0ull)));
   EXPECT_THAT(signal_semaphore_2->Query(), IsOkAndHolds(Eq(0ull)));
-  // Note: This fails with Vulkan timeline semaphore emulation (returns OK)
   EXPECT_TRUE(IsDeadlineExceeded(command_queue->WaitIdle(Milliseconds(100))));
 
   // Signal the wait semaphores, work should only begin after each is set.
