@@ -20,7 +20,7 @@ import os
 import random
 import re
 import tempfile
-from typing import Any, Sequence, Type
+from typing import Any, Callable, Sequence, Type
 
 from absl import flags
 from absl import logging
@@ -310,7 +310,7 @@ class IreeCompiledModule(CompiledModule):
 class _TfFunctionWrapper(object):
   """Wraps a TF function, normalizing it to numpy."""
 
-  def __init__(self, f: callable):
+  def __init__(self, f: Callable[..., Any]):
     self._f = f
 
   def _convert_to_numpy(self, tensor: Any) -> Any:
@@ -343,7 +343,7 @@ class TfCompiledModule(CompiledModule):
 
   def __init__(self,
                module_class: Type[tf.Module],
-               backend_info: Sequence["BackendInfo"],
+               backend_info: "BackendInfo",
                exported_names: Sequence[str] = (),
                artifacts_dir: str = None):
     """Wrap a tf.Module in a TFCompiledModule facade.
