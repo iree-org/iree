@@ -258,7 +258,13 @@ class _IreeFunctionWrapper(object):
     self._f = f
 
   def __call__(self, *args):
-    return self._f(*args)
+    new_args = []
+    # For boolean inputs we need to convert to int8.
+    for arg in args:
+      if arg.dtype == np.bool:
+        arg = arg.astype(dtype=np.int8)
+      new_args.append(arg)
+    return self._f(*new_args)
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     return self._f.get_serialized_values()
@@ -345,6 +351,9 @@ class _TfFunctionWrapper(object):
     if np.isscalar(result):
       # convert_to_tensor isn't reversible via .numpy()
       result = np.array(result)
+    if result.dtype == np.bool:
+      # bools should be interpreted as int8s
+      result = result.astype(dtype=np.int8)
     return result
 
   def __call__(self, *args, **kwargs):

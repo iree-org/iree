@@ -30,12 +30,21 @@ class MathModule(tf.Module):
     return tf.math.ceil(x)
 
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
+  def compare(self, x):
+    return x > 1.0
+
+  @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
   def cos(self, x):
     return tf.math.cos(x)
 
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
   def log(self, x):
     return tf.math.log(x)
+
+  @tf.function(input_signature=[tf.TensorSpec([4], tf.bool),
+                                tf.TensorSpec([4], tf.bool)])
+  def logical_and(self, x, y):
+    return tf.math.logical_and(x, y)
 
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
   def mod(self, x):
@@ -59,6 +68,13 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
 
     self.compare_backends(ceil)
 
+  def test_compare(self):
+
+    def compare(module):
+      module.compare(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+
+    self.compare_backends(compare)
+
   def test_cos(self):
 
     def cos(module):
@@ -72,6 +88,15 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
       module.log(np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32))
 
     self.compare_backends(log)
+
+  def test_logical_and(self):
+
+    def logical_and(module):
+      module.logical_and(
+        np.array([True, True, False, False], dtype=np.bool),
+        np.array([True, False, False, True], dtype=np.bool))
+
+    self.compare_backends(logical_and)
 
   def test_mod(self):
 
