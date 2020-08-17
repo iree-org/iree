@@ -24,6 +24,10 @@
 
 namespace mlir {
 class FuncOp;
+class Value;
+class SubViewOp;
+class OperationFolder;
+class OpBuilder;
 struct LogicalResult;
 
 namespace iree_compiler {
@@ -32,6 +36,19 @@ namespace iree_compiler {
 LogicalResult updateWorkGroupSize(FuncOp funcOp,
                                   ArrayRef<int64_t> workGroupSize);
 
+/// Allocation callback for allocation workgroup local memory.
+Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
+                                        ArrayRef<Value> boundingSubViewSize,
+                                        OperationFolder *folder);
+
+/// Deallocation callback for allocation workgroup local memory.
+LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
+
+/// Function used as callback for copyin/copyout in promotion pattern used
+/// to promote subviews to workgroup memory when the number of threads is
+/// known to be greater than equal to the number of iteration of loops the
+/// copy is lowered to.
+LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst);
 }  // namespace iree_compiler
 }  // namespace mlir
 
