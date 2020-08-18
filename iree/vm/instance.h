@@ -49,7 +49,6 @@ iree_vm_instance_retain(iree_vm_instance_t* instance);
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_instance_release(iree_vm_instance_t* instance);
 
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

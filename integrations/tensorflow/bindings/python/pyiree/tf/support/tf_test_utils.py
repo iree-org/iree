@@ -504,8 +504,8 @@ class TracedModule:
 
 
 def compile_module(
-    module_class: Type[tf.Module],
-    exported_names: Sequence[str] = ()) -> Callable[[Any], Any]:
+    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
+) -> Callable[[Any], Any]:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
@@ -569,16 +569,15 @@ class TracedModuleTestCase(tf.test.TestCase):
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
     # Get the backend information for this test.
-    ref_backend_info = tf_utils.BackendInfo(
-        FLAGS.reference_backend, f"{FLAGS.reference_backend}_ref")
+    ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
+                                            f"{FLAGS.reference_backend}_ref")
     tar_backend_infos = get_target_backends()
 
     global _global_ref_module
     global _global_tar_modules
     _global_ref_module = cls._compile(ref_backend_info)
     _global_tar_modules = [
-        cls._compile(backend_info)
-        for backend_info in tar_backend_infos
+        cls._compile(backend_info) for backend_info in tar_backend_infos
     ]
 
   def setUp(self) -> None:
