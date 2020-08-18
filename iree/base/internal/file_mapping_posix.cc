@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <memory>
 
 namespace iree {
 
@@ -47,7 +48,7 @@ class FileDescriptor {
              << "Unable to open file " << path << ": " << ::strerror(errno);
     }
 
-    return absl::make_unique<FileDescriptor>(std::move(path), fd, file_size);
+    return std::make_unique<FileDescriptor>(std::move(path), fd, file_size);
   }
 
   FileDescriptor(std::string path, int fd, size_t size)
@@ -88,7 +89,7 @@ StatusOr<ref_ptr<FileMapping>> FileMapping::OpenRead(std::string path) {
 
   // Open the file for reading. Note that we only need to keep it open long
   // enough to map it and we can close the descriptor after that.
-  ASSIGN_OR_RETURN(auto file, FileDescriptor::OpenRead(std::move(path)));
+  IREE_ASSIGN_OR_RETURN(auto file, FileDescriptor::OpenRead(std::move(path)));
 
   // Map the file from the file descriptor.
   void* data =

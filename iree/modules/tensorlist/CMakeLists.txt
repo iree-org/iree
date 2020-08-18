@@ -60,7 +60,6 @@ iree_cc_library(
     absl::inlined_vector
     absl::span
     iree::base::api
-    iree::base::api_util
     iree::base::ref_ptr
     iree::base::status
     iree::hal::api

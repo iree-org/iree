@@ -38,7 +38,7 @@ iree_status_t iree_vm_list_register_types();
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
   if (iree_vm_ro_byte_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   }
 
   iree_vm_ro_byte_buffer_descriptor.destroy = iree_vm_ro_byte_buffer_destroy;
@@ -59,5 +59,5 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
 
   IREE_RETURN_IF_ERROR(iree_vm_list_register_types());
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }

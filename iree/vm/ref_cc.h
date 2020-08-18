@@ -113,13 +113,13 @@ class ref {
             ref_type_descriptor<T>::get()->offsetof_counter,
             ref_type_descriptor<T>::get()->type,
         }) {}
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept
+  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept  // NOLINT
       : ref_({
             0,
             ref_type_descriptor<T>::get()->offsetof_counter,
             ref_type_descriptor<T>::get()->type,
         }) {}
-  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept
+  ABSL_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept  // NOLINT
       : ref_({
             p,
             ref_type_descriptor<T>::get()->offsetof_counter,
@@ -146,7 +146,7 @@ class ref {
 
   // Move support from another compatible type.
   template <typename U>
-  ref(ref<U>&& rhs) noexcept {
+  ref(ref<U>&& rhs) noexcept {  // NOLINT
     ref_.ptr = static_cast<T*>(rhs.release());
     ref_.offsetof_counter = rhs.ref_.offsetof_counter;
     ref_.type = rhs.ref_.type;
@@ -195,13 +195,13 @@ class ref {
   // Returns a pointer to the inner pointer storage.
   // This allows passing a pointer to the ref as an output argument to C-style
   // creation functions.
-  constexpr T** operator&() noexcept {
+  constexpr T** operator&() noexcept {  // NOLINT
     return reinterpret_cast<T**>(&ref_.ptr);
   }
 
   // Support boolean expression evaluation ala unique_ptr/shared_ptr:
   // https://en.cppreference.com/w/cpp/memory/shared_ptr/operator_bool
-  constexpr operator unspecified_bool_type() const noexcept {
+  constexpr operator unspecified_bool_type() const noexcept {  // NOLINT
     return get() ? reinterpret_cast<unspecified_bool_type>(&this_type::ref_.ptr)
                  : nullptr;
   }
@@ -215,7 +215,9 @@ class ref {
   // Example:
   //    iree::vm::ref<my_type_t> value;
   //    my_type_create(..., &value);
-  constexpr operator iree_vm_ref_t*() const noexcept { return &ref_; }
+  constexpr operator iree_vm_ref_t*() const noexcept {  // NOLINT
+    return &ref_;
+  }
 
  private:
   mutable iree_vm_ref_t ref_;
@@ -312,7 +314,9 @@ class opaque_ref {
   ~opaque_ref() { iree_vm_ref_release(&value_); }
 
   constexpr iree_vm_ref_t* get() const noexcept { return &value_; }
-  constexpr operator iree_vm_ref_t*() const noexcept { return &value_; }
+  constexpr operator iree_vm_ref_t*() const noexcept {  // NOLINT
+    return &value_;
+  }
   constexpr bool operator!() const noexcept { return !value_.ptr; }
 
   // Returns a pointer to the inner pointer storage.

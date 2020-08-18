@@ -16,8 +16,8 @@
 
 #include "absl/container/inlined_vector.h"
 #include "iree/base/memory.h"
-#include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -55,9 +55,9 @@ TEST(Copy, WholeBuffer) {
   std::vector<int32_t> lengths = {2, 2};
   auto expected_dst = src_buffer;
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -71,9 +71,9 @@ TEST(Copy, FirstRow) {
   std::vector<int32_t> lengths = {1, 4};
   std::vector<uint8_t> expected_dst = {1, 2, 3, 4};
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -87,9 +87,9 @@ TEST(Copy, RowPart) {
   std::vector<int32_t> lengths = {1, 2};
   std::vector<uint8_t> expected_dst = {6, 7};
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -103,9 +103,9 @@ TEST(Copy, MultiRow) {
   std::vector<int32_t> lengths = {2, 4};
   std::vector<uint8_t> expected_dst = {5, 6, 7, 8, 9, 10, 11, 12};
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -119,9 +119,9 @@ TEST(Copy, NonContiguous) {
   std::vector<int32_t> lengths = {2, 2};
   std::vector<uint8_t> expected_dst = {6, 7, 10, 11};
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -137,9 +137,9 @@ TEST(Copy, MultiByte) {
   std::vector<int32_t> lengths = {2, 2};
   std::vector<int32_t> expected_dst = {6, 7, 10, 11};
 
-  EXPECT_OK(Copy::Execute<4>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<4>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
 
   absl::Span<int32_t> dst_buffer_int32_t =
       ReinterpretSpan<int32_t>(absl::MakeSpan(dst_buffer));
@@ -162,9 +162,9 @@ TEST(Copy, NotFullDst) {
                                      42, 42, 42};
   // clang-format on
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -179,9 +179,9 @@ TEST(Copy, HighRank) {
   std::vector<uint8_t> expected_dst = {41, 42, 44, 45, 50, 51, 53, 54,
                                        68, 69, 71, 72, 77, 78, 80, 81};
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -195,9 +195,9 @@ TEST(Copy, Scalar) {
   std::vector<int32_t> lengths = {};
   std::vector<uint8_t> expected_dst = {42};
 
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
@@ -212,9 +212,9 @@ TEST(Copy, ScalarMultiByte) {
   std::vector<int32_t> lengths = {};
   std::vector<int32_t> expected_dst = {INT32_MAX};
 
-  EXPECT_OK(Copy::Execute<4>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
+  IREE_EXPECT_OK(Copy::Execute<4>(src_buffer, src_shape, src_indices,
+                                  absl::MakeSpan(dst_buffer), dst_shape,
+                                  dst_indices, lengths));
 
   absl::Span<int32_t> dst_buffer_int32_t =
       ReinterpretSpan<int32_t>(absl::MakeSpan(dst_buffer));
@@ -233,7 +233,7 @@ TEST(Pad, NoPadding) {
   std::vector<uint16_t> dst_buffer(GetShapeElementCount(dst_shape), UINT16_MAX);
   auto expected_dst = src_buffer;
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -254,7 +254,7 @@ TEST(Pad, LowHighPadding) {
                                       0, 0, 0, 0, 0, 0};
   // clang-format on
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -275,7 +275,7 @@ TEST(Pad, OnlyHighPadding) {
                                       0, 0, 0, 0, 0, 0};
   // clang-format on
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -296,7 +296,7 @@ TEST(Pad, OnlyLowPadding) {
                                       0, 0, 0, 4, 5, 6};
   // clang-format on
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -317,7 +317,7 @@ TEST(Pad, OnlyInteriorPadding) {
                                       4, 0, 5, 0, 6};
   // clang-format on
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -340,7 +340,7 @@ TEST(Pad, AllPaddingTypes) {
                                       0, 0, 0, 0, 0, 0, 0, 0};
   // clang-format on
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -371,7 +371,7 @@ TEST(Pad, HighRank) {
 
   ASSERT_EQ(dst_buffer.size(), expected_dst.size());
 
-  EXPECT_OK(Pad::Execute<uint16_t>(
+  IREE_EXPECT_OK(Pad::Execute<uint16_t>(
       src_buffer, pad_value_buffer, absl::MakeSpan(dst_buffer), src_shape,
       dst_shape, edge_padding_low, edge_padding_high, interior_padding));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -386,9 +386,9 @@ TEST(ReduceSum, Scalar) {
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<float> expected_dst = {5.0f};
 
-  EXPECT_OK(ReduceSum::Execute<float>(src_buffer, init_buffer,
-                                      absl::MakeSpan(dst_buffer), dimension,
-                                      src_shape, dst_shape));
+  IREE_EXPECT_OK(ReduceSum::Execute<float>(src_buffer, init_buffer,
+                                           absl::MakeSpan(dst_buffer),
+                                           dimension, src_shape, dst_shape));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
@@ -405,9 +405,9 @@ TEST(ReduceMin, TwoDimensionsToOne) {
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<float> expected_dst = {1.0f, 2.0f, 3.0f};
 
-  EXPECT_OK(ReduceMin::Execute<float>(src_buffer, init_buffer,
-                                      absl::MakeSpan(dst_buffer), dimension,
-                                      src_shape, dst_shape));
+  IREE_EXPECT_OK(ReduceMin::Execute<float>(src_buffer, init_buffer,
+                                           absl::MakeSpan(dst_buffer),
+                                           dimension, src_shape, dst_shape));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
@@ -425,7 +425,7 @@ TEST(PoolingMax, NoOverlapping) {
   std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<int> expected_dst = {9, 12, 21, 24};
 
-  EXPECT_OK(PoolingMax::Execute<int>(
+  IREE_EXPECT_OK(PoolingMax::Execute<int>(
       src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
       window_sizes, strides, pad_low));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -446,7 +446,7 @@ TEST(PoolingMin, Padding) {
   std::vector<int> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<int> expected_dst = {1, 1, 2, 1, 1, 2};
 
-  EXPECT_OK(PoolingMin::Execute<int>(
+  IREE_EXPECT_OK(PoolingMin::Execute<int>(
       src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
       window_sizes, strides, pad_low));
   EXPECT_EQ(dst_buffer, expected_dst);
@@ -464,7 +464,7 @@ TEST(PoolingSum, Overlapping) {
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
   std::vector<float> expected_dst = {24, 30, 48, 54};
 
-  EXPECT_OK(PoolingSum::Execute<float>(
+  IREE_EXPECT_OK(PoolingSum::Execute<float>(
       src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
       window_sizes, strides, pad_low));
   for (int i = 0; i < dst_buffer.size(); ++i) {
@@ -492,10 +492,10 @@ TEST(Conv2d, NoDilation) {
   }
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
 
-  EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
-                                   filter_shape, absl::MakeSpan(dst_buffer),
-                                   dst_shape, strides, pad_h, pad_w, dilation,
-                                   1));
+  IREE_EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape,
+                                        filter_buffer, filter_shape,
+                                        absl::MakeSpan(dst_buffer), dst_shape,
+                                        strides, pad_h, pad_w, dilation, 1));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
@@ -524,10 +524,10 @@ TEST(Conv2d, DepthwiseConv) {
   }
   std::vector<float> dst_buffer(GetShapeElementCount(dst_shape), 0.0f);
 
-  EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
-                                   filter_shape, absl::MakeSpan(dst_buffer),
-                                   dst_shape, strides, pad_h, pad_w, dilation,
-                                   2));
+  IREE_EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape,
+                                        filter_buffer, filter_shape,
+                                        absl::MakeSpan(dst_buffer), dst_shape,
+                                        strides, pad_h, pad_w, dilation, 2));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);

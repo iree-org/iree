@@ -20,7 +20,6 @@ iree_cc_library(
   HDRS
     "alignment.h"
   DEPS
-    ::platform_headers
     ::target_platform
   PUBLIC
 )
@@ -31,13 +30,9 @@ iree_cc_library(
   HDRS
     "api.h"
   SRCS
-    "api.cc"
+    "api.c"
   DEPS
     ::api_hdrs
-    ::api_util
-    ::file_mapping
-    ::init
-    ::platform_headers
     ::target_platform
     ::tracing
   PUBLIC
@@ -48,20 +43,6 @@ iree_cc_library(
     api_hdrs
   HDRS
     "api.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    api_util
-  HDRS
-    "api_util.h"
-  DEPS
-    ::api_hdrs
-    ::logging
-    ::status
-    absl::core_headers
-    absl::inlined_vector
   PUBLIC
 )
 
@@ -95,7 +76,6 @@ iree_cc_library(
   HDRS
     "atomics.h"
   DEPS
-    ::platform_headers
     ::target_platform
   PUBLIC
 )
@@ -138,7 +118,6 @@ iree_cc_library(
     ${_DYNAMIC_LIBRARY_LINKOPTS}
   DEPS
     ::logging
-    ::platform_headers
     ::status
     ::target_platform
     ::tracing
@@ -187,8 +166,8 @@ iree_cc_test(
     ::dynamic_library_test_library
     ::file_io
     ::status
-    ::status_matchers
     ::target_platform
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -228,8 +207,8 @@ iree_cc_test(
     ::file_path
     ::logging
     ::status
-    ::status_matchers
     absl::strings
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -293,7 +272,6 @@ iree_cc_library(
     ::file_mapping
     ::memory
     ::ref_ptr
-    ::source_location
     ::status
     ::tracing
     absl::memory
@@ -380,7 +358,6 @@ iree_cc_library(
     "main_win32.cc"
   DEPS
     ::logging
-    ::platform_headers
     ::target_platform
   PUBLIC
 )
@@ -402,16 +379,6 @@ iree_cc_library(
     "memory.h"
   DEPS
     absl::span
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    platform_headers
-  HDRS
-    "platform_headers.h"
-  DEPS
-    ::target_platform
   PUBLIC
 )
 
@@ -465,33 +432,11 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    source_location
-  HDRS
-    "source_location.h"
-  DEPS
-    iree::base::internal::source_location_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     status
   HDRS
     "status.h"
   DEPS
-    ::source_location
     iree::base::internal::status_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    status_matchers
-  HDRS
-    "status_matchers.h"
-  DEPS
-    iree::base::internal::status_matchers_internal
-  TESTONLY
   PUBLIC
 )
 
@@ -502,7 +447,7 @@ iree_cc_test(
     "status_test.cc"
   DEPS
     ::status
-    ::status_matchers
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -591,8 +536,8 @@ endif()
 #     "wait_handle_test.cc"
 #   DEPS
 #     absl::time
-#     iree::testing::gtest_main
 #     iree::base::status
-#     iree::base::status_matchers
 #     iree::base::wait_handle
+#     iree::testing::gtest
+#     iree::testing::gtest_main
 # )

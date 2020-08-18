@@ -274,29 +274,31 @@ struct ref_type_descriptor {
   IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
 
 // TODO(benvanik): make these macros standard/document them.
-#define IREE_VM_DEFINE_TYPE_ADAPTERS(name, T)                                 \
-  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value) {   \
-    iree_vm_ref_t ref = {0};                                                  \
-    iree_vm_ref_wrap_retain(value, name##_descriptor.type, &ref);             \
-    return ref;                                                               \
-  }                                                                           \
-  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value) {     \
-    iree_vm_ref_t ref = {0};                                                  \
-    iree_vm_ref_wrap_assign(value, name##_descriptor.type, &ref);             \
-    return ref;                                                               \
-  }                                                                           \
-  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref) {         \
-    if (!iree_status_is_ok(iree_vm_ref_check(ref, name##_descriptor.type))) { \
-      return NULL;                                                            \
-    }                                                                         \
-    return (T*)ref->ptr;                                                      \
-  }                                                                           \
-  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL          \
-      name##_get_descriptor() {                                               \
-    return &name##_descriptor;                                                \
-  }                                                                           \
-  IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL name##_type_id() {         \
-    return name##_descriptor.type;                                            \
+#define IREE_VM_DEFINE_TYPE_ADAPTERS(name, T)                               \
+  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value) { \
+    iree_vm_ref_t ref = {0};                                                \
+    iree_vm_ref_wrap_retain(value, name##_descriptor.type, &ref);           \
+    return ref;                                                             \
+  }                                                                         \
+  IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value) {   \
+    iree_vm_ref_t ref = {0};                                                \
+    iree_vm_ref_wrap_assign(value, name##_descriptor.type, &ref);           \
+    return ref;                                                             \
+  }                                                                         \
+  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref) {       \
+    iree_status_t status = iree_vm_ref_check(ref, name##_descriptor.type);  \
+    if (!iree_status_is_ok(status)) {                                       \
+      iree_status_ignore(status);                                           \
+      return NULL;                                                          \
+    }                                                                       \
+    return (T*)ref->ptr;                                                    \
+  }                                                                         \
+  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL        \
+      name##_get_descriptor() {                                             \
+    return &name##_descriptor;                                              \
+  }                                                                         \
+  IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL name##_type_id() {       \
+    return name##_descriptor.type;                                          \
   }
 
 #endif  // IREE_VM_REF_H_

@@ -19,7 +19,6 @@
 #include <string>
 #include <utility>
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -49,12 +48,13 @@ StatusOr<ref_ptr<Buffer>> Allocator::AllocateConstant(
 
   MemoryTypeBitfield memory_type =
       MemoryType::kDeviceLocal | MemoryType::kHostVisible;
-  ASSIGN_OR_RETURN(auto device_buffer, Allocate(memory_type, buffer_usage,
-                                                source_buffer->byte_length()));
-  ASSIGN_OR_RETURN(auto source_mapping,
-                   source_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
-  RETURN_IF_ERROR(device_buffer->WriteData(0, source_mapping.data(),
-                                           source_mapping.byte_length()));
+  IREE_ASSIGN_OR_RETURN(
+      auto device_buffer,
+      Allocate(memory_type, buffer_usage, source_buffer->byte_length()));
+  IREE_ASSIGN_OR_RETURN(auto source_mapping,
+                        source_buffer->MapMemory<uint8_t>(MemoryAccess::kRead));
+  IREE_RETURN_IF_ERROR(device_buffer->WriteData(0, source_mapping.data(),
+                                                source_mapping.byte_length()));
   return device_buffer;
 }
 

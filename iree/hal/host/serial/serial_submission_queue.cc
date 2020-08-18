@@ -33,7 +33,7 @@ StatusOr<bool> SerialSubmissionQueue::CheckBatchReady(
     const PendingBatch& batch) const {
   for (auto& wait_point : batch.wait_semaphores) {
     auto* semaphore = reinterpret_cast<CondVarSemaphore*>(wait_point.semaphore);
-    ASSIGN_OR_RETURN(uint64_t value, semaphore->Query());
+    IREE_ASSIGN_OR_RETURN(uint64_t value, semaphore->Query());
     if (value < wait_point.value) {
       return false;
     }
@@ -109,7 +109,7 @@ Status SerialSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
       if (!batch_status.ok()) {
         // Batch failed; set the permanent error flag and abort so we don't
         // try to process anything else.
-        permanent_error_ = batch_status;
+        permanent_error_ = Status(batch_status);
         CompleteSubmission(submission, batch_status);
         FailAllPending(permanent_error_);
         return permanent_error_;
@@ -139,13 +139,13 @@ Status SerialSubmissionQueue::ProcessBatch(const PendingBatch& batch,
   // need to check the wait semaphores here.
 
   // Let the caller handle execution of the command buffers.
-  RETURN_IF_ERROR(execute_fn(batch.command_buffers));
+  IREE_RETURN_IF_ERROR(execute_fn(batch.command_buffers));
 
   // Signal all semaphores to allow them to unblock waiters.
   for (auto& signal_point : batch.signal_semaphores) {
     auto* semaphore =
         reinterpret_cast<CondVarSemaphore*>(signal_point.semaphore);
-    RETURN_IF_ERROR(semaphore->Signal(signal_point.value));
+    IREE_RETURN_IF_ERROR(semaphore->Signal(signal_point.value));
   }
 
   return OkStatus();

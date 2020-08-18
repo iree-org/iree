@@ -134,11 +134,12 @@ static void substitute(scf::ForOp forOp, SmallVectorImpl<AffineExpr> &exprs,
   dims.push_back(forOp.getInductionVar());
 }
 
-/// Traverse the .
-static void substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
+/// Substitue dimensions coming from forOp or AffineMin. Return false if it has
+/// unknown dimension operands.
+static bool substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
                        SmallVectorImpl<Value> &dims,
                        SmallVectorImpl<Value> &symbols) {
-  MLIRContext *ctx = minOp.getContext();
+  if (minOp.getDimOperands().empty()) return false;
   for (Value v : minOp.getDimOperands()) {
     if (auto forOp = scf::getForInductionVarOwner(v)) {
       substitute(forOp, exprs, dims, symbols);
@@ -148,9 +149,10 @@ static void substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
       substitute(parentMinOp, exprs, dims, symbols);
       continue;
     }
-    exprs.push_back(getAffineDimExpr(dims.size(), ctx));
-    dims.push_back(v);
+    // If couldn't substitue the dimension give up and use the original map.
+    return false;
   }
+  return true;
 }
 
 /// Perform folding of chains of AffineMinOp.
@@ -172,17 +174,23 @@ LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
       min = std::min(min, cstExpr.getValue());
   if (min == std::numeric_limits<int64_t>::max()) return failure();
 
+  MLIRContext *ctx = minOp.getContext();
+  AffineMap map;
+  SmallVector<Value, 4> operands;
   SmallVector<AffineExpr, 4> exprs;
   SmallVector<Value, 4> dims, symbols;
-  substitute(minOp, exprs, dims, symbols);
+  if (substitute(minOp, exprs, dims, symbols)) {
+    operands = dims;
+    operands.append(symbols.begin(), symbols.end());
 
-  SmallVector<Value, 4> operands = dims;
-  operands.append(symbols.begin(), symbols.end());
-
-  MLIRContext *ctx = minOp.getContext();
-  auto map = AffineMap::get(dims.size(), symbols.size(), exprs, ctx);
-  LLVM_DEBUG(llvm::dbgs() << "Substitution map: " << map << "\n");
-
+    map = AffineMap::get(dims.size(), symbols.size(), exprs, ctx);
+    LLVM_DEBUG(llvm::dbgs() << "Substitution map: " << map << "\n");
+  } else {
+    map = minOp.getAffineMap();
+    operands = minOp.getDimOperands();
+    operands.append(minOp.getSymbolOperands().begin(),
+                    minOp.getSymbolOperands().end());
+  }
   SmallVector<AffineExpr, 4> modExprs;
   for (unsigned idx = 0, e = map.getNumResults(); idx < e; ++idx)
     modExprs.push_back(getAffineDimExpr(idx, ctx) % min);
@@ -226,7 +234,10 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
 
   OwningRewritePatternList stage2Patterns =
       linalg::getLinalgTilingCanonicalizationPatterns(context);
-  stage2Patterns.insert<AffineMinCanonicalizationPattern>(context);
+  // Add extra patterns to canonicalize AffineMin in combination with scf loops
+  // operations after tiling.
+  stage2Patterns.insert<AffineMinCanonicalizationPattern,
+                        AffineMinSCFCanonicalizationPattern>(context);
 
   auto stage3Transforms = [](Operation *op) {
     promoteSingleIterationLoops(cast<FuncOp>(op));

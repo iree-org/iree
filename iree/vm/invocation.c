@@ -44,7 +44,7 @@ static iree_status_t iree_vm_stack_frame_marshal_inputs(
       dst_regs.i32[i32_reg++] = variant.i32;
     }
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Marshals callee return registers into a variant list.
@@ -63,7 +63,7 @@ static iree_status_t iree_vm_stack_frame_marshal_outputs(
       IREE_RETURN_IF_ERROR(iree_vm_list_push_value(outputs, &value));
     }
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // TODO(benvanik): implement this as an iree_vm_invocation_t sequence.
@@ -71,6 +71,9 @@ static iree_status_t iree_vm_invoke_within(
     iree_vm_context_t* context, iree_vm_stack_t* stack,
     iree_vm_function_t function, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs) {
+  IREE_ASSERT_ARGUMENT(context);
+  IREE_ASSERT_ARGUMENT(stack);
+
   // TODO(#2075): disabled because check_test is invoking native methods.
   // These checks should be nice and simple as we don't support variadic
   // args/results in bytecode.
@@ -79,16 +82,17 @@ static iree_status_t iree_vm_invoke_within(
   // iree_vm_function_signature_t signature =
   //     iree_vm_function_signature(&function);
   // if (input_count != signature.argument_count) {
-  //   return IREE_STATUS_INVALID_ARGUMENT;
+  //   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   // } else if (!outputs && signature.result_count > 0) {
-  //   return IREE_STATUS_INVALID_ARGUMENT;
+  //   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   // }
 
   // Keep the I/O count reasonable to limit stack usage. If we end up passing
   // this many things (such as for nested variadic lists/etc) we should instead
   // use list objects as they'll be significantly more efficient.
   if (input_count > 1024 || output_count > 1024) {
-    return IREE_STATUS_RESOURCE_EXHAUSTED;
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "input/output count overflow");
   }
 
   // Allocate storage for marshaling arguments into the callee stack frame.

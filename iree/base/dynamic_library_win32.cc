@@ -14,7 +14,6 @@
 
 #include "absl/memory/memory.h"
 #include "iree/base/dynamic_library.h"
-#include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 

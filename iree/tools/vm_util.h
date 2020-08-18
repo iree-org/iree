@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include <ostream>
+#include <vector>
 
 #include "absl/types/span.h"
 #include "iree/base/signature_mangle.h"

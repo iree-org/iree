@@ -399,9 +399,10 @@ Status ScatterCopy(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
   }
 
   for (int i = 0; i < src_shape[0]; i++) {
-    RETURN_IF_ERROR(ScatterCopy(src_buffer.subspan(i * src_stride, src_stride),
-                                dst_buffer.subspan(i * dst_stride, dst_stride),
-                                src_shape.subspan(1), dst_shape.subspan(1)));
+    IREE_RETURN_IF_ERROR(
+        ScatterCopy(src_buffer.subspan(i * src_stride, src_stride),
+                    dst_buffer.subspan(i * dst_stride, dst_stride),
+                    src_shape.subspan(1), dst_shape.subspan(1)));
   }
 
   return OkStatus();
@@ -428,8 +429,9 @@ Status ScatterHelper(absl::Span<const T> src_buffer,
            << "Attempting to scatter to differing dimensions.";
   }
 
-  RETURN_IF_ERROR(ScatterCopy(src_buffer, dst_buffer.subspan(offset), src_shape,
-                              dst_shape.subspan(indices_buffer.size())));
+  IREE_RETURN_IF_ERROR(ScatterCopy(src_buffer, dst_buffer.subspan(offset),
+                                   src_shape,
+                                   dst_shape.subspan(indices_buffer.size())));
 
   return OkStatus();
 }
@@ -461,7 +463,7 @@ Status Scatter::Execute(absl::Span<const T> src_buffer,
   }
 
   for (int i = 0; i < batch_size; i++) {
-    RETURN_IF_ERROR(impl::ScatterHelper(
+    IREE_RETURN_IF_ERROR(impl::ScatterHelper(
         src_buffer.subspan(i * src_size, src_size),
         indices_buffer.subspan(i * indices_size, indices_size), dst_buffer,
         src_shape.subspan(1), dst_shape));
@@ -935,10 +937,10 @@ Status ReduceMax::Execute(absl::Span<const T> src_buffer,
 namespace impl {
 
 template <typename T, typename KernelImpl>
-Status ComputePoolingWindow(absl::Span<const T> src_buffer,
-                            absl::Span<const int> src_indices,
-                            ShapeSpan src_shape, T init_value,
-                            ShapeSpan window_dimensions, T* dst_value) {
+void ComputePoolingWindow(absl::Span<const T> src_buffer,
+                          absl::Span<const int> src_indices,
+                          ShapeSpan src_shape, T init_value,
+                          ShapeSpan window_dimensions, T* dst_value) {
   int rank = src_shape.size();
   absl::InlinedVector<int, 8> window_indices(rank, 0);
   auto getSrcValue = [&]() -> T {
@@ -956,7 +958,6 @@ Status ComputePoolingWindow(absl::Span<const T> src_buffer,
     KernelImpl()(dst_value, getSrcValue());
     IncrementShapeIndex(absl::MakeSpan(window_indices), window_dimensions);
   }
-  return OkStatus();
 }
 
 template <typename T, typename KernelImpl>
@@ -972,10 +973,9 @@ Status GenericPooling(absl::Span<const T> src_buffer,
     for (int j = 0; j < rank; ++j) {
       src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];
     }
-    auto status = ComputePoolingWindow<T, KernelImpl>(
-        src_buffer, src_indices, src_shape, init_buffer[0], window_dimensions,
-        &dst_buffer[i]);
-    RETURN_IF_ERROR(status);
+    ComputePoolingWindow<T, KernelImpl>(src_buffer, src_indices, src_shape,
+                                        init_buffer[0], window_dimensions,
+                                        &dst_buffer[i]);
     IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
   }
   return OkStatus();

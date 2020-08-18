@@ -14,61 +14,60 @@
 
 #include "iree/base/internal/status_builder.h"
 
+#include <cerrno>
 #include <cstdio>
 
-#include "iree/base/internal/status_errors.h"
+#include "iree/base/target_platform.h"
 
 namespace iree {
 
 StatusBuilder::Rep::Rep(const Rep& r)
     : stream_message(r.stream_message), stream(&stream_message) {}
 
-StatusBuilder::StatusBuilder(const Status& original_status,
-                             SourceLocation location)
-    : status_(original_status), loc_(location) {}
-
 StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location)
-    : status_(original_status), loc_(location) {}
+    : status_(exchange(original_status, original_status.code())) {}
+
+StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location,
+                             const char* format, ...)
+    : status_(exchange(original_status, original_status.code())) {
+  if (status_.ok()) return;
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  status_ =
+      iree_status_annotate_vf(status_.release(), format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
+}
 
 StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location)
-    : status_(code, ""), loc_(location) {}
+    : status_(code, location, "") {}
 
-StatusBuilder::operator Status() const& {
-  if (rep_ == nullptr) return status_;
-  return StatusBuilder(*this).CreateStatus();
+StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location,
+                             const char* format, ...) {
+  if (code == StatusCode::kOk) {
+    status_ = StatusCode::kOk;
+    return;
+  }
+  va_list varargs_0, varargs_1;
+  va_start(varargs_0, format);
+  va_start(varargs_1, format);
+  status_ = iree_status_allocate_vf(static_cast<iree_status_code_t>(code),
+                                    location.file_name(), location.line(),
+                                    format, varargs_0, varargs_1);
+  va_end(varargs_0);
+  va_end(varargs_1);
 }
-StatusBuilder::operator Status() && {
-  if (rep_ == nullptr) return status_;
-  return std::move(*this).CreateStatus();
+
+void StatusBuilder::Flush() {
+  if (!rep_ || rep_->stream_message.empty()) return;
+  auto rep = std::move(rep_);
+  status_ = iree_status_annotate_f(status_.release(), "%.*s",
+                                   static_cast<int>(rep->stream_message.size()),
+                                   rep->stream_message.data());
 }
 
 bool StatusBuilder::ok() const { return status_.ok(); }
-
-StatusCode StatusBuilder::code() const { return status_.code(); }
-
-SourceLocation StatusBuilder::source_location() const { return loc_; }
-
-Status StatusBuilder::CreateStatus() && {
-  Status result = JoinMessageToStatus(status_, rep_->stream_message);
-
-  // Reset the status after consuming it.
-  status_ = UnknownError("");
-  rep_ = nullptr;
-  return result;
-}
-
-Status StatusBuilder::JoinMessageToStatus(Status s, absl::string_view msg) {
-  if (msg.empty()) return s;
-  return Annotate(s, msg);
-}
-
-std::ostream& operator<<(std::ostream& os, const StatusBuilder& builder) {
-  return os << static_cast<Status>(builder);
-}
-
-std::ostream& operator<<(std::ostream& os, StatusBuilder&& builder) {
-  return os << static_cast<Status>(std::move(builder));
-}
 
 StatusBuilder AbortedErrorBuilder(SourceLocation location) {
   return StatusBuilder(StatusCode::kAborted, location);
@@ -133,5 +132,192 @@ StatusBuilder UnimplementedErrorBuilder(SourceLocation location) {
 StatusBuilder UnknownErrorBuilder(SourceLocation location) {
   return StatusBuilder(StatusCode::kUnknown, location);
 }
+
+// Returns the code for |error_number|, which should be an |errno| value.
+// See https://en.cppreference.com/w/cpp/error/errno_macros and similar refs.
+static StatusCode ErrnoToCanonicalCode(int error_number) {
+  switch (error_number) {
+    case 0:
+      return StatusCode::kOk;
+    case EINVAL:        // Invalid argument
+    case ENAMETOOLONG:  // Filename too long
+    case E2BIG:         // Argument list too long
+    case EDESTADDRREQ:  // Destination address required
+    case EDOM:          // Mathematics argument out of domain of function
+    case EFAULT:        // Bad address
+    case EILSEQ:        // Illegal byte sequence
+    case ENOPROTOOPT:   // Protocol not available
+    case ENOSTR:        // Not a STREAM
+    case ENOTSOCK:      // Not a socket
+    case ENOTTY:        // Inappropriate I/O control operation
+    case EPROTOTYPE:    // Protocol wrong type for socket
+    case ESPIPE:        // Invalid seek
+      return StatusCode::kInvalidArgument;
+    case ETIMEDOUT:  // Connection timed out
+    case ETIME:      // Timer expired
+      return StatusCode::kDeadlineExceeded;
+    case ENODEV:  // No such device
+    case ENOENT:  // No such file or directory
+#ifdef ENOMEDIUM
+    case ENOMEDIUM:  // No medium found
+#endif
+    case ENXIO:  // No such device or address
+    case ESRCH:  // No such process
+      return StatusCode::kNotFound;
+    case EEXIST:         // File exists
+    case EADDRNOTAVAIL:  // Address not available
+    case EALREADY:       // Connection already in progress
+#ifdef ENOTUNIQ
+    case ENOTUNIQ:  // Name not unique on network
+#endif
+      return StatusCode::kAlreadyExists;
+    case EPERM:   // Operation not permitted
+    case EACCES:  // Permission denied
+#ifdef ENOKEY
+    case ENOKEY:  // Required key not available
+#endif
+    case EROFS:  // Read only file system
+      return StatusCode::kPermissionDenied;
+    case ENOTEMPTY:   // Directory not empty
+    case EISDIR:      // Is a directory
+    case ENOTDIR:     // Not a directory
+    case EADDRINUSE:  // Address already in use
+    case EBADF:       // Invalid file descriptor
+#ifdef EBADFD
+    case EBADFD:  // File descriptor in bad state
+#endif
+    case EBUSY:    // Device or resource busy
+    case ECHILD:   // No child processes
+    case EISCONN:  // Socket is connected
+#ifdef EISNAM
+    case EISNAM:  // Is a named type file
+#endif
+#ifdef ENOTBLK
+    case ENOTBLK:  // Block device required
+#endif
+    case ENOTCONN:  // The socket is not connected
+    case EPIPE:     // Broken pipe
+#ifdef ESHUTDOWN
+    case ESHUTDOWN:  // Cannot send after transport endpoint shutdown
+#endif
+    case ETXTBSY:  // Text file busy
+#ifdef EUNATCH
+    case EUNATCH:  // Protocol driver not attached
+#endif
+      return StatusCode::kFailedPrecondition;
+    case ENOSPC:  // No space left on device
+#ifdef EDQUOT
+    case EDQUOT:  // Disk quota exceeded
+#endif
+    case EMFILE:   // Too many open files
+    case EMLINK:   // Too many links
+    case ENFILE:   // Too many open files in system
+    case ENOBUFS:  // No buffer space available
+    case ENODATA:  // No message is available on the STREAM read queue
+    case ENOMEM:   // Not enough space
+    case ENOSR:    // No STREAM resources
+#ifdef EUSERS
+    case EUSERS:  // Too many users
+#endif
+      return StatusCode::kResourceExhausted;
+#ifdef ECHRNG
+    case ECHRNG:  // Channel number out of range
+#endif
+    case EFBIG:      // File too large
+    case EOVERFLOW:  // Value too large to be stored in data type
+    case ERANGE:     // Result too large
+      return StatusCode::kOutOfRange;
+#ifdef ENOPKG
+    case ENOPKG:  // Package not installed
+#endif
+    case ENOSYS:        // Function not implemented
+    case ENOTSUP:       // Operation not supported
+    case EAFNOSUPPORT:  // Address family not supported
+#ifdef EPFNOSUPPORT
+    case EPFNOSUPPORT:  // Protocol family not supported
+#endif
+    case EPROTONOSUPPORT:  // Protocol not supported
+#ifdef ESOCKTNOSUPPORT
+    case ESOCKTNOSUPPORT:  // Socket type not supported
+#endif
+    case EXDEV:  // Improper link
+      return StatusCode::kUnimplemented;
+    case EAGAIN:  // Resource temporarily unavailable
+#ifdef ECOMM
+    case ECOMM:  // Communication error on send
+#endif
+    case ECONNREFUSED:  // Connection refused
+    case ECONNABORTED:  // Connection aborted
+    case ECONNRESET:    // Connection reset
+    case EINTR:         // Interrupted function call
+#ifdef EHOSTDOWN
+    case EHOSTDOWN:  // Host is down
+#endif
+    case EHOSTUNREACH:  // Host is unreachable
+    case ENETDOWN:      // Network is down
+    case ENETRESET:     // Connection aborted by network
+    case ENETUNREACH:   // Network unreachable
+    case ENOLCK:        // No locks available
+    case ENOLINK:       // Link has been severed
+#ifdef ENONET
+    case ENONET:  // Machine is not on the network
+#endif
+      return StatusCode::kUnavailable;
+    case EDEADLK:  // Resource deadlock avoided
+#ifdef ESTALE
+    case ESTALE:  // Stale file handle
+#endif
+      return StatusCode::kAborted;
+    case ECANCELED:  // Operation cancelled
+      return StatusCode::kCancelled;
+    default:
+      return StatusCode::kUnknown;
+  }
+}
+
+StatusBuilder ErrnoToCanonicalStatusBuilder(int error_number,
+                                            SourceLocation location) {
+  return StatusBuilder(ErrnoToCanonicalCode(error_number), location);
+}
+
+#if defined(IREE_PLATFORM_WINDOWS)
+
+// Returns the code for |error| which should be a Win32 error dword.
+static StatusCode Win32ErrorToCanonicalCode(uint32_t error) {
+  switch (error) {
+    case ERROR_SUCCESS:
+      return StatusCode::kOk;
+    case ERROR_FILE_NOT_FOUND:
+    case ERROR_PATH_NOT_FOUND:
+      return StatusCode::kNotFound;
+    case ERROR_TOO_MANY_OPEN_FILES:
+    case ERROR_OUTOFMEMORY:
+    case ERROR_HANDLE_DISK_FULL:
+    case ERROR_HANDLE_EOF:
+      return StatusCode::kResourceExhausted;
+    case ERROR_ACCESS_DENIED:
+      return StatusCode::kPermissionDenied;
+    case ERROR_INVALID_HANDLE:
+      return StatusCode::kInvalidArgument;
+    case ERROR_NOT_READY:
+    case ERROR_READ_FAULT:
+      return StatusCode::kUnavailable;
+    case ERROR_WRITE_FAULT:
+      return StatusCode::kDataLoss;
+    case ERROR_NOT_SUPPORTED:
+      return StatusCode::kUnimplemented;
+    default:
+      return StatusCode::kUnknown;
+  }
+}
+
+StatusBuilder Win32ErrorToCanonicalStatusBuilder(uint32_t error,
+                                                 SourceLocation location) {
+  // TODO(benvanik): use FormatMessage; or defer until required?
+  return StatusBuilder(Win32ErrorToCanonicalCode(error), location)
+         << "<TBD>: " << error;
+}
+
+#endif  // IREE_PLATFORM_WINDOWS
 
 }  // namespace iree

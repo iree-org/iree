@@ -15,12 +15,13 @@
 #include "absl/base/macros.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -31,8 +32,6 @@
 namespace iree {
 namespace samples {
 namespace {
-
-#define ASSERT_API_OK(expr) IREE_ASSERT_OK((expr))
 
 struct TestParams {
   // HAL driver to use for the test.
@@ -49,14 +48,14 @@ std::vector<TestParams> GetAvailableDriverTestParams() {
   iree_string_view_t* driver_names = nullptr;
   iree_host_size_t driver_count = 0;
   IREE_CHECK_OK(iree_hal_driver_registry_query_available_drivers(
-      IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count));
+      iree_allocator_system(), &driver_names, &driver_count));
   for (int i = 0; i < driver_count; ++i) {
     TestParams test_params;
     test_params.driver_name =
         std::string(driver_names[i].data, driver_names[i].size);
     all_test_params.push_back(std::move(test_params));
   }
-  iree_allocator_free(IREE_ALLOCATOR_SYSTEM, driver_names);
+  iree_allocator_free(iree_allocator_system(), driver_names);
   return all_test_params;
 }
 
@@ -70,38 +69,38 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   IREE_ASSERT_OK(iree_hal_module_register_types());
 
   iree_vm_instance_t* instance = nullptr;
-  IREE_ASSERT_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance));
+  IREE_ASSERT_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
   // Create the driver/device as defined by the test and setup the HAL module.
   const auto& driver_name = GetParam().driver_name;
   LOG(INFO) << "Creating driver '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
-  ASSERT_API_OK(iree_hal_driver_registry_create_driver(
+  IREE_ASSERT_OK(iree_hal_driver_registry_create_driver(
       iree_string_view_t{driver_name.data(), driver_name.size()},
-      IREE_ALLOCATOR_SYSTEM, &driver));
+      iree_allocator_system(), &driver));
   iree_hal_device_t* device = nullptr;
-  ASSERT_API_OK(iree_hal_driver_create_default_device(
-      driver, IREE_ALLOCATOR_SYSTEM, &device));
+  IREE_ASSERT_OK(iree_hal_driver_create_default_device(
+      driver, iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
-  ASSERT_API_OK(
-      iree_hal_module_create(device, IREE_ALLOCATOR_SYSTEM, &hal_module));
+  IREE_ASSERT_OK(
+      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
   iree_hal_driver_release(driver);
 
   // Load bytecode module from the embedded data.
   LOG(INFO) << "Loading simple_module_test.mlir...";
   const auto* module_file_toc = simple_embedding_test_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
-  ASSERT_API_OK(iree_vm_bytecode_module_create(
+  IREE_ASSERT_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module));
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
   IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-      instance, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+      instance, modules.data(), modules.size(), iree_allocator_system(),
       &context));
   LOG(INFO) << "Module loaded and context is ready for use";
   iree_vm_module_release(hal_module);
@@ -112,10 +111,8 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // erased buffers.
   const char kMainFunctionName[] = "module.simple_mul$raw";
   iree_vm_function_t main_function;
-  CHECK_EQ(
-      IREE_STATUS_OK,
-      iree_vm_context_resolve_function(
-          context, iree_make_cstring_view(kMainFunctionName), &main_function))
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view(kMainFunctionName), &main_function))
       << "Exported function '" << kMainFunctionName << "' not found";
 
   // Allocate buffers that can be mapped on the CPU and that can also be used
@@ -124,12 +121,12 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   constexpr int kElementCount = 4;
   iree_hal_buffer_t* arg0_buffer = nullptr;
   iree_hal_buffer_t* arg1_buffer = nullptr;
-  ASSERT_API_OK(iree_hal_allocator_allocate_buffer(
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       iree_hal_device_allocator(device),
       iree_hal_memory_type_t(IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
       IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount, &arg0_buffer));
-  ASSERT_API_OK(iree_hal_allocator_allocate_buffer(
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       iree_hal_device_allocator(device),
       iree_hal_memory_type_t(IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
@@ -138,16 +135,16 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // Populate initial values for 4 * 2 = 8.
   float kFloat4 = 4.0f;
   float kFloat2 = 2.0f;
-  ASSERT_API_OK(iree_hal_buffer_fill(arg0_buffer, 0, IREE_WHOLE_BUFFER,
-                                     &kFloat4, sizeof(float)));
-  ASSERT_API_OK(iree_hal_buffer_fill(arg1_buffer, 0, IREE_WHOLE_BUFFER,
-                                     &kFloat2, sizeof(float)));
+  IREE_ASSERT_OK(iree_hal_buffer_fill(arg0_buffer, 0, IREE_WHOLE_BUFFER,
+                                      &kFloat4, sizeof(float)));
+  IREE_ASSERT_OK(iree_hal_buffer_fill(arg1_buffer, 0, IREE_WHOLE_BUFFER,
+                                      &kFloat2, sizeof(float)));
 
   // Setup call inputs with our buffers.
   // TODO(benvanik): make a macro/magic.
   vm::ref<iree_vm_list_t> inputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
-                                     IREE_ALLOCATOR_SYSTEM, &inputs));
+                                     iree_allocator_system(), &inputs));
   auto arg0_buffer_ref = iree_hal_buffer_move_ref(arg0_buffer);
   auto arg1_buffer_ref = iree_hal_buffer_move_ref(arg1_buffer);
   IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &arg0_buffer_ref));
@@ -156,13 +153,13 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
   IREE_ASSERT_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
-                                     IREE_ALLOCATOR_SYSTEM, &outputs));
+                                     iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
   LOG(INFO) << "Calling " << kMainFunctionName << "...";
   IREE_ASSERT_OK(iree_vm_invoke(context, main_function,
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
-                                IREE_ALLOCATOR_SYSTEM));
+                                iree_allocator_system()));
 
   // Get the result buffers from the invocation.
   LOG(INFO) << "Retreiving results...";
@@ -174,13 +171,13 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // Read back the results and ensure we got the right values.
   LOG(INFO) << "Reading back results...";
   iree_hal_mapped_memory_t mapped_memory;
-  ASSERT_API_OK(iree_hal_buffer_map(ret_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                    IREE_WHOLE_BUFFER, &mapped_memory));
+  IREE_ASSERT_OK(iree_hal_buffer_map(ret_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                     IREE_WHOLE_BUFFER, &mapped_memory));
   ASSERT_THAT(absl::Span<const float>(
                   reinterpret_cast<const float*>(mapped_memory.contents.data),
                   mapped_memory.contents.data_length / sizeof(float)),
               ::testing::ElementsAreArray({8.0f, 8.0f, 8.0f, 8.0f}));
-  ASSERT_API_OK(iree_hal_buffer_unmap(ret_buffer, &mapped_memory));
+  IREE_ASSERT_OK(iree_hal_buffer_unmap(ret_buffer, &mapped_memory));
   LOG(INFO) << "Results match!";
 
   inputs.reset();

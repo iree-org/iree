@@ -54,6 +54,7 @@ cc_test(
         "//iree/vm:ref_cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -63,7 +64,6 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/hal:api",
         "//iree/modules/hal",
         "//iree/vm",

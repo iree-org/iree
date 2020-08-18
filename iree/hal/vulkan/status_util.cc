@@ -14,13 +14,11 @@
 
 #include "iree/hal/vulkan/status_util.h"
 
-#include "iree/base/status.h"
-
 namespace iree {
 namespace hal {
 namespace vulkan {
 
-Status VkResultToStatus(VkResult result) {
+Status VkResultToStatus(VkResult result, SourceLocation loc) {
   switch (result) {
     // Success codes.
     case VK_SUCCESS:
@@ -49,14 +47,16 @@ Status VkResultToStatus(VkResult result) {
     // Error codes.
     case VK_ERROR_OUT_OF_HOST_MEMORY:
       // A host memory allocation has failed.
-      return ResourceExhaustedError("VK_ERROR_OUT_OF_HOST_MEMORY");
+      return ResourceExhaustedErrorBuilder(loc)
+             << "VK_ERROR_OUT_OF_HOST_MEMORY";
     case VK_ERROR_OUT_OF_DEVICE_MEMORY:
       // A device memory allocation has failed.
-      return ResourceExhaustedError("VK_ERROR_OUT_OF_DEVICE_MEMORY");
+      return ResourceExhaustedErrorBuilder(loc)
+             << "VK_ERROR_OUT_OF_DEVICE_MEMORY";
     case VK_ERROR_INITIALIZATION_FAILED:
       // Initialization of an object could not be completed for
       // implementation-specific reasons.
-      return InternalError("VK_ERROR_INITIALIZATION_FAILED");
+      return InternalErrorBuilder(loc) << "VK_ERROR_INITIALIZATION_FAILED";
     case VK_ERROR_DEVICE_LOST:
       // The logical or physical device has been lost.
       //
@@ -125,71 +125,77 @@ Status VkResultToStatus(VkResult result) {
       // command buffer is in the pending state, or whether resources are
       // considered in-use by the device, a return value of
       // VK_ERROR_DEVICE_LOST is equivalent to VK_SUCCESS.
-      return InternalError("VK_ERROR_DEVICE_LOST");
+      return InternalErrorBuilder(loc) << "VK_ERROR_DEVICE_LOST";
     case VK_ERROR_MEMORY_MAP_FAILED:
       // Mapping of a memory object has failed.
-      return InternalError("VK_ERROR_MEMORY_MAP_FAILED");
+      return InternalErrorBuilder(loc) << "VK_ERROR_MEMORY_MAP_FAILED";
     case VK_ERROR_LAYER_NOT_PRESENT:
       // A requested layer is not present or could not be loaded.
-      return UnimplementedError("VK_ERROR_LAYER_NOT_PRESENT");
+      return UnimplementedErrorBuilder(loc) << "VK_ERROR_LAYER_NOT_PRESENT";
     case VK_ERROR_EXTENSION_NOT_PRESENT:
       // A requested extension is not supported.
-      return UnimplementedError("VK_ERROR_EXTENSION_NOT_PRESENT");
+      return UnimplementedErrorBuilder(loc) << "VK_ERROR_EXTENSION_NOT_PRESENT";
     case VK_ERROR_FEATURE_NOT_PRESENT:
       // A requested feature is not supported.
-      return UnimplementedError("VK_ERROR_FEATURE_NOT_PRESENT");
+      return UnimplementedErrorBuilder(loc) << "VK_ERROR_FEATURE_NOT_PRESENT";
     case VK_ERROR_INCOMPATIBLE_DRIVER:
       // The requested version of Vulkan is not supported by the driver or is
       // otherwise incompatible for implementation-specific reasons.
-      return FailedPreconditionError("VK_ERROR_INCOMPATIBLE_DRIVER");
+      return FailedPreconditionErrorBuilder(loc)
+             << "VK_ERROR_INCOMPATIBLE_DRIVER";
     case VK_ERROR_TOO_MANY_OBJECTS:
       // Too many objects of the type have already been created.
-      return ResourceExhaustedError("VK_ERROR_TOO_MANY_OBJECTS");
+      return ResourceExhaustedErrorBuilder(loc) << "VK_ERROR_TOO_MANY_OBJECTS";
     case VK_ERROR_FORMAT_NOT_SUPPORTED:
       // A requested format is not supported on this device.
-      return UnimplementedError("VK_ERROR_FORMAT_NOT_SUPPORTED");
+      return UnimplementedErrorBuilder(loc) << "VK_ERROR_FORMAT_NOT_SUPPORTED";
     case VK_ERROR_FRAGMENTED_POOL:
       // A pool allocation has failed due to fragmentation of the pool’s memory.
       // This must only be returned if no attempt to allocate host or device
       // memory was made to accommodate the new allocation.
-      return ResourceExhaustedError("VK_ERROR_FRAGMENTED_POOL");
+      return ResourceExhaustedErrorBuilder(loc) << "VK_ERROR_FRAGMENTED_POOL";
     case VK_ERROR_OUT_OF_POOL_MEMORY:
       // A pool memory allocation has failed. This must only be returned if no
       // attempt to allocate host or device memory was made to accommodate the
       // new allocation. If the failure was definitely due to fragmentation of
       // the pool, VK_ERROR_FRAGMENTED_POOL should be returned instead.
-      return ResourceExhaustedError("VK_ERROR_OUT_OF_POOL_MEMORY");
+      return ResourceExhaustedErrorBuilder(loc)
+             << "VK_ERROR_OUT_OF_POOL_MEMORY";
     case VK_ERROR_INVALID_EXTERNAL_HANDLE:
       // An external handle is not a valid handle of the specified type.
-      return InvalidArgumentError("VK_ERROR_INVALID_EXTERNAL_HANDLE");
+      return InvalidArgumentErrorBuilder(loc)
+             << "VK_ERROR_INVALID_EXTERNAL_HANDLE";
     case VK_ERROR_SURFACE_LOST_KHR:
       // A surface is no longer available.
-      return UnavailableError("VK_ERROR_SURFACE_LOST_KHR");
+      return UnavailableErrorBuilder(loc) << "VK_ERROR_SURFACE_LOST_KHR";
     case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
       // The requested window is already in use by Vulkan or another API in a
       // manner which prevents it from being used again.
-      return InvalidArgumentError("VK_ERROR_NATIVE_WINDOW_IN_USE_KHR");
+      return InvalidArgumentErrorBuilder(loc)
+             << "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
     case VK_ERROR_OUT_OF_DATE_KHR:
       // A surface has changed in such a way that it is no longer compatible
       // with the swapchain, and further presentation requests using the
       // swapchain will fail. Applications must query the new surface properties
       // and recreate their swapchain if they wish to continue presenting to the
       // surface.
-      return FailedPreconditionError("VK_ERROR_OUT_OF_DATE_KHR");
+      return FailedPreconditionErrorBuilder(loc) << "VK_ERROR_OUT_OF_DATE_KHR";
     case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
       // The display used by a swapchain does not use the same presentable image
       // layout, or is incompatible in a way that prevents sharing an image.
-      return InvalidArgumentError("VK_ERROR_INCOMPATIBLE_DISPLAY_KHR");
+      return InvalidArgumentErrorBuilder(loc)
+             << "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
     case VK_ERROR_VALIDATION_FAILED_EXT:
       // Validation layer testing failed. It is not expected that an
       // application would see this this error code during normal use of the
       // validation layers.
-      return InvalidArgumentError("VK_ERROR_VALIDATION_FAILED_EXT");
+      return InvalidArgumentErrorBuilder(loc)
+             << "VK_ERROR_VALIDATION_FAILED_EXT";
     case VK_ERROR_INVALID_SHADER_NV:
       // One or more shaders failed to compile or link. More details are
       // reported back to the application when the validation layer is enabled
       // using the extension VK_EXT_debug_report.
-      return InvalidArgumentError("VK_ERROR_INVALID_SHADER_NV");
+      return InvalidArgumentErrorBuilder(loc) << "VK_ERROR_INVALID_SHADER_NV";
     case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT:
       // When creating an image with
       // VkImageDrmFormatModifierExplicitCreateInfoEXT, it is the application’s
@@ -201,28 +207,30 @@ Status VkResultToStatus(VkResult result) {
       // outside the scope of Vulkan, and therefore not described by Valid Usage
       // requirements). If this validation fails, then vkCreateImage returns
       // VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT.
-      return InvalidArgumentError(
-          "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT");
+      return InvalidArgumentErrorBuilder(loc)
+             << "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT";
     case VK_ERROR_FRAGMENTATION_EXT:
       // A descriptor pool creation has failed due to fragmentation.
-      return ResourceExhaustedError("VK_ERROR_FRAGMENTATION_EXT");
+      return ResourceExhaustedErrorBuilder(loc) << "VK_ERROR_FRAGMENTATION_EXT";
     case VK_ERROR_NOT_PERMITTED_EXT:
       // When creating a queue, the caller does not have sufficient privileges
       // to request to acquire a priority above the default priority
       // (VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT).
-      return PermissionDeniedError("VK_ERROR_NOT_PERMITTED_EXT");
+      return PermissionDeniedErrorBuilder(loc) << "VK_ERROR_NOT_PERMITTED_EXT";
     case VK_ERROR_INVALID_DEVICE_ADDRESS_EXT:
       // A buffer creation failed because the requested address is not
       // available.
-      return OutOfRangeError("VK_ERROR_INVALID_DEVICE_ADDRESS_EXT");
+      return OutOfRangeErrorBuilder(loc)
+             << "VK_ERROR_INVALID_DEVICE_ADDRESS_EXT";
     case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
       // An operation on a swapchain created with
       // VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed as it did
       // not have exlusive full-screen access. This may occur due to
       // implementation-dependent reasons, outside of the application’s control.
-      return UnavailableError("VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT");
+      return UnavailableErrorBuilder(loc)
+             << "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
     default:
-      return UnknownError(std::to_string(result));
+      return UnknownErrorBuilder(loc) << result;
   }
 }
 

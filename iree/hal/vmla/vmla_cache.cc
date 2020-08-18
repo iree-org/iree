@@ -14,7 +14,6 @@
 
 #include "iree/hal/vmla/vmla_cache.h"
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
@@ -47,7 +46,7 @@ StatusOr<ref_ptr<Executable>> VMLACache::PrepareExecutable(
   // Wrap the data (or copy it).
   bool allow_aliasing_data =
       AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto executable,
       VMLAExecutable::Load(instance_, vmla_module_, spec, allow_aliasing_data));
 

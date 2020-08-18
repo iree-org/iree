@@ -20,7 +20,6 @@
 #include "absl/memory/memory.h"
 #include "iree/base/file_mapping.h"
 #include "iree/base/memory.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -129,7 +128,7 @@ Status FlatBufferFileBase::LoadFile(Identifier identifier, std::string path,
                                     VerifierFn verifier_fn) {
   IREE_TRACE_SCOPE0("FlatBufferFileBase::LoadFile");
 
-  ASSIGN_OR_RETURN(auto file_mapping, FileMapping::OpenRead(path));
+  IREE_ASSIGN_OR_RETURN(auto file_mapping, FileMapping::OpenRead(path));
   auto buffer_data = file_mapping->data();
 
   auto handle_baton = IreeMoveToLambda(file_mapping);
