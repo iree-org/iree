@@ -23,24 +23,32 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-static LogicalResult translateReturnOpToC(mlir::emitc::CppEmitter &emitter,
-                                          IREE::VM::ReturnOp returnOp,
-                                          llvm::raw_ostream &output) {
-  int outputIndex = 0;
-  for (auto operand : returnOp.getOperands()) {
-    output << "*out" << outputIndex++ << " = "
-           << emitter.getOrCreateName(operand) << ";\n";
+static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                     IREE::VM::FuncOp &funcOp) {
+  return std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
+}
+
+static LogicalResult translateReturnOpToC(
+    mlir::emitc::CppEmitter &emitter, IREE::VM::ReturnOp returnOp,
+    llvm::raw_ostream &output, std::vector<std::string> resultNames) {
+  for (std::tuple<Value, std::string> tuple :
+       llvm::zip(returnOp.getOperands(), resultNames)) {
+    Value operand = std::get<0>(tuple);
+    std::string resultName = std::get<1>(tuple);
+    output << "*" << resultName << " = " << emitter.getOrCreateName(operand)
+           << ";\n";
   }
 
-  output << "return IREE_STATUS_OK;\n";
+  output << "return iree_ok_status();\n";
 
   return success();
 }
 
 static LogicalResult translateOpToC(mlir::emitc::CppEmitter &emitter,
-                                    Operation &op, llvm::raw_ostream &output) {
+                                    Operation &op, llvm::raw_ostream &output,
+                                    std::vector<std::string> resultNames) {
   if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
-    return translateReturnOpToC(emitter, returnOp, output);
+    return translateReturnOpToC(emitter, returnOp, output, resultNames);
   if (succeeded(emitter.emitOperation(op))) {
     return success();
   }
@@ -49,11 +57,12 @@ static LogicalResult translateOpToC(mlir::emitc::CppEmitter &emitter,
 }
 
 static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
-                                          IREE::VM::FuncOp funcOp,
+                                          IREE::VM::ModuleOp &moduleOp,
+                                          IREE::VM::FuncOp &funcOp,
                                           llvm::raw_ostream &output) {
   emitc::CppEmitter::Scope scope(emitter);
 
-  output << "iree_status_t " << funcOp.getName() << "(";
+  output << "iree_status_t " << buildFunctionName(moduleOp, funcOp) << "(";
 
   mlir::emitc::interleaveCommaWithError(
       funcOp.getArguments(), output, [&](auto arg) -> LogicalResult {
@@ -68,22 +77,32 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
     output << ", ";
   }
 
-  int outputIndex = 0;
-  mlir::emitc::interleaveCommaWithError(funcOp.getType().getResults(), output,
-                                        [&](Type type) -> LogicalResult {
-                                          if (failed(emitter.emitType(type))) {
-                                            return failure();
-                                          }
-                                          output << " *out_" << outputIndex++;
-                                          return success();
-                                        });
+  std::vector<std::string> resultNames;
+  for (size_t idx = 0; idx < funcOp.getNumResults(); idx++) {
+    std::string resultName("out");
+    resultName.append(std::to_string(idx));
+    resultNames.push_back(resultName);
+  }
+
+  mlir::emitc::interleaveCommaWithError(
+      llvm::zip(funcOp.getType().getResults(), resultNames), output,
+      [&](std::tuple<Type, std::string> tuple) -> LogicalResult {
+        Type type = std::get<0>(tuple);
+        std::string resultName = std::get<1>(tuple);
+
+        if (failed(emitter.emitType(type))) {
+          return failure();
+        }
+        output << " *" << resultName;
+        return success();
+      });
 
   output << ") {\n";
 
   for (auto &op : funcOp.getOps()) {
-    if (failed(translateOpToC(emitter, op, output))) {
+    if (failed(translateOpToC(emitter, op, output, resultNames))) {
       return failure();
-    };
+    }
   }
 
   output << "}\n";
@@ -100,9 +119,9 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   output << "\n";
 
   for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-    if (failed(translateFunctionToC(emitter, funcOp, output))) {
+    if (failed(translateFunctionToC(emitter, moduleOp, funcOp, output))) {
       return failure();
-    };
+    }
 
     output << "\n";
   }
