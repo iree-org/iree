@@ -178,6 +178,7 @@ StatusOr<std::string> PrepareModule(
   IREE_TRACE_SCOPE0("PrepareModule");
 
   mlir::MLIRContext context;
+  context.loadAllGloballyRegisteredDialects();
 
   // Parse input MLIR module.
   llvm::SourceMgr source_mgr;
