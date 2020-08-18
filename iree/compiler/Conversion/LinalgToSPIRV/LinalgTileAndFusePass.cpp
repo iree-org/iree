@@ -126,6 +126,7 @@ LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
     Convolution = 0x1,
     Matmul = 0x2,
     Pooling = 0x4,
+    BatchMatmul = 0x8,
   };
   uint32_t opInfo = OpInfo::None;
   for (linalg::LinalgOp linalgOp : linalgOps) {
@@ -134,6 +135,8 @@ LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
       opInfo |= OpInfo::Convolution;
     else if (isa<linalg::MatmulOp>(op))
       opInfo |= OpInfo::Matmul;
+    else if (isa<linalg::BatchMatmulOp>(op))
+      opInfo |= OpInfo::BatchMatmul;
     else if (isa<linalg::PoolingMaxOp>(op))
       opInfo |= OpInfo::Pooling;
     else if (isa<linalg::PoolingMinOp>(op))
@@ -166,6 +169,11 @@ LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
     // TODO: For now just hard wire this, but we can do better.
     tileSizes = {8, 8, 4};
     workgroupSize = {8, 8, 1};
+    return success();
+  }
+  if (opInfo & OpInfo::BatchMatmul) {
+    tileSizes = {2, 8, 8, 4};
+    workgroupSize = {8, 8, 2};
     return success();
   }
   if (opInfo & OpInfo::Pooling) {
@@ -237,6 +245,36 @@ struct TileMatmulPattern
     if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
         failed(updateWorkGroupSize(funcOp, workgroupSize)))
       return failure();
+    funcOp.setAttr(getWorkgroupCountAttrName(),
+                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                       WorkgroupCountMethodology::ResultShape)));
+    return success();
+  }
+
+  SmallVector<int64_t, 3> workgroupSize;
+};
+
+struct TileBatchMatmulPattern
+    : public linalg::LinalgTilingPattern<linalg::BatchMatmulOp> {
+  using Base = linalg::LinalgTilingPattern<linalg::BatchMatmulOp>;
+  TileBatchMatmulPattern(MLIRContext *context,
+                         linalg::LinalgTilingOptions options,
+                         ArrayRef<int64_t> workgroupSize,
+                         PatternBenefit benefit = 1)
+      : Base(context, options,
+             linalg::LinalgMarker(
+                 ArrayRef<Identifier>(),
+                 Identifier::get(getWorkgroupMarker(), context)),
+             benefit),
+        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    FuncOp funcOp = op->getParentOfType<FuncOp>();
+    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
+        failed(updateWorkGroupSize(funcOp, this->workgroupSize))) {
+      return failure();
+    }
     funcOp.setAttr(getWorkgroupCountAttrName(),
                    rewriter.getI32IntegerAttr(static_cast<int32_t>(
                        WorkgroupCountMethodology::ResultShape)));
@@ -374,15 +412,16 @@ void LinalgTileAndFusePass::runOnFunction() {
   });
 
   OwningRewritePatternList tilingPatterns;
-  tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>, TileMatmulPattern,
-                        TileConvPoolPattern<linalg::PoolingMaxOp>,
-                        TileConvPoolPattern<linalg::PoolingMinOp>,
-                        TileConvPoolPattern<linalg::PoolingSumOp>>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setTileSizes(tileSizeCalculator.getTileSizes())
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      tileSizeCalculator.getWorkgroupSize());
+  tilingPatterns
+      .insert<TileConvPoolPattern<linalg::ConvOp>, TileMatmulPattern,
+              TileBatchMatmulPattern, TileConvPoolPattern<linalg::PoolingMaxOp>,
+              TileConvPoolPattern<linalg::PoolingMinOp>,
+              TileConvPoolPattern<linalg::PoolingSumOp>>(
+          context,
+          linalg::LinalgTilingOptions()
+              .setTileSizes(tileSizeCalculator.getTileSizes())
+              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
+          tileSizeCalculator.getWorkgroupSize());
   applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
   if (useWorkgroupMemory) {
