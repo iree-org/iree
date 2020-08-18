@@ -256,13 +256,14 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
   rewriter.setInsertionPointToStart(&newPLoopOp.getLoopBody().front());
   Value loopIv = *newPLoopOp.getInductionVars().begin();
   BlockAndValueMapping map;
+  edsc::ScopedContext scope(rewriter, loc);
+  using namespace edsc::op;
   for (int i : llvm::seq<int>(0, numLoops)) {
     Value iterNum =
         rewriter.create<SignedDivIOp>(loc, loopIv, iterationStride[i]);
-    Value newIv = rewriter.create<AddIOp>(
-        loc, lbs[i], rewriter.create<MulIOp>(loc, iterNum, steps[i]));
+    Value newIv = lbs[i] + (iterNum * steps[i]);
     map.map(pLoopBody.getArgument(i), newIv);
-    loopIv = rewriter.create<SignedRemIOp>(loc, loopIv, iterationStride[i]);
+    if (i != numLoops - 1) loopIv = loopIv % iterationStride[i];
   }
   for (Operation &op : pLoopBody.without_terminator()) {
     rewriter.clone(op, map);
@@ -618,26 +619,9 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
       hasMarker(linalgOp, {getWorkgroupMarker(), getWorkgroupMemoryMarker()}));
 }
 
-/// CopyOp that are loading to/storing from workgroup memory are special cased
-/// to use all workitems to do a copy. This is done by linearizing the copy
-/// operation.
-// TODO(ravishankarm): This linearization is achieved through collapsing the
-// generated parallel loops from a multi-dimensional copy. Such lowering results
-// in mods/divs in the collapsed loop body. This can be removed by reshaping the
-// copy to be a 1D copy. This seems to be hitting an error in reshape
-// canonicalization. Investigate this further.
-template <>
-LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
-    linalg::CopyOp copyOp, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) {
-  if (!hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) return failure();
-  Optional<linalg::LinalgLoops> loops =
-      linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, copyOp);
-  if (!loops) return failure();
-  if (loops.getValue().empty()) return success();
-
-  scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
-  if (!pLoopOp) return success();
+static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
+                                      scf::ParallelOp pLoopOp,
+                                      ConversionPatternRewriter &rewriter) {
   pLoopOp = collapseParallelLoops(rewriter, pLoopOp);
   if (!pLoopOp) return failure();
 
@@ -658,6 +642,28 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
   }
   return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount.id,
                                           idAndCount.count);
+}
+/// CopyOp that are loading to/storing from workgroup memory are special cased
+/// to use all workitems to do a copy. This is done by linearizing the copy
+/// operation.
+// TODO(ravishankarm): This linearization is achieved through collapsing the
+// generated parallel loops from a multi-dimensional copy. Such lowering results
+// in mods/divs in the collapsed loop body. This can be removed by reshaping the
+// copy to be a 1D copy. This seems to be hitting an error in reshape
+// canonicalization. Investigate this further.
+template <>
+LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
+    linalg::CopyOp copyOp, ArrayRef<Value> operands,
+    ConversionPatternRewriter &rewriter) {
+  if (!hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) return failure();
+  Optional<linalg::LinalgLoops> loops =
+      linalg::linalgLowerOpToLoops<scf::ParallelOp>(rewriter, copyOp);
+  if (!loops) return failure();
+  if (loops.getValue().empty()) return success();
+
+  scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
+  if (!pLoopOp) return success();
+  return distributeCopyOp(copyOp, pLoopOp, rewriter);
 }
 
 /// Map tiled linalg op to workitems by lowering it to scf.parallel and
@@ -740,9 +746,60 @@ struct RemoveLinalgRange : public OpConversionPattern<linalg::RangeOp> {
 };
 }  // namespace
 
-void populateParallelLoopToWorkgroupPatterns(
+static LogicalResult linalgCopyToVector(linalg::CopyOp copyOp,
+                                        ArrayRef<Value> operands,
+                                        ConversionPatternRewriter &rewriter) {
+  linalg::LinalgTilingOptions options;
+  // Tile to memory access of 128bits as those tend to be optimal on most GPUs.
+  constexpr unsigned vecLoadSize = 128;
+  unsigned elementSize = copyOp.getSource()
+                             .getType()
+                             .cast<MemRefType>()
+                             .getElementType()
+                             .getIntOrFloatBitWidth();
+  if (elementSize == 0 || vecLoadSize % elementSize != 0) return failure();
+  unsigned numElement = vecLoadSize / elementSize;
+  options.setTileSizes({1, numElement})
+      .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops);
+  Optional<linalg::TiledLinalgOp> tiledOp = linalg::tileLinalgOp(
+      rewriter, cast<linalg::LinalgOp>(copyOp.getOperation()), options);
+  if (!tiledOp) return failure();
+  if (tiledOp->loops.empty()) return success();
+  setMarker(tiledOp->op, getVectorizeMarker());
+  scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(tiledOp->loops[0]);
+  return distributeCopyOp(copyOp, pLoopOp, rewriter);
+}
+
+namespace {
+// Pattern to tile and distribute linalg::copyOp.
+struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
+  using OpConversionPattern<linalg::CopyOp>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      linalg::CopyOp linalgOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!hasMarker(linalgOp, getCopyToWorkgroupMemoryMarker()))
+      return failure();
+    if (failed(linalgCopyToVector(linalgOp, operands, rewriter)))
+      return failure();
+
+    // Insert a barrier if read or write shared memory.
+    if (llvm::any_of(linalgOp.getOperands(), [](Value output) {
+          return output.getType().cast<MemRefType>().getMemorySpace() ==
+                 getWorkgroupMemorySpace();
+        })) {
+      rewriter.create<spirv::ControlBarrierOp>(
+          linalgOp.getLoc(), spirv::Scope::Workgroup, spirv::Scope::Workgroup,
+          spirv::MemorySemantics::AcquireRelease);
+    }
+    rewriter.eraseOp(linalgOp);
+    return success();
+  }
+};
+}  // namespace
+
+void populateLinalgTileAndDistributePatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<PartitionPLoopToWorkgroups>(context);
+  patterns.insert<TileAndDistributeCopyOp>(context);
 }
 
 void ConvertToGPUPass::runOnFunction() {

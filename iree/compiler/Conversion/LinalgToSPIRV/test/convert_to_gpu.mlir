@@ -23,7 +23,11 @@ module attributes {
     return
   }
 }
-// CHECK-LABEL: func @parallel_4D
+// CHECK: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s1 mod s0)>
+// CHECK: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((s2 mod s0) mod s1)>
+// CHECK: #[[MAP2:.+]] = affine_map<()[s0, s1, s2, s3] -> (((s3 mod s0) mod s1) mod s2)>
+
+// CHECK: func @parallel_4D
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]>
 //  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
@@ -45,11 +49,11 @@ module attributes {
 //       CHECK:     %[[COND:.+]] = cmpi "slt", %[[IV]], %[[UB]]
 //       CHECK:     scf.if %[[COND]]
 //       CHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[T5]]
-//       CHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[T5]]
+//       CHECK:       %[[T14:.+]] = affine.apply #[[MAP0]]()[%[[T5]], %[[IV]]]
 //       CHECK:       %[[IV1:.+]] = divi_signed %[[T14]], %[[T4]]
-//       CHECK:       %[[T16:.+]] = remi_signed %[[T14]], %[[T4]]
+//       CHECK:       %[[T16:.+]] = affine.apply #[[MAP1]]()[%[[T5]], %[[T4]], %[[IV]]]
 //       CHECK:       %[[IV2:.+]] = divi_signed %[[T16]], %[[UB3]]
-//       CHECK:       %[[IV3:.+]] = remi_signed %[[T16]], %[[UB3]]
+//       CHECK:       %[[IV3:.+]] = affine.apply #[[MAP2]]()[%[[T5]], %[[T4]], %[[UB3]], %[[IV]]]
 //       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 //       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
 //       CHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
@@ -116,7 +120,9 @@ module {
   }
 }
 
-// CHECK-LABEL: func @reduce_sum
+// CHECK: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s1 mod s0)>
+
+// CHECK: func @reduce_sum
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]> : vector<3xi32>
 //  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
@@ -129,7 +135,7 @@ module {
 //       CHECK:     %[[COND:.+]] = cmpi "slt", %{{.+}}, %[[UB]]
 //       CHECK:     scf.if %[[COND]]
 //       CHECK:       %[[IV0:.+]] = divi_signed %{{.+}}, %[[UB1]]
-//       CHECK:       %[[IV1:.+]] = remi_signed %{{.+}}, %[[UB1]]
+//       CHECK:       %[[IV1:.+]] = affine.apply #[[MAP0]]()[%[[UB1]], %{{.+}}]
 //       CHECK:       scf.for %[[IV:.+]] = %{{.+}} to %[[UB2]]
 //       CHECK:         %[[ISZERO:.+]] = cmpi "eq", %[[IV]], %[[C0]]
 
