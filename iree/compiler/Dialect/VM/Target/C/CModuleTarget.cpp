@@ -24,8 +24,32 @@ namespace IREE {
 namespace VM {
 
 static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
-                                     IREE::VM::FuncOp &funcOp) {
-  return std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
+                                     IREE::VM::FuncOp &funcOp,
+                                     bool implSuffix) {
+  std::string functionName =
+      std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
+
+  return implSuffix ? functionName + "_impl" : functionName;
+}
+
+static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
+                               llvm::raw_ostream &output) {
+  output << "//" << std::string(77, '=') << "\n"
+         << "// module \"" << moduleOp.getName()
+         << "\"\n"
+            "//"
+         << std::string(77, '=') << "\n";
+  output << "\n";
+}
+
+static void printSeparatingComment(llvm::raw_ostream &output) {
+  output << "//" << std::string(77, '=')
+         << "\n"
+            "// The code below setups functions and lookup tables to "
+            "implement the vm\n"
+            "// interface\n"
+            "//"
+         << std::string(77, '=') << "\n";
 }
 
 static LogicalResult translateReturnOpToC(
@@ -62,7 +86,11 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
                                           llvm::raw_ostream &output) {
   emitc::CppEmitter::Scope scope(emitter);
 
-  output << "iree_status_t " << buildFunctionName(moduleOp, funcOp) << "(";
+  // this function later gets wrapped with argument marshalling code
+  std::string functionName =
+      buildFunctionName(moduleOp, funcOp, /*implSuffix=*/true);
+
+  output << "iree_status_t " << functionName << "(";
 
   mlir::emitc::interleaveCommaWithError(
       funcOp.getArguments(), output, [&](auto arg) -> LogicalResult {
@@ -110,21 +138,17 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
   return success();
 }
 
-LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
-                                 llvm::raw_ostream &output) {
-  mlir::emitc::CppEmitter emitter(output);
-  mlir::emitc::CppEmitter::Scope scope(emitter);
-
-  output << "#include \"vm_c_funcs.h\"\n";
-  output << "\n";
-
-  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-    if (failed(translateFunctionToC(emitter, moduleOp, funcOp, output))) {
-      return failure();
-    }
-
-    output << "\n";
-  }
+static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
+                                            llvm::raw_ostream &output) {
+  // TODO(simon-camp) generate boilerplate code
+  //   * import/export table
+  //   * module descriptor
+  //   * module struct
+  //   * module state struct
+  //   * function wrappers
+  //   * function table
+  //   * begin_call function
+  //   * create function
 
   return success();
 }
@@ -144,7 +168,46 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
     return outerModuleOp.emitError()
            << "outer module does not contain a vm.module op";
   }
-  return translateModuleToC(*moduleOps.begin(), output);
+
+  auto printInlcude = [&output](std::string include) {
+    output << "#include \"" << include << "\"\n";
+  };
+
+  printInlcude("iree/vm/context.h");
+  printInlcude("iree/vm/instance.h");
+  printInlcude("iree/vm/native_module.h");
+  printInlcude("iree/vm/ref.h");
+  printInlcude("iree/vm/stack.h");
+  output << "\n";
+
+  printInlcude("iree/compiler/Dialect/VM/Target/C/vm_c_funcs.h");
+  output << "\n";
+
+  for (auto moduleOp : moduleOps) {
+    printModuleComment(moduleOp, output);
+
+    mlir::emitc::CppEmitter emitter(output);
+    mlir::emitc::CppEmitter::Scope scope(emitter);
+
+    // translate functions
+    for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
+      if (failed(translateFunctionToC(emitter, moduleOp, funcOp, output))) {
+        return failure();
+      }
+
+      output << "\n";
+    }
+  }
+
+  printSeparatingComment(output);
+
+  for (auto moduleOp : moduleOps) {
+    // generate module descriptors
+    if (failed(buildModuleDescriptors(moduleOp, output))) {
+      return failure();
+    }
+  }
+  return success();
 }
 
 }  // namespace VM
