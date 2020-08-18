@@ -494,6 +494,49 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
                  "Error moving buffer view");
 }
 
+std::vector<std::string> SerializeVmVariantList(VmVariantList& vm_list) {
+  LOG(INFO) << "SerializeVmVariantList: " << vm_list.DebugString();
+
+  std::vector<std::string> results;
+  for (iree_host_size_t i = 0, e = vm_list.size(); i < e; ++i) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    iree_status_t status =
+        iree_vm_list_get_variant(vm_list.raw_ptr(), i, &variant);
+    if (!iree_status_is_ok(status)) {
+      RaiseValueError("Failed to get vm variant from list");
+    }
+
+    if (iree_vm_variant_is_value(variant)) {
+      results.push_back("i32=" + std::to_string(variant.i32));
+    } else if (iree_vm_variant_is_ref(variant) &&
+               iree_hal_buffer_view_isa(&variant.ref)) {
+      auto buffer_view = iree_hal_buffer_view_deref(&variant.ref);
+
+      std::string result_str(4096, '\0');
+      iree_status_t status;
+      do {
+        iree_host_size_t actual_length = 0;
+        iree_host_size_t max_element_count =
+            std::numeric_limits<iree_host_size_t>::max();
+        status = iree_hal_buffer_view_format(buffer_view, max_element_count,
+                                             result_str.size() + 1,
+                                             &result_str[0], &actual_length);
+        result_str.resize(actual_length);
+      } while (iree_status_is_out_of_range(status));
+      if (!iree_status_is_ok(status)) {
+        RaiseValueError(
+            "Failed to create a string representation of the inputs.");
+      }
+
+      results.push_back(result_str);
+    } else {
+      RaiseValueError(
+          "Expected vm_list's elements to be scalars or buffer views.");
+    }
+  }
+  return results;
+}
+
 void SetupFunctionAbiBindings(pybind11::module m) {
   py::class_<FunctionAbi, std::unique_ptr<FunctionAbi>>(m, "FunctionAbi")
       .def(py::init(&PyCreateAbi))
@@ -505,6 +548,10 @@ void SetupFunctionAbiBindings(pybind11::module m) {
              return PyRawPack(self,
                               absl::MakeConstSpan(self->raw_config().inputs),
                               py_args, false /* writable */);
+           })
+      .def("serialize_vm_list",
+           [](FunctionAbi* self, VmVariantList& vm_list) {
+             return SerializeVmVariantList(vm_list);
            })
       .def("allocate_results", &PyAllocateResults, py::arg("f_results"),
            py::arg("static_alloc") = true)

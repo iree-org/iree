@@ -124,6 +124,8 @@ class ModuleCall:
                method: str,
                inputs: Tuple[Any],
                outputs: Tuple[Any],
+               serialized_inputs: Tuple[str],
+               serialized_outputs: Tuple[str],
                rtol: float = 1e-6,
                atol: float = 1e-6):
     """Records the details of a call to a CompiledModule."""
@@ -142,6 +144,9 @@ class ModuleCall:
       outputs = tuple()
     self.outputs = outputs if isinstance(outputs, tuple) else (outputs,)
 
+    self.serialized_inputs = serialized_inputs
+    self.serialized_outputs = serialized_outputs
+
     self.rtol = rtol
     self.atol = atol
 
@@ -150,7 +155,7 @@ class ModuleCall:
     return self.rtol, self.atol
 
   def _get_shape_and_dtype(self, value: Any) -> str:
-    if isinstance(value, (int, float, np.ndarray)):
+    if isinstance(value, np.ndarray):
       return tf_utils.get_shape_and_dtype(value, allow_non_mlir_dtype=True)
     else:
       return str(type(value))
@@ -187,7 +192,13 @@ class ModuleCall:
     """
     os.makedirs(call_dir, exist_ok=True)
 
-    metadata = {"method": self.method, "rtol": self.rtol, "atol": self.atol}
+    metadata = {
+        "method": self.method,
+        "serialized_inputs": self.serialized_inputs,
+        "serialized_outputs": self.serialized_outputs,
+        "rtol": self.rtol,
+        "atol": self.atol
+    }
     with open(os.path.join(call_dir, "metadata.pkl"), "wb") as f:
       pickle.dump(metadata, f)
 
@@ -436,20 +447,20 @@ class Trace:
       call.serialize(call_dir)
 
     # C++ Serialization.
-    flagfile = []
-    if self.compiled_path is not None:
-      # Can be overridden with another flag after the flagfile.
-      flagfile.append(f"--input_file={self.compiled_path}")
-    flagfile.append(f"--driver={self.backend_driver}")
-    inputs_str = ", ".join(
-        [tf_utils.to_iree_data_string(value) for value in self.calls[0].inputs])
-    flagfile.append(f"--inputs={inputs_str}")
-    flagfile.append(f"--entry_function={self.calls[0].method}")
-    flagfile = "\n".join(flagfile)
+    if "tf" not in self.backend:
+      flagfile = []
+      if self.compiled_path is not None:
+        # Can be overridden with another flag after the flagfile.
+        flagfile.append(f"--input_file={self.compiled_path}")
+      flagfile.append(f"--driver={self.backend_driver}")
+      inputs_str = ", ".join(self.calls[0].serialized_inputs)
+      flagfile.append(f"--inputs={inputs_str}")
+      flagfile.append(f"--entry_function={self.calls[0].method}")
+      flagfile = "\n".join(flagfile)
 
-    with open(os.path.join(trace_dir, "flagfile"), "w") as f:
-      f.write(flagfile)
-      f.write("\n")
+      with open(os.path.join(trace_dir, "flagfile"), "w") as f:
+        f.write(flagfile)
+        f.write("\n")
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":
@@ -508,8 +519,10 @@ class TracedModule:
 
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)
+      serialized_inputs, serialized_outputs = method.get_serialized_values()
       self._trace.calls.append(
-          ModuleCall(method_name, args, outputs, **tolerances))
+          ModuleCall(method_name, args, outputs, serialized_inputs,
+                     serialized_outputs, **tolerances))
       return outputs
 
     return call
@@ -528,8 +541,8 @@ class TracedModule:
 
 
 def compile_module(
-    module_class: Type[tf.Module],
-    exported_names: Sequence[str] = ()) -> Callable[[Any], Any]:
+    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
+) -> Callable[[Any], Any]:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
@@ -593,16 +606,15 @@ class TracedModuleTestCase(tf.test.TestCase):
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
     # Get the backend information for this test.
-    ref_backend_info = tf_utils.BackendInfo(
-        FLAGS.reference_backend, f"{FLAGS.reference_backend}_ref")
+    ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
+                                            f"{FLAGS.reference_backend}_ref")
     tar_backend_infos = get_target_backends()
 
     global _global_ref_module
     global _global_tar_modules
     _global_ref_module = cls._compile(ref_backend_info)
     _global_tar_modules = [
-        cls._compile(backend_info)
-        for backend_info in tar_backend_infos
+        cls._compile(backend_info) for backend_info in tar_backend_infos
     ]
 
   def setUp(self) -> None:

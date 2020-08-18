@@ -58,18 +58,16 @@ def _create_default_iree_driver(
   driver_exceptions = {}
   for driver_name in driver_names:
     if driver_name not in available_driver_names:
-      print(
-          "Could not create driver %s (not registered)" % driver_name,
-          file=sys.stderr)
+      print("Could not create driver %s (not registered)" % driver_name,
+            file=sys.stderr)
       continue
     try:
       driver = _binding.HalDriver.create(driver_name)
       # TODO(laurenzo): Remove these prints to stderr (for now, more information
       # is better and there is no better way to report it yet).
     except Exception as ex:  # pylint: disable=broad-except
-      print(
-          "Could not create default driver %s: %r" % (driver_name, ex),
-          file=sys.stderr)
+      print("Could not create default driver %s: %r" % (driver_name, ex),
+            file=sys.stderr)
       driver_exceptions[driver_name] = ex
       continue
 
@@ -80,9 +78,8 @@ def _create_default_iree_driver(
     try:
       device = driver.create_default_device()
     except Exception as ex:
-      print(
-          "Could not create default driver device %s: %r" % (driver_name, ex),
-          file=sys.stderr)
+      print("Could not create default driver device %s: %r" % (driver_name, ex),
+            file=sys.stderr)
       driver_exceptions[driver_name] = ex
       continue
 
@@ -134,14 +131,18 @@ class BoundFunction:
     self._context = context
     self._vm_function = vm_function
     self._abi = context.create_function_abi(vm_function)
+    self._serialized_inputs = None
+    self._serialized_outputs = None
 
   def __call__(self, *args):
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy
     # flag that can allow it to be overridden.
     inputs = self._abi.raw_pack_inputs(args)
+    self._serialized_inputs = self._abi.serialize_vm_list(inputs)
     results = self._abi.allocate_results(inputs, static_alloc=False)
     self._context._vm_context.invoke(self._vm_function, inputs, results)
+    self._serialized_outputs = self._abi.serialize_vm_list(results)
     unpacked_results = self._abi.raw_unpack_results(results)
     # TODO(laurenzo): When switching from 'raw' to structured pack/unpack,
     # the ABI should take care of this one-arg special case.
@@ -157,6 +158,12 @@ class BoundFunction:
         self._abi,
         self._vm_function,
     )
+
+  def get_serialized_values(self):
+    if self._serialized_inputs is None:
+      raise RuntimeError("Attempted to call get_serialized_values() before "
+                         "any values were passed.")
+    return tuple(self._serialized_inputs), tuple(self._serialized_outputs)
 
 
 class BoundModule:
@@ -219,8 +226,8 @@ class SystemContext:
     else:
       init_modules = None
 
-    self._vm_context = _binding.VmContext(
-        instance=self._config.vm_instance, modules=init_modules)
+    self._vm_context = _binding.VmContext(instance=self._config.vm_instance,
+                                          modules=init_modules)
 
     if self._is_dynamic:
       self._vm_context.register_modules(self._config.default_modules)

@@ -89,6 +89,7 @@ def save_input_values(inputs: Sequence[np.ndarray],
       f.write("\n")
   return result
 
+
 def backends_to_str(backend_infos: Sequence["BackendInfo"]) -> str:
   """Creates a normalized string representing the provided backends."""
   normalized_names = []
@@ -255,6 +256,9 @@ class _IreeFunctionWrapper(object):
   def __call__(self, *args):
     return self._f(*args)
 
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    return self._f.get_serialized_values()
+
 
 class IreeCompiledModule(CompiledModule):
   """Iree compiled module."""
@@ -296,8 +300,8 @@ class IreeCompiledModule(CompiledModule):
       self.compiled_path = _create_reinitialized_dict["compiled_path"]
 
     # Holds all of the module's mutable state.
-    self._context = rt.SystemContext(
-        modules=[self._module], config=self._config)
+    self._context = rt.SystemContext(modules=[self._module],
+                                     config=self._config)
 
   def create_reinitialized(self) -> "IreeCompiledModule":
     """Duplicates this module with its initial state without recompiling."""
@@ -343,8 +347,13 @@ class _TfFunctionWrapper(object):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(
-        self._convert_to_numpy, *results, check_types=False)
+    return tf.nest.map_structure(self._convert_to_numpy,
+                                 *results,
+                                 check_types=False)
+
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    """Dummy function to match _IreeFunctionWrapper's API."""
+    return (), ()
 
 
 class TfCompiledModule(CompiledModule):
