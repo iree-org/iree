@@ -49,7 +49,7 @@ struct ShapeInlinerInterface : public DialectInlinerInterface {
 struct ShapeConstantFoldInterface : public DialectFoldInterface {
   using DialectFoldInterface::DialectFoldInterface;
 
-  LogicalResult Fold(Operation* op, ArrayRef<Attribute> operands,
+  LogicalResult fold(Operation* op, ArrayRef<Attribute> operands,
                      SmallVectorImpl<OpFoldResult>& results) const final {
     bool foundConstantRankedShape = false;
     for (Value result : op->getResults()) {
