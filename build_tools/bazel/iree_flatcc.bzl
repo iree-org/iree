@@ -27,16 +27,16 @@ def iree_flatbuffer_c_library(
         "-o$(RULEDIR)",
     ] + flatcc_args
 
-    out_stem = "%s" % (srcs[0].replace(".fbs", ""))
+    out_stem = "%s" % srcs[0].replace(".fbs", "")
 
     outs = []
     for arg in flags:
         if arg == "--reader":
-            outs += ["%s_reader.h" % (out_stem)]
+            outs += ["%s_reader.h" % out_stem]
         if arg == "--builder":
-            outs += ["%s_builder.h" % (out_stem)]
+            outs += ["%s_builder.h" % out_stem]
         if arg == "--verifier":
-            outs += ["%s_verifier.h" % (out_stem)]
+            outs += ["%s_verifier.h" % out_stem]
 
     native.genrule(
         name = name + "_gen",

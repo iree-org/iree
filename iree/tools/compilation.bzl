@@ -28,18 +28,18 @@ def iree_bytecode_module(
         name = name,
         srcs = [src],
         outs = [
-            "%s.module" % (name),
+            "%s.module" % name,
         ],
         cmd = " && ".join([
             " ".join([
-                "$(location %s)" % (translate_tool),
+                "$(location %s)" % translate_tool,
                 " ".join(flags),
-                "-o $(location %s.module)" % (name),
-                "$(location %s)" % (src),
+                "-o $(location %s.module)" % name,
+                "$(location %s)" % src,
             ]),
         ]),
         tools = [translate_tool],
-        message = "Compiling IREE module %s..." % (name),
+        message = "Compiling IREE module %s..." % name,
         output_to_bindir = 1,
     )
 
@@ -47,11 +47,11 @@ def iree_bytecode_module(
     # tests and samples that would otherwise complicate execution/porting.
     if cc_namespace:
         cc_embed_data(
-            name = "%s_cc" % (name),
+            name = "%s_cc" % name,
             identifier = name,
-            srcs = ["%s.module" % (name)],
-            cc_file_output = "%s.cc" % (name),
-            h_file_output = "%s.h" % (name),
+            srcs = ["%s.module" % name],
+            cc_file_output = "%s.cc" % name,
+            h_file_output = "%s.h" % name,
             cpp_namespace = cc_namespace,
             visibility = visibility,
             flatten = True,
