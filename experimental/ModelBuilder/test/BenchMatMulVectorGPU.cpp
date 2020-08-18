@@ -64,6 +64,11 @@ static llvm::cl::opt<bool> useWorkgroupMemory(
     "use-workgroup-memory", llvm::cl::desc("Enable use of workgroup memory"),
     llvm::cl::value_desc("boolean"), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> enableLICM(
+    "enable-licm",
+    llvm::cl::desc("Enable loop invariant hoisting optimizations"),
+    llvm::cl::value_desc("boolean"), llvm::cl::init(false));
+
 static void addLoweringPasses(mlir::PassManager &pm,
                               llvm::ArrayRef<int64_t> numWorkgroups,
                               llvm::ArrayRef<Type> args) {
@@ -208,7 +213,7 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
                 .setTileSizes({tileM, tileN, tileK})
                 .setInterchange({1, 0, 2})
                 .setDistributionOptions(WGDistribute))
-        .setHoistInvariantCode(true);
+        .setHoistInvariantCode(enableLICM);
     if (useWorkgroupMemory) {
       strategy
           .promote<linalg::MatmulOp>(
@@ -227,8 +232,10 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
                       {tileM / numSubgroupX, tileN / numSubgroupY, tileK})
                   .setDistributionOptions(SGDistribute));
     }
+    std::array<int64_t, 3> nativeSize = {cooperativeMatrixM, cooperativeMatrixN,
+                                         cooperativeMatrixK};
     strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
-        {cooperativeMatrixM, cooperativeMatrixN, cooperativeMatrixK});
+        nativeSize);
     modelBuilder.getModuleRef()->walk(
         [&](FuncOp fn) { strategy.transform(fn); });
     addLoweringPasses(pm, {resRows / tileM, resColumns / tileN, 1},
