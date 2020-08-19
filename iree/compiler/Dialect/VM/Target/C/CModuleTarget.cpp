@@ -140,16 +140,58 @@ static LogicalResult translateFunctionToC(mlir::emitc::CppEmitter &emitter,
 
 static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
                                             llvm::raw_ostream &output) {
+  std::string moduleName = moduleOp.getName().str();
+
+  // exports
+  std::string exportName = moduleName + "_exports_";
+  output << "static const iree_vm_native_export_descriptor_t " << exportName
+         << "[] = {\n";
+  for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
+    // TODO(simon-camp) support function-level reflection attributes
+    output << "{iree_make_cstring_view(\"" << exportOp.export_name()
+           << "\"), 0, 0, 0, NULL},\n";
+  }
+  output << "}\n";
+  output << "\n";
+
+  // imports
+  std::string importName = moduleName + "_imports_";
+  output << "static const iree_vm_native_import_descriptor_t " << importName
+         << "[] = {\n";
+  for (auto importOp : moduleOp.getOps<IREE::VM::ImportOp>()) {
+    output << "{iree_make_cstring_view(\"" << importOp.getName() << "\")},\n";
+  }
+  output << "}\n";
+  output << "\n";
+
+  // module descriptor
+  // TODO(simon-camp) support module-level reflection attributes
+  std::string descriptorName = moduleName + "_descriptor_";
+  output << "static const iree_vm_native_module_descriptor_t " << descriptorName
+         << " = {\n"
+         << "iree_make_cstring_view(\"" << moduleName << "\"),\n"
+         << "IREE_ARRAYSIZE(" << importName << "),\n"
+         << importName << ",\n"
+         << "IREE_ARRAYSIZE(" << exportName << "),\n"
+         << exportName << ",\n"
+         << "0,\n"
+         << "NULL,\n"
+         << "};\n";
+
   // TODO(simon-camp) generate boilerplate code
-  //   * import/export table
-  //   * module descriptor
   //   * module struct
   //   * module state struct
   //   * function wrappers
   //   * function table
-  //   * begin_call function
-  //   * create function
+  //   * interface functions
+  //      * begin_call
+  //      * create
+  //      * destroy
+  //      * alloc_state
+  //      * free_state
+  //      * resolve_import
 
+  output << "\n";
   return success();
 }
 
@@ -202,6 +244,8 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   printSeparatingComment(output);
 
   for (auto moduleOp : moduleOps) {
+    printModuleComment(moduleOp, output);
+
     // generate module descriptors
     if (failed(buildModuleDescriptors(moduleOp, output))) {
       return failure();
