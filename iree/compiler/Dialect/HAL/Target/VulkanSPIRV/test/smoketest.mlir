@@ -17,7 +17,6 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 // VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32}
@@ -46,11 +45,6 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 // VKSPV-DAG:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 // VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.entry_point @reduction_rgn_reduce_0_dim_0_entry attributes {
-// VKSPV-SAME:     interface = @legacy_io,
-// VKSPV-SAME:     ordinal = 0 : i32,
-// VKSPV-SAME:     signature = (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
-// VKSPV-SAME:   }
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32} {

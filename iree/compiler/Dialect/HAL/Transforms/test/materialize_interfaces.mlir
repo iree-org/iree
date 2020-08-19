@@ -5,12 +5,12 @@
 //  CHECK-NEXT:   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
-//   CHECK-DAG: hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {
-//  CHECK-SAME:   interface = @legacy_io,
-//  CHECK-SAME:   ordinal = 0 : i32,
-//  CHECK-SAME:   signature = (tensor<4xf32>) -> tensor<4xf32>
-//  CHECK-SAME: }
 //   CHECK-DAG: hal.executable.target "vmla" {
+//   CHECK-DAG:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {
+//  CHECK-SAME:     interface = @legacy_io,
+//  CHECK-SAME:     ordinal = 0 : i32,
+//  CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
+//  CHECK-SAME:   }
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
     workload = 4 : index
@@ -40,11 +40,6 @@ flow.executable @simpleMath_ex_dispatch_0 {
 //  CHECK-NEXT:   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
-//  CHECK-NEXT: hal.executable.entry_point @entry attributes {
-//  CHECK-SAME:   interface = @legacy_io,
-//  CHECK-SAME:   ordinal = 0 : i32,
-//  CHECK-SAME:   signature = (tensor<?x7x10xf32>, index, index) -> tensor<7x?x10xf32>
-//  CHECK-SAME: }
 flow.executable @shaped_dispatch {
   flow.dispatch.entry @entry
   // CHECK: module {
