@@ -64,12 +64,9 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   def test_artifact_saving(self, backend_infos):
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
-      iree_compiled_module = tf_utils.compile_tf_module(
+      iree_compiled_module, compiled_path = tf_utils.compile_tf_module(
           tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
 
-      compiled_path = tf_utils._get_backends_path('compiled', backend_infos,
-                                                  artifacts_dir)
-      compiled_path = f'{compiled_path}.vmfb'
       artifacts_to_check = [
           'tf_input.mlir',
           'iree_input.mlir',
