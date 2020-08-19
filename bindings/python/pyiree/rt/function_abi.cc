@@ -497,8 +497,10 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
 std::vector<std::string> SerializeVmVariantList(VmVariantList& vm_list) {
   LOG(INFO) << "SerializeVmVariantList: " << vm_list.DebugString();
 
+  size_t size = vm_list.size();
   std::vector<std::string> results;
-  for (iree_host_size_t i = 0, e = vm_list.size(); i < e; ++i) {
+  results.reserve(size);
+  for (iree_host_size_t i = 0; i < size; ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     iree_status_t status =
         iree_vm_list_get_variant(vm_list.raw_ptr(), i, &variant);
