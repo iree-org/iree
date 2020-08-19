@@ -151,7 +151,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     output << "{iree_make_cstring_view(\"" << exportOp.export_name()
            << "\"), 0, 0, 0, NULL},\n";
   }
-  output << "}\n";
+  output << "};\n";
   output << "\n";
 
   // imports
@@ -161,7 +161,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   for (auto importOp : moduleOp.getOps<IREE::VM::ImportOp>()) {
     output << "{iree_make_cstring_view(\"" << importOp.getName() << "\")},\n";
   }
-  output << "}\n";
+  output << "};\n";
   output << "\n";
 
   // module descriptor

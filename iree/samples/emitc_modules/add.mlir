@@ -4,4 +4,5 @@ vm.module @add_module {
     %1 = vm.add.i32 %0, %0 : i32
     vm.return %0, %1 : i32, i32
   }
+  vm.export @add_1
 }

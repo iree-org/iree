@@ -59,8 +59,7 @@ class VMAddModuleTest : public ::testing::Test {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(
         iree_vm_context_resolve_function(
-            context_, iree_make_cstring_view("module_a.test_function"),
-            &function),
+            context_, iree_make_cstring_view("add_module.add_1"), &function),
         "unable to resolve entry point");
 
     // Setup I/O lists and pass in the argument. The result list will be
@@ -100,7 +99,7 @@ class VMAddModuleTest : public ::testing::Test {
 
 TEST_F(VMAddModuleTest, Example) {
   StatusOr<i32_i32_t> v0 =
-      RunFunction(iree_make_cstring_view("module_a.test_function"), 17, 42);
+      RunFunction(iree_make_cstring_view("add_module.add_1"), 17, 42);
   ASSERT_EQ(v0->first, 59);
   ASSERT_EQ(v0->second, 118);
 }

@@ -19,20 +19,7 @@
 #include "iree/vm/stack.h"
 
 // This would be generated together with the functions in the header
-#include "iree/samples/emitc_modules/add_mlir_generated.h"
-
-static const iree_vm_native_export_descriptor_t module_a_exports_[] = {
-    {iree_make_cstring_view("test_function"), 0, 0, 0, NULL},
-};
-static const iree_vm_native_module_descriptor_t module_a_descriptor_ = {
-    iree_make_cstring_view("module_a"),
-    0,
-    NULL,
-    IREE_ARRAYSIZE(module_a_exports_),
-    module_a_exports_,
-    0,
-    NULL,
-};
+#include "iree/samples/emitc_modules/add_module.module"
 
 struct module_a_s;
 struct module_a_state_s;
@@ -59,7 +46,7 @@ static iree_status_t module_a_test_function(
   int32_t out0;
   int32_t out1;
 
-  test_function(arg0, arg1, &out0, &out1);
+  add_module_add_1_impl(arg0, arg1, &out0, &out1);
 
   // Store the result.
   regs.i32[ret_list->registers[0] & regs.i32_mask] = out0;
@@ -76,7 +63,7 @@ static const module_a_func_t module_a_funcs_[] = {
     module_a_test_function,
 };
 static_assert(IREE_ARRAYSIZE(module_a_funcs_) ==
-                  IREE_ARRAYSIZE(module_a_exports_),
+                  IREE_ARRAYSIZE(add_module_exports_),
               "function pointer table must be 1:1 with exports");
 
 static iree_status_t IREE_API_PTR module_a_begin_call(
@@ -93,6 +80,6 @@ static iree_status_t module_a_create(iree_allocator_t allocator,
   iree_vm_module_t interface;
   IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
   interface.begin_call = module_a_begin_call;
-  return iree_vm_native_module_create(&interface, &module_a_descriptor_,
+  return iree_vm_native_module_create(&interface, &add_module_descriptor_,
                                       allocator, out_module);
 }

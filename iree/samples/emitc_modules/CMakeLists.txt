@@ -13,24 +13,19 @@
 # limitations under the License.
 
 if(${IREE_ENABLE_EMITC})
-  iree_cc_test(
+  # TODO(simon-camp) We are only interested in the output of iree-translate, i.e. add_module.module
+  iree_bytecode_module(
   NAME
-      add_module_test
-  SRCS
-      "add_module_test.cc"
-  DEPS
-      iree::vm::context
-      iree::vm::instance
-      iree::vm::invocation
-      iree::vm::list
-      ::add_module_test_hdrs
-      iree::vm::ref_cc
-      iree::base::api
-      iree::base::status
-      iree::testing::gtest
-      iree::testing::gtest_main
+    add_module
+  SRC
+    "add.mlir"
+  CC_NAMESPACE
+    "iree::samples::custom_modules"
+  FLAGS
+    "-iree-vm-ir-to-c-module"
+  PUBLIC
   )
-  
+
   iree_cc_library(
   NAME
       add_module_test_hdrs
@@ -45,6 +40,25 @@ if(${IREE_ENABLE_EMITC})
       iree::vm::stack
       iree::base::api
       iree::compiler::Dialect::VM::Target::C::VMCFuncs
+      ::add_module_cc
   PUBLIC
+  )
+
+  iree_cc_test(
+  NAME
+      add_module_test
+  SRCS
+      "add_module_test.cc"
+  DEPS
+      iree::vm::context
+      iree::vm::instance
+      iree::vm::invocation
+      iree::vm::list
+      iree::vm::ref_cc
+      iree::base::api
+      iree::base::status
+      iree::testing::gtest
+      iree::testing::gtest_main
+      ::add_module_test_hdrs
   )
 endif()
