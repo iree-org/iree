@@ -451,7 +451,6 @@ class Trace:
     if "tf" not in self.backend:
       flaglines = []
       if self.compiled_path is not None:
-        # Can be overridden with another flag after the flagfile.
         flaglines.append(f"--input_file={self.compiled_path}")
       flaglines.append(f"--driver={self.backend_driver}")
       inputs_str = ", ".join(self.calls[0].serialized_inputs)
