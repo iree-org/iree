@@ -27,18 +27,12 @@ namespace Strings {
 class StringType : public Type::TypeBase<StringType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static StringType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::String);
-  }
 };
 
 class StringTensorType
     : public Type::TypeBase<StringTensorType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static StringTensorType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::StringTensor);
-  }
 };
 
 }  // namespace Strings

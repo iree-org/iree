@@ -19,36 +19,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-
-namespace AttrKind {
-enum Kind {
-  FIRST_HAL_ATTR = Attribute::FIRST_IREE_ATTR + 10,
-  FIRST_VULKAN_ATTR = Attribute::FIRST_IREE_ATTR + 20,
-};
-}  // namespace AttrKind
-
-namespace HAL {
-namespace AttrKind {
-enum Kind {
-  DescriptorSetLayoutBindingAttr = IREE::AttrKind::FIRST_HAL_ATTR,
-  MatchAlwaysAttr,
-  MatchAllAttr,
-  MatchAnyAttr,
-  DeviceMatchIDAttr,
-};
-}  // namespace AttrKind
-}  // namespace HAL
-
-namespace Vulkan {
-namespace AttrKind {
-enum Kind {
-  TargetEnv = IREE::AttrKind::FIRST_VULKAN_ATTR,
-};
-}  // namespace AttrKind
-}  // namespace Vulkan
-
-}  // namespace IREE
+namespace IREE {}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 

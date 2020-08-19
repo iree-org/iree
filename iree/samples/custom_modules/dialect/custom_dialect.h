@@ -26,12 +26,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Custom {
 
-namespace TypeKind {
-enum Kind {
-  Message = Type::FIRST_PRIVATE_EXPERIMENTAL_0_TYPE,
-};
-}  // namespace TypeKind
-
 class CustomDialect : public Dialect {
  public:
   explicit CustomDialect(MLIRContext *context);
@@ -44,9 +38,6 @@ class CustomDialect : public Dialect {
 class MessageType : public Type::TypeBase<MessageType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static MessageType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::Message);
-  }
 };
 
 #define GET_OP_CLASSES

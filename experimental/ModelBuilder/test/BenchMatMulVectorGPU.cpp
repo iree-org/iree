@@ -103,43 +103,36 @@ static void insertBarrier(OpBuilder &b, Location loc) {
 }
 
 template <typename IdOp, typename NProcsOp>
-static linalg::ProcInfo getGpuProcIds(OpBuilder &b, Location loc,
-                                      unsigned loopNum) {
+static SmallVector<linalg::ProcInfo, 2> getGpuProcIds(
+    OpBuilder &b, Location loc, ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+  if (parallelLoopRanges.size() != 2)
+    llvm_unreachable("expected two parallel loops for matmul operation");
   Type indexType = b.getIndexType();
-  switch (loopNum) {
-    case 0:
-      return {b.create<IdOp>(loc, indexType, b.getStringAttr("y")),
-              b.create<NProcsOp>(loc, indexType, b.getStringAttr("y"))};
-    case 1:
-      return {b.create<IdOp>(loc, indexType, b.getStringAttr("x")),
-              b.create<NProcsOp>(loc, indexType, b.getStringAttr("x"))};
-    default:
-      llvm_unreachable("test patterns handles only upto 2-level nested loops");
-  }
-  return {nullptr, nullptr};
+  SmallVector<linalg::ProcInfo, 2> procInfo(2);
+  procInfo[0] = {b.create<IdOp>(loc, indexType, b.getStringAttr("y")),
+                 b.create<NProcsOp>(loc, indexType, b.getStringAttr("y"))};
+  procInfo[1] = {b.create<IdOp>(loc, indexType, b.getStringAttr("x")),
+                 b.create<NProcsOp>(loc, indexType, b.getStringAttr("x"))};
+  return procInfo;
 }
 
 constexpr int numSubgroupX = 2;
 constexpr int numSubgroupY = 2;
 
-static linalg::ProcInfo getSubgroupIds(OpBuilder &b, Location loc,
-                                       unsigned loopNum) {
+static SmallVector<linalg::ProcInfo, 2> getSubgroupIds(
+    OpBuilder &b, Location loc, ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+  if (parallelLoopRanges.size() != 2)
+    llvm_unreachable("expected two parallel loops for matmul operation");
   Type indexType = b.getIndexType();
   Value sg = b.create<gpu::SubgroupIdOp>(loc, indexType);
   Value vSubgroupX = b.create<ConstantIndexOp>(loc, numSubgroupX);
+  Value sgdiv = b.create<SignedDivIOp>(loc, indexType, sg, vSubgroupX);
+  Value vSubgroupY = b.create<ConstantIndexOp>(loc, numSubgroupY);
+  SmallVector<linalg::ProcInfo, 2> procInfo(2);
   using namespace edsc::op;
-  switch (loopNum) {
-    case 0:
-      return {sg % vSubgroupX, vSubgroupX};
-    case 1: {
-      Value vSubgroupY = b.create<ConstantIndexOp>(loc, numSubgroupY);
-      Value sgdiv = b.create<SignedDivIOp>(loc, indexType, sg, vSubgroupX);
-      return {sgdiv % vSubgroupY, vSubgroupY};
-    }
-    default:
-      llvm_unreachable("test patterns handles only upto 2-level nested loops");
-  }
-  return {nullptr, nullptr};
+  procInfo[0] = {sg % vSubgroupX, vSubgroupX};
+  procInfo[1] = {sgdiv % vSubgroupY, vSubgroupY};
+  return procInfo;
 }
 
 void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
