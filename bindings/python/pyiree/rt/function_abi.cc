@@ -504,9 +504,7 @@ std::vector<std::string> SerializeVmVariantList(VmVariantList& vm_list) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     iree_status_t status =
         iree_vm_list_get_variant(vm_list.raw_ptr(), i, &variant);
-    if (!iree_status_is_ok(status)) {
-      RaiseValueError("Failed to get vm variant from list");
-    }
+    CheckApiStatus(status, "Failed to get vm variant from list");
 
     if (iree_vm_variant_is_value(variant)) {
       results.push_back("i32=" + std::to_string(variant.i32));
