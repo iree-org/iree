@@ -70,11 +70,16 @@ void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
   // Make sure the execution engine runs LLVM passes for the specified
   // optimization level.
   auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
+  if (!tmBuilderOrError) {
+    llvm::errs() << tmBuilderOrError.takeError() << "\n";
+    return;
+  }
   auto t = tmBuilderOrError->getTargetTriple().getTriple();
-  assert(tmBuilderOrError);
   auto tmOrError = tmBuilderOrError->createTargetMachine();
-  if (!tmOrError) llvm::errs() << tmOrError.takeError() << "\n";
-  assert(tmOrError);
+  if (!tmOrError) {
+    llvm::errs() << tmOrError.takeError() << "\n";
+    return;
+  }
   targetMachine = std::move(tmOrError.get());
   SmallVector<const llvm::PassInfo*, 4> llvmPasses;
   if (target == Target::CPUTarget) {
