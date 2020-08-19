@@ -261,7 +261,8 @@ class Trace:
       self.module_name = module.module_name
       self.compiled_path = module.compiled_path
       self.backend_name = module.backend
-      self.backend_is_tf = isinstance(module, tf_utils.TfCompiledModule)
+      self.supports_cxx_serialization = isinstance(module,
+                                                   tf_utils.TfCompiledModule)
       self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
@@ -274,7 +275,7 @@ class Trace:
       self.module_name = _load_dict["module_name"]
       self.compiled_path = _load_dict["compiled_path"]
       self.backend_name = _load_dict["backend_name"]
-      self.backend_is_tf = _load_dict["backend_is_tf"]
+      self.supports_cxx_serialization = _load_dict["supports_cxx_serialization"]
       self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
@@ -436,7 +437,7 @@ class Trace:
         "module_name": self.module_name,
         "compiled_path": self.compiled_path,
         "backend_name": self.backend_name,
-        "backend_is_tf": self.backend_is_tf,
+        "supports_cxx_serialization": self.supports_cxx_serialization,
         "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
@@ -452,7 +453,7 @@ class Trace:
       call.serialize(call_dir)
 
     # C++ Serialization.
-    if not self.backend_is_tf:
+    if not self.supports_cxx_serialization:
       flaglines = []
       if self.compiled_path is not None:
         flaglines.append(f"--input_file={self.compiled_path}")
