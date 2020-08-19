@@ -752,11 +752,8 @@ static LogicalResult linalgCopyTileAndDistribute(
   linalg::LinalgTilingOptions options;
   // Tile to memory access of 128bits as those tend to be optimal on most GPUs.
   constexpr unsigned vecLoadBits = 128;
-  unsigned elementBits = copyOp.getSource()
-                             .getType()
-                             .cast<MemRefType>()
-                             .getElementType()
-                             .getIntOrFloatBitWidth();
+  unsigned elementBits =
+      copyOp.getSource().getType().cast<MemRefType>().getElementTypeBitWidth();
   if (elementBits == 0 || vecLoadBits % elementBits != 0) return failure();
   unsigned numElement = vecLoadBits / elementBits;
   options.setTileSizes({1, numElement})
@@ -771,7 +768,7 @@ static LogicalResult linalgCopyTileAndDistribute(
 }
 
 namespace {
-// Pattern to tile and distribute linalg::copyOp.
+// Pattern to tile and distribute linalg::CopyOp.
 struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern<linalg::CopyOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(

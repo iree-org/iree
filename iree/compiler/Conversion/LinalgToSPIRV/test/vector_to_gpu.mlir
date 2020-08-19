@@ -31,7 +31,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     linalg.copy(%sv, %a) {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<128x32xf32, #map0>, memref<128x32xf32, 3>
     return
   }
-    // CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (d0 * 4 - (d0 floordiv 8) * 32)>
+    // CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (d0 * 4)>
 
     // CHECK: %[[C1024:.+]] = constant 1024 : index
     // CHECK: %[[C8:.+]] = constant 8 : index
@@ -52,7 +52,8 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK: %[[DIMzyx:.+]] = muli %[[DIMzy]], %[[DIMx]] : index
     // CHECK: scf.for %[[IV:.+]] = %[[LID]] to %[[C1024]] step %[[DIMzyx]] {
     // CHECK:   %[[SIZEx:.+]] = divi_signed %[[IV]], %[[C8]] : index
-    // CHECK:   %[[SIZEy:.+]] = affine.apply #[[MAP1]](%[[IV]])
+    // CHECK:   %[[MOD:.+]] = remi_signed %[[IV]], %[[C8]] : index
+    // CHECK:   %[[SIZEy:.+]] = affine.apply #[[MAP1]](%[[MOD]])
     // CHECK:   %[[SVs:.+]] = subview %[[DST]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, #map0> to memref<1x4xf32
     // CHECK:   %[[SVd:.+]] = subview %[[ALLOC]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, 3> to memref<1x4xf32
     // CHECK:   %[[LOAD:.+]] = vector.transfer_read %[[SVs]][%c0, %c0], %cst {{.*}} : memref<1x4xf32, {{.*}}>, vector<1x4xf32>

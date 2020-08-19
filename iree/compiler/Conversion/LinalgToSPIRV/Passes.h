@@ -74,7 +74,7 @@ std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
                                      const SPIRVCodegenOptions &options);
 
-/// Poplate passes tile and distribute linalg operations.
+/// Populate patterns to tile and distribute linalg operations.
 void populateLinalgTileAndDistributePatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 }  // namespace iree_compiler
