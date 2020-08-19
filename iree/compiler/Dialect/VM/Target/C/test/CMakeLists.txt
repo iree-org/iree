@@ -24,38 +24,3 @@ iree_lit_test_suite(
     iree::tools::IreeFileCheck
     iree::tools::iree-translate
 )
-
-iree_cc_test(
-  NAME
-    add_module_test
-  SRCS
-    "add_module_test.cc"
-  DEPS
-    iree::vm::context
-    iree::vm::instance
-    iree::vm::invocation
-    iree::vm::list
-    ::add_module_test_hdrs
-    iree::vm::ref_cc
-    iree::base::api
-    iree::base::status
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    add_module_test_hdrs
-  HDRS
-    "add_module_test.h"
-    "add_mlir_generated.h"
-  DEPS
-    iree::vm::context
-    iree::vm::instance
-    iree::vm::native_module
-    iree::vm::ref
-    iree::vm::stack
-    iree::base::api
-    iree::compiler::Dialect::VM::Target::C::VMCFuncs
-  PUBLIC
-)

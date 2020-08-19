@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/VM/Target/C/test/add_module_test.h"
+#include "iree/samples/emitc_modules/add_module_test.h"
 
 #include "iree/base/status.h"
 #include "iree/testing/gtest.h"

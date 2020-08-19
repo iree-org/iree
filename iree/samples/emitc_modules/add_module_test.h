@@ -19,7 +19,7 @@
 #include "iree/vm/stack.h"
 
 // This would be generated together with the functions in the header
-#include "iree/compiler/Dialect/VM/Target/C/test/add_mlir_generated.h"
+#include "iree/samples/emitc_modules/add_mlir_generated.h"
 
 static const iree_vm_native_export_descriptor_t module_a_exports_[] = {
     {iree_make_cstring_view("test_function"), 0, 0, 0, NULL},
