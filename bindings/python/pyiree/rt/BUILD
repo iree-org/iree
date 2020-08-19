@@ -83,7 +83,6 @@ pybind_cc_library(
     deps = [
         "//bindings/python/pyiree/common",
         "//iree/base:api",
-        "//iree/base:localfile",
         "//iree/base:signature_mangle",
         "//iree/hal:api",
         "//iree/modules/hal",

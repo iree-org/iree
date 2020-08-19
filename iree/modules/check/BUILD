@@ -58,7 +58,6 @@ iree_cc_binary(
         "//iree/base:api",
         "//iree/base:file_io",
         "//iree/base:init",
-        "//iree/base:localfile",
         "//iree/base:status",
         "//iree/base:target_platform",
         "//iree/base:tracing",

@@ -332,14 +332,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    localfile
-  DEPS
-    iree::base::internal::localfile_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     logging
   HDRS
     "logging.h"

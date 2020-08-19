@@ -93,12 +93,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    localfile_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     ostringstream
   HDRS
     "ostringstream.h"
