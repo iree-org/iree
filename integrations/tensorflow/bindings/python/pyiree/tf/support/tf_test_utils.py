@@ -448,19 +448,18 @@ class Trace:
 
     # C++ Serialization.
     if "tf" not in self.backend:
-      flagfile = []
+    if "tf" not in self.backend:
+      flaglines = []
       if self.compiled_path is not None:
         # Can be overridden with another flag after the flagfile.
-        flagfile.append(f"--input_file={self.compiled_path}")
-      flagfile.append(f"--driver={self.backend_driver}")
+        flaglines.append(f"--input_file={self.compiled_path}")
+      flaglines.append(f"--driver={self.backend_driver}")
       inputs_str = ", ".join(self.calls[0].serialized_inputs)
-      flagfile.append(f"--inputs={inputs_str}")
-      flagfile.append(f"--entry_function={self.calls[0].method}")
-      flagfile = "\n".join(flagfile)
+      flaglines.append(f"--inputs={inputs_str}")
+      flaglines.append(f"--entry_function={self.calls[0].method}")
 
       with open(os.path.join(trace_dir, "flagfile"), "w") as f:
-        f.write(flagfile)
-        f.write("\n")
+        f.writelines(line + '\n' for line in flaglines)
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":
