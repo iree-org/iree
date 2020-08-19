@@ -63,8 +63,7 @@ TargetEnvAttr TargetEnvAttr::get(IntegerAttr version, IntegerAttr revision,
                                  DictionaryAttr capabilities) {
   assert(version && revision && extensions && capabilities);
   MLIRContext *context = version.getContext();
-  return Base::get(context, AttrKind::TargetEnv, version, revision, extensions,
-                   capabilities);
+  return Base::get(context, version, revision, extensions, capabilities);
 }
 
 StringRef TargetEnvAttr::getKindName() { return "target_env"; }

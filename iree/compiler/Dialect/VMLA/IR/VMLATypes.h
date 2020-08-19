@@ -46,17 +46,11 @@ namespace VMLA {
 class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static BufferType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::Buffer);
-  }
 };
 
 class InterfaceType : public Type::TypeBase<InterfaceType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static InterfaceType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::Interface);
-  }
 };
 
 }  // namespace VMLA
