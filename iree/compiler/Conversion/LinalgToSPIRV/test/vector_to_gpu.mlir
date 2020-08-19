@@ -51,10 +51,10 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     // CHECK: %[[LID:.+]] = addi %[[LIDzyx]], %[[TIDx]] : index
     // CHECK: %[[DIMzyx:.+]] = muli %[[DIMzy]], %[[DIMx]] : index
     // CHECK: scf.for %[[IV:.+]] = %[[LID]] to %[[C1024]] step %[[DIMzyx]] {
-      // CHECK: %[[SIZEx:.+]] = divi_signed %[[IV]], %[[C8]] : index
-      // CHECK: %[[SIZEy:.+]] = affine.apply #[[MAP1]](%[[IV]])
-      // CHECK: %[[SVs:.+]] = subview %[[DST]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, #map0> to memref<1x4xf32
-      // CHECK: %[[SVd:.+]] = subview %[[ALLOC]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, 3> to memref<1x4xf32
-      // CHECK: %[[LOAD:.+]] = vector.transfer_read %[[SVs]][%c0, %c0], %cst {{.*}} : memref<1x4xf32, {{.*}}>, vector<1x4xf32>
-      // CHECK: vector.transfer_write %[[LOAD]], %[[SVd]][%[[C0]], %[[C0]]] {{.*}} : vector<1x4xf32>, memref<1x4xf32
+    // CHECK:   %[[SIZEx:.+]] = divi_signed %[[IV]], %[[C8]] : index
+    // CHECK:   %[[SIZEy:.+]] = affine.apply #[[MAP1]](%[[IV]])
+    // CHECK:   %[[SVs:.+]] = subview %[[DST]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, #map0> to memref<1x4xf32
+    // CHECK:   %[[SVd:.+]] = subview %[[ALLOC]][%[[SIZEx]], %[[SIZEy]]] [1, 4] [1, 1]  : memref<128x32xf32, 3> to memref<1x4xf32
+    // CHECK:   %[[LOAD:.+]] = vector.transfer_read %[[SVs]][%c0, %c0], %cst {{.*}} : memref<1x4xf32, {{.*}}>, vector<1x4xf32>
+    // CHECK:   vector.transfer_write %[[LOAD]], %[[SVd]][%[[C0]], %[[C0]]] {{.*}} : vector<1x4xf32>, memref<1x4xf32
 }

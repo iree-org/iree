@@ -263,7 +263,7 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
         rewriter.create<SignedDivIOp>(loc, loopIv, iterationStride[i]);
     Value newIv = lbs[i] + (iterNum * steps[i]);
     map.map(pLoopBody.getArgument(i), newIv);
-    if (i != numLoops - 1) loopIv = loopIv % iterationStride[i];
+    loopIv = rewriter.create<SignedRemIOp>(loc, loopIv, iterationStride[i]);
   }
   for (Operation &op : pLoopBody.without_terminator()) {
     rewriter.clone(op, map);
@@ -611,9 +611,7 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
   if (!loops) return failure();
   if (loops.getValue().empty()) return success();
 
-  scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
-  if (!pLoopOp) return success();
-
+  auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
   return mapToLocalInvocationId(
       rewriter, pLoopOp,
       hasMarker(linalgOp, {getWorkgroupMarker(), getWorkgroupMemoryMarker()}));
@@ -643,6 +641,7 @@ static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
   return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount.id,
                                           idAndCount.count);
 }
+
 /// CopyOp that are loading to/storing from workgroup memory are special cased
 /// to use all workitems to do a copy. This is done by linearizing the copy
 /// operation.
@@ -661,8 +660,7 @@ LogicalResult mapLinalgOpToLocalInvocationIdImpl<linalg::CopyOp>(
   if (!loops) return failure();
   if (loops.getValue().empty()) return success();
 
-  scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
-  if (!pLoopOp) return success();
+  auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
   return distributeCopyOp(copyOp, pLoopOp, rewriter);
 }
 
@@ -746,19 +744,21 @@ struct RemoveLinalgRange : public OpConversionPattern<linalg::RangeOp> {
 };
 }  // namespace
 
-static LogicalResult linalgCopyToVector(linalg::CopyOp copyOp,
-                                        ArrayRef<Value> operands,
-                                        ConversionPatternRewriter &rewriter) {
+// Applies tiling followed to load/store optimized size then distribute on
+// incovations.
+static LogicalResult linalgCopyTileAndDistribute(
+    linalg::CopyOp copyOp, ArrayRef<Value> operands,
+    ConversionPatternRewriter &rewriter) {
   linalg::LinalgTilingOptions options;
   // Tile to memory access of 128bits as those tend to be optimal on most GPUs.
-  constexpr unsigned vecLoadSize = 128;
-  unsigned elementSize = copyOp.getSource()
+  constexpr unsigned vecLoadBits = 128;
+  unsigned elementBits = copyOp.getSource()
                              .getType()
                              .cast<MemRefType>()
                              .getElementType()
                              .getIntOrFloatBitWidth();
-  if (elementSize == 0 || vecLoadSize % elementSize != 0) return failure();
-  unsigned numElement = vecLoadSize / elementSize;
+  if (elementBits == 0 || vecLoadBits % elementBits != 0) return failure();
+  unsigned numElement = vecLoadBits / elementBits;
   options.setTileSizes({1, numElement})
       .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops);
   Optional<linalg::TiledLinalgOp> tiledOp = linalg::tileLinalgOp(
@@ -766,7 +766,7 @@ static LogicalResult linalgCopyToVector(linalg::CopyOp copyOp,
   if (!tiledOp) return failure();
   if (tiledOp->loops.empty()) return success();
   setMarker(tiledOp->op, getVectorizeMarker());
-  scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(tiledOp->loops[0]);
+  auto pLoopOp = cast<scf::ParallelOp>(tiledOp->loops[0]);
   return distributeCopyOp(copyOp, pLoopOp, rewriter);
 }
 
@@ -777,10 +777,12 @@ struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
   LogicalResult matchAndRewrite(
       linalg::CopyOp linalgOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!hasMarker(linalgOp, getCopyToWorkgroupMemoryMarker()))
+    if (!hasMarker(linalgOp, getCopyToWorkgroupMemoryMarker())) {
       return failure();
-    if (failed(linalgCopyToVector(linalgOp, operands, rewriter)))
+    }
+    if (failed(linalgCopyTileAndDistribute(linalgOp, operands, rewriter))) {
       return failure();
+    }
 
     // Insert a barrier if read or write shared memory.
     if (llvm::any_of(linalgOp.getOperands(), [](Value output) {
