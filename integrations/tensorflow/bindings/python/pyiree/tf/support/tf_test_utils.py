@@ -260,7 +260,8 @@ class Trace:
       # Extract metadata from module and function.
       self.module_name = module.module_name
       self.compiled_path = module.compiled_path
-      self.backend = module.backend
+      self.backend_name = module.backend
+      self.backend_is_tf = isinstance(module, tf_utils.TfCompiledModule)
       self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
@@ -272,7 +273,8 @@ class Trace:
     else:
       self.module_name = _load_dict["module_name"]
       self.compiled_path = _load_dict["compiled_path"]
-      self.backend = _load_dict["backend"]
+      self.backend_name = _load_dict["backend_name"]
+      self.backend_is_tf = _load_dict["backend_is_tf"]
       self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
@@ -281,7 +283,7 @@ class Trace:
       self.calls = _load_dict["calls"]
 
   def __str__(self):
-    header = (f"Trace of {self.module_name} compiled to '{self.backend}' "
+    header = (f"Trace of {self.module_name} compiled to '{self.backend_name}' "
               f"on function '{self.function_name}':")
     # Give each call a number so it's easier to compare between multiple traces.
     calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
@@ -322,9 +324,11 @@ class Trace:
 
       if not calls_match:
         logging.error("Comparision between '%s' and '%s' failed on method '%s'",
-                      ref_trace.backend, tar_trace.backend, ref_call.method)
-        logging.error("Reference call '%s':\n%s", ref_trace.backend, ref_call)
-        logging.error("Target call '%s':\n%s", tar_trace.backend, tar_call)
+                      ref_trace.backend_name, tar_trace.backend_name,
+                      ref_call.method)
+        logging.error("Reference call '%s':\n%s", ref_trace.backend_name,
+                      ref_call)
+        logging.error("Target call '%s':\n%s", tar_trace.backend_name, tar_call)
 
       traces_match = traces_match and calls_match
     return traces_match
@@ -431,7 +435,8 @@ class Trace:
     metadata = {
         "module_name": self.module_name,
         "compiled_path": self.compiled_path,
-        "backend": self.backend,
+        "backend_name": self.backend_name,
+        "backend_is_tf": self.backend_is_tf,
         "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
@@ -447,7 +452,7 @@ class Trace:
       call.serialize(call_dir)
 
     # C++ Serialization.
-    if "tf" not in self.backend:
+    if not self.backend_is_tf:
       flaglines = []
       if self.compiled_path is not None:
         flaglines.append(f"--input_file={self.compiled_path}")
@@ -478,7 +483,7 @@ class Trace:
 
 
 def _get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
-  trace_dir = os.path.join(artifacts_dir, trace.backend, "traces",
+  trace_dir = os.path.join(artifacts_dir, trace.backend_name, "traces",
                            trace.function_name)
   os.makedirs(trace_dir, exist_ok=True)
   return trace_dir
@@ -655,7 +660,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     failed_backend_indices = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
-                   ref_trace.backend, tar_trace.backend)
+                   ref_trace.backend_name, tar_trace.backend_name)
       traces_match = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
