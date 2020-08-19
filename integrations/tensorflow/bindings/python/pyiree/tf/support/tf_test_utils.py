@@ -261,8 +261,7 @@ class Trace:
       self.module_name = module.module_name
       self.compiled_path = module.compiled_path
       self.backend_name = module.backend
-      self.supports_cxx_serialization = isinstance(module,
-                                                   tf_utils.TfCompiledModule)
+      self.supports_cxx_serialization = module.supports_cxx_serialization()
       self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)

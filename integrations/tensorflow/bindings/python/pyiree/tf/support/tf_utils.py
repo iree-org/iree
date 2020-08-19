@@ -245,6 +245,10 @@ class CompiledModule(object):
     """Duplicates this module with its initial state without recompiling."""
     raise NotImplementedError()
 
+  @staticmethod
+  def supports_cxx_serialization():
+    raise NotImplementedError()
+
 
 class _IreeFunctionWrapper(object):
   """Wraps an IREE function, making it callable."""
@@ -323,6 +327,10 @@ class IreeCompiledModule(CompiledModule):
     f = m[attr]
     return _IreeFunctionWrapper(self._context, f)
 
+  @staticmethod
+  def supports_cxx_serialization() -> bool:
+    return True
+
 
 class _TfFunctionWrapper(object):
   """Wraps a TF function, normalizing it to numpy."""
@@ -398,6 +406,10 @@ class TfCompiledModule(CompiledModule):
       raise AttributeError(
           f"The TensorFlow module does not have a callable attr '{attr}'")
     return _TfFunctionWrapper(f)
+
+  @staticmethod
+  def supports_cxx_serialization() -> bool:
+    return False
 
 
 class BackendInfo:
