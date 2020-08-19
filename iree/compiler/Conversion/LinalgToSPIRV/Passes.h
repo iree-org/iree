@@ -74,8 +74,8 @@ std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
                                      const SPIRVCodegenOptions &options);
 
-/// Poplate passes needed to lower loop.parallel to workgroups.
-void populateParallelLoopToWorkgroupPatterns(
+/// Populate patterns to tile and distribute linalg operations.
+void populateLinalgTileAndDistributePatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 }  // namespace iree_compiler
 }  // namespace mlir
