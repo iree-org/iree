@@ -139,10 +139,10 @@ class BoundFunction:
     # this should default to async and potentially have some kind of policy
     # flag that can allow it to be overridden.
     inputs = self._abi.raw_pack_inputs(args)
-    self._serialized_inputs = self._abi.serialize_vm_list(inputs)
+    self._serialized_inputs = tuple(self._abi.serialize_vm_list(inputs))
     results = self._abi.allocate_results(inputs, static_alloc=False)
     self._context._vm_context.invoke(self._vm_function, inputs, results)
-    self._serialized_outputs = self._abi.serialize_vm_list(results)
+    self._serialized_outputs = tuple(self._abi.serialize_vm_list(results))
     unpacked_results = self._abi.raw_unpack_results(results)
     # TODO(laurenzo): When switching from 'raw' to structured pack/unpack,
     # the ABI should take care of this one-arg special case.
@@ -163,7 +163,7 @@ class BoundFunction:
     if self._serialized_inputs is None:
       raise RuntimeError("Attempted to call get_serialized_values() before "
                          "any values were passed.")
-    return tuple(self._serialized_inputs), tuple(self._serialized_outputs)
+    return self._serialized_inputs, self._serialized_outputs
 
 
 class BoundModule:
