@@ -448,7 +448,6 @@ class Trace:
 
     # C++ Serialization.
     if "tf" not in self.backend:
-    if "tf" not in self.backend:
       flaglines = []
       if self.compiled_path is not None:
         flaglines.append(f"--input_file={self.compiled_path}")
