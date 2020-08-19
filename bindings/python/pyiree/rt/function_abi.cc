@@ -522,7 +522,7 @@ std::vector<std::string> SerializeVmVariantList(VmVariantList& vm_list) {
         result_str.resize(actual_length);
       } while (iree_status_is_out_of_range(status));
       CheckApiStatus(status,
-          "Failed to create a string representation of the inputs");
+                     "Failed to create a string representation of the inputs");
 
       results.push_back(result_str);
     } else {
