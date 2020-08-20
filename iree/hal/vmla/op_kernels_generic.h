@@ -510,6 +510,16 @@ Status Broadcast::Execute(absl::Span<const T> src_buffer,
 }
 
 template <typename T>
+Status Iota::Execute(absl::Span<T> dst_buffer) {
+  T value = 0;
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = value;
+    value += 1;
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status Tile::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
                      ShapeSpan src_shape, ShapeSpan dst_shape) {
   // This implementation is .... not fast.
@@ -773,16 +783,6 @@ template <typename T>
 Status Ceil::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::ceil(src_buffer[i]);
-  }
-  return OkStatus();
-}
-
-template <typename T>
-Status Iota::Execute(absl::Span<T> dst_buffer) {
-  T value = 0;
-  for (size_t i = 0; i < dst_buffer.size(); ++i) {
-    dst_buffer[i] = value;
-    value += 1;
   }
   return OkStatus();
 }
