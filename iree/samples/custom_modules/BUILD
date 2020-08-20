@@ -48,13 +48,13 @@ cc_test(
         "//iree/hal:api",
         "//iree/hal/vmla:vmla_driver_module",
         "//iree/modules/hal",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
     ],
 )
 

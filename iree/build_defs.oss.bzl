@@ -48,9 +48,7 @@ PLATFORM_VULKAN_DEPS = select({
 })
 
 # A platform-sensitive list of dependencies for tests using Vulkan.
-PLATFORM_VULKAN_TEST_DEPS = [
-    "//iree/testing:gtest_main",
-]
+PLATFORM_VULKAN_TEST_DEPS = []
 
 # Driver modules that register themselves at link time.
 IREE_DRIVER_MODULES = [

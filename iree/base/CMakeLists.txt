@@ -67,6 +67,7 @@ iree_cc_test(
     "arena_test.cc"
   DEPS
     ::arena
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -98,6 +99,7 @@ iree_cc_test(
   DEPS
     ::bitfield
     absl::core_headers
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -258,6 +260,7 @@ iree_cc_test(
     "file_path_test.cc"
   DEPS
     ::file_path
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -327,15 +330,8 @@ iree_cc_test(
   DEPS
     ::intrusive_list
     absl::memory
+    iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    localfile
-  DEPS
-    iree::base::internal::localfile_internal
-  PUBLIC
 )
 
 iree_cc_library(
@@ -400,6 +396,7 @@ iree_cc_test(
     "ref_ptr_test.cc"
   DEPS
     ::ref_ptr
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -427,6 +424,7 @@ iree_cc_test(
     "signature_mangle_test.cc"
   DEPS
     ::signature_mangle
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -476,6 +474,7 @@ iree_cc_test(
     "time_test.cc"
   DEPS
     ::time
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 

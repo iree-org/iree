@@ -41,13 +41,13 @@ iree_cc_test(
     ::custom_modules_test_module_cc
     ::native_module
     absl::core_headers
-    absl::span
     absl::strings
     iree::base::api
     iree::base::logging
     iree::hal::api
     iree::hal::vmla::vmla_driver_module
     iree::modules::hal
+    iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module

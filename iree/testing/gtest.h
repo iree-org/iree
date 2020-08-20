@@ -15,10 +15,8 @@
 #ifndef IREE_TESTING_GTEST_H_
 #define IREE_TESTING_GTEST_H_
 
-#if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/testing/google_internal/gtest_google.h"
-#else
-#include "iree/testing/internal/gtest_internal.h"
-#endif  // IREE_CONFIG_GOOGLE_INTERNAL
+#include "gmock/gmock.h"      // IWYU pragma: export
+#include "gtest/gtest-spi.h"  // IWYU pragma: export
+#include "gtest/gtest.h"      // IWYU pragma: export
 
 #endif  // IREE_TESTING_GTEST_H_

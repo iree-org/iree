@@ -66,6 +66,7 @@ cc_test(
     srcs = ["arena_test.cc"],
     deps = [
         ":arena",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -91,8 +92,8 @@ cc_test(
     srcs = ["bitfield_test.cc"],
     deps = [
         ":bitfield",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -151,10 +152,11 @@ cc_library(
     deps = [
         ":status",
         ":target_platform",
+        "//iree/base/internal:file_io_internal",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ] + platform_trampoline_deps("file_io"),
+    ],
 )
 
 cc_library(
@@ -186,10 +188,11 @@ cc_library(
     deps = [
         ":ref_ptr",
         ":status",
+        "//iree/base/internal:file_mapping_internal",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-    ] + platform_trampoline_deps("file_mapping"),
+    ],
 )
 
 cc_library(
@@ -218,6 +221,7 @@ cc_test(
     ],
     deps = [
         ":file_path",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -277,15 +281,10 @@ cc_test(
     ],
     deps = [
         ":intrusive_list",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/memory",
     ],
-)
-
-# This library is a no-op in OSS, but exists for upstream compatibility
-cc_library(
-    name = "localfile",
-    deps = platform_trampoline_deps("localfile"),
 )
 
 cc_library(
@@ -338,6 +337,7 @@ cc_test(
     srcs = ["ref_ptr_test.cc"],
     deps = [
         ":ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -361,6 +361,7 @@ cc_test(
     srcs = ["signature_mangle_test.cc"],
     deps = [
         ":signature_mangle",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -401,6 +402,7 @@ cc_test(
     srcs = ["time_test.cc"],
     deps = [
         ":time",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )

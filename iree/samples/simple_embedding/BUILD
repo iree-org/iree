@@ -55,6 +55,8 @@ cc_test(
         "//iree/base:logging",
         "//iree/hal:api",
         "//iree/modules/hal",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",
