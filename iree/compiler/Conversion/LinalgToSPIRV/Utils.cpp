@@ -87,25 +87,26 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 template <typename GPUIdOp, typename GPUCountOp>
 static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
                                                       Location loc,
-                                                      StringRef dim) {
+                                                      unsigned dim) {
+  std::array<StringRef, kNumGPUDims> dimAttr{"x", "y", "z"};
+  StringAttr attr =
+      builder.getStringAttr(dimAttr[std::min<unsigned>(dim, kNumGPUDims)]);
   Type indexType = builder.getIndexType();
-  return {
-      builder.create<GPUIdOp>(loc, indexType, builder.getStringAttr(dim)),
-      builder.create<GPUCountOp>(loc, indexType, builder.getStringAttr(dim))};
+  return {builder.create<GPUIdOp>(loc, indexType, attr),
+          builder.create<GPUCountOp>(loc, indexType, attr)};
 }
 
 template <>
 linalg::ProcInfo getGPUProcessorIdAndCountImpl<GPUGlobalId, GPUGlobalCount>(
-    OpBuilder &builder, Location loc, StringRef dim) {
+    OpBuilder &builder, Location loc, unsigned dim) {
+  std::array<StringRef, kNumGPUDims> dimAttr{"x", "y", "z"};
+  StringAttr attr =
+      builder.getStringAttr(dimAttr[std::min<unsigned>(dim, kNumGPUDims)]);
   Type indexType = builder.getIndexType();
-  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType,
-                                                 builder.getStringAttr(dim));
-  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType,
-                                                 builder.getStringAttr(dim));
-  Value blockDim = builder.create<gpu::BlockDimOp>(loc, indexType,
-                                                   builder.getStringAttr(dim));
-  Value threadId = builder.create<gpu::ThreadIdOp>(loc, indexType,
-                                                   builder.getStringAttr(dim));
+  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType, attr);
+  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType, attr);
+  Value blockDim = builder.create<gpu::BlockDimOp>(loc, indexType, attr);
+  Value threadId = builder.create<gpu::ThreadIdOp>(loc, indexType, attr);
   return {builder.create<AddIOp>(
               loc, builder.create<MulIOp>(loc, blockId, blockDim), threadId),
           builder.create<MulIOp>(loc, blockDim, gridDim)};
@@ -115,11 +116,9 @@ template <typename GPUIdOp, typename GPUCountOp>
 static SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCountsImpl(
     OpBuilder &builder, Location loc, unsigned numDims) {
   SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
-  std::array<StringRef, kNumGPUDims> dims{"x", "y", "z"};
   for (unsigned i = 0; i < numDims; ++i) {
     procInfo[numDims - 1 - i] =
-        getGPUProcessorIdAndCountImpl<GPUIdOp, GPUCountOp>(builder, loc,
-                                                           dims[i]);
+        getGPUProcessorIdAndCountImpl<GPUIdOp, GPUCountOp>(builder, loc, i);
   }
   return procInfo;
 }
