@@ -417,8 +417,8 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.target "llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         func @dot_ex_dispatch_0() {
           %c0 = constant 0 : index
@@ -527,25 +527,6 @@ func @dot_ex_dispatch_0() {
   %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
   hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
   return
-}
-
-```
-### IR Dump After LinalgFusionOfTensorOps
-```
-module {
-  func @dot_ex_dispatch_0() {
-    %c0 = constant 0 : index
-    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<32x1024xf32>
-    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<1024x64xf32>
-    %2 = "mhlo.dot"(%0, %1) : (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>
-    hal.interface.store.tensor %2, @legacy_io::@ret0, offset = %c0 : tensor<32x64xf32>
-    return
-  }
-  hal.interface @legacy_io attributes {sym_visibility = "private"} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
 }
 
 ```
@@ -3062,8 +3043,8 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
   hal.executable.target "llvm-ir*" {
+    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module {
       llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
         %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -3497,8 +3478,8 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.target "llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -3941,8 +3922,8 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.target "llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -4532,8 +4513,8 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.target "llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -5039,8 +5020,8 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.target "llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -5646,8 +5627,8 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.target "llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -6211,7 +6192,6 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
   hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18836xi8>, format = 1280071245 : i32} {
   }
 }
@@ -6376,7 +6356,6 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18836xi8>, format = 1280071245 : i32} {
     }
   }
@@ -6470,7 +6449,6 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18836xi8>, format = 1280071245 : i32} {
     }
   }
