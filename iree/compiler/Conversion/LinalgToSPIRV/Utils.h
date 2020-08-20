@@ -31,16 +31,9 @@ class OperationFolder;
 class OpBuilder;
 struct LogicalResult;
 
-namespace gpu {
-class BlockIdOp;
-class GridDimOp;
-class ThreadIdOp;
-class BlockDimOp;
-}  // namespace gpu
-
 namespace iree_compiler {
 
-static constexpr int kNumDims = 3;
+static constexpr int kNumGPUDims = 3;
 
 /// Updates the workgroup size used for the dispatch region.
 LogicalResult updateWorkGroupSize(FuncOp funcOp,
@@ -63,6 +56,8 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst);
 class GPUGlobalId;
 class GPUGlobalCount;
 
+/// Generate the operations that compute the processor ID and number of
+/// processors. Used as the callback needed for LinalgDistributionOptions.
 template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
                                                              Location loc,

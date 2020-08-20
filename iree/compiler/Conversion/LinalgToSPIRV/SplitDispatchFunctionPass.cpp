@@ -150,11 +150,10 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   // there is nothing to do.
   Block &fnBody = oldFn.getBlocks().front();
 
-  // Collect all Linalg and scf.parallel ops for distributing.
+  // Collect all Linalg and scf.parallel ops for splitting.
   SmallVector<Operation *, 4> separableOps;
   for (Operation &op : fnBody)
-    if (isa<linalg::LinalgOp>(op) || isa<scf::ParallelOp>(op) ||
-        isa<scf::ForOp>(op))
+    if (isa<linalg::LinalgOp, scf::ParallelOp, scf::ForOp>(op))
       separableOps.push_back(&op);
 
   if (separableOps.size() <= 1) return success();

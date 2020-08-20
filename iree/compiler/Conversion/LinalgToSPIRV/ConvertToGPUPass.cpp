@@ -285,12 +285,10 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
 /// processors.
 static LogicalResult distributeCyclicallyToProcessors(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    ArrayRef<Value> processorIDs, ArrayRef<Value> numProcessors) {
+    ArrayRef<linalg::ProcInfo> procInfo) {
   unsigned numLoops = pLoopOp.getNumLoops();
-  assert(numLoops == processorIDs.size() &&
+  assert(numLoops == procInfo.size() &&
          "expected as many ids as number of loops");
-  assert(numLoops == numProcessors.size() &&
-         "expected as many nprocs as number of loops");
   SmallVector<LoopBounds, 2> forBounds;
   SmallVector<unsigned, 2> permutation;
   forBounds.reserve(numLoops);
@@ -298,10 +296,12 @@ static LogicalResult distributeCyclicallyToProcessors(
   Location loc = pLoopOp.getLoc();
   auto lbs = pLoopOp.lowerBound(), ubs = pLoopOp.upperBound(),
        steps = pLoopOp.step();
-  for (unsigned i : llvm::seq<unsigned>(0, processorIDs.size())) {
+  for (unsigned i : llvm::seq<unsigned>(0, procInfo.size())) {
     Value mappedLb = rewriter.create<AddIOp>(
-        loc, lbs[i], rewriter.create<MulIOp>(loc, steps[i], processorIDs[i]));
-    Value mappedStep = rewriter.create<MulIOp>(loc, steps[i], numProcessors[i]);
+        loc, lbs[i],
+        rewriter.create<MulIOp>(loc, steps[i], procInfo[i].procId));
+    Value mappedStep =
+        rewriter.create<MulIOp>(loc, steps[i], procInfo[i].nprocs);
     forBounds.push_back({mappedLb, ubs[i], mappedStep});
     permutation.push_back(i);
   }
@@ -323,10 +323,10 @@ static LogicalResult distributeCyclicallyToProcessors(
 /// generating the if statement.
 static LogicalResult distributeSingleIterationPerProcessor(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    ArrayRef<Value> processorIDs, bool generateGuard = false) {
+    ArrayRef<linalg::ProcInfo> procInfo, bool generateGuard = false) {
   unsigned numLoops = pLoopOp.getNumLoops();
   Location loc = pLoopOp.getLoc();
-  assert(numLoops == processorIDs.size() &&
+  assert(numLoops == procInfo.size() &&
          "expected as many ids as number of loops");
 
   auto lbs = pLoopOp.lowerBound();
@@ -334,7 +334,7 @@ static LogicalResult distributeSingleIterationPerProcessor(
   SmallVector<Value, 2> ivReplacements;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
     Value iterValue = rewriter.create<AddIOp>(
-        loc, lbs[i], rewriter.create<MulIOp>(loc, processorIDs[i], step[i]));
+        loc, lbs[i], rewriter.create<MulIOp>(loc, procInfo[i].procId, step[i]));
     ivReplacements.push_back(iterValue);
   }
   Region &pLoopOpRegion = pLoopOp.getLoopBody();
@@ -379,11 +379,12 @@ template <typename GPUIdOp, typename GPUCountOp>
 static linalg::ProcInfo getLinearizedGPUProcessorIdAndCount(
     Location loc, ConversionPatternRewriter &rewriter) {
   SmallVector<linalg::ProcInfo, 3> procInfo =
-      getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(rewriter, loc, kNumDims);
+      getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(rewriter, loc,
+                                                       kNumGPUDims);
   linalg::ProcInfo linearized;
   linearized.procId = procInfo[0].procId;
   linearized.nprocs = procInfo[0].nprocs;
-  for (unsigned i = 0; i < kNumDims - 1; ++i) {
+  for (unsigned i = 0; i < kNumGPUDims - 1; ++i) {
     linearized.procId =
         rewriter.create<MulIOp>(loc, linearized.procId, procInfo[i + 1].nprocs);
     linearized.procId =
@@ -409,12 +410,7 @@ static LogicalResult distributeCyclicallyToProcessors(
   SmallVector<linalg::ProcInfo, 2> procInfo =
       getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(
           rewriter, pLoopOp.getLoc(), numLoops);
-  SmallVector<Value, 2> ids(procInfo.size()), counts(procInfo.size());
-  for (auto info : enumerate(procInfo)) {
-    ids[info.index()] = info.value().procId;
-    counts[info.index()] = info.value().nprocs;
-  }
-  return distributeCyclicallyToProcessors(rewriter, pLoopOp, ids, counts);
+  return distributeCyclicallyToProcessors(rewriter, pLoopOp, procInfo);
 }
 
 /// Distributes scf.parallel to processors where `IdOp` is used to get the
@@ -431,11 +427,9 @@ static LogicalResult distributeSingleIterationPerProcessor(
         cast<scf::ParallelOp>(serializeDimensionsFrom(rewriter, pLoopOp, 3));
     numLoops = 3;
   }
-  SmallVector<Value, 2> ids = llvm::to_vector<2>(
-      llvm::map_range(getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(
-                          rewriter, pLoopOp.getLoc(), numLoops),
-                      [](linalg::ProcInfo info) { return info.procId; }));
-  return distributeSingleIterationPerProcessor(rewriter, pLoopOp, ids,
+  auto procInfo = getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(
+      rewriter, pLoopOp.getLoc(), numLoops);
+  return distributeSingleIterationPerProcessor(rewriter, pLoopOp, procInfo,
                                                generateGuard);
 }
 
@@ -567,11 +561,10 @@ static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
 
   if (copyLength.hasValue() && !workgroupSize.empty() &&
       copyLength.getValue() <= linearizedWorkgroupSize) {
-    return distributeSingleIterationPerProcessor(
-        rewriter, pLoopOp, idAndCount.procId, /*generateGuard=*/true);
+    return distributeSingleIterationPerProcessor(rewriter, pLoopOp, idAndCount,
+                                                 /*generateGuard=*/true);
   }
-  return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount.procId,
-                                          idAndCount.nprocs);
+  return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount);
 }
 
 /// CopyOp that are loading to/storing from workgroup memory are special cased

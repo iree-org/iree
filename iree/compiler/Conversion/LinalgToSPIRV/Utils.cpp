@@ -115,7 +115,7 @@ template <typename GPUIdOp, typename GPUCountOp>
 static SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCountsImpl(
     OpBuilder &builder, Location loc, unsigned numDims) {
   SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
-  std::array<StringRef, kNumDims> dims{"x", "y", "z"};
+  std::array<StringRef, kNumGPUDims> dims{"x", "y", "z"};
   for (unsigned i = 0; i < numDims; ++i) {
     procInfo[numDims - 1 - i] =
         getGPUProcessorIdAndCountImpl<GPUIdOp, GPUCountOp>(builder, loc,
@@ -124,20 +124,25 @@ static SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCountsImpl(
   return procInfo;
 }
 
-#define DEFINE_PROCINFO_CALLBACK_FNS(IdOp, CountOp)                            \
-  template <>                                                                  \
-  SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts<IdOp, CountOp>( \
-      OpBuilder & builder, Location loc, unsigned numDims) {                   \
-    return getGPUProcessorIdsAndCountsImpl<IdOp, CountOp>(builder, loc,        \
-                                                          numDims);            \
-  }
+template <typename GPUIdOp, typename GPUCountOp>
+SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
+                                                             Location loc,
+                                                             unsigned numDims) {
+  return getGPUProcessorIdsAndCountsImpl<GPUIdOp, GPUCountOp>(builder, loc,
+                                                              numDims);
+}
 
-// clang-format off
-DEFINE_PROCINFO_CALLBACK_FNS(gpu::BlockIdOp, gpu::GridDimOp)
-DEFINE_PROCINFO_CALLBACK_FNS(gpu::ThreadIdOp, gpu::BlockDimOp)
-DEFINE_PROCINFO_CALLBACK_FNS(GPUGlobalId, GPUGlobalCount)
-// clang-format on
-
-#undef DEFINE_PROCINFO_CALLBACK_FNS
+/// Explicit instantiation of gpuGPUProcessorIdsAndCounts.
+template SmallVector<linalg::ProcInfo, 2>
+getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(OpBuilder &builder,
+                                                            Location loc,
+                                                            unsigned numDims);
+template SmallVector<linalg::ProcInfo, 2>
+getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
+    OpBuilder &builder, Location loc, unsigned numDims);
+template SmallVector<linalg::ProcInfo, 2>
+getGPUProcessorIdsAndCounts<GPUGlobalId, GPUGlobalCount>(OpBuilder &builder,
+                                                         Location loc,
+                                                         unsigned numDims);
 }  // namespace iree_compiler
 }  // namespace mlir
