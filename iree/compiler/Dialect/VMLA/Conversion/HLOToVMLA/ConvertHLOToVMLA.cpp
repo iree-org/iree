@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
@@ -215,6 +216,40 @@ struct ConcatenateOpConversion
     }
 
     rewriter.replaceOp(srcOp, {dst});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
+struct IotaOpConversion : public OpConversionPattern<Shape::IotaOp> {
+  IotaOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  LogicalResult matchAndRewrite(
+      Shape::IotaOp op, ArrayRef<Value> operandValues,
+      ConversionPatternRewriter &rewriter) const override {
+    auto resultTy = op.getResult().getType().cast<ShapedType>();
+
+    int32_t elementSize = VMLATypeConverter::getRoundedElementByteWidth(
+        resultTy.getElementType());
+    auto elementSizeValue =
+        rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), elementSize);
+
+    auto shapeDim0 = rewriter.createOrFold<Shape::RankedDimOp>(
+        op.getLoc(), rewriter.getIndexType(), op.getOperand(),
+        rewriter.getI64IntegerAttr(0));
+
+    auto bufferSize = rewriter.createOrFold<mlir::MulIOp>(
+        op.getLoc(), elementSizeValue, shapeDim0);
+
+    auto dst = rewriter.createOrFold<IREE::VMLA::BufferAllocOp>(
+        op.getLoc(), IREE::VMLA::BufferType::get(rewriter.getContext()),
+        bufferSize);
+
+    rewriter.createOrFold<IREE::VMLA::IotaOp>(
+        op.getLoc(), dst, TypeAttr::get(resultTy.getElementType()));
+    rewriter.replaceOp(op, {dst});
+
     return success();
   }
 
@@ -791,6 +826,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<ScatterOpConversion>(context, typeConverter);
   patterns.insert<SliceOpConversion>(context, typeConverter);
   patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
+  patterns.insert<IotaOpConversion>(context, typeConverter);
 
   // Tensor-level canonicalizations to reduce the op surface area of the
   // runtime.

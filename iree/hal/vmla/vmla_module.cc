@@ -330,6 +330,12 @@ class VMLAModuleState final {
   // Common helpers for defining ops
   //===--------------------------------------------------------------------===//
 
+#define IREE_VMLA_NONARY_OP(name, kernel, type)    \
+  Status name(vm::ref<Buffer> dst) {               \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);  \
+    return kernel::Execute<type>(dst->As<type>()); \
+  }
+
 #define IREE_VMLA_UNARY_OP(name, kernel, type)                      \
   Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
@@ -546,6 +552,11 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
   // VMLA Ops: arithmetic
   //===--------------------------------------------------------------------===//
+
+  IREE_VMLA_NONARY_OP(IotaI8, kernels::Iota, int8_t);
+  IREE_VMLA_NONARY_OP(IotaI16, kernels::Iota, int16_t);
+  IREE_VMLA_NONARY_OP(IotaI32, kernels::Iota, int32_t);
+  IREE_VMLA_NONARY_OP(IotaF32, kernels::Iota, float_t);
 
   IREE_VMLA_BINARY_OP(AddI8, kernels::Add, int8_t);
   IREE_VMLA_BINARY_OP(AddI16, kernels::Add, int16_t);
@@ -857,6 +868,11 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("shr.i8", &VMLAModuleState::ShrI8),
     vm::MakeNativeFunction("shr.i16", &VMLAModuleState::ShrI16),
     vm::MakeNativeFunction("shr.i32", &VMLAModuleState::ShrI32),
+
+    vm::MakeNativeFunction("iota.i8", &VMLAModuleState::IotaI8),
+    vm::MakeNativeFunction("iota.i16", &VMLAModuleState::IotaI16),
+    vm::MakeNativeFunction("iota.i32", &VMLAModuleState::IotaI32),
+    vm::MakeNativeFunction("iota.f32", &VMLAModuleState::IotaF32),
 
     vm::MakeNativeFunction("add.i8", &VMLAModuleState::AddI8),
     vm::MakeNativeFunction("add.i16", &VMLAModuleState::AddI16),

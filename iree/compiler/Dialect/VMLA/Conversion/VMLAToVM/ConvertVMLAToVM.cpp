@@ -309,6 +309,7 @@ void populateVMLAToVMPatterns(MLIRContext *context,
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::SinOp, "vmla.sin");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::TanhOp, "vmla.tanh");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::Atan2Op, "vmla.atan2");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::IotaOp, "vmla.iota");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::MinOp, "vmla.min");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::MaxOp, "vmla.max");

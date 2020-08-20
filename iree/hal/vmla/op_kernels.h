@@ -353,6 +353,11 @@ struct Ceil {
                         absl::Span<T> dst_buffer);
 };
 
+struct Iota {
+  template <typename T>
+  static Status Execute(absl::Span<T> dst_buffer);
+};
+
 struct Convert {
   template <typename SRC, typename DST>
   static Status Execute(absl::Span<const SRC> src_buffer,
