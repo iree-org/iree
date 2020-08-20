@@ -1,0 +1,49 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import numpy as np
+from pyiree.tf.support import tf_test_utils
+import tensorflow.compat.v2 as tf
+
+
+class RangeModule(tf.Module):
+
+  def __init__(self):
+    pass
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([], tf.float32),
+      tf.TensorSpec([], tf.float32)
+  ])
+  def range(self, start, stop):
+    delta = np.array(3, dtype=np.float32)
+    return tf.range(start, stop, delta)
+
+
+@tf_test_utils.compile_module(RangeModule)
+class RangeTest(tf_test_utils.TracedModuleTestCase):
+
+  def test_range(self):
+    def range(module):
+      start = np.array(3., dtype=np.float32)
+      stop = np.array(12., dtype=np.float32)
+      result = module.range(start, stop)
+
+    self.compare_backends(range)
+
+
+if __name__ == "__main__":
+  if hasattr(tf, "enable_v2_behavior"):
+    tf.enable_v2_behavior()
+  tf.test.main()

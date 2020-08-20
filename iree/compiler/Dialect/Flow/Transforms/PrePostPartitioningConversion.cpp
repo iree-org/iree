@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/Conversion/StandardToFlow/ConvertStandardToFlow.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
@@ -88,6 +89,9 @@ class PrePartitioningConversionPass
     // any such attributes to dedicated mhlo.broadcast_in_dim ops.
     mhlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
     mhlo::PopulateMaterializeBroadcastsPatterns(context, &conversionPatterns);
+
+    Shape::populateShapeToStandardConversionPatterns(conversionPatterns, context);
+    Shape::setupShapeToStandardLegality(conversionTarget);
 
     // Early conversion of ops that have matches we want to route through.
     // For example, DynamicUpdateSlice should end up as a stream operation.
