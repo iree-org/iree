@@ -31,15 +31,12 @@ void setupMaterializeShapeCalculationsLegality(ConversionTarget &target);
 void populateMaterializeShapeCalculationsConversionPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context);
 
-
 // Sets up legality for shape calculation materialization conversions.
 void setupShapeToStandardLegality(ConversionTarget &target);
 
 // Populates patterns that will convert shape calculations into standard ops.
 void populateShapeToStandardConversionPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context);
-
-
 
 }  // namespace Shape
 }  // namespace iree_compiler
