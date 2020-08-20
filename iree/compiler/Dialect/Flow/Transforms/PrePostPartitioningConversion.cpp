@@ -90,7 +90,8 @@ class PrePartitioningConversionPass
     mhlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
     mhlo::PopulateMaterializeBroadcastsPatterns(context, &conversionPatterns);
 
-    Shape::populateShapeToStandardConversionPatterns(conversionPatterns, context);
+    Shape::populateShapeToStandardConversionPatterns(conversionPatterns,
+                                                     context);
     Shape::setupShapeToStandardLegality(conversionTarget);
 
     // Early conversion of ops that have matches we want to route through.

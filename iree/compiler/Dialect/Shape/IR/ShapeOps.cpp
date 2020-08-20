@@ -50,7 +50,8 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
   auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
   if (shapedType && shapedType.hasRank() && rsType) {
     for (auto it : llvm::zip(shapedType.getShape(), rsType.getAllDims())) {
-      if ((std::get<0>(it) != -1 && std::get<1>(it) != -1) && std::get<0>(it) != std::get<1>(it)) {
+      if ((std::get<0>(it) != -1 && std::get<1>(it) != -1) &&
+          std::get<0>(it) != std::get<1>(it)) {
         return op.emitOpError("dims must match between tensor and shape");
       }
     }
