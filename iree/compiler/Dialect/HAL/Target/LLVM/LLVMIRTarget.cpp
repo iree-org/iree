@@ -58,9 +58,8 @@ class LLVMIRTargetBackend final : public TargetBackend {
 
     // Create invocation function an populate entry_points.
     iree::LLVMIRExecutableDefT llvmIrExecutableDef;
-    auto executableOp = cast<IREE::HAL::ExecutableOp>(targetOp.getParentOp());
     auto entryPointOps =
-        executableOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+        targetOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
     for (auto entryPointOp : entryPointOps) {
       llvmIrExecutableDef.entry_points.push_back(
           std::string(entryPointOp.sym_name()));

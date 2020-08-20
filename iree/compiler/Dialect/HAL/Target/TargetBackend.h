@@ -70,18 +70,26 @@ TargetOptions getTargetOptionsFromFlags();
 //   [[-iree-hal-materialize-interfaces]]
 //   -> hal.executable @my_exe
 //      + hal.executable.target "vulkan-spirv-v1.1-mobile"
+//          hal.executable.entry_point @my_entry
 //          module { ... }
 //      + hal.executable.target "vulkan-spirv-v1.1-desktop"
+//          hal.executable.entry_point @my_entry
 //          module { ... }
 //      + hal.executable.target "vulkan-spirv-v1.2-desktop"
+//          hal.executable.entry_point @my_entry
 //          module { ... }
 //   [[-iree-hal-translate-executables]]
 //   -> hal.executable @my_exe
 //      + hal.executable.target "vulkan-spirv-v1.1-mobile"
+//          hal.executable.entry_point @my_entry_1
+//          hal.executable.entry_point @my_entry_2
+//          hal.executable.entry_point @my_entry_3
 //          module { spv.module { ... } }
 //      + hal.executable.target "vulkan-spirv-v1.1-desktop"
+//          hal.executable.entry_point @my_entry
 //          module { spv.module { ... } }
 //      + hal.executable.target "vulkan-spirv-v1.2-desktop"
+//          hal.executable.entry_point @my_entry
 //          module { spv.module { ... } }
 //   [[-iree-hal-link-executables]]
 //   -> TODO(benvanik): linkage rules.
@@ -125,8 +133,9 @@ class TargetBackend {
   //     IREE::Flow::ExecutableOp sourceOp);
 
   // Creates zero or more hal.executable.target ops for the target backend.
-  // The target op will contain the flow.executable contents and any attributes
-  // the backend wants to carry along during transformation.
+  // The target op's inner module should be constructed with any attributes
+  // the backends wants to carry along during transformation and will later be
+  // filled in with the flow.executable's contents.
   //
   // A backend may decide to create multiple variants of an executable given
   // different parameters or target device requirements. For example, if the
@@ -137,8 +146,8 @@ class TargetBackend {
   //   my-backend-v1-reduce-final
   // The `recordDispatch` implementation can then switch between these binaries
   // as needed based on dispatch context.
-  virtual void constructTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                                  IREE::HAL::ExecutableOp executableOp);
+  virtual void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
+                                IREE::HAL::ExecutableOp executableOp);
 
   // Captured state from the point at which a dispatch is to be recorded.
   struct DispatchState {
@@ -236,12 +245,12 @@ class TargetBackend {
   //       hal.interface.binding @arg0, set=0, binding=0, ...
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
-  //     hal.executable.entry_point @main attributes {
-  //       interface = @main_io,
-  //       ordinal = 0 : i32,
-  //       signature = (tensor<4xf32>) -> tensor<4xf32>
-  //     }
   //     hal.executable.target "target-backend" {
+  //       hal.executable.entry_point @main attributes {
+  //         interface = @main_io,
+  //         ordinal = 0 : i32,
+  //         signature = (tensor<4xf32>) -> tensor<4xf32>
+  //       }
   //       module { ... }
   //     }
   //   }
@@ -249,8 +258,8 @@ class TargetBackend {
   // As output:
   //   hal.executable @some_executable {
   //     hal.interface @main_io ...
-  //     hal.executable.entry_point @main ...
   //     hal.executable.target "target-backend" {
+  //       hal.executable.entry_point @main ...
   //       module { spv.module { ... } }
   //     }
   //   }

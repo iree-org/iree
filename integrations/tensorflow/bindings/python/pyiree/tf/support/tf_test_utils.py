@@ -124,6 +124,8 @@ class ModuleCall:
                method: str,
                inputs: Tuple[Any],
                outputs: Tuple[Any],
+               serialized_inputs: Tuple[str],
+               serialized_outputs: Tuple[str],
                rtol: float = 1e-6,
                atol: float = 1e-6):
     """Records the details of a call to a CompiledModule."""
@@ -141,6 +143,9 @@ class ModuleCall:
     else:
       outputs = tuple()
     self.outputs = outputs if isinstance(outputs, tuple) else (outputs,)
+
+    self.serialized_inputs = serialized_inputs
+    self.serialized_outputs = serialized_outputs
 
     self.rtol = rtol
     self.atol = atol
@@ -187,7 +192,13 @@ class ModuleCall:
     """
     os.makedirs(call_dir, exist_ok=True)
 
-    metadata = {"method": self.method, "rtol": self.rtol, "atol": self.atol}
+    metadata = {
+        "method": self.method,
+        "serialized_inputs": self.serialized_inputs,
+        "serialized_outputs": self.serialized_outputs,
+        "rtol": self.rtol,
+        "atol": self.atol
+    }
     with open(os.path.join(call_dir, "metadata.pkl"), "wb") as f:
       pickle.dump(metadata, f)
 
@@ -248,7 +259,10 @@ class Trace:
     if _load_dict is None:
       # Extract metadata from module and function.
       self.module_name = module.module_name
-      self.backend = module.backend
+      self.compiled_path = module.compiled_path
+      self.backend_name = module.backend
+      self.supports_cxx_serialization = module.supports_cxx_serialization()
+      self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
       source, start_line = inspect.getsourcelines(function)
@@ -258,7 +272,10 @@ class Trace:
       self.calls = []
     else:
       self.module_name = _load_dict["module_name"]
-      self.backend = _load_dict["backend"]
+      self.compiled_path = _load_dict["compiled_path"]
+      self.backend_name = _load_dict["backend_name"]
+      self.supports_cxx_serialization = _load_dict["supports_cxx_serialization"]
+      self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
       self.function_line_numbers = _load_dict["function_line_numbers"]
@@ -266,7 +283,7 @@ class Trace:
       self.calls = _load_dict["calls"]
 
   def __str__(self):
-    header = (f"Trace of {self.module_name} compiled to '{self.backend}' "
+    header = (f"Trace of {self.module_name} compiled to '{self.backend_name}' "
               f"on function '{self.function_name}':")
     # Give each call a number so it's easier to compare between multiple traces.
     calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
@@ -307,9 +324,11 @@ class Trace:
 
       if not calls_match:
         logging.error("Comparision between '%s' and '%s' failed on method '%s'",
-                      ref_trace.backend, tar_trace.backend, ref_call.method)
-        logging.error("Reference call '%s':\n%s", ref_trace.backend, ref_call)
-        logging.error("Target call '%s':\n%s", tar_trace.backend, tar_call)
+                      ref_trace.backend_name, tar_trace.backend_name,
+                      ref_call.method)
+        logging.error("Reference call '%s':\n%s", ref_trace.backend_name,
+                      ref_call)
+        logging.error("Target call '%s':\n%s", tar_trace.backend_name, tar_call)
 
       traces_match = traces_match and calls_match
     return traces_match
@@ -411,9 +430,14 @@ class Trace:
     Args:
       trace_dir: str, path to the directory to serialize the trace to.
     """
+
+    # Python serialization.
     metadata = {
         "module_name": self.module_name,
-        "backend": self.backend,
+        "compiled_path": self.compiled_path,
+        "backend_name": self.backend_name,
+        "supports_cxx_serialization": self.supports_cxx_serialization,
+        "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
         "function_line_numbers": self.function_line_numbers,
@@ -426,6 +450,19 @@ class Trace:
     for i, call in enumerate(self.calls):
       call_dir = os.path.join(trace_dir, f"call_{str(i).zfill(width)}")
       call.serialize(call_dir)
+
+    # C++ Serialization.
+    if not self.supports_cxx_serialization:
+      flaglines = []
+      if self.compiled_path is not None:
+        flaglines.append(f"--input_file={self.compiled_path}")
+      flaglines.append(f"--driver={self.backend_driver}")
+      inputs_str = ", ".join(self.calls[0].serialized_inputs)
+      flaglines.append(f"--inputs={inputs_str}")
+      flaglines.append(f"--entry_function={self.calls[0].method}")
+
+      with open(os.path.join(trace_dir, "flagfile"), "w") as f:
+        f.writelines(line + '\n' for line in flaglines)
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":
@@ -446,7 +483,7 @@ class Trace:
 
 
 def _get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
-  trace_dir = os.path.join(artifacts_dir, trace.backend, "traces",
+  trace_dir = os.path.join(artifacts_dir, trace.backend_name, "traces",
                            trace.function_name)
   os.makedirs(trace_dir, exist_ok=True)
   return trace_dir
@@ -484,8 +521,10 @@ class TracedModule:
 
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)
+      serialized_inputs, serialized_outputs = method.get_serialized_values()
       self._trace.calls.append(
-          ModuleCall(method_name, args, outputs, **tolerances))
+          ModuleCall(method_name, args, outputs, serialized_inputs,
+                     serialized_outputs, **tolerances))
       return outputs
 
     return call
@@ -621,7 +660,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     failed_backend_indices = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
-                   ref_trace.backend, tar_trace.backend)
+                   ref_trace.backend_name, tar_trace.backend_name)
       traces_match = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)

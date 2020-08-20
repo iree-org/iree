@@ -14,7 +14,7 @@
 
 # Test coverage across backends for e2e tests is defined directly in the BUILD
 # files. A coverage table generated from this file can be viewed here:
-#   https://google.github.io/iree/TensorFlowE2ECoverage
+#   https://google.github.io/iree/tf-e2e-coverage
 # Updates made to test suite names should also be reflected here:
 #   https://github.com/google/iree/blob/main/scripts/update_e2e_coverage.py
 

@@ -17,7 +17,6 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Dialect/IREE/IR/IREEAttributes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"

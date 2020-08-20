@@ -155,14 +155,6 @@ static bool substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
   return true;
 }
 
-/// Perform folding of chains of AffineMinOp.
-struct AffineMinCanonicalizationPattern : public OpRewritePattern<AffineMinOp> {
-  using OpRewritePattern<AffineMinOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineMinOp minOp,
-                                PatternRewriter &rewriter) const override;
-};
-
 LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
     AffineMinOp minOp, PatternRewriter &rewriter) const {
   LLVM_DEBUG(llvm::dbgs() << "\nCanonicalize AffineMin: "

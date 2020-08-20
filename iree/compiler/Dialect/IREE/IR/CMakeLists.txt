@@ -19,7 +19,6 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "IREEAttributes.h"
     "IREEDialect.h"
     "IREEOps.h"
     "IREEOps.h.inc"
