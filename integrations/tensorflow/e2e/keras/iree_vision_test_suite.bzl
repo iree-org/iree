@@ -106,7 +106,6 @@ def iree_vision_test_suite(
                 args = [
                     "--model={}".format(model),
                     "--data={}".format(dataset),
-                    "--include_top=1",
                     "--reference_backend={}".format(reference_backend),
                     "--target_backends={}".format(backend),
                 ]

@@ -35,7 +35,7 @@ flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
 flags.DEFINE_bool(
     'include_top', True,
-    'Whether or not to include the last (top) layer of the model')
+    'Whether or not to include the final (top) layers of the model.')
 
 APP_MODELS = {
     'ResNet50':
