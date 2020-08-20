@@ -24,7 +24,6 @@ iree_cc_library(
   DEPS
     absl::memory
     absl::strings
-    iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
   PUBLIC
@@ -42,7 +41,6 @@ iree_cc_library(
     absl::strings
     iree::base::file_io_hdrs
     iree::base::file_path
-    iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
@@ -60,7 +58,6 @@ iree_cc_library(
     absl::memory
     absl::strings
     iree::base::file_mapping_hdrs
-    iree::base::platform_headers
     iree::base::target_platform
     iree::base::tracing
   PUBLIC
@@ -90,7 +87,7 @@ iree_cc_library(
   DEPS
     absl::core_headers
     absl::flags
-    iree::base::platform_headers
+    iree::base::target_platform
   PUBLIC
 )
 
@@ -112,54 +109,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    source_location_internal
-  HDRS
-    "source_location.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     status_internal
   HDRS
     "status.h"
     "status_builder.h"
-    "status_errno.h"
-    "status_errors.h"
-    "status_macros.h"
-    "status_win32_errors.h"
     "statusor.h"
   SRCS
     "status.cc"
     "status_builder.cc"
-    "status_errno.cc"
-    "status_errors.cc"
-    "status_win32_errors.cc"
     "statusor.cc"
   DEPS
-    ::logging_internal
     ::ostringstream
     absl::core_headers
-    absl::flags
-    absl::memory
-    absl::stacktrace
     absl::strings
-    iree::base::platform_headers
-    iree::base::source_location
+    iree::base::api
+    iree::base::logging
     iree::base::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    status_matchers_internal
-  HDRS
-    "status_matchers.h"
-  DEPS
-    absl::optional
-    absl::strings
-    iree::base::status
-    iree::testing::gtest
-  TESTONLY
   PUBLIC
 )

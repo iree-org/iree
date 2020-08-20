@@ -178,12 +178,12 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     def trace_function(module):
       module.increment()
       module.increment_by(np.array([81.], dtype=np.float32))
-      module.increment_by_max(np.array([81], dtype=np.float32),
-                              np.array([92], dtype=np.float32))
+      module.increment_by_max(
+          np.array([81], dtype=np.float32), np.array([92], dtype=np.float32))
       module.get_count()
 
-    module = tf_utils.TfCompiledModule(StatefulCountingModule,
-                                       tf_utils.BackendInfo('tf'))
+    module = tf_utils.IreeCompiledModule(StatefulCountingModule,
+                                         tf_utils.BackendInfo('iree_vmla'))
     trace = tf_test_utils.Trace(module, trace_function)
     trace_function(tf_test_utils.TracedModule(module, trace))
 

@@ -93,7 +93,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t byte_offset = VM_DecGlobalAttr("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+            module_state->rwdata_storage.data_length);
       }
       int32_t* value = VM_DecResultRegI32("value");
       const int32_t* global_ptr =
@@ -105,7 +108,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t byte_offset = VM_DecGlobalAttr("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+            module_state->rwdata_storage.data_length);
       }
       int32_t value = VM_DecOperandRegI32("value");
       int32_t* global_ptr =
@@ -117,7 +123,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t byte_offset = VM_DecOperandRegI32("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+            module_state->rwdata_storage.data_length);
       }
       int32_t* value = VM_DecResultRegI32("value");
       const int32_t* global_ptr =
@@ -129,7 +138,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t byte_offset = VM_DecOperandRegI32("global");
       if (byte_offset < 0 ||
           byte_offset >= module_state->rwdata_storage.data_length) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+            module_state->rwdata_storage.data_length);
       }
       int32_t value = VM_DecOperandRegI32("value");
       int32_t* global_ptr =
@@ -140,53 +152,65 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, GlobalLoadRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global ref ordinal out of range: %d (table=%zu)", global,
+            module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
-      iree_vm_ref_retain_or_move_checked(result_is_move, global_ref,
-                                         type_def->ref_type, result);
+      IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+          result_is_move, global_ref, type_def->ref_type, result));
     });
 
     DISPATCH_OP(CORE, GlobalStoreRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global ref ordinal out of range: %d (table=%zu)", global,
+            module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
       bool value_is_move;
       iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
-      iree_vm_ref_retain_or_move_checked(value_is_move, value,
-                                         type_def->ref_type, global_ref);
+      IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+          value_is_move, value, type_def->ref_type, global_ref));
     });
 
     DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global ref ordinal out of range: %d (table=%zu)", global,
+            module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
-      iree_vm_ref_retain_or_move_checked(result_is_move, global_ref,
-                                         type_def->ref_type, result);
+      IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+          result_is_move, global_ref, type_def->ref_type, result));
     });
 
     DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
       int32_t global = VM_DecGlobalAttr("global");
       if (global < 0 || global >= module_state->global_ref_count) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "global ref ordinal out of range: %d (table=%zu)", global,
+            module_state->global_ref_count);
       }
       const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
       bool value_is_move;
       iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
-      iree_vm_ref_retain_or_move_checked(value_is_move, value,
-                                         type_def->ref_type, global_ref);
+      IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+          value_is_move, value, type_def->ref_type, global_ref));
     });
 
     //===------------------------------------------------------------------===//
@@ -214,12 +238,16 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t rodata_ordinal = VM_DecRodataAttr("rodata");
       if (rodata_ordinal < 0 ||
           rodata_ordinal >= module_state->rodata_ref_count) {
-        return IREE_STATUS_OUT_OF_RANGE;
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "rodata ref ordinal out of range: %d (table=%zu)", rodata_ordinal,
+            module_state->rodata_ref_count);
       }
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
-      iree_vm_ref_wrap_retain(&module_state->rodata_ref_table[rodata_ordinal],
-                              iree_vm_ro_byte_buffer_type_id(), result);
+      IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_retain(
+          &module_state->rodata_ref_table[rodata_ordinal],
+          iree_vm_ro_byte_buffer_type_id(), result));
     });
 
     //===------------------------------------------------------------------===//
@@ -235,14 +263,17 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_list_t* list = NULL;
       IREE_RETURN_IF_ERROR(iree_vm_list_create(
           element_type_def, initial_capacity, module_state->allocator, &list));
-      iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), result);
+      IREE_RETURN_IF_ERROR(
+          iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), result));
     });
 
     DISPATCH_OP(CORE, ListReserve, {
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      if (!list) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
       int32_t minimum_capacity = VM_DecOperandRegI32("minimum_capacity");
       IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, minimum_capacity));
     });
@@ -251,7 +282,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      if (!list) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
       int32_t* result = VM_DecResultRegI32("result");
       *result = (int32_t)iree_vm_list_size(list);
     });
@@ -260,7 +293,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      if (!list) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
       int32_t new_size = VM_DecOperandRegI32("new_size");
       IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, new_size));
     });
@@ -269,7 +304,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      if (!list) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
       int32_t index = VM_DecOperandRegI32("index");
       int32_t* result = VM_DecResultRegI32("result");
       iree_vm_value_t value;
@@ -282,7 +319,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      if (!list) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+      }
       int32_t index = VM_DecOperandRegI32("index");
       int32_t raw_value = VM_DecOperandRegI32("raw_value");
       iree_vm_value_t value = iree_vm_value_make_i32(raw_value);
@@ -293,21 +332,23 @@ iree_status_t iree_vm_bytecode_dispatch(
       // bool list_is_move;
       // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      // if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      // if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
       // int32_t index = VM_DecOperandRegI32("index");
       // iree_vm_ref_t* result = VM_DecResultRegRef("result");
-      return IREE_STATUS_UNIMPLEMENTED;
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "vm.list.get.ref not implemented");
     });
 
     DISPATCH_OP(CORE, ListSetRef, {
       // bool list_is_move;
       // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      // if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+      // if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
       // int32_t index = VM_DecOperandRegI32("index");
       // bool operand_is_move = VM_DecOperandRegRefIsMove("value");
       // iree_vm_ref_t* operand = VM_DecOperandRegRef("value");
-      return IREE_STATUS_UNIMPLEMENTED;
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "vm.list.set.ref not implemented");
     });
 
     //===------------------------------------------------------------------===//
@@ -337,13 +378,13 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
       if (condition) {
         // Select LHS.
-        iree_vm_ref_retain_or_move_checked(true_value_is_move, true_value,
-                                           type_def->ref_type, result);
+        IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+            true_value_is_move, true_value, type_def->ref_type, result));
         if (false_value_is_move) iree_vm_ref_release(false_value);
       } else {
         // Select RHS.
-        iree_vm_ref_retain_or_move_checked(false_value_is_move, false_value,
-                                           type_def->ref_type, result);
+        IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+            false_value_is_move, false_value, type_def->ref_type, result));
         if (true_value_is_move) iree_vm_ref_release(true_value);
       }
     });
@@ -376,11 +417,11 @@ iree_status_t iree_vm_bytecode_dispatch(
             value_reg_list->registers[index] & IREE_REF_REGISTER_MOVE_BIT;
         iree_vm_ref_t* new_value =
             &regs.ref[value_reg_list->registers[index] & regs.ref_mask];
-        iree_vm_ref_retain_or_move_checked(is_move, new_value,
-                                           type_def->ref_type, result);
+        IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+            is_move, new_value, type_def->ref_type, result));
       } else {
-        iree_vm_ref_retain_or_move_checked(default_is_move, default_value,
-                                           type_def->ref_type, result);
+        IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
+            default_is_move, default_value, type_def->ref_type, result));
       }
     });
 
@@ -553,7 +594,8 @@ iree_status_t iree_vm_bytecode_dispatch(
             call.function.module->self, stack, &call, out_result);
         if (!iree_status_is_ok(call_status)) {
           // TODO(benvanik): set execution result to failure/capture stack.
-          return call_status;
+          return iree_status_annotate(
+              call_status, iree_make_cstring_view("while calling import"));
         }
       } else {
         // Switch execution to the target function and continue running in the
@@ -573,7 +615,9 @@ iree_status_t iree_vm_bytecode_dispatch(
             stack, target_function, src_reg_list, dst_reg_list, &current_frame);
         if (!iree_status_is_ok(enter_status)) {
           // TODO(benvanik): set execution result to stack overflow.
-          return enter_status;
+          return iree_status_annotate(
+              enter_status,
+              iree_make_cstring_view("while calling internal function"));
         }
         regs = current_frame->registers;
         bytecode_data =
@@ -599,7 +643,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       int is_import = (function_ordinal & 0x80000000u) != 0;
       if (!is_import) {
         // Variadic calls are currently only supported for import functions.
-        return IREE_STATUS_FAILED_PRECONDITION;
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variadic calls only supported for internal callees");
       }
 
       // Import that we can fetch from the module state.
@@ -617,7 +663,9 @@ iree_status_t iree_vm_bytecode_dispatch(
           call.function.module->self, stack, &call, out_result);
       if (!iree_status_is_ok(call_status)) {
         // TODO(benvanik): set execution result to failure/capture stack.
-        return call_status;
+        return iree_status_annotate(
+            call_status,
+            iree_make_cstring_view("while calling variadic import"));
       }
     });
 
@@ -627,12 +675,13 @@ iree_status_t iree_vm_bytecode_dispatch(
       current_frame->pc = pc;
 
       // Leave callee by cleaning up the stack.
-      iree_vm_stack_function_leave(stack, src_reg_list, &current_frame);
+      IREE_RETURN_IF_ERROR(
+          iree_vm_stack_function_leave(stack, src_reg_list, &current_frame));
 
       if (!current_frame || current_frame->depth < entry_frame_depth) {
         // Return from the top-level entry frame - return back to call().
         // TODO(benvanik): clear execution results.
-        return IREE_STATUS_OK;
+        return iree_ok_status();
       }
 
       // Reset dispatch state so we can continue executing in the caller.
@@ -648,12 +697,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       uint32_t status_code = VM_DecOperandRegI32("status");
       iree_string_view_t message;
       VM_DecStrAttr("message", &message);
-      // TODO(benvanik): attach string and stack.
-      if (status_code == 0) {
-        // Shouldn't happen; we expect to die here, so there's no way to no-op.
-        return IREE_STATUS_INVALID_ARGUMENT;
+      if (status_code != 0) {
+        // TODO(benvanik): capture source information.
+        return iree_status_allocate(status_code, "<vm>", 0, message);
       }
-      return iree_make_status(status_code);
     });
 
     //===------------------------------------------------------------------===//
@@ -662,7 +709,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, Yield, {
       // TODO(benvanik): yield with execution results.
-      return IREE_STATUS_OK;
+      return iree_ok_status();
     });
 
     //===------------------------------------------------------------------===//
@@ -722,7 +769,10 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t byte_offset = VM_DecGlobalAttr("global");
         if (byte_offset < 0 ||
             byte_offset >= module_state->rwdata_storage.data_length) {
-          return IREE_STATUS_OUT_OF_RANGE;
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
         }
         int64_t* value = VM_DecResultRegI64("value");
         const int64_t* global_ptr =
@@ -734,7 +784,10 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t byte_offset = VM_DecGlobalAttr("global");
         if (byte_offset < 0 ||
             byte_offset >= module_state->rwdata_storage.data_length) {
-          return IREE_STATUS_OUT_OF_RANGE;
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
         }
         int64_t value = VM_DecOperandRegI64("value");
         int64_t* global_ptr =
@@ -746,7 +799,10 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t byte_offset = VM_DecOperandRegI32("global");
         if (byte_offset < 0 ||
             byte_offset >= module_state->rwdata_storage.data_length) {
-          return IREE_STATUS_OUT_OF_RANGE;
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
         }
         int64_t* value = VM_DecResultRegI64("value");
         const int64_t* global_ptr =
@@ -758,7 +814,10 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t byte_offset = VM_DecOperandRegI32("global");
         if (byte_offset < 0 ||
             byte_offset >= module_state->rwdata_storage.data_length) {
-          return IREE_STATUS_OUT_OF_RANGE;
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
+              module_state->rwdata_storage.data_length);
         }
         int64_t value = VM_DecOperandRegI64("value");
         int64_t* global_ptr =
@@ -789,7 +848,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
         iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-        if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+        if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
         int32_t index = VM_DecOperandRegI32("index");
         int64_t* result = VM_DecResultRegI64("result");
         iree_vm_value_t value;
@@ -802,7 +861,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
         iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-        if (!list) return IREE_STATUS_INVALID_ARGUMENT;
+        if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
         int32_t index = VM_DecOperandRegI32("index");
         int64_t raw_value = VM_DecOperandRegI64("value");
         iree_vm_value_t value = iree_vm_value_make_i64(raw_value);
@@ -919,14 +978,16 @@ iree_status_t iree_vm_bytecode_dispatch(
         *result = (operand != 0) ? 1 : 0;
       });
 #else
-      return IREE_STATUS_UNIMPLEMENTED;
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 #endif  // IREE_VM_EXT_I64_ENABLE
     }
     END_DISPATCH_PREFIX();
 
-    DISPATCH_OP(CORE, PrefixExtF32, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(CORE, PrefixExtF32,
+                { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });
 
-    DISPATCH_OP(CORE, PrefixExtF64, { return IREE_STATUS_UNIMPLEMENTED; });
+    DISPATCH_OP(CORE, PrefixExtF64,
+                { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });
 
     // NOLINTNEXTLINE(misc-static-assert)
     DISPATCH_UNHANDLED_CORE();

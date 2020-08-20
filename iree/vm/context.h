@@ -37,8 +37,6 @@ extern "C" {
 // Thread-compatible and must be externally synchronized.
 typedef struct iree_vm_context iree_vm_context_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Creates a new context that uses the given |instance| for device management.
 // |out_context| must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -93,8 +91,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

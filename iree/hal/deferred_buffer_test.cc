@@ -15,10 +15,10 @@
 #include "iree/hal/deferred_buffer.h"
 
 #include "absl/memory/memory.h"
-#include "iree/base/status_matchers.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/testing/mock_allocator.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -69,11 +69,12 @@ TEST(DeferredBufferTest, SizeCheck) {
   EXPECT_CALL(allocator, CanUseBufferLike(_, _, _, _))
       .WillRepeatedly(Return(true));
 
-  EXPECT_OK(deferred_buffer->BindAllocation(add_ref(real_buffer), 10, 100));
+  IREE_EXPECT_OK(
+      deferred_buffer->BindAllocation(add_ref(real_buffer), 10, 100));
   EXPECT_EQ(256, deferred_buffer->allocation_size());
   EXPECT_EQ(10, deferred_buffer->byte_offset());
   EXPECT_EQ(100, deferred_buffer->byte_length());
-  EXPECT_OK(
+  IREE_EXPECT_OK(
       deferred_buffer->BindAllocation(add_ref(real_buffer), 10, kWholeBuffer));
   EXPECT_EQ(256, deferred_buffer->allocation_size());
   EXPECT_EQ(10, deferred_buffer->byte_offset());
@@ -100,14 +101,15 @@ TEST(DeferredBufferTest, Resizing) {
 
   // Grow.
   EXPECT_EQ(100, deferred_buffer->byte_length());
-  EXPECT_OK(deferred_buffer->GrowByteLength(150));
+  IREE_EXPECT_OK(deferred_buffer->GrowByteLength(150));
   EXPECT_EQ(150, deferred_buffer->byte_length());
 
   // Shrinking should fail.
   EXPECT_TRUE(IsInvalidArgument(deferred_buffer->GrowByteLength(5)));
 
   // Growing should fail if bound.
-  EXPECT_OK(deferred_buffer->BindAllocation(std::move(real_buffer), 0, 150));
+  IREE_EXPECT_OK(
+      deferred_buffer->BindAllocation(std::move(real_buffer), 0, 150));
   EXPECT_TRUE(IsFailedPrecondition(deferred_buffer->GrowByteLength(100)));
 }
 
@@ -127,13 +129,13 @@ TEST(DeferredBufferTest, Rebinding) {
   EXPECT_EQ(deferred_buffer.get(), deferred_buffer->allocated_buffer());
   EXPECT_EQ(0, deferred_buffer->allocation_size());
 
-  EXPECT_OK(deferred_buffer->BindAllocation(add_ref(real_buffer), 0, 100));
+  IREE_EXPECT_OK(deferred_buffer->BindAllocation(add_ref(real_buffer), 0, 100));
   EXPECT_EQ(real_buffer.get(), deferred_buffer->allocated_buffer());
   EXPECT_EQ(256, deferred_buffer->allocation_size());
   deferred_buffer->ResetAllocation();
   EXPECT_EQ(deferred_buffer.get(), deferred_buffer->allocated_buffer());
   EXPECT_EQ(0, deferred_buffer->allocation_size());
-  EXPECT_OK(deferred_buffer->BindAllocation(add_ref(real_buffer), 0, 100));
+  IREE_EXPECT_OK(deferred_buffer->BindAllocation(add_ref(real_buffer), 0, 100));
   EXPECT_EQ(real_buffer.get(), deferred_buffer->allocated_buffer());
   EXPECT_EQ(256, deferred_buffer->allocation_size());
 }
@@ -148,12 +150,13 @@ TEST(DeferredBufferTest, BoundUsage) {
       HeapBuffer::Allocate(MemoryType::kHostLocal, BufferUsage::kAll, 256);
   EXPECT_CALL(allocator, CanUseBufferLike(_, _, _, _))
       .WillRepeatedly(Return(true));
-  EXPECT_OK(deferred_buffer->BindAllocation(std::move(real_buffer), 0, 100));
+  IREE_EXPECT_OK(
+      deferred_buffer->BindAllocation(std::move(real_buffer), 0, 100));
 
   EXPECT_FALSE(deferred_buffer->DebugString().empty());
   EXPECT_FALSE(deferred_buffer->DebugStringShort().empty());
 
-  EXPECT_OK(deferred_buffer->Fill8(0, 10, 0xFF));
+  IREE_EXPECT_OK(deferred_buffer->Fill8(0, 10, 0xFF));
 }
 
 // Tests that unbound buffers fail to perform any buffer actions.

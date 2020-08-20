@@ -16,13 +16,14 @@
 #define IREE_BASE_INTERNAL_STATUSOR_H_
 
 #include "absl/base/attributes.h"
+#include "absl/utility/utility.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
 
 namespace iree {
 
 template <typename T>
-class ABSL_MUST_USE_RESULT StatusOr;
+class IREE_MUST_USE_RESULT StatusOr;
 
 namespace internal_statusor {
 
@@ -117,7 +118,7 @@ class StatusOrData {
       MakeValue(std::move(other.data_));
       MakeStatus();
     } else {
-      MakeStatus(std::move(other.status_));
+      MakeStatus(exchange(other.status_, other.status_.code()));
     }
   }
 
@@ -137,7 +138,7 @@ class StatusOrData {
       MakeValue(std::move(other.data_));
       MakeStatus();
     } else {
-      MakeStatus(std::move(other.status_));
+      MakeStatus(exchange(other.status_, other.status_.code()));
     }
   }
 
@@ -153,30 +154,28 @@ class StatusOrData {
   explicit StatusOrData(const Status& status) : status_(status) {
     EnsureNotOk();
   }
-  explicit StatusOrData(Status&& status) : status_(status) { EnsureNotOk(); }
-
-  explicit StatusOrData(const StatusBuilder& builder) : status_(builder) {
-    EnsureNotOk();
-  }
-  explicit StatusOrData(StatusBuilder&& builder) : status_(std::move(builder)) {
+  explicit StatusOrData(Status&& status)
+      : status_(exchange(status, status.code())) {
     EnsureNotOk();
   }
 
   StatusOrData& operator=(const StatusOrData& other) {
     if (this == &other) return *this;
-    if (other.ok())
+    if (other.ok()) {
       Assign(other.data_);
-    else
+    } else {
       Assign(other.status_);
+    }
     return *this;
   }
 
   StatusOrData& operator=(StatusOrData&& other) {
     if (this == &other) return *this;
-    if (other.ok())
+    if (other.ok()) {
       Assign(std::move(other.data_));
-    else
-      Assign(std::move(other.status_));
+    } else {
+      Assign(exchange(other.status_, other.status_.code()));
+    }
     return *this;
   }
 
@@ -195,7 +194,7 @@ class StatusOrData {
       MakeValue(value);
     } else {
       MakeValue(value);
-      status_ = OkStatus();
+      status_ = StatusCode::kOk;
     }
   }
 
@@ -205,19 +204,13 @@ class StatusOrData {
       MakeValue(std::move(value));
     } else {
       MakeValue(std::move(value));
-      status_ = OkStatus();
+      status_ = StatusCode::kOk;
     }
-  }
-
-  void Assign(const Status& status) {
-    Clear();
-    status_ = status;
-    EnsureNotOk();
   }
 
   void Assign(Status&& status) {
     Clear();
-    status_ = std::move(status);
+    status_ = exchange(status, status.code());
     EnsureNotOk();
   }
 
@@ -246,11 +239,11 @@ class StatusOrData {
   }
 
   void EnsureOk() const {
-    if (!ok()) Helper::Crash(status_);
+    if (IREE_UNLIKELY(!ok())) Helper::Crash(status_);
   }
 
   void EnsureNotOk() {
-    if (ok()) Helper::HandleInvalidStatusCtorArg(&status_);
+    if (IREE_UNLIKELY(ok())) Helper::HandleInvalidStatusCtorArg(&status_);
   }
 
   // Construct the value (data_) through placement new with the passed arg.
@@ -422,8 +415,8 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   // constructor, this->ok() will be false and calls to value() will CHECK-fail.
   StatusOr(const Status& status);
   StatusOr& operator=(const Status& status);
-  StatusOr(const StatusBuilder& builder);
-  StatusOr& operator=(const StatusBuilder& builder);
+  StatusOr(const StatusBuilder& builder) = delete;
+  StatusOr& operator=(const StatusBuilder& builder) = delete;
 
   // Similar to the `const T&` overload.
   //
@@ -475,7 +468,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   explicit operator bool() const { return ok(); }
 
   // Returns this->status().ok()
-  ABSL_MUST_USE_RESULT bool ok() const { return this->status_.ok(); }
+  IREE_MUST_USE_RESULT bool ok() const { return this->status_.ok(); }
 
   // Returns a reference to our status. If this contains a T, then
   // returns OkStatus().
@@ -535,30 +528,23 @@ template <typename T>
 StatusOr<T>::StatusOr(const T& value) : Base(value) {}
 
 template <typename T>
+StatusOr<T>::StatusOr(T&& value) : Base(std::move(value)) {}
+
+template <typename T>
 StatusOr<T>::StatusOr(const Status& status) : Base(status) {}
 
 template <typename T>
-StatusOr<T>::StatusOr(const StatusBuilder& builder) : Base(builder) {}
+StatusOr<T>::StatusOr(Status&& status) : Base(std::move(status)) {}
+
+template <typename T>
+StatusOr<T>::StatusOr(StatusBuilder&& builder)
+    : Base(static_cast<Status&&>(std::move(builder))) {}
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(const Status& status) {
   this->Assign(status);
   return *this;
 }
-
-template <typename T>
-StatusOr<T>& StatusOr<T>::operator=(const StatusBuilder& builder) {
-  return *this = static_cast<Status>(builder);
-}
-
-template <typename T>
-StatusOr<T>::StatusOr(T&& value) : Base(std::move(value)) {}
-
-template <typename T>
-StatusOr<T>::StatusOr(Status&& status) : Base(std::move(status)) {}
-
-template <typename T>
-StatusOr<T>::StatusOr(StatusBuilder&& builder) : Base(std::move(builder)) {}
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
@@ -568,7 +554,8 @@ StatusOr<T>& StatusOr<T>::operator=(Status&& status) {
 
 template <typename T>
 StatusOr<T>& StatusOr<T>::operator=(StatusBuilder&& builder) {
-  return *this = static_cast<Status>(std::move(builder));
+  this->Assign(builder.ToStatus());
+  return *this;
 }
 
 template <typename T>
@@ -605,9 +592,14 @@ template <typename T>
 const Status& StatusOr<T>::status() const& {
   return this->status_;
 }
+
 template <typename T>
 Status StatusOr<T>::status() && {
-  return ok() ? OkStatus() : std::move(this->status_);
+  if (ok()) {
+    return OkStatus();
+  } else {
+    return exchange(this->status_, this->status_.code());
+  }
 }
 
 template <typename T>
@@ -690,9 +682,46 @@ T StatusOr<T>::value_or(U&& default_value) && {
 
 template <typename T>
 void StatusOr<T>::IgnoreError() const {
-  // no-op
+  this->status_.IgnoreError();
+}
+
+template <typename T>
+IREE_MUST_USE_RESULT static inline bool IsOk(const StatusOr<T>& status_or) {
+  return status_or.ok();
 }
 
 }  // namespace iree
+
+// Executes an expression `rexpr` that returns a `iree::StatusOr<T>`. On OK,
+// moves its value into the variable defined by `lhs`, otherwise returns
+// from the current function.
+#define IREE_ASSIGN_OR_RETURN(...)                               \
+  IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
+      (__VA_ARGS__, IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_, \
+       IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_))             \
+  (IREE_STATUS_IMPL_CONCAT_(_status_or_value, __LINE__), __VA_ARGS__)
+
+// MSVC incorrectly expands variadic macros, splice together a macro call to
+// work around the bug.
+#define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_(_1, _2, _3, NAME, ...) NAME
+#define IREE_STATUS_MACROS_IMPL_GET_VARIADIC_(args) \
+  IREE_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_ args
+
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_(statusor, lhs, rexpr) \
+  auto statusor = rexpr;                                                  \
+  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                           \
+    return std::move(statusor).status();                                  \
+  }                                                                       \
+  lhs = std::move(statusor).value()
+
+#define IREE_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(statusor, lhs, rexpr, \
+                                                    error_expression)     \
+  auto statusor = rexpr;                                                  \
+  if (IREE_UNLIKELY(!::iree::IsOk(statusor))) {                           \
+    ::iree::StatusBuilder _(std::move(statusor).status(), IREE_LOC);      \
+    (void)_; /* error_expression is allowed to not use this variable */   \
+    return std::move(error_expression);                                   \
+  }                                                                       \
+  lhs = std::move(statusor).value()
 
 #endif  // IREE_BASE_INTERNAL_STATUSOR_H_

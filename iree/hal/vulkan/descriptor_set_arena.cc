@@ -44,7 +44,7 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
     const auto& binding = bindings[i];
 
     auto& buffer_info = buffer_infos[i];
-    ASSIGN_OR_RETURN(auto buffer, CastBuffer(binding.buffer));
+    IREE_ASSIGN_OR_RETURN(auto buffer, CastBuffer(binding.buffer));
     buffer_info.buffer = buffer->handle();
     // TODO(benvanik): properly subrange (add to BufferBinding).
     buffer_info.offset = binding.buffer->byte_offset();
@@ -140,7 +140,7 @@ Status DescriptorSetArena::BindDescriptorSet(
   }
   if (descriptor_pool_buckets_[bucket].handle == VK_NULL_HANDLE) {
     // Acquire a pool for this max_descriptor_count bucket.
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         descriptor_pool_buckets_[bucket],
         descriptor_pool_cache_->AcquireDescriptorPool(
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, max_descriptor_count));
@@ -163,7 +163,7 @@ Status DescriptorSetArena::BindDescriptorSet(
   if (result == VK_ERROR_OUT_OF_POOL_MEMORY) {
     // Allocation failed because the pool is either out of descriptors or too
     // fragmented. We'll just allocate another pool.
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         descriptor_pool_buckets_[bucket],
         descriptor_pool_cache_->AcquireDescriptorPool(
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, max_descriptor_count));
@@ -183,9 +183,9 @@ Status DescriptorSetArena::BindDescriptorSet(
   }
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
-  ASSIGN_OR_RETURN(auto write_infos,
-                   PopulateDescriptorSetWriteInfos(bindings, descriptor_set,
-                                                   &scratch_arena_));
+  IREE_ASSIGN_OR_RETURN(auto write_infos,
+                        PopulateDescriptorSetWriteInfos(
+                            bindings, descriptor_set, &scratch_arena_));
 
   // This is the reason why push descriptor sets are good.
   // We can't batch these effectively as we don't know prior to recording what
@@ -209,9 +209,9 @@ Status DescriptorSetArena::PushDescriptorSet(
   IREE_TRACE_SCOPE0("DescriptorSetArena::PushDescriptorSet");
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
-  ASSIGN_OR_RETURN(auto write_infos,
-                   PopulateDescriptorSetWriteInfos(bindings, VK_NULL_HANDLE,
-                                                   &scratch_arena_));
+  IREE_ASSIGN_OR_RETURN(auto write_infos,
+                        PopulateDescriptorSetWriteInfos(
+                            bindings, VK_NULL_HANDLE, &scratch_arena_));
 
   // Fast path using push descriptors. These are pooled internally by the
   // command buffer and prevent the need for our own pooling mechanisms.

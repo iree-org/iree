@@ -297,8 +297,10 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];
     iree_vm_variant_t f_result = iree_vm_variant_empty();
-    if (!iree_status_is_ok(
-            iree_vm_list_get_variant(f_results.raw_ptr(), i, &f_result))) {
+    iree_status_t status =
+        iree_vm_list_get_variant(f_results.raw_ptr(), i, &f_result);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
       throw RaiseValueError("Could not get result from list");
     }
     switch (desc.type) {
@@ -318,13 +320,14 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
         // Extract dims from the buffer view.
         size_t rank = 0;
         absl::InlinedVector<int32_t, 6> dims(6);
-        if (ABSL_PREDICT_FALSE(!iree_status_is_ok(iree_hal_buffer_view_shape(
-                buffer_view, dims.capacity(), dims.data(), &rank)))) {
+        iree_status_t status = iree_hal_buffer_view_shape(
+            buffer_view, dims.capacity(), dims.data(), &rank);
+        if (iree_status_is_out_of_range(status)) {
           dims.resize(rank);
-          CheckApiStatus(iree_hal_buffer_view_shape(
-                             buffer_view, dims.capacity(), dims.data(), &rank),
-                         "Error extracting shape");
+          status = iree_hal_buffer_view_shape(buffer_view, dims.capacity(),
+                                              dims.data(), &rank);
         }
+        CheckApiStatus(status, "Error extracting shape");
         dims.resize(rank);
 
         // Deal with int32_t != int (but require 32bits). Happens on some
@@ -395,7 +398,7 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
         iree_hal_buffer_view_t* buffer_view;
         CheckApiStatus(iree_hal_buffer_view_create(
                            raw_buffer, dims.data(), dims.size(), element_type,
-                           IREE_ALLOCATOR_SYSTEM, &buffer_view),
+                           iree_allocator_system(), &buffer_view),
                        "Error allocating buffer_view");
         iree_hal_buffer_release(raw_buffer);
         iree_vm_ref_t buffer_view_ref =
@@ -483,12 +486,51 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   iree_hal_buffer_view_t* buffer_view;
   CheckApiStatus(iree_hal_buffer_view_create(
                      raw_buffer, dims.data(), dims.size(), element_type,
-                     IREE_ALLOCATOR_SYSTEM, &buffer_view),
+                     iree_allocator_system(), &buffer_view),
                  "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
   CheckApiStatus(iree_vm_list_push_ref_move(f_args.raw_ptr(), &buffer_view_ref),
                  "Error moving buffer view");
+}
+
+std::vector<std::string> SerializeVmVariantList(VmVariantList& vm_list) {
+  size_t size = vm_list.size();
+  std::vector<std::string> results;
+  results.reserve(size);
+  for (iree_host_size_t i = 0; i < size; ++i) {
+    iree_vm_variant_t variant = iree_vm_variant_empty();
+    iree_status_t status =
+        iree_vm_list_get_variant(vm_list.raw_ptr(), i, &variant);
+    CheckApiStatus(status, "Failed to get vm variant from list");
+
+    if (iree_vm_variant_is_value(variant)) {
+      results.push_back("i32=" + std::to_string(variant.i32));
+    } else if (iree_vm_variant_is_ref(variant) &&
+               iree_hal_buffer_view_isa(&variant.ref)) {
+      auto buffer_view = iree_hal_buffer_view_deref(&variant.ref);
+
+      std::string result_str(4096, '\0');
+      iree_status_t status;
+      do {
+        iree_host_size_t actual_length = 0;
+        iree_host_size_t max_element_count =
+            std::numeric_limits<iree_host_size_t>::max();
+        status = iree_hal_buffer_view_format(buffer_view, max_element_count,
+                                             result_str.size() + 1,
+                                             &result_str[0], &actual_length);
+        result_str.resize(actual_length);
+      } while (iree_status_is_out_of_range(status));
+      CheckApiStatus(status,
+                     "Failed to create a string representation of the inputs");
+
+      results.push_back(result_str);
+    } else {
+      RaiseValueError(
+          "Expected vm_list's elements to be scalars or buffer views.");
+    }
+  }
+  return results;
 }
 
 void SetupFunctionAbiBindings(pybind11::module m) {
@@ -502,6 +544,10 @@ void SetupFunctionAbiBindings(pybind11::module m) {
              return PyRawPack(self,
                               absl::MakeConstSpan(self->raw_config().inputs),
                               py_args, false /* writable */);
+           })
+      .def("serialize_vm_list",
+           [](FunctionAbi* self, VmVariantList& vm_list) {
+             return SerializeVmVariantList(vm_list);
            })
       .def("allocate_results", &PyAllocateResults, py::arg("f_results"),
            py::arg("static_alloc") = true)

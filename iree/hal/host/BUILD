@@ -43,7 +43,7 @@ cc_test(
         ":condvar_semaphore",
         "//iree/base:api",
         "//iree/base:status",
-        "//iree/base:status_matchers",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -54,7 +54,6 @@ cc_library(
     hdrs = ["host_buffer.h"],
     deps = [
         "//iree/base:logging",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/hal:buffer",
     ],
@@ -99,7 +98,6 @@ cc_library(
     hdrs = ["host_local_allocator.h"],
     deps = [
         ":host_buffer",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:allocator",

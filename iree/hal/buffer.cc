@@ -148,8 +148,8 @@ class SubspanBuffer : public Buffer {
 StatusOr<ref_ptr<Buffer>> Buffer::Subspan(const ref_ptr<Buffer>& buffer,
                                           device_size_t byte_offset,
                                           device_size_t byte_length) {
-  RETURN_IF_ERROR(buffer->CalculateRange(byte_offset, byte_length, &byte_offset,
-                                         &byte_length));
+  IREE_RETURN_IF_ERROR(buffer->CalculateRange(byte_offset, byte_length,
+                                              &byte_offset, &byte_length));
   if (byte_offset == 0 && byte_length == buffer->byte_length()) {
     // Asking for the same buffer.
     return add_ref(buffer);
@@ -401,10 +401,10 @@ Status Buffer::CalculateLocalRange(device_size_t max_length,
 Status Buffer::Fill(device_size_t byte_offset, device_size_t byte_length,
                     const void* pattern, device_size_t pattern_length) {
   // If not host visible we'll need to issue command buffers.
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(
       CalculateRange(byte_offset, byte_length, &byte_offset, &byte_length));
   if (pattern_length != 1 && pattern_length != 2 && pattern_length != 4) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
@@ -433,10 +433,11 @@ Status Buffer::Fill(device_size_t byte_offset, device_size_t byte_length,
 Status Buffer::ReadData(device_size_t source_offset, void* data,
                         device_size_t data_length) {
   // If not host visible we'll need to issue command buffers.
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kRead));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
-  RETURN_IF_ERROR(CalculateRange(source_offset, data_length, &source_offset));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kRead));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(
+      CalculateRange(source_offset, data_length, &source_offset));
   if (data_length == 0) {
     return OkStatus();  // No-op.
   }
@@ -446,10 +447,11 @@ Status Buffer::ReadData(device_size_t source_offset, void* data,
 Status Buffer::WriteData(device_size_t target_offset, const void* data,
                          device_size_t data_length) {
   // If not host visible we'll need to issue command buffers.
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
-  RETURN_IF_ERROR(CalculateRange(target_offset, data_length, &target_offset));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(
+      CalculateRange(target_offset, data_length, &target_offset));
   if (data_length == 0) {
     return OkStatus();  // No-op.
   }
@@ -459,23 +461,23 @@ Status Buffer::WriteData(device_size_t target_offset, const void* data,
 Status Buffer::CopyData(device_size_t target_offset, Buffer* source_buffer,
                         device_size_t source_offset,
                         device_size_t data_length) {
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateAccess(MemoryAccess::kWrite));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(
       source_buffer->ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(source_buffer->ValidateAccess(MemoryAccess::kRead));
-  RETURN_IF_ERROR(source_buffer->ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(source_buffer->ValidateAccess(MemoryAccess::kRead));
+  IREE_RETURN_IF_ERROR(source_buffer->ValidateUsage(BufferUsage::kMapping));
 
   // We need to validate both buffers.
   device_size_t source_data_length = data_length;
   device_size_t target_data_length = data_length;
   device_size_t adjusted_source_offset;
-  RETURN_IF_ERROR(source_buffer->CalculateRange(
+  IREE_RETURN_IF_ERROR(source_buffer->CalculateRange(
       source_offset, source_data_length, &adjusted_source_offset,
       &source_data_length));
-  RETURN_IF_ERROR(CalculateRange(target_offset, target_data_length,
-                                 &target_offset, &target_data_length));
+  IREE_RETURN_IF_ERROR(CalculateRange(target_offset, target_data_length,
+                                      &target_offset, &target_data_length));
   device_size_t adjusted_data_length;
   if (data_length == kWholeBuffer) {
     // Whole buffer copy requested - that could mean either, so take the min.
@@ -507,10 +509,10 @@ Status Buffer::MapMemory(MappingMode mapping_mode,
                          MemoryAccessBitfield memory_access,
                          device_size_t* byte_offset, device_size_t* byte_length,
                          void** out_data) {
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(ValidateAccess(memory_access));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateAccess(memory_access));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(
       CalculateRange(*byte_offset, *byte_length, byte_offset, byte_length));
   *out_data = nullptr;
   return MapMemoryImpl(mapping_mode, memory_access, *byte_offset, *byte_length,
@@ -519,29 +521,29 @@ Status Buffer::MapMemory(MappingMode mapping_mode,
 
 Status Buffer::UnmapMemory(device_size_t local_byte_offset,
                            device_size_t local_byte_length, void* data) {
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
   // NOTE: local_byte_offset/local_byte_length are already adjusted.
   return UnmapMemoryImpl(local_byte_offset, local_byte_length, data);
 }
 
 Status Buffer::InvalidateMappedMemory(device_size_t local_byte_offset,
                                       device_size_t local_byte_length) {
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
   if (AnyBitSet(memory_type_ & MemoryType::kHostCoherent)) {
     return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Buffer memory type is coherent and invalidation is not required";
   }
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
   // NOTE: local_byte_offset/local_byte_length are already adjusted.
   return InvalidateMappedMemoryImpl(local_byte_offset, local_byte_length);
 }
 
 Status Buffer::FlushMappedMemory(device_size_t local_byte_offset,
                                  device_size_t local_byte_length) {
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible |
-                                               MemoryType::kHostCached));
-  RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible |
+                                                    MemoryType::kHostCached));
+  IREE_RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));
   // NOTE: local_byte_offset/local_byte_length are already adjusted.
   return FlushMappedMemoryImpl(local_byte_offset, local_byte_length);
 }

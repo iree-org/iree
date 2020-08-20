@@ -19,7 +19,6 @@
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/memory.h"
-#include "iree/base/source_location.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/command_queue.h"
@@ -54,8 +53,8 @@ StatusOr<bool> TryToPrepareSemaphores(
     DVLOG(3) << "Preparing binary VkSemaphore for timeline semaphore "
              << timeline_semaphore.semaphore << "..";
     // Query first to progress this timeline semaphore to the furthest.
-    ASSIGN_OR_RETURN(auto signaled_value,
-                     timeline_semaphore.semaphore->Query());
+    IREE_ASSIGN_OR_RETURN(auto signaled_value,
+                          timeline_semaphore.semaphore->Query());
 
     // If it's already signaled to a value greater than we require here,
     // we can just ignore this semaphore now.
@@ -80,7 +79,8 @@ StatusOr<bool> TryToPrepareSemaphores(
 
       // Cancel the wait so others may make progress.
       for (VkSemaphore semaphore : *wait_semaphores) {
-        RETURN_IF_ERROR(emulated_semaphore->CancelWaitSemaphore(semaphore));
+        IREE_RETURN_IF_ERROR(
+            emulated_semaphore->CancelWaitSemaphore(semaphore));
       }
 
       // This batch cannot be submitted to GPU yet.
@@ -101,9 +101,9 @@ StatusOr<bool> TryToPrepareSemaphores(
     auto* emulated_semaphore =
         static_cast<EmulatedTimelineSemaphore*>(timeline_semaphore.semaphore);
 
-    ASSIGN_OR_RETURN(auto binary_semaphore,
-                     emulated_semaphore->GetSignalSemaphore(
-                         timeline_semaphore.value, batch_fence));
+    IREE_ASSIGN_OR_RETURN(auto binary_semaphore,
+                          emulated_semaphore->GetSignalSemaphore(
+                              timeline_semaphore.value, batch_fence));
     signal_semaphores->push_back(binary_semaphore);
     DVLOG(3) << "..acqiured binary VkSemaphore " << binary_semaphore;
   }
@@ -191,7 +191,7 @@ Status SerializingCommandQueue::Submit(
   for (int i = 0; i < batches.size(); ++i) {
     // Grab a fence for this submission first. This will be used to check the
     // progress of emulated timeline semaphores later.
-    ASSIGN_OR_RETURN(auto fence, fence_pool_->Acquire());
+    IREE_ASSIGN_OR_RETURN(auto fence, fence_pool_->Acquire());
     auto submission = std::make_unique<FencedSubmission>();
     submission->batch = PendingBatch{
         {batches[i].wait_semaphores.begin(), batches[i].wait_semaphores.end()},
@@ -258,7 +258,7 @@ StatusOr<bool> SerializingCommandQueue::ProcessDeferredSubmissions() {
     const PendingBatch& batch = submission->batch;
     ref_ptr<TimePointFence>& fence = submission->fence;
 
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         bool ready_to_submit,
         TryToPrepareSemaphores(batch.wait_semaphores, batch.signal_semaphores,
                                fence, &wait_semaphores, &signal_semaphores));
@@ -313,7 +313,7 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
 
     // Submit and complete all deferred work.
     while (!deferred_submissions_.empty()) {
-      ASSIGN_OR_RETURN(bool work_submitted, ProcessDeferredSubmissions());
+      IREE_ASSIGN_OR_RETURN(bool work_submitted, ProcessDeferredSubmissions());
       if (work_submitted) {
         VK_RETURN_IF_ERROR(syms()->vkQueueWaitIdle(queue_));
         pending_fences_.clear();
@@ -327,7 +327,7 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
 
   // Keep trying to submit more workload to the GPU until reaching the deadline.
   do {
-    RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
+    IREE_RETURN_IF_ERROR(ProcessDeferredSubmissions().status());
 
     uint64_t timeout_ns;
     if (deadline_ns == InfiniteFuture()) {
@@ -364,7 +364,7 @@ Status SerializingCommandQueue::WaitIdle(Time deadline_ns) {
         return DeadlineExceededErrorBuilder(IREE_LOC)
                << "Deadline exceeded waiting for idle";
       default:
-        return VkResultToStatus(result);
+        return VkResultToStatus(result, IREE_LOC);
     }
     // As long as there is submitted or deferred work still pending.
   } while (!pending_fences_.empty() || !deferred_submissions_.empty());
@@ -378,7 +378,7 @@ Status SerializingCommandQueue::AdvanceQueueSubmission() {
   // submissions gotten submitted to the GPU. Other callers might be
   // interested in that information but for this API we just want to advance
   // queue submisison if possible. So we ignore it here.
-  ASSIGN_OR_RETURN(std::ignore, ProcessDeferredSubmissions());
+  IREE_ASSIGN_OR_RETURN(std::ignore, ProcessDeferredSubmissions());
   return OkStatus();
 }
 

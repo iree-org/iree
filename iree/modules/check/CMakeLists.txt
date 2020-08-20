@@ -26,13 +26,12 @@ if(${IREE_HAL_DRIVER_VMLA})
       absl::core_headers
       absl::strings
       iree::base::api
-      iree::base::api_util
       iree::base::logging
       iree::base::status
-      iree::base::status_matchers
       iree::hal::api
       iree::hal::vmla::vmla_driver_module
       iree::modules::hal
+      iree::testing::gtest
       iree::testing::gtest_main
       iree::vm
       iree::vm::bytecode_module
@@ -52,11 +51,9 @@ iree_cc_binary(
     absl::flags
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::file_io
     iree::base::init
     iree::base::localfile
-    iree::base::source_location
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
@@ -79,7 +76,6 @@ iree_cc_library(
     absl::inlined_vector
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::status
     iree::hal::api
     iree::modules::hal

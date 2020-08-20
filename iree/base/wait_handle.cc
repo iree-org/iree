@@ -27,7 +27,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 // TODO(benvanik): organize these macros - they are terrible.
@@ -65,7 +64,7 @@ StatusOr<typename std::result_of<SyscallT(ParamsT...)>::type> Syscall(
       // Retry on EINTR.
       continue;
     } else {
-      return ErrnoToCanonicalStatus(errno, "");
+      return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC);
     }
   }
 }
@@ -155,8 +154,8 @@ StatusOr<absl::FixedArray<pollfd>> AcquireWaitHandles(
     // This may block (if |deadline| allows it) if the fd is not yet available.
     // This is like a pre-wait for the actual poll operation. It can be bad with
     // WaitAny, though we could handle that better here.
-    ASSIGN_OR_RETURN(auto fd_info,
-                     wait_handles[i]->object()->AcquireFdForWait(deadline));
+    IREE_ASSIGN_OR_RETURN(
+        auto fd_info, wait_handles[i]->object()->AcquireFdForWait(deadline));
     poll_fds[i].fd = fd_info.second;
 
     // Abort if deadline exceeded.
@@ -195,7 +194,8 @@ Status ClearFd(WaitableObject::FdType fd_type, int fd) {
         // Retry.
         continue;
       } else {
-        return ErrnoToCanonicalStatus(errno, "ClearFd failed");
+        return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+               << "ClearFd failed";
       }
     }
   }
@@ -234,7 +234,7 @@ Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
   // Pass handles to ppoll.
   // http://man7.org/linux/man-pages/man2/poll.2.html
   if (any_valid_fds) {
-    ASSIGN_OR_RETURN(int rv, SystemPoll(poll_fds, deadline));
+    IREE_ASSIGN_OR_RETURN(int rv, SystemPoll(poll_fds, deadline));
     if (rv == 0) {
       // Call timed out and no descriptors were ready.
       // If this was just a poll then that's fine.
@@ -253,7 +253,7 @@ Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
     if (poll_fds[i].fd == kSignaledFd || poll_fds[i].revents == POLLIN) {
       // First attempt any resolve actions. If these fail we can't consider the
       // fd as having been signaled.
-      ASSIGN_OR_RETURN(
+      IREE_ASSIGN_OR_RETURN(
           bool resolved,
           wait_handles[i]->object()->TryResolveWakeOnFd(poll_fds[i].fd));
       if (!resolved) {
@@ -324,14 +324,16 @@ Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, Time deadline_ns) {
   if (wait_handles.empty()) return OkStatus();
 
   // Build the list of pollfds to wait on.
-  ASSIGN_OR_RETURN(auto poll_fds, AcquireWaitHandles(wait_handles, deadline));
+  IREE_ASSIGN_OR_RETURN(auto poll_fds,
+                        AcquireWaitHandles(wait_handles, deadline));
 
   // Loop until all handles have been signaled or the deadline is exceeded.
   int unsignaled_count = 0;
   do {
     int any_signaled_index = 0;
-    RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
-                              &any_signaled_index, &unsignaled_count));
+    IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds),
+                                   deadline, &any_signaled_index,
+                                   &unsignaled_count));
   } while (unsignaled_count > 0 && Now() < deadline);
 
   if (unsignaled_count == 0) {
@@ -363,13 +365,15 @@ StatusOr<int> WaitHandle::WaitAny(WaitHandleSpan wait_handles,
   }
 
   // Build the list of pollfds to wait on.
-  ASSIGN_OR_RETURN(auto poll_fds, AcquireWaitHandles(wait_handles, deadline));
+  IREE_ASSIGN_OR_RETURN(auto poll_fds,
+                        AcquireWaitHandles(wait_handles, deadline));
 
   // Poll once; this makes a WaitAny just a WaitMulti that doesn't loop.
   int any_signaled_index = -1;
   int unsignaled_count = 0;
-  RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds), deadline,
-                            &any_signaled_index, &unsignaled_count));
+  IREE_RETURN_IF_ERROR(MultiPoll(wait_handles, absl::MakeSpan(poll_fds),
+                                 deadline, &any_signaled_index,
+                                 &unsignaled_count));
   if (any_signaled_index == -1) {
     // No wait handles were valid. Pretend 0 was signaled.
     return 0;
@@ -463,7 +467,7 @@ void ManualResetEvent::Initialize() {
 void ManualResetEvent::Dispose() {
   if (fd_ != kInvalidFd) {
     // Always signal, as we need to ensure waiters are woken.
-    CHECK_OK(Set());
+    IREE_CHECK_OK(Set());
     Syscall(::close, fd_).value();
     fd_ = kInvalidFd;
   }

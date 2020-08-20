@@ -29,7 +29,7 @@ import os
 import pickle
 import sys
 import tempfile
-from typing import Any, Dict, Sequence, Tuple, Type
+from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -114,7 +114,7 @@ def _indent(input_str: str, indentation: int = 2) -> str:
   return "\n".join(lines)
 
 
-def _zfill_width(length: int) -> int:
+def _zfill_width(length: int) -> Union[int, None]:
   return int(np.ceil(np.log10(length))) if length else None
 
 
@@ -124,6 +124,8 @@ class ModuleCall:
                method: str,
                inputs: Tuple[Any],
                outputs: Tuple[Any],
+               serialized_inputs: Tuple[str],
+               serialized_outputs: Tuple[str],
                rtol: float = 1e-6,
                atol: float = 1e-6):
     """Records the details of a call to a CompiledModule."""
@@ -141,6 +143,9 @@ class ModuleCall:
     else:
       outputs = tuple()
     self.outputs = outputs if isinstance(outputs, tuple) else (outputs,)
+
+    self.serialized_inputs = serialized_inputs
+    self.serialized_outputs = serialized_outputs
 
     self.rtol = rtol
     self.atol = atol
@@ -187,7 +192,13 @@ class ModuleCall:
     """
     os.makedirs(call_dir, exist_ok=True)
 
-    metadata = {"method": self.method, "rtol": self.rtol, "atol": self.atol}
+    metadata = {
+        "method": self.method,
+        "serialized_inputs": self.serialized_inputs,
+        "serialized_outputs": self.serialized_outputs,
+        "rtol": self.rtol,
+        "atol": self.atol
+    }
     with open(os.path.join(call_dir, "metadata.pkl"), "wb") as f:
       pickle.dump(metadata, f)
 
@@ -229,7 +240,7 @@ class Trace:
 
   def __init__(self,
                module: tf_utils.CompiledModule,
-               function: callable,
+               function: Union[Callable[["TracedModule"], None], None],
                _load_dict: Dict[str, Any] = None):
     """Extracts metadata from module and function and initializes.
 
@@ -248,7 +259,10 @@ class Trace:
     if _load_dict is None:
       # Extract metadata from module and function.
       self.module_name = module.module_name
-      self.backend = module.backend
+      self.compiled_path = module.compiled_path
+      self.backend_name = module.backend
+      self.supports_cxx_serialization = module.supports_cxx_serialization()
+      self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
       source, start_line = inspect.getsourcelines(function)
@@ -258,7 +272,10 @@ class Trace:
       self.calls = []
     else:
       self.module_name = _load_dict["module_name"]
-      self.backend = _load_dict["backend"]
+      self.compiled_path = _load_dict["compiled_path"]
+      self.backend_name = _load_dict["backend_name"]
+      self.supports_cxx_serialization = _load_dict["supports_cxx_serialization"]
+      self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
       self.function_line_numbers = _load_dict["function_line_numbers"]
@@ -266,7 +283,7 @@ class Trace:
       self.calls = _load_dict["calls"]
 
   def __str__(self):
-    header = (f"Trace of {self.module_name} compiled to '{self.backend}' "
+    header = (f"Trace of {self.module_name} compiled to '{self.backend_name}' "
               f"on function '{self.function_name}':")
     # Give each call a number so it's easier to compare between multiple traces.
     calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
@@ -307,9 +324,11 @@ class Trace:
 
       if not calls_match:
         logging.error("Comparision between '%s' and '%s' failed on method '%s'",
-                      ref_trace.backend, tar_trace.backend, ref_call.method)
-        logging.error("Reference call '%s':\n%s", ref_trace.backend, ref_call)
-        logging.error("Target call '%s':\n%s", tar_trace.backend, tar_call)
+                      ref_trace.backend_name, tar_trace.backend_name,
+                      ref_call.method)
+        logging.error("Reference call '%s':\n%s", ref_trace.backend_name,
+                      ref_call)
+        logging.error("Target call '%s':\n%s", tar_trace.backend_name, tar_call)
 
       traces_match = traces_match and calls_match
     return traces_match
@@ -411,9 +430,14 @@ class Trace:
     Args:
       trace_dir: str, path to the directory to serialize the trace to.
     """
+
+    # Python serialization.
     metadata = {
         "module_name": self.module_name,
-        "backend": self.backend,
+        "compiled_path": self.compiled_path,
+        "backend_name": self.backend_name,
+        "supports_cxx_serialization": self.supports_cxx_serialization,
+        "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
         "function_line_numbers": self.function_line_numbers,
@@ -426,6 +450,19 @@ class Trace:
     for i, call in enumerate(self.calls):
       call_dir = os.path.join(trace_dir, f"call_{str(i).zfill(width)}")
       call.serialize(call_dir)
+
+    # C++ Serialization.
+    if not self.supports_cxx_serialization:
+      flaglines = []
+      if self.compiled_path is not None:
+        flaglines.append(f"--input_file={self.compiled_path}")
+      flaglines.append(f"--driver={self.backend_driver}")
+      inputs_str = ", ".join(self.calls[0].serialized_inputs)
+      flaglines.append(f"--inputs={inputs_str}")
+      flaglines.append(f"--entry_function={self.calls[0].method}")
+
+      with open(os.path.join(trace_dir, "flagfile"), "w") as f:
+        f.writelines(line + '\n' for line in flaglines)
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":
@@ -446,7 +483,7 @@ class Trace:
 
 
 def _get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
-  trace_dir = os.path.join(artifacts_dir, trace.backend, "traces",
+  trace_dir = os.path.join(artifacts_dir, trace.backend_name, "traces",
                            trace.function_name)
   os.makedirs(trace_dir, exist_ok=True)
   return trace_dir
@@ -471,7 +508,7 @@ class TracedModule:
     self._module = module
     self._trace = trace
 
-  def _trace_call(self, method: callable, method_name: str):
+  def _trace_call(self, method: Callable[..., Any], method_name: str):
     """Decorates a CompiledModule method to capture its inputs and outputs."""
 
     def call(*args, **kwargs):
@@ -484,8 +521,10 @@ class TracedModule:
 
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)
+      serialized_inputs, serialized_outputs = method.get_serialized_values()
       self._trace.calls.append(
-          ModuleCall(method_name, args, outputs, **tolerances))
+          ModuleCall(method_name, args, outputs, serialized_inputs,
+                     serialized_outputs, **tolerances))
       return outputs
 
     return call
@@ -503,8 +542,9 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-def compile_module(module_class: Type[tf.Module],
-                   exported_names: Sequence[str] = ()) -> callable:
+def compile_module(
+    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
+) -> Callable[[Any], Any]:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
@@ -534,15 +574,21 @@ def compile_module(module_class: Type[tf.Module],
   return decorator
 
 
+# Will be initialized by TracedModuleTestCase.setUpClass
+# Global variables are used because storing the compiler context on the cls
+# causes cleaning up refcounts to fail, and tf.test.TestCase wipes the variables
+# on the class instance (self.*) before each unittest.
+# TODO(#2900): Move these back to class variables when we figure out issues with
+# refcounting.
+_global_ref_module = None
+_global_tar_modules = None
+
+
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
   # Will be initialized by the @compile_module decorator.
   _module_class = None
   _exported_names = ()
-
-  # Will be initialized in setUpClass.
-  _ref_module = None
-  _tar_modules = None
 
   @classmethod
   def _compile(cls, backend_info: tf_utils.BackendInfo):
@@ -561,20 +607,30 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Setup the directory for saving compilation artifacts and traces.
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
-  def setUp(self):
-    # Ran before each unit test.
-    super().setUp()
-    # Create a CompiledModule for the reference backend and each target backend.
+    # Get the backend information for this test.
     ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
                                             f"{FLAGS.reference_backend}_ref")
-    self._ref_module = self._compile(ref_backend_info)
-
     tar_backend_infos = get_target_backends()
-    self._tar_modules = [
-        self._compile(backend_info) for backend_info in tar_backend_infos
+
+    global _global_ref_module
+    global _global_tar_modules
+    _global_ref_module = cls._compile(ref_backend_info)
+    _global_tar_modules = [
+        cls._compile(backend_info) for backend_info in tar_backend_infos
     ]
 
-  def compare_backends(self, trace_function: callable) -> None:
+  def setUp(self) -> None:
+    # Runs before each unit test.
+    super().setUp()
+    global _global_ref_module
+    global _global_tar_modules
+    _global_ref_module = _global_ref_module.create_reinitialized()
+    _global_tar_modules = [
+        module.create_reinitialized() for module in _global_tar_modules
+    ]
+
+  def compare_backends(self, trace_function: Callable[[TracedModule],
+                                                      None]) -> None:
     """Run the reference and target backends on trace_function and compare them.
 
     Random seeds for tensorflow, numpy and python are set before each invocation
@@ -584,15 +640,17 @@ class TracedModuleTestCase(tf.test.TestCase):
       trace_function: a function accepting a TracedModule as its argument.
     """
     # Create Traces for each backend.
-    ref_trace = Trace(self._ref_module, trace_function)
-    tar_traces = [Trace(module, trace_function) for module in self._tar_modules]
+    ref_trace = Trace(_global_ref_module, trace_function)
+    tar_traces = [
+        Trace(module, trace_function) for module in _global_tar_modules
+    ]
 
     # Run the traces through trace_function with their associated modules.
     tf_utils.set_random_seed()
-    trace_function(TracedModule(self._ref_module, ref_trace))
+    trace_function(TracedModule(_global_ref_module, ref_trace))
     if FLAGS.log_all_traces:
       logging.info(ref_trace)
-    for module, trace in zip(self._tar_modules, tar_traces):
+    for module, trace in zip(_global_tar_modules, tar_traces):
       tf_utils.set_random_seed()
       trace_function(TracedModule(module, trace))
       if FLAGS.log_all_traces:
@@ -602,7 +660,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     failed_backend_indices = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
-                   ref_trace.backend, tar_trace.backend)
+                   ref_trace.backend_name, tar_trace.backend_name)
       traces_match = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
@@ -627,5 +685,5 @@ class TracedModuleTestCase(tf.test.TestCase):
 
   @classmethod
   def tearDownClass(cls) -> None:
-    # Ran after all unit tests are completed.
+    # Runs after all unit tests are completed.
     super().tearDownClass()

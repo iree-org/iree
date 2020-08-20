@@ -18,14 +18,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#ifdef IREE_PLATFORM_ANDROID
+// VC++ does not have C11's stdalign.h.
+#if !defined(_MSC_VER)
 #include <stdalign.h>
-#else
-// TODO(benvanik): figure out how to make MSVC happy with C11 stdalign.h.
-#ifdef __cplusplus
-#include <cstdalign>
-#endif  // __cplusplus
-#endif
+#endif  // _MSC_VER
 
 #include "iree/base/api.h"
 #include "iree/vm/builtin_types.h"
@@ -54,7 +50,7 @@ typedef struct {
   // Table of internal function bytecode descriptors.
   // Mapped 1:1 with internal functions. Each defined bytecode span represents a
   // range of bytes in |bytecode_data|.
-  int32_t function_descriptor_count;
+  iree_host_size_t function_descriptor_count;
   const iree_vm_FunctionDescriptor_t* function_descriptor_table;
 
   // A pointer to the bytecode data embedded within the module.
@@ -69,7 +65,7 @@ typedef struct {
   iree_vm_BytecodeModuleDef_table_t def;
 
   // Type table mapping module type IDs to registered VM types.
-  int32_t type_count;
+  iree_host_size_t type_count;
   iree_vm_type_def_t* type_table;
 } iree_vm_bytecode_module_t;
 
@@ -83,18 +79,18 @@ typedef struct {
   iree_byte_span_t rwdata_storage;
 
   // Global ref_ptr values, indexed by global ordinal.
-  int32_t global_ref_count;
+  iree_host_size_t global_ref_count;
   iree_vm_ref_t* global_ref_table;
 
   // TODO(benvanik): move to iree_vm_bytecode_module_t if always static.
   // Initialized references to rodata segments.
   // Right now these don't do much, however we can perform lazy caching and
   // on-the-fly decompression using this information.
-  int32_t rodata_ref_count;
+  iree_host_size_t rodata_ref_count;
   iree_vm_ro_byte_buffer_t* rodata_ref_table;
 
   // Resolved function imports.
-  int32_t import_count;
+  iree_host_size_t import_count;
   iree_vm_function_t* import_table;
 
   // Allocator used for the state itself and any runtime allocations needed.

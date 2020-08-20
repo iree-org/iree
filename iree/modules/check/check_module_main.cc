@@ -18,16 +18,15 @@
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/file_io.h"
 #include "iree/base/init.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/bytecode_module.h"
 
@@ -61,7 +60,7 @@ class CheckModuleTest : public ::testing::Test {
       : instance_(instance), modules_(modules), function_(function) {}
   void SetUp() override {
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-        instance_, modules_.data(), modules_.size(), IREE_ALLOCATOR_SYSTEM,
+        instance_, modules_.data(), modules_.size(), iree_allocator_system(),
         &context_));
   }
   void TearDown() override { iree_vm_context_release(context_); }
@@ -69,7 +68,7 @@ class CheckModuleTest : public ::testing::Test {
   void TestBody() override {
     IREE_EXPECT_OK(iree_vm_invoke(context_, function_, /*policy=*/nullptr,
                                   /*inputs=*/nullptr, /*outputs=*/nullptr,
-                                  IREE_ALLOCATOR_SYSTEM));
+                                  iree_allocator_system()));
   }
 
  private:
@@ -83,11 +82,11 @@ class CheckModuleTest : public ::testing::Test {
 StatusOr<int> Run(std::string input_file_path) {
   IREE_TRACE_SCOPE0("iree-check-module");
 
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
       << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
+  IREE_RETURN_IF_ERROR(
+      iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
   std::string module_data;
@@ -95,18 +94,19 @@ StatusOr<int> Run(std::string input_file_path) {
     module_data = std::string{std::istreambuf_iterator<char>(std::cin),
                               std::istreambuf_iterator<char>()};
   } else {
-    ASSIGN_OR_RETURN(module_data, file_io::GetFileContents(input_file_path));
+    IREE_ASSIGN_OR_RETURN(module_data,
+                          file_io::GetFileContents(input_file_path));
   }
 
   iree_vm_module_t* input_module = nullptr;
-  RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
+  IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
   iree_vm_module_t* hal_module = nullptr;
-  RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
   iree_vm_module_t* check_module = nullptr;
-  check_native_module_create(IREE_ALLOCATOR_SYSTEM, &check_module);
+  check_native_module_create(iree_allocator_system(), &check_module);
 
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};
@@ -115,11 +115,9 @@ StatusOr<int> Run(std::string input_file_path) {
        ++ordinal) {
     iree_vm_function_t function;
     iree_string_view_t export_name_sv;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
-                          input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                          ordinal, &function, &export_name_sv),
-                      IREE_LOC))
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+        input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
+        &export_name_sv))
         << "Looking up function export " << ordinal;
 
     // TODO(gcmn): Implicit conversion from iree to absl string view.
@@ -135,9 +133,9 @@ StatusOr<int> Run(std::string input_file_path) {
       continue;
     }
 
-    RETURN_IF_ERROR(ValidateFunctionAbi(function));
-    ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
-    ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
+    IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+    IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
     if (!input_descs.empty() || !output_descs.empty()) {
       iree_string_view_t sig_f = iree_vm_function_reflection_attr(
           &function, iree_make_cstring_view("f"));

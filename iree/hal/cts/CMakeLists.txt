@@ -25,8 +25,8 @@ iree_cc_library(
     iree::tools::sanitizer_suppressions.txt
   DEPS
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
+    iree::testing::gtest
     iree::testing::gtest_main
     ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
@@ -41,7 +41,6 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
     iree::testing::gtest
 )
@@ -54,7 +53,6 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
     iree::testing::gtest
 )
@@ -67,7 +65,6 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
     iree::testing::gtest
 )

@@ -264,7 +264,6 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
 static void recordPushConstants(Value device, Value commandBuffer,
                                 IREE::Flow::DispatchOp &dispatchOp,
                                 IREE::HAL::ExecutableOp &executableOp,
-                                IREE::HAL::ExecutableEntryPointOp &entryPointOp,
                                 Value executableLayout,
                                 ConversionPatternRewriter &rewriter) {
   SmallVector<Value, 4> pushConstantValues;
@@ -298,11 +297,12 @@ static void recordPushConstants(Value device, Value commandBuffer,
       rewriter.getI32IntegerAttr(0), pushConstantValues);
 }
 
-static LogicalResult recordPushBindings(
-    Value device, Value commandBuffer, IREE::Flow::DispatchOp &dispatchOp,
-    IREE::HAL::ExecutableOp &executableOp,
-    IREE::HAL::ExecutableEntryPointOp &entryPointOp, Value executableLayout,
-    BufferSet &bufferSet, ConversionPatternRewriter &rewriter) {
+static LogicalResult recordPushBindings(Value device, Value commandBuffer,
+                                        IREE::Flow::DispatchOp &dispatchOp,
+                                        IREE::HAL::ExecutableOp &executableOp,
+                                        Value executableLayout,
+                                        BufferSet &bufferSet,
+                                        ConversionPatternRewriter &rewriter) {
   LLVM_DEBUG(llvm::dbgs() << "HAL recordPushBindings: "
                           << *dispatchOp.getOperation() << "\n");
   uint32_t setOrdinal = 0;
@@ -372,38 +372,17 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
           interfaceOp.getExecutableSetLayoutsAttr(),
           interfaceOp.push_constantsAttr());
 
-  // Compute the workgroup count based on the executable's tiling.
-  auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
-      SymbolTable::lookupSymbolIn(executableOp, dispatchOp.entry_point()));
-
   // Setup push constants for any dynamic values we need to pass across at
   // runtime.
   recordPushConstants(device, commandBuffer, dispatchOp, executableOp,
-                      entryPointOp, executableLayout, rewriter);
+                      executableLayout, rewriter);
 
-  // Setup bindings, right now pushed immediately but soon to be replaced with
-  // descriptor sets (or something better, anyway).
+  // Setup bindings, right now pushed immediately but soon to be replaced
+  // with descriptor sets (or something better, anyway).
   if (failed(recordPushBindings(device, commandBuffer, dispatchOp, executableOp,
-                                entryPointOp, executableLayout, bufferSet,
-                                rewriter))) {
+                                executableLayout, bufferSet, rewriter))) {
     return failure();
   }
-
-  IREE::HAL::TargetBackend::DispatchState dispatchState;
-  dispatchState.dispatchOp = dispatchOp;
-  dispatchState.executableOp = executableOp;
-  dispatchState.entryPointOp = entryPointOp;
-
-  dispatchState.device = device;
-  dispatchState.commandBuffer = commandBuffer;
-  dispatchState.executable = executable;
-  dispatchState.executableLayout = executableLayout;
-
-  dispatchState.workload = rewriter.getRemappedValue(dispatchOp.workload());
-
-  // TODO(benvanik): support extended push constants.
-  dispatchState.basePushConstantOffset = 0;
-
   // Marshal tensor operands/results in to the state so that backends can
   // read/write them as they need.
   SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> operandAdaptors;
@@ -420,7 +399,7 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
     }
     operandAdaptors.emplace_back(adaptor.getValue());
   }
-  dispatchState.operands = operandAdaptors;
+
   SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> resultAdaptors;
   for (int i = 0; i < dispatchOp.getNumResults(); ++i) {
     auto value = dispatchOp.getResult(i);
@@ -436,17 +415,38 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
     }
     resultAdaptors.emplace_back(adaptor.getValue());
   }
+
+  IREE::HAL::TargetBackend::DispatchState dispatchState;
+  dispatchState.dispatchOp = dispatchOp;
+  dispatchState.executableOp = executableOp;
+  dispatchState.device = device;
+  dispatchState.commandBuffer = commandBuffer;
+  dispatchState.executable = executable;
+  dispatchState.executableLayout = executableLayout;
+  dispatchState.workload = rewriter.getRemappedValue(dispatchOp.workload());
+  // TODO(benvanik): support extended push constants.
+  dispatchState.basePushConstantOffset = 0;
+  dispatchState.operands = operandAdaptors;
   dispatchState.results = resultAdaptors;
 
   // Ask each target backend to record their dispatch logic.
   IREE::HAL::DeviceSwitchBuilder switchBuilder(dispatchOp.getLoc(),
                                                /*resultTypes=*/TypeRange{},
-                                               /*device=*/dispatchState.device,
-                                               rewriter);
+                                               device, rewriter);
   for (auto targetOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
     for (auto &targetBackend :
          IREE::HAL::matchTargetBackends({targetOp.target_backend().str()})) {
+      auto entryPointOps =
+          targetOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+      if (entryPointOps.empty()) {
+        return dispatchOp.emitOpError() << "need at least one entry point";
+      }
+      // Use the first (possibly only) entry point op. If the target split the
+      // original entry point into multiple entry points then it should
+      // sequence them together during the call to |recordDispatch| below.
+      dispatchState.entryPointOp = *entryPointOps.begin();
+
       if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(),
                                                dispatchState, switchBuilder))) {
         return dispatchOp.emitError()

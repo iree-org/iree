@@ -331,8 +331,7 @@ static void emitAttrFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
                   structAttr.getAllFields().front().getName());
   }
 
-  os << formatv("  return Base::get(context, AttrKind::{0}",
-                structAttr.getStructClassName());
+  os << formatv("  return Base::get(context");
   if (!structAttr.getAllFields().empty()) {
     os << ",\n                   ";
     interleaveComma(structAttr.getAllFields(), os,

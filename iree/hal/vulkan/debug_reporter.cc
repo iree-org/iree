@@ -103,8 +103,8 @@ DebugReporter::CreateDebugUtilsMessenger(
     const VkAllocationCallbacks* allocation_callbacks) {
   IREE_TRACE_SCOPE0("DebugReporter::CreateDebugUtilsMessenger");
 
-  auto debug_reporter =
-      absl::WrapUnique(new DebugReporter(instance, syms, allocation_callbacks));
+  auto debug_reporter = std::unique_ptr<DebugReporter>(
+      new DebugReporter(instance, syms, allocation_callbacks));
 
   VkDebugUtilsMessengerCreateInfoEXT create_info;
   PopulateStaticCreateInfo(&create_info);
@@ -124,8 +124,8 @@ DebugReporter::CreateDebugReportCallback(
     const VkAllocationCallbacks* allocation_callbacks) {
   IREE_TRACE_SCOPE0("DebugReporter::CreateDebugReportCallback");
 
-  auto debug_reporter =
-      absl::WrapUnique(new DebugReporter(instance, syms, allocation_callbacks));
+  auto debug_reporter = std::unique_ptr<DebugReporter>(
+      new DebugReporter(instance, syms, allocation_callbacks));
 
   VkDebugReportCallbackCreateInfoEXT create_info;
   PopulateStaticCreateInfo(&create_info);

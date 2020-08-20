@@ -46,7 +46,7 @@ cd ${BUILD_DIR}
                 -DIREE_BUILD_PYTHON_BINDINGS=OFF \
                 -G Ninja
 # Generate docs and also build iree-opt for generating more docs :)
-ninja iree-doc iree-opt
+ninja iree-doc iree_tools_iree-opt
 
 cd ${ROOT_DIR}
 # Copy docs in source tree over

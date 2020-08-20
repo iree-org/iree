@@ -92,7 +92,6 @@ iree_cc_library(
     "dylib_executable_cache.cc"
   DEPS
     ::dylib_executable
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::executable

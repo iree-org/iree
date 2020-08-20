@@ -19,9 +19,9 @@
 #include "iree/base/dynamic_library_test_library_embed.h"
 #include "iree/base/file_io.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/base/target_platform.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace {
@@ -38,7 +38,8 @@ class DynamicLibraryTest : public ::testing::Test {
     // to a platform/test-environment specific temp file for loading.
 
     std::string base_name = "dynamic_library_test_library";
-    ASSERT_OK_AND_ASSIGN(library_temp_path_, file_io::GetTempFile(base_name));
+    IREE_ASSERT_OK_AND_ASSIGN(library_temp_path_,
+                              file_io::GetTempFile(base_name));
     // System APIs for loading dynamic libraries typically require an extension.
 #if defined(IREE_PLATFORM_WINDOWS)
     library_temp_path_ += ".dll";
@@ -49,7 +50,7 @@ class DynamicLibraryTest : public ::testing::Test {
     const auto* file_toc = dynamic_library_test_library_create();
     absl::string_view file_data(reinterpret_cast<const char*>(file_toc->data),
                                 file_toc->size);
-    ASSERT_OK(file_io::SetFileContents(library_temp_path_, file_data));
+    IREE_ASSERT_OK(file_io::SetFileContents(library_temp_path_, file_data));
 
     LOG(INFO) << "Embedded test library written to temp path: "
               << library_temp_path_;
@@ -61,11 +62,8 @@ class DynamicLibraryTest : public ::testing::Test {
 std::string DynamicLibraryTest::library_temp_path_;
 
 TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
-  auto library_or = DynamicLibrary::Load(library_temp_path_.c_str());
-  ASSERT_OK(library_or);
-
-  auto library = std::move(library_or.value());
-
+  IREE_ASSERT_OK_AND_ASSIGN(auto library,
+                            DynamicLibrary::Load(library_temp_path_.c_str()));
   EXPECT_EQ(library_temp_path_, library->file_name());
 }
 
@@ -75,15 +73,15 @@ TEST_F(DynamicLibraryTest, LoadLibraryFailure) {
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
-  ASSERT_OK_AND_ASSIGN(auto library1,
-                       DynamicLibrary::Load(library_temp_path_.c_str()));
-  ASSERT_OK_AND_ASSIGN(auto library2,
-                       DynamicLibrary::Load(library_temp_path_.c_str()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto library1,
+                            DynamicLibrary::Load(library_temp_path_.c_str()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto library2,
+                            DynamicLibrary::Load(library_temp_path_.c_str()));
 }
 
 TEST_F(DynamicLibraryTest, GetSymbolSuccess) {
-  ASSERT_OK_AND_ASSIGN(auto library,
-                       DynamicLibrary::Load(library_temp_path_.c_str()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto library,
+                            DynamicLibrary::Load(library_temp_path_.c_str()));
 
   auto times_two_fn = library->GetSymbol<int (*)(int)>("times_two");
   ASSERT_NE(nullptr, times_two_fn);
@@ -91,8 +89,8 @@ TEST_F(DynamicLibraryTest, GetSymbolSuccess) {
 }
 
 TEST_F(DynamicLibraryTest, GetSymbolFailure) {
-  ASSERT_OK_AND_ASSIGN(auto library,
-                       DynamicLibrary::Load(library_temp_path_.c_str()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto library,
+                            DynamicLibrary::Load(library_temp_path_.c_str()));
 
   auto unknown_fn = library->GetSymbol<int (*)(int)>("unknown");
   EXPECT_EQ(nullptr, unknown_fn);

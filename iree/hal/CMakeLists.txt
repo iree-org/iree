@@ -25,7 +25,6 @@ iree_cc_library(
     ::buffer
     absl::span
     iree::base::ref_ptr
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
   PUBLIC
@@ -48,10 +47,10 @@ iree_cc_library(
     ::driver_registry
     ::heap_buffer
     ::semaphore
+    absl::inlined_vector
     absl::span
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::memory
     iree::base::ref_ptr
     iree::base::tracing
@@ -78,10 +77,9 @@ iree_cc_test(
     ::api
     absl::inlined_vector
     absl::strings
-    iree::base::api_util
     iree::base::memory
     iree::base::status
-    iree::base::status_matchers
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -99,7 +97,6 @@ iree_cc_library(
     absl::variant
     iree::base::bitfield
     iree::base::logging
-    iree::base::source_location
     iree::base::status
   PUBLIC
 )
@@ -115,7 +112,7 @@ iree_cc_test(
     ::heap_buffer
     absl::span
     iree::base::status
-    iree::base::status_matchers
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -202,8 +199,8 @@ iree_cc_test(
     ::deferred_buffer
     ::heap_buffer
     absl::memory
-    iree::base::status_matchers
     iree::hal::testing::mock_allocator
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -282,7 +279,6 @@ iree_cc_library(
     ::semaphore
     absl::span
     absl::synchronization
-    iree::base::source_location
     iree::base::status
     iree::base::time
     iree::base::tracing
@@ -405,7 +401,6 @@ iree_cc_library(
   DEPS
     ::allocator
     ::buffer
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::host::host_buffer

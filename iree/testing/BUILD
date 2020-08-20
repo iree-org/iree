@@ -35,14 +35,26 @@ cc_library(
 cc_library(
     name = "gtest",
     testonly = True,
-    hdrs = ["gtest.h"],
-    deps = platform_trampoline_deps("gtest", "testing"),
+    hdrs = [
+        "gtest.h",
+        "status_matchers.h",
+    ],
+    deps = platform_trampoline_deps("gtest", "testing") + [
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+    ],
 )
 
 cc_library(
     name = "gtest_main",
     testonly = True,
-    hdrs = ["gtest.h"],
+    hdrs = [
+        "gtest.h",
+        "status_matchers.h",
+    ],
     tags = ["keep_dep"],
-    deps = platform_trampoline_deps("gtest_main", "testing"),
+    deps = platform_trampoline_deps("gtest_main", "testing") + [
+        ":gtest",
+    ],
 )

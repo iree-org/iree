@@ -31,7 +31,6 @@ iree_cc_library(
     "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::api
-    iree::base::api_util
     iree::base::tracing
     iree::hal::api
     iree::hal::vulkan::dynamic_symbols
@@ -176,7 +175,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::dynamic_library
-    iree::base::platform_headers
     iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
@@ -193,9 +191,9 @@ iree_cc_test(
   COPTS
     "-DVK_NO_PROTOTYPES"
   DEPS
-    iree::base::status_matchers
     iree::hal::vulkan::status_util
     iree::hal::vulkan::dynamic_symbols
+    iree::testing::gtest
     iree::testing::gtest_main
   LABELS
     "nokokoro"
@@ -396,8 +394,8 @@ iree_cc_library(
   DEPS
     iree::base::dynamic_library
     iree::base::logging
-    iree::base::platform_headers
     iree::base::status
+    iree::base::target_platform
     iree::base::tracing
     iree::hal::debug_capture_manager
     renderdoc_api::renderdoc_app

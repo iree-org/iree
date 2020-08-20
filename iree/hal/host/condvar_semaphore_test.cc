@@ -18,8 +18,8 @@
 #include <thread>  // NOLINT
 
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -29,7 +29,7 @@ namespace {
 // Tests that a semaphore that is unused properly cleans itself up.
 TEST(CondVarSemaphoreTest, NoOp) {
   CondVarSemaphore semaphore(123u);
-  ASSERT_OK_AND_ASSIGN(uint64_t value, semaphore.Query());
+  IREE_ASSERT_OK_AND_ASSIGN(uint64_t value, semaphore.Query());
   EXPECT_EQ(123u, value);
 }
 
@@ -37,9 +37,9 @@ TEST(CondVarSemaphoreTest, NoOp) {
 TEST(CondVarSemaphoreTest, NormalSignaling) {
   CondVarSemaphore semaphore(2u);
   EXPECT_EQ(2u, semaphore.Query().value());
-  EXPECT_OK(semaphore.Signal(3u));
+  IREE_EXPECT_OK(semaphore.Signal(3u));
   EXPECT_EQ(3u, semaphore.Query().value());
-  EXPECT_OK(semaphore.Signal(40u));
+  IREE_EXPECT_OK(semaphore.Signal(40u));
   EXPECT_EQ(40u, semaphore.Query().value());
 }
 
@@ -57,7 +57,7 @@ TEST(CondVarSemaphoreTest, RequireIncreasingValues) {
 TEST(CondVarSemaphoreTest, StickyFailure) {
   CondVarSemaphore semaphore(2u);
   // Signal to 3.
-  EXPECT_OK(semaphore.Signal(3u));
+  IREE_EXPECT_OK(semaphore.Signal(3u));
   EXPECT_EQ(3u, semaphore.Query().value());
 
   // Fail now.
@@ -71,17 +71,17 @@ TEST(CondVarSemaphoreTest, StickyFailure) {
 
 // Tests waiting on no semaphores.
 TEST(CondVarSemaphoreTest, EmptyWait) {
-  EXPECT_OK(CondVarSemaphore::WaitForSemaphores({}, /*wait_all=*/true,
-                                                InfiniteFuture()));
+  IREE_EXPECT_OK(CondVarSemaphore::WaitForSemaphores({}, /*wait_all=*/true,
+                                                     InfiniteFuture()));
 }
 
 // Tests waiting on a semaphore that has already been signaled.
 TEST(CondVarSemaphoreTest, WaitAlreadySignaled) {
   CondVarSemaphore semaphore(2u);
   // Test both previous and current values.
-  EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
+  IREE_EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
       {{&semaphore, 1u}}, /*wait_all=*/true, InfiniteFuture()));
-  EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
+  IREE_EXPECT_OK(CondVarSemaphore::WaitForSemaphores(
       {{&semaphore, 2u}}, /*wait_all=*/true, InfiniteFuture()));
 }
 
@@ -109,16 +109,16 @@ TEST(CondVarSemaphoreTest, PingPong) {
   CondVarSemaphore b2a(0u);
   std::thread thread([&]() {
     // Should advance right past this because the value is already set.
-    ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
+    IREE_ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
         {{&a2b, 0u}}, /*wait_all=*/true, InfiniteFuture()));
-    ASSERT_OK(b2a.Signal(1u));
+    IREE_ASSERT_OK(b2a.Signal(1u));
     // Jump ahead.
-    ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
+    IREE_ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
         {{&a2b, 4u}}, /*wait_all=*/true, InfiniteFuture()));
   });
-  ASSERT_OK(CondVarSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
-                                                InfiniteFuture()));
-  ASSERT_OK(a2b.Signal(4u));
+  IREE_ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
+      {{&b2a, 1u}}, /*wait_all=*/true, InfiniteFuture()));
+  IREE_ASSERT_OK(a2b.Signal(4u));
   thread.join();
 }
 
@@ -128,12 +128,12 @@ TEST(CondVarSemaphoreTest, FailNotifies) {
   CondVarSemaphore b2a(0u);
   bool got_failure = false;
   std::thread thread([&]() {
-    ASSERT_OK(b2a.Signal(1u));
+    IREE_ASSERT_OK(b2a.Signal(1u));
     got_failure = IsUnknown(CondVarSemaphore::WaitForSemaphores(
         {{&a2b, 1u}}, /*wait_all=*/true, InfiniteFuture()));
   });
-  ASSERT_OK(CondVarSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
-                                                InfiniteFuture()));
+  IREE_ASSERT_OK(CondVarSemaphore::WaitForSemaphores(
+      {{&b2a, 1u}}, /*wait_all=*/true, InfiniteFuture()));
   a2b.Fail(UnknownErrorBuilder(IREE_LOC));
   thread.join();
   ASSERT_TRUE(got_failure);

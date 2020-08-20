@@ -29,14 +29,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace tf_strings {
 
-namespace TFStringsTypes {
-enum Kind {
-  FIRST_USED_STRINGS_TYPE = Type::FIRST_PRIVATE_EXPERIMENTAL_1_TYPE,
-  String,
-  LAST_USED_STRINGS_TYPE,
-};
-}  // namespace TFStringsTypes
-
 class TFStringsType : public Type {
  public:
   using Type::Type;
@@ -48,9 +40,6 @@ class StringType
     : public Type::TypeBase<StringType, TFStringsType, TypeStorage> {
  public:
   using Base::Base;
-  static StringType get(MLIRContext* context) {
-    return Base::get(context, TFStringsTypes::String);
-  }
 };
 
 }  // namespace tf_strings

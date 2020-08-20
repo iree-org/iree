@@ -20,7 +20,6 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/platform_headers.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 

@@ -91,20 +91,20 @@ static_assert(sizeof(iree_vm_function_t) == 8 + sizeof(void*),
 typedef struct {
   // TODO(#1979): rework to add useful information here (types, etc).
   // Total number of arguments to the function.
-  int32_t argument_count;
+  iree_host_size_t argument_count;
   // Total number of results from the function.
-  int32_t result_count;
+  iree_host_size_t result_count;
 } iree_vm_function_signature_t;
 
 // Describes the imports, exports, and capabilities of a module.
 typedef struct {
   // Total number of imported functions.
-  int32_t import_function_count;
+  iree_host_size_t import_function_count;
   // Total number of exported functions.
-  int32_t export_function_count;
+  iree_host_size_t export_function_count;
   // Total number of internal functions, if debugging info is present and they
   // can be queried.
-  int32_t internal_function_count;
+  iree_host_size_t internal_function_count;
 } iree_vm_module_signature_t;
 
 // Internal storage for the module state.
@@ -165,7 +165,7 @@ typedef struct iree_vm_module {
   // - |out_name| set to the function name.
   // - |out_signature| set to the function signature.
   iree_status_t(IREE_API_PTR* get_function)(
-      void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
+      void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
       iree_vm_function_t* out_function, iree_string_view_t* out_name,
       iree_vm_function_signature_t* out_signature);
 
@@ -188,8 +188,8 @@ typedef struct iree_vm_module {
   // The function is guaranteed to remain valid for the lifetime of the module
   // state.
   iree_status_t(IREE_API_PTR* resolve_import)(
-      void* self, iree_vm_module_state_t* module_state, int32_t ordinal,
-      iree_vm_function_t function);
+      void* self, iree_vm_module_state_t* module_state,
+      iree_host_size_t ordinal, iree_vm_function_t function);
 
   // Begins a function call with the given |call| arguments.
   // Execution may yield in the case of asynchronous code and require one or
@@ -212,11 +212,10 @@ typedef struct iree_vm_module {
   // the function.
   // See: docs/design_docs/function_abi.md
   iree_status_t(IREE_API_PTR* get_function_reflection_attr)(
-      void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
-      int32_t index, iree_string_view_t* key, iree_string_view_t* value);
+      void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
+      iree_host_size_t index, iree_string_view_t* key,
+      iree_string_view_t* value);
 } iree_vm_module_t;
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Initializes the interface of a module handle.
 // This should be called by module implementations after they allocate
@@ -261,7 +260,7 @@ iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
                                           iree_vm_function_linkage_t linkage,
-                                          int32_t ordinal,
+                                          iree_host_size_t ordinal,
                                           iree_vm_function_t* out_function,
                                           iree_string_view_t* out_linkage_name);
 
@@ -291,11 +290,10 @@ iree_vm_function_reflection_attr(const iree_vm_function_t* function,
 // the function.
 // See: docs/design_docs/function_abi.md
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_get_function_reflection_attr(iree_vm_function_t function, int32_t index,
+iree_vm_get_function_reflection_attr(iree_vm_function_t function,
+                                     iree_host_size_t index,
                                      iree_string_view_t* key,
                                      iree_string_view_t* value);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

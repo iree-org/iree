@@ -21,8 +21,9 @@ namespace iree {
 
 OStringStream::Buf::int_type OStringStream::overflow(int c) {
   assert(s_);
-  if (!Buf::traits_type::eq_int_type(c, Buf::traits_type::eof()))
+  if (!Buf::traits_type::eq_int_type(c, Buf::traits_type::eof())) {
     s_->push_back(static_cast<char>(c));
+  }
   return 1;
 }
 

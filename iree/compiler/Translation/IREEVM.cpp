@@ -128,8 +128,8 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 LogicalResult translateFromMLIRToVMCModule(
     ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, llvm::raw_ostream &output) {
-  auto result = translateFromMLIRToVM(moduleOp, executableOptions);
-
+  auto result =
+      translateFromMLIRToVM(moduleOp, executableOptions, targetOptions);
   if (failed(result)) {
     return result;
   }

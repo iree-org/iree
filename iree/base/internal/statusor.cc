@@ -14,8 +14,6 @@
 
 #include "iree/base/internal/statusor.h"
 
-#include "iree/base/internal/status_errors.h"
-
 namespace iree {
 
 namespace internal_statusor {
@@ -24,7 +22,7 @@ void Helper::HandleInvalidStatusCtorArg(Status* status) {
   const char* kMessage =
       "An OK status is not a valid constructor argument to StatusOr<T>";
   LOG(ERROR) << kMessage;
-  *status = InternalError(kMessage);
+  *status = Status(StatusCode::kInternal, kMessage);
   abort();
 }
 

@@ -41,6 +41,7 @@ iree_cc_test(
     ::custom_modules_test_module_cc
     ::native_module
     absl::core_headers
+    absl::span
     absl::strings
     iree::base::api
     iree::base::logging
@@ -62,7 +63,6 @@ iree_cc_library(
     "native_module.cc"
   DEPS
     iree::base::api
-    iree::base::api_util
     iree::hal::api
     iree::modules::hal
     iree::vm

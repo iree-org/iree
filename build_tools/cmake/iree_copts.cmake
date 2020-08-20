@@ -132,6 +132,35 @@ set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
+# Size-optimized build flags
+#-------------------------------------------------------------------------------
+
+  # TODO(#898): add a dedicated size-constrained configuration.
+if(${IREE_SIZE_OPTIMIZED})
+  iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
+    MSVC_OR_CLANG_CL
+      "/GS-"
+      "/GL"
+      "/Gw"
+      "/Gy"
+      "/DNDEBUG"
+      "/DIREE_STATUS_MODE=0"
+  )
+  iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
+    MSVC_OR_CLANG_CL
+      "/LTCG"
+      "/opt:ref,icf"
+  )
+  # TODO(#898): make this only impact the runtime (IREE_RUNTIME_DEFAULT_...).
+  set(IREE_DEFAULT_COPTS
+      "${IREE_DEFAULT_COPTS}"
+      "${IREE_SIZE_OPTIMIZED_DEFAULT_COPTS}")
+  set(IREE_DEFAULT_LINKOPTS
+      "${IREE_DEFAULT_LINKOPTS}"
+      "${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}")
+endif()
+
+#-------------------------------------------------------------------------------
 # Compiler: Clang/LLVM
 #-------------------------------------------------------------------------------
 

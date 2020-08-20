@@ -48,7 +48,7 @@ iree_cc_test(
     ::op_kernels
     absl::inlined_vector
     iree::base::memory
-    iree::base::status_matchers
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -61,7 +61,6 @@ iree_cc_library(
     "vmla_cache.cc"
   DEPS
     ::vmla_executable
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator
@@ -107,7 +106,6 @@ iree_cc_library(
   DEPS
     ::vmla_device
     ::vmla_module
-    iree::base::api_util
     iree::base::tracing
     iree::hal::device_info
     iree::hal::driver
@@ -142,7 +140,6 @@ iree_cc_library(
     ::vmla_module
     absl::inlined_vector
     absl::span
-    iree::base::api_util
     iree::base::status
     iree::base::tracing
     iree::hal::executable

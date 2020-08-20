@@ -228,6 +228,14 @@ struct MatmulCodegenStrategy {
   SmallVector<std::unique_ptr<Transformation>, 4> transformationSequence;
 };
 
+/// Perform folding of chains of AffineMinOp.
+struct AffineMinCanonicalizationPattern
+    : public mlir::OpRewritePattern<mlir::AffineMinOp> {
+  using OpRewritePattern<mlir::AffineMinOp>::OpRewritePattern;
+
+  mlir::LogicalResult matchAndRewrite(
+      mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override;
+};
 }  // namespace mlir
 
 #endif  // MLIR_EDGE_BENCHMARKS_STRATEGIES_MATMULCODEGENSTRATEGIES_H_

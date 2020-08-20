@@ -32,10 +32,9 @@ namespace {
 // TODO(laurenzo): Every one of these should have better support and removed
 // from this exclusion list eventually.
 bool isUnsupportedFusionOp(Operation *op) {
-  return isa<mhlo::DotOp>(op) || isa<mhlo::ConvOp>(op) ||
-         isa<mhlo::ReduceOp>(op) || isa<mhlo::PadOp>(op) ||
-         isa<mhlo::ReduceWindowOp>(op) || isa<mhlo::TorchIndexSelectOp>(op) ||
-         isa<mhlo::SliceOp>(op) || isa<mhlo::ConcatenateOp>(op);
+  return isa<mhlo::ConcatenateOp, mhlo::ConvOp, mhlo::DotGeneralOp, mhlo::DotOp,
+             mhlo::PadOp, mhlo::ReduceOp, mhlo::ReduceWindowOp, mhlo::SliceOp,
+             mhlo::TorchIndexSelectOp>(op);
 }
 
 // Allowlist of ops that materialize to a an index-permuted copy of some kind

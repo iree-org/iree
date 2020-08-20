@@ -105,7 +105,7 @@ def get_test_targets(test_suite_path):
 
   query = ['bazel', 'query', f'tests({test_suite_path})']
   tests = subprocess.check_output(query)
-  tests = tests.decode('ascii').split('\n')
+  tests = tests.decode('ascii').split(os.linesep)
   tests = list(filter(lambda s: s.startswith(f'{test_suite_path}_'), tests))
   tests = [test.replace(f'{test_suite_path}_', '') for test in tests]
   return tests

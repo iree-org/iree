@@ -17,12 +17,9 @@
 #include <cstddef>
 
 #include "absl/base/attributes.h"
-#include "absl/base/macros.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
-#include "iree/base/platform_headers.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -135,7 +132,7 @@ Status ResolveFunctions(DynamicSymbols* syms,
   // Resolve the mandatory functions that we need to create instances.
   // If the provided |get_proc_addr| cannot resolve these then it's not a loader
   // or ICD we want to use, anyway.
-  for (int i = 0; i < ABSL_ARRAYSIZE(kInstancelessFunctionPtrInfos); ++i) {
+  for (int i = 0; i < IREE_ARRAYSIZE(kInstancelessFunctionPtrInfos); ++i) {
     const auto& function_ptr = kInstancelessFunctionPtrInfos[i];
     auto* member_ptr = reinterpret_cast<PFN_vkVoidFunction*>(
         reinterpret_cast<uint8_t*>(syms) + function_ptr.member_offset);
@@ -159,7 +156,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
   IREE_TRACE_SCOPE0("DynamicSymbols::Create");
 
   auto syms = make_ref<DynamicSymbols>();
-  RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
+  IREE_RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
   syms->FixupExtensionFunctions();
   return syms;
 }
@@ -168,14 +165,14 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto loader_library,
       DynamicLibrary::Load(absl::MakeSpan(kVulkanLoaderSearchNames)));
   auto syms = make_ref<DynamicSymbols>();
   syms->loader_library_ = std::move(loader_library);
 
   auto* loader_library_ptr = syms->loader_library_.get();
-  RETURN_IF_ERROR(ResolveFunctions(
+  IREE_RETURN_IF_ERROR(ResolveFunctions(
       syms.get(), [loader_library_ptr](const char* function_name) {
         return loader_library_ptr->GetSymbol<PFN_vkVoidFunction>(function_name);
       }));
@@ -208,7 +205,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
   }
 
   // Load the rest of the functions.
-  for (int i = 0; i < ABSL_ARRAYSIZE(kDynamicFunctionPtrInfos); ++i) {
+  for (int i = 0; i < IREE_ARRAYSIZE(kDynamicFunctionPtrInfos); ++i) {
     const auto& function_ptr = kDynamicFunctionPtrInfos[i];
     auto* member_ptr = reinterpret_cast<PFN_vkVoidFunction*>(
         reinterpret_cast<uint8_t*>(this) + function_ptr.member_offset);

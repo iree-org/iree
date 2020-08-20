@@ -18,7 +18,9 @@
 #include "experimental/ModelBuilder/VulkanWrapperPass.h"
 #include "iree/base/initializer.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
@@ -58,6 +60,15 @@ static llvm::cl::opt<bool> correctness(
         "matrix multiply in this case to avoid long runtime."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> useWorkgroupMemory(
+    "use-workgroup-memory", llvm::cl::desc("Enable use of workgroup memory"),
+    llvm::cl::value_desc("boolean"), llvm::cl::init(false));
+
+static llvm::cl::opt<bool> enableLICM(
+    "enable-licm",
+    llvm::cl::desc("Enable loop invariant hoisting optimizations"),
+    llvm::cl::value_desc("boolean"), llvm::cl::init(false));
+
 static void addLoweringPasses(mlir::PassManager &pm,
                               llvm::ArrayRef<int64_t> numWorkgroups,
                               llvm::ArrayRef<Type> args) {
@@ -85,6 +96,45 @@ static void addLoweringPasses(mlir::PassManager &pm,
   pm.addPass(mlir::createConvertVulkanLaunchFuncToVulkanCallsPass());
 }
 
+static void insertBarrier(OpBuilder &b, Location loc) {
+  b.create<spirv::ControlBarrierOp>(loc, spirv::Scope::Workgroup,
+                                    spirv::Scope::Workgroup,
+                                    spirv::MemorySemantics::AcquireRelease);
+}
+
+template <typename IdOp, typename NProcsOp>
+static SmallVector<linalg::ProcInfo, 2> getGpuProcIds(
+    OpBuilder &b, Location loc, ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+  if (parallelLoopRanges.size() != 2)
+    llvm_unreachable("expected two parallel loops for matmul operation");
+  Type indexType = b.getIndexType();
+  SmallVector<linalg::ProcInfo, 2> procInfo(2);
+  procInfo[0] = {b.create<IdOp>(loc, indexType, b.getStringAttr("y")),
+                 b.create<NProcsOp>(loc, indexType, b.getStringAttr("y"))};
+  procInfo[1] = {b.create<IdOp>(loc, indexType, b.getStringAttr("x")),
+                 b.create<NProcsOp>(loc, indexType, b.getStringAttr("x"))};
+  return procInfo;
+}
+
+constexpr int numSubgroupX = 2;
+constexpr int numSubgroupY = 2;
+
+static SmallVector<linalg::ProcInfo, 2> getSubgroupIds(
+    OpBuilder &b, Location loc, ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+  if (parallelLoopRanges.size() != 2)
+    llvm_unreachable("expected two parallel loops for matmul operation");
+  Type indexType = b.getIndexType();
+  Value sg = b.create<gpu::SubgroupIdOp>(loc, indexType);
+  Value vSubgroupX = b.create<ConstantIndexOp>(loc, numSubgroupX);
+  Value sgdiv = b.create<SignedDivIOp>(loc, indexType, sg, vSubgroupX);
+  Value vSubgroupY = b.create<ConstantIndexOp>(loc, numSubgroupY);
+  SmallVector<linalg::ProcInfo, 2> procInfo(2);
+  using namespace edsc::op;
+  procInfo[0] = {sg % vSubgroupX, vSubgroupX};
+  procInfo[1] = {sgdiv % vSubgroupY, vSubgroupY};
+  return procInfo;
+}
+
 void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
             bool correctness) {
   const int warpSize = 32;
@@ -106,9 +156,11 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     modelBuilder.addGPUAttr();
     FuncOp kernelFunc = modelBuilder.makeFunction(
         funcName, {}, {typeA, typeB, typeC}, MLIRFuncOpConfig());
+    int workgroupSize = warpSize * numSubgroupX * numSubgroupY;
     // Right now we map one workgroup to one warp.
-    kernelFunc.setAttr(spirv::getEntryPointABIAttrName(),
-                       spirv::getEntryPointABIAttr({warpSize, 1, 1}, &context));
+    kernelFunc.setAttr(
+        spirv::getEntryPointABIAttrName(),
+        spirv::getEntryPointABIAttr({workgroupSize, 1, 1}, &context));
     OpBuilder b(&kernelFunc.getBody());
     ScopedContext scope(b, kernelFunc.getLoc());
 
@@ -129,22 +181,54 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     MatmulCodegenStrategy strategy;
     // Use hardcoded value for cooperative matrix size. Those will be pulled
     // from device properties eventually.
-    const int cooperativeMatrixM = 8;
-    const int cooperativeMatrixN = 8;
+    const int cooperativeMatrixM = 16;
+    const int cooperativeMatrixN = 16;
     const int cooperativeMatrixK = 32;
+
+    linalg::LinalgLoopDistributionOptions WGDistribute;
+    WGDistribute.distributionMethod = {
+        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+        linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+    WGDistribute.procInfo = getGpuProcIds<gpu::BlockIdOp, gpu::GridDimOp>;
+
+    linalg::LinalgLoopDistributionOptions SGDistribute;
+    SGDistribute.distributionMethod = {
+        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+        linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+    SGDistribute.procInfo = getSubgroupIds;
+
     // Swap the order of the parallel loops because PLoopToGPU pattern assigns
     // dimension in reverse order of the loop.
-    // TODO(thomasraooux) LICM is disabled due to limitation in SPIR-V
     strategy
         .tile<linalg::MatmulOp>(
             linalg::LinalgTilingOptions()
                 .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
                 .setTileSizes({tileM, tileN, tileK})
-                .setInterchange({1, 0, 2}))
-        .setHoistInvariantCode(false)
-        .vectorize<linalg::MatmulOp>()
-        .unrollVector<vector::ContractionOp>(
-            {cooperativeMatrixM, cooperativeMatrixN, cooperativeMatrixK});
+                .setInterchange({1, 0, 2})
+                .setDistributionOptions(WGDistribute))
+        .setHoistInvariantCode(enableLICM);
+    if (useWorkgroupMemory) {
+      strategy
+          .promote<linalg::MatmulOp>(
+              linalg::LinalgPromotionOptions()
+                  .setAllocationDeallocationFns(
+                      mlir::iree_compiler::allocateWorkgroupMemory,
+                      mlir::iree_compiler::deallocateWorkgroupMemory)
+                  .setCopyInOutFns(mlir::iree_compiler::copyToWorkgroupMemory,
+                                   mlir::iree_compiler::copyToWorkgroupMemory)
+                  .setOperandsToPromote({0, 1})
+                  .setUseFullTileBuffers({false, false}))
+          .tile<linalg::MatmulOp>(
+              linalg::LinalgTilingOptions()
+                  .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+                  .setTileSizes(
+                      {tileM / numSubgroupX, tileN / numSubgroupY, tileK})
+                  .setDistributionOptions(SGDistribute));
+    }
+    std::array<int64_t, 3> nativeSize = {cooperativeMatrixM, cooperativeMatrixN,
+                                         cooperativeMatrixK};
+    strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
+        nativeSize);
     modelBuilder.getModuleRef()->walk(
         [&](FuncOp fn) { strategy.transform(fn); });
     addLoweringPasses(pm, {resRows / tileM, resColumns / tileN, 1},
@@ -216,19 +300,23 @@ int main(int argc, char **argv) {
     k = 256;
   }
   printf("Matrix size: %ix%ix%i", m, n, k);
-  int tileK = 32;
-  for (int tileM = 8; tileM <= 128; tileM *= 2) {
-    for (int tileN = 8; tileN <= 128; tileN *= 2) {
-      printf("tileM=%i tileN=%i tileK=%i\n", tileM, tileN, tileK);
-      // For non-power of two tile sizes, round up the matrix size to
-      // be an even multiple of the tile size.
-      // TODO(thomasraoux): enable non power of two tiles once affine.min
-      // folding is fixed.
-      auto paddedM = (m + tileM - 1) / tileM * tileM;
-      auto paddedN = (n + tileN - 1) / tileN * tileN;
-      auto paddedK = (k + tileK - 1) / tileK * tileK;
+  for (int tileK = 32; tileK <= 64; tileK *= 2) {
+    for (int tileM = 128; tileM <= 256; tileM *= 2) {
+      for (int tileN = 128; tileN <= 256; tileN *= 2) {
+        // Workgroup memory requires at least a tile size of 128x128 to be able
+        // to do full speed copy from video memory to shared local memory.
+        if (useWorkgroupMemory && (tileM < 128 || tileN < 128)) continue;
+        printf("tileM=%i tileN=%i tileK=%i\n", tileM, tileN, tileK);
+        // For non-power of two tile sizes, round up the matrix size to
+        // be an even multiple of the tile size.
+        // TODO(thomasraoux): enable non power of two tiles once affine.min
+        // folding is fixed.
+        auto paddedM = (m + tileM - 1) / tileM * tileM;
+        auto paddedN = (n + tileN - 1) / tileN * tileN;
+        auto paddedK = (k + tileK - 1) / tileK * tileK;
 
-      matMul(paddedM, paddedN, paddedK, tileM, tileN, tileK, correctness);
+        matMul(paddedM, paddedN, paddedK, tileM, tileN, tileK, correctness);
+      }
     }
   }
 }

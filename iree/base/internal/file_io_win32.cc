@@ -23,7 +23,7 @@
 #include "iree/base/file_io.h"
 #include "iree/base/file_path.h"
 #include "iree/base/internal/file_handle_win32.h"
-#include "iree/base/platform_headers.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
 namespace iree {
@@ -41,8 +41,9 @@ Status FileExists(const std::string& path) {
 
 StatusOr<std::string> GetFileContents(const std::string& path) {
   IREE_TRACE_SCOPE0("file_io::GetFileContents");
-  ASSIGN_OR_RETURN(auto file, FileHandle::OpenRead(std::move(path),
-                                                   FILE_FLAG_SEQUENTIAL_SCAN));
+  IREE_ASSIGN_OR_RETURN(
+      auto file,
+      FileHandle::OpenRead(std::move(path), FILE_FLAG_SEQUENTIAL_SCAN));
   std::string result;
   result.resize(file->size());
   DWORD bytes_read = 0;
@@ -61,7 +62,7 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
 
 Status SetFileContents(const std::string& path, absl::string_view content) {
   IREE_TRACE_SCOPE0("file_io::SetFileContents");
-  ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
+  IREE_ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
   if (::WriteFile(file->handle(), content.data(), content.size(), NULL, NULL) ==
       FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)

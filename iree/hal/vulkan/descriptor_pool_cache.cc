@@ -40,7 +40,7 @@ Status DescriptorSetGroup::Reset() {
   IREE_TRACE_SCOPE0("DescriptorSetGroup::Reset");
 
   if (descriptor_pool_cache_ != nullptr) {
-    RETURN_IF_ERROR(descriptor_pool_cache_->ReleaseDescriptorPools(
+    IREE_RETURN_IF_ERROR(descriptor_pool_cache_->ReleaseDescriptorPools(
         absl::MakeSpan(descriptor_pools_)));
   }
   descriptor_pools_.clear();
