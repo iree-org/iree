@@ -677,7 +677,9 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Validate results.
     if failed_backend_indices:
       # Extract info for logging.
-      failed_backends = [tar_traces[i].backend for i in failed_backend_indices]
+      failed_backends = [
+          tar_traces[i].backend_name for i in failed_backend_indices
+      ]
       self.fail(
           "Comparision between the reference backend and the following targets "
           f"failed: {failed_backends}. The errors above show the inputs and "
