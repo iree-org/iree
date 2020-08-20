@@ -52,6 +52,12 @@ static void printSeparatingComment(llvm::raw_ostream &output) {
          << std::string(77, '=') << "\n";
 }
 
+static LogicalResult translateCallOpToC(mlir::emitc::CppEmitter &emitter,
+                                        IREE::VM::CallOp callOp,
+                                        llvm::raw_ostream &output) {
+  return success();
+}
+
 static LogicalResult translateReturnOpToC(
     mlir::emitc::CppEmitter &emitter, IREE::VM::ReturnOp returnOp,
     llvm::raw_ostream &output, std::vector<std::string> resultNames) {
@@ -71,6 +77,8 @@ static LogicalResult translateReturnOpToC(
 static LogicalResult translateOpToC(mlir::emitc::CppEmitter &emitter,
                                     Operation &op, llvm::raw_ostream &output,
                                     std::vector<std::string> resultNames) {
+  if (auto callOp = dyn_cast<IREE::VM::CallOp>(op))
+    return translateCallOpToC(emitter, callOp, output);
   if (auto returnOp = dyn_cast<IREE::VM::ReturnOp>(op))
     return translateReturnOpToC(emitter, returnOp, output, resultNames);
   if (succeeded(emitter.emitOperation(op))) {
