@@ -218,65 +218,202 @@ static Optional<Offset<Vector<T>>> createOptionalVector(
   return fbb.CreateVector(contents);
 }
 
+// Encodes a type (or a tuple of nested types) to a calling convention string.
+//
+// Examples:
+//  i32              -> i
+//  !vm.ref<...>     -> r
+//  tuple<i32, i64>  -> iI
+static LogicalResult encodeCallingConventionType(Operation *op, Type type,
+                                                 SmallVectorImpl<char> &s) {
+  if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+    s.push_back('r');
+    return success();
+  } else if (auto intType = type.dyn_cast<IntegerType>()) {
+    switch (intType.getIntOrFloatBitWidth()) {
+      default:
+      case 32:
+        s.push_back('i');
+        return success();
+      case 64:
+        s.push_back('I');
+        return success();
+    }
+  } else if (auto tupleType = type.dyn_cast<TupleType>()) {
+    // Flatten tuple (so tuple<i32, i64> -> `...iI...`).
+    SmallVector<Type, 4> flattenedTypes;
+    tupleType.getFlattenedTypes(flattenedTypes);
+    for (auto elementType : flattenedTypes) {
+      if (failed(encodeCallingConventionType(op, elementType, s))) {
+        return op->emitError()
+               << "unsupported external calling convention tuple element type "
+               << elementType;
+      }
+    }
+    return success();
+  }
+  return op->emitError() << "unsupported external calling convention type "
+                         << type;
+}
+
+static LogicalResult encodeVariadicCallingConventionType(
+    Operation *op, Type type, SmallVectorImpl<char> &s) {
+  s.push_back('[');
+  auto result = encodeCallingConventionType(op, type, s);
+  s.push_back(']');
+  return result;
+}
+
+// Generates a string encoding the function type for defining the
+// FunctionSignatureDef::calling_convention field for import functions.
+//
+// This differs from makeCallingConventionString in that it supports variadic
+// arguments. Ideally we'd combine the two, but we only have this additional
+// metadata on IREE::VM::ImportOp.
+static Optional<std::string> makeImportCallingConventionString(
+    IREE::VM::ImportOp importOp) {
+  auto functionType = importOp.getType();
+  if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
+    return std::string{};  // Valid but empty.
+  }
+
+  SmallVector<char, 8> s = {'0'};
+  for (int i = 0; i < functionType.getNumInputs(); ++i) {
+    if (importOp.isFuncArgumentVariadic(i)) {
+      if (failed(encodeVariadicCallingConventionType(
+              importOp, functionType.getInput(i), s))) {
+        return None;
+      }
+    } else {
+      if (failed(encodeCallingConventionType(importOp, functionType.getInput(i),
+                                             s))) {
+        return None;
+      }
+    }
+  }
+  if (functionType.getNumResults() > 0) {
+    s.push_back('.');
+    for (int i = 0; i < functionType.getNumResults(); ++i) {
+      if (failed(encodeCallingConventionType(importOp,
+                                             functionType.getResult(i), s))) {
+        return None;
+      }
+    }
+  }
+  return std::string(s.data(), s.size());
+}
+
+// Generates a string encoding the function type for defining the
+// FunctionSignatureDef::calling_convention field for internal/export functions.
+static Optional<std::string> makeCallingConventionString(
+    IREE::VM::FuncOp funcOp) {
+  auto functionType = funcOp.getType();
+  if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
+    return std::string{};  // Valid but empty.
+  }
+
+  SmallVector<char, 8> s = {'0'};
+  for (int i = 0; i < functionType.getNumInputs(); ++i) {
+    if (failed(
+            encodeCallingConventionType(funcOp, functionType.getInput(i), s))) {
+      return None;
+    }
+  }
+  if (functionType.getNumResults() > 0) {
+    s.push_back('.');
+    for (int i = 0; i < functionType.getNumResults(); ++i) {
+      if (failed(encodeCallingConventionType(funcOp, functionType.getResult(i),
+                                             s))) {
+        return None;
+      }
+    }
+  }
+  return std::string(s.data(), s.size());
+}
+
+// Populates common fields for FunctionSignatureDefs of all function types.
+static void populateFunctionSignatureDef(FunctionType functionType,
+                                         llvm::DenseMap<Type, int> &typeTable,
+                                         iree::vm::FunctionSignatureDefT &fsd) {
+  for (auto type : functionType.getInputs()) {
+    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+      type = refPtrType.getObjectType();
+    }
+    fsd.argument_types.push_back(typeTable.lookup(type));
+  }
+  for (auto type : functionType.getResults()) {
+    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+      type = refPtrType.getObjectType();
+    }
+    fsd.result_types.push_back(typeTable.lookup(type));
+  }
+}
+
 // Returns a serialized function signature.
-static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
-    FunctionType functionType, llvm::DenseMap<Type, int> &typeTable,
-    DictionaryAttr reflectionAttrs, FlatBufferBuilder &fbb) {
-  // Argument types.
-  std::vector<int32_t> argumentTypes(functionType.getNumInputs());
-  for (int i = 0; i < argumentTypes.size(); ++i) {
-    Type type = functionType.getInput(i);
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-      type = refPtrType.getObjectType();
-    }
-    argumentTypes[i] = typeTable.lookup(type);
-  }
-  auto argumentTypesOffset = createOptionalVector(argumentTypes, fbb);
+static Offset<iree::vm::FunctionSignatureDef> makeImportFunctionSignatureDef(
+    IREE::VM::ImportOp importOp, llvm::DenseMap<Type, int> &typeTable,
+    FlatBufferBuilder &fbb) {
+  // Common attributes.
+  iree::vm::FunctionSignatureDefT fsd;
+  populateFunctionSignatureDef(importOp.getType(), typeTable, fsd);
 
-  // Result types.
-  std::vector<int32_t> resultTypes(functionType.getNumResults());
-  for (int i = 0; i < resultTypes.size(); ++i) {
-    Type type = functionType.getResult(i);
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-      type = refPtrType.getObjectType();
-    }
-    resultTypes[i] = typeTable.lookup(type);
-  }
-  auto resultTypesOffset = createOptionalVector(resultTypes, fbb);
+  // Generate the signature calling convention string based on types.
+  auto cconv = makeImportCallingConventionString(importOp);
+  if (!cconv.hasValue()) return {};
+  fsd.calling_convention = cconv.getValue();
 
-  // Reflection attrs.
-  Optional<Offset<Vector<Offset<iree::vm::ReflectionAttrDef>>>>
-      reflectionAttrsOffset;
-  if (reflectionAttrs) {
+  return iree::vm::FunctionSignatureDef::Pack(fbb, &fsd);
+}
+
+// Returns a serialized function signature.
+static Offset<iree::vm::FunctionSignatureDef> makeExportFunctionSignatureDef(
+    IREE::VM::ExportOp exportOp, IREE::VM::FuncOp funcOp,
+    llvm::DenseMap<Type, int> &typeTable, FlatBufferBuilder &fbb) {
+  // Common attributes.
+  iree::vm::FunctionSignatureDefT fsd;
+  populateFunctionSignatureDef(funcOp.getType(), typeTable, fsd);
+
+  // Generate the signature calling convention string based on types.
+  auto cconv = makeCallingConventionString(funcOp);
+  if (!cconv.hasValue()) return {};
+  fsd.calling_convention = cconv.getValue();
+
+  return iree::vm::FunctionSignatureDef::Pack(fbb, &fsd);
+}
+
+// Returns a serialized function signature.
+static Offset<iree::vm::FunctionSignatureDef> makeInternalFunctionSignatureDef(
+    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
+    FlatBufferBuilder &fbb) {
+  // Common attributes.
+  iree::vm::FunctionSignatureDefT fsd;
+  populateFunctionSignatureDef(funcOp.getType(), typeTable, fsd);
+
+  // Generate the signature calling convention string based on types.
+  // TODO(benvanik): only do this on exports. The runtime currently looks on
+  // internal functions, though, so we have to have it here.
+  auto cconv = makeCallingConventionString(funcOp);
+  if (!cconv.hasValue()) return {};
+  fsd.calling_convention = cconv.getValue();
+
+  // Reflection attributes.
+  // TODO(benvanik): move these to exports (or remove entirely).
+  if (auto reflectionAttrs =
+          funcOp.getAttrOfType<DictionaryAttr>("iree.reflection")) {
     llvm::SmallVector<Offset<iree::vm::ReflectionAttrDef>, 4>
         reflectionAttrItems;
     for (auto reflectionAttr : reflectionAttrs) {
       auto key = reflectionAttr.first.strref();
       auto value = reflectionAttr.second.dyn_cast<StringAttr>();
       if (!value || key.empty()) continue;
-      auto keyOffset = fbb.CreateString(key.data(), key.size());
-      auto valueOffset =
-          fbb.CreateString(value.getValue().data(), value.getValue().size());
-      iree::vm::ReflectionAttrDefBuilder rattr(fbb);
-      rattr.add_key(keyOffset);
-      rattr.add_value(valueOffset);
-      reflectionAttrItems.push_back(rattr.Finish());
+      auto rattr = std::make_unique<iree::vm::ReflectionAttrDefT>();
+      rattr->key = key.str();
+      rattr->value = value.getValue().str();
+      fsd.reflection_attrs.push_back(std::move(rattr));
     }
-    reflectionAttrsOffset = fbb.CreateVector(reflectionAttrItems.data(),
-                                             reflectionAttrItems.size());
   }
 
-  iree::vm::FunctionSignatureDefBuilder fsd(fbb);
-  if (argumentTypesOffset) {
-    fsd.add_argument_types(argumentTypesOffset.getValue());
-  }
-  if (resultTypesOffset) {
-    fsd.add_result_types(resultTypesOffset.getValue());
-  }
-  if (reflectionAttrsOffset) {
-    fsd.add_reflection_attrs(reflectionAttrsOffset.getValue());
-  }
-  return fsd.Finish();
+  return iree::vm::FunctionSignatureDef::Pack(fbb, &fsd);
 }
 
 // Builds a complete BytecodeModuleDef FlatBuffer object in |fbb|.
@@ -394,8 +531,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   for (auto importOp : importFuncOps) {
     auto nameOffset = fbb.CreateString(importOp.getName().str());
     auto signatureOffset =
-        makeFunctionSignatureDef(importOp.getType(), typeOrdinalMap,
-                                 nullptr /* no reflection for imports */, fbb);
+        makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
     iree::vm::ImportFunctionDefBuilder ifd(fbb);
     ifd.add_full_name(nameOffset);
     ifd.add_signature(signatureOffset);
@@ -407,8 +543,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     auto nameOffset = fbb.CreateString(exportOp.export_name().str());
     auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
     auto signatureOffset =
-        makeFunctionSignatureDef(funcOp.getType(), typeOrdinalMap,
-                                 nullptr /* no reflection for internal */, fbb);
+        makeExportFunctionSignatureDef(exportOp, funcOp, typeOrdinalMap, fbb);
     iree::vm::ExportFunctionDefBuilder efd(fbb);
     efd.add_local_name(nameOffset);
     efd.add_signature(signatureOffset);
@@ -420,9 +555,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     internalFuncOffsets.reserve(internalFuncOps.size());
     for (auto funcOp : internalFuncOps) {
       auto nameOffset = fbb.CreateString(funcOp.getName().str());
-      auto signatureOffset = makeFunctionSignatureDef(
-          funcOp.getType(), typeOrdinalMap,
-          funcOp.getAttrOfType<DictionaryAttr>("iree.reflection"), fbb);
+      auto signatureOffset =
+          makeInternalFunctionSignatureDef(funcOp, typeOrdinalMap, fbb);
       iree::vm::InternalFunctionDefBuilder ifd(fbb);
       ifd.add_local_name(nameOffset);
       ifd.add_signature(signatureOffset);

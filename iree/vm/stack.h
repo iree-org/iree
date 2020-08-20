@@ -46,58 +46,57 @@ extern "C" {
 // The maximum size of VM stack storage; anything larger is probably a bug.
 #define IREE_VM_STACK_MAX_SIZE (1 * 1024 * 1024)
 
-// Maximum register count per bank.
-// This determines the bits required to reference registers in the VM bytecode.
-#define IREE_I32_REGISTER_COUNT 0x7FFF
-#define IREE_REF_REGISTER_COUNT 0x7FFF
-
-#define IREE_I32_REGISTER_MASK 0x7FFF
-
-#define IREE_REF_REGISTER_TYPE_BIT 0x8000
-#define IREE_REF_REGISTER_MOVE_BIT 0x4000
-#define IREE_REF_REGISTER_MASK 0x3FFF
-
-// Pointers to typed register storage.
-typedef struct {
-  // Ordinal mask defining which ordinal bits are valid. All i32 indexing must
-  // be ANDed with this mask.
-  uint16_t i32_mask;
-  // Ordinal mask defining which ordinal bits are valid. All ref indexing must
-  // be ANDed with this mask.
-  uint16_t ref_mask;
-  // 16-byte aligned i32 register array.
-  int32_t* i32;
-  // Naturally aligned ref register array.
-  iree_vm_ref_t* ref;
-} iree_vm_registers_t;
+enum {
+  // Represents an `[external]` frame that needs to marshal args/results.
+  // These frames have no source location and are tracked so that we know when
+  // transitions occur into/out-of external code.
+  IREE_VM_STACK_FRAME_EXTERNAL = 0,
+  // Represents a `[native]` frame that has no persistent register storage.
+  // These frames may have source location information provided by the
+  // implementation.
+  IREE_VM_STACK_FRAME_NATIVE = 1,
+  // VM stack frame in bytecode using internal register storage.
+  IREE_VM_STACK_FRAME_BYTECODE = 2,
+};
+typedef uint8_t iree_vm_stack_frame_type_t;
 
 // A single stack frame within the VM.
+//
+// NOTE: to (try to) get better cache hit rates we put the most frequently
+// accessed members **LAST**. This is because the custom frame storage data
+// immediately follows this struct in memory and is highly likely to be touched
+// by the callee immediately and repeatedly.
 typedef struct iree_vm_stack_frame {
-  // NOTE: to (try to) get better cache hit rates we put the most frequently
-  // accessed members first.
-
-  // Current program counter within the function.
-  // Implementations may treat this offset differently, treating it as a byte
-  // offset (such as in the case of VM bytecode), a block identifier (compiled
-  // code), etc.
-  iree_vm_source_offset_t pc;
-
-  // Pointers to register arrays into storage.
-  iree_vm_registers_t registers;
-
   // Function that the stack frame is within.
   iree_vm_function_t function;
+
+  // Depth of the frame within the stack.
+  // As stack frame pointers are not stable this can be used instead to detect
+  // stack enter/leave balance issues.
+  int32_t depth;
 
   // Cached module state pointer for the module containing |function|.
   // This removes the need to lookup the module state when control returns to
   // the function during continuation or from a return instruction.
   iree_vm_module_state_t* module_state;
 
-  // Depth of the frame within the stack.
-  // As stack frame pointers are not stable this can be used instead to detect
-  // stack enter/leave balance issues.
-  int32_t depth;
+  // Current program counter within the function.
+  // Implementations may treat this offset differently, treating it as a byte
+  // offset (such as in the case of VM bytecode), a block identifier (compiled
+  // code), etc.
+  iree_vm_source_offset_t pc;
 } iree_vm_stack_frame_t;
+
+// Returns the implementation-defined frame storage associated with |frame|.
+// The pointer will contain at least as many bytes as requested by frame_size.
+static inline void* iree_vm_stack_frame_storage(iree_vm_stack_frame_t* frame) {
+  return (void*)((uintptr_t)frame + sizeof(iree_vm_stack_frame_t));
+}
+
+// Callback for cleaning up stack frame storage before a frame is left or the
+// stack is destroyed.
+typedef void(IREE_API_PTR* iree_vm_stack_frame_cleanup_fn_t)(
+    iree_vm_stack_frame_t* frame);
 
 // A state resolver that can allocate or lookup module state.
 typedef struct iree_vm_state_resolver {
@@ -197,41 +196,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_query_module_state(
 // May invalidate any pointers to stack frames and the only pointer that can be
 // assumed valid after return is the one in |out_callee_frame|.
 //
-// |argument_registers| and |result_registers| are lists of registers within the
-// caller frame that will be used to source and store arguments and results with
-// the callee. They must remain live and valid until the callee returns (which
-// may be much later if asynchronous!).
-//
-// TODO(benvanik): copy the result register list to make async easier.
+// |frame_size| can optionally be used to allocate storage within the stack for
+// callee data. |frame_cleanup_fn| will be called when the frame is left either
+// normally via an iree_vm_stack_function_leave call or if an error occurs and
+// the stack needs to be torn down.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
-    iree_vm_stack_t* stack, iree_vm_function_t function,
-    const iree_vm_register_list_t* argument_registers,
-    const iree_vm_register_list_t* result_registers,
+    iree_vm_stack_t* stack, const iree_vm_function_t* function,
+    iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
+    iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
     iree_vm_stack_frame_t** out_callee_frame);
 
 // Leaves the current stack frame.
-// The provided |result_registers| in the callee frame will be stored back into
-// the caller frame result registers.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_leave(
-    iree_vm_stack_t* stack, const iree_vm_register_list_t* result_registers,
-    iree_vm_stack_frame_t** out_caller_frame);
-
-// Enters into an `[external]` frame and returns the external stack frame.
-// May invalidate any existing pointers to stack frames and the only pointer
-// that can be assumed valid after return is the one in |out_callee_frame|.
-//
-// The frame will have |register_count| registers of each type reserved and
-// ready for the caller to populate.
-//
-// |name| can be used to provide a debug-visible name to help identify where the
-// transition is occurring.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_external_enter(
-    iree_vm_stack_t* stack, iree_string_view_t name,
-    iree_host_size_t register_count, iree_vm_stack_frame_t** out_callee_frame);
-
-// Leaves the current external stack frame.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_stack_external_leave(iree_vm_stack_t* stack);
+iree_vm_stack_function_leave(iree_vm_stack_t* stack);
 
 #ifdef __cplusplus
 }  // extern "C"

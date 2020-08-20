@@ -170,6 +170,7 @@ Status VMLAExecutable::DispatchTile(DispatchState* state,
     iree_vm_list_push_value(input_list, &value);
   }
 
+  // TODO(benvanik): switch to direct calling to avoid the invoke overhead.
   auto status =
       Status(iree_vm_invoke(context(), dispatch_state->function,
                             /*policy=*/nullptr, input_list,
