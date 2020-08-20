@@ -46,6 +46,9 @@ StringRef getWorkgroupMemoryNumItemsGENumItersMarker();
 /// Workgroup memory.
 StringRef getCopyToWorkgroupMemoryMarker();
 
+/// Marker for operations that are going to be vectorized.
+StringRef getVectorizeMarker();
+
 /// Returns true if an operation has the specified `marker`. When `marker` is
 /// empty, returns true if the operation has any marker.
 bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});

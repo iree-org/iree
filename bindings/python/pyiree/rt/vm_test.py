@@ -126,6 +126,7 @@ class VmTest(absltest.TestCase):
     logging.info("abi: %s", abi)
 
     inputs = abi.raw_pack_inputs((5, 6))
+    logging.info("serialize_inputs: %s", abi.serialize_vm_list(inputs))
     logging.info("inputs: %s", inputs)
 
     allocated_results = abi.allocate_results(inputs, static_alloc=False)
@@ -148,6 +149,7 @@ class VmTest(absltest.TestCase):
 
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
     inputs = abi.raw_pack_inputs((arg0,))
+    logging.info("Serialized inputs: %s", abi.serialize_vm_list(inputs))
     logging.info("inputs: %s", inputs)
 
     allocated_results = abi.allocate_results(inputs, static_alloc=False)
@@ -171,6 +173,7 @@ class VmTest(absltest.TestCase):
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     inputs = abi.raw_pack_inputs((arg0, arg1))
+    logging.info("Serialized inputs: %s", abi.serialize_vm_list(inputs))
     logging.info("inputs: %s", inputs)
 
     allocated_results = abi.allocate_results(inputs, static_alloc=False)

@@ -62,9 +62,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
 
     // Create invocation function an populate entry_points.
-    auto executableOp = cast<ExecutableOp>(targetOp.getParentOp());
-    auto entryPointOps =
-        executableOp.getBlock().getOps<ExecutableEntryPointOp>();
+    auto entryPointOps = targetOp.getBlock().getOps<ExecutableEntryPointOp>();
 
     for (auto entryPointOp : entryPointOps) {
       dyLibExecutableDef.entry_points.push_back(

@@ -17,8 +17,8 @@ flow.executable @simpleMath_ex_dispatch_0 {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>}
 //  CHECK-NEXT:   hal.executable.target "vmla" {
+//  CHECK-NEXT:     hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>}
 //  CHECK-NEXT:     module {
 //  CHECK-NEXT:       vm.module @module {
 //  CHECK-NEXT:         vm.func @simpleMath_rgn_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -60,8 +60,8 @@ flow.executable @shaped_dispatch {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.entry_point @entry attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x?xf32>, index) -> tensor<4x?xf32>}
 //  CHECK-NEXT:   hal.executable.target "vmla" {
+//  CHECK-NEXT:     hal.executable.entry_point @entry attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x?xf32>, index) -> tensor<4x?xf32>}
 //  CHECK-NEXT:     module {
 //  CHECK-NEXT:       vm.module @module {
 //  CHECK-NEXT:         vm.func @entry(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -102,8 +102,8 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.entry_point @reduction_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x8xf32>) -> tensor<4xf32>}
 //  CHECK-NEXT:   hal.executable.target "vmla" {
+//  CHECK-NEXT:     hal.executable.entry_point @reduction_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x8xf32>) -> tensor<4xf32>}
 //  CHECK-NEXT:     module {
 //  CHECK-NEXT:       vm.module @module {
 //  CHECK-NEXT:         vm.rodata @reduction_ex_dispatch_0_const_0 dense<0.000000e+00> : tensor<f32>

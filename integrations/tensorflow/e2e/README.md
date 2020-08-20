@@ -187,6 +187,39 @@ Traces are named after the trace functions defined in their unittests. So in the
 `SimpleArithmeticModule` example above, the `trace_dir` would be
 `/tmp/iree/modules/SimpleArithmeticModule/iree_vmla/traces/simple_mul/`.
 
+## Benchmarking E2E Modules
+
+Abseil flagfiles containing all of the data that `iree-benchmark-module` needs
+to run are generated for each `Trace` in our E2E tests. This allows for any
+module we test to be easily benchmarked on valid inputs. The process for
+benchmarking a vision model can thus be reduced to the following:
+
+```shell
+# Generate benchmarking artifacts for all vision models:
+bazel test integrations/tensorflow/e2e/keras:vision_external_tests
+
+# Benchmark ResNet50 with cifar10 weights on vmla:
+bazel run iree/tools:iree-benchmark-module -- \
+  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_vmla/traces/predict/flagfile
+
+# Benchmark ResNet50 with cifar10 weights on llvmjit:
+bazel run iree/tools:iree-benchmark-module -- \
+  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_llvmjit/traces/predict/flagfile
+```
+
+Duplicate flags provided after the flagfile will take precedence. For example:
+
+```shell
+bazel run iree/tools:iree-benchmark-module -- \
+  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_llvmjit/traces/predict/flagfile  \
+  --input_file=/path/to/custom/compiled.vmfb
+```
+
+Currently, this only supports benchmarking the first module call in a trace. We
+plan to extend this to support benchmarking all of the calls in the trace, and
+also plan to support verifying outputs during the warm-up phase of the
+benchmark.
+
 ## Debugging Tests
 
 If the compiler fails to compile the program, then it will create a crash

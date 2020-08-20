@@ -12,7 +12,6 @@ flow.executable @simpleMath_ex_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-// CHECK-DAG:   hal.executable.entry_point @simpleMath_rgn_dispatch_0
 // CHECK-DAG:   hal.executable.binary attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1280071245 : i32} {
