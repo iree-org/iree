@@ -62,6 +62,7 @@ cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:SCFToSPIRV",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:StandardOps",
