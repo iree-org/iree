@@ -168,6 +168,11 @@ struct Broadcast {
                         absl::Span<T> dst_buffer);
 };
 
+struct Iota {
+  template <typename T>
+  static Status Execute(absl::Span<T> dst_buffer);
+};
+
 struct Tile {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
@@ -351,11 +356,6 @@ struct Ceil {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<T> dst_buffer);
-};
-
-struct Iota {
-  template <typename T>
-  static Status Execute(absl::Span<T> dst_buffer);
 };
 
 struct Convert {

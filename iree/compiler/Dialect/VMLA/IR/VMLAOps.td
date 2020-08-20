@@ -155,22 +155,6 @@ def VMLA_BufferLoadI32Op : VMLA_PureOp<"buffer.load.i32"> {
 }
 
 //===----------------------------------------------------------------------===//
-// VMLA Ops: iota
-//===----------------------------------------------------------------------===//
-
-def VMLA_IotaOp : VMLA_ElementTypeOp<"iota"> {
-  let arguments = (ins
-    VMLA_Buffer:$dst,
-    VMLA_AnyTypeAttr:$element_type
-  );
-
-  let assemblyFormat = [{
-    `out` $dst attr-dict `:` $element_type
-  }];
-}
-
-
-//===----------------------------------------------------------------------===//
 // VMLA Ops: comparison
 //===----------------------------------------------------------------------===//
 
@@ -295,6 +279,17 @@ def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {
   let assemblyFormat = [{
     $src`(`$src_shape `:` type($src_shape)`)``,`
     `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
+}
+
+def VMLA_IotaOp : VMLA_ElementTypeOp<"iota"> {
+  let arguments = (ins
+    VMLA_Buffer:$dst,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    `out` $dst attr-dict `:` $element_type
   }];
 }
 
