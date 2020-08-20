@@ -174,6 +174,7 @@ StatusOr<int> Run(std::string input_file_path) {
 
 extern "C" int main(int argc, char** argv) {
   InitializeEnvironment(&argc, &argv);
+  ::testing::InitGoogleTest(&argc, argv);
   IREE_FORCE_BINARY_STDIN();
 
   if (argc < 2) {

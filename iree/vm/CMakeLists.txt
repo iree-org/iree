@@ -43,6 +43,7 @@ iree_cc_test(
     absl::strings
     iree::base::logging
     iree::base::status
+    iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_cc
 )
@@ -135,6 +136,7 @@ iree_cc_test(
     "bytecode_module_test.cc"
   DEPS
     ::bytecode_module
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -222,6 +224,7 @@ iree_cc_test(
     ::list
     iree::base::api
     iree::base::ref_ptr
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 

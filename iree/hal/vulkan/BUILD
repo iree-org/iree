@@ -176,6 +176,8 @@ cc_test(
     deps = [
         ":status_util",
         ":dynamic_symbols",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ] + PLATFORM_VULKAN_TEST_DEPS,
 )
 

@@ -32,6 +32,7 @@ cc_test(
         ":module",
         "//iree/base:logging",
         "//iree/base:status",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm/test:all_bytecode_modules_cc",
         "@com_google_absl//absl/strings",
@@ -114,6 +115,7 @@ cc_test(
     srcs = ["bytecode_module_test.cc"],
     deps = [
         ":bytecode_module",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -195,6 +197,7 @@ cc_test(
         ":list",
         "//iree/base:api",
         "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )

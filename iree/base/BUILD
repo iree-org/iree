@@ -66,6 +66,7 @@ cc_test(
     srcs = ["arena_test.cc"],
     deps = [
         ":arena",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -91,8 +92,8 @@ cc_test(
     srcs = ["bitfield_test.cc"],
     deps = [
         ":bitfield",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -220,6 +221,7 @@ cc_test(
     ],
     deps = [
         ":file_path",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -279,6 +281,7 @@ cc_test(
     ],
     deps = [
         ":intrusive_list",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/memory",
     ],
@@ -334,6 +337,7 @@ cc_test(
     srcs = ["ref_ptr_test.cc"],
     deps = [
         ":ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -357,6 +361,7 @@ cc_test(
     srcs = ["signature_mangle_test.cc"],
     deps = [
         ":signature_mangle",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -397,6 +402,7 @@ cc_test(
     srcs = ["time_test.cc"],
     deps = [
         ":time",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
