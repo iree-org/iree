@@ -94,6 +94,7 @@ static spirv::TargetEnvAttr getTargetEnv(MLIRContext *context) {
       spirv::Version::V_1_0,
       {spirv::Capability::Shader, spirv::Capability::CooperativeMatrixNV,
        spirv::Capability::Int8, spirv::Capability::Float16,
+       spirv::Capability::StorageUniform16,
        spirv::Capability::StorageBuffer8BitAccess,
        spirv::Capability::Float16Buffer},
       {spirv::Extension::SPV_KHR_storage_buffer_storage_class,
