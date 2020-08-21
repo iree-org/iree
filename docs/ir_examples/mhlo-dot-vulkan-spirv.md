@@ -649,20 +649,23 @@ func @dot_ex_dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<
   %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
   %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   linalg.fill(%0, %cst) : memref<32x64xf32>, f32
-  scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c64) step (%c8, %c8) {
-    scf.for %arg2 = %c0 to %c1024 step %c4 {
-      %3 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
-      %4 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg2)
-      %5 = subview %1[%arg0, %arg2] [%3, %4] [%c1, %c1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      %6 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg2)
-      %7 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
-      %8 = subview %2[%arg2, %arg1] [%6, %7] [%c1, %c1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      %9 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
-      %10 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
-      %11 = subview %0[%arg0, %arg1] [%9, %10] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
-    }
-    scf.yield
+  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
+  %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %c0 to %c1024 step %c4 {
+    %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+    %6 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %5)
+    %7 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg0)
+    %8 = subview %1[%5, %arg0] [%6, %7] [%c1, %c1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+    %9 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg0)
+    %10 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+    %11 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %10)
+    %12 = subview %2[%arg0, %10] [%9, %11] [%c1, %c1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+    %13 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+    %14 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %13)
+    %15 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+    %16 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %15)
+    %17 = subview %0[%13, %15] [%14, %16] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+    linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %8, %12, %17 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
   }
   return
 }
@@ -682,20 +685,23 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c64) step (%c8, %c8) {
-      scf.for %arg2 = %c0 to %c1024 step %c4 {
-        %3 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
-        %4 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg2)
-        %5 = subview %1[%arg0, %arg2] [%3, %4] [%c1, %c1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-        %6 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg2)
-        %7 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
-        %8 = subview %2[%arg2, %arg1] [%6, %7] [%c1, %c1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-        %9 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
-        %10 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
-        %11 = subview %0[%arg0, %arg1] [%9, %10] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-        linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
-      }
-      scf.yield
+    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
+    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %c0 to %c1024 step %c4 {
+      %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+      %6 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %5)
+      %7 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg0)
+      %8 = subview %1[%5, %arg0] [%6, %7] [%c1, %c1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+      %9 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg0)
+      %10 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+      %11 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %10)
+      %12 = subview %2[%arg0, %10] [%9, %11] [%c1, %c1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+      %13 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+      %14 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %13)
+      %15 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+      %16 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %15)
+      %17 = subview %0[%13, %15] [%14, %16] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+      linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %8, %12, %17 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
     }
     return
   }
@@ -726,20 +732,23 @@ func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_si
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
   %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
   %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-  scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c64) step (%c8, %c8) {
-    scf.for %arg2 = %c0 to %c1024 step %c4 {
-      %3 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
-      %4 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg2)
-      %5 = subview %1[%arg0, %arg2] [%3, %4] [%c1, %c1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      %6 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg2)
-      %7 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
-      %8 = subview %2[%arg2, %arg1] [%6, %7] [%c1, %c1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      %9 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %arg0)
-      %10 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %arg1)
-      %11 = subview %0[%arg0, %arg1] [%9, %10] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-      linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
-    }
-    scf.yield
+  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
+  %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+  scf.for %arg0 = %c0 to %c1024 step %c4 {
+    %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+    %6 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %5)
+    %7 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg0)
+    %8 = subview %1[%5, %arg0] [%6, %7] [%c1, %c1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+    %9 = affine.min affine_map<(d0, d1, d2) -> (4, d1 - d2)>(%c4, %c1024, %arg0)
+    %10 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+    %11 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %10)
+    %12 = subview %2[%arg0, %10] [%9, %11] [%c1, %c1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+    %13 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+    %14 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c32, %13)
+    %15 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+    %16 = affine.min affine_map<(d0, d1, d2) -> (8, d1 - d2)>(%c8, %c64, %15)
+    %17 = subview %0[%13, %15] [%14, %16] [%c1, %c1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+    linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %8, %12, %17 : (memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>)
   }
   return
 }
@@ -762,26 +771,26 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %c0 = constant 0 : index
     %c4 = constant 4 : index
     %c1024 = constant 1024 : index
-    %c32 = constant 32 : index
-    %c8 = constant 8 : index
-    %c64 = constant 64 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
-    scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c64) step (%c8, %c8) {
-      scf.for %arg2 = %c0 to %c1024 step %c4 {
-        %3 = affine.min affine_map<(d0) -> (8, -d0 + 32)>(%arg0)
-        %4 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg2)
-        %5 = subview %1[%arg0, %arg2] [%3, %4] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %6 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg2)
-        %7 = affine.min affine_map<(d0) -> (8, -d0 + 64)>(%arg1)
-        %8 = subview %2[%arg2, %arg1] [%6, %7] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %9 = affine.min affine_map<(d0) -> (8, -d0 + 32)>(%arg0)
-        %10 = affine.min affine_map<(d0) -> (8, -d0 + 64)>(%arg1)
-        %11 = subview %0[%arg0, %arg1] [%9, %10] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %5, %8, %11 : (memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
-      }
-      scf.yield
+    %3 = "gpu.block_id"() {dimension = "x"} : () -> index
+    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+    scf.for %arg0 = %c0 to %c1024 step %c4 {
+      %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+      %6 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 32)>()[%4]
+      %7 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg0)
+      %8 = subview %1[%5, %arg0] [%6, %7] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %9 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg0)
+      %10 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+      %11 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 64)>()[%3]
+      %12 = subview %2[%arg0, %10] [%9, %11] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %13 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+      %14 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 32)>()[%4]
+      %15 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+      %16 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 64)>()[%3]
+      %17 = subview %0[%13, %15] [%14, %16] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      linalg.matmul  {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"} %8, %12, %17 : (memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>)
     }
     return
   }
@@ -805,87 +814,82 @@ func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_si
   %c0 = constant 0 : index
   %c4 = constant 4 : index
   %c1024 = constant 1024 : index
-  %c32 = constant 32 : index
-  %c8 = constant 8 : index
-  %c64 = constant 64 : index
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
   %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
   %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.grid_dim"() {dimension = "x"} : () -> index
-  %5 = "gpu.block_id"() {dimension = "y"} : () -> index
-  %6 = "gpu.grid_dim"() {dimension = "y"} : () -> index
-  %7 = muli %5, %c8 : index
-  %8 = addi %c0, %7 : index
-  %9 = muli %3, %c8 : index
-  %10 = addi %c0, %9 : index
+  %4 = "gpu.block_id"() {dimension = "y"} : () -> index
   scf.for %arg0 = %c0 to %c1024 step %c4 {
-    %11 = affine.min affine_map<(d0) -> (8, -d0 + 32)>(%8)
-    %12 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg0)
-    %13 = subview %1[%8, %arg0] [%11, %12] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %14 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg0)
-    %15 = affine.min affine_map<(d0) -> (8, -d0 + 64)>(%10)
-    %16 = subview %2[%arg0, %10] [%14, %15] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %17 = affine.min affine_map<(d0) -> (8, -d0 + 32)>(%8)
-    %18 = affine.min affine_map<(d0) -> (8, -d0 + 64)>(%10)
-    %19 = subview %0[%8, %10] [%17, %18] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+    %6 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 32)>()[%4]
+    %7 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg0)
+    %8 = subview %1[%5, %arg0] [%6, %7] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %9 = affine.min affine_map<(d0) -> (4, -d0 + 1024)>(%arg0)
+    %10 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+    %11 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 64)>()[%3]
+    %12 = subview %2[%arg0, %10] [%9, %11] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %13 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%4]
+    %14 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 32)>()[%4]
+    %15 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%3]
+    %16 = affine.min affine_map<()[s0] -> (8, s0 * -8 + 64)>()[%3]
+    %17 = subview %0[%13, %15] [%14, %16] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c0_0 = constant 0 : index
-    %20 = dim %13, %c0_0 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %18 = dim %8, %c0_0 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %c1 = constant 1 : index
-    %21 = dim %13, %c1 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %19 = dim %8, %c1 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %c0_1 = constant 0 : index
-    %22 = dim %16, %c0_1 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %20 = dim %12, %c0_1 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c1_2 = constant 1 : index
-    %23 = dim %16, %c1_2 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %21 = dim %12, %c1_2 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c0_3 = constant 0 : index
-    %24 = dim %19, %c0_3 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %22 = dim %17, %c0_3 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c1_4 = constant 1 : index
-    %25 = dim %19, %c1_4 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %23 = dim %17, %c1_4 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c0_5 = constant 0 : index
-    %26 = dim %13, %c0_5 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %24 = dim %8, %c0_5 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %c1_6 = constant 1 : index
-    %27 = dim %13, %c1_6 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %25 = dim %8, %c1_6 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %c0_7 = constant 0 : index
-    %28 = dim %16, %c0_7 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %26 = dim %12, %c0_7 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c1_8 = constant 1 : index
-    %29 = dim %16, %c1_8 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %27 = dim %12, %c1_8 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c0_9 = constant 0 : index
-    %30 = dim %19, %c0_9 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %28 = dim %17, %c0_9 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c1_10 = constant 1 : index
-    %31 = dim %19, %c1_10 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %29 = dim %17, %c1_10 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %c0_11 = constant 0 : index
     %c1_12 = constant 1 : index
     %c0_13 = constant 0 : index
     %c1_14 = constant 1 : index
     %c0_15 = constant 0 : index
     %c1_16 = constant 1 : index
-    %32 = "gpu.thread_id"() {dimension = "x"} : () -> index
-    %33 = "gpu.block_dim"() {dimension = "x"} : () -> index
-    %34 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %35 = "gpu.block_dim"() {dimension = "y"} : () -> index
-    %36 = muli %34, %c1_12 : index
-    %37 = addi %c0_11, %36 : index
-    %38 = muli %32, %c1_16 : index
-    %39 = addi %c0_15, %38 : index
-    %40 = cmpi "slt", %37, %26 : index
-    %41 = cmpi "slt", %39, %29 : index
-    %42 = and %40, %41 : i1
-    scf.if %42 {
-      scf.for %arg1 = %c0_13 to %27 step %c1_14 {
-        %43 = affine.apply affine_map<(d0) -> (d0)>(%37)
+    %30 = "gpu.thread_id"() {dimension = "x"} : () -> index
+    %31 = "gpu.block_dim"() {dimension = "x"} : () -> index
+    %32 = "gpu.thread_id"() {dimension = "y"} : () -> index
+    %33 = "gpu.block_dim"() {dimension = "y"} : () -> index
+    %34 = muli %32, %c1_12 : index
+    %35 = addi %c0_11, %34 : index
+    %36 = muli %30, %c1_16 : index
+    %37 = addi %c0_15, %36 : index
+    %38 = cmpi "slt", %35, %24 : index
+    %39 = cmpi "slt", %37, %27 : index
+    %40 = and %38, %39 : i1
+    scf.if %40 {
+      scf.for %arg1 = %c0_13 to %25 step %c1_14 {
+        %41 = affine.apply affine_map<(d0) -> (d0)>(%35)
+        %42 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
+        %43 = load %8[%41, %42] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
         %44 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
-        %45 = load %13[%43, %44] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-        %46 = affine.apply affine_map<(d0) -> (d0)>(%arg1)
-        %47 = affine.apply affine_map<(d0) -> (d0)>(%39)
-        %48 = load %16[%46, %47] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %49 = affine.apply affine_map<(d0) -> (d0)>(%37)
-        %50 = affine.apply affine_map<(d0) -> (d0)>(%39)
-        %51 = load %19[%49, %50] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-        %52 = affine.apply affine_map<(d0) -> (d0)>(%37)
-        %53 = affine.apply affine_map<(d0) -> (d0)>(%39)
-        %54 = mulf %45, %48 : f32
-        %55 = addf %51, %54 : f32
-        store %55, %19[%52, %53] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %45 = affine.apply affine_map<(d0) -> (d0)>(%37)
+        %46 = load %12[%44, %45] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %47 = affine.apply affine_map<(d0) -> (d0)>(%35)
+        %48 = affine.apply affine_map<(d0) -> (d0)>(%37)
+        %49 = load %17[%47, %48] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+        %50 = affine.apply affine_map<(d0) -> (d0)>(%35)
+        %51 = affine.apply affine_map<(d0) -> (d0)>(%37)
+        %52 = mulf %43, %46 : f32
+        %53 = addf %49, %52 : f32
+        store %53, %17[%50, %51] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       }
     }
   }
@@ -951,115 +955,114 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %c0 = constant 0 : index
     %c4 = constant 4 : index
     %c1024 = constant 1024 : index
-    %c32 = constant 32 : index
-    %c8 = constant 8 : index
-    %c64 = constant 64 : index
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<32x64xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<32x1024xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
     %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-    %4 = "gpu.grid_dim"() {dimension = "x"} : () -> index
-    %5 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %6 = "gpu.grid_dim"() {dimension = "y"} : () -> index
-    %7 = muli %5, %c8 : index
-    %8 = addi %c0, %7 : index
-    %9 = muli %3, %c8 : index
-    %10 = addi %c0, %9 : index
+    %4 = "gpu.block_id"() {dimension = "y"} : () -> index
     scf.for %arg0 = %c0 to %c1024 step %c4 {
+      %c8 = constant 8 : index
+      %5 = muli %4, %c8 : index
       %c8_0 = constant 8 : index
+      %c-8 = constant -8 : index
+      %6 = muli %4, %c-8 : index
+      %c32 = constant 32 : index
+      %7 = addi %6, %c32 : index
+      %8 = cmpi "slt", %c8_0, %7 : index
+      %9 = select %8, %c8_0, %7 : index
+      %c4_1 = constant 4 : index
       %c-1 = constant -1 : index
-      %11 = muli %8, %c-1 : index
-      %c32_1 = constant 32 : index
-      %12 = addi %11, %c32_1 : index
-      %13 = cmpi "slt", %c8_0, %12 : index
-      %14 = select %13, %c8_0, %12 : index
-      %c4_2 = constant 4 : index
-      %c-1_3 = constant -1 : index
-      %15 = muli %arg0, %c-1_3 : index
-      %c1024_4 = constant 1024 : index
-      %16 = addi %15, %c1024_4 : index
-      %17 = cmpi "slt", %c4_2, %16 : index
-      %18 = select %17, %c4_2, %16 : index
-      %19 = subview %1[%8, %arg0] [%14, %18] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %c4_5 = constant 4 : index
-      %c-1_6 = constant -1 : index
-      %20 = muli %arg0, %c-1_6 : index
-      %c1024_7 = constant 1024 : index
-      %21 = addi %20, %c1024_7 : index
-      %22 = cmpi "slt", %c4_5, %21 : index
-      %23 = select %22, %c4_5, %21 : index
-      %c8_8 = constant 8 : index
-      %c-1_9 = constant -1 : index
-      %24 = muli %10, %c-1_9 : index
-      %c64_10 = constant 64 : index
-      %25 = addi %24, %c64_10 : index
-      %26 = cmpi "slt", %c8_8, %25 : index
-      %27 = select %26, %c8_8, %25 : index
-      %28 = subview %2[%arg0, %10] [%23, %27] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %c8_11 = constant 8 : index
-      %c-1_12 = constant -1 : index
-      %29 = muli %8, %c-1_12 : index
-      %c32_13 = constant 32 : index
-      %30 = addi %29, %c32_13 : index
-      %31 = cmpi "slt", %c8_11, %30 : index
-      %32 = select %31, %c8_11, %30 : index
+      %10 = muli %arg0, %c-1 : index
+      %c1024_2 = constant 1024 : index
+      %11 = addi %10, %c1024_2 : index
+      %12 = cmpi "slt", %c4_1, %11 : index
+      %13 = select %12, %c4_1, %11 : index
+      %14 = subview %1[%5, %arg0] [%9, %13] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %c4_3 = constant 4 : index
+      %c-1_4 = constant -1 : index
+      %15 = muli %arg0, %c-1_4 : index
+      %c1024_5 = constant 1024 : index
+      %16 = addi %15, %c1024_5 : index
+      %17 = cmpi "slt", %c4_3, %16 : index
+      %18 = select %17, %c4_3, %16 : index
+      %c8_6 = constant 8 : index
+      %19 = muli %3, %c8_6 : index
+      %c8_7 = constant 8 : index
+      %c-8_8 = constant -8 : index
+      %20 = muli %3, %c-8_8 : index
+      %c64 = constant 64 : index
+      %21 = addi %20, %c64 : index
+      %22 = cmpi "slt", %c8_7, %21 : index
+      %23 = select %22, %c8_7, %21 : index
+      %24 = subview %2[%arg0, %19] [%18, %23] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %c8_9 = constant 8 : index
+      %25 = muli %4, %c8_9 : index
+      %c8_10 = constant 8 : index
+      %c-8_11 = constant -8 : index
+      %26 = muli %4, %c-8_11 : index
+      %c32_12 = constant 32 : index
+      %27 = addi %26, %c32_12 : index
+      %28 = cmpi "slt", %c8_10, %27 : index
+      %29 = select %28, %c8_10, %27 : index
+      %c8_13 = constant 8 : index
+      %30 = muli %3, %c8_13 : index
       %c8_14 = constant 8 : index
-      %c-1_15 = constant -1 : index
-      %33 = muli %10, %c-1_15 : index
+      %c-8_15 = constant -8 : index
+      %31 = muli %3, %c-8_15 : index
       %c64_16 = constant 64 : index
-      %34 = addi %33, %c64_16 : index
-      %35 = cmpi "slt", %c8_14, %34 : index
-      %36 = select %35, %c8_14, %34 : index
-      %37 = subview %0[%8, %10] [%32, %36] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %32 = addi %31, %c64_16 : index
+      %33 = cmpi "slt", %c8_14, %32 : index
+      %34 = select %33, %c8_14, %32 : index
+      %35 = subview %0[%25, %30] [%29, %34] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c0_17 = constant 0 : index
-      %38 = dim %19, %c0_17 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %36 = dim %14, %c0_17 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %c1 = constant 1 : index
-      %39 = dim %19, %c1 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %37 = dim %14, %c1 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %c0_18 = constant 0 : index
-      %40 = dim %28, %c0_18 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %38 = dim %24, %c0_18 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c1_19 = constant 1 : index
-      %41 = dim %28, %c1_19 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %39 = dim %24, %c1_19 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c0_20 = constant 0 : index
-      %42 = dim %37, %c0_20 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %40 = dim %35, %c0_20 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c1_21 = constant 1 : index
-      %43 = dim %37, %c1_21 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %41 = dim %35, %c1_21 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c0_22 = constant 0 : index
-      %44 = dim %19, %c0_22 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %42 = dim %14, %c0_22 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %c1_23 = constant 1 : index
-      %45 = dim %19, %c1_23 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %43 = dim %14, %c1_23 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %c0_24 = constant 0 : index
-      %46 = dim %28, %c0_24 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %44 = dim %24, %c0_24 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c1_25 = constant 1 : index
-      %47 = dim %28, %c1_25 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %45 = dim %24, %c1_25 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c0_26 = constant 0 : index
-      %48 = dim %37, %c0_26 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %46 = dim %35, %c0_26 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c1_27 = constant 1 : index
-      %49 = dim %37, %c1_27 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %47 = dim %35, %c1_27 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %c0_28 = constant 0 : index
       %c1_29 = constant 1 : index
       %c0_30 = constant 0 : index
       %c1_31 = constant 1 : index
       %c0_32 = constant 0 : index
       %c1_33 = constant 1 : index
-      %50 = "gpu.thread_id"() {dimension = "x"} : () -> index
-      %51 = "gpu.block_dim"() {dimension = "x"} : () -> index
-      %52 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %53 = "gpu.block_dim"() {dimension = "y"} : () -> index
-      %54 = muli %52, %c1_29 : index
-      %55 = addi %c0_28, %54 : index
-      %56 = muli %50, %c1_33 : index
-      %57 = addi %c0_32, %56 : index
-      %58 = cmpi "slt", %55, %44 : index
-      %59 = cmpi "slt", %57, %47 : index
-      %60 = and %58, %59 : i1
-      scf.if %60 {
-        scf.for %arg1 = %c0_30 to %45 step %c1_31 {
-          %61 = load %19[%55, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          %62 = load %28[%arg1, %57] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %63 = load %37[%55, %57] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %64 = mulf %61, %62 : f32
-          %65 = addf %63, %64 : f32
-          store %65, %37[%55, %57] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %48 = "gpu.thread_id"() {dimension = "x"} : () -> index
+      %49 = "gpu.block_dim"() {dimension = "x"} : () -> index
+      %50 = "gpu.thread_id"() {dimension = "y"} : () -> index
+      %51 = "gpu.block_dim"() {dimension = "y"} : () -> index
+      %52 = muli %50, %c1_29 : index
+      %53 = addi %c0_28, %52 : index
+      %54 = muli %48, %c1_33 : index
+      %55 = addi %c0_32, %54 : index
+      %56 = cmpi "slt", %53, %42 : index
+      %57 = cmpi "slt", %55, %45 : index
+      %58 = and %56, %57 : i1
+      scf.if %58 {
+        scf.for %arg1 = %c0_30 to %43 step %c1_31 {
+          %59 = load %14[%53, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %60 = load %24[%arg1, %55] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %61 = load %35[%53, %55] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %62 = mulf %59, %60 : f32
+          %63 = addf %61, %62 : f32
+          store %63, %35[%53, %55] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         }
       }
     }
@@ -1121,10 +1124,11 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>, vkspv.entry_point_schedule = ["dot_ex_dispatch_0_dispatch_0", "dot_ex_dispatch_0_dispatch_1"]} {
   func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %c4 = constant 4 : index
+    %c-1 = constant -1 : index
     %c1024 = constant 1024 : index
     %c32 = constant 32 : index
     %c8 = constant 8 : index
-    %c-1 = constant -1 : index
+    %c-8 = constant -8 : index
     %c64 = constant 64 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1133,49 +1137,51 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
     %3 = "gpu.block_id"() {dimension = "x"} : () -> index
     %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c8 : index
     scf.for %arg0 = %c0 to %c1024 step %c4 {
-      %7 = muli %5, %c-1 : index
-      %8 = addi %7, %c32 : index
-      %9 = cmpi "slt", %c8, %8 : index
-      %10 = select %9, %c8, %8 : index
-      %11 = muli %arg0, %c-1 : index
-      %12 = addi %11, %c1024 : index
-      %13 = cmpi "slt", %c4, %12 : index
-      %14 = select %13, %c4, %12 : index
-      %15 = subview %1[%5, %arg0] [%10, %14] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %16 = muli %arg0, %c-1 : index
-      %17 = addi %16, %c1024 : index
-      %18 = cmpi "slt", %c4, %17 : index
-      %19 = select %18, %c4, %17 : index
-      %20 = muli %6, %c-1 : index
+      %5 = muli %4, %c8 : index
+      %6 = muli %4, %c-8 : index
+      %7 = addi %6, %c32 : index
+      %8 = cmpi "slt", %c8, %7 : index
+      %9 = select %8, %c8, %7 : index
+      %10 = muli %arg0, %c-1 : index
+      %11 = addi %10, %c1024 : index
+      %12 = cmpi "slt", %c4, %11 : index
+      %13 = select %12, %c4, %11 : index
+      %14 = subview %1[%5, %arg0] [%9, %13] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %15 = muli %arg0, %c-1 : index
+      %16 = addi %15, %c1024 : index
+      %17 = cmpi "slt", %c4, %16 : index
+      %18 = select %17, %c4, %16 : index
+      %19 = muli %3, %c8 : index
+      %20 = muli %3, %c-8 : index
       %21 = addi %20, %c64 : index
       %22 = cmpi "slt", %c8, %21 : index
       %23 = select %22, %c8, %21 : index
-      %24 = subview %2[%arg0, %6] [%19, %23] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %25 = muli %5, %c-1 : index
-      %26 = addi %25, %c32 : index
-      %27 = cmpi "slt", %c8, %26 : index
-      %28 = select %27, %c8, %26 : index
-      %29 = muli %6, %c-1 : index
-      %30 = addi %29, %c64 : index
-      %31 = cmpi "slt", %c8, %30 : index
-      %32 = select %31, %c8, %30 : index
-      %33 = subview %0[%5, %6] [%28, %32] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %34 = "gpu.thread_id"() {dimension = "x"} : () -> index
-      %35 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %36 = cmpi "slt", %35, %10 : index
-      %37 = cmpi "slt", %34, %23 : index
-      %38 = and %36, %37 : i1
-      scf.if %38 {
-        scf.for %arg1 = %c0 to %14 step %c1 {
-          %39 = load %15[%35, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          %40 = load %24[%arg1, %34] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %41 = load %33[%35, %34] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-          %42 = mulf %39, %40 : f32
-          %43 = addf %41, %42 : f32
-          store %43, %33[%35, %34] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %24 = subview %2[%arg0, %19] [%18, %23] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %25 = muli %4, %c8 : index
+      %26 = muli %4, %c-8 : index
+      %27 = addi %26, %c32 : index
+      %28 = cmpi "slt", %c8, %27 : index
+      %29 = select %28, %c8, %27 : index
+      %30 = muli %3, %c8 : index
+      %31 = muli %3, %c-8 : index
+      %32 = addi %31, %c64 : index
+      %33 = cmpi "slt", %c8, %32 : index
+      %34 = select %33, %c8, %32 : index
+      %35 = subview %0[%25, %30] [%29, %34] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %36 = "gpu.thread_id"() {dimension = "x"} : () -> index
+      %37 = "gpu.thread_id"() {dimension = "y"} : () -> index
+      %38 = cmpi "slt", %37, %9 : index
+      %39 = cmpi "slt", %36, %23 : index
+      %40 = and %38, %39 : i1
+      scf.if %40 {
+        scf.for %arg1 = %c0 to %13 step %c1 {
+          %41 = load %14[%37, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %42 = load %24[%arg1, %36] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %43 = load %35[%37, %36] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+          %44 = mulf %41, %42 : f32
+          %45 = addf %43, %44 : f32
+          store %45, %35[%37, %36] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         }
       }
     }
@@ -1212,10 +1218,11 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>, vkspv.entry_point_schedule = ["dot_ex_dispatch_0_dispatch_0", "dot_ex_dispatch_0_dispatch_1"]} {
   func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %c4 = constant 4 : index
+    %c-1 = constant -1 : index
     %c1024 = constant 1024 : index
     %c32 = constant 32 : index
     %c8 = constant 8 : index
-    %c-1 = constant -1 : index
+    %c-8 = constant -8 : index
     %c64 = constant 64 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1224,32 +1231,32 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
     %3 = "gpu.block_id"() {dimension = "x"} : () -> index
     %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c8 : index
     scf.for %arg0 = %c0 to %c1024 step %c4 {
-      %7 = muli %5, %c-1 : index
-      %8 = addi %7, %c32 : index
-      %9 = cmpi "slt", %c8, %8 : index
-      %10 = select %9, %c8, %8 : index
-      %11 = muli %arg0, %c-1 : index
-      %12 = addi %11, %c1024 : index
-      %13 = cmpi "slt", %c4, %12 : index
-      %14 = select %13, %c4, %12 : index
-      %15 = subview %1[%5, %arg0] [%10, %14] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      %16 = muli %6, %c-1 : index
+      %5 = muli %4, %c8 : index
+      %6 = muli %4, %c-8 : index
+      %7 = addi %6, %c32 : index
+      %8 = cmpi "slt", %c8, %7 : index
+      %9 = select %8, %c8, %7 : index
+      %10 = muli %arg0, %c-1 : index
+      %11 = addi %10, %c1024 : index
+      %12 = cmpi "slt", %c4, %11 : index
+      %13 = select %12, %c4, %11 : index
+      %14 = subview %1[%5, %arg0] [%9, %13] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      %15 = muli %3, %c8 : index
+      %16 = muli %3, %c-8 : index
       %17 = addi %16, %c64 : index
       %18 = cmpi "slt", %c8, %17 : index
       %19 = select %18, %c8, %17 : index
-      %20 = subview %2[%arg0, %6] [%14, %19] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-      %21 = subview %0[%5, %6] [%10, %19] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %20 = subview %2[%arg0, %15] [%13, %19] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+      %21 = subview %0[%5, %15] [%9, %19] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
       %22 = "gpu.thread_id"() {dimension = "x"} : () -> index
       %23 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %24 = cmpi "slt", %23, %10 : index
+      %24 = cmpi "slt", %23, %9 : index
       %25 = cmpi "slt", %22, %19 : index
       %26 = and %24, %25 : i1
       scf.if %26 {
-        scf.for %arg1 = %c0 to %14 step %c1 {
-          %27 = load %15[%23, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+        scf.for %arg1 = %c0 to %13 step %c1 {
+          %27 = load %14[%23, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           %28 = load %20[%arg1, %22] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
           %29 = load %21[%23, %22] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
           %30 = mulf %27, %28 : f32
@@ -1290,10 +1297,11 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 ```
 func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
   %c4 = constant 4 : index
+  %c-1 = constant -1 : index
   %c1024 = constant 1024 : index
   %c32 = constant 32 : index
   %c8 = constant 8 : index
-  %c-1 = constant -1 : index
+  %c-8 = constant -8 : index
   %c64 = constant 64 : index
   %c0 = constant 0 : index
   %c1 = constant 1 : index
@@ -1302,32 +1310,32 @@ func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_si
   %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-  %5 = muli %4, %c8 : index
-  %6 = muli %3, %c8 : index
   scf.for %arg0 = %c0 to %c1024 step %c4 {
-    %7 = muli %5, %c-1 : index
-    %8 = addi %7, %c32 : index
-    %9 = cmpi "slt", %c8, %8 : index
-    %10 = select %9, %c8, %8 : index
-    %11 = muli %arg0, %c-1 : index
-    %12 = addi %11, %c1024 : index
-    %13 = cmpi "slt", %c4, %12 : index
-    %14 = select %13, %c4, %12 : index
-    %15 = subview %1[%5, %arg0] [%10, %14] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-    %16 = muli %6, %c-1 : index
+    %5 = muli %4, %c8 : index
+    %6 = muli %4, %c-8 : index
+    %7 = addi %6, %c32 : index
+    %8 = cmpi "slt", %c8, %7 : index
+    %9 = select %8, %c8, %7 : index
+    %10 = muli %arg0, %c-1 : index
+    %11 = addi %10, %c1024 : index
+    %12 = cmpi "slt", %c4, %11 : index
+    %13 = select %12, %c4, %11 : index
+    %14 = subview %1[%5, %arg0] [%9, %13] [1, 1]  : memref<32x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+    %15 = muli %3, %c8 : index
+    %16 = muli %3, %c-8 : index
     %17 = addi %16, %c64 : index
     %18 = cmpi "slt", %c8, %17 : index
     %19 = select %18, %c8, %17 : index
-    %20 = subview %2[%arg0, %6] [%14, %19] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
-    %21 = subview %0[%5, %6] [%10, %19] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %20 = subview %2[%arg0, %15] [%13, %19] [1, 1]  : memref<1024x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
+    %21 = subview %0[%5, %15] [%9, %19] [1, 1]  : memref<32x64xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
     %22 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %23 = "gpu.thread_id"() {dimension = "y"} : () -> index
-    %24 = cmpi "slt", %23, %10 : index
+    %24 = cmpi "slt", %23, %9 : index
     %25 = cmpi "slt", %22, %19 : index
     %26 = and %24, %25 : i1
     scf.if %26 {
-      scf.for %arg1 = %c0 to %14 step %c1 {
-        %27 = load %15[%23, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+      scf.for %arg1 = %c0 to %13 step %c1 {
+        %27 = load %14[%23, %arg1] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
         %28 = load %20[%arg1, %22] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         %29 = load %21[%23, %22] : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 64 + s0 + d1)>>
         %30 = mulf %27, %28 : f32
@@ -1367,10 +1375,11 @@ func @dot_ex_dispatch_0_dispatch_0() attributes {spv.entry_point_abi = {local_si
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>, vkspv.entry_point_schedule = ["dot_ex_dispatch_0_dispatch_0", "dot_ex_dispatch_0_dispatch_1"]} {
   func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %c4 = constant 4 : index
+    %c-1 = constant -1 : index
     %c1024 = constant 1024 : index
     %c32 = constant 32 : index
     %c8 = constant 8 : index
-    %c-1 = constant -1 : index
+    %c-8 = constant -8 : index
     %c64 = constant 64 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1379,41 +1388,41 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
     %3 = "gpu.block_id"() {dimension = "x"} : () -> index
     %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c8 : index
     scf.for %arg0 = %c0 to %c1024 step %c4 {
-      %7 = muli %5, %c-1 : index
-      %8 = addi %7, %c32 : index
-      %9 = cmpi "slt", %c8, %8 : index
-      %10 = select %9, %c8, %8 : index
-      %11 = muli %arg0, %c-1 : index
-      %12 = addi %11, %c1024 : index
-      %13 = cmpi "slt", %c4, %12 : index
-      %14 = select %13, %c4, %12 : index
-      %15 = muli %6, %c-1 : index
+      %5 = muli %4, %c8 : index
+      %6 = muli %4, %c-8 : index
+      %7 = addi %6, %c32 : index
+      %8 = cmpi "slt", %c8, %7 : index
+      %9 = select %8, %c8, %7 : index
+      %10 = muli %arg0, %c-1 : index
+      %11 = addi %10, %c1024 : index
+      %12 = cmpi "slt", %c4, %11 : index
+      %13 = select %12, %c4, %11 : index
+      %14 = muli %3, %c8 : index
+      %15 = muli %3, %c-8 : index
       %16 = addi %15, %c64 : index
       %17 = cmpi "slt", %c8, %16 : index
       %18 = select %17, %c8, %16 : index
       %19 = "gpu.thread_id"() {dimension = "x"} : () -> index
       %20 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %21 = cmpi "slt", %20, %10 : index
+      %21 = cmpi "slt", %20, %9 : index
       %22 = cmpi "slt", %19, %18 : index
       %23 = and %21, %22 : i1
       scf.if %23 {
-        scf.for %arg1 = %c0 to %14 step %c1 {
+        scf.for %arg1 = %c0 to %13 step %c1 {
           %24 = addi %5, %20 : index
           %25 = addi %arg0, %arg1 : index
           %26 = load %1[%24, %25] : memref<32x1024xf32>
           %27 = addi %arg0, %arg1 : index
-          %28 = addi %6, %19 : index
+          %28 = addi %14, %19 : index
           %29 = load %2[%27, %28] : memref<1024x64xf32>
           %30 = addi %5, %20 : index
-          %31 = addi %6, %19 : index
+          %31 = addi %14, %19 : index
           %32 = load %0[%30, %31] : memref<32x64xf32>
           %33 = mulf %26, %29 : f32
           %34 = addf %32, %33 : f32
           %35 = addi %5, %20 : index
-          %36 = addi %6, %19 : index
+          %36 = addi %14, %19 : index
           store %34, %0[%35, %36] : memref<32x64xf32>
         }
       }
@@ -1451,10 +1460,11 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>, vkspv.entry_point_schedule = ["dot_ex_dispatch_0_dispatch_0", "dot_ex_dispatch_0_dispatch_1"]} {
   func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %c4 = constant 4 : index
+    %c-1 = constant -1 : index
     %c1024 = constant 1024 : index
     %c32 = constant 32 : index
     %c8 = constant 8 : index
-    %c-1 = constant -1 : index
+    %c-8 = constant -8 : index
     %c64 = constant 64 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1463,41 +1473,41 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
     %3 = "gpu.block_id"() {dimension = "x"} : () -> index
     %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c8 : index
     scf.for %arg0 = %c0 to %c1024 step %c4 {
-      %7 = muli %5, %c-1 : index
-      %8 = addi %7, %c32 : index
-      %9 = cmpi "slt", %c8, %8 : index
-      %10 = select %9, %c8, %8 : index
-      %11 = muli %arg0, %c-1 : index
-      %12 = addi %11, %c1024 : index
-      %13 = cmpi "slt", %c4, %12 : index
-      %14 = select %13, %c4, %12 : index
-      %15 = muli %6, %c-1 : index
+      %5 = muli %4, %c8 : index
+      %6 = muli %4, %c-8 : index
+      %7 = addi %6, %c32 : index
+      %8 = cmpi "slt", %c8, %7 : index
+      %9 = select %8, %c8, %7 : index
+      %10 = muli %arg0, %c-1 : index
+      %11 = addi %10, %c1024 : index
+      %12 = cmpi "slt", %c4, %11 : index
+      %13 = select %12, %c4, %11 : index
+      %14 = muli %3, %c8 : index
+      %15 = muli %3, %c-8 : index
       %16 = addi %15, %c64 : index
       %17 = cmpi "slt", %c8, %16 : index
       %18 = select %17, %c8, %16 : index
       %19 = "gpu.thread_id"() {dimension = "x"} : () -> index
       %20 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %21 = cmpi "slt", %20, %10 : index
+      %21 = cmpi "slt", %20, %9 : index
       %22 = cmpi "slt", %19, %18 : index
       %23 = and %21, %22 : i1
       scf.if %23 {
-        scf.for %arg1 = %c0 to %14 step %c1 {
+        scf.for %arg1 = %c0 to %13 step %c1 {
           %24 = addi %5, %20 : index
           %25 = addi %arg0, %arg1 : index
           %26 = load %1[%24, %25] : memref<32x1024xf32>
           %27 = addi %arg0, %arg1 : index
-          %28 = addi %6, %19 : index
+          %28 = addi %14, %19 : index
           %29 = load %2[%27, %28] : memref<1024x64xf32>
           %30 = addi %5, %20 : index
-          %31 = addi %6, %19 : index
+          %31 = addi %14, %19 : index
           %32 = load %0[%30, %31] : memref<32x64xf32>
           %33 = mulf %26, %29 : f32
           %34 = addf %32, %33 : f32
           %35 = addi %5, %20 : index
-          %36 = addi %6, %19 : index
+          %36 = addi %14, %19 : index
           store %34, %0[%35, %36] : memref<32x64xf32>
         }
       }
@@ -1535,10 +1545,11 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>, vkspv.entry_point_schedule = ["dot_ex_dispatch_0_dispatch_0", "dot_ex_dispatch_0_dispatch_1"]} {
   func @dot_ex_dispatch_0_dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %c4 = constant 4 : index
+    %c-1 = constant -1 : index
     %c1024 = constant 1024 : index
     %c32 = constant 32 : index
     %c8 = constant 8 : index
-    %c-1 = constant -1 : index
+    %c-8 = constant -8 : index
     %c64 = constant 64 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -1547,32 +1558,32 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
     %3 = "gpu.block_id"() {dimension = "x"} : () -> index
     %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-    %5 = muli %4, %c8 : index
-    %6 = muli %3, %c8 : index
     scf.for %arg0 = %c0 to %c1024 step %c4 {
-      %7 = muli %5, %c-1 : index
-      %8 = addi %7, %c32 : index
-      %9 = cmpi "slt", %c8, %8 : index
-      %10 = select %9, %c8, %8 : index
-      %11 = muli %arg0, %c-1 : index
-      %12 = addi %11, %c1024 : index
-      %13 = cmpi "slt", %c4, %12 : index
-      %14 = select %13, %c4, %12 : index
-      %15 = muli %6, %c-1 : index
+      %5 = muli %4, %c8 : index
+      %6 = muli %4, %c-8 : index
+      %7 = addi %6, %c32 : index
+      %8 = cmpi "slt", %c8, %7 : index
+      %9 = select %8, %c8, %7 : index
+      %10 = muli %arg0, %c-1 : index
+      %11 = addi %10, %c1024 : index
+      %12 = cmpi "slt", %c4, %11 : index
+      %13 = select %12, %c4, %11 : index
+      %14 = muli %3, %c8 : index
+      %15 = muli %3, %c-8 : index
       %16 = addi %15, %c64 : index
       %17 = cmpi "slt", %c8, %16 : index
       %18 = select %17, %c8, %16 : index
       %19 = "gpu.thread_id"() {dimension = "x"} : () -> index
       %20 = "gpu.thread_id"() {dimension = "y"} : () -> index
-      %21 = cmpi "slt", %20, %10 : index
+      %21 = cmpi "slt", %20, %9 : index
       %22 = cmpi "slt", %19, %18 : index
       %23 = and %21, %22 : i1
       scf.if %23 {
-        scf.for %arg1 = %c0 to %14 step %c1 {
+        scf.for %arg1 = %c0 to %13 step %c1 {
           %24 = addi %5, %20 : index
           %25 = addi %arg0, %arg1 : index
           %26 = load %1[%24, %25] : memref<32x1024xf32>
-          %27 = addi %6, %19 : index
+          %27 = addi %14, %19 : index
           %28 = load %2[%25, %27] : memref<1024x64xf32>
           %29 = load %0[%24, %27] : memref<32x64xf32>
           %30 = mulf %26, %28 : f32
@@ -1620,107 +1631,108 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
     spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
     spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>}, vkspv.workgroup_count_from_result_shape = 2 : i32} {
       %0 = spv.constant 4 : i32
-      %1 = spv.constant 1024 : i32
-      %2 = spv.constant 32 : i32
-      %3 = spv.constant 8 : i32
-      %4 = spv.constant -1 : i32
-      %5 = spv.constant 64 : i32
-      %6 = spv.constant 0 : i32
-      %7 = spv.constant 1 : i32
-      %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-      %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-      %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-      %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-      %12 = spv.Load "Input" %11 : vector<3xi32>
-      %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-      %14 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-      %15 = spv.Load "Input" %14 : vector<3xi32>
-      %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
-      %17 = spv.IMul %16, %3 : i32
-      %18 = spv.IMul %13, %3 : i32
+      %1 = spv.constant -1 : i32
+      %2 = spv.constant 1024 : i32
+      %3 = spv.constant 32 : i32
+      %4 = spv.constant 8 : i32
+      %5 = spv.constant -8 : i32
+      %6 = spv.constant 64 : i32
+      %7 = spv.constant 0 : i32
+      %8 = spv.constant 1 : i32
+      %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+      %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+      %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+      %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+      %13 = spv.Load "Input" %12 : vector<3xi32>
+      %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+      %15 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+      %16 = spv.Load "Input" %15 : vector<3xi32>
+      %17 = spv.CompositeExtract %16[1 : i32] : vector<3xi32>
       spv.loop {
-        spv.Branch ^bb1(%6 : i32)
-      ^bb1(%19: i32):  // 2 preds: ^bb0, ^bb2
-        %20 = spv.SLessThan %19, %1 : i32
-        spv.BranchConditional %20, ^bb2, ^bb3
+        spv.Branch ^bb1(%7 : i32)
+      ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
+        %19 = spv.SLessThan %18, %2 : i32
+        spv.BranchConditional %19, ^bb2, ^bb3
       ^bb2:  // pred: ^bb1
-        %21 = spv.IMul %17, %4 : i32
-        %22 = spv.IAdd %21, %2 : i32
-        %23 = spv.SLessThan %3, %22 : i32
-        %24 = spv.Select %23, %3, %22 : i1, i32
-        %25 = spv.IMul %19, %4 : i32
-        %26 = spv.IAdd %25, %1 : i32
+        %20 = spv.IMul %17, %4 : i32
+        %21 = spv.IMul %17, %5 : i32
+        %22 = spv.IAdd %21, %3 : i32
+        %23 = spv.SLessThan %4, %22 : i32
+        %24 = spv.Select %23, %4, %22 : i1, i32
+        %25 = spv.IMul %18, %1 : i32
+        %26 = spv.IAdd %25, %2 : i32
         %27 = spv.SLessThan %0, %26 : i32
         %28 = spv.Select %27, %0, %26 : i1, i32
-        %29 = spv.IMul %18, %4 : i32
-        %30 = spv.IAdd %29, %5 : i32
-        %31 = spv.SLessThan %3, %30 : i32
-        %32 = spv.Select %31, %3, %30 : i1, i32
-        %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-        %34 = spv.Load "Input" %33 : vector<3xi32>
-        %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
-        %36 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-        %37 = spv.Load "Input" %36 : vector<3xi32>
-        %38 = spv.CompositeExtract %37[1 : i32] : vector<3xi32>
-        %39 = spv.SLessThan %38, %24 : i32
-        %40 = spv.SLessThan %35, %32 : i32
-        %41 = spv.LogicalAnd %39, %40 : i1
+        %29 = spv.IMul %14, %4 : i32
+        %30 = spv.IMul %14, %5 : i32
+        %31 = spv.IAdd %30, %6 : i32
+        %32 = spv.SLessThan %4, %31 : i32
+        %33 = spv.Select %32, %4, %31 : i1, i32
+        %34 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+        %35 = spv.Load "Input" %34 : vector<3xi32>
+        %36 = spv.CompositeExtract %35[0 : i32] : vector<3xi32>
+        %37 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+        %38 = spv.Load "Input" %37 : vector<3xi32>
+        %39 = spv.CompositeExtract %38[1 : i32] : vector<3xi32>
+        %40 = spv.SLessThan %39, %24 : i32
+        %41 = spv.SLessThan %36, %33 : i32
+        %42 = spv.LogicalAnd %40, %41 : i1
         spv.selection {
-          spv.BranchConditional %41, ^bb1, ^bb2
+          spv.BranchConditional %42, ^bb1, ^bb2
         ^bb1:  // pred: ^bb0
           spv.loop {
-            spv.Branch ^bb1(%6 : i32)
-          ^bb1(%43: i32):  // 2 preds: ^bb0, ^bb2
-            %44 = spv.SLessThan %43, %28 : i32
-            spv.BranchConditional %44, ^bb2, ^bb3
+            spv.Branch ^bb1(%7 : i32)
+          ^bb1(%44: i32):  // 2 preds: ^bb0, ^bb2
+            %45 = spv.SLessThan %44, %28 : i32
+            spv.BranchConditional %45, ^bb2, ^bb3
           ^bb2:  // pred: ^bb1
-            %45 = spv.IAdd %17, %38 : i32
-            %46 = spv.IAdd %19, %43 : i32
-            %47 = spv.constant 0 : i32
+            %46 = spv.IAdd %20, %39 : i32
+            %47 = spv.IAdd %18, %44 : i32
             %48 = spv.constant 0 : i32
-            %49 = spv.constant 1024 : i32
-            %50 = spv.IMul %49, %45 : i32
-            %51 = spv.IAdd %48, %50 : i32
-            %52 = spv.constant 1 : i32
-            %53 = spv.IMul %52, %46 : i32
-            %54 = spv.IAdd %51, %53 : i32
-            %55 = spv.AccessChain %9[%47, %54] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-            %56 = spv.Load "StorageBuffer" %55 : f32
-            %57 = spv.IAdd %18, %35 : i32
-            %58 = spv.constant 0 : i32
+            %49 = spv.constant 0 : i32
+            %50 = spv.constant 1024 : i32
+            %51 = spv.IMul %50, %46 : i32
+            %52 = spv.IAdd %49, %51 : i32
+            %53 = spv.constant 1 : i32
+            %54 = spv.IMul %53, %47 : i32
+            %55 = spv.IAdd %52, %54 : i32
+            %56 = spv.AccessChain %10[%48, %55] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+            %57 = spv.Load "StorageBuffer" %56 : f32
+            %58 = spv.IAdd %29, %36 : i32
             %59 = spv.constant 0 : i32
-            %60 = spv.constant 64 : i32
-            %61 = spv.IMul %60, %46 : i32
-            %62 = spv.IAdd %59, %61 : i32
-            %63 = spv.constant 1 : i32
-            %64 = spv.IMul %63, %57 : i32
-            %65 = spv.IAdd %62, %64 : i32
-            %66 = spv.AccessChain %10[%58, %65] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-            %67 = spv.Load "StorageBuffer" %66 : f32
-            %68 = spv.constant 0 : i32
+            %60 = spv.constant 0 : i32
+            %61 = spv.constant 64 : i32
+            %62 = spv.IMul %61, %47 : i32
+            %63 = spv.IAdd %60, %62 : i32
+            %64 = spv.constant 1 : i32
+            %65 = spv.IMul %64, %58 : i32
+            %66 = spv.IAdd %63, %65 : i32
+            %67 = spv.AccessChain %11[%59, %66] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+            %68 = spv.Load "StorageBuffer" %67 : f32
             %69 = spv.constant 0 : i32
-            %70 = spv.constant 64 : i32
-            %71 = spv.IMul %70, %45 : i32
-            %72 = spv.IAdd %69, %71 : i32
-            %73 = spv.constant 1 : i32
-            %74 = spv.IMul %73, %57 : i32
-            %75 = spv.IAdd %72, %74 : i32
-            %76 = spv.AccessChain %8[%68, %75] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-            %77 = spv.Load "StorageBuffer" %76 : f32
-            %78 = spv.FMul %56, %67 : f32
-            %79 = spv.FAdd %77, %78 : f32
-            %80 = spv.constant 0 : i32
+            %70 = spv.constant 0 : i32
+            %71 = spv.constant 64 : i32
+            %72 = spv.IMul %71, %46 : i32
+            %73 = spv.IAdd %70, %72 : i32
+            %74 = spv.constant 1 : i32
+            %75 = spv.IMul %74, %58 : i32
+            %76 = spv.IAdd %73, %75 : i32
+            %77 = spv.AccessChain %9[%69, %76] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+            %78 = spv.Load "StorageBuffer" %77 : f32
+            %79 = spv.FMul %57, %68 : f32
+            %80 = spv.FAdd %78, %79 : f32
             %81 = spv.constant 0 : i32
-            %82 = spv.constant 64 : i32
-            %83 = spv.IMul %82, %45 : i32
-            %84 = spv.IAdd %81, %83 : i32
-            %85 = spv.constant 1 : i32
-            %86 = spv.IMul %85, %57 : i32
-            %87 = spv.IAdd %84, %86 : i32
-            %88 = spv.AccessChain %8[%80, %87] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-            spv.Store "StorageBuffer" %88, %79 : f32
-            %89 = spv.IAdd %43, %7 : i32
-            spv.Branch ^bb1(%89 : i32)
+            %82 = spv.constant 0 : i32
+            %83 = spv.constant 64 : i32
+            %84 = spv.IMul %83, %46 : i32
+            %85 = spv.IAdd %82, %84 : i32
+            %86 = spv.constant 1 : i32
+            %87 = spv.IMul %86, %58 : i32
+            %88 = spv.IAdd %85, %87 : i32
+            %89 = spv.AccessChain %9[%81, %88] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+            spv.Store "StorageBuffer" %89, %80 : f32
+            %90 = spv.IAdd %44, %8 : i32
+            spv.Branch ^bb1(%90 : i32)
           ^bb3:  // pred: ^bb1
             spv._merge
           }
@@ -1728,8 +1740,8 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
         ^bb2:  // 2 preds: ^bb0, ^bb1
           spv._merge
         }
-        %42 = spv.IAdd %19, %0 : i32
-        spv.Branch ^bb1(%42 : i32)
+        %43 = spv.IAdd %18, %0 : i32
+        spv.Branch ^bb1(%43 : i32)
       ^bb3:  // pred: ^bb1
         spv._merge
       }
@@ -1795,107 +1807,108 @@ spv.module Logical GLSL450 {
   spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
   spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %0 = spv.constant 4 : i32
-    %1 = spv.constant 1024 : i32
-    %2 = spv.constant 32 : i32
-    %3 = spv.constant 8 : i32
-    %4 = spv.constant -1 : i32
-    %5 = spv.constant 64 : i32
-    %6 = spv.constant 0 : i32
-    %7 = spv.constant 1 : i32
-    %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-    %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-    %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %12 = spv.Load "Input" %11 : vector<3xi32>
-    %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-    %14 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %15 = spv.Load "Input" %14 : vector<3xi32>
-    %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
-    %17 = spv.IMul %16, %3 : i32
-    %18 = spv.IMul %13, %3 : i32
+    %1 = spv.constant -1 : i32
+    %2 = spv.constant 1024 : i32
+    %3 = spv.constant 32 : i32
+    %4 = spv.constant 8 : i32
+    %5 = spv.constant -8 : i32
+    %6 = spv.constant 64 : i32
+    %7 = spv.constant 0 : i32
+    %8 = spv.constant 1 : i32
+    %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+    %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+    %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+    %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %13 = spv.Load "Input" %12 : vector<3xi32>
+    %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+    %15 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %16 = spv.Load "Input" %15 : vector<3xi32>
+    %17 = spv.CompositeExtract %16[1 : i32] : vector<3xi32>
     spv.loop {
-      spv.Branch ^bb1(%6 : i32)
-    ^bb1(%19: i32):  // 2 preds: ^bb0, ^bb2
-      %20 = spv.SLessThan %19, %1 : i32
-      spv.BranchConditional %20, ^bb2, ^bb3
+      spv.Branch ^bb1(%7 : i32)
+    ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
+      %19 = spv.SLessThan %18, %2 : i32
+      spv.BranchConditional %19, ^bb2, ^bb3
     ^bb2:  // pred: ^bb1
-      %21 = spv.IMul %17, %4 : i32
-      %22 = spv.IAdd %21, %2 : i32
-      %23 = spv.SLessThan %3, %22 : i32
-      %24 = spv.Select %23, %3, %22 : i1, i32
-      %25 = spv.IMul %19, %4 : i32
-      %26 = spv.IAdd %25, %1 : i32
+      %20 = spv.IMul %17, %4 : i32
+      %21 = spv.IMul %17, %5 : i32
+      %22 = spv.IAdd %21, %3 : i32
+      %23 = spv.SLessThan %4, %22 : i32
+      %24 = spv.Select %23, %4, %22 : i1, i32
+      %25 = spv.IMul %18, %1 : i32
+      %26 = spv.IAdd %25, %2 : i32
       %27 = spv.SLessThan %0, %26 : i32
       %28 = spv.Select %27, %0, %26 : i1, i32
-      %29 = spv.IMul %18, %4 : i32
-      %30 = spv.IAdd %29, %5 : i32
-      %31 = spv.SLessThan %3, %30 : i32
-      %32 = spv.Select %31, %3, %30 : i1, i32
-      %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %34 = spv.Load "Input" %33 : vector<3xi32>
-      %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
-      %36 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %37 = spv.Load "Input" %36 : vector<3xi32>
-      %38 = spv.CompositeExtract %37[1 : i32] : vector<3xi32>
-      %39 = spv.SLessThan %38, %24 : i32
-      %40 = spv.SLessThan %35, %32 : i32
-      %41 = spv.LogicalAnd %39, %40 : i1
+      %29 = spv.IMul %14, %4 : i32
+      %30 = spv.IMul %14, %5 : i32
+      %31 = spv.IAdd %30, %6 : i32
+      %32 = spv.SLessThan %4, %31 : i32
+      %33 = spv.Select %32, %4, %31 : i1, i32
+      %34 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %35 = spv.Load "Input" %34 : vector<3xi32>
+      %36 = spv.CompositeExtract %35[0 : i32] : vector<3xi32>
+      %37 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %38 = spv.Load "Input" %37 : vector<3xi32>
+      %39 = spv.CompositeExtract %38[1 : i32] : vector<3xi32>
+      %40 = spv.SLessThan %39, %24 : i32
+      %41 = spv.SLessThan %36, %33 : i32
+      %42 = spv.LogicalAnd %40, %41 : i1
       spv.selection {
-        spv.BranchConditional %41, ^bb1, ^bb2
+        spv.BranchConditional %42, ^bb1, ^bb2
       ^bb1:  // pred: ^bb0
         spv.loop {
-          spv.Branch ^bb1(%6 : i32)
-        ^bb1(%43: i32):  // 2 preds: ^bb0, ^bb2
-          %44 = spv.SLessThan %43, %28 : i32
-          spv.BranchConditional %44, ^bb2, ^bb3
+          spv.Branch ^bb1(%7 : i32)
+        ^bb1(%44: i32):  // 2 preds: ^bb0, ^bb2
+          %45 = spv.SLessThan %44, %28 : i32
+          spv.BranchConditional %45, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
-          %45 = spv.IAdd %17, %38 : i32
-          %46 = spv.IAdd %19, %43 : i32
-          %47 = spv.constant 0 : i32
+          %46 = spv.IAdd %20, %39 : i32
+          %47 = spv.IAdd %18, %44 : i32
           %48 = spv.constant 0 : i32
-          %49 = spv.constant 1024 : i32
-          %50 = spv.IMul %49, %45 : i32
-          %51 = spv.IAdd %48, %50 : i32
-          %52 = spv.constant 1 : i32
-          %53 = spv.IMul %52, %46 : i32
-          %54 = spv.IAdd %51, %53 : i32
-          %55 = spv.AccessChain %9[%47, %54] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %56 = spv.Load "StorageBuffer" %55 : f32
-          %57 = spv.IAdd %18, %35 : i32
-          %58 = spv.constant 0 : i32
+          %49 = spv.constant 0 : i32
+          %50 = spv.constant 1024 : i32
+          %51 = spv.IMul %50, %46 : i32
+          %52 = spv.IAdd %49, %51 : i32
+          %53 = spv.constant 1 : i32
+          %54 = spv.IMul %53, %47 : i32
+          %55 = spv.IAdd %52, %54 : i32
+          %56 = spv.AccessChain %10[%48, %55] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %57 = spv.Load "StorageBuffer" %56 : f32
+          %58 = spv.IAdd %29, %36 : i32
           %59 = spv.constant 0 : i32
-          %60 = spv.constant 64 : i32
-          %61 = spv.IMul %60, %46 : i32
-          %62 = spv.IAdd %59, %61 : i32
-          %63 = spv.constant 1 : i32
-          %64 = spv.IMul %63, %57 : i32
-          %65 = spv.IAdd %62, %64 : i32
-          %66 = spv.AccessChain %10[%58, %65] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %67 = spv.Load "StorageBuffer" %66 : f32
-          %68 = spv.constant 0 : i32
+          %60 = spv.constant 0 : i32
+          %61 = spv.constant 64 : i32
+          %62 = spv.IMul %61, %47 : i32
+          %63 = spv.IAdd %60, %62 : i32
+          %64 = spv.constant 1 : i32
+          %65 = spv.IMul %64, %58 : i32
+          %66 = spv.IAdd %63, %65 : i32
+          %67 = spv.AccessChain %11[%59, %66] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %68 = spv.Load "StorageBuffer" %67 : f32
           %69 = spv.constant 0 : i32
-          %70 = spv.constant 64 : i32
-          %71 = spv.IMul %70, %45 : i32
-          %72 = spv.IAdd %69, %71 : i32
-          %73 = spv.constant 1 : i32
-          %74 = spv.IMul %73, %57 : i32
-          %75 = spv.IAdd %72, %74 : i32
-          %76 = spv.AccessChain %8[%68, %75] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %77 = spv.Load "StorageBuffer" %76 : f32
-          %78 = spv.FMul %56, %67 : f32
-          %79 = spv.FAdd %77, %78 : f32
-          %80 = spv.constant 0 : i32
+          %70 = spv.constant 0 : i32
+          %71 = spv.constant 64 : i32
+          %72 = spv.IMul %71, %46 : i32
+          %73 = spv.IAdd %70, %72 : i32
+          %74 = spv.constant 1 : i32
+          %75 = spv.IMul %74, %58 : i32
+          %76 = spv.IAdd %73, %75 : i32
+          %77 = spv.AccessChain %9[%69, %76] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %78 = spv.Load "StorageBuffer" %77 : f32
+          %79 = spv.FMul %57, %68 : f32
+          %80 = spv.FAdd %78, %79 : f32
           %81 = spv.constant 0 : i32
-          %82 = spv.constant 64 : i32
-          %83 = spv.IMul %82, %45 : i32
-          %84 = spv.IAdd %81, %83 : i32
-          %85 = spv.constant 1 : i32
-          %86 = spv.IMul %85, %57 : i32
-          %87 = spv.IAdd %84, %86 : i32
-          %88 = spv.AccessChain %8[%80, %87] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          spv.Store "StorageBuffer" %88, %79 : f32
-          %89 = spv.IAdd %43, %7 : i32
-          spv.Branch ^bb1(%89 : i32)
+          %82 = spv.constant 0 : i32
+          %83 = spv.constant 64 : i32
+          %84 = spv.IMul %83, %46 : i32
+          %85 = spv.IAdd %82, %84 : i32
+          %86 = spv.constant 1 : i32
+          %87 = spv.IMul %86, %58 : i32
+          %88 = spv.IAdd %85, %87 : i32
+          %89 = spv.AccessChain %9[%81, %88] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %89, %80 : f32
+          %90 = spv.IAdd %44, %8 : i32
+          spv.Branch ^bb1(%90 : i32)
         ^bb3:  // pred: ^bb1
           spv._merge
         }
@@ -1903,8 +1916,8 @@ spv.module Logical GLSL450 {
       ^bb2:  // 2 preds: ^bb0, ^bb1
         spv._merge
       }
-      %42 = spv.IAdd %19, %0 : i32
-      spv.Branch ^bb1(%42 : i32)
+      %43 = spv.IAdd %18, %0 : i32
+      spv.Branch ^bb1(%43 : i32)
     ^bb3:  // pred: ^bb1
       spv._merge
     }
@@ -1968,83 +1981,84 @@ spv.module Logical GLSL450 {
   spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
   spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %0 = spv.constant 4 : i32
-    %1 = spv.constant 32 : i32
-    %2 = spv.constant 8 : i32
-    %3 = spv.constant -1 : i32
-    %4 = spv.constant 1 : i32
-    %5 = spv.constant 1024 : i32
-    %6 = spv.constant 0 : i32
-    %7 = spv.constant 64 : i32
-    %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-    %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-    %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %12 = spv.Load "Input" %11 : vector<3xi32>
-    %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-    %14 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %15 = spv.Load "Input" %14 : vector<3xi32>
-    %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
-    %17 = spv.IMul %16, %2 : i32
-    %18 = spv.IMul %13, %2 : i32
+    %1 = spv.constant -1 : i32
+    %2 = spv.constant 32 : i32
+    %3 = spv.constant 8 : i32
+    %4 = spv.constant -8 : i32
+    %5 = spv.constant 1 : i32
+    %6 = spv.constant 1024 : i32
+    %7 = spv.constant 0 : i32
+    %8 = spv.constant 64 : i32
+    %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+    %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+    %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+    %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %13 = spv.Load "Input" %12 : vector<3xi32>
+    %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+    %15 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %16 = spv.Load "Input" %15 : vector<3xi32>
+    %17 = spv.CompositeExtract %16[1 : i32] : vector<3xi32>
     spv.loop {
-      spv.Branch ^bb1(%6 : i32)
-    ^bb1(%19: i32):  // 2 preds: ^bb0, ^bb2
-      %20 = spv.SLessThan %19, %5 : i32
-      spv.BranchConditional %20, ^bb2, ^bb3
+      spv.Branch ^bb1(%7 : i32)
+    ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
+      %19 = spv.SLessThan %18, %6 : i32
+      spv.BranchConditional %19, ^bb2, ^bb3
     ^bb2:  // pred: ^bb1
-      %21 = spv.IMul %17, %3 : i32
-      %22 = spv.IAdd %21, %1 : i32
-      %23 = spv.SLessThan %2, %22 : i32
-      %24 = spv.Select %23, %2, %22 : i1, i32
-      %25 = spv.IMul %19, %3 : i32
-      %26 = spv.IAdd %25, %5 : i32
+      %20 = spv.IMul %17, %3 : i32
+      %21 = spv.IMul %17, %4 : i32
+      %22 = spv.IAdd %21, %2 : i32
+      %23 = spv.SLessThan %3, %22 : i32
+      %24 = spv.Select %23, %3, %22 : i1, i32
+      %25 = spv.IMul %18, %1 : i32
+      %26 = spv.IAdd %25, %6 : i32
       %27 = spv.SLessThan %0, %26 : i32
       %28 = spv.Select %27, %0, %26 : i1, i32
-      %29 = spv.IMul %18, %3 : i32
-      %30 = spv.IAdd %29, %7 : i32
-      %31 = spv.SLessThan %2, %30 : i32
-      %32 = spv.Select %31, %2, %30 : i1, i32
-      %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %34 = spv.Load "Input" %33 : vector<3xi32>
-      %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
-      %36 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %37 = spv.Load "Input" %36 : vector<3xi32>
-      %38 = spv.CompositeExtract %37[1 : i32] : vector<3xi32>
-      %39 = spv.SLessThan %38, %24 : i32
-      %40 = spv.SLessThan %35, %32 : i32
-      %41 = spv.LogicalAnd %39, %40 : i1
+      %29 = spv.IMul %14, %3 : i32
+      %30 = spv.IMul %14, %4 : i32
+      %31 = spv.IAdd %30, %8 : i32
+      %32 = spv.SLessThan %3, %31 : i32
+      %33 = spv.Select %32, %3, %31 : i1, i32
+      %34 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %35 = spv.Load "Input" %34 : vector<3xi32>
+      %36 = spv.CompositeExtract %35[0 : i32] : vector<3xi32>
+      %37 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %38 = spv.Load "Input" %37 : vector<3xi32>
+      %39 = spv.CompositeExtract %38[1 : i32] : vector<3xi32>
+      %40 = spv.SLessThan %39, %24 : i32
+      %41 = spv.SLessThan %36, %33 : i32
+      %42 = spv.LogicalAnd %40, %41 : i1
       spv.selection {
-        spv.BranchConditional %41, ^bb1, ^bb2
+        spv.BranchConditional %42, ^bb1, ^bb2
       ^bb1:  // pred: ^bb0
         spv.loop {
-          spv.Branch ^bb1(%6 : i32)
-        ^bb1(%43: i32):  // 2 preds: ^bb0, ^bb2
-          %44 = spv.SLessThan %43, %28 : i32
-          spv.BranchConditional %44, ^bb2, ^bb3
+          spv.Branch ^bb1(%7 : i32)
+        ^bb1(%44: i32):  // 2 preds: ^bb0, ^bb2
+          %45 = spv.SLessThan %44, %28 : i32
+          spv.BranchConditional %45, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
-          %45 = spv.IAdd %17, %38 : i32
-          %46 = spv.IAdd %19, %43 : i32
-          %47 = spv.IMul %45, %5 : i32
-          %48 = spv.IAdd %47, %46 : i32
-          %49 = spv.AccessChain %9[%6, %48] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %50 = spv.Load "StorageBuffer" %49 : f32
-          %51 = spv.IAdd %18, %35 : i32
-          %52 = spv.IMul %46, %7 : i32
-          %53 = spv.IAdd %52, %51 : i32
-          %54 = spv.AccessChain %10[%6, %53] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %55 = spv.Load "StorageBuffer" %54 : f32
-          %56 = spv.IMul %45, %7 : i32
-          %57 = spv.IAdd %56, %51 : i32
-          %58 = spv.AccessChain %8[%6, %57] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %59 = spv.Load "StorageBuffer" %58 : f32
-          %60 = spv.FMul %50, %55 : f32
-          %61 = spv.FAdd %59, %60 : f32
-          %62 = spv.IMul %45, %7 : i32
-          %63 = spv.IAdd %62, %51 : i32
-          %64 = spv.AccessChain %8[%6, %63] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          spv.Store "StorageBuffer" %64, %61 : f32
-          %65 = spv.IAdd %43, %4 : i32
-          spv.Branch ^bb1(%65 : i32)
+          %46 = spv.IAdd %20, %39 : i32
+          %47 = spv.IAdd %18, %44 : i32
+          %48 = spv.IMul %46, %6 : i32
+          %49 = spv.IAdd %48, %47 : i32
+          %50 = spv.AccessChain %10[%7, %49] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %51 = spv.Load "StorageBuffer" %50 : f32
+          %52 = spv.IAdd %29, %36 : i32
+          %53 = spv.IMul %47, %8 : i32
+          %54 = spv.IAdd %53, %52 : i32
+          %55 = spv.AccessChain %11[%7, %54] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %56 = spv.Load "StorageBuffer" %55 : f32
+          %57 = spv.IMul %46, %8 : i32
+          %58 = spv.IAdd %57, %52 : i32
+          %59 = spv.AccessChain %9[%7, %58] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %60 = spv.Load "StorageBuffer" %59 : f32
+          %61 = spv.FMul %51, %56 : f32
+          %62 = spv.FAdd %60, %61 : f32
+          %63 = spv.IMul %46, %8 : i32
+          %64 = spv.IAdd %63, %52 : i32
+          %65 = spv.AccessChain %9[%7, %64] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          spv.Store "StorageBuffer" %65, %62 : f32
+          %66 = spv.IAdd %44, %5 : i32
+          spv.Branch ^bb1(%66 : i32)
         ^bb3:  // pred: ^bb1
           spv._merge
         }
@@ -2052,8 +2066,8 @@ spv.module Logical GLSL450 {
       ^bb2:  // 2 preds: ^bb0, ^bb1
         spv._merge
       }
-      %42 = spv.IAdd %19, %0 : i32
-      spv.Branch ^bb1(%42 : i32)
+      %43 = spv.IAdd %18, %0 : i32
+      spv.Branch ^bb1(%43 : i32)
     ^bb3:  // pred: ^bb1
       spv._merge
     }
@@ -2112,78 +2126,79 @@ spv.module Logical GLSL450 {
   spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
   spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %0 = spv.constant 4 : i32
-    %1 = spv.constant 32 : i32
-    %2 = spv.constant 8 : i32
-    %3 = spv.constant -1 : i32
-    %4 = spv.constant 1 : i32
-    %5 = spv.constant 1024 : i32
-    %6 = spv.constant 0 : i32
-    %7 = spv.constant 64 : i32
-    %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-    %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-    %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %12 = spv.Load "Input" %11 : vector<3xi32>
-    %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-    %14 = spv.Load "Input" %11 : vector<3xi32>
-    %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-    %16 = spv.IMul %15, %2 : i32
-    %17 = spv.IMul %13, %2 : i32
+    %1 = spv.constant -1 : i32
+    %2 = spv.constant 32 : i32
+    %3 = spv.constant 8 : i32
+    %4 = spv.constant -8 : i32
+    %5 = spv.constant 1 : i32
+    %6 = spv.constant 1024 : i32
+    %7 = spv.constant 0 : i32
+    %8 = spv.constant 64 : i32
+    %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+    %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+    %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+    %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %13 = spv.Load "Input" %12 : vector<3xi32>
+    %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+    %15 = spv.Load "Input" %12 : vector<3xi32>
+    %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
     spv.loop {
-      spv.Branch ^bb1(%6 : i32)
-    ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-      %19 = spv.SLessThan %18, %5 : i32
-      spv.BranchConditional %19, ^bb2, ^bb3
+      spv.Branch ^bb1(%7 : i32)
+    ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+      %18 = spv.SLessThan %17, %6 : i32
+      spv.BranchConditional %18, ^bb2, ^bb3
     ^bb2:  // pred: ^bb1
-      %20 = spv.IMul %16, %3 : i32
-      %21 = spv.IAdd %20, %1 : i32
-      %22 = spv.SLessThan %2, %21 : i32
-      %23 = spv.Select %22, %2, %21 : i1, i32
-      %24 = spv.IMul %18, %3 : i32
-      %25 = spv.IAdd %24, %5 : i32
+      %19 = spv.IMul %16, %3 : i32
+      %20 = spv.IMul %16, %4 : i32
+      %21 = spv.IAdd %20, %2 : i32
+      %22 = spv.SLessThan %3, %21 : i32
+      %23 = spv.Select %22, %3, %21 : i1, i32
+      %24 = spv.IMul %17, %1 : i32
+      %25 = spv.IAdd %24, %6 : i32
       %26 = spv.SLessThan %0, %25 : i32
       %27 = spv.Select %26, %0, %25 : i1, i32
-      %28 = spv.IMul %17, %3 : i32
-      %29 = spv.IAdd %28, %7 : i32
-      %30 = spv.SLessThan %2, %29 : i32
-      %31 = spv.Select %30, %2, %29 : i1, i32
-      %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %33 = spv.Load "Input" %32 : vector<3xi32>
-      %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-      %35 = spv.Load "Input" %32 : vector<3xi32>
-      %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-      %37 = spv.SLessThan %36, %23 : i32
-      %38 = spv.SLessThan %34, %31 : i32
-      %39 = spv.LogicalAnd %37, %38 : i1
+      %28 = spv.IMul %14, %3 : i32
+      %29 = spv.IMul %14, %4 : i32
+      %30 = spv.IAdd %29, %8 : i32
+      %31 = spv.SLessThan %3, %30 : i32
+      %32 = spv.Select %31, %3, %30 : i1, i32
+      %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %34 = spv.Load "Input" %33 : vector<3xi32>
+      %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+      %36 = spv.Load "Input" %33 : vector<3xi32>
+      %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+      %38 = spv.SLessThan %37, %23 : i32
+      %39 = spv.SLessThan %35, %32 : i32
+      %40 = spv.LogicalAnd %38, %39 : i1
       spv.selection {
-        spv.BranchConditional %39, ^bb1, ^bb2
+        spv.BranchConditional %40, ^bb1, ^bb2
       ^bb1:  // pred: ^bb0
         spv.loop {
-          spv.Branch ^bb1(%6 : i32)
-        ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-          %42 = spv.SLessThan %41, %27 : i32
-          spv.BranchConditional %42, ^bb2, ^bb3
+          spv.Branch ^bb1(%7 : i32)
+        ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+          %43 = spv.SLessThan %42, %27 : i32
+          spv.BranchConditional %43, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
-          %43 = spv.IAdd %16, %36 : i32
-          %44 = spv.IAdd %18, %41 : i32
-          %45 = spv.IMul %43, %5 : i32
-          %46 = spv.IAdd %45, %44 : i32
-          %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %48 = spv.Load "StorageBuffer" %47 : f32
-          %49 = spv.IAdd %17, %34 : i32
-          %50 = spv.IMul %44, %7 : i32
-          %51 = spv.IAdd %50, %49 : i32
-          %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %53 = spv.Load "StorageBuffer" %52 : f32
-          %54 = spv.IMul %43, %7 : i32
-          %55 = spv.IAdd %54, %49 : i32
-          %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %57 = spv.Load "StorageBuffer" %56 : f32
-          %58 = spv.FMul %48, %53 : f32
-          %59 = spv.FAdd %57, %58 : f32
-          spv.Store "StorageBuffer" %56, %59 : f32
-          %60 = spv.IAdd %41, %4 : i32
-          spv.Branch ^bb1(%60 : i32)
+          %44 = spv.IAdd %19, %37 : i32
+          %45 = spv.IAdd %17, %42 : i32
+          %46 = spv.IMul %44, %6 : i32
+          %47 = spv.IAdd %46, %45 : i32
+          %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %49 = spv.Load "StorageBuffer" %48 : f32
+          %50 = spv.IAdd %28, %35 : i32
+          %51 = spv.IMul %45, %8 : i32
+          %52 = spv.IAdd %51, %50 : i32
+          %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %54 = spv.Load "StorageBuffer" %53 : f32
+          %55 = spv.IMul %44, %8 : i32
+          %56 = spv.IAdd %55, %50 : i32
+          %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %58 = spv.Load "StorageBuffer" %57 : f32
+          %59 = spv.FMul %49, %54 : f32
+          %60 = spv.FAdd %58, %59 : f32
+          spv.Store "StorageBuffer" %57, %60 : f32
+          %61 = spv.IAdd %42, %5 : i32
+          spv.Branch ^bb1(%61 : i32)
         ^bb3:  // pred: ^bb1
           spv._merge
         }
@@ -2191,8 +2206,8 @@ spv.module Logical GLSL450 {
       ^bb2:  // 2 preds: ^bb0, ^bb1
         spv._merge
       }
-      %40 = spv.IAdd %18, %0 : i32
-      spv.Branch ^bb1(%40 : i32)
+      %41 = spv.IAdd %17, %0 : i32
+      spv.Branch ^bb1(%41 : i32)
     ^bb3:  // pred: ^bb1
       spv._merge
     }
@@ -2251,78 +2266,79 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
   spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
   spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
     %0 = spv.constant 4 : i32
-    %1 = spv.constant 32 : i32
-    %2 = spv.constant 8 : i32
-    %3 = spv.constant -1 : i32
-    %4 = spv.constant 1 : i32
-    %5 = spv.constant 1024 : i32
-    %6 = spv.constant 0 : i32
-    %7 = spv.constant 64 : i32
-    %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-    %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-    %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-    %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-    %12 = spv.Load "Input" %11 : vector<3xi32>
-    %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-    %14 = spv.Load "Input" %11 : vector<3xi32>
-    %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-    %16 = spv.IMul %15, %2 : i32
-    %17 = spv.IMul %13, %2 : i32
+    %1 = spv.constant -1 : i32
+    %2 = spv.constant 32 : i32
+    %3 = spv.constant 8 : i32
+    %4 = spv.constant -8 : i32
+    %5 = spv.constant 1 : i32
+    %6 = spv.constant 1024 : i32
+    %7 = spv.constant 0 : i32
+    %8 = spv.constant 64 : i32
+    %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+    %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+    %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+    %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+    %13 = spv.Load "Input" %12 : vector<3xi32>
+    %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+    %15 = spv.Load "Input" %12 : vector<3xi32>
+    %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
     spv.loop {
-      spv.Branch ^bb1(%6 : i32)
-    ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-      %19 = spv.SLessThan %18, %5 : i32
-      spv.BranchConditional %19, ^bb2, ^bb3
+      spv.Branch ^bb1(%7 : i32)
+    ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+      %18 = spv.SLessThan %17, %6 : i32
+      spv.BranchConditional %18, ^bb2, ^bb3
     ^bb2:  // pred: ^bb1
-      %20 = spv.IMul %16, %3 : i32
-      %21 = spv.IAdd %20, %1 : i32
-      %22 = spv.SLessThan %2, %21 : i32
-      %23 = spv.Select %22, %2, %21 : i1, i32
-      %24 = spv.IMul %18, %3 : i32
-      %25 = spv.IAdd %24, %5 : i32
+      %19 = spv.IMul %16, %3 : i32
+      %20 = spv.IMul %16, %4 : i32
+      %21 = spv.IAdd %20, %2 : i32
+      %22 = spv.SLessThan %3, %21 : i32
+      %23 = spv.Select %22, %3, %21 : i1, i32
+      %24 = spv.IMul %17, %1 : i32
+      %25 = spv.IAdd %24, %6 : i32
       %26 = spv.SLessThan %0, %25 : i32
       %27 = spv.Select %26, %0, %25 : i1, i32
-      %28 = spv.IMul %17, %3 : i32
-      %29 = spv.IAdd %28, %7 : i32
-      %30 = spv.SLessThan %2, %29 : i32
-      %31 = spv.Select %30, %2, %29 : i1, i32
-      %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-      %33 = spv.Load "Input" %32 : vector<3xi32>
-      %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-      %35 = spv.Load "Input" %32 : vector<3xi32>
-      %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-      %37 = spv.SLessThan %36, %23 : i32
-      %38 = spv.SLessThan %34, %31 : i32
-      %39 = spv.LogicalAnd %37, %38 : i1
+      %28 = spv.IMul %14, %3 : i32
+      %29 = spv.IMul %14, %4 : i32
+      %30 = spv.IAdd %29, %8 : i32
+      %31 = spv.SLessThan %3, %30 : i32
+      %32 = spv.Select %31, %3, %30 : i1, i32
+      %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+      %34 = spv.Load "Input" %33 : vector<3xi32>
+      %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+      %36 = spv.Load "Input" %33 : vector<3xi32>
+      %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+      %38 = spv.SLessThan %37, %23 : i32
+      %39 = spv.SLessThan %35, %32 : i32
+      %40 = spv.LogicalAnd %38, %39 : i1
       spv.selection {
-        spv.BranchConditional %39, ^bb1, ^bb2
+        spv.BranchConditional %40, ^bb1, ^bb2
       ^bb1:  // pred: ^bb0
         spv.loop {
-          spv.Branch ^bb1(%6 : i32)
-        ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-          %42 = spv.SLessThan %41, %27 : i32
-          spv.BranchConditional %42, ^bb2, ^bb3
+          spv.Branch ^bb1(%7 : i32)
+        ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+          %43 = spv.SLessThan %42, %27 : i32
+          spv.BranchConditional %43, ^bb2, ^bb3
         ^bb2:  // pred: ^bb1
-          %43 = spv.IAdd %16, %36 : i32
-          %44 = spv.IAdd %18, %41 : i32
-          %45 = spv.IMul %43, %5 : i32
-          %46 = spv.IAdd %45, %44 : i32
-          %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %48 = spv.Load "StorageBuffer" %47 : f32
-          %49 = spv.IAdd %17, %34 : i32
-          %50 = spv.IMul %44, %7 : i32
-          %51 = spv.IAdd %50, %49 : i32
-          %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %53 = spv.Load "StorageBuffer" %52 : f32
-          %54 = spv.IMul %43, %7 : i32
-          %55 = spv.IAdd %54, %49 : i32
-          %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-          %57 = spv.Load "StorageBuffer" %56 : f32
-          %58 = spv.FMul %48, %53 : f32
-          %59 = spv.FAdd %57, %58 : f32
-          spv.Store "StorageBuffer" %56, %59 : f32
-          %60 = spv.IAdd %41, %4 : i32
-          spv.Branch ^bb1(%60 : i32)
+          %44 = spv.IAdd %19, %37 : i32
+          %45 = spv.IAdd %17, %42 : i32
+          %46 = spv.IMul %44, %6 : i32
+          %47 = spv.IAdd %46, %45 : i32
+          %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %49 = spv.Load "StorageBuffer" %48 : f32
+          %50 = spv.IAdd %28, %35 : i32
+          %51 = spv.IMul %45, %8 : i32
+          %52 = spv.IAdd %51, %50 : i32
+          %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %54 = spv.Load "StorageBuffer" %53 : f32
+          %55 = spv.IMul %44, %8 : i32
+          %56 = spv.IAdd %55, %50 : i32
+          %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+          %58 = spv.Load "StorageBuffer" %57 : f32
+          %59 = spv.FMul %49, %54 : f32
+          %60 = spv.FAdd %58, %59 : f32
+          spv.Store "StorageBuffer" %57, %60 : f32
+          %61 = spv.IAdd %42, %5 : i32
+          spv.Branch ^bb1(%61 : i32)
         ^bb3:  // pred: ^bb1
           spv._merge
         }
@@ -2330,8 +2346,8 @@ spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_bu
       ^bb2:  // 2 preds: ^bb0, ^bb1
         spv._merge
       }
-      %40 = spv.IAdd %18, %0 : i32
-      spv.Branch ^bb1(%40 : i32)
+      %41 = spv.IAdd %17, %0 : i32
+      spv.Branch ^bb1(%41 : i32)
     ^bb3:  // pred: ^bb1
       spv._merge
     }
@@ -2399,78 +2415,79 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
         spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
         spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
           %0 = spv.constant 4 : i32
-          %1 = spv.constant 32 : i32
-          %2 = spv.constant 8 : i32
-          %3 = spv.constant -1 : i32
-          %4 = spv.constant 1 : i32
-          %5 = spv.constant 1024 : i32
-          %6 = spv.constant 0 : i32
-          %7 = spv.constant 64 : i32
-          %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-          %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-          %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-          %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-          %12 = spv.Load "Input" %11 : vector<3xi32>
-          %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-          %14 = spv.Load "Input" %11 : vector<3xi32>
-          %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-          %16 = spv.IMul %15, %2 : i32
-          %17 = spv.IMul %13, %2 : i32
+          %1 = spv.constant -1 : i32
+          %2 = spv.constant 32 : i32
+          %3 = spv.constant 8 : i32
+          %4 = spv.constant -8 : i32
+          %5 = spv.constant 1 : i32
+          %6 = spv.constant 1024 : i32
+          %7 = spv.constant 0 : i32
+          %8 = spv.constant 64 : i32
+          %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+          %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+          %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+          %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+          %13 = spv.Load "Input" %12 : vector<3xi32>
+          %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+          %15 = spv.Load "Input" %12 : vector<3xi32>
+          %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
           spv.loop {
-            spv.Branch ^bb1(%6 : i32)
-          ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-            %19 = spv.SLessThan %18, %5 : i32
-            spv.BranchConditional %19, ^bb2, ^bb3
+            spv.Branch ^bb1(%7 : i32)
+          ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+            %18 = spv.SLessThan %17, %6 : i32
+            spv.BranchConditional %18, ^bb2, ^bb3
           ^bb2:  // pred: ^bb1
-            %20 = spv.IMul %16, %3 : i32
-            %21 = spv.IAdd %20, %1 : i32
-            %22 = spv.SLessThan %2, %21 : i32
-            %23 = spv.Select %22, %2, %21 : i1, i32
-            %24 = spv.IMul %18, %3 : i32
-            %25 = spv.IAdd %24, %5 : i32
+            %19 = spv.IMul %16, %3 : i32
+            %20 = spv.IMul %16, %4 : i32
+            %21 = spv.IAdd %20, %2 : i32
+            %22 = spv.SLessThan %3, %21 : i32
+            %23 = spv.Select %22, %3, %21 : i1, i32
+            %24 = spv.IMul %17, %1 : i32
+            %25 = spv.IAdd %24, %6 : i32
             %26 = spv.SLessThan %0, %25 : i32
             %27 = spv.Select %26, %0, %25 : i1, i32
-            %28 = spv.IMul %17, %3 : i32
-            %29 = spv.IAdd %28, %7 : i32
-            %30 = spv.SLessThan %2, %29 : i32
-            %31 = spv.Select %30, %2, %29 : i1, i32
-            %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-            %33 = spv.Load "Input" %32 : vector<3xi32>
-            %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-            %35 = spv.Load "Input" %32 : vector<3xi32>
-            %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-            %37 = spv.SLessThan %36, %23 : i32
-            %38 = spv.SLessThan %34, %31 : i32
-            %39 = spv.LogicalAnd %37, %38 : i1
+            %28 = spv.IMul %14, %3 : i32
+            %29 = spv.IMul %14, %4 : i32
+            %30 = spv.IAdd %29, %8 : i32
+            %31 = spv.SLessThan %3, %30 : i32
+            %32 = spv.Select %31, %3, %30 : i1, i32
+            %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+            %34 = spv.Load "Input" %33 : vector<3xi32>
+            %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+            %36 = spv.Load "Input" %33 : vector<3xi32>
+            %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+            %38 = spv.SLessThan %37, %23 : i32
+            %39 = spv.SLessThan %35, %32 : i32
+            %40 = spv.LogicalAnd %38, %39 : i1
             spv.selection {
-              spv.BranchConditional %39, ^bb1, ^bb2
+              spv.BranchConditional %40, ^bb1, ^bb2
             ^bb1:  // pred: ^bb0
               spv.loop {
-                spv.Branch ^bb1(%6 : i32)
-              ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-                %42 = spv.SLessThan %41, %27 : i32
-                spv.BranchConditional %42, ^bb2, ^bb3
+                spv.Branch ^bb1(%7 : i32)
+              ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+                %43 = spv.SLessThan %42, %27 : i32
+                spv.BranchConditional %43, ^bb2, ^bb3
               ^bb2:  // pred: ^bb1
-                %43 = spv.IAdd %16, %36 : i32
-                %44 = spv.IAdd %18, %41 : i32
-                %45 = spv.IMul %43, %5 : i32
-                %46 = spv.IAdd %45, %44 : i32
-                %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                %48 = spv.Load "StorageBuffer" %47 : f32
-                %49 = spv.IAdd %17, %34 : i32
-                %50 = spv.IMul %44, %7 : i32
-                %51 = spv.IAdd %50, %49 : i32
-                %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                %53 = spv.Load "StorageBuffer" %52 : f32
-                %54 = spv.IMul %43, %7 : i32
-                %55 = spv.IAdd %54, %49 : i32
-                %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                %57 = spv.Load "StorageBuffer" %56 : f32
-                %58 = spv.FMul %48, %53 : f32
-                %59 = spv.FAdd %57, %58 : f32
-                spv.Store "StorageBuffer" %56, %59 : f32
-                %60 = spv.IAdd %41, %4 : i32
-                spv.Branch ^bb1(%60 : i32)
+                %44 = spv.IAdd %19, %37 : i32
+                %45 = spv.IAdd %17, %42 : i32
+                %46 = spv.IMul %44, %6 : i32
+                %47 = spv.IAdd %46, %45 : i32
+                %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                %49 = spv.Load "StorageBuffer" %48 : f32
+                %50 = spv.IAdd %28, %35 : i32
+                %51 = spv.IMul %45, %8 : i32
+                %52 = spv.IAdd %51, %50 : i32
+                %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                %54 = spv.Load "StorageBuffer" %53 : f32
+                %55 = spv.IMul %44, %8 : i32
+                %56 = spv.IAdd %55, %50 : i32
+                %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                %58 = spv.Load "StorageBuffer" %57 : f32
+                %59 = spv.FMul %49, %54 : f32
+                %60 = spv.FAdd %58, %59 : f32
+                spv.Store "StorageBuffer" %57, %60 : f32
+                %61 = spv.IAdd %42, %5 : i32
+                spv.Branch ^bb1(%61 : i32)
               ^bb3:  // pred: ^bb1
                 spv._merge
               }
@@ -2478,8 +2495,8 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
             ^bb2:  // 2 preds: ^bb0, ^bb1
               spv._merge
             }
-            %40 = spv.IAdd %18, %0 : i32
-            spv.Branch ^bb1(%40 : i32)
+            %41 = spv.IAdd %17, %0 : i32
+            spv.Branch ^bb1(%41 : i32)
           ^bb3:  // pred: ^bb1
             spv._merge
           }
@@ -2557,78 +2574,79 @@ module {
           spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
           spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
             %0 = spv.constant 4 : i32
-            %1 = spv.constant 32 : i32
-            %2 = spv.constant 8 : i32
-            %3 = spv.constant -1 : i32
-            %4 = spv.constant 1 : i32
-            %5 = spv.constant 1024 : i32
-            %6 = spv.constant 0 : i32
-            %7 = spv.constant 64 : i32
-            %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-            %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-            %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-            %12 = spv.Load "Input" %11 : vector<3xi32>
-            %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-            %14 = spv.Load "Input" %11 : vector<3xi32>
-            %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-            %16 = spv.IMul %15, %2 : i32
-            %17 = spv.IMul %13, %2 : i32
+            %1 = spv.constant -1 : i32
+            %2 = spv.constant 32 : i32
+            %3 = spv.constant 8 : i32
+            %4 = spv.constant -8 : i32
+            %5 = spv.constant 1 : i32
+            %6 = spv.constant 1024 : i32
+            %7 = spv.constant 0 : i32
+            %8 = spv.constant 64 : i32
+            %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+            %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+            %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+            %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+            %13 = spv.Load "Input" %12 : vector<3xi32>
+            %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+            %15 = spv.Load "Input" %12 : vector<3xi32>
+            %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
             spv.loop {
-              spv.Branch ^bb1(%6 : i32)
-            ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-              %19 = spv.SLessThan %18, %5 : i32
-              spv.BranchConditional %19, ^bb2, ^bb3
+              spv.Branch ^bb1(%7 : i32)
+            ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+              %18 = spv.SLessThan %17, %6 : i32
+              spv.BranchConditional %18, ^bb2, ^bb3
             ^bb2:  // pred: ^bb1
-              %20 = spv.IMul %16, %3 : i32
-              %21 = spv.IAdd %20, %1 : i32
-              %22 = spv.SLessThan %2, %21 : i32
-              %23 = spv.Select %22, %2, %21 : i1, i32
-              %24 = spv.IMul %18, %3 : i32
-              %25 = spv.IAdd %24, %5 : i32
+              %19 = spv.IMul %16, %3 : i32
+              %20 = spv.IMul %16, %4 : i32
+              %21 = spv.IAdd %20, %2 : i32
+              %22 = spv.SLessThan %3, %21 : i32
+              %23 = spv.Select %22, %3, %21 : i1, i32
+              %24 = spv.IMul %17, %1 : i32
+              %25 = spv.IAdd %24, %6 : i32
               %26 = spv.SLessThan %0, %25 : i32
               %27 = spv.Select %26, %0, %25 : i1, i32
-              %28 = spv.IMul %17, %3 : i32
-              %29 = spv.IAdd %28, %7 : i32
-              %30 = spv.SLessThan %2, %29 : i32
-              %31 = spv.Select %30, %2, %29 : i1, i32
-              %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-              %33 = spv.Load "Input" %32 : vector<3xi32>
-              %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-              %35 = spv.Load "Input" %32 : vector<3xi32>
-              %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-              %37 = spv.SLessThan %36, %23 : i32
-              %38 = spv.SLessThan %34, %31 : i32
-              %39 = spv.LogicalAnd %37, %38 : i1
+              %28 = spv.IMul %14, %3 : i32
+              %29 = spv.IMul %14, %4 : i32
+              %30 = spv.IAdd %29, %8 : i32
+              %31 = spv.SLessThan %3, %30 : i32
+              %32 = spv.Select %31, %3, %30 : i1, i32
+              %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+              %34 = spv.Load "Input" %33 : vector<3xi32>
+              %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+              %36 = spv.Load "Input" %33 : vector<3xi32>
+              %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+              %38 = spv.SLessThan %37, %23 : i32
+              %39 = spv.SLessThan %35, %32 : i32
+              %40 = spv.LogicalAnd %38, %39 : i1
               spv.selection {
-                spv.BranchConditional %39, ^bb1, ^bb2
+                spv.BranchConditional %40, ^bb1, ^bb2
               ^bb1:  // pred: ^bb0
                 spv.loop {
-                  spv.Branch ^bb1(%6 : i32)
-                ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-                  %42 = spv.SLessThan %41, %27 : i32
-                  spv.BranchConditional %42, ^bb2, ^bb3
+                  spv.Branch ^bb1(%7 : i32)
+                ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+                  %43 = spv.SLessThan %42, %27 : i32
+                  spv.BranchConditional %43, ^bb2, ^bb3
                 ^bb2:  // pred: ^bb1
-                  %43 = spv.IAdd %16, %36 : i32
-                  %44 = spv.IAdd %18, %41 : i32
-                  %45 = spv.IMul %43, %5 : i32
-                  %46 = spv.IAdd %45, %44 : i32
-                  %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %48 = spv.Load "StorageBuffer" %47 : f32
-                  %49 = spv.IAdd %17, %34 : i32
-                  %50 = spv.IMul %44, %7 : i32
-                  %51 = spv.IAdd %50, %49 : i32
-                  %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %53 = spv.Load "StorageBuffer" %52 : f32
-                  %54 = spv.IMul %43, %7 : i32
-                  %55 = spv.IAdd %54, %49 : i32
-                  %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %57 = spv.Load "StorageBuffer" %56 : f32
-                  %58 = spv.FMul %48, %53 : f32
-                  %59 = spv.FAdd %57, %58 : f32
-                  spv.Store "StorageBuffer" %56, %59 : f32
-                  %60 = spv.IAdd %41, %4 : i32
-                  spv.Branch ^bb1(%60 : i32)
+                  %44 = spv.IAdd %19, %37 : i32
+                  %45 = spv.IAdd %17, %42 : i32
+                  %46 = spv.IMul %44, %6 : i32
+                  %47 = spv.IAdd %46, %45 : i32
+                  %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %49 = spv.Load "StorageBuffer" %48 : f32
+                  %50 = spv.IAdd %28, %35 : i32
+                  %51 = spv.IMul %45, %8 : i32
+                  %52 = spv.IAdd %51, %50 : i32
+                  %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %54 = spv.Load "StorageBuffer" %53 : f32
+                  %55 = spv.IMul %44, %8 : i32
+                  %56 = spv.IAdd %55, %50 : i32
+                  %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %58 = spv.Load "StorageBuffer" %57 : f32
+                  %59 = spv.FMul %49, %54 : f32
+                  %60 = spv.FAdd %58, %59 : f32
+                  spv.Store "StorageBuffer" %57, %60 : f32
+                  %61 = spv.IAdd %42, %5 : i32
+                  spv.Branch ^bb1(%61 : i32)
                 ^bb3:  // pred: ^bb1
                   spv._merge
                 }
@@ -2636,8 +2654,8 @@ module {
               ^bb2:  // 2 preds: ^bb0, ^bb1
                 spv._merge
               }
-              %40 = spv.IAdd %18, %0 : i32
-              spv.Branch ^bb1(%40 : i32)
+              %41 = spv.IAdd %17, %0 : i32
+              spv.Branch ^bb1(%41 : i32)
             ^bb3:  // pred: ^bb1
               spv._merge
             }
@@ -2724,78 +2742,79 @@ module {
           spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
           spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
             %0 = spv.constant 4 : i32
-            %1 = spv.constant 32 : i32
-            %2 = spv.constant 8 : i32
-            %3 = spv.constant -1 : i32
-            %4 = spv.constant 1 : i32
-            %5 = spv.constant 1024 : i32
-            %6 = spv.constant 0 : i32
-            %7 = spv.constant 64 : i32
-            %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-            %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-            %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-            %12 = spv.Load "Input" %11 : vector<3xi32>
-            %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-            %14 = spv.Load "Input" %11 : vector<3xi32>
-            %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-            %16 = spv.IMul %15, %2 : i32
-            %17 = spv.IMul %13, %2 : i32
+            %1 = spv.constant -1 : i32
+            %2 = spv.constant 32 : i32
+            %3 = spv.constant 8 : i32
+            %4 = spv.constant -8 : i32
+            %5 = spv.constant 1 : i32
+            %6 = spv.constant 1024 : i32
+            %7 = spv.constant 0 : i32
+            %8 = spv.constant 64 : i32
+            %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+            %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+            %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+            %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+            %13 = spv.Load "Input" %12 : vector<3xi32>
+            %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+            %15 = spv.Load "Input" %12 : vector<3xi32>
+            %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
             spv.loop {
-              spv.Branch ^bb1(%6 : i32)
-            ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-              %19 = spv.SLessThan %18, %5 : i32
-              spv.BranchConditional %19, ^bb2, ^bb3
+              spv.Branch ^bb1(%7 : i32)
+            ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+              %18 = spv.SLessThan %17, %6 : i32
+              spv.BranchConditional %18, ^bb2, ^bb3
             ^bb2:  // pred: ^bb1
-              %20 = spv.IMul %16, %3 : i32
-              %21 = spv.IAdd %20, %1 : i32
-              %22 = spv.SLessThan %2, %21 : i32
-              %23 = spv.Select %22, %2, %21 : i1, i32
-              %24 = spv.IMul %18, %3 : i32
-              %25 = spv.IAdd %24, %5 : i32
+              %19 = spv.IMul %16, %3 : i32
+              %20 = spv.IMul %16, %4 : i32
+              %21 = spv.IAdd %20, %2 : i32
+              %22 = spv.SLessThan %3, %21 : i32
+              %23 = spv.Select %22, %3, %21 : i1, i32
+              %24 = spv.IMul %17, %1 : i32
+              %25 = spv.IAdd %24, %6 : i32
               %26 = spv.SLessThan %0, %25 : i32
               %27 = spv.Select %26, %0, %25 : i1, i32
-              %28 = spv.IMul %17, %3 : i32
-              %29 = spv.IAdd %28, %7 : i32
-              %30 = spv.SLessThan %2, %29 : i32
-              %31 = spv.Select %30, %2, %29 : i1, i32
-              %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-              %33 = spv.Load "Input" %32 : vector<3xi32>
-              %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-              %35 = spv.Load "Input" %32 : vector<3xi32>
-              %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-              %37 = spv.SLessThan %36, %23 : i32
-              %38 = spv.SLessThan %34, %31 : i32
-              %39 = spv.LogicalAnd %37, %38 : i1
+              %28 = spv.IMul %14, %3 : i32
+              %29 = spv.IMul %14, %4 : i32
+              %30 = spv.IAdd %29, %8 : i32
+              %31 = spv.SLessThan %3, %30 : i32
+              %32 = spv.Select %31, %3, %30 : i1, i32
+              %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+              %34 = spv.Load "Input" %33 : vector<3xi32>
+              %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+              %36 = spv.Load "Input" %33 : vector<3xi32>
+              %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+              %38 = spv.SLessThan %37, %23 : i32
+              %39 = spv.SLessThan %35, %32 : i32
+              %40 = spv.LogicalAnd %38, %39 : i1
               spv.selection {
-                spv.BranchConditional %39, ^bb1, ^bb2
+                spv.BranchConditional %40, ^bb1, ^bb2
               ^bb1:  // pred: ^bb0
                 spv.loop {
-                  spv.Branch ^bb1(%6 : i32)
-                ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-                  %42 = spv.SLessThan %41, %27 : i32
-                  spv.BranchConditional %42, ^bb2, ^bb3
+                  spv.Branch ^bb1(%7 : i32)
+                ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+                  %43 = spv.SLessThan %42, %27 : i32
+                  spv.BranchConditional %43, ^bb2, ^bb3
                 ^bb2:  // pred: ^bb1
-                  %43 = spv.IAdd %16, %36 : i32
-                  %44 = spv.IAdd %18, %41 : i32
-                  %45 = spv.IMul %43, %5 : i32
-                  %46 = spv.IAdd %45, %44 : i32
-                  %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %48 = spv.Load "StorageBuffer" %47 : f32
-                  %49 = spv.IAdd %17, %34 : i32
-                  %50 = spv.IMul %44, %7 : i32
-                  %51 = spv.IAdd %50, %49 : i32
-                  %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %53 = spv.Load "StorageBuffer" %52 : f32
-                  %54 = spv.IMul %43, %7 : i32
-                  %55 = spv.IAdd %54, %49 : i32
-                  %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %57 = spv.Load "StorageBuffer" %56 : f32
-                  %58 = spv.FMul %48, %53 : f32
-                  %59 = spv.FAdd %57, %58 : f32
-                  spv.Store "StorageBuffer" %56, %59 : f32
-                  %60 = spv.IAdd %41, %4 : i32
-                  spv.Branch ^bb1(%60 : i32)
+                  %44 = spv.IAdd %19, %37 : i32
+                  %45 = spv.IAdd %17, %42 : i32
+                  %46 = spv.IMul %44, %6 : i32
+                  %47 = spv.IAdd %46, %45 : i32
+                  %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %49 = spv.Load "StorageBuffer" %48 : f32
+                  %50 = spv.IAdd %28, %35 : i32
+                  %51 = spv.IMul %45, %8 : i32
+                  %52 = spv.IAdd %51, %50 : i32
+                  %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %54 = spv.Load "StorageBuffer" %53 : f32
+                  %55 = spv.IMul %44, %8 : i32
+                  %56 = spv.IAdd %55, %50 : i32
+                  %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %58 = spv.Load "StorageBuffer" %57 : f32
+                  %59 = spv.FMul %49, %54 : f32
+                  %60 = spv.FAdd %58, %59 : f32
+                  spv.Store "StorageBuffer" %57, %60 : f32
+                  %61 = spv.IAdd %42, %5 : i32
+                  spv.Branch ^bb1(%61 : i32)
                 ^bb3:  // pred: ^bb1
                   spv._merge
                 }
@@ -2803,8 +2822,8 @@ module {
               ^bb2:  // 2 preds: ^bb0, ^bb1
                 spv._merge
               }
-              %40 = spv.IAdd %18, %0 : i32
-              spv.Branch ^bb1(%40 : i32)
+              %41 = spv.IAdd %17, %0 : i32
+              spv.Branch ^bb1(%41 : i32)
             ^bb3:  // pred: ^bb1
               spv._merge
             }
@@ -3106,78 +3125,79 @@ module {
           spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
           spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
             %0 = spv.constant 4 : i32
-            %1 = spv.constant 32 : i32
-            %2 = spv.constant 8 : i32
-            %3 = spv.constant -1 : i32
-            %4 = spv.constant 1 : i32
-            %5 = spv.constant 1024 : i32
-            %6 = spv.constant 0 : i32
-            %7 = spv.constant 64 : i32
-            %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-            %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-            %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-            %12 = spv.Load "Input" %11 : vector<3xi32>
-            %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-            %14 = spv.Load "Input" %11 : vector<3xi32>
-            %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-            %16 = spv.IMul %15, %2 : i32
-            %17 = spv.IMul %13, %2 : i32
+            %1 = spv.constant -1 : i32
+            %2 = spv.constant 32 : i32
+            %3 = spv.constant 8 : i32
+            %4 = spv.constant -8 : i32
+            %5 = spv.constant 1 : i32
+            %6 = spv.constant 1024 : i32
+            %7 = spv.constant 0 : i32
+            %8 = spv.constant 64 : i32
+            %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+            %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+            %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+            %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+            %13 = spv.Load "Input" %12 : vector<3xi32>
+            %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+            %15 = spv.Load "Input" %12 : vector<3xi32>
+            %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
             spv.loop {
-              spv.Branch ^bb1(%6 : i32)
-            ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-              %19 = spv.SLessThan %18, %5 : i32
-              spv.BranchConditional %19, ^bb2, ^bb3
+              spv.Branch ^bb1(%7 : i32)
+            ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+              %18 = spv.SLessThan %17, %6 : i32
+              spv.BranchConditional %18, ^bb2, ^bb3
             ^bb2:  // pred: ^bb1
-              %20 = spv.IMul %16, %3 : i32
-              %21 = spv.IAdd %20, %1 : i32
-              %22 = spv.SLessThan %2, %21 : i32
-              %23 = spv.Select %22, %2, %21 : i1, i32
-              %24 = spv.IMul %18, %3 : i32
-              %25 = spv.IAdd %24, %5 : i32
+              %19 = spv.IMul %16, %3 : i32
+              %20 = spv.IMul %16, %4 : i32
+              %21 = spv.IAdd %20, %2 : i32
+              %22 = spv.SLessThan %3, %21 : i32
+              %23 = spv.Select %22, %3, %21 : i1, i32
+              %24 = spv.IMul %17, %1 : i32
+              %25 = spv.IAdd %24, %6 : i32
               %26 = spv.SLessThan %0, %25 : i32
               %27 = spv.Select %26, %0, %25 : i1, i32
-              %28 = spv.IMul %17, %3 : i32
-              %29 = spv.IAdd %28, %7 : i32
-              %30 = spv.SLessThan %2, %29 : i32
-              %31 = spv.Select %30, %2, %29 : i1, i32
-              %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-              %33 = spv.Load "Input" %32 : vector<3xi32>
-              %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-              %35 = spv.Load "Input" %32 : vector<3xi32>
-              %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-              %37 = spv.SLessThan %36, %23 : i32
-              %38 = spv.SLessThan %34, %31 : i32
-              %39 = spv.LogicalAnd %37, %38 : i1
+              %28 = spv.IMul %14, %3 : i32
+              %29 = spv.IMul %14, %4 : i32
+              %30 = spv.IAdd %29, %8 : i32
+              %31 = spv.SLessThan %3, %30 : i32
+              %32 = spv.Select %31, %3, %30 : i1, i32
+              %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+              %34 = spv.Load "Input" %33 : vector<3xi32>
+              %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+              %36 = spv.Load "Input" %33 : vector<3xi32>
+              %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+              %38 = spv.SLessThan %37, %23 : i32
+              %39 = spv.SLessThan %35, %32 : i32
+              %40 = spv.LogicalAnd %38, %39 : i1
               spv.selection {
-                spv.BranchConditional %39, ^bb1, ^bb2
+                spv.BranchConditional %40, ^bb1, ^bb2
               ^bb1:  // pred: ^bb0
                 spv.loop {
-                  spv.Branch ^bb1(%6 : i32)
-                ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-                  %42 = spv.SLessThan %41, %27 : i32
-                  spv.BranchConditional %42, ^bb2, ^bb3
+                  spv.Branch ^bb1(%7 : i32)
+                ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+                  %43 = spv.SLessThan %42, %27 : i32
+                  spv.BranchConditional %43, ^bb2, ^bb3
                 ^bb2:  // pred: ^bb1
-                  %43 = spv.IAdd %16, %36 : i32
-                  %44 = spv.IAdd %18, %41 : i32
-                  %45 = spv.IMul %43, %5 : i32
-                  %46 = spv.IAdd %45, %44 : i32
-                  %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %48 = spv.Load "StorageBuffer" %47 : f32
-                  %49 = spv.IAdd %17, %34 : i32
-                  %50 = spv.IMul %44, %7 : i32
-                  %51 = spv.IAdd %50, %49 : i32
-                  %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %53 = spv.Load "StorageBuffer" %52 : f32
-                  %54 = spv.IMul %43, %7 : i32
-                  %55 = spv.IAdd %54, %49 : i32
-                  %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %57 = spv.Load "StorageBuffer" %56 : f32
-                  %58 = spv.FMul %48, %53 : f32
-                  %59 = spv.FAdd %57, %58 : f32
-                  spv.Store "StorageBuffer" %56, %59 : f32
-                  %60 = spv.IAdd %41, %4 : i32
-                  spv.Branch ^bb1(%60 : i32)
+                  %44 = spv.IAdd %19, %37 : i32
+                  %45 = spv.IAdd %17, %42 : i32
+                  %46 = spv.IMul %44, %6 : i32
+                  %47 = spv.IAdd %46, %45 : i32
+                  %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %49 = spv.Load "StorageBuffer" %48 : f32
+                  %50 = spv.IAdd %28, %35 : i32
+                  %51 = spv.IMul %45, %8 : i32
+                  %52 = spv.IAdd %51, %50 : i32
+                  %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %54 = spv.Load "StorageBuffer" %53 : f32
+                  %55 = spv.IMul %44, %8 : i32
+                  %56 = spv.IAdd %55, %50 : i32
+                  %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %58 = spv.Load "StorageBuffer" %57 : f32
+                  %59 = spv.FMul %49, %54 : f32
+                  %60 = spv.FAdd %58, %59 : f32
+                  spv.Store "StorageBuffer" %57, %60 : f32
+                  %61 = spv.IAdd %42, %5 : i32
+                  spv.Branch ^bb1(%61 : i32)
                 ^bb3:  // pred: ^bb1
                   spv._merge
                 }
@@ -3185,8 +3205,8 @@ module {
               ^bb2:  // 2 preds: ^bb0, ^bb1
                 spv._merge
               }
-              %40 = spv.IAdd %18, %0 : i32
-              spv.Branch ^bb1(%40 : i32)
+              %41 = spv.IAdd %17, %0 : i32
+              spv.Branch ^bb1(%41 : i32)
             ^bb3:  // pred: ^bb1
               spv._merge
             }
@@ -3342,78 +3362,79 @@ module {
           spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
           spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
             %0 = spv.constant 4 : i32
-            %1 = spv.constant 32 : i32
-            %2 = spv.constant 8 : i32
-            %3 = spv.constant -1 : i32
-            %4 = spv.constant 1 : i32
-            %5 = spv.constant 1024 : i32
-            %6 = spv.constant 0 : i32
-            %7 = spv.constant 64 : i32
-            %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-            %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-            %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-            %12 = spv.Load "Input" %11 : vector<3xi32>
-            %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-            %14 = spv.Load "Input" %11 : vector<3xi32>
-            %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-            %16 = spv.IMul %15, %2 : i32
-            %17 = spv.IMul %13, %2 : i32
+            %1 = spv.constant -1 : i32
+            %2 = spv.constant 32 : i32
+            %3 = spv.constant 8 : i32
+            %4 = spv.constant -8 : i32
+            %5 = spv.constant 1 : i32
+            %6 = spv.constant 1024 : i32
+            %7 = spv.constant 0 : i32
+            %8 = spv.constant 64 : i32
+            %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+            %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+            %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+            %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+            %13 = spv.Load "Input" %12 : vector<3xi32>
+            %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+            %15 = spv.Load "Input" %12 : vector<3xi32>
+            %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
             spv.loop {
-              spv.Branch ^bb1(%6 : i32)
-            ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-              %19 = spv.SLessThan %18, %5 : i32
-              spv.BranchConditional %19, ^bb2, ^bb3
+              spv.Branch ^bb1(%7 : i32)
+            ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+              %18 = spv.SLessThan %17, %6 : i32
+              spv.BranchConditional %18, ^bb2, ^bb3
             ^bb2:  // pred: ^bb1
-              %20 = spv.IMul %16, %3 : i32
-              %21 = spv.IAdd %20, %1 : i32
-              %22 = spv.SLessThan %2, %21 : i32
-              %23 = spv.Select %22, %2, %21 : i1, i32
-              %24 = spv.IMul %18, %3 : i32
-              %25 = spv.IAdd %24, %5 : i32
+              %19 = spv.IMul %16, %3 : i32
+              %20 = spv.IMul %16, %4 : i32
+              %21 = spv.IAdd %20, %2 : i32
+              %22 = spv.SLessThan %3, %21 : i32
+              %23 = spv.Select %22, %3, %21 : i1, i32
+              %24 = spv.IMul %17, %1 : i32
+              %25 = spv.IAdd %24, %6 : i32
               %26 = spv.SLessThan %0, %25 : i32
               %27 = spv.Select %26, %0, %25 : i1, i32
-              %28 = spv.IMul %17, %3 : i32
-              %29 = spv.IAdd %28, %7 : i32
-              %30 = spv.SLessThan %2, %29 : i32
-              %31 = spv.Select %30, %2, %29 : i1, i32
-              %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-              %33 = spv.Load "Input" %32 : vector<3xi32>
-              %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-              %35 = spv.Load "Input" %32 : vector<3xi32>
-              %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-              %37 = spv.SLessThan %36, %23 : i32
-              %38 = spv.SLessThan %34, %31 : i32
-              %39 = spv.LogicalAnd %37, %38 : i1
+              %28 = spv.IMul %14, %3 : i32
+              %29 = spv.IMul %14, %4 : i32
+              %30 = spv.IAdd %29, %8 : i32
+              %31 = spv.SLessThan %3, %30 : i32
+              %32 = spv.Select %31, %3, %30 : i1, i32
+              %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+              %34 = spv.Load "Input" %33 : vector<3xi32>
+              %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+              %36 = spv.Load "Input" %33 : vector<3xi32>
+              %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+              %38 = spv.SLessThan %37, %23 : i32
+              %39 = spv.SLessThan %35, %32 : i32
+              %40 = spv.LogicalAnd %38, %39 : i1
               spv.selection {
-                spv.BranchConditional %39, ^bb1, ^bb2
+                spv.BranchConditional %40, ^bb1, ^bb2
               ^bb1:  // pred: ^bb0
                 spv.loop {
-                  spv.Branch ^bb1(%6 : i32)
-                ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-                  %42 = spv.SLessThan %41, %27 : i32
-                  spv.BranchConditional %42, ^bb2, ^bb3
+                  spv.Branch ^bb1(%7 : i32)
+                ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+                  %43 = spv.SLessThan %42, %27 : i32
+                  spv.BranchConditional %43, ^bb2, ^bb3
                 ^bb2:  // pred: ^bb1
-                  %43 = spv.IAdd %16, %36 : i32
-                  %44 = spv.IAdd %18, %41 : i32
-                  %45 = spv.IMul %43, %5 : i32
-                  %46 = spv.IAdd %45, %44 : i32
-                  %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %48 = spv.Load "StorageBuffer" %47 : f32
-                  %49 = spv.IAdd %17, %34 : i32
-                  %50 = spv.IMul %44, %7 : i32
-                  %51 = spv.IAdd %50, %49 : i32
-                  %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %53 = spv.Load "StorageBuffer" %52 : f32
-                  %54 = spv.IMul %43, %7 : i32
-                  %55 = spv.IAdd %54, %49 : i32
-                  %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %57 = spv.Load "StorageBuffer" %56 : f32
-                  %58 = spv.FMul %48, %53 : f32
-                  %59 = spv.FAdd %57, %58 : f32
-                  spv.Store "StorageBuffer" %56, %59 : f32
-                  %60 = spv.IAdd %41, %4 : i32
-                  spv.Branch ^bb1(%60 : i32)
+                  %44 = spv.IAdd %19, %37 : i32
+                  %45 = spv.IAdd %17, %42 : i32
+                  %46 = spv.IMul %44, %6 : i32
+                  %47 = spv.IAdd %46, %45 : i32
+                  %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %49 = spv.Load "StorageBuffer" %48 : f32
+                  %50 = spv.IAdd %28, %35 : i32
+                  %51 = spv.IMul %45, %8 : i32
+                  %52 = spv.IAdd %51, %50 : i32
+                  %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %54 = spv.Load "StorageBuffer" %53 : f32
+                  %55 = spv.IMul %44, %8 : i32
+                  %56 = spv.IAdd %55, %50 : i32
+                  %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %58 = spv.Load "StorageBuffer" %57 : f32
+                  %59 = spv.FMul %49, %54 : f32
+                  %60 = spv.FAdd %58, %59 : f32
+                  spv.Store "StorageBuffer" %57, %60 : f32
+                  %61 = spv.IAdd %42, %5 : i32
+                  spv.Branch ^bb1(%61 : i32)
                 ^bb3:  // pred: ^bb1
                   spv._merge
                 }
@@ -3421,8 +3442,8 @@ module {
               ^bb2:  // 2 preds: ^bb0, ^bb1
                 spv._merge
               }
-              %40 = spv.IAdd %18, %0 : i32
-              spv.Branch ^bb1(%40 : i32)
+              %41 = spv.IAdd %17, %0 : i32
+              spv.Branch ^bb1(%41 : i32)
             ^bb3:  // pred: ^bb1
               spv._merge
             }
@@ -3684,78 +3705,79 @@ module {
           spv.globalVariable @__resource_var_0_2__ bind(0, 2) : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
           spv.func @dot_ex_dispatch_0_dispatch_1() "None" attributes {vkspv.workgroup_count_from_result_shape = 2 : i32} {
             %0 = spv.constant 4 : i32
-            %1 = spv.constant 32 : i32
-            %2 = spv.constant 8 : i32
-            %3 = spv.constant -1 : i32
-            %4 = spv.constant 1 : i32
-            %5 = spv.constant 1024 : i32
-            %6 = spv.constant 0 : i32
-            %7 = spv.constant 64 : i32
-            %8 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
-            %9 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
-            %10 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
-            %11 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
-            %12 = spv.Load "Input" %11 : vector<3xi32>
-            %13 = spv.CompositeExtract %12[0 : i32] : vector<3xi32>
-            %14 = spv.Load "Input" %11 : vector<3xi32>
-            %15 = spv.CompositeExtract %14[1 : i32] : vector<3xi32>
-            %16 = spv.IMul %15, %2 : i32
-            %17 = spv.IMul %13, %2 : i32
+            %1 = spv.constant -1 : i32
+            %2 = spv.constant 32 : i32
+            %3 = spv.constant 8 : i32
+            %4 = spv.constant -8 : i32
+            %5 = spv.constant 1 : i32
+            %6 = spv.constant 1024 : i32
+            %7 = spv.constant 0 : i32
+            %8 = spv.constant 64 : i32
+            %9 = spv._address_of @__resource_var_0_2__ : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>
+            %10 = spv._address_of @__resource_var_0_0__ : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>
+            %11 = spv._address_of @__resource_var_0_1__ : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>
+            %12 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
+            %13 = spv.Load "Input" %12 : vector<3xi32>
+            %14 = spv.CompositeExtract %13[0 : i32] : vector<3xi32>
+            %15 = spv.Load "Input" %12 : vector<3xi32>
+            %16 = spv.CompositeExtract %15[1 : i32] : vector<3xi32>
             spv.loop {
-              spv.Branch ^bb1(%6 : i32)
-            ^bb1(%18: i32):  // 2 preds: ^bb0, ^bb2
-              %19 = spv.SLessThan %18, %5 : i32
-              spv.BranchConditional %19, ^bb2, ^bb3
+              spv.Branch ^bb1(%7 : i32)
+            ^bb1(%17: i32):  // 2 preds: ^bb0, ^bb2
+              %18 = spv.SLessThan %17, %6 : i32
+              spv.BranchConditional %18, ^bb2, ^bb3
             ^bb2:  // pred: ^bb1
-              %20 = spv.IMul %16, %3 : i32
-              %21 = spv.IAdd %20, %1 : i32
-              %22 = spv.SLessThan %2, %21 : i32
-              %23 = spv.Select %22, %2, %21 : i1, i32
-              %24 = spv.IMul %18, %3 : i32
-              %25 = spv.IAdd %24, %5 : i32
+              %19 = spv.IMul %16, %3 : i32
+              %20 = spv.IMul %16, %4 : i32
+              %21 = spv.IAdd %20, %2 : i32
+              %22 = spv.SLessThan %3, %21 : i32
+              %23 = spv.Select %22, %3, %21 : i1, i32
+              %24 = spv.IMul %17, %1 : i32
+              %25 = spv.IAdd %24, %6 : i32
               %26 = spv.SLessThan %0, %25 : i32
               %27 = spv.Select %26, %0, %25 : i1, i32
-              %28 = spv.IMul %17, %3 : i32
-              %29 = spv.IAdd %28, %7 : i32
-              %30 = spv.SLessThan %2, %29 : i32
-              %31 = spv.Select %30, %2, %29 : i1, i32
-              %32 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
-              %33 = spv.Load "Input" %32 : vector<3xi32>
-              %34 = spv.CompositeExtract %33[0 : i32] : vector<3xi32>
-              %35 = spv.Load "Input" %32 : vector<3xi32>
-              %36 = spv.CompositeExtract %35[1 : i32] : vector<3xi32>
-              %37 = spv.SLessThan %36, %23 : i32
-              %38 = spv.SLessThan %34, %31 : i32
-              %39 = spv.LogicalAnd %37, %38 : i1
+              %28 = spv.IMul %14, %3 : i32
+              %29 = spv.IMul %14, %4 : i32
+              %30 = spv.IAdd %29, %8 : i32
+              %31 = spv.SLessThan %3, %30 : i32
+              %32 = spv.Select %31, %3, %30 : i1, i32
+              %33 = spv._address_of @__builtin_var_LocalInvocationId__ : !spv.ptr<vector<3xi32>, Input>
+              %34 = spv.Load "Input" %33 : vector<3xi32>
+              %35 = spv.CompositeExtract %34[0 : i32] : vector<3xi32>
+              %36 = spv.Load "Input" %33 : vector<3xi32>
+              %37 = spv.CompositeExtract %36[1 : i32] : vector<3xi32>
+              %38 = spv.SLessThan %37, %23 : i32
+              %39 = spv.SLessThan %35, %32 : i32
+              %40 = spv.LogicalAnd %38, %39 : i1
               spv.selection {
-                spv.BranchConditional %39, ^bb1, ^bb2
+                spv.BranchConditional %40, ^bb1, ^bb2
               ^bb1:  // pred: ^bb0
                 spv.loop {
-                  spv.Branch ^bb1(%6 : i32)
-                ^bb1(%41: i32):  // 2 preds: ^bb0, ^bb2
-                  %42 = spv.SLessThan %41, %27 : i32
-                  spv.BranchConditional %42, ^bb2, ^bb3
+                  spv.Branch ^bb1(%7 : i32)
+                ^bb1(%42: i32):  // 2 preds: ^bb0, ^bb2
+                  %43 = spv.SLessThan %42, %27 : i32
+                  spv.BranchConditional %43, ^bb2, ^bb3
                 ^bb2:  // pred: ^bb1
-                  %43 = spv.IAdd %16, %36 : i32
-                  %44 = spv.IAdd %18, %41 : i32
-                  %45 = spv.IMul %43, %5 : i32
-                  %46 = spv.IAdd %45, %44 : i32
-                  %47 = spv.AccessChain %9[%6, %46] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %48 = spv.Load "StorageBuffer" %47 : f32
-                  %49 = spv.IAdd %17, %34 : i32
-                  %50 = spv.IMul %44, %7 : i32
-                  %51 = spv.IAdd %50, %49 : i32
-                  %52 = spv.AccessChain %10[%6, %51] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %53 = spv.Load "StorageBuffer" %52 : f32
-                  %54 = spv.IMul %43, %7 : i32
-                  %55 = spv.IAdd %54, %49 : i32
-                  %56 = spv.AccessChain %8[%6, %55] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
-                  %57 = spv.Load "StorageBuffer" %56 : f32
-                  %58 = spv.FMul %48, %53 : f32
-                  %59 = spv.FAdd %57, %58 : f32
-                  spv.Store "StorageBuffer" %56, %59 : f32
-                  %60 = spv.IAdd %41, %4 : i32
-                  spv.Branch ^bb1(%60 : i32)
+                  %44 = spv.IAdd %19, %37 : i32
+                  %45 = spv.IAdd %17, %42 : i32
+                  %46 = spv.IMul %44, %6 : i32
+                  %47 = spv.IAdd %46, %45 : i32
+                  %48 = spv.AccessChain %10[%7, %47] : !spv.ptr<!spv.struct<!spv.array<32768 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %49 = spv.Load "StorageBuffer" %48 : f32
+                  %50 = spv.IAdd %28, %35 : i32
+                  %51 = spv.IMul %45, %8 : i32
+                  %52 = spv.IAdd %51, %50 : i32
+                  %53 = spv.AccessChain %11[%7, %52] : !spv.ptr<!spv.struct<!spv.array<65536 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %54 = spv.Load "StorageBuffer" %53 : f32
+                  %55 = spv.IMul %44, %8 : i32
+                  %56 = spv.IAdd %55, %50 : i32
+                  %57 = spv.AccessChain %9[%7, %56] : !spv.ptr<!spv.struct<!spv.array<2048 x f32, stride=4> [0]>, StorageBuffer>, i32, i32
+                  %58 = spv.Load "StorageBuffer" %57 : f32
+                  %59 = spv.FMul %49, %54 : f32
+                  %60 = spv.FAdd %58, %59 : f32
+                  spv.Store "StorageBuffer" %57, %60 : f32
+                  %61 = spv.IAdd %42, %5 : i32
+                  spv.Branch ^bb1(%61 : i32)
                 ^bb3:  // pred: ^bb1
                   spv._merge
                 }
@@ -3763,8 +3785,8 @@ module {
               ^bb2:  // 2 preds: ^bb0, ^bb1
                 spv._merge
               }
-              %40 = spv.IAdd %18, %0 : i32
-              spv.Branch ^bb1(%40 : i32)
+              %41 = spv.IAdd %17, %0 : i32
+              spv.Branch ^bb1(%41 : i32)
             ^bb3:  // pred: ^bb1
               spv._merge
             }
@@ -3967,7 +3989,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<3076xi8>, format = 1397773893 : i32} {
+  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<3092xi8>, format = 1397773893 : i32} {
   }
 }
 
@@ -4140,7 +4162,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<3076xi8>, format = 1397773893 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<3092xi8>, format = 1397773893 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
@@ -4237,7 +4259,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<3076xi8>, format = 1397773893 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<3092xi8>, format = 1397773893 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
@@ -4335,7 +4357,7 @@ module {
     }
     vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3076xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3092xi8>
     vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -4522,7 +4544,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3076xi8>
+  vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3092xi8>
   vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -4694,7 +4716,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3076xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3092xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -4936,7 +4958,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3076xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3092xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -5178,7 +5200,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3076xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3092xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -5390,7 +5412,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3076xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_spirv opaque<"", "0xDEADBEEF"> : vector<3092xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
