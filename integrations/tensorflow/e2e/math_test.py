@@ -30,7 +30,7 @@ class MathModule(tf.Module):
     return tf.math.ceil(x)
 
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
-  def compare(self, x):
+  def greater_than(self, x):
     return x > 1.0
 
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
@@ -68,12 +68,12 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
 
     self.compare_backends(ceil)
 
-  def test_compare(self):
+  def test_greater_than(self):
 
-    def compare(module):
-      module.compare(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+    def greater_than(module):
+      module.greater_than(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-    self.compare_backends(compare)
+    self.compare_backends(greater_than)
 
   def test_cos(self):
 
