@@ -69,6 +69,7 @@ class CheckModuleTest : public ::testing::Test {
     IREE_EXPECT_OK(iree_vm_invoke(context_, function_, /*policy=*/nullptr,
                                   /*inputs=*/nullptr, /*outputs=*/nullptr,
                                   iree_allocator_system()));
+    EXPECT_TRUE(false);
   }
 
  private:
