@@ -113,7 +113,18 @@ func @cloneDynamic(%arg0 : tensor<4xi32>) -> tensor<4xi32> {
 
 // -----
 
-// TODO(benvanik): const folder for slice.
+// CHECK-LABEL: @sliceConst
+func @sliceConst() -> tensor<1x2x3xi32> {
+  %0 = constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense
+  %1 = flow.tensor.slice %0[%c0, %c1, %c0 for %c1, %c2, %c3] : tensor<2x3x3xi32> -> tensor<1x2x3xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<1x2x3xi32>
+}
 
 // -----
 
