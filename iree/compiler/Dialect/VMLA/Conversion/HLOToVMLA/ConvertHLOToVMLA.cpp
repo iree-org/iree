@@ -179,8 +179,6 @@ struct IotaOpConversion : public OpConversionPattern<Shape::IotaOp> {
   TypeConverter &typeConverter;
 };
 
-
-
 struct CanonicalizeBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mhlo::BroadcastOp op,

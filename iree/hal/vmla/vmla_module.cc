@@ -512,6 +512,11 @@ class VMLAModuleState final {
   IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX32, uint32_t);
 
+  IREE_VMLA_NONARY_OP(IotaI8, kernels::Iota, int8_t);
+  IREE_VMLA_NONARY_OP(IotaI16, kernels::Iota, int16_t);
+  IREE_VMLA_NONARY_OP(IotaI32, kernels::Iota, int32_t);
+  IREE_VMLA_NONARY_OP(IotaF32, kernels::Iota, float_t);
+
 #define IREE_VMLA_TILE_OP(name, type)                                     \
   Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
               vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {         \
@@ -552,11 +557,6 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
   // VMLA Ops: arithmetic
   //===--------------------------------------------------------------------===//
-
-  IREE_VMLA_NONARY_OP(IotaI8, kernels::Iota, int8_t);
-  IREE_VMLA_NONARY_OP(IotaI16, kernels::Iota, int16_t);
-  IREE_VMLA_NONARY_OP(IotaI32, kernels::Iota, int32_t);
-  IREE_VMLA_NONARY_OP(IotaF32, kernels::Iota, float_t);
 
   IREE_VMLA_BINARY_OP(AddI8, kernels::Add, int8_t);
   IREE_VMLA_BINARY_OP(AddI16, kernels::Add, int16_t);
