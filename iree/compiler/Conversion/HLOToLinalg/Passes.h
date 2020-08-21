@@ -27,6 +27,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Creates a pass to fuse operations on tensors.
+std::unique_ptr<Pass> createFusionOfTensorOpsPass();
+
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 

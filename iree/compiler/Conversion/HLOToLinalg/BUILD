@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "HLOToLinalg",
     srcs = [
+        "FusionOfTensorOps.cpp",
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "Passes.cpp",
