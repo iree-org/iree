@@ -843,6 +843,10 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("scatter.x8", &VMLAModuleState::ScatterX8),
     vm::MakeNativeFunction("scatter.x16", &VMLAModuleState::ScatterX16),
     vm::MakeNativeFunction("scatter.x32", &VMLAModuleState::ScatterX32),
+    vm::MakeNativeFunction("iota.i8", &VMLAModuleState::IotaI8),
+    vm::MakeNativeFunction("iota.i16", &VMLAModuleState::IotaI16),
+    vm::MakeNativeFunction("iota.i32", &VMLAModuleState::IotaI32),
+    vm::MakeNativeFunction("iota.f32", &VMLAModuleState::IotaF32),
     vm::MakeNativeFunction("tile.x8", &VMLAModuleState::TileX8),
     vm::MakeNativeFunction("tile.x16", &VMLAModuleState::TileX16),
     vm::MakeNativeFunction("tile.x32", &VMLAModuleState::TileX32),
@@ -868,11 +872,6 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("shr.i8", &VMLAModuleState::ShrI8),
     vm::MakeNativeFunction("shr.i16", &VMLAModuleState::ShrI16),
     vm::MakeNativeFunction("shr.i32", &VMLAModuleState::ShrI32),
-
-    vm::MakeNativeFunction("iota.i8", &VMLAModuleState::IotaI8),
-    vm::MakeNativeFunction("iota.i16", &VMLAModuleState::IotaI16),
-    vm::MakeNativeFunction("iota.i32", &VMLAModuleState::IotaI32),
-    vm::MakeNativeFunction("iota.f32", &VMLAModuleState::IotaF32),
 
     vm::MakeNativeFunction("add.i8", &VMLAModuleState::AddI8),
     vm::MakeNativeFunction("add.i16", &VMLAModuleState::AddI16),
