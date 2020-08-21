@@ -51,7 +51,7 @@ iree_cc_library(
     MLIRSCFToSPIRV
     MLIRSPIRV
     MLIRSPIRVTransforms
-    MLIRSideEffectInterface
+    MLIRSideEffectInterfaces
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport
