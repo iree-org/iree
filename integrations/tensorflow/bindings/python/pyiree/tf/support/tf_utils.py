@@ -352,7 +352,7 @@ class _TfFunctionWrapper(object):
       # convert_to_tensor isn't reversible via .numpy()
       result = np.array(result)
     if result.dtype == np.bool:
-      # bools should be interpreted as int8s
+      # IREE interprets bools as int8s, so we modify this for comparison.
       result = result.astype(dtype=np.int8)
     return result
 
