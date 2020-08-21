@@ -113,7 +113,85 @@ func @cloneDynamic(%arg0 : tensor<4xi32>) -> tensor<4xi32> {
 
 // -----
 
-// TODO(benvanik): const folder for slice.
+// CHECK-LABEL: @sliceConst0D
+func @sliceConst0D() -> tensor<i32> {
+  %0 = constant dense<0> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = constant dense<0> : tensor<i32>
+  %1 = flow.tensor.slice %0[for] : tensor<i32> -> tensor<i32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<i32>
+}
+
+// CHECK-LABEL: @sliceConst1D
+func @sliceConst1D() -> tensor<1xi32> {
+  %0 = constant dense<0> : tensor<1xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<0> : tensor<1xi32>
+  %1 = flow.tensor.slice %0[%c0 for %c1] : tensor<1xi32> -> tensor<1xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<1xi32>
+}
+
+// CHECK-LABEL: @sliceConst1DZeroLength
+func @sliceConst1DZeroLength() -> tensor<0xi32> {
+  %0 = constant dense<0> : tensor<1xi32>
+  %c0 = constant 0 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<> : tensor<0xi32>
+  %1 = flow.tensor.slice %0[%c0 for %c0] : tensor<1xi32> -> tensor<0xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<0xi32>
+}
+
+// CHECK-LABEL: @sliceConst2D
+func @sliceConst2D() -> tensor<1x2xi32> {
+  %0 = constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
+  // CHECK-SAME:     [1, 2]
+  // CHECK-SAME: ]> : tensor<1x2xi32>
+  %1 = flow.tensor.slice %0[%c0, %c1 for %c1, %c2] : tensor<2x3xi32> -> tensor<1x2xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<1x2xi32>
+}
+
+// CHECK-LABEL: @sliceConst2DZeroLength1
+func @sliceConst2DZeroLength1() -> tensor<1x0xi32> {
+  %0 = constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<> : tensor<1x0xi32>
+  %1 = flow.tensor.slice %0[%c0, %c0 for %c1, %c0] : tensor<2x3xi32> -> tensor<1x0xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<1x0xi32>
+}
+
+// CHECK-LABEL: @sliceConst2DZeroLength01
+func @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
+  %0 = constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
+  %c0 = constant 0 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<> : tensor<0x0xi32>
+  %1 = flow.tensor.slice %0[%c0, %c0 for %c0, %c0] : tensor<2x3xi32> -> tensor<0x0xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<0x0xi32>
+}
+
+// CHECK-LABEL: @sliceConst3D
+func @sliceConst3D() -> tensor<1x2x3xi32> {
+  %0 = constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
+  // CHECK-SAME:                             [
+  // CHECK-SAME:                              [3, 4, 5], [6, 7, 8]]]> : tensor<1x2x3xi32>
+  %1 = flow.tensor.slice %0[%c0, %c1, %c0 for %c1, %c2, %c3] : tensor<2x3x3xi32> -> tensor<1x2x3xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %1 : tensor<1x2x3xi32>
+}
 
 // -----
 
