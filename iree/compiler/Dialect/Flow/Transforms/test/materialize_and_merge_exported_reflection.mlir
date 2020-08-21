@@ -41,10 +41,18 @@ func @unsupportedTypeOnAbiNone(%arg0 : i1) -> ()
 {
   return
 }
+// -----
+// CHECK-LABEL: @reflectionOnBool
+// CHECK-SAME: iree.reflection = {f = "I6!S3!t4R1!", fv = "1"}
+func @reflectionOnBool(%arg0 : i1) -> ()
+    attributes {iree.module.export}
+{
+  return
+}
 
 // -----
 // expected-warning @+1 {{Argument #0 of function unsupportedType is not a recognized public ABI type and the function may not be invokable by standard tools}}
-func @unsupportedType(%arg0 : i1) -> ()
+func @unsupportedType(%arg0 : i3) -> ()
     attributes {iree.module.export}
 {
   return
