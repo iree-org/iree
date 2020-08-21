@@ -54,40 +54,40 @@ class MathModule(tf.Module):
 @tf_test_utils.compile_module(MathModule)
 class MathTest(tf_test_utils.TracedModuleTestCase):
 
-  #def test_abs(self):
+  def test_abs(self):
 
-  #  def abs(module):
-  #    module.abs(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
+    def abs(module):
+      module.abs(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
 
-  #  self.compare_backends(abs)
+    self.compare_backends(abs)
 
-  #def test_ceil(self):
+  def test_ceil(self):
 
-  #  def ceil(module):
-  #    module.ceil(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+    def ceil(module):
+      module.ceil(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-  #  self.compare_backends(ceil)
+    self.compare_backends(ceil)
 
-  #def test_greater_than(self):
+  def test_greater_than(self):
 
-  #  def greater_than(module):
-  #    module.greater_than(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+    def greater_than(module):
+      module.greater_than(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-  #  self.compare_backends(greater_than)
+    self.compare_backends(greater_than)
 
-  #def test_cos(self):
+  def test_cos(self):
 
-  #  def cos(module):
-  #    module.cos(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
+    def cos(module):
+      module.cos(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
 
-  #  self.compare_backends(cos)
+    self.compare_backends(cos)
 
-  #def test_log(self):
+  def test_log(self):
 
-  #  def log(module):
-  #    module.log(np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32))
+    def log(module):
+      module.log(np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32))
 
-  #  self.compare_backends(log)
+    self.compare_backends(log)
 
   def test_logical_and(self):
 
@@ -98,12 +98,12 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
 
     self.compare_backends(logical_and)
 
-  #def test_mod(self):
+  def test_mod(self):
 
-  #  def mod(module):
-  #    module.mod(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
+    def mod(module):
+      module.mod(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-  #  self.compare_backends(mod)
+    self.compare_backends(mod)
 
 
 if __name__ == "__main__":
