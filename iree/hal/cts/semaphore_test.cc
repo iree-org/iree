@@ -88,6 +88,42 @@ TEST_P(SemaphoreTest, WaitUnsignaled) {
 // Waiting on a failed semaphore is undefined behavior. Some backends may
 // return UnknownError while others may succeed.
 
+// Waiting all semaphores but not all are signaled.
+TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto a, device_->CreateSemaphore(0u));
+  IREE_ASSERT_OK_AND_ASSIGN(auto b, device_->CreateSemaphore(1u));
+  // NOTE: we don't actually block here because otherwise we'd lock up.
+  // Result status is undefined - some backends may return DeadlineExceededError
+  // while others may return success.
+  device_->WaitAllSemaphores({{a.get(), 1u}, {b.get(), 1u}}, InfinitePast())
+      .IgnoreError();
+}
+
+// Waiting all semaphores and all are signaled.
+TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
+  // TODO: fix this.
+  if (driver_->name() == "dylib") GTEST_SKIP();
+
+  IREE_ASSERT_OK_AND_ASSIGN(auto a, device_->CreateSemaphore(1u));
+  IREE_ASSERT_OK_AND_ASSIGN(auto b, device_->CreateSemaphore(1u));
+  IREE_ASSERT_OK(device_->WaitAllSemaphores({{a.get(), 1u}, {b.get(), 1u}},
+                                            InfiniteFuture()));
+}
+
+// Waiting any semaphore to signal.
+TEST_P(SemaphoreTest, WaitAny) {
+  // TODO: fix this.
+  if (driver_->name() == "dylib" || driver_->name() == "llvmjit" ||
+      driver_->name() == "vmla" || driver_->name() == "vulkan") {
+    GTEST_SKIP();
+  }
+
+  IREE_ASSERT_OK_AND_ASSIGN(auto a, device_->CreateSemaphore(0u));
+  IREE_ASSERT_OK_AND_ASSIGN(auto b, device_->CreateSemaphore(1u));
+  IREE_ASSERT_OK(device_->WaitAnySemaphore({{a.get(), 1u}, {b.get(), 1u}},
+                                           InfiniteFuture()));
+}
+
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
 TEST_P(SemaphoreTest, PingPong) {

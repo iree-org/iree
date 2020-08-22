@@ -91,6 +91,16 @@ cc_test(
 )
 
 cc_test(
+    name = "driver_test",
+    srcs = ["driver_test.cc"],
+    deps = [
+        ":cts_test_base",
+        "//iree/hal:driver_registry",
+        "//iree/testing:gtest",
+    ],
+)
+
+cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
     deps = [

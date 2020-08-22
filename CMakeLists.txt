@@ -87,6 +87,7 @@ endif()
 set(IREE_ALL_HAL_DRIVERS
   DyLib
   LLVM
+  Metal
   VMLA
   Vulkan
 )
@@ -97,6 +98,14 @@ if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
   if(ANDROID)
     # TODO(ataei): Enable dylib/dylib-llvm-aot for android.
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM DyLib)
+  endif()
+
+  # For Apple platforms we need to use Metal instead of Vulkan.
+  if(APPLE)
+    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
+  else()
+    # And Metal isn't available on non-Apple platforms for sure.
+    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Metal)
   endif()
 endif()
 message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
@@ -120,6 +129,9 @@ if(${IREE_HAL_DRIVER_DYLIB})
 endif()
 if(${IREE_HAL_DRIVER_LLVM})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::llvmjit::llvmjit_driver_module)
+endif()
+if(${IREE_HAL_DRIVER_METAL})
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::metal::metal_driver_module)
 endif()
 if(${IREE_HAL_DRIVER_VMLA})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::vmla::vmla_driver_module)
