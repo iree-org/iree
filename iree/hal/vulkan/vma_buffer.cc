@@ -55,21 +55,19 @@ Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
     case 1: {
       uint8_t* data = static_cast<uint8_t*>(data_ptr);
       uint8_t value_bits = *static_cast<const uint8_t*>(pattern);
-      std::fill_n(data + byte_offset, byte_length, value_bits);
+      std::fill_n(data, byte_length, value_bits);
       break;
     }
     case 2: {
       uint16_t* data = static_cast<uint16_t*>(data_ptr);
       uint16_t value_bits = *static_cast<const uint16_t*>(pattern);
-      std::fill_n(data + byte_offset / sizeof(uint16_t),
-                  byte_length / sizeof(uint16_t), value_bits);
+      std::fill_n(data, byte_length / sizeof(uint16_t), value_bits);
       break;
     }
     case 4: {
       uint32_t* data = static_cast<uint32_t*>(data_ptr);
       uint32_t value_bits = *static_cast<const uint32_t*>(pattern);
-      std::fill_n(data + byte_offset / sizeof(uint32_t),
-                  byte_length / sizeof(uint32_t), value_bits);
+      std::fill_n(data, byte_length / sizeof(uint32_t), value_bits);
       break;
     }
     default:
@@ -111,8 +109,8 @@ Status VmaBuffer::CopyDataImpl(device_size_t target_offset,
                         MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
                                            target_offset, data_length));
   CHECK_EQ(data_length, target_mapping.size());
-  std::memcpy(target_mapping.mutable_data() + target_offset,
-              source_mapping.data(), data_length);
+  std::memcpy(target_mapping.mutable_data(), source_mapping.data(),
+              data_length);
   return OkStatus();
 }
 
