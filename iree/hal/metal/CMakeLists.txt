@@ -61,6 +61,7 @@ iree_cc_library(
   DEPS
     ::metal_command_buffer
     ::metal_command_queue
+    ::metal_direct_allocator
     ::metal_shared_event
     absl::strings
     absl::span
@@ -72,6 +73,26 @@ iree_cc_library(
     iree::hal::device
     iree::hal::driver
     iree::hal::semaphore
+  LINKOPTS
+    "-framework Metal"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    metal_direct_allocator
+  HDRS
+    "metal_buffer.h"
+    "metal_direct_allocator.h"
+  SRCS
+    "metal_buffer.mm"
+    "metal_direct_allocator.mm"
+  DEPS
+    absl::memory
+    iree::base::logging
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
   LINKOPTS
     "-framework Metal"
   PUBLIC

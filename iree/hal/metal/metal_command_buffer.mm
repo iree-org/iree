@@ -14,12 +14,49 @@
 
 #include "iree/hal/metal/metal_command_buffer.h"
 
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
 namespace iree {
 namespace hal {
 namespace metal {
+
+namespace {
+
+// Returns the repeated byte in |pattern| of |pattern_length| bytes. Returns absl::nullopt if
+// |pattern| does not contain repeated bytes.
+StatusOr<uint8_t> GetRepeatedBytePattern(const void* pattern, size_t pattern_length) {
+  switch (pattern_length) {
+    case 1: {
+      uint8_t pattern_value = *static_cast<const uint8_t*>(pattern);
+      return pattern_value;
+    }
+    case 2: {
+      uint16_t pattern_value = *static_cast<const uint16_t*>(pattern);
+      uint8_t high_byte = pattern_value >> 8;
+      uint8_t low_byte = pattern_value & 0xff;
+      if (high_byte != low_byte) {
+        return InvalidArgumentErrorBuilder(IREE_LOC) << "non-repeated bytes in pattern";
+      }
+      return low_byte;
+    }
+    case 4: {
+      uint32_t pattern_value = *static_cast<const uint32_t*>(pattern);
+      uint8_t low_byte = pattern_value & 0xff;
+      for (int shift_amount : {8, 16, 24}) {
+        if (low_byte != ((pattern_value >> shift_amount) & 0xff)) {
+          return InvalidArgumentErrorBuilder(IREE_LOC) << "non-repeated bytes in pattern";
+        }
+      }
+      return low_byte;
+    }
+    default:
+      return InvalidArgumentErrorBuilder(IREE_LOC) << "unsupported pattern length";
+  }
+}
+
+}  // namespace
 
 // static
 StatusOr<ref_ptr<CommandBuffer>> MetalCommandBuffer::Create(
@@ -38,6 +75,58 @@ MetalCommandBuffer::~MetalCommandBuffer() {
   [metal_handle_ release];
 }
 
+StatusOr<MetalBuffer*> MetalCommandBuffer::CastBuffer(Buffer* buffer) const {
+  // TODO(benvanik): assert that the buffer is from the right allocator and
+  // that it is compatible with our target queue family.
+  return static_cast<MetalBuffer*>(buffer->allocated_buffer());
+}
+
+id<MTLBlitCommandEncoder> MetalCommandBuffer::GetOrBeginBlitEncoder() {
+  IREE_TRACE_SCOPE0("MetalCommandBuffer::GetOrBeginBlitEncoder");
+
+  if (current_compute_encoder_) EndComputeEncoder();
+
+  @autoreleasepool {
+    if (!current_blit_encoder_) {
+      current_blit_encoder_ = [[metal_handle_ blitCommandEncoder] retain];
+    }
+  }
+
+  return current_blit_encoder_;
+}
+
+void MetalCommandBuffer::EndBlitEncoder() {
+  IREE_TRACE_SCOPE0("MetalCommandBuffer::EndBlitEncoder");
+  if (current_blit_encoder_) {
+    [current_blit_encoder_ endEncoding];
+    [current_blit_encoder_ release];
+    current_blit_encoder_ = nil;
+  }
+}
+
+id<MTLComputeCommandEncoder> MetalCommandBuffer::GetOrBeginComputeEncoder() {
+  IREE_TRACE_SCOPE0("MetalCommandBuffer::GetOrBeginComputeEncoder");
+
+  if (current_blit_encoder_) EndBlitEncoder();
+
+  @autoreleasepool {
+    if (!current_compute_encoder_) {
+      current_compute_encoder_ = [[metal_handle_ computeCommandEncoder] retain];
+    }
+  }
+
+  return current_compute_encoder_;
+}
+
+void MetalCommandBuffer::EndComputeEncoder() {
+  IREE_TRACE_SCOPE0("MetalCommandBuffer::EndComputeEncoder");
+  if (current_compute_encoder_) {
+    [current_compute_encoder_ endEncoding];
+    [current_compute_encoder_ release];
+    current_compute_encoder_ = nil;
+  }
+}
+
 Status MetalCommandBuffer::Begin() {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::Begin");
   is_recording_ = true;
@@ -46,6 +135,8 @@ Status MetalCommandBuffer::Begin() {
 
 Status MetalCommandBuffer::End() {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::End");
+  EndBlitEncoder();
+  EndComputeEncoder();
   is_recording_ = false;
   return OkStatus();
 }
@@ -81,12 +172,36 @@ Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, device_size_t targe
                                       device_size_t length, const void* pattern,
                                       size_t pattern_length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::FillBuffer");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::FillBuffer";
+  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+
+  target_offset += target_buffer->byte_offset();
+
+#ifdef IREE_PLATFORM_MACOS
+  // Per the spec for fillBuffer:range:value: "The alignment and length of the range must both be a
+  // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS."
+  if (target_offset % 4 != 0) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::FillBuffer with offset that is not a multiple of 4 bytes";
+  }
+#endif
+
+  // Note that fillBuffer:range:value: only accepts a single byte as the pattern but FillBuffer
+  // can accept 1/2/4 bytes. If the pattern itself contains repeated bytes, we can call into
+  // fillBuffer:rnage:value:. Otherwise we may need to find another way. Leave that as
+  // unimplemented for now.
+  IREE_ASSIGN_OR_RETURN(uint8_t byte_pattern, GetRepeatedBytePattern(pattern, pattern_length));
+
+  [GetOrBeginBlitEncoder() fillBuffer:target_device_buffer->handle()
+                                range:NSMakeRange(target_offset, length)
+                                value:byte_pattern];
+
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::DiscardBuffer(Buffer* buffer) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::DiscardBuffer");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::DiscardBuffer";
+  // This is a hint. Nothing to do for Metal.
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::UpdateBuffer(const void* source_buffer, device_size_t source_offset,
@@ -100,7 +215,29 @@ Status MetalCommandBuffer::CopyBuffer(Buffer* source_buffer, device_size_t sourc
                                       Buffer* target_buffer, device_size_t target_offset,
                                       device_size_t length) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::CopyBuffer");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::CopyBuffer";
+
+  IREE_ASSIGN_OR_RETURN(auto* source_device_buffer, CastBuffer(source_buffer));
+  IREE_ASSIGN_OR_RETURN(auto* target_device_buffer, CastBuffer(target_buffer));
+
+  source_offset += source_buffer->byte_offset();
+  target_offset += target_buffer->byte_offset();
+
+#ifdef IREE_PLATFORM_MACOS
+  // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
+  // offset must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
+  if (source_offset % 4 != 0 || target_offset % 4 != 0) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::CopyBuffer with offset that is not a multiple of 4 bytes";
+  }
+#endif
+
+  [GetOrBeginBlitEncoder() copyFromBuffer:source_device_buffer->handle()
+                             sourceOffset:source_offset
+                                 toBuffer:target_device_buffer->handle()
+                        destinationOffset:target_offset
+                                     size:length];
+
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::PushConstants(ExecutableLayout* executable_layout, size_t offset,

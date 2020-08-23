@@ -58,6 +58,8 @@ IREE HAL Class | Metal Protocol
 [`hal::CommandQueue`][hal-command-queue] | [`MTLCommandQueue`][mtl-command-queue]
 [`hal::CommandBuffer`][hal-command-buffer] | [`MTLCommandBuffer`][mtl-command-buffer]
 [`hal::Semaphore`][hal-semaphore] | [`MTLSharedEvent`][mtl-shared-event]
+[`hal::Allocator`][hal-allocator] | N/A
+[`hal::Buffer`][hal-buffer] | [`MTLBuffer`][mtl-buffer]
 
 In the following subsections, we go over each pair to provide more details.
 
@@ -124,25 +126,78 @@ A listener is registered on the `MTLSharedEvent` with
 `notifyListener:atValue:block:` to singal a semaphore to wake the current
 thread, which is put into sleep by waiting on the semaphore.
 
+### Allocator
+
+At the moment the Metal HAL driver just has a very simple
+[`hal::Allocator`][hal-allocator] implementation. It just wraps a `MTLDevice`
+and redirects all allocation requests to the `MTLDevice`. No page/pool/slab
+or whatever. This is only meant to get started. In the future we should have
+a better memory allocation library, probably by layering the [Vulkan
+Memory Allocator][vma] on top of [`MTLHeap`][mtl-heap].
+
+### Buffer
+
+IREE [`hal::Buffer`][hal-buffer] maps Metal `MTLBuffer`. See
+[Memory Management](#memory-management) for more details.
+
+## Memory Management
+
+### Storage type
+
+Metal provides four four [`MTLStorageMode`][mtl-storage-mode]:
+
+* `MTLStorageModeShared`: The resource is stored in system memory and is
+  accessible to both the CPU and the GPU.
+* `MTLStorageModeManaged`: The CPU and GPU may maintain separate copies of the
+  resource, and any changes must be explicitly synchronized.
+* `MTLStorageModePrivate`: The resource can be accessed only by the GPU.
+* `MTLStorageMemoryless`: The resource’s contents can be accessed only by the
+  GPU and only exist temporarily during a render pass.
+
+Among them, `MTLStorageModeManaged` is only available on macOS.
+
+IREE HAL defines serveral [`MemoryType`][hal-buffer]. They need to map to the
+above storage modes:
+
+* If `kDeviceLocal` but not `kHostVisible`, `MTLStorageModePrivate` is chosen.
+* If `kDeviceLocal` and `kHostVisible`:
+  * If macOS, `MTLStorageModeManaged` can be chosen.
+  * Otherwise, `MTLStorageModeShared` is chosen.
+* If not `DeviceLocal` but `kDeviceVisible`, `MTLStorageModeShared` is chosen.
+* If not `kDeviceLocal` and not `kDeviceVisible`, `MTLStorageModeShared` is
+  chosen. (TODO: We should probably use host buffer here.)
+
+IREE HAL also allows to create buffers with `kHostCoherent` bit. This may still
+be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
+`kHostCoherent` protocol, the Metal HAL driver will perform necessary
+`InValidate`/`Flush` operations automatically under the hood.
+
+
 [macos-version-share]: https://gs.statcounter.com/macos-version-market-share/desktop/worldwide
 [ios-version-share]: https://developer.apple.com/support/app-store/
 [iree-hal]: https://github.com/google/iree/tree/main/iree/hal
 [iree-metal]: https://github.com/google/iree/tree/main/iree/hal/metal
 [iree-refptr]: https://github.com/google/iree/blob/main/iree/base/ref_ptr.h
-[hal-driver]: https://github.com/google/iree/blob/main/iree/hal/driver.h
-[hal-device]: https://github.com/google/iree/blob/main/iree/hal/device.h
+[hal-allocator]: https://github.com/google/iree/blob/main/iree/hal/allocator.h
+[hal-buffer]: https://github.com/google/iree/blob/main/iree/hal/buffer.h
 [hal-command-queue]: https://github.com/google/iree/blob/main/iree/hal/command_queue.h
 [hal-command-buffer]: https://github.com/google/iree/blob/main/iree/hal/command_buffer.h
+[hal-device]: https://github.com/google/iree/blob/main/iree/hal/device.h
+[hal-driver]: https://github.com/google/iree/blob/main/iree/hal/driver.h
 [hal-semaphore]: https://github.com/google/iree/blob/main/iree/hal/semaphore.h
-[metal-driver]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_driver.h
-[metal-device]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_device.h
 [metal-command-queue]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_command_queue.h
 [metal-command-buffer]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_command_buffer.h
+[metal-device]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_device.h
+[metal-driver]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_driver.h
 [metal-shared-event]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_shared_event.h
-[mtl-device]: https://developer.apple.com/documentation/metal/mtldevice?language=objc
-[mtl-command-queue]: https://developer.apple.com/documentation/metal/mtlcommandqueue?language=objc
+[mtl-buffer]: https://developer.apple.com/documentation/metal/mtlbuffer?language=objc
 [mtl-command-buffer]: https://developer.apple.com/documentation/metal/mtlcommandbuffer?language=objc
 [mtl-command-encoder]: https://developer.apple.com/documentation/metal/mtlcommandencoder?language=objc
+[mtl-command-queue]: https://developer.apple.com/documentation/metal/mtlcommandqueue?language=objc
+[mtl-device]: https://developer.apple.com/documentation/metal/mtldevice?language=objc
+[mtl-heap]: https://developer.apple.com/documentation/metal/mtlheap?language=objc
 [mtl-shared-event]: https://developer.apple.com/documentation/metal/mtlsharedevent?language=objc
+[mtl-storage-mode]: https://developer.apple.com/documentation/metal/mtlstoragemode?language=objc
 [objc-arc]: https://en.wikipedia.org/wiki/Automatic_Reference_Counting
 [objcxx]: https://en.wikipedia.org/wiki/Objective-C#Objective-C++
+[vma]: https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
