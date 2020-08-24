@@ -156,7 +156,11 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     modelBuilder.addGPUAttr();
     FuncOp kernelFunc = modelBuilder.makeFunction(
         funcName, {}, {typeA, typeB, typeC}, MLIRFuncOpConfig());
-    int workgroupSize = warpSize * numSubgroupX * numSubgroupY;
+    int workgroupSize;
+    if (useWorkgroupMemory)
+      workgroupSize = warpSize * numSubgroupX * numSubgroupY;
+    else
+      workgroupSize = warpSize;
     // Right now we map one workgroup to one warp.
     kernelFunc.setAttr(
         spirv::getEntryPointABIAttrName(),
@@ -197,14 +201,11 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
         linalg::DistributionMethod::CyclicNumProcsEqNumIters};
     SGDistribute.procInfo = getSubgroupIds;
 
-    // Swap the order of the parallel loops because PLoopToGPU pattern assigns
-    // dimension in reverse order of the loop.
     strategy
         .tile<linalg::MatmulOp>(
             linalg::LinalgTilingOptions()
                 .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-                .setTileSizes({tileM, tileN, tileK})
-                .setInterchange({1, 0, 2})
+                .setTileSizes({tileN, tileM, tileK})
                 .setDistributionOptions(WGDistribute))
         .setHoistInvariantCode(enableLICM);
     if (useWorkgroupMemory) {
@@ -222,16 +223,16 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
               linalg::LinalgTilingOptions()
                   .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
                   .setTileSizes(
-                      {tileM / numSubgroupX, tileN / numSubgroupY, tileK})
+                      {tileN / numSubgroupY, tileM / numSubgroupX, tileK})
                   .setDistributionOptions(SGDistribute));
     }
-    std::array<int64_t, 3> nativeSize = {cooperativeMatrixM, cooperativeMatrixN,
+    std::array<int64_t, 3> nativeSize = {cooperativeMatrixN, cooperativeMatrixM,
                                          cooperativeMatrixK};
     strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
         nativeSize);
     modelBuilder.getModuleRef()->walk(
         [&](FuncOp fn) { strategy.transform(fn); });
-    addLoweringPasses(pm, {resRows / tileM, resColumns / tileN, 1},
+    addLoweringPasses(pm, {resColumns / tileN, resRows / tileM, 1},
                       {typeA, typeB, typeC});
   };
   runner.compile(options, {vulkanWrapper});
@@ -301,8 +302,8 @@ int main(int argc, char **argv) {
   }
   printf("Matrix size: %ix%ix%i", m, n, k);
   for (int tileK = 32; tileK <= 64; tileK *= 2) {
-    for (int tileM = 128; tileM <= 256; tileM *= 2) {
-      for (int tileN = 128; tileN <= 256; tileN *= 2) {
+    for (int tileM = 32; tileM <= 256; tileM *= 2) {
+      for (int tileN = 32; tileN <= 256; tileN *= 2) {
         // Workgroup memory requires at least a tile size of 128x128 to be able
         // to do full speed copy from video memory to shared local memory.
         if (useWorkgroupMemory && (tileM < 128 || tileN < 128)) continue;

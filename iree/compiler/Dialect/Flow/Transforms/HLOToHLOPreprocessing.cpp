@@ -37,7 +37,7 @@ static llvm::cl::opt<bool> extractPadFromConv(
 static llvm::cl::opt<bool> conv1x1toDot(
     "iree-flow-1x1-conv-to-dot",
     llvm::cl::desc("Rewrites mhlo.conv with 1x1 filter into mhlo.dot"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static bool isAllZero(DenseIntElementsAttr attr) {
   if (!attr.isSplat()) return false;

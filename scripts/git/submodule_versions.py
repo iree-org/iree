@@ -132,10 +132,10 @@ def check_submodule_versions(repo_dir):
         "Submodule state differs from SUBMODULE_VERSIONS file. Run (and commit) one of:"
     )
     print(
-        "  ./scripts/git/submodule_versions.py import # Use version in SUBMODULE_VERSIONS"
+        "  ./scripts/git/submodule_versions.py import # Use version in SUBMODULE_VERSIONS ('written')"
     )
     print(
-        "  ./scripts/git/submodule_versions.py export # Use version in git state"
+        "  ./scripts/git/submodule_versions.py export # Use version in git state ('actual')"
     )
     for k, (current, written) in diff_versions.items():
       print("%s : actual=%s written=%s" % (k, current, written))

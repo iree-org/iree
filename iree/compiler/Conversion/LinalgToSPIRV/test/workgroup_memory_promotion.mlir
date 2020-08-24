@@ -1,6 +1,10 @@
 // RUN: iree-opt -split-input-file -iree-codegen-linalg-tile-and-fuse=use-workgroup-memory -canonicalize -cse %s | IreeFileCheck %s
 
-module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+                    {max_compute_workgroup_invocations = 128 : i32,
+		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @matmul_tile(%arg0 : memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>) {
     linalg.matmul %arg0, %arg1, %arg2 :
       (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>)
@@ -11,8 +15,7 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]: memref<?x?xf32>
 //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]: memref<?x?xf32>
 //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]+]]: memref<?x?xf32>
-//       CHECK: scf.parallel (%{{.*}}, %{{.*}})
-//       CHECK:   scf.for %{{.*}}
+//       CHECK:   scf.for
 //       CHECK:     %[[ARG0SV:.+]] = subview %[[ARG0]]
 //       CHECK:     %[[ARG1SV:.+]] = subview %[[ARG1]]
 //       CHECK:     %[[ARG2SV:.+]] = subview %[[ARG2]]
@@ -32,10 +35,15 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 
 // -----
 
-
-module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @conv_no_padding_tile(%arg0: memref<3x4x3x2xf32>, %arg1: memref<?x?x?x3xf32>, %arg2: memref<?x?x?x2xf32>) {
-    linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], strides = [1, 1]} : memref<3x4x3x2xf32>, memref<?x?x?x3xf32>, memref<?x?x?x2xf32>
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+                    {max_compute_workgroup_invocations = 128 : i32,
+		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @conv_no_padding_tile(%arg0: memref<3x4x3x2xf32>,
+                             %arg1: memref<?x?x?x3xf32>, %arg2: memref<?x?x?x2xf32>) {
+    linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], strides = [1, 1]}
+      : memref<3x4x3x2xf32>, memref<?x?x?x3xf32>, memref<?x?x?x2xf32>
     return
   }
 }

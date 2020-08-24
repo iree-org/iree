@@ -139,8 +139,15 @@ void MapBufferAttrs(Py_buffer& py_view,
   // it is basically a bitcast.
   const char* f_expected_format =
       kScalarTypePyFormat[static_cast<int>(desc.buffer.scalar_type)];
+
+  // If the format is booleans, we should treat it as bytes.
+  const char* f_found_format = py_view.format;
+  if (strcmp(f_found_format, "?") == 0) {
+    f_found_format = "b";
+  }
+
   if (f_expected_format != nullptr &&
-      strcmp(f_expected_format, py_view.format) != 0) {
+      strcmp(f_expected_format, f_found_format) != 0) {
     throw RaiseBufferMismatchError(
         absl::StrCat("Mismatched buffer format (received: ", py_view.format,
                      ", expected: ", f_expected_format, "): "),

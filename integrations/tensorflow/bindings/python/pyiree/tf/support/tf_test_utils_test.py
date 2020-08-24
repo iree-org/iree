@@ -190,6 +190,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     with tempfile.TemporaryDirectory() as artifacts_dir:
       trace_function_dir = tf_test_utils._get_trace_dir(artifacts_dir, trace)
       trace.serialize(trace_function_dir)
+      self.assertTrue(
+          os.path.exists(os.path.join(trace_function_dir, 'flagfile')))
       loaded_trace = tf_test_utils.Trace.load(trace_function_dir)
 
       # Check all calls match.

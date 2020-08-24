@@ -20,6 +20,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_UTILS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_UTILS_H_
 
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -31,6 +32,8 @@ class OpBuilder;
 struct LogicalResult;
 
 namespace iree_compiler {
+
+static constexpr int kNumGPUDims = 3;
 
 /// Updates the workgroup size used for the dispatch region.
 LogicalResult updateWorkGroupSize(FuncOp funcOp,
@@ -49,6 +52,17 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
 /// known to be greater than equal to the number of iteration of loops the
 /// copy is lowered to.
 LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst);
+
+class GPUGlobalId;
+class GPUGlobalCount;
+
+/// Generate the operations that compute the processor ID and number of
+/// processors. Used as the callback needed for LinalgDistributionOptions.
+template <typename GPUIdOp, typename GPUCountOp>
+SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCounts(OpBuilder &builder,
+                                                             Location loc,
+                                                             unsigned numDims);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

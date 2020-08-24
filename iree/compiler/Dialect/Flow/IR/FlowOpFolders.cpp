@@ -30,6 +30,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -342,11 +343,51 @@ OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {
   return operand();
 }
 
+// Slices tensor from start to (start + length) exclusively at dim.
+static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
+                                uint64_t start, uint64_t length) {
+  auto shape = llvm::to_vector<4>(tensor.getType().getShape());
+  if (length == shape[dim]) {
+    // No need to slice.
+    return tensor;
+  }
+  auto outputShape = shape;
+  outputShape[dim] = length;
+  auto outputType =
+      RankedTensorType::get(outputShape, getElementTypeOrSelf(tensor));
+  llvm::SmallVector<Attribute, 4> newContents;
+  newContents.reserve(outputType.getNumElements());
+  auto valuesBegin = tensor.getValues<Attribute>().begin();
+  int64_t step =
+      std::accumulate(shape.rbegin(), shape.rbegin() + shape.size() - dim,
+                      /*init=*/1, /*op=*/std::multiplies<int64_t>());
+  int64_t num = length * step / shape[dim];
+  for (int64_t offset = step / shape[dim] * start,
+               numElements = tensor.getType().getNumElements();
+       offset < numElements; offset += step) {
+    newContents.append(valuesBegin + offset, valuesBegin + offset + num);
+  }
+  return DenseElementsAttr::get(outputType, newContents);
+}
+
 OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
-  if (operands[0] && operands[1] && operands[2]) {
+  if (llvm::count(operands, nullptr) == 0) {
     // Fully constant arguments so we can perform the slice here.
-    // TODO(benvanik): constant slice.
-    return {};
+    auto tensor = operands[0].cast<ElementsAttr>();
+    int64_t rank = source().getType().cast<ShapedType>().getRank();
+    // start = operands[1:1+rank), and length = operands[1+rank:].
+    auto start = llvm::to_vector<4>(llvm::map_range(
+        operands.drop_front(1).drop_back(rank), [](Attribute value) {
+          return value.cast<IntegerAttr>().getValue().getZExtValue();
+        }));
+    auto length = llvm::to_vector<4>(
+        llvm::map_range(operands.drop_front(1 + rank), [](Attribute value) {
+          return value.cast<IntegerAttr>().getValue().getZExtValue();
+        }));
+    for (int64_t dim = 0; dim < rank; ++dim) {
+      tensor = tensorSlice(tensor, dim, start[dim], length[dim]);
+    }
+    return tensor;
   }
   return {};
 }

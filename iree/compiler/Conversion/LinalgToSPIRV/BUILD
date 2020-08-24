@@ -64,6 +64,7 @@ cc_library(
         "@llvm-project//mlir:SCFToSPIRV",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:Support",

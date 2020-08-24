@@ -44,8 +44,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-static constexpr int kNumDims = 3;
-
 /// In some cases the iterations of the loops when partitioned to workgroups
 /// need to be distributed in a cyclic manner. The main use case here is when
 /// the number of workgroups is constrained such that the number of iterations
@@ -197,7 +195,6 @@ static Operation *serializeDimensionsFrom(ConversionPatternRewriter &rewriter,
                                           scf::ParallelOp pLoopOp,
                                           unsigned serializeFrom) {
   unsigned numLoops = pLoopOp.getNumLoops();
-  assert(serializeFrom > 0 && "unhandled serializaing all dimensions");
   assert(serializeFrom < numLoops &&
          "unhandled corner case of no serialization");
   SmallVector<unsigned, 2> serializedDimensions;
@@ -288,12 +285,10 @@ scf::ParallelOp collapseParallelLoops(ConversionPatternRewriter &rewriter,
 /// processors.
 static LogicalResult distributeCyclicallyToProcessors(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    ArrayRef<Value> processorIDs, ArrayRef<Value> numProcessors) {
+    ArrayRef<linalg::ProcInfo> procInfo) {
   unsigned numLoops = pLoopOp.getNumLoops();
-  assert(numLoops == processorIDs.size() &&
+  assert(numLoops == procInfo.size() &&
          "expected as many ids as number of loops");
-  assert(numLoops == numProcessors.size() &&
-         "expected as many nprocs as number of loops");
   SmallVector<LoopBounds, 2> forBounds;
   SmallVector<unsigned, 2> permutation;
   forBounds.reserve(numLoops);
@@ -301,10 +296,12 @@ static LogicalResult distributeCyclicallyToProcessors(
   Location loc = pLoopOp.getLoc();
   auto lbs = pLoopOp.lowerBound(), ubs = pLoopOp.upperBound(),
        steps = pLoopOp.step();
-  for (unsigned i : llvm::seq<unsigned>(0, processorIDs.size())) {
+  for (unsigned i : llvm::seq<unsigned>(0, procInfo.size())) {
     Value mappedLb = rewriter.create<AddIOp>(
-        loc, lbs[i], rewriter.create<MulIOp>(loc, steps[i], processorIDs[i]));
-    Value mappedStep = rewriter.create<MulIOp>(loc, steps[i], numProcessors[i]);
+        loc, lbs[i],
+        rewriter.create<MulIOp>(loc, steps[i], procInfo[i].procId));
+    Value mappedStep =
+        rewriter.create<MulIOp>(loc, steps[i], procInfo[i].nprocs);
     forBounds.push_back({mappedLb, ubs[i], mappedStep});
     permutation.push_back(i);
   }
@@ -326,10 +323,10 @@ static LogicalResult distributeCyclicallyToProcessors(
 /// generating the if statement.
 static LogicalResult distributeSingleIterationPerProcessor(
     ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    ArrayRef<Value> processorIDs, bool generateGuard = false) {
+    ArrayRef<linalg::ProcInfo> procInfo, bool generateGuard = false) {
   unsigned numLoops = pLoopOp.getNumLoops();
   Location loc = pLoopOp.getLoc();
-  assert(numLoops == processorIDs.size() &&
+  assert(numLoops == procInfo.size() &&
          "expected as many ids as number of loops");
 
   auto lbs = pLoopOp.lowerBound();
@@ -337,7 +334,7 @@ static LogicalResult distributeSingleIterationPerProcessor(
   SmallVector<Value, 2> ivReplacements;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
     Value iterValue = rewriter.create<AddIOp>(
-        loc, lbs[i], rewriter.create<MulIOp>(loc, processorIDs[i], step[i]));
+        loc, lbs[i], rewriter.create<MulIOp>(loc, procInfo[i].procId, step[i]));
     ivReplacements.push_back(iterValue);
   }
   Region &pLoopOpRegion = pLoopOp.getLoopBody();
@@ -378,76 +375,22 @@ static LogicalResult distributeSingleIterationPerProcessor(
   return success();
 }
 
-namespace {
-struct ProcessorIdAndCount {
-  Value id;
-  Value count;
-};
-
-/// These are class declarations that are only used for template
-/// specialization. They wont be needed if GPU dialect has ops for global
-/// invocation ID directly.
-class GPUGlobalId;
-class GPUGlobalCount;
-}  // namespace
-
 template <typename GPUIdOp, typename GPUCountOp>
-static ProcessorIdAndCount getGPUProcessorIdAndCount(
-    Location loc, StringRef dim, ConversionPatternRewriter &rewriter) {
-  Type indexType = rewriter.getIndexType();
-  return {
-      rewriter.create<GPUIdOp>(loc, indexType, rewriter.getStringAttr(dim)),
-      rewriter.create<GPUCountOp>(loc, indexType, rewriter.getStringAttr(dim))};
-}
-
-template <>
-ProcessorIdAndCount getGPUProcessorIdAndCount<GPUGlobalId, GPUGlobalCount>(
-    Location loc, StringRef dim, ConversionPatternRewriter &rewriter) {
-  Type indexType = rewriter.getIndexType();
-  Value gridDim = rewriter.create<gpu::GridDimOp>(loc, indexType,
-                                                  rewriter.getStringAttr(dim));
-  Value blockId = rewriter.create<gpu::BlockIdOp>(loc, indexType,
-                                                  rewriter.getStringAttr(dim));
-  Value blockDim = rewriter.create<gpu::BlockDimOp>(
-      loc, indexType, rewriter.getStringAttr(dim));
-  Value threadId = rewriter.create<gpu::ThreadIdOp>(
-      loc, indexType, rewriter.getStringAttr(dim));
-  return {rewriter.create<AddIOp>(
-              loc, rewriter.create<MulIOp>(loc, blockId, blockDim), threadId),
-          rewriter.create<MulIOp>(loc, blockDim, gridDim)};
-}
-
-template <typename GPUIdOp, typename GPUCountOp>
-static void getGPUProcessorIdsAndCounts(Location loc,
-                                        ConversionPatternRewriter &rewriter,
-                                        unsigned numDims,
-                                        MutableArrayRef<Value> id,
-                                        MutableArrayRef<Value> count) {
-  std::array<StringRef, kNumDims> dims{"x", "y", "z"};
-  assert(id.size() == numDims);
-  assert(count.size() == numDims);
-  for (unsigned i = 0; i < numDims; ++i) {
-    ProcessorIdAndCount idAndCount =
-        getGPUProcessorIdAndCount<GPUIdOp, GPUCountOp>(loc, dims[i], rewriter);
-    id[numDims - 1 - i] = idAndCount.id;
-    count[numDims - 1 - i] = idAndCount.count;
-  }
-}
-
-template <typename GPUIdOp, typename GPUCountOp>
-static ProcessorIdAndCount getLinearizedGPUProcessorIdAndCount(
+static linalg::ProcInfo getLinearizedGPUProcessorIdAndCount(
     Location loc, ConversionPatternRewriter &rewriter) {
-  std::array<Value, kNumDims> ids, counts;
-  getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(loc, rewriter, kNumDims, ids,
-                                                   counts);
-  ProcessorIdAndCount linearized;
-  linearized.id = ids[0];
-  linearized.count = counts[0];
-  for (unsigned i = 0; i < kNumDims - 1; ++i) {
-    linearized.id = rewriter.create<MulIOp>(loc, linearized.id, counts[i + 1]);
-    linearized.id = rewriter.create<AddIOp>(loc, linearized.id, ids[i + 1]);
-    linearized.count =
-        rewriter.create<MulIOp>(loc, linearized.count, counts[i + 1]);
+  SmallVector<linalg::ProcInfo, 3> procInfo =
+      getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(rewriter, loc,
+                                                       kNumGPUDims);
+  linalg::ProcInfo linearized;
+  linearized.procId = procInfo[0].procId;
+  linearized.nprocs = procInfo[0].nprocs;
+  for (unsigned i = 0; i < kNumGPUDims - 1; ++i) {
+    linearized.procId =
+        rewriter.create<MulIOp>(loc, linearized.procId, procInfo[i + 1].nprocs);
+    linearized.procId =
+        rewriter.create<AddIOp>(loc, linearized.procId, procInfo[i + 1].procId);
+    linearized.nprocs =
+        rewriter.create<MulIOp>(loc, linearized.nprocs, procInfo[i + 1].nprocs);
   }
   return linearized;
 }
@@ -464,10 +407,10 @@ static LogicalResult distributeCyclicallyToProcessors(
         cast<scf::ParallelOp>(serializeDimensionsFrom(rewriter, pLoopOp, 3));
     numLoops = 3;
   }
-  SmallVector<Value, 2> id(numLoops), count(numLoops);
-  getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(pLoopOp.getLoc(), rewriter,
-                                                   numLoops, id, count);
-  return distributeCyclicallyToProcessors(rewriter, pLoopOp, id, count);
+  SmallVector<linalg::ProcInfo, 2> procInfo =
+      getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(
+          rewriter, pLoopOp.getLoc(), numLoops);
+  return distributeCyclicallyToProcessors(rewriter, pLoopOp, procInfo);
 }
 
 /// Distributes scf.parallel to processors where `IdOp` is used to get the
@@ -484,10 +427,9 @@ static LogicalResult distributeSingleIterationPerProcessor(
         cast<scf::ParallelOp>(serializeDimensionsFrom(rewriter, pLoopOp, 3));
     numLoops = 3;
   }
-  SmallVector<Value, 2> id(numLoops), count(numLoops);
-  getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(pLoopOp.getLoc(), rewriter,
-                                                   numLoops, id, count);
-  return distributeSingleIterationPerProcessor(rewriter, pLoopOp, id,
+  auto procInfo = getGPUProcessorIdsAndCounts<GPUIdOp, GPUCountOp>(
+      rewriter, pLoopOp.getLoc(), numLoops);
+  return distributeSingleIterationPerProcessor(rewriter, pLoopOp, procInfo,
                                                generateGuard);
 }
 
@@ -562,19 +504,6 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 // Pass and patterns.
 //===----------------------------------------------------------------------===//
 
-// TODO(#2134): Mapping iterations to processors directly by assuming number of
-// iterations <= number of processors again seems to have an issue with
-// convolution/pooling. Needs further investigation.
-static bool useCyclicLoopDistribution(scf::ParallelOp pLoopOp) {
-  auto walkResult = pLoopOp.walk([](Operation *op) -> WalkResult {
-    if (isa<linalg::ConvOp>(op) || isa<linalg::PoolingMaxOp>(op) ||
-        isa<linalg::PoolingMinOp>(op) || isa<linalg::PoolingSumOp>(op))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
-  return walkResult.wasInterrupted();
-}
-
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
 struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
@@ -584,16 +513,13 @@ struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
   void runOnFunction() override;
 };
 
-/// Pattern to map scf.parallel to workgroups.
-struct PartitionPLoopToWorkgroups
+struct SerializeParallelLoopPattern
     : public OpConversionPattern<scf::ParallelOp> {
   using OpConversionPattern<scf::ParallelOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       scf::ParallelOp pLoopOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    return mapToWorkgroups(
-        rewriter, pLoopOp,
-        isWorkgroupCountConstrained || useCyclicLoopDistribution(pLoopOp));
+    return success(serializeDimensionsFrom(rewriter, pLoopOp, 0) != nullptr);
   }
 };
 
@@ -624,7 +550,7 @@ static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
   if (!pLoopOp) return failure();
 
   Optional<int64_t> copyLength = getLinearizedCopySize(copyOp);
-  ProcessorIdAndCount idAndCount =
+  linalg::ProcInfo idAndCount =
       getLinearizedGPUProcessorIdAndCount<gpu::ThreadIdOp, gpu::BlockDimOp>(
           copyOp.getLoc(), rewriter);
   auto workgroupSize =
@@ -635,11 +561,10 @@ static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
 
   if (copyLength.hasValue() && !workgroupSize.empty() &&
       copyLength.getValue() <= linearizedWorkgroupSize) {
-    return distributeSingleIterationPerProcessor(
-        rewriter, pLoopOp, idAndCount.id, /*generateGuard=*/true);
+    return distributeSingleIterationPerProcessor(rewriter, pLoopOp, idAndCount,
+                                                 /*generateGuard=*/true);
   }
-  return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount.id,
-                                          idAndCount.count);
+  return distributeCyclicallyToProcessors(rewriter, pLoopOp, idAndCount);
 }
 
 /// CopyOp that are loading to/storing from workgroup memory are special cased
@@ -835,7 +760,7 @@ void ConvertToGPUPass::runOnFunction() {
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>,
-                  PartitionPLoopToWorkgroups, RemoveLinalgRange>(context);
+                  RemoveLinalgRange, SerializeParallelLoopPattern>(context);
 
   if (failed(applyFullConversion(funcOp, target, patterns)))
     return signalPassFailure();

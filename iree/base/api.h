@@ -181,10 +181,7 @@ extern "C" {
 //   if (IREE_UNLIKELY(something_failed)) {
 //     return do_expensive_error_logging();
 //   }
-#if IREE_HAVE_ATTRIBUTE(likely) && IREE_HAVE_ATTRIBUTE(unlikely)
-#define IREE_LIKELY(x) [[likely]] (x)
-#define IREE_UNLIKELY(x) [[unlikely]] (x)
-#elif defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__) || defined(__clang__)
 #define IREE_LIKELY(x) (__builtin_expect(!!(x), 1))
 #define IREE_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 #else

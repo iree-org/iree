@@ -33,7 +33,9 @@ flags.DEFINE_string(
     'for example https://storage.googleapis.com/iree_models/')
 flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
-flags.DEFINE_integer('include_top', 0, 'if 1 top level is appended')
+flags.DEFINE_bool(
+    'include_top', True,
+    'Whether or not to include the final (top) layers of the model.')
 
 APP_MODELS = {
     'ResNet50':
@@ -94,7 +96,7 @@ def load_cifar10_weights(model):
   # get_file will download the model weights from a publicly available folder,
   # save them to cache_dir=~/.keras/models/ and return a path to them.
   url = os.path.join(
-      FLAGS.url, f'cifar10_include_top_{FLAGS.include_top}_{FLAGS.model}.h5')
+      FLAGS.url, f'cifar10_include_top_{FLAGS.include_top:d}_{FLAGS.model}.h5')
   weights_path = tf.keras.utils.get_file(file_name, url)
   model.load_weights(weights_path)
   return model

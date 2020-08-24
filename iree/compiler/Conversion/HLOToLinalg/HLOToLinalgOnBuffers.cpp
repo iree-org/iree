@@ -1481,11 +1481,11 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
     }
     if (auto tensorReshapeOp =
             tensor.getDefiningOp<linalg::TensorReshapeOp>()) {
-      if (!tensorReshapeOp.result().hasOneUse()) break;
+      tensor = tensorReshapeOp.src();
+      if (resultTensorToBufferMap.count(tensor)) break;
       auto newReshapeOp = builder.create<linalg::ReshapeOp>(
           op.getLoc(), getMemrefTypeForTensor(tensorReshapeOp.getSrcType()),
           buffer, tensorReshapeOp.reassociation());
-      tensor = tensorReshapeOp.src();
       buffer = newReshapeOp.result();
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;

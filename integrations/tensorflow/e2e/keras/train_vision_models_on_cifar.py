@@ -21,10 +21,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('model_name', 'MobileNet', 'keras vision model name')
+flags.DEFINE_string('model', 'MobileNet', 'keras vision model name')
 flags.DEFINE_string('model_path', '',
                     'Path to a location where model will be saved.')
-flags.DEFINE_integer('include_top', 0, 'if 1 top level is appended')
+flags.DEFINE_bool(
+    'include_top', True,
+    'Whether or not to include the final (top) layers of the model.')
 
 APP_MODELS = {
     'ResNet50':
@@ -87,7 +89,7 @@ def main(_):
   train_labels = train_labels[:4000]
 
   # It is a toy model for debugging (not optimized for accuracy or speed).
-  model = APP_MODELS[FLAGS.model_name](
+  model = APP_MODELS[FLAGS.model](
       weights=None, include_top=FLAGS.include_top, input_shape=INPUT_SHAPE[1:])
   model.summary()
   model.compile(
@@ -104,12 +106,11 @@ def main(_):
 
   file_name = os.path.join(
       FLAGS.model_path,
-      'cifar10_include_top_{}_{}'.format(FLAGS.include_top,
-                                         FLAGS.model_name + '.h5'))
+      f'cifar10_include_top_{FLAGS.include_top:d}_{FLAGS.model}.h5')
   try:
     model.save_weights(file_name)
   except IOError as e:
-    raise IOError('Failed to save model at: %s, error: %s' % (file_name, e))
+    raise IOError(f'Failed to save model at: {file_name}, error: {e}')
 
   # test model
   _, test_acc = model.evaluate(test_images, test_labels, verbose=2)
