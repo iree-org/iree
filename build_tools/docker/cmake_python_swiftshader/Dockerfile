@@ -12,19 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for cross-compiling IREE towards Android using CMake.
+# An image for building IREE using CMake and testing IREE with SwiftShader
+# Vulkan implementation.
 
-ARG NDK_VERSION=r21d
+FROM gcr.io/iree-oss/cmake-python-vulkan AS final
+COPY --from=gcr.io/iree-oss/swiftshader /swiftshader /swiftshader
 
-FROM gcr.io/iree-oss/util AS install-ndk
-ARG NDK_VERSION
-WORKDIR /install-ndk
-
-RUN wget "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux-x86_64.zip"
-
-RUN unzip "android-ndk-${NDK_VERSION?}-linux-x86_64.zip" -d /usr/src/
-
-FROM gcr.io/iree-oss/cmake AS final
-ARG NDK_VERSION
-COPY --from=install-ndk "/usr/src/android-ndk-${NDK_VERSION}" "/usr/src/android-ndk-${NDK_VERSION}"
-ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
+# Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
+ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json

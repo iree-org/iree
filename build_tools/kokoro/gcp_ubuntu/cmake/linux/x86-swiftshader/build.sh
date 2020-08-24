@@ -24,18 +24,10 @@ export PS4='[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging
 export CMAKE_BIN="$(which cmake)"
-"$CMAKE_BIN" --version
-"$CC" --version
-"$CXX" --version
+"${CMAKE_BIN?}" --version
+"${CC?}" --version
+"${CXX?}" --version
 python3 --version
-
-# For some reason the environment variable set in base `cmake` image cannot
-# reach the child `cmake-swiftshader` image. Given this environment variable
-# is just a temporary solution, duplicate it here instead of spending all
-# the effort trying to figure out why.
-# TODO(#2645): remove this once we have a better solution for AOT linker
-# discovery.
-export IREE_LLVMAOT_LINKER_PATH=/usr/bin/ld
 
 # Print Vulkan related information: SDK version and GPU ICD version
 vulkaninfo 2>/dev/null | grep "Vulkan Instance" || echo "Vulkan Instance not found!"

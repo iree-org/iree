@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for cross-compiling IREE towards Android using CMake.
+# An image for building IREE and its Python bindings using CMake.
 
-ARG NDK_VERSION=r21d
-
-FROM gcr.io/iree-oss/util AS install-ndk
-ARG NDK_VERSION
-WORKDIR /install-ndk
-
-RUN wget "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux-x86_64.zip"
-
-RUN unzip "android-ndk-${NDK_VERSION?}-linux-x86_64.zip" -d /usr/src/
+ARG CMAKE_MAJOR_VERSION=3
+ARG CMAKE_MINOR_VERSION=13
+ARG CMAKE_PATCH_VERSION=5
 
 FROM gcr.io/iree-oss/cmake AS final
-ARG NDK_VERSION
-COPY --from=install-ndk "/usr/src/android-ndk-${NDK_VERSION}" "/usr/src/android-ndk-${NDK_VERSION}"
-ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
+# Dependencies for the python bindings tests.
+RUN apt-get update \
+  && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-setuptools \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install numpy absl-py
+
+ENV PYTHON_BIN /usr/bin/python3

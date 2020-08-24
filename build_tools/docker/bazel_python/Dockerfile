@@ -12,19 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE with python bindings using bazel.
+# An image for building IREE with Python bindings using Bazel.
 
-# Build using:
-# docker build --tag gcr.io/iree-oss/bazel-bindings \
-#   build_tools/docker/bazel_bindings/
-
-# Run interactively using the following, where IREE_WORKDIR is the path to your
-# local dev environment:
-# docker run -it --rm --entrypoint bash --volume ${IREE_WORKDIR}:/usr/src/iree/ \
-#   gcr.io/iree-oss/bazel-bindings
-
-# Set up the image and working directory.
-FROM gcr.io/iree-oss/bazel
+FROM gcr.io/iree-oss/bazel AS final
 
 # Install python3 and numpy.
 RUN apt-get update \
@@ -35,3 +25,5 @@ RUN apt-get update \
     python3-setuptools \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install numpy
+
+ENV PYTHON_BIN /usr/bin/python3

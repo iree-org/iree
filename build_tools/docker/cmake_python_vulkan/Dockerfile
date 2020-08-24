@@ -12,35 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE using CMake and testing IREE with NVIDIA GPUs.
+# A base image for building IREE using CMake and running Vulkan tests. Requires
+# a child image to provide a Vulkan ICD.
 
-# Build using:
-# docker build --tag gcr.io/iree-oss/cmake-nvidia \
-#              build_tools/docker/cmake_nvidia/
+FROM gcr.io/iree-oss/cmake-python
 
-# Run interactively using the following, where IREE_WORKDIR is the path to your
-# local dev environment:
-# docker run -it --rm --entrypoint bash \
-#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
-#   --gpus all \
-#   gcr.io/iree-oss/cmake-nvidia
-
-# Set up the image and working directory by inheriting the base
-# CMake configuration.
-# Note that we don't start from NVIDIA's docker base:
-# - nvidia/cuda (https://hub.docker.com/r/nvidia/cuda):
-#     it's.. for CUDA.
-# - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
-#      does not support Ubuntu 18.04.
-# This allows to share configuration with base CMake, but it also means we need
-# to MATCH the driver version between the host machine and the docker image.
-# TODO: use cmake-vulkan as the base.
-FROM gcr.io/iree-oss/cmake
-
-# Additionally, we need to install the Vulkan SDK and the NVIDIA Vulkan driver.
+# It would be nice to have a separate install vulkan image and copy from that,
+# but I don't know all the files that installing the vulkan-sdk adds.
+RUN apt-get update && apt-get install -y wget
 
 ARG VULKAN_SDK_VERSION=1.2.141
-
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
 # thing is then feel free. The warning complains about parsing apt-key output,
 # which we're not even doing.
@@ -52,4 +33,6 @@ RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
     "/etc/apt/sources.list.d/lunarg-vulkan-${VULKAN_SDK_VERSION?}-bionic.list" \
     "http://packages.lunarg.com/vulkan/${VULKAN_SDK_VERSION?}/lunarg-vulkan-${VULKAN_SDK_VERSION?}-bionic.list" \
   && apt-get update \
-  && apt-get install -y vulkan-sdk nvidia-driver-440
+  && apt-get install -y vulkan-sdk
+
+RUN rm /usr/bin/wget

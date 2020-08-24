@@ -26,15 +26,11 @@ export PS4='[$(date -u "+%T %Z")] '
 # Kokoro checks out the repository here.
 WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
-# Mount the checked out repository, make that the working directory and run the
-# tests in the bazel-tensorflow image.
-docker run \
-  --volume "${WORKDIR?}:${WORKDIR?}" \
-  --workdir="${WORKDIR?}" \
-  --rm \
-  --env IREE_VULKAN_DISABLE=0 \
+docker_setup
+
+docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
-  gcr.io/iree-oss/bazel-nvidia@sha256:77866668ac679de65f5008c3c3df0e5dbf2944a431c88a8c1b6b2e8ab7f8c65d \
+  gcr.io/iree-oss/bazel-tensorflow-nvidia:latest \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-turing/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

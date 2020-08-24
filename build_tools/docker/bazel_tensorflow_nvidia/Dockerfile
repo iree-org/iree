@@ -12,19 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for cross-compiling IREE towards Android using CMake.
+# An image for building IREE with TensorFlow integrations using Bazel and
+# running Vulkan tests on an Nvidia GPU.
 
-ARG NDK_VERSION=r21d
+FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
 
-FROM gcr.io/iree-oss/util AS install-ndk
-ARG NDK_VERSION
-WORKDIR /install-ndk
-
-RUN wget "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux-x86_64.zip"
-
-RUN unzip "android-ndk-${NDK_VERSION?}-linux-x86_64.zip" -d /usr/src/
-
-FROM gcr.io/iree-oss/cmake AS final
-ARG NDK_VERSION
-COPY --from=install-ndk "/usr/src/android-ndk-${NDK_VERSION}" "/usr/src/android-ndk-${NDK_VERSION}"
-ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y vulkan-sdk nvidia-driver-440

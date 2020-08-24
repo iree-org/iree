@@ -12,23 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# An image for building IREE's tensorflow integrations using bazel and vulkan.
+# A base image for building IREE with TensorFlow integrations using Bazel and
+# running Vulkan tests. Requires a child image to provide a Vulkan ICD.
 
-# Build using:
-# docker build --tag gcr.io/iree-oss/bazel-nvidia \
-#   build_tools/docker/bazel_nvidia/
+FROM gcr.io/iree-oss/bazel-tensorflow AS final
 
-# Run interactively using the following, where IREE_WORKDIR is the path to your
-# local dev environment:
-# docker run -it --rm --entrypoint bash --volume ${IREE_WORKDIR}:/usr/src/iree/ \
-#   gcr.io/iree-oss/bazel-nvidia
-
-# Set up the image and working directory.
-# We start from bazel-nvidia so this image can be used to testing TensorFlow
-# integrations.
-FROM gcr.io/iree-oss/bazel-tensorflow
-
-# Additionally, we need to install the Vulkan SDK and the NVIDIA Vulkan driver.
+RUN apt-get update && apt-get install -y wget
 
 ARG VULKAN_SDK_VERSION=1.2.141
 
@@ -43,4 +32,4 @@ RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
     "/etc/apt/sources.list.d/lunarg-vulkan-${VULKAN_SDK_VERSION?}-bionic.list" \
     "http://packages.lunarg.com/vulkan/${VULKAN_SDK_VERSION?}/lunarg-vulkan-${VULKAN_SDK_VERSION?}-bionic.list" \
   && apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y vulkan-sdk nvidia-driver-440
+  && apt-get install -y vulkan-sdk
