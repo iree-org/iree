@@ -39,6 +39,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
+#include "mlir/InitAllPasses.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -82,12 +83,9 @@ bool LLVMOnceInit() {
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
-  // Depending on the build environment the MLIR Passes may already be
-  // registered. Conditionally register passes until re-registration is
-  // supported.
-#ifdef IREE_REGISTER_MLIR_PASSES
+  // Register all MLIR Core passes.
   mlir::registerMlirPasses();
-#endif
+
   // Register IREE dialects.
   mlir::iree_compiler::registerAllIreePasses();
 
@@ -377,6 +375,7 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
 
 void CompilerModuleBundle::RunPassPipeline(
     const std::vector<std::string>& pipelines) {
+  registerAllPasses();
   mlir::PassManager pm(context_->mlir_context());
   mlir::applyPassManagerCLOptions(pm);
   auto crash_reproducer_path = context_->crash_reproducer_path();

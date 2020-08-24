@@ -36,10 +36,6 @@ PYBIND_EXTENSION_COPTS = [
     "-fvisibility=hidden",
 ]
 
-PYBIND_REGISTER_MLIR_PASSES = [
-    "-DIREE_REGISTER_MLIR_PASSES",
-]
-
 # Optional deps to enable an intree TensorFlow python. This build configuration
 # defaults to getting TensorFlow from the python environment (empty).
 INTREE_TENSORFLOW_PY_DEPS = []
