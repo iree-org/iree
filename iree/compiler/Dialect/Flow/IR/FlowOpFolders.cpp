@@ -394,8 +394,48 @@ OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
 
 static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
                                  ArrayRef<Attribute> startIndicesAttrs) {
-  // TODO(benvanik): tensor update constant folding.
-  return {};
+  auto updateType = update.getType().cast<ShapedType>();
+  auto targetType = target.getType().cast<ShapedType>();
+  // If either target or update has zero element, then no update happens.
+  if (updateType.getNumElements() == 0 || targetType.getNumElements() == 0) {
+    return target;
+  }
+
+  int64_t rank = targetType.getRank();
+  // If target is scalar, update is also scalar and is the new content.
+  if (rank == 0) {
+    return update;
+  }
+
+  auto startIndex = llvm::to_vector<4>(
+      llvm::map_range(startIndicesAttrs, [](Attribute value) {
+        return value.cast<IntegerAttr>().getValue().getZExtValue();
+      }));
+  auto targetValues = llvm::to_vector<4>(target.getValues<Attribute>());
+  // target indices start from startIndicesAttrs and update indices start from
+  // all zeros.
+  llvm::SmallVector<uint64_t, 4> targetIndex(startIndex);
+  llvm::SmallVector<uint64_t, 4> updateIndex(rank, 0);
+  int64_t numElements = updateType.getNumElements();
+  while (numElements--) {
+    targetValues[getFlattenedIndex(targetType, targetIndex)] =
+        update.getValue<Attribute>(updateIndex);
+    // Increment the index at last dim.
+    ++updateIndex.back();
+    ++targetIndex.back();
+    // If the index in dim j exceeds dim size, reset dim j and
+    // increment dim (j-1).
+    for (int64_t j = rank - 1;
+         j >= 0 && updateIndex[j] >= updateType.getDimSize(j); --j) {
+      updateIndex[j] = 0;
+      targetIndex[j] = startIndex[j];
+      if (j - 1 >= 0) {
+        ++updateIndex[j - 1];
+        ++targetIndex[j - 1];
+      }
+    }
+  }
+  return DenseElementsAttr::get(targetType, targetValues);
 }
 
 OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
