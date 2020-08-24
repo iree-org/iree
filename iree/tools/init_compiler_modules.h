@@ -35,7 +35,8 @@ inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
 // all the possible dialects to be made available to the context automatically.
 inline void registerIreeCompilerModuleDialects() {
   static bool initOnce =
-      ([]() { registerIreeCompilerModuleDialects(getGlobalDialectRegistry()); }(), true);
+      ([]() { registerIreeCompilerModuleDialects(getGlobalDialectRegistry()); }(),
+       true);
   (void)initOnce;
 }
 }  // namespace iree_compiler
