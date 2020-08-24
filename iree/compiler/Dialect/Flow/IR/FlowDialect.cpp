@@ -29,8 +29,6 @@ namespace Flow {
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOpInterface.cpp.inc"
 
-static DialectRegistration<FlowDialect> flow_dialect;
-
 namespace {
 
 struct FlowFolderInterface : public DialectFoldInterface {

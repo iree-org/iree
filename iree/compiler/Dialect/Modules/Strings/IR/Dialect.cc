@@ -32,8 +32,6 @@ namespace Strings {
 
 namespace {
 
-static DialectRegistration<StringsDialect> strings_dialect;
-
 class StringsToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
