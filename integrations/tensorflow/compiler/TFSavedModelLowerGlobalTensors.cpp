@@ -108,7 +108,7 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
     }
     func.eraseArguments(argsToErase);
     Dialect *ireeFlowDialect =
-        func.getContext()->getRegisteredDialect<IREE::Flow::FlowDialect>();
+        func.getContext()->getLoadedDialect<IREE::Flow::FlowDialect>();
     while (!typeConversionWorklist.empty()) {
       Value v = typeConversionWorklist.pop_back_val();
       Type desiredType = v.getType();

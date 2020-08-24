@@ -39,15 +39,7 @@ using namespace mlir::edsc::intrinsics;
 thread_local MLIRContext mlir::ModelBuilder::ctx;
 
 void ModelBuilder::registerAllDialects() {
-  registerDialect<AffineDialect>();
-  registerDialect<gpu::GPUDialect>();
-  registerDialect<LLVM::LLVMDialect>();
-  registerDialect<linalg::LinalgDialect>();
-  registerDialect<scf::SCFDialect>();
-  registerDialect<omp::OpenMPDialect>();
-  registerDialect<spirv::SPIRVDialect>();
-  registerDialect<StandardOpsDialect>();
-  registerDialect<vector::VectorDialect>();
+  // TODO: remove.
 }
 
 mlir::ModelBuilder::ModelBuilder()
@@ -57,7 +49,17 @@ mlir::ModelBuilder::ModelBuilder()
       loc(module->getLoc()),
       i8(IntegerType::get(8, &ctx)),
       f32(FloatType::getF32(&ctx)),
-      f64(FloatType::getF64(&ctx)) {}
+      f64(FloatType::getF64(&ctx)) {
+  ctx.getOrLoadDialect<AffineDialect>();
+  ctx.getOrLoadDialect<gpu::GPUDialect>();
+  ctx.getOrLoadDialect<LLVM::LLVMDialect>();
+  ctx.getOrLoadDialect<linalg::LinalgDialect>();
+  ctx.getOrLoadDialect<scf::SCFDialect>();
+  ctx.getOrLoadDialect<omp::OpenMPDialect>();
+  ctx.getOrLoadDialect<spirv::SPIRVDialect>();
+  ctx.getOrLoadDialect<StandardOpsDialect>();
+  ctx.getOrLoadDialect<vector::VectorDialect>();
+}
 
 Value mlir::ModelBuilder::constant_f32(float v) {
   return std_constant_float(llvm::APFloat(v),

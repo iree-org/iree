@@ -462,7 +462,7 @@ class Trace:
       flaglines.append(f"--entry_function={self.calls[0].method}")
 
       with open(os.path.join(trace_dir, "flagfile"), "w") as f:
-        f.writelines(line + '\n' for line in flaglines)
+        f.writelines(line + "\n" for line in flaglines)
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":
