@@ -16,7 +16,7 @@
 //
 // Pass to fuse operations on tensors after conversion to Linalg. Uses the
 // patterns from MLIR for fusion linalg operations on tensors, and a few
-// patterns to fuse these with IREE specific operations
+// patterns to fuse these with IREE specific operations.
 //
 //===----------------------------------------------------------------------===//
 
