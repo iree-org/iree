@@ -25,16 +25,21 @@
 
 namespace mlir {
 
+// Add all the XLA dialects to the provided registry.
+inline void registerXLADialects(DialectRegistry &registry) {
+  // clang-format off
+  registry.insert<mlir::chlo::HloClientDialect,
+                  mlir::lmhlo::LmhloDialect,
+                  mlir::mhlo::MhloDialect>();
+  // clang-format on
+}
+
 // This function should be called before creating any MLIRContext if one expect
 // all the possible dialects to be made available to the context automatically.
 inline void registerXLADialects() {
-  static bool init_once = []() {
-    registerDialect<mlir::chlo::HloClientDialect>();
-    registerDialect<mlir::lmhlo::LmhloDialect>();
-    registerDialect<mlir::mhlo::MhloDialect>();
-    return true;
-  }();
-  (void)init_once;
+  static bool initOnce =
+      ([]() { registerXLADialects(getGlobalDialectRegistry()); }(), true);
+  (void)initOnce;
 }
 }  // namespace mlir
 
