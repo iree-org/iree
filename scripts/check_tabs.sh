@@ -21,14 +21,14 @@ set -x
 
 BASE_REF="${1:-main}"
 
-declare -a excluded_files_regex=(
+declare -a excluded_files_patterns=(
   "^.gitmodules$"
   "/third_party/"
   "^third_party/"
 )
 
 # Join on |
-excluded_files_pattern="$(IFS="|" ; echo "${excluded_files_regex[*]?}")"
+excluded_files_pattern="$(IFS="|" ; echo "${excluded_files_patterns[*]?}")"
 
 git diff --name-only "${BASE_REF?}" | \
   grep -v -E "${excluded_files_pattern?}" | \
