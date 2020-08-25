@@ -144,6 +144,7 @@ endif()
 set(IREE_ALL_TARGET_BACKENDS
   # TODO(#2645): Add DYLIB-LLVM-AOT when it doesn't require an env var
   LLVM-IR
+  Metal-SPIRV
   Vulkan-SPIRV
   VMLA
 )
@@ -446,6 +447,11 @@ if(${IREE_BUILD_PYTHON_BINDINGS})
   # after. This should be pulled in locally at some point.
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
   iree_multipy_configure()
+endif()
+
+if(${IREE_TARGET_BACKEND_METAL-SPIRV})
+  # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
+  add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------
