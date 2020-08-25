@@ -25,6 +25,7 @@
 #include "iree/hal/metal/metal_command_buffer.h"
 #include "iree/hal/metal/metal_command_queue.h"
 #include "iree/hal/metal/metal_direct_allocator.h"
+#include "iree/hal/metal/metal_pipeline_cache.h"
 #include "iree/hal/metal/metal_shared_event.h"
 
 namespace iree {
@@ -75,7 +76,7 @@ std::string MetalDevice::DebugString() const {
 
 ref_ptr<ExecutableCache> MetalDevice::CreateExecutableCache() {
   IREE_TRACE_SCOPE0("MetalDevice::CreateExecutableCache");
-  return nullptr;
+  return make_ref<MetalPipelineCache>(metal_handle_);
 }
 
 StatusOr<ref_ptr<DescriptorSetLayout>> MetalDevice::CreateDescriptorSetLayout(
