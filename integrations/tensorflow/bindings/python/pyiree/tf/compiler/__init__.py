@@ -31,11 +31,14 @@ __all__ = [
     "tf_load_saved_model",
     "tf_load_signature_def_saved_model",
     "tf_compile_saved_model",
+    "tf_module_to_compiler_module",
 ]
 
+import tempfile
 from typing import Collection, Optional, Sequence
 
 from . import binding as binding
+import tensorflow as tf
 
 # Native aliases (matches those in the generic compiler).
 llvm = binding.llvm
@@ -179,3 +182,34 @@ def tf_compile_saved_model(
   input_module = tf_load_saved_model(saved_model_dir, compiler_context,
                                      exported_names, pass_pipeline)
   return input_module.compile(target_backends=target_backends)
+
+
+def tf_module_to_compiler_module(module: tf.Module,
+                                 exported_names: Collection[str] = (),
+                                 sm_path: str = None):
+  """Converts a tf.Module into a MLIR module.
+
+  Args:
+    module: The tf.Module instance to convert to MLIR
+    exported_names: Optional tuple of strings representing the exported names to
+      keep.
+    sm_path: the path to save the tf.Module to, if any. Defaults to None.
+
+  Returns:
+    An MLIR Module suitable for compilation by the IREE compiler.
+    This can be further compiled to an IREE blob by calling
+    .compile_to_sequencer_blob.
+  """
+
+  def _convert(sm_path):
+    options = tf.saved_model.SaveOptions(save_debug_info=True)
+    tf.saved_model.save(module, sm_path, options=options)
+    return tf_load_saved_model(
+        sm_path, exported_names=exported_names, pass_pipeline=())
+
+  if sm_path is None:
+    with tempfile.TemporaryDirectory() as sm_path:
+      compiler_module = _convert(sm_path)
+  else:
+    compiler_module = _convert(sm_path)
+  return compiler_module
