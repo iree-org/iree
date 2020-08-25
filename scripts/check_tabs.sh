@@ -18,6 +18,7 @@
 # "main")
 
 set -x
+set -o pipefail
 
 BASE_REF="${1:-main}"
 
