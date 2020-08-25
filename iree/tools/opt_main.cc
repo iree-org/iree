@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
 #ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCDialect();
+  mlir::registerEmitCDialect(registry);
 #endif  // IREE_HAVE_EMITC_DIALECT
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeDialects(registry);
