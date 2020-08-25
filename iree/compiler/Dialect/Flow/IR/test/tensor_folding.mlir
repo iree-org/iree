@@ -195,7 +195,93 @@ func @sliceConst3D() -> tensor<1x2x3xi32> {
 
 // -----
 
-// TODO(benvanik): const folder for update.
+// CHECK-LABEL: @updateConst0D
+func @updateConst0D() -> tensor<i32> {
+  %0 = constant dense<0> : tensor<i32>
+  %1 = constant dense<1> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = constant dense<0> : tensor<i32>
+  %2 = flow.tensor.update %0, %1[] : tensor<i32> -> tensor<i32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<i32>
+}
+
+// CHECK-LABEL: @updateConst1D
+func @updateConst1D() -> tensor<1xi32> {
+  %0 = constant dense<0> : tensor<1xi32>
+  %1 = constant dense<1> : tensor<1xi32>
+  %c0 = constant 0 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<0> : tensor<1xi32>
+  %2 = flow.tensor.update %0, %1[%c0] : tensor<1xi32> -> tensor<1xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<1xi32>
+}
+
+// CHECK-LABEL: @updateConst1DUpdateZeroSize
+func @updateConst1DUpdateZeroSize() -> tensor<1xi32> {
+  %0 = constant dense<> : tensor<0xi32>
+  %1 = constant dense<1> : tensor<1xi32>
+  %c0 = constant 0 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<1> : tensor<1xi32>
+  %2 = flow.tensor.update %0, %1[%c0] : tensor<0xi32> -> tensor<1xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<1xi32>
+}
+
+// CHECK-LABEL: @updateConst2DUpdate1x1
+func @updateConst2DUpdate1x1() -> tensor<3x4xi32> {
+  %0 = constant dense<[[12]]> : tensor<1x1xi32>
+  %1 = constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
+  // CHECK-SAME: [0, 12, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %2 = flow.tensor.update %0, %1[%c0, %c1] : tensor<1x1xi32> -> tensor<3x4xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<3x4xi32>
+}
+
+// CHECK-LABEL: @updateConst2DUpdate2x2
+func @updateConst2DUpdate2x2() -> tensor<3x4xi32> {
+  %0 = constant dense<[[12, 13], [14, 15]]> : tensor<2x2xi32>
+  %1 = constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
+  // CHECK-SAME: [0, 12, 13, 3], [4, 14, 15, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %2 = flow.tensor.update %0, %1[%c0, %c1] : tensor<2x2xi32> -> tensor<3x4xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<3x4xi32>
+}
+
+// CHECK-LABEL: @updateConst3DUpdate1x2x3
+func @updateConst3DUpdate1x2x3() -> tensor<2x3x3xi32> {
+  %0 = constant dense<[[[18, 19, 20], [21, 22, 23]]]> : tensor<1x2x3xi32>
+  %1 = constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
+  // CHECK-SAME:                             [
+  // CHECK-SAME:                              [0, 1, 2], [18, 19, 20], [21, 22, 23]], [
+  // CHECK-SAME: [9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %2 = flow.tensor.update %0, %1[%c0, %c1, %c0] : tensor<1x2x3xi32> -> tensor<2x3x3xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<2x3x3xi32>
+}
+
+// CHECK-LABEL: @updateConst3DUpdate2x3x2
+func @updateConst3DUpdate2x3x2() -> tensor<2x3x3xi32> {
+  %0 = constant dense<[[[18, 19], [20, 21], [22, 23]], [[24, 25], [26, 27], [28, 29]]]> : tensor<2x3x2xi32>
+  %1 = constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %c0 = constant 0 : index
+  %c1 = constant 0 : index
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
+  // CHECK-SAME:                             [
+  // CHECK-SAME:                              [18, 19, 2], [20, 21, 5], [22, 23, 8]], [
+  // CHECK-SAME: [24, 25, 11], [26, 27, 14], [28, 29, 17]]]> : tensor<2x3x3xi32>
+  %2 = flow.tensor.update %0, %1[%c0, %c1, %c0] : tensor<2x3x2xi32> -> tensor<2x3x3xi32>
+  // CHECK-NEXT: return %[[C]]
+  return %2 : tensor<2x3x3xi32>
+}
 
 // CHECK-LABEL: @updateReplace
 func @updateReplace(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi32> {

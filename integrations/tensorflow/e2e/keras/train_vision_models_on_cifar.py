@@ -89,6 +89,7 @@ def main(_):
   train_labels = train_labels[:4000]
 
   # It is a toy model for debugging (not optimized for accuracy or speed).
+
   model = APP_MODELS[FLAGS.model](
       weights=None, include_top=FLAGS.include_top, input_shape=INPUT_SHAPE[1:])
   model.summary()
