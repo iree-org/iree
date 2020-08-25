@@ -21,7 +21,7 @@ using namespace mlir;
 
 namespace {
 bool isLegalVectorContract(vector::ContractionOp contract) {
-	if (llvm::size(contract.masks()) != 0) return false;
+  if (llvm::size(contract.masks()) != 0) return false;
   VectorType lhsType = contract.lhs().getType().cast<VectorType>();
   VectorType rhsType = contract.rhs().getType().cast<VectorType>();
   VectorType accType = contract.acc().getType().cast<VectorType>();
