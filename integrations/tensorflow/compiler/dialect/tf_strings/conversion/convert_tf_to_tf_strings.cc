@@ -133,8 +133,8 @@ class LowerTensorflowToStringsPass
     populateCallOpTypeConversionPattern(patterns, &getContext(), typeConverter);
     populateTFToTFStringsPatterns(&getContext(), patterns);
 
-    auto result =
-        applyPartialConversion(module.getOperation(), target, patterns);
+    auto result = applyPartialConversion(module.getOperation(), target,
+                                         std::move(patterns));
 
     // Partial conversion doesn't include return types. Update in a separate
     // walk.

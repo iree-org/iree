@@ -32,6 +32,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 static llvm::cl::opt<bool> mlirDebug(
@@ -63,7 +64,7 @@ void mlir::ModelRunner::compile(
     mlir::vector::populateVectorContractLoweringPatterns(
         patterns, module->getContext(),
         compilationOptions.vectorTransformsOptions);
-    mlir::applyPatternsAndFoldGreedily(*module, patterns);
+    mlir::applyPatternsAndFoldGreedily(*module, std::move(patterns));
   }
   runLoweringPass(compilationOptions.loweringPasses
                       ? compilationOptions.loweringPasses

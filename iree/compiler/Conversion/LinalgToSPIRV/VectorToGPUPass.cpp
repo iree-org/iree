@@ -42,6 +42,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -182,8 +183,8 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   target->markUnknownOpDynamicallyLegal([](Operation *) { return true; });
   OwningRewritePatternList tileAndDistributePattern;
   populateLinalgTileAndDistributePatterns(context, tileAndDistributePattern);
-  if (failed(
-          applyPartialConversion(funcOp, *target, tileAndDistributePattern))) {
+  if (failed(applyPartialConversion(funcOp, *target,
+                                    std::move(tileAndDistributePattern)))) {
     return signalPassFailure();
   }
 
@@ -193,7 +194,7 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   canonicalizePatterns.insert<AffineMinCanonicalizationPattern,
                               linalg::AffineMinSCFCanonicalizationPattern>(
       context);
-  applyPatternsAndFoldGreedily(funcOp, canonicalizePatterns);
+  applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
   OwningRewritePatternList vectorizationPatterns;
@@ -201,7 +202,7 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
       .insert<linalg::LinalgVectorizationPattern<linalg::CopyOp>>(
           context, linalg::LinalgMarker(
                        Identifier::get(getVectorizeMarker(), context), {}));
-  applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns);
+  applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 }
 
 void ConvertVectorToGPUPass::runOnOperation() {
@@ -221,7 +222,7 @@ void ConvertVectorToGPUPass::runOnOperation() {
   target->addLegalOp<scf::YieldOp>();
   target->addLegalOp<scf::ForOp>();
   target->addLegalDialect<gpu::GPUDialect>();
-  if (failed(applyPartialConversion(funcOp, *target, patterns)))
+  if (failed(applyPartialConversion(funcOp, *target, std::move(patterns))))
     return signalPassFailure();
 }
 }  // namespace

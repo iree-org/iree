@@ -14,6 +14,7 @@
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 
 namespace mlir {
@@ -61,7 +62,7 @@ struct DecomposeHLOClampPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
     patterns.insert<DecomposeClampOp>(context);
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 }  // namespace

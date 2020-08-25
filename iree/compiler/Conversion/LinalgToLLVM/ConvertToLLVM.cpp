@@ -30,6 +30,7 @@
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -324,7 +325,7 @@ void ConvertToLLVMPass::runOnOperation() {
                                                            &getContext());
     vector::populateVectorSlicesLoweringPatterns(patterns, &getContext());
     vector::populateVectorContractLoweringPatterns(patterns, &getContext());
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
   //
   auto module = getOperation();
@@ -358,7 +359,7 @@ void ConvertToLLVMPass::runOnOperation() {
     funcOp.walk([&](IREE::PlaceholderOp placeholderOp) { any = true; });
     return any ? false : true;
   });
-  if (failed(applyPartialConversion(module, target, patterns))) {
+  if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
   }
 }
