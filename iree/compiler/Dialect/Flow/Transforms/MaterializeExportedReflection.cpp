@@ -41,6 +41,8 @@ llvm::Optional<ScalarType> mapScalarType(Type elementType) {
     // TODO(laurenzo): These types are still signless. Assume signed and
     // preserve once represented.
     switch (bits) {
+      // We represent bools as 8-bit integers right now.
+      case 1:
       case 8:
         return ScalarType::kSint8;
       case 16:

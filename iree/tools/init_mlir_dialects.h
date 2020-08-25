@@ -35,24 +35,29 @@
 
 namespace mlir {
 
+// Add all the MLIR dialects to the provided registry.
+inline void registerMlirDialects(DialectRegistry &registry) {
+  // clang-format off
+  registry.insert<AffineDialect,
+                  gpu::GPUDialect,
+                  LLVM::LLVMDialect,
+                  linalg::LinalgDialect,
+                  scf::SCFDialect,
+                  quant::QuantizationDialect,
+                  spirv::SPIRVDialect,
+                  StandardOpsDialect,
+                  vector::VectorDialect,
+                  SDBMDialect,
+                  shape::ShapeDialect>();
+  // clang-format on
+}
+
 // This function should be called before creating any MLIRContext if one expect
 // all the possible dialects to be made available to the context automatically.
 inline void registerMlirDialects() {
-  static bool init_once = []() {
-    registerDialect<AffineDialect>();
-    registerDialect<gpu::GPUDialect>();
-    registerDialect<LLVM::LLVMDialect>();
-    registerDialect<linalg::LinalgDialect>();
-    registerDialect<scf::SCFDialect>();
-    registerDialect<quant::QuantizationDialect>();
-    registerDialect<shape::ShapeDialect>();
-    registerDialect<spirv::SPIRVDialect>();
-    registerDialect<StandardOpsDialect>();
-    registerDialect<vector::VectorDialect>();
-    registerDialect<SDBMDialect>();
-    return true;
-  }();
-  (void)init_once;
+  static bool initOnce =
+      ([]() { registerMlirDialects(getGlobalDialectRegistry()); }(), true);
+  (void)initOnce;
 }
 }  // namespace mlir
 

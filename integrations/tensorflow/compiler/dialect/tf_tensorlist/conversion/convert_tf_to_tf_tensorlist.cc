@@ -102,7 +102,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   // want to blindly update all variant types to tensorlist. So here we do a
   // targeted rewrite.
   auto *tfTensorListDialect =
-      func.getContext()->getRegisteredDialect<TfTensorListDialect>();
+      func.getContext()->getLoadedDialect<TfTensorListDialect>();
   auto tensorListType = TensorListType::get(func.getContext());
   SmallVector<Value, 8> typeConversionWorklist;
   func.walk([&](Operation *op) {

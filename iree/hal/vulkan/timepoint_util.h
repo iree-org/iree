@@ -67,6 +67,9 @@ class TimePointFence final : public RefObject<TimePointFence>,
   // under the hood.
   VkResult GetStatus();
 
+  // Resets the status to unsignaled (VK_NOT_READY).
+  void ResetStatus();
+
   // Returns the pool from which this fence comes.
   TimePointFencePool* pool() const { return pool_; }
 

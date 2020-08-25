@@ -85,11 +85,14 @@ class ModelRunner {
   // Compile the owned `module` into LLVMIR that can be passed to the buffer.
   // For now, the MLIR passes and transformations are kept to a minimum and only
   // perform straightforward lowering to LLVMIR.
-  // An optional CompilationOptions object is passed to control special passes
+  // An optional CompilationOptions object is passed to control special passes.
   // An optional array of shared runtime support libraries is passed to the
   // execution engine.
-  void compile(CompilationOptions compilationOptions,
-               llvm::ArrayRef<const std::string> runtime = None);
+  // An optional array of extra symbols can be given.
+  void compile(
+      CompilationOptions compilationOptions,
+      llvm::ArrayRef<const std::string> runtime = None,
+      llvm::ArrayRef<std::pair<std::string, void *>> extra_symbols = None);
 
   // Reference to the compiled module.
   mlir::OwningModuleRef &module;

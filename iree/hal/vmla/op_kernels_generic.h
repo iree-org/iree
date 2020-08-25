@@ -177,19 +177,19 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
   for (int ho = 0; ho < dst_shape[0]; ho++) {
     for (int wo = 0; wo < dst_shape[1]; wo++) {
       for (int g = 0; g < groups; ++g) {
-        for (int co = 0; co < output_group_size; co++) {
-          const int cg_o = g * output_group_size + co;
-          const int y_i = ho * dst_strides[0] + wo * dst_strides[1] + cg_o;
-          T dst_value = T(0);
-          for (int ci = 0; ci < input_group_size; ci++) {
-            for (int kh = 0; kh < filter_shape[0]; kh++) {
-              const int ih = ho * window_strides[0] + kh - pad_h[0];
-              // left-right padding condition.
-              if (ih < 0 || ih >= input_shape[0]) continue;
-              for (int kw = 0; kw < filter_shape[1]; kw++) {
-                // top-bottom padding condition.
-                const int iw = wo * window_strides[1] + kw - pad_w[0];
-                if (iw < 0 || iw >= input_shape[1]) continue;
+        for (int kh = 0; kh < filter_shape[0]; kh++) {
+          const int ih = ho * window_strides[0] + kh - pad_h[0];
+          // left-right padding condition.
+          if (ih < 0 || ih >= input_shape[0]) continue;
+          for (int kw = 0; kw < filter_shape[1]; kw++) {
+            // top-bottom padding condition.
+            const int iw = wo * window_strides[1] + kw - pad_w[0];
+            if (iw < 0 || iw >= input_shape[1]) continue;
+            for (int co = 0; co < output_group_size; co++) {
+              const int cg_o = g * output_group_size + co;
+              const int y_i = ho * dst_strides[0] + wo * dst_strides[1] + cg_o;
+              T dst_value = T(0);
+              for (int ci = 0; ci < input_group_size; ci++) {
                 const int cg_i = g * input_group_size + ci;
                 const int w_i = kh * dilation[0] * filter_strides[0] +
                                 kw * dilation[1] * filter_strides[1] +
@@ -198,9 +198,9 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
                     ih * input_strides[0] + iw * input_strides[1] + cg_i;
                 dst_value += input_buffer[x_i] * filter_buffer[w_i];
               }
+              dst_buffer[y_i] += dst_value;
             }
           }
-          dst_buffer[y_i] = dst_value;
         }
       }
     }

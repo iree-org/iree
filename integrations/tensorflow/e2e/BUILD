@@ -81,6 +81,7 @@ LLVM_FAILING = [
 
 # keep sorted
 VULKAN_FAILING = [
+    "bool_test.py",
     "broadcast_to_test.py",
     "broadcasting_test.py",
     "control_flow_test.py",

@@ -215,9 +215,9 @@ bazel run iree/tools:iree-benchmark-module -- \
   --input_file=/path/to/custom/compiled.vmfb
 ```
 
-Currently, this only supports benchmarking the first module call in a trace.
-We plan to extend this to support benchmarking all of the calls in the trace,
-and also plan to support verifying outputs during the warm-up phase of the
+Currently, this only supports benchmarking the first module call in a trace. We
+plan to extend this to support benchmarking all of the calls in the trace, and
+also plan to support verifying outputs during the warm-up phase of the
 benchmark.
 
 ## Debugging Tests
