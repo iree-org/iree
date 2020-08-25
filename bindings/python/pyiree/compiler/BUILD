@@ -93,7 +93,7 @@ pybind_cc_library(
         "//iree/tools:init_mlir_passes_and_dialects",
         "//iree/tools:init_targets",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
+        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Parser",
