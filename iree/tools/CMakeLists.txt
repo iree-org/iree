@@ -57,11 +57,11 @@ iree_cc_binary(
     absl::flags
     absl::strings
     benchmark
+    iree::base::init
     iree::base::file_io
     iree::base::status
     iree::base::tracing
     iree::modules::hal
-    iree::testing::benchmark_main
     iree::vm
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
