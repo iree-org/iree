@@ -50,8 +50,10 @@ namespace llvm {
 extern Pass* createLowerMatrixIntrinsicsPass();
 }  // end namespace llvm
 
-void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
-                                llvm::ArrayRef<const std::string> runtime) {
+void mlir::ModelRunner::compile(
+    CompilationOptions compilationOptions,
+    llvm::ArrayRef<const std::string> runtime,
+    llvm::ArrayRef<std::pair<std::string, void*>> extra_symbols) {
   if (target == Target::CPUTarget) {
     // Lower vector operations progressively into more elementary
     // vector operations before running the regular compiler passes.
@@ -111,6 +113,20 @@ void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
     assert(false);
   });
   engine = std::move(*created);
+
+  // Define any extra symbols so they're available at runtime.
+  auto symbolRegisterer =
+      [&extra_symbols](llvm::orc::MangleAndInterner interner) {
+        llvm::orc::SymbolMap symbolMap;
+        for (auto& symbol : extra_symbols) {
+          const std::string& name = symbol.first;
+          void* function_pointer = symbol.second;
+          symbolMap[interner(name)] =
+              llvm::JITEvaluatedSymbol::fromPointer(function_pointer);
+        }
+        return symbolMap;
+      };
+  engine->registerSymbols(symbolRegisterer);
 }
 
 static void addVulkanLoweringPass(mlir::PassManager& manager) {
