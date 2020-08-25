@@ -24,10 +24,10 @@ class RangeModule(tf.Module):
 
   @tf.function(input_signature=[
       tf.TensorSpec([], tf.float32),
+      tf.TensorSpec([], tf.float32),
       tf.TensorSpec([], tf.float32)
   ])
-  def range(self, start, stop):
-    delta = np.array(3, dtype=np.float32)
+  def range(self, start, stop, delta):
     return tf.range(start, stop, delta)
 
 
@@ -38,7 +38,8 @@ class RangeTest(tf_test_utils.TracedModuleTestCase):
     def range(module):
       start = np.array(3., dtype=np.float32)
       stop = np.array(12., dtype=np.float32)
-      result = module.range(start, stop)
+      delta = np.array(3, dtype=np.float32)
+      result = module.range(start, stop, delta)
 
     self.compare_backends(range)
 
