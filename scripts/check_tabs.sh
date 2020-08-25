@@ -31,12 +31,19 @@ declare -a excluded_files_patterns=(
 excluded_files_pattern="$(IFS="|" ; echo "${excluded_files_patterns[*]?}")"
 
 readarray -t files < <(\
-  (git diff --name-only "${BASE_REF}" | grep -v -E "${excluded_files_pattern?}") \
-    || kill $$)
+  (git diff --name-only "${BASE_REF}" \
+    | grep -v -E "${excluded_files_pattern?}") \
+  || kill $$)
 
 diff="$(grep --with-filename --line-number --perl-regexp '\t' "${files[@]}")"
 
-if (( "$?" == 0 )); then
+grep_exit="$?"
+
+if (( "${grep_exit?}" >= 2 )); then
+  exit "${grep_exit?}"
+fi
+
+if (( "${grep_exit?}" == 0 )); then
   echo "Changed files include tabs. Please use spaces.";
   echo "$diff"
   exit 1;
