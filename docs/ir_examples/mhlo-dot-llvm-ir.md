@@ -561,7 +561,7 @@ module {
 }
 
 ```
-### IR Dump After LinalgFusionOfTensorOps
+### IR Dump After mlir::iree_compiler::{anonymous}::FusionOfTensorOpsPass
 ```
 module {
   func @dot_ex_dispatch_0() {
