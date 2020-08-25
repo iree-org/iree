@@ -17,7 +17,6 @@
 # Checks for tabs in files modified vs the specified reference commit (default
 # "main")
 
-set -x
 set -o pipefail
 
 BASE_REF="${1:-main}"
@@ -31,12 +30,14 @@ declare -a excluded_files_patterns=(
 # Join on |
 excluded_files_pattern="$(IFS="|" ; echo "${excluded_files_patterns[*]?}")"
 
-git diff --name-only "${BASE_REF?}" | \
-  grep -v -E "${excluded_files_pattern?}" | \
-  xargs \
-    grep --with-filename --line-number --perl-regexp '\t'
+readarray -t files < <(\
+  (git diff --name-only "${BASE_REF}" | grep -v -E "${excluded_files_pattern?}") \
+    || kill $$)
+
+diff="$(grep --with-filename --line-number --perl-regexp '\t' "${files[@]}")"
 
 if (( "$?" == 0 )); then
   echo "Changed files include tabs. Please use spaces.";
+  echo "$diff"
   exit 1;
 fi
