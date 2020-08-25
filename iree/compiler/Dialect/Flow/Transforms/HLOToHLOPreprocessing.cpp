@@ -342,7 +342,8 @@ class ReorderBroadcastInDimOpAndBinaryElementwiseOp
 
     auto bcastxOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(lhsOp);
     auto bcastyOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(rhsOp);
-    if (!bcastxOp || !bcastyOp) {
+    if (!bcastxOp || !bcastyOp ||
+        bcastxOp.broadcast_dimensions() != bcastyOp.broadcast_dimensions()) {
       return failure();
     }
 
@@ -351,11 +352,6 @@ class ReorderBroadcastInDimOpAndBinaryElementwiseOp
     auto xType = x.getType().template dyn_cast<ShapedType>();
     auto yType = y.getType().template dyn_cast<ShapedType>();
     if (!xType || !yType || !xType.hasStaticShape() || xType != yType) {
-      return failure();
-    }
-
-    if (xType.hasRank() != 1 &&
-        bcastxOp.broadcast_dimensions() != bcastyOp.broadcast_dimensions()) {
       return failure();
     }
 
