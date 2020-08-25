@@ -76,14 +76,15 @@ static llvm::cl::opt<bool> showDialects(
     llvm::cl::init(false));
 
 int main(int argc, char **argv) {
-  mlir::registerMlirDialects();
+  mlir::DialectRegistry registry;
+  mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
 #ifdef IREE_HAVE_EMITC_DIALECT
   mlir::registerEmitCDialect();
 #endif  // IREE_HAVE_EMITC_DIALECT
-  mlir::registerXLADialects();
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALConversionPasses();
   mlir::iree_compiler::registerHALTargetBackends();
@@ -108,11 +109,10 @@ int main(int argc, char **argv) {
                                     "IREE modular optimizer driver\n");
 
   if (showDialects) {
-    llvm::outs() << "Registered Dialects:\n";
-    mlir::MLIRContext context;
-    for (mlir::Dialect *dialect : context.getLoadedDialects()) {
-      llvm::outs() << dialect->getNamespace() << "\n";
-    }
+    llvm::outs() << "Available Dialects:\n";
+    interleave(
+        registry, llvm::outs(),
+        [](auto &registryEntry) { llvm::outs() << registryEntry.first; }, "\n");
     return 0;
   }
 
@@ -130,9 +130,10 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  mlir::DialectRegistry registry;
-  return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
-                                  registry, splitInputFile, verifyDiagnostics,
-                                  verifyPasses, allowUnregisteredDialects,
-                                  /*preloadDialectsInContext=*/true));
+  if (failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
+                               registry, splitInputFile, verifyDiagnostics,
+                               verifyPasses, allowUnregisteredDialects,
+                               /*preloadDialectsInContext=*/true))) {
+    return 1;
+  }
 }
