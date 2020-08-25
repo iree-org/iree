@@ -33,6 +33,42 @@
 
 namespace iree {
 
+// A helper wrapper that moves the wrapped object on copy.
+// This is particularly handy for capturing unique_ptrs in lambdas.
+// Usage example:
+//
+//  std::unique_ptr<Foo> foo_ptr(new Foo());
+//  move_on_copy<std::unique_ptr<Foo>> foo(std::move(foo_ptr));
+//  auto some_lambda = [bar]() { ... }
+//
+template <typename T>
+struct move_on_copy {
+  explicit move_on_copy(T&& t) : value(std::move(t)) {}
+
+  move_on_copy(move_on_copy const& other) : value(std::move(other.value)) {}
+
+  move_on_copy(move_on_copy&& other) : value(std::move(other.value)) {}
+
+  move_on_copy& operator=(move_on_copy const& other) {
+    value = std::move(other.value);
+    return *this;
+  }
+
+  move_on_copy& operator=(move_on_copy&& other) {
+    value = std::move(other.value);
+    return *this;
+  }
+
+  mutable T value;
+};
+
+// Utility to aid in moving ref_ptr's into closures.
+//
+// Usage:
+//   auto baton = MoveToLambda(my_ref);
+//   DoSomething([baton] () { baton.value; });
+#define IreeMoveToLambda(p) ::iree::move_on_copy<decltype(p)>(std::move(p))
+
 // Wraps a FlatBuffer String in an absl::string_view.
 // Returns empty-string ("") for nullptr values.
 inline absl::string_view WrapString(const ::flatbuffers::String* value) {
@@ -206,7 +242,7 @@ StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Create(
     const T* root, std::function<void()> deleter) {
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(base_file->Create(root, std::move(deleter)));
+  IREE_RETURN_IF_ERROR(base_file->Create(root, std::move(deleter)));
   return std::move(flat_buffer_file);
 }
 
@@ -217,7 +253,7 @@ StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::CreateWithBackingBuffer(
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   auto* root_ptr = ::flatbuffers::GetRoot<T>(backing_buffer.data());
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(
       base_file->CreateWithBackingBuffer(root_ptr, std::move(backing_buffer)));
   return std::move(flat_buffer_file);
 }
@@ -227,7 +263,7 @@ template <typename T>
 StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Wrap(const T* root) {
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(base_file->Wrap(root));
+  IREE_RETURN_IF_ERROR(base_file->Wrap(root));
   return std::move(flat_buffer_file);
 }
 
@@ -238,7 +274,7 @@ StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
     std::function<void()> deleter) {
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(base_file->FromBuffer(
+  IREE_RETURN_IF_ERROR(base_file->FromBuffer(
       identifier, buffer_data, std::move(deleter), sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
 }
@@ -259,7 +295,7 @@ StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::WrapBuffer(
     Identifier identifier, absl::Span<const uint8_t> buffer_data) {
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(
       base_file->WrapBuffer(identifier, buffer_data, sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
 }
@@ -271,8 +307,8 @@ StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromContainer(
     Identifier identifier, Container buffer_data) {
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(base_file->FromContainer(identifier, std::move(buffer_data),
-                                           sizeof(T), VerifierFnT));
+  IREE_RETURN_IF_ERROR(base_file->FromContainer(
+      identifier, std::move(buffer_data), sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
 }
 
@@ -282,7 +318,7 @@ StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::LoadFile(
     Identifier identifier, std::string path) {
   ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(
       base_file->LoadFile(identifier, std::move(path), sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
 }

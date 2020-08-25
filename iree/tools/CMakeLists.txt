@@ -57,10 +57,7 @@ iree_cc_binary(
     absl::flags
     absl::strings
     benchmark
-    iree::base::api_util
     iree::base::file_io
-    iree::base::localfile
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::modules::hal
@@ -83,7 +80,6 @@ iree_cc_binary(
     iree::base::file_io
     iree::base::flatbuffer_util
     iree::base::init
-    iree::base::localfile
     iree::schemas::bytecode_module_def_cc_fbs
 )
 
@@ -98,11 +94,8 @@ iree_cc_binary(
     ::vm_util
     absl::flags
     absl::strings
-    iree::base::api_util
     iree::base::file_io
     iree::base::init
-    iree::base::localfile
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::modules::hal
@@ -340,9 +333,7 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       absl::strings
       iree::base::api
-      iree::base::api_util
       iree::base::init
-      iree::base::localfile
       iree::base::source_location
       iree::base::status
       iree::base::tracing
@@ -387,7 +378,6 @@ iree_cc_library(
   DEPS
     absl::span
     absl::strings
-    iree::base::api_util
     iree::base::file_io
     iree::base::signature_mangle
     iree::base::status
@@ -407,10 +397,10 @@ iree_cc_test(
   DEPS
     ::vm_util
     iree::base::api
-    iree::base::status_matchers
     iree::hal::api
     iree::hal::vmla::vmla_driver_module
     iree::modules::hal
+    iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
 )

@@ -34,23 +34,24 @@ namespace {
 
 VmModule CreateHalModule(HalDevice* device) {
   iree_vm_module_t* module;
-  CheckApiStatus(
-      iree_hal_module_create(device->raw_ptr(), IREE_ALLOCATOR_SYSTEM, &module),
-      "Error creating hal module");
+  CheckApiStatus(iree_hal_module_create(device->raw_ptr(),
+                                        iree_allocator_system(), &module),
+                 "Error creating hal module");
   return VmModule::CreateRetained(module);
 }
 
 VmModule CreateStringsModule() {
   iree_vm_module_t* module;
-  CheckApiStatus(iree_strings_module_create(IREE_ALLOCATOR_SYSTEM, &module),
+  CheckApiStatus(iree_strings_module_create(iree_allocator_system(), &module),
                  "Error creating trings module");
   return VmModule::CreateRetained(module);
 }
 
 VmModule CreateTensorListModule() {
   iree_vm_module_t* module;
-  CheckApiStatus(iree_tensorlist_module_create(IREE_ALLOCATOR_SYSTEM, &module),
-                 "Error creating tensorlist module");
+  CheckApiStatus(
+      iree_tensorlist_module_create(iree_allocator_system(), &module),
+      "Error creating tensorlist module");
   return VmModule::CreateRetained(module);
 }
 
@@ -62,7 +63,7 @@ VmModule CreateTensorListModule() {
 
 VmInstance VmInstance::Create() {
   iree_vm_instance_t* instance;
-  auto status = iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance);
+  auto status = iree_vm_instance_create(iree_allocator_system(), &instance);
   CheckApiStatus(status, "Error creating instance");
   return VmInstance::CreateRetained(instance);
 }
@@ -77,7 +78,7 @@ VmContext VmContext::Create(VmInstance* instance,
   if (!modules) {
     // Simple create with open allowed modules.
     auto status = iree_vm_context_create(instance->raw_ptr(),
-                                         IREE_ALLOCATOR_SYSTEM, &context);
+                                         iree_allocator_system(), &context);
     CheckApiStatus(status, "Error creating vm context");
   } else {
     // Closed set of modules.
@@ -88,7 +89,7 @@ VmContext VmContext::Create(VmInstance* instance,
     }
     auto status = iree_vm_context_create_with_modules(
         instance->raw_ptr(), module_handles.data(), module_handles.size(),
-        IREE_ALLOCATOR_SYSTEM, &context);
+        iree_allocator_system(), &context);
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
@@ -117,7 +118,8 @@ std::unique_ptr<FunctionAbi> VmContext::CreateFunctionAbi(
     attrs.push_back({});
     auto status = iree_vm_get_function_reflection_attr(
         f, i, &attrs.back().first, &attrs.back().second);
-    if (status == IREE_STATUS_NOT_FOUND) {
+    if (iree_status_is_not_found(status)) {
+      iree_status_ignore(status);
       attrs.pop_back();
       break;
     }
@@ -139,7 +141,7 @@ std::unique_ptr<FunctionAbi> VmContext::CreateFunctionAbi(
 void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
                        VmVariantList& outputs) {
   CheckApiStatus(iree_vm_invoke(raw_ptr(), f, nullptr, inputs.raw_ptr(),
-                                outputs.raw_ptr(), IREE_ALLOCATOR_SYSTEM),
+                                outputs.raw_ptr(), iree_allocator_system()),
                  "Error invoking function");
 }
 
@@ -164,8 +166,8 @@ VmModule VmModule::FromFlatbufferBlob(py::buffer flatbuffer_blob) {
   auto status = iree_vm_bytecode_module_create(
       {static_cast<const uint8_t*>(buffer_info.ptr),
        static_cast<iree_host_size_t>(buffer_info.size)},
-      deallocator, IREE_ALLOCATOR_SYSTEM, &module);
-  if (status != IREE_STATUS_OK) {
+      deallocator, iree_allocator_system(), &module);
+  if (!iree_status_is_ok(status)) {
     deallocator.free(raw_ptr, nullptr);
   }
 
@@ -178,7 +180,8 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
   iree_vm_function_t f;
   auto status = iree_vm_module_lookup_function_by_name(
       raw_ptr(), linkage, {name.data(), name.size()}, &f);
-  if (status == IREE_STATUS_NOT_FOUND) {
+  if (iree_status_is_not_found(status)) {
+    iree_status_ignore(status);
     return absl::nullopt;
   }
   CheckApiStatus(status, "Error looking up function");
@@ -198,8 +201,10 @@ std::string VmVariantList::DebugString() const {
 
   for (iree_host_size_t i = 0, e = size(); i < e; ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    if (!iree_status_is_ok(
-            iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant))) {
+    iree_status_t status =
+        iree_vm_list_get_variant(mutable_this->raw_ptr(), i, &variant);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
       absl::StrAppend(&s, "Error");
       continue;
     }
@@ -236,10 +241,10 @@ std::string VmVariantList::DebugString() const {
 }
 
 void SetupVmBindings(pybind11::module m) {
-  CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_tensorlist_module_register_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_strings_module_register_types());
+  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  IREE_CHECK_OK(iree_hal_module_register_types());
+  IREE_CHECK_OK(iree_tensorlist_module_register_types());
+  IREE_CHECK_OK(iree_strings_module_register_types());
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);

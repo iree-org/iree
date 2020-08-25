@@ -16,7 +16,6 @@
 
 #include "absl/synchronization/mutex.h"
 #include "flatbuffers/flatbuffers.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
@@ -51,7 +50,7 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
       *::flatbuffers::GetRoot<SpirVExecutableDef>(spec.executable_data.data());
 
   // Create the executable (which may itself own many pipelines).
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto executable,
       PipelineExecutable::Create(
           add_ref(logical_device_),

@@ -33,7 +33,9 @@ flags.DEFINE_string(
     'for example https://storage.googleapis.com/iree_models/')
 flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
-flags.DEFINE_integer('include_top', 0, 'if 1 top level is appended')
+flags.DEFINE_bool(
+    'include_top', True,
+    'Whether or not to include the final (top) layers of the model.')
 
 APP_MODELS = {
     'ResNet50':
@@ -94,7 +96,7 @@ def load_cifar10_weights(model):
   # get_file will download the model weights from a publicly available folder,
   # save them to cache_dir=~/.keras/models/ and return a path to them.
   url = os.path.join(
-      FLAGS.url, f'cifar10_include_top_{FLAGS.include_top}_{FLAGS.model}.h5')
+      FLAGS.url, f'cifar10_include_top_{FLAGS.include_top:d}_{FLAGS.model}.h5')
   weights_path = tf.keras.utils.get_file(file_name, url)
   model.load_weights(weights_path)
   return model
@@ -112,8 +114,9 @@ def initialize_model():
   # an external tf.keras URL.
   weights = 'imagenet' if FLAGS.data == 'imagenet' else None
 
-  model = APP_MODELS[FLAGS.model](
-      weights=weights, include_top=FLAGS.include_top, input_shape=input_shape)
+  model = APP_MODELS[FLAGS.model](weights=weights,
+                                  include_top=FLAGS.include_top,
+                                  input_shape=input_shape)
 
   if FLAGS.data == 'cifar10' and FLAGS.url:
     model = load_cifar10_weights(model)
@@ -129,8 +132,7 @@ class VisionModule(tf.Module):
     # TODO(b/142948097): Add support for dynamic shapes in SPIR-V lowering.
     # Replace input_shape with m.input_shape to make the batch size dynamic.
     self.predict = tf.function(
-        input_signature=[tf.TensorSpec(get_input_shape())])(
-            self.m.call)
+        input_signature=[tf.TensorSpec(get_input_shape())])(self.m.call)
 
 
 @tf_test_utils.compile_module(VisionModule, exported_names=['predict'])

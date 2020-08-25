@@ -33,21 +33,26 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Add all the IREE dialects to the provided registry.
+inline void registerIreeDialects(DialectRegistry &registry) {
+  // clang-format off
+  registry.insert<IREE::Flow::FlowDialect,
+                  IREE::HAL::HALDialect,
+                  IREE::Sequence::SequenceDialect,
+                  ShapeDialect,
+                  IREEDialect,
+                  IREE::VM::VMDialect,
+                  IREE::VMLA::VMLADialect,
+                  IREE::Vulkan::VulkanDialect>();
+  // clang-format on
+}
+
 // This function should be called before creating any MLIRContext if one expect
 // all the possible dialects to be made available to the context automatically.
 inline void registerIreeDialects() {
-  static bool init_once = []() {
-    registerDialect<IREE::Flow::FlowDialect>();
-    registerDialect<IREE::HAL::HALDialect>();
-    registerDialect<IREE::Sequence::SequenceDialect>();
-    registerDialect<ShapeDialect>();
-    registerDialect<IREEDialect>();
-    registerDialect<IREE::VM::VMDialect>();
-    registerDialect<IREE::VMLA::VMLADialect>();
-    registerDialect<IREE::Vulkan::VulkanDialect>();
-    return true;
-  }();
-  (void)init_once;
+  static bool initOnce =
+      ([]() { registerIreeDialects(getGlobalDialectRegistry()); }(), true);
+  (void)initOnce;
 }
 }  // namespace iree_compiler
 }  // namespace mlir

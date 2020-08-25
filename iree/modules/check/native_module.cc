@@ -23,7 +23,6 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
@@ -56,9 +55,7 @@ StatusOr<std::string> BufferViewToString(iree_hal_buffer_view_t* buffer_view) {
         &result_str[0], &actual_length);
     result_str.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC);
-  }
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(result_str);
 }
 
@@ -113,10 +110,8 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
     }
   }
   char element_type_str[16];
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_format_element_type(element_type, sizeof(element_type_str),
-                                   element_type_str, nullptr),
-      IREE_LOC));
+  IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
+      element_type, sizeof(element_type_str), element_type_str, nullptr));
   return InvalidArgumentErrorBuilder(IREE_LOC)
          << "Unsupported element type " << element_type_str;
 }
@@ -154,10 +149,8 @@ Status ExpectAllTrue(iree_byte_span_t bytes,
     }
   }
   char element_type_str[16];
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_format_element_type(element_type, sizeof(element_type_str),
-                                   element_type_str, nullptr),
-      IREE_LOC));
+  IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
+      element_type, sizeof(element_type_str), element_type_str, nullptr));
   return InvalidArgumentErrorBuilder(IREE_LOC)
          << "Unsupported element type " << element_type_str;
 }
@@ -190,11 +183,10 @@ class CheckModuleState final {
         iree_hal_buffer_view_element_type(view);
     iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
     iree_hal_mapped_memory_t mapped_memory;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_map(buf, IREE_HAL_MEMORY_ACCESS_READ, /*byte_offset=*/0,
-                            IREE_WHOLE_BUFFER, &mapped_memory),
-        IREE_LOC));
-    RETURN_IF_ERROR(
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+        buf, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &mapped_memory));
+    IREE_RETURN_IF_ERROR(
         ::iree::ExpectAllTrue(mapped_memory.contents, element_type));
     iree_hal_buffer_unmap(buf, &mapped_memory);
     return OkStatus();
@@ -206,15 +198,13 @@ class CheckModuleState final {
     auto* rhs = rhs_ref.get();
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
     absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
 
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
     absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr));
 
     iree_hal_element_type_t lhs_element_type =
         iree_hal_buffer_view_element_type(lhs);
@@ -223,18 +213,14 @@ class CheckModuleState final {
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
     iree_hal_mapped_memory_t lhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &lhs_mapped_memory),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+        lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
     iree_hal_mapped_memory_t rhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &rhs_mapped_memory),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+        rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;
@@ -259,13 +245,13 @@ class CheckModuleState final {
       os << "\n"
             "  lhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
+      IREE_ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
       os << lhs_str;
 
       os << "\n"
             "  rhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
+      IREE_ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
       os << rhs_str;
 
       // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
@@ -281,15 +267,13 @@ class CheckModuleState final {
     auto* rhs = rhs_ref.get();
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
     absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr));
 
     size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
     absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr));
 
     iree_hal_element_type_t lhs_element_type =
         iree_hal_buffer_view_element_type(lhs);
@@ -298,25 +282,21 @@ class CheckModuleState final {
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
     iree_hal_mapped_memory_t lhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &lhs_mapped_memory),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+        lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
     iree_hal_mapped_memory_t rhs_mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
-                                          &rhs_mapped_memory),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map(
+        rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, IREE_WHOLE_BUFFER, &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;
     // Only check contents if shape and element type match. Otherwise we can't.
     bool contents_could_be_almost_eq = true;
     if (element_types_eq && shape_eq) {
-      ASSIGN_OR_RETURN(
+      IREE_ASSIGN_OR_RETURN(
           contents_could_be_almost_eq,
           AlmostEqByteSpan(lhs_mapped_memory.contents,
                            rhs_mapped_memory.contents, lhs_element_type));
@@ -340,13 +320,13 @@ class CheckModuleState final {
       os << "\n"
             "  lhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
+      IREE_ASSIGN_OR_RETURN(auto lhs_str, BufferViewToString(lhs));
       os << lhs_str;
 
       os << "\n"
             "  rhs:\n"
             "    ";
-      ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
+      IREE_ASSIGN_OR_RETURN(auto rhs_str, BufferViewToString(rhs));
       os << rhs_str;
 
       // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
@@ -359,7 +339,7 @@ class CheckModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = IREE_ALLOCATOR_SYSTEM;
+  iree_allocator_t allocator_ = iree_allocator_system();
 };
 
 // Function table mapping imported function names to their implementation.
@@ -399,12 +379,12 @@ class CheckModule final : public vm::NativeModule<CheckModuleState> {
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t check_native_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CheckModule>(
       "check", allocator, absl::MakeConstSpan(kCheckModuleFunctions));
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 }  // namespace iree

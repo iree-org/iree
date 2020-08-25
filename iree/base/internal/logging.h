@@ -21,7 +21,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
-#include "iree/base/platform_headers.h"
+#include "iree/base/target_platform.h"
 
 namespace iree {
 

@@ -177,19 +177,19 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
   for (int ho = 0; ho < dst_shape[0]; ho++) {
     for (int wo = 0; wo < dst_shape[1]; wo++) {
       for (int g = 0; g < groups; ++g) {
-        for (int co = 0; co < output_group_size; co++) {
-          const int cg_o = g * output_group_size + co;
-          const int y_i = ho * dst_strides[0] + wo * dst_strides[1] + cg_o;
-          T dst_value = T(0);
-          for (int ci = 0; ci < input_group_size; ci++) {
-            for (int kh = 0; kh < filter_shape[0]; kh++) {
-              const int ih = ho * window_strides[0] + kh - pad_h[0];
-              // left-right padding condition.
-              if (ih < 0 || ih >= input_shape[0]) continue;
-              for (int kw = 0; kw < filter_shape[1]; kw++) {
-                // top-bottom padding condition.
-                const int iw = wo * window_strides[1] + kw - pad_w[0];
-                if (iw < 0 || iw >= input_shape[1]) continue;
+        for (int kh = 0; kh < filter_shape[0]; kh++) {
+          const int ih = ho * window_strides[0] + kh - pad_h[0];
+          // left-right padding condition.
+          if (ih < 0 || ih >= input_shape[0]) continue;
+          for (int kw = 0; kw < filter_shape[1]; kw++) {
+            // top-bottom padding condition.
+            const int iw = wo * window_strides[1] + kw - pad_w[0];
+            if (iw < 0 || iw >= input_shape[1]) continue;
+            for (int co = 0; co < output_group_size; co++) {
+              const int cg_o = g * output_group_size + co;
+              const int y_i = ho * dst_strides[0] + wo * dst_strides[1] + cg_o;
+              T dst_value = T(0);
+              for (int ci = 0; ci < input_group_size; ci++) {
                 const int cg_i = g * input_group_size + ci;
                 const int w_i = kh * dilation[0] * filter_strides[0] +
                                 kw * dilation[1] * filter_strides[1] +
@@ -198,9 +198,9 @@ Status Conv2D::Execute(absl::Span<const T> input_buffer, ShapeSpan input_shape,
                     ih * input_strides[0] + iw * input_strides[1] + cg_i;
                 dst_value += input_buffer[x_i] * filter_buffer[w_i];
               }
+              dst_buffer[y_i] += dst_value;
             }
           }
-          dst_buffer[y_i] = dst_value;
         }
       }
     }
@@ -399,9 +399,10 @@ Status ScatterCopy(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer,
   }
 
   for (int i = 0; i < src_shape[0]; i++) {
-    RETURN_IF_ERROR(ScatterCopy(src_buffer.subspan(i * src_stride, src_stride),
-                                dst_buffer.subspan(i * dst_stride, dst_stride),
-                                src_shape.subspan(1), dst_shape.subspan(1)));
+    IREE_RETURN_IF_ERROR(
+        ScatterCopy(src_buffer.subspan(i * src_stride, src_stride),
+                    dst_buffer.subspan(i * dst_stride, dst_stride),
+                    src_shape.subspan(1), dst_shape.subspan(1)));
   }
 
   return OkStatus();
@@ -428,8 +429,9 @@ Status ScatterHelper(absl::Span<const T> src_buffer,
            << "Attempting to scatter to differing dimensions.";
   }
 
-  RETURN_IF_ERROR(ScatterCopy(src_buffer, dst_buffer.subspan(offset), src_shape,
-                              dst_shape.subspan(indices_buffer.size())));
+  IREE_RETURN_IF_ERROR(ScatterCopy(src_buffer, dst_buffer.subspan(offset),
+                                   src_shape,
+                                   dst_shape.subspan(indices_buffer.size())));
 
   return OkStatus();
 }
@@ -461,7 +463,7 @@ Status Scatter::Execute(absl::Span<const T> src_buffer,
   }
 
   for (int i = 0; i < batch_size; i++) {
-    RETURN_IF_ERROR(impl::ScatterHelper(
+    IREE_RETURN_IF_ERROR(impl::ScatterHelper(
         src_buffer.subspan(i * src_size, src_size),
         indices_buffer.subspan(i * indices_size, indices_size), dst_buffer,
         src_shape.subspan(1), dst_shape));
@@ -935,10 +937,10 @@ Status ReduceMax::Execute(absl::Span<const T> src_buffer,
 namespace impl {
 
 template <typename T, typename KernelImpl>
-Status ComputePoolingWindow(absl::Span<const T> src_buffer,
-                            absl::Span<const int> src_indices,
-                            ShapeSpan src_shape, T init_value,
-                            ShapeSpan window_dimensions, T* dst_value) {
+void ComputePoolingWindow(absl::Span<const T> src_buffer,
+                          absl::Span<const int> src_indices,
+                          ShapeSpan src_shape, T init_value,
+                          ShapeSpan window_dimensions, T* dst_value) {
   int rank = src_shape.size();
   absl::InlinedVector<int, 8> window_indices(rank, 0);
   auto getSrcValue = [&]() -> T {
@@ -956,7 +958,6 @@ Status ComputePoolingWindow(absl::Span<const T> src_buffer,
     KernelImpl()(dst_value, getSrcValue());
     IncrementShapeIndex(absl::MakeSpan(window_indices), window_dimensions);
   }
-  return OkStatus();
 }
 
 template <typename T, typename KernelImpl>
@@ -972,10 +973,9 @@ Status GenericPooling(absl::Span<const T> src_buffer,
     for (int j = 0; j < rank; ++j) {
       src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];
     }
-    auto status = ComputePoolingWindow<T, KernelImpl>(
-        src_buffer, src_indices, src_shape, init_buffer[0], window_dimensions,
-        &dst_buffer[i]);
-    RETURN_IF_ERROR(status);
+    ComputePoolingWindow<T, KernelImpl>(src_buffer, src_indices, src_shape,
+                                        init_buffer[0], window_dimensions,
+                                        &dst_buffer[i]);
     IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
   }
   return OkStatus();

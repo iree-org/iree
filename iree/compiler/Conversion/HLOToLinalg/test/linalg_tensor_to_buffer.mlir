@@ -372,3 +372,50 @@ module {
 //       CHECK:   %[[T4:.*]] = linalg.reshape %[[T2]]
 //       CHECK:   linalg.generic {{.*}} %[[T3]], %[[T4]], %[[T1]]
 //       CHECK:   return
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0) -> (d0)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
+module {
+  func @generic_reshape_reshape() {
+    %c0 = constant 0 : index
+    %cst = constant 0.000000e+00 : f32
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x1x1x1000xf32>
+    %1 = linalg.tensor_reshape %0 [#map0] : tensor<1x1x1x1000xf32> into tensor<1000xf32>
+    %2 = linalg.generic {args_in = 1 : i64, args_out = 1 : i64, indexing_maps = [#map1, #map1], iterator_types = ["parallel"]} %1 {
+    ^bb0(%arg0: f32):  // no predecessors
+      %5 = addf %arg0, %cst : f32
+      linalg.yield %5 : f32
+    }: tensor<1000xf32> -> tensor<1000xf32>
+    %3 = linalg.tensor_reshape %2 [#map0] : tensor<1000xf32> into tensor<1x1x1x1000xf32>
+    %4 = linalg.tensor_reshape %3 [#map2, #map3] : tensor<1x1x1x1000xf32> into tensor<1x1000xf32>
+    hal.interface.store.tensor %3, @legacy_io::@ret0, offset = %c0 : tensor<1x1x1x1000xf32>
+    hal.interface.store.tensor %4, @legacy_io::@ret1, offset = %c0 : tensor<1x1000xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @generic_reshape_reshape
+//       CHECK:   %[[RET0:.+]] = iree.placeholder
+//  CHECK-SAME:     @legacy_io::@ret0
+//       CHECK:   %[[RET0_RESHAPE:.+]] = linalg.reshape %[[RET0]]
+//  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1000xf32>
+//       CHECK:   %[[RET1:.+]] = iree.placeholder
+//  CHECK-SAME:     @legacy_io::@ret1
+//       CHECK:   %[[ARG0:.+]] = iree.placeholder
+//  CHECK-SAME:     @legacy_io::@arg0
+//       CHECK:   %[[ARG0_RESHAPE:.+]] = linalg.reshape %[[ARG0]]
+//  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1000xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     %[[ARG0_RESHAPE]], %[[RET0_RESHAPE]]
+//       CHECK:   %[[RET0_RESHAPE2:.+]] = linalg.reshape %[[RET0]]
+//  CHECK-SAME:     memref<1x1x1x1000xf32> into memref<1x1000xf32>
+//       CHECK:   linalg.copy(%[[RET0_RESHAPE2]], %[[RET1]])

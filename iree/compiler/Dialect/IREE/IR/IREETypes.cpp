@@ -47,11 +47,11 @@ struct PtrTypeStorage : public TypeStorage {
 }  // namespace detail
 
 PtrType PtrType::get(Type targetType) {
-  return Base::get(targetType.getContext(), TypeKind::Ptr, targetType);
+  return Base::get(targetType.getContext(), targetType);
 }
 
 PtrType PtrType::getChecked(Type targetType, Location location) {
-  return Base::getChecked(location, TypeKind::Ptr, targetType);
+  return Base::getChecked(location, targetType);
 }
 
 Type PtrType::getTargetType() { return getImpl()->targetType; }

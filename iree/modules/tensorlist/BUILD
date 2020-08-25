@@ -38,6 +38,7 @@ cc_test(
         "//iree/hal:api",
         "//iree/hal/vmla:vmla_driver_module",
         "//iree/modules/hal",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
@@ -55,7 +56,6 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/hal:api",

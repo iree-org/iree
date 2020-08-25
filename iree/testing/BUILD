@@ -14,8 +14,6 @@
 
 # Testing utilities for IREE.
 
-load("//iree:build_defs.oss.bzl", "platform_trampoline_deps")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -35,14 +33,26 @@ cc_library(
 cc_library(
     name = "gtest",
     testonly = True,
-    hdrs = ["gtest.h"],
-    deps = platform_trampoline_deps("gtest", "testing"),
+    hdrs = [
+        "gtest.h",
+        "status_matchers.h",
+    ],
+    deps = [
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest",
+    ],
 )
 
 cc_library(
     name = "gtest_main",
     testonly = True,
-    hdrs = ["gtest.h"],
+    srcs = ["gtest_main.cc"],
     tags = ["keep_dep"],
-    deps = platform_trampoline_deps("gtest_main", "testing"),
+    deps = [
+        ":gtest",
+        "//iree/base:init",
+        "@com_google_googletest//:gtest",
+    ],
 )

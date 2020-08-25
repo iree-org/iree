@@ -42,6 +42,8 @@ iree_cc_test(
     ::module
     absl::strings
     iree::base::logging
+    iree::base::status
+    iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_cc
 )
@@ -54,7 +56,7 @@ iree_cc_library(
   SRCS
     "bytecode_dispatch.c"
     "bytecode_dispatch_util.h"
-    "bytecode_module.cc"
+    "bytecode_module.c"
     "bytecode_module_impl.h"
     "bytecode_op_table.h"
   DEPS
@@ -68,8 +70,7 @@ iree_cc_library(
     flatcc::runtime
     iree::base::alignment
     iree::base::api
-    iree::base::logging
-    iree::base::target_platform
+    iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC
 )
@@ -135,6 +136,7 @@ iree_cc_test(
     "bytecode_module_test.cc"
   DEPS
     ::bytecode_module
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -222,6 +224,7 @@ iree_cc_test(
     ::list
     iree::base::api
     iree::base::ref_ptr
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -254,7 +257,6 @@ iree_cc_library(
     absl::span
     absl::strings
     iree::base::api
-    iree::base::api_util
     iree::base::ref_ptr
     iree::base::status
   PUBLIC
@@ -282,6 +284,7 @@ iree_cc_test(
     ::ref
     iree::base::api
     iree::base::ref_ptr
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -323,6 +326,7 @@ iree_cc_test(
     ::stack
     iree::base::api
     iree::base::ref_ptr
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 

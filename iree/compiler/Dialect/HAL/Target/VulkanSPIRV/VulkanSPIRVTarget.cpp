@@ -229,21 +229,20 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   // NOTE: we could vary this based on the options such as 'vulkan-v1.1'.
   std::string name() const override { return "vulkan*"; }
 
-  void constructTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                          IREE::HAL::ExecutableOp executableOp) override {
-    // Attach SPIR-V target environment to the hal.executable.target op.
-    // If we had multiple target environments we would generate one target op
-    // per environment.
-    spirv::TargetEnvAttr spvTargetEnv =
-        getSPIRVTargetEnv(options_.vulkanTargetEnv, sourceOp.getContext());
-
+  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
+                        IREE::HAL::ExecutableOp executableOp) override {
     OpBuilder targetBuilder(&executableOp.getBlock().back());
     auto targetOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
         sourceOp.getLoc(), name());
     OpBuilder containerBuilder(&targetOp.getBlock().back());
-    auto innerModuleOp =
-        containerBuilder.clone(*sourceOp.getInnerModule().getOperation());
-    innerModuleOp->setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
+
+    auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+    // Attach SPIR-V target environment to the target's ModuleOp.
+    // If we had multiple target environments we would generate one target op
+    // per environment, with each setting its own environment attribute.
+    spirv::TargetEnvAttr spvTargetEnv =
+        getSPIRVTargetEnv(options_.vulkanTargetEnv, sourceOp.getContext());
+    innerModuleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,

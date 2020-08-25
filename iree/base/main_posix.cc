@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "iree/base/main.h"
-#include "iree/base/platform_headers.h"
+#include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX)

@@ -31,6 +31,8 @@ cc_test(
         ":invocation",
         ":module",
         "//iree/base:logging",
+        "//iree/base:status",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "//iree/vm/test:all_bytecode_modules_cc",
         "@com_google_absl//absl/strings",
@@ -42,7 +44,7 @@ cc_library(
     srcs = [
         "bytecode_dispatch.c",
         "bytecode_dispatch_util.h",
-        "bytecode_module.cc",
+        "bytecode_module.c",
         "bytecode_module_impl.h",
         "bytecode_op_table.h",
     ],
@@ -60,8 +62,7 @@ cc_library(
         ":value",
         "//iree/base:alignment",
         "//iree/base:api",
-        "//iree/base:logging",
-        "//iree/base:target_platform",
+        "//iree/base:tracing",
         "//iree/schemas:bytecode_module_def_c_fbs",
         "@com_github_dvidelabs_flatcc//:runtime",
     ],
@@ -114,6 +115,7 @@ cc_test(
     srcs = ["bytecode_module_test.cc"],
     deps = [
         ":bytecode_module",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -195,6 +197,7 @@ cc_test(
         ":list",
         "//iree/base:api",
         "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -223,7 +226,6 @@ cc_library(
         ":ref_cc",
         ":stack",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/strings",
@@ -248,6 +250,7 @@ cc_test(
         ":ref",
         "//iree/base:api",
         "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )
@@ -283,6 +286,7 @@ cc_test(
         ":stack",
         "//iree/base:api",
         "//iree/base:ref_ptr",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
 )

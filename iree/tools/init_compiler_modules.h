@@ -22,16 +22,22 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Add all the IREE compiler module dialects to the provided registry.
+inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
+  // clang-format off
+  registry.insert<IREE::Check::CheckDialect,
+                  IREE::Strings::StringsDialect,
+                  IREE::TensorList::TensorListDialect>();
+  // clang-format on
+}
+
 // This function should be called before creating any MLIRContext if one expect
 // all the possible dialects to be made available to the context automatically.
 inline void registerIreeCompilerModuleDialects() {
-  static bool init_once = []() {
-    registerDialect<IREE::Check::CheckDialect>();
-    registerDialect<IREE::Strings::StringsDialect>();
-    registerDialect<IREE::TensorList::TensorListDialect>();
-    return true;
-  }();
-  (void)init_once;
+  static bool initOnce =
+      ([]() { registerIreeCompilerModuleDialects(getGlobalDialectRegistry()); }(),
+       true);
+  (void)initOnce;
 }
 }  // namespace iree_compiler
 }  // namespace mlir

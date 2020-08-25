@@ -19,9 +19,10 @@
 #include <tuple>
 #include <utility>
 
+#include "absl/container/inlined_vector.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/status.h"
 #include "iree/vm/builtin_types.h"
 #include "iree/vm/module.h"
@@ -122,7 +123,7 @@ struct Unpacker {
     Unpacker unpacker(registers, argument_list, variadic_segment_size_list);
     ApplyLoad<Ts...>(&unpacker, params,
                      std::make_index_sequence<sizeof...(Ts)>());
-    RETURN_IF_ERROR(unpacker.status);
+    IREE_RETURN_IF_ERROR(std::move(unpacker.status));
     return std::move(params);
   }
 
@@ -525,8 +526,8 @@ struct DispatchFunctor {
                      const iree_vm_function_call_t* call,
                      iree_vm_execution_result_t* out_result) {
     iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
-    ASSIGN_OR_RETURN(auto params,
-                     Unpacker::LoadSequence<Params...>(
+    IREE_ASSIGN_OR_RETURN(
+        auto params, Unpacker::LoadSequence<Params...>(
                          &caller_frame->registers, call->argument_registers,
                          call->variadic_segment_size_list));
 
@@ -562,8 +563,8 @@ struct DispatchFunctorVoid {
     }
 
     iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
-    ASSIGN_OR_RETURN(auto params,
-                     Unpacker::LoadSequence<Params...>(
+    IREE_ASSIGN_OR_RETURN(
+        auto params, Unpacker::LoadSequence<Params...>(
                          &caller_frame->registers, call->argument_registers,
                          call->variadic_segment_size_list));
 

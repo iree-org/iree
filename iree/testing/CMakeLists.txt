@@ -31,8 +31,13 @@ iree_cc_library(
     gtest
   HDRS
     "gtest.h"
+    "status_matchers.h"
   DEPS
-    iree::testing::internal::gtest_internal
+    absl::optional
+    absl::strings
+    gmock
+    gtest
+    iree::base::status
   TESTONLY
   PUBLIC
 )
@@ -40,10 +45,13 @@ iree_cc_library(
 iree_cc_library(
   NAME
     gtest_main
-  HDRS
-    "gtest.h"
+  SRCS
+    "gtest_main.cc"
   DEPS
-    iree::testing::internal::gtest_main_internal
+    ::gtest
+    gmock
+    gtest
+    iree::base::init
   TESTONLY
   PUBLIC
 )

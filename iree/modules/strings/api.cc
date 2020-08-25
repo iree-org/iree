@@ -44,7 +44,7 @@ extern "C" iree_status_t strings_string_create(iree_string_view_t value,
   message->value.size = value.size;
   memcpy((void*)message->value.data, value.data, message->value.size);
   *out_message = message;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 extern "C" iree_status_t strings_string_tensor_create(
@@ -61,7 +61,7 @@ extern "C" iree_status_t strings_string_tensor_create(
   }
 
   if (count != value_count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   // Compute our total memory requirements
@@ -109,17 +109,17 @@ extern "C" iree_status_t strings_string_tensor_create(
   }
 
   *out_message = message;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Returns the count of elements in the tensor.
 iree_status_t strings_string_tensor_get_count(
     const strings_string_tensor_t* tensor, size_t* count) {
   if (!tensor) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   *count = tensor->count;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // returns the list of stored string views.
@@ -127,36 +127,36 @@ iree_status_t strings_string_tensor_get_elements(
     const strings_string_tensor_t* tensor, iree_string_view_t* strs,
     size_t count, size_t offset) {
   if (!tensor || offset < 0 || offset + count > tensor->count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   for (size_t i = 0; i < count; i++) {
     strs[i] = tensor->values[i + offset];
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Returns the rank of the tensor.
 iree_status_t strings_string_tensor_get_rank(
     const strings_string_tensor_t* tensor, int32_t* rank) {
   if (!tensor || !rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
   *rank = tensor->rank;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Returns the shape of the tensor.
 iree_status_t strings_string_tensor_get_shape(
     const strings_string_tensor_t* tensor, int32_t* shape, size_t rank) {
   if (!tensor || (!shape && rank != 0) || rank != tensor->rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   for (int i = 0; i < rank; i++) {
     shape[i] = tensor->shape[i];
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 // Returns the store string view using the provided indices.
@@ -164,20 +164,20 @@ iree_status_t strings_string_tensor_get_element(
     const strings_string_tensor_t* tensor, int32_t* indices, size_t rank,
     iree_string_view_t* str) {
   if (!tensor || !indices || rank != tensor->rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   }
 
   size_t index = 0;
   for (int i = 0; i < rank; i++) {
     if (indices[i] >= tensor->shape[i]) {
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
     }
 
     index = index * tensor->shape[i] + indices[i];
   }
 
   *str = tensor->values[index];
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 void strings_string_destroy(void* ptr) {

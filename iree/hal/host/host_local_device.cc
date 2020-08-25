@@ -60,8 +60,8 @@ StatusOr<ref_ptr<CommandBuffer>> HostLocalDevice::CreateCommandBuffer(
     CommandCategoryBitfield command_categories) {
   IREE_TRACE_SCOPE0("HostLocalDevice::CreateCommandBuffer");
   // TODO(b/140026716): conditionally enable validation.
-  ASSIGN_OR_RETURN(auto impl, scheduling_model_->CreateCommandBuffer(
-                                  mode, command_categories));
+  IREE_ASSIGN_OR_RETURN(auto impl, scheduling_model_->CreateCommandBuffer(
+                                       mode, command_categories));
   return WrapCommandBufferWithValidation(allocator(), std::move(impl));
 }
 

@@ -41,7 +41,7 @@ iree_cc_test(
     ::condvar_semaphore
     iree::base::api
     iree::base::status
-    iree::base::status_matchers
+    iree::testing::gtest
     iree::testing::gtest_main
 )
 
@@ -54,7 +54,6 @@ iree_cc_library(
     "host_buffer.cc"
   DEPS
     iree::base::logging
-    iree::base::source_location
     iree::base::status
     iree::hal::buffer
   PUBLIC
@@ -110,7 +109,6 @@ iree_cc_library(
     "host_local_allocator.cc"
   DEPS
     ::host_buffer
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator

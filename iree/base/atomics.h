@@ -31,7 +31,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
 
 #ifdef __cplusplus

@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -25,9 +25,10 @@ namespace cts {
 class CommandBufferTest : public CtsTestBase {};
 
 TEST_P(CommandBufferTest, CreateCommandBuffer) {
-  ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
-                                                CommandBufferMode::kOneShot,
-                                                CommandCategory::kDispatch));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto command_buffer,
+      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
+                                   CommandCategory::kDispatch));
 
   EXPECT_TRUE((command_buffer->mode() & CommandBufferMode::kOneShot) ==
               CommandBufferMode::kOneShot);

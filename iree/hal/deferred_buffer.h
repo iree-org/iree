@@ -33,19 +33,20 @@ namespace hal {
 // Usage:
 //  // Setup two spans referencing ranges of a deferred buffer.
 //  auto deferred_buffer = make_ref<DeferredBuffer>(..., 200);
-//  ASSIGN_OR_RETURN(auto span0, Buffer::Subspan(deferred_buffer, 0, 100));
-//  ASSIGN_OR_RETURN(auto span1, Buffer::Subspan(deferred_buffer, 100, 100));
+//  IREE_ASSIGN_OR_RETURN(auto span0, Buffer::Subspan(deferred_buffer, 0, 100));
+//  IREE_ASSIGN_OR_RETURN(auto span1, Buffer::Subspan(deferred_buffer, 100,
+//  100));
 //
 //  // Attempting to access |deferred_buffer| or |span0| or |span1| will fail.
 //  // ERROR: span0->Fill(false);
 //
 //  // Now allocate a real buffer to serve as storage for the data.
-//  ASSIGN_OR_RETURN(auto allocated_buffer, Buffer::Allocate(..., 200));
-//  RETURN_IF_ERROR(deferred_buffer->BindAllocation(
+//  IREE_ASSIGN_OR_RETURN(auto allocated_buffer, Buffer::Allocate(..., 200));
+//  IREE_RETURN_IF_ERROR(deferred_buffer->BindAllocation(
 //      allocated_buffer, 0, kWholeBuffer));
 //
 //  // And now we can use the spans.
-//  RETURN_IF_ERROR(span0->Fill(false));
+//  IREE_RETURN_IF_ERROR(span0->Fill(false));
 //
 //  // If at some point we want to detach the buffer from the allocation (so we
 //  // can use a different allocation, reuse the memory, etc).

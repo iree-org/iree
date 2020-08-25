@@ -90,7 +90,6 @@ cc_library(
     hdrs = ["dylib_executable_cache.h"],
     deps = [
         ":dylib_executable",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:executable",

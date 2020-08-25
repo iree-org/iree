@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -51,10 +51,10 @@ TEST_P(CommandQueueTest, EnumerateDeviceQueues) {
 // Tests that waiting for idle is a no-op when nothing is queued.
 TEST_P(CommandQueueTest, WaitIdleWhileIdle) {
   for (auto* dispatch_queue : device_->dispatch_queues()) {
-    EXPECT_OK(dispatch_queue->WaitIdle());
+    IREE_EXPECT_OK(dispatch_queue->WaitIdle());
   }
   for (auto* transfer_queue : device_->transfer_queues()) {
-    EXPECT_OK(transfer_queue->WaitIdle());
+    IREE_EXPECT_OK(transfer_queue->WaitIdle());
   }
 }
 
@@ -64,14 +64,15 @@ TEST_P(CommandQueueTest, WaitIdleWhileIdle) {
 TEST_P(CommandQueueTest, BlockingSubmit) {
   auto command_queue = device_->dispatch_queues()[0];
 
-  ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
-                                                CommandBufferMode::kOneShot,
-                                                CommandCategory::kDispatch));
-  ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto command_buffer,
+      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
+                                   CommandCategory::kDispatch));
+  IREE_ASSERT_OK_AND_ASSIGN(auto semaphore, device_->CreateSemaphore(0ull));
 
-  ASSERT_OK(command_queue->Submit(
+  IREE_ASSERT_OK(command_queue->Submit(
       {{}, {command_buffer.get()}, {{semaphore.get(), 1ull}}}));
-  ASSERT_OK(semaphore->Wait(1ull, InfiniteFuture()));
+  IREE_ASSERT_OK(semaphore->Wait(1ull, InfiniteFuture()));
 }
 
 // Tests waiting while work is pending/in-flight.
@@ -79,38 +80,46 @@ TEST_P(CommandQueueTest, BlockingSubmit) {
 TEST_P(CommandQueueTest, WaitTimeout) {
   auto command_queue = device_->dispatch_queues()[0];
 
-  ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
-                                                CommandBufferMode::kOneShot,
-                                                CommandCategory::kDispatch));
-  ASSERT_OK_AND_ASSIGN(auto wait_semaphore, device_->CreateSemaphore(0ull));
-  ASSERT_OK_AND_ASSIGN(auto signal_semaphore, device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto command_buffer,
+      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
+                                   CommandCategory::kDispatch));
+  IREE_ASSERT_OK_AND_ASSIGN(auto wait_semaphore,
+                            device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(auto signal_semaphore,
+                            device_->CreateSemaphore(0ull));
 
-  ASSERT_OK(command_queue->Submit({{{wait_semaphore.get(), 1ull}},
-                                   {command_buffer.get()},
-                                   {{signal_semaphore.get(), 1ull}}}));
+  IREE_ASSERT_OK(command_queue->Submit({{{wait_semaphore.get(), 1ull}},
+                                        {command_buffer.get()},
+                                        {{signal_semaphore.get(), 1ull}}}));
 
   // Work shouldn't start until the wait semaphore reaches its payload value.
   EXPECT_THAT(signal_semaphore->Query(), IsOkAndHolds(Eq(0ull)));
   EXPECT_TRUE(IsDeadlineExceeded(command_queue->WaitIdle(Milliseconds(100))));
 
   // Signal the wait semaphore, work should begin and complete.
-  ASSERT_OK(wait_semaphore->Signal(1ull));
-  ASSERT_OK(signal_semaphore->Wait(1ull, InfiniteFuture()));
+  IREE_ASSERT_OK(wait_semaphore->Signal(1ull));
+  IREE_ASSERT_OK(signal_semaphore->Wait(1ull, InfiniteFuture()));
 }
 
 // Tests using multiple wait and signal semaphores.
 TEST_P(CommandQueueTest, WaitMultiple) {
   auto command_queue = device_->dispatch_queues()[0];
 
-  ASSERT_OK_AND_ASSIGN(auto command_buffer, device_->CreateCommandBuffer(
-                                                CommandBufferMode::kOneShot,
-                                                CommandCategory::kDispatch));
-  ASSERT_OK_AND_ASSIGN(auto wait_semaphore_1, device_->CreateSemaphore(0ull));
-  ASSERT_OK_AND_ASSIGN(auto wait_semaphore_2, device_->CreateSemaphore(0ull));
-  ASSERT_OK_AND_ASSIGN(auto signal_semaphore_1, device_->CreateSemaphore(0ull));
-  ASSERT_OK_AND_ASSIGN(auto signal_semaphore_2, device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto command_buffer,
+      device_->CreateCommandBuffer(CommandBufferMode::kOneShot,
+                                   CommandCategory::kDispatch));
+  IREE_ASSERT_OK_AND_ASSIGN(auto wait_semaphore_1,
+                            device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(auto wait_semaphore_2,
+                            device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(auto signal_semaphore_1,
+                            device_->CreateSemaphore(0ull));
+  IREE_ASSERT_OK_AND_ASSIGN(auto signal_semaphore_2,
+                            device_->CreateSemaphore(0ull));
 
-  ASSERT_OK(command_queue->Submit(
+  IREE_ASSERT_OK(command_queue->Submit(
       {{{wait_semaphore_1.get(), 1ull}, {wait_semaphore_2.get(), 1ull}},
        {command_buffer.get()},
        {{signal_semaphore_1.get(), 1ull}, {signal_semaphore_2.get(), 1ull}}}));
@@ -122,12 +131,12 @@ TEST_P(CommandQueueTest, WaitMultiple) {
   EXPECT_TRUE(IsDeadlineExceeded(command_queue->WaitIdle(Milliseconds(100))));
 
   // Signal the wait semaphores, work should only begin after each is set.
-  ASSERT_OK(wait_semaphore_1->Signal(1ull));
+  IREE_ASSERT_OK(wait_semaphore_1->Signal(1ull));
   EXPECT_THAT(signal_semaphore_1->Query(), IsOkAndHolds(Eq(0ull)));
   EXPECT_THAT(signal_semaphore_2->Query(), IsOkAndHolds(Eq(0ull)));
-  ASSERT_OK(wait_semaphore_2->Signal(1ull));
+  IREE_ASSERT_OK(wait_semaphore_2->Signal(1ull));
 
-  ASSERT_OK(command_queue->WaitIdle());
+  IREE_ASSERT_OK(command_queue->WaitIdle());
 }
 
 std::vector<std::string> GetSupportedDrivers() {

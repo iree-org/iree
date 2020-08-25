@@ -14,12 +14,11 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
-#include "iree/base/api_util.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -45,10 +44,7 @@ StatusOr<Shape> ParseShape(absl::string_view value) {
                              shape.size(), shape.data(), &actual_rank);
     shape.resize(actual_rank);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC)
-           << "Failed to parse shape '" << value << "'";
-  }
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(shape);
 }
 
@@ -63,9 +59,7 @@ StatusOr<std::string> FormatShape(absl::Span<const iree_hal_dim_t> value) {
                               &buffer[0], &actual_length);
     buffer.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC);
-  }
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(buffer);
 }
 
@@ -75,10 +69,8 @@ StatusOr<iree_hal_element_type_t> ParseElementType(absl::string_view value) {
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_status_t status = iree_hal_parse_element_type(
       iree_string_view_t{value.data(), value.size()}, &element_type);
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC)
-           << "Failed to parse element type '" << value << "'";
-  }
+  IREE_RETURN_IF_ERROR(std::move(status))
+      << "Failed to parse element type '" << value << "'";
   return element_type;
 }
 
@@ -93,9 +85,7 @@ StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
                                           &actual_length);
     buffer.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC);
-  }
+  IREE_RETURN_IF_ERROR(status);
   return std::move(buffer);
 }
 
@@ -111,10 +101,8 @@ Status ParseElement(absl::string_view value,
       iree_string_view_t{value.data(), value.size()}, element_type,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
                        buffer.size() * sizeof(T)});
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC)
-           << "Failed to parse element '" << value << "'";
-  }
+  IREE_RETURN_IF_ERROR(std::move(status))
+      << "Failed to parse element '" << value << "'";
   return OkStatus();
 }
 
@@ -132,10 +120,8 @@ StatusOr<std::string> FormatElement(T value,
         element_type, result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC)
-           << "Failed to format buffer element '" << value << "'";
-  }
+  IREE_RETURN_IF_ERROR(std::move(status))
+      << "Failed to format buffer element '" << value << "'";
   return std::move(result);
 }
 
@@ -148,14 +134,11 @@ template <typename T>
 Status ParseBufferElements(absl::string_view value,
                            iree_hal_element_type_t element_type,
                            absl::Span<T> buffer) {
-  iree_status_t status = iree_hal_parse_buffer_elements(
+  IREE_RETURN_IF_ERROR(iree_hal_parse_buffer_elements(
       iree_string_view_t{value.data(), value.size()}, element_type,
       iree_byte_span_t{reinterpret_cast<uint8_t*>(buffer.data()),
-                       buffer.size() * sizeof(T)});
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC)
-           << "Failed to parse buffer elements '" << value << "'";
-  }
+                       buffer.size() * sizeof(T)}))
+      << "Failed to parse buffer elements '" << value << "'";
   return OkStatus();
 }
 
@@ -181,9 +164,7 @@ StatusOr<std::string> FormatBufferElements(absl::Span<const T> data,
         result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
-  if (!iree_status_is_ok(status)) {
-    return FromApiStatus(status, IREE_LOC);
-  }
+  IREE_RETURN_IF_ERROR(std::move(status));
   return std::move(result);
 }
 
@@ -246,8 +227,8 @@ struct ElementTypeFromCType<double> {
 template <typename T>
 inline StatusOr<T> ParseElement(absl::string_view value) {
   T result = T();
-  RETURN_IF_ERROR(ParseElement(value, ElementTypeFromCType<T>::value,
-                               absl::MakeSpan(&result, 1)));
+  IREE_RETURN_IF_ERROR(ParseElement(value, ElementTypeFromCType<T>::value,
+                                    absl::MakeSpan(&result, 1)));
   return result;
 }
 
@@ -280,7 +261,7 @@ inline StatusOr<std::vector<T>> ParseBufferElements(absl::string_view value,
     element_count *= shape[i];
   }
   std::vector<T> result(element_count);
-  RETURN_IF_ERROR(ParseBufferElements(value, absl::MakeSpan(result)));
+  IREE_RETURN_IF_ERROR(ParseBufferElements(value, absl::MakeSpan(result)));
   return std::move(result);
 }
 
@@ -409,11 +390,9 @@ struct Allocator final
   // used.
   static StatusOr<Allocator> CreateHostLocal() {
     Allocator allocator;
-    iree_status_t status =
-        iree_hal_allocator_create_host_local(IREE_ALLOCATOR_SYSTEM, &allocator);
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC);
-    }
+    iree_status_t status = iree_hal_allocator_create_host_local(
+        iree_allocator_system(), &allocator);
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(allocator);
   }
 };
@@ -436,9 +415,7 @@ struct Buffer final : public Handle<iree_hal_buffer_t, iree_hal_buffer_retain,
     std::vector<T> result(total_byte_length / sizeof(T));
     iree_status_t status =
         iree_hal_buffer_read_data(get(), 0, result.data(), total_byte_length);
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC);
-    }
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(result);
   }
 };
@@ -455,11 +432,9 @@ struct BufferView final
                                      iree_hal_element_type_t element_type) {
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_create(
-        buffer, shape.data(), shape.size(), element_type, IREE_ALLOCATOR_SYSTEM,
-        &buffer_view);
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC);
-    }
+        buffer, shape.data(), shape.size(), element_type,
+        iree_allocator_system(), &buffer_view);
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }
 
@@ -509,10 +484,8 @@ struct BufferView final
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_parse(
         iree_string_view_t{value.data(), value.size()}, allocator,
-        IREE_ALLOCATOR_SYSTEM, &buffer_view);
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC);
-    }
+        iree_allocator_system(), &buffer_view);
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }
 
@@ -532,9 +505,7 @@ struct BufferView final
                                            &actual_length);
       result.resize(actual_length);
     } while (iree_status_is_out_of_range(status));
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC);
-    }
+    IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(result);
   }
 };
@@ -702,23 +673,24 @@ TEST(ElementStringUtilTest, ParseElementInvalid) {
 
 TEST(ElementStringUtilTest, ParseOpaqueElement) {
   std::vector<uint8_t> buffer1(1);
-  EXPECT_OK(ParseElement("FF", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
-                         absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseElement("FF", IREE_HAL_ELEMENT_TYPE_OPAQUE_8,
+                              absl::MakeSpan(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<uint8_t>{0xFF}));
 
   std::vector<uint16_t> buffer2(1);
-  EXPECT_OK(ParseElement("FFCD", IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
-                         absl::MakeSpan(buffer2)));
+  IREE_EXPECT_OK(ParseElement("FFCD", IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
+                              absl::MakeSpan(buffer2)));
   EXPECT_THAT(buffer2, Eq(std::vector<uint16_t>{0xCDFFu}));
 
   std::vector<uint32_t> buffer4(1);
-  EXPECT_OK(ParseElement("FFCDAABB", IREE_HAL_ELEMENT_TYPE_OPAQUE_32,
-                         absl::MakeSpan(buffer4)));
+  IREE_EXPECT_OK(ParseElement("FFCDAABB", IREE_HAL_ELEMENT_TYPE_OPAQUE_32,
+                              absl::MakeSpan(buffer4)));
   EXPECT_THAT(buffer4, Eq(std::vector<uint32_t>{0xBBAACDFFu}));
 
   std::vector<uint64_t> buffer8(1);
-  EXPECT_OK(ParseElement("FFCDAABBCCDDEEFF", IREE_HAL_ELEMENT_TYPE_OPAQUE_64,
-                         absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseElement("FFCDAABBCCDDEEFF",
+                              IREE_HAL_ELEMENT_TYPE_OPAQUE_64,
+                              absl::MakeSpan(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<uint64_t>{0xFFEEDDCCBBAACDFFull}));
 }
 
@@ -783,36 +755,36 @@ TEST(ElementStringUtilTest, FormatOpaqueElement) {
 TEST(BufferElementsStringUtilTest, ParseBufferElements) {
   // Empty:
   std::vector<int8_t> buffer0(0);
-  EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer0)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer0)));
   EXPECT_THAT(buffer0, Eq(std::vector<int8_t>{}));
   std::vector<int8_t> buffer8(8, 123);
-  EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("", absl::MakeSpan(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<int8_t>{0, 0, 0, 0, 0, 0, 0, 0}));
   // Scalar:
   std::vector<int8_t> buffer1(1);
-  EXPECT_OK(ParseBufferElements<int8_t>("1", absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("1", absl::MakeSpan(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<int8_t>{1}));
   // Splat:
-  EXPECT_OK(ParseBufferElements<int8_t>("3", absl::MakeSpan(buffer8)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("3", absl::MakeSpan(buffer8)));
   EXPECT_THAT(buffer8, Eq(std::vector<int8_t>{3, 3, 3, 3, 3, 3, 3, 3}));
   // 1:1:
-  EXPECT_OK(ParseBufferElements<int8_t>("2", absl::MakeSpan(buffer1)));
+  IREE_EXPECT_OK(ParseBufferElements<int8_t>("2", absl::MakeSpan(buffer1)));
   EXPECT_THAT(buffer1, Eq(std::vector<int8_t>{2}));
   std::vector<int16_t> buffer8i16(8);
-  EXPECT_OK(ParseBufferElements<int16_t>("0 1 2 3 4 5 6 7",
-                                         absl::MakeSpan(buffer8i16)));
+  IREE_EXPECT_OK(ParseBufferElements<int16_t>("0 1 2 3 4 5 6 7",
+                                              absl::MakeSpan(buffer8i16)));
   EXPECT_THAT(buffer8i16, Eq(std::vector<int16_t>{0, 1, 2, 3, 4, 5, 6, 7}));
   std::vector<int32_t> buffer8i32(8);
-  EXPECT_OK(ParseBufferElements<int32_t>("[0 1 2 3] [4 5 6 7]",
-                                         absl::MakeSpan(buffer8i32)));
+  IREE_EXPECT_OK(ParseBufferElements<int32_t>("[0 1 2 3] [4 5 6 7]",
+                                              absl::MakeSpan(buffer8i32)));
   EXPECT_THAT(buffer8i32, Eq(std::vector<int32_t>{0, 1, 2, 3, 4, 5, 6, 7}));
 }
 
 TEST(BufferElementsStringUtilTest, ParseBufferElementsOpaque) {
   std::vector<uint16_t> buffer3i16(3);
-  EXPECT_OK(ParseBufferElements("0011 2233 4455",
-                                IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
-                                absl::MakeSpan(buffer3i16)));
+  IREE_EXPECT_OK(ParseBufferElements("0011 2233 4455",
+                                     IREE_HAL_ELEMENT_TYPE_OPAQUE_16,
+                                     absl::MakeSpan(buffer3i16)));
   EXPECT_THAT(buffer3i16, Eq(std::vector<uint16_t>{0x1100, 0x3322, 0x5544}));
 }
 
@@ -924,44 +896,44 @@ TEST(BufferElementsStringUtilTest, FormatBufferElementsElided) {
 }
 
 TEST(BufferViewStringUtilTest, Parse) {
-  ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
+  IREE_ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
 
   // Zero fill.
-  ASSERT_OK_AND_ASSIGN(auto bv0, BufferView::Parse("i8", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv0, BufferView::Parse("i8", allocator));
   EXPECT_THAT(bv0.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{0})));
 
   // Zero fill (empty value).
-  ASSERT_OK_AND_ASSIGN(auto bv1, BufferView::Parse("2x2xi8=", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv1, BufferView::Parse("2x2xi8=", allocator));
   EXPECT_THAT(bv1.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{0, 0, 0, 0})));
 
   // Splat.
-  ASSERT_OK_AND_ASSIGN(auto bv2, BufferView::Parse("2x2xi8=3", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv2, BufferView::Parse("2x2xi8=3", allocator));
   EXPECT_THAT(bv2.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{3, 3, 3, 3})));
 
   // Flat list.
-  ASSERT_OK_AND_ASSIGN(auto bv3,
-                       BufferView::Parse("2x2xi8=1 2 3 4", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(auto bv3,
+                            BufferView::Parse("2x2xi8=1 2 3 4", allocator));
   EXPECT_THAT(bv3.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{1, 2, 3, 4})));
 
   // Whitespace and separators shouldn't matter.
-  ASSERT_OK_AND_ASSIGN(auto bv4,
-                       BufferView::Parse("  2x2xi8 =  1,\n2 3\t,4", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto bv4, BufferView::Parse("  2x2xi8 =  1,\n2 3\t,4", allocator));
   EXPECT_THAT(bv4.buffer().CloneData<int8_t>(),
               IsOkAndHolds(Eq(std::vector<int8_t>{1, 2, 3, 4})));
 
   // Brackets are optional.
-  ASSERT_OK_AND_ASSIGN(auto bv5,
-                       BufferView::Parse("4xi16=[[0][1][2]][3]", allocator));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto bv5, BufferView::Parse("4xi16=[[0][1][2]][3]", allocator));
   EXPECT_THAT(bv5.buffer().CloneData<int16_t>(),
               IsOkAndHolds(Eq(std::vector<int16_t>{0, 1, 2, 3})));
 }
 
 TEST(BufferViewStringUtilTest, ParseInvalid) {
-  ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
+  IREE_ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
 
   // Incomplete.
   EXPECT_THAT(BufferView::Parse("", allocator),
@@ -1015,10 +987,10 @@ TEST(BufferViewStringUtilTest, ToString) {
 }
 
 TEST(BufferViewStringUtilTest, RoundTrip) {
-  ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
+  IREE_ASSERT_OK_AND_ASSIGN(auto allocator, Allocator::CreateHostLocal());
   auto expect_round_trip = [&](std::string source_value) {
-    ASSERT_OK_AND_ASSIGN(auto buffer_view,
-                         BufferView::Parse(source_value, allocator));
+    IREE_ASSERT_OK_AND_ASSIGN(auto buffer_view,
+                              BufferView::Parse(source_value, allocator));
     EXPECT_THAT(buffer_view.ToString(), IsOkAndHolds(source_value));
   };
 

@@ -41,7 +41,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 
   // Load the Vulkan library. This will fail if the library cannot be found or
   // does not have the expected functions.
-  ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
+  IREE_ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
 
   // Setup driver options from flags. We do this here as we want to enable other
   // consumers that may not be using modules/command line flags to be able to
@@ -95,7 +95,8 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   }
 
   // Create the driver and VkInstance.
-  ASSIGN_OR_RETURN(auto driver, VulkanDriver::Create(options, std::move(syms)));
+  IREE_ASSIGN_OR_RETURN(auto driver,
+                        VulkanDriver::Create(options, std::move(syms)));
 
   return driver;
 }
@@ -106,7 +107,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 }  // namespace iree
 
 IREE_REGISTER_MODULE_INITIALIZER(iree_hal_vulkan_driver, {
-  QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
+  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
       "vulkan", ::iree::hal::vulkan::CreateVulkanDriver));
 });
 IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_vulkan_driver);

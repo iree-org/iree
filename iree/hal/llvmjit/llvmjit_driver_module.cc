@@ -35,7 +35,7 @@ static StatusOr<ref_ptr<Driver>> CreateLLVMJITDriver() {
 }  // namespace iree
 
 IREE_REGISTER_MODULE_INITIALIZER(iree_hal_llvm_driver, {
-  QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
+  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
       "llvm", ::iree::hal::llvmjit::CreateLLVMJITDriver));
 });
 IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_llvm_driver);

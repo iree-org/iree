@@ -131,6 +131,10 @@
 #endif  // TARGET_IPHONE_SIMULATOR
 #endif  // __APPLE__
 
+#if defined(IREE_PLATFORM_IOS) || defined(IREE_PLATFORM_MACOS)
+#define IREE_PLATFORM_APPLE 1
+#endif  // IREE_PLATFORM_IOS || IREE_PLATFORM_MACOS
+
 //==============================================================================
 // IREE_PLATFORM_LINUX
 //==============================================================================
@@ -147,9 +151,29 @@
 #define IREE_PLATFORM_WINDOWS 1
 #endif  // _WIN32 || _WIN64
 
-#if defined(IREE_PLATFORM_IOS) || defined(IREE_PLATFORM_MACOS)
-#define IREE_PLATFORM_APPLE 1
-#endif  // IREE_PLATFORM_IOS || IREE_PLATFORM_MACOS
+#if defined(IREE_PLATFORM_WINDOWS)
+
+#if defined(_MSC_VER)
+// Abseil compatibility: don't include incompatible winsock versions.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif  // WIN32_LEAN_AND_MEAN
+// Abseil compatibility: don't define min and max macros.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif  // NOMINMAX
+#endif  // _MSC_VER
+
+#include <windows.h>
+
+// WinGDI.h defines `ERROR`, undef to avoid conflict naming.
+#undef ERROR
+
+#endif  // IREE_PLATFORM_WINDOWS
+
+//==============================================================================
+// Fallthrough for unsupported platforms
+//==============================================================================
 
 #if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
     !defined(IREE_PLATFORM_IOS) && !defined(IREE_PLATFORM_LINUX) &&          \

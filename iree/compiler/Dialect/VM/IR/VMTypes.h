@@ -70,10 +70,6 @@ class ListType
 class OpaqueType : public Type::TypeBase<OpaqueType, Type, TypeStorage> {
  public:
   using Base::Base;
-
-  static OpaqueType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::Opaque);
-  }
 };
 
 /// A ref_ptr containing a reference to a ref-object-compatible type.

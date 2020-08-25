@@ -37,7 +37,7 @@ static llvm::cl::opt<bool> extractPadFromConv(
 static llvm::cl::opt<bool> conv1x1toDot(
     "iree-flow-1x1-conv-to-dot",
     llvm::cl::desc("Rewrites mhlo.conv with 1x1 filter into mhlo.dot"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static bool isAllZero(DenseIntElementsAttr attr) {
   if (!attr.isSplat()) return false;
@@ -223,6 +223,18 @@ class Lower1x1ConvolutionToDotOp : public OpRewritePattern<mhlo::ConvOp> {
     // Check 1x1x... kernel spatial size.
     for (auto dim : op.dimension_numbers().kernel_spatial_dimensions()) {
       if (filterShape[dim.getZExtValue()] != 1) return failure();
+    }
+
+    // Check dilation & strides are ones.
+    if (op.window_strides()) {
+      for (auto stride : op.window_strides()->getValues<int64_t>()) {
+        if (stride != 1) return failure();
+      }
+    }
+    if (op.rhs_dilation()) {
+      for (auto dilation : op.rhs_dilation()->getValues<int64_t>()) {
+        if (dilation != 1) return failure();
+      }
     }
 
     int64_t spatialSize = inputShape[0];

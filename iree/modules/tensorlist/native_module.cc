@@ -22,7 +22,6 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
@@ -73,9 +72,8 @@ class TensorList final : public RefObject<TensorList> {
              << "expected rank > 0 buffer view";
     }
     absl::InlinedVector<int32_t, 6> shape(rank);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_shape(tensor.get(), rank, shape.data(), nullptr),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_view_shape(tensor.get(), rank, shape.data(), nullptr));
 
     TensorList* list = new TensorList;
     list->Resize(shape[0]);
@@ -89,25 +87,19 @@ class TensorList final : public RefObject<TensorList> {
       start_indices[0] = i;
       iree_device_size_t start_offset = 0;
       iree_device_size_t subview_length = 0;
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_view_compute_range(
-              tensor.get(), start_indices.data(), start_indices.size(),
-              lengths.data(), lengths.size(), &start_offset, &subview_length),
-          IREE_LOC));
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_range(
+          tensor.get(), start_indices.data(), start_indices.size(),
+          lengths.data(), lengths.size(), &start_offset, &subview_length));
       vm::ref<iree_hal_buffer_t> subview_buffer;
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_subspan(iree_hal_buffer_view_buffer(tensor.get()),
-                                  start_offset, subview_length,
-                                  IREE_ALLOCATOR_SYSTEM, &subview_buffer),
-          IREE_LOC));
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
+          iree_hal_buffer_view_buffer(tensor.get()), start_offset,
+          subview_length, iree_allocator_system(), &subview_buffer));
 
       iree_hal_buffer_view_t* slice = nullptr;
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_view_create(
-              subview_buffer.get(), shape.data() + 1, shape.size() - 1,
-              iree_hal_buffer_view_element_type(tensor.get()),
-              IREE_ALLOCATOR_SYSTEM, &slice),
-          IREE_LOC));
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+          subview_buffer.get(), shape.data() + 1, shape.size() - 1,
+          iree_hal_buffer_view_element_type(tensor.get()),
+          iree_allocator_system(), &slice));
       list->SetItem(i, slice);
     }
     return list;
@@ -129,17 +121,13 @@ class TensorList final : public RefObject<TensorList> {
     iree_hal_element_type_t type =
         iree_hal_buffer_view_element_type(GetItem(0).get());
     absl::InlinedVector<int32_t, 6> shape(rank);
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
-                                                 shape.data(), nullptr),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
+                                                    shape.data(), nullptr));
     for (size_t i = 0; i < num_tensors; i++) {
       size_t element_rank = iree_hal_buffer_view_shape_rank(GetItem(i).get());
       absl::InlinedVector<int32_t, 6> element_shape(element_rank);
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_view_shape(GetItem(i).get(), element_rank,
-                                     element_shape.data(), nullptr),
-          IREE_LOC));
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
+          GetItem(i).get(), element_rank, element_shape.data(), nullptr));
       if (absl::MakeSpan(shape) != absl::MakeSpan(element_shape) ||
           iree_hal_buffer_view_element_type(GetItem(i).get()) != type) {
         return InvalidArgumentErrorBuilder(IREE_LOC)
@@ -159,17 +147,14 @@ class TensorList final : public RefObject<TensorList> {
     size_t result_byte_size = num_result_elements * element_size;
     iree_hal_allocator_t* hal_allocator = iree_hal_buffer_allocator(
         iree_hal_buffer_view_buffer(GetItem(0).get()));
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_allocator_allocate_buffer(
-            hal_allocator,
-            static_cast<iree_hal_memory_type_t>(
-                IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-            IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+        hal_allocator,
+        static_cast<iree_hal_memory_type_t>(
+            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+        IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer));
 
-    RETURN_IF_ERROR(
-        FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
+    IREE_RETURN_IF_ERROR(CopyTensorBytes(result_buffer.get()));
 
     absl::InlinedVector<int32_t, 4> result_shape;
     result_shape.push_back(Size());
@@ -177,11 +162,9 @@ class TensorList final : public RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
-                                    result_shape.size(), type,
-                                    IREE_ALLOCATOR_SYSTEM, &result_view),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+        result_buffer.get(), result_shape.data(), result_shape.size(), type,
+        iree_allocator_system(), &result_view));
     return std::move(result_view);
   }
 
@@ -201,10 +184,8 @@ class TensorList final : public RefObject<TensorList> {
     iree_hal_element_type_t type =
         iree_hal_buffer_view_element_type(GetItem(0).get());
     absl::InlinedVector<int32_t, 6> shape(rank);
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
-                                                 shape.data(), nullptr),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(GetItem(0).get(), rank,
+                                                    shape.data(), nullptr));
     size_t num_rows = 0;
     for (size_t i = 0; i < num_tensors; i++) {
       size_t element_rank = iree_hal_buffer_view_shape_rank(GetItem(i).get());
@@ -214,10 +195,8 @@ class TensorList final : public RefObject<TensorList> {
       }
 
       absl::InlinedVector<int32_t, 6> element_shape(element_rank);
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_view_shape(GetItem(i).get(), element_rank,
-                                     element_shape.data(), nullptr),
-          IREE_LOC));
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_shape(
+          GetItem(i).get(), element_rank, element_shape.data(), nullptr));
       num_rows += element_shape.front();
 
       if (absl::MakeSpan(shape).subspan(1) !=
@@ -240,17 +219,14 @@ class TensorList final : public RefObject<TensorList> {
     size_t result_byte_size = num_result_elements * element_size;
     iree_hal_allocator_t* hal_allocator = iree_hal_buffer_allocator(
         iree_hal_buffer_view_buffer(GetItem(0).get()));
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_allocator_allocate_buffer(
-            hal_allocator,
-            static_cast<iree_hal_memory_type_t>(
-                IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-            IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+        hal_allocator,
+        static_cast<iree_hal_memory_type_t>(
+            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+        IREE_HAL_BUFFER_USAGE_ALL, result_byte_size, &result_buffer));
 
-    RETURN_IF_ERROR(
-        FromApiStatus(CopyTensorBytes(result_buffer.get()), IREE_LOC));
+    IREE_RETURN_IF_ERROR(CopyTensorBytes(result_buffer.get()));
 
     absl::InlinedVector<int32_t, 4> result_shape;
     result_shape.push_back(num_rows);
@@ -258,11 +234,9 @@ class TensorList final : public RefObject<TensorList> {
       result_shape.push_back(dim);
     }
     vm::ref<iree_hal_buffer_view_t> result_view;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_view_create(result_buffer.get(), result_shape.data(),
-                                    result_shape.size(), type,
-                                    IREE_ALLOCATOR_SYSTEM, &result_view),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+        result_buffer.get(), result_shape.data(), result_shape.size(), type,
+        iree_allocator_system(), &result_view));
 
     return std::move(result_view);
   }
@@ -333,10 +307,10 @@ struct ref_type_descriptor<TensorList> {
 
 extern "C" iree_status_t iree_tensorlist_module_register_types() {
   static bool has_registered = false;
-  if (has_registered) return IREE_STATUS_OK;
+  if (has_registered) return iree_ok_status();
   IREE_VM_REGISTER_CC_TYPE(TensorList, "tensorlist.list",
                            iree_tensorlist_descriptor);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -359,13 +333,10 @@ static StatusOr<int32_t> ReadInt32FromScalarBufferView(
   }
   iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
   iree_hal_mapped_memory_t mapped_memory;
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                        4, &mapped_memory),
-                    IREE_LOC));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                                           0, 4, &mapped_memory));
   int32_t scalar = *reinterpret_cast<int32_t*>(mapped_memory.contents.data);
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_hal_buffer_unmap(buffer, &mapped_memory), IREE_LOC));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap(buffer, &mapped_memory));
   return scalar;
 }
 
@@ -382,8 +353,8 @@ class TensorListModuleState final {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape;
     TensorList* tensorlist = new TensorList;
-    ASSIGN_OR_RETURN(int32_t num_elements,
-                     ReadInt32FromScalarBufferView(num_elements_buf.get()));
+    IREE_ASSIGN_OR_RETURN(int32_t num_elements, ReadInt32FromScalarBufferView(
+                                                    num_elements_buf.get()));
     tensorlist->Resize(num_elements);
     return tensorlist;
   }
@@ -394,8 +365,8 @@ class TensorListModuleState final {
       vm::ref<iree_hal_buffer_view_t> element_shape) {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape;
-    ASSIGN_OR_RETURN(int32_t index,
-                     ReadInt32FromScalarBufferView(index_buf.get()));
+    IREE_ASSIGN_OR_RETURN(int32_t index,
+                          ReadInt32FromScalarBufferView(index_buf.get()));
     return vm::retain_ref(tensorlist->GetItem(index).get());
   }
 
@@ -404,8 +375,8 @@ class TensorListModuleState final {
       vm::ref<TensorList> list, vm::ref<iree_hal_buffer_view_t> index_buf,
       vm::ref<iree_hal_buffer_view_t> item) {
     TensorList* new_list = new TensorList;
-    ASSIGN_OR_RETURN(int32_t index,
-                     ReadInt32FromScalarBufferView(index_buf.get()));
+    IREE_ASSIGN_OR_RETURN(int32_t index,
+                          ReadInt32FromScalarBufferView(index_buf.get()));
     new_list->CopyFrom(list);
     new_list->SetItem(index, vm::retain_ref(item));
     return new_list;
@@ -432,8 +403,9 @@ class TensorListModuleState final {
       vm::ref<iree_hal_buffer_view_t> num_elements_buffer_view) {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape_buffer_view;
-    ASSIGN_OR_RETURN(int32_t num_elements, ReadInt32FromScalarBufferView(
-                                               num_elements_buffer_view.get()));
+    IREE_ASSIGN_OR_RETURN(
+        int32_t num_elements,
+        ReadInt32FromScalarBufferView(num_elements_buffer_view.get()));
     if (num_elements != -1 && list->Size() != num_elements) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "num_elements arg to tesorlist.stack doesn't match the list "
@@ -472,12 +444,12 @@ class TensorListModule final : public vm::NativeModule<TensorListModuleState> {
 
 extern "C" iree_status_t iree_tensorlist_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_module) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
   *out_module = NULL;
   auto module = std::make_unique<TensorListModule>(
       "tensorlist", allocator, absl::MakeConstSpan(kTensorListModuleFunctions));
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 }  // namespace iree
