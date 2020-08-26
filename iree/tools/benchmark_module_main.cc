@@ -147,6 +147,7 @@ Status Run(::benchmark::State& state) {
                                  iree_allocator_system()));
   }
 
+  inputs.reset();
   iree_vm_module_release(hal_module);
   iree_vm_module_release(input_module);
   iree_hal_device_release(device);
