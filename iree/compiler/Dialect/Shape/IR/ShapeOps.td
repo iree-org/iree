@@ -360,6 +360,27 @@ def Shape_RankedBroadcastInDimOp : Shape_PureOp<"ranked_broadcast_in_dim"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Iota operations.
+//===----------------------------------------------------------------------===//
+
+def Shape_IotaOp : Shape_PureOp<"iota"> {
+  let summary = "Creates an iota of the desired 1-D shape.";
+  let description = [{
+    Creates an iota of the desired 1-D shape.
+
+    Usage:
+      %0 = shapex.iota %shp0 : !shapex.ranked_shape<...>
+  }];
+
+  let arguments = (ins Shape_RankedShape:$result_shape);
+  let results = (outs AnyRankedTensor:$result);
+
+  // TODO: Custom parser/printer
+  let parser = ?;
+  let printer = ?;
+}
+
+//===----------------------------------------------------------------------===//
 // Shape manipulations.
 //===----------------------------------------------------------------------===//
 

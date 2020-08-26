@@ -23,6 +23,7 @@ cc_library(
     srcs = [
         "CleanupPlaceholdersPass.cpp",
         "ConvertHLOToShapeDialectPass.cpp",
+        "ConvertShapeToStandard.cpp",
         "FunctionSignatureExpansionPass.cpp",
         "HoistShapeCalculationsPass.cpp",
         "MaterializeShapeCalculations.cpp",

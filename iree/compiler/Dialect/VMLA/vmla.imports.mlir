@@ -217,6 +217,11 @@ vm.import @broadcast.x32(
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
+vm.import @iota.i8(%dst : !vm.ref<!vmla.buffer>)
+vm.import @iota.i16(%dst : !vm.ref<!vmla.buffer>)
+vm.import @iota.i32(%dst : !vm.ref<!vmla.buffer>)
+vm.import @iota.f32(%dst : !vm.ref<!vmla.buffer>)
+
 vm.import @tile.x8(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...

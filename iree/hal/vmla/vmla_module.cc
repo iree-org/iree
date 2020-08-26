@@ -330,6 +330,12 @@ class VMLAModuleState final {
   // Common helpers for defining ops
   //===--------------------------------------------------------------------===//
 
+#define IREE_VMLA_NONARY_OP(name, kernel, type)    \
+  Status name(vm::ref<Buffer> dst) {               \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);  \
+    return kernel::Execute<type>(dst->As<type>()); \
+  }
+
 #define IREE_VMLA_UNARY_OP(name, kernel, type)                      \
   Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
@@ -505,6 +511,11 @@ class VMLAModuleState final {
   IREE_VMLA_BROADCAST_OP(BroadcastX8, uint8_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX32, uint32_t);
+
+  IREE_VMLA_NONARY_OP(IotaI8, kernels::Iota, int8_t);
+  IREE_VMLA_NONARY_OP(IotaI16, kernels::Iota, int16_t);
+  IREE_VMLA_NONARY_OP(IotaI32, kernels::Iota, int32_t);
+  IREE_VMLA_NONARY_OP(IotaF32, kernels::Iota, float_t);
 
 #define IREE_VMLA_TILE_OP(name, type)                                     \
   Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
@@ -832,6 +843,10 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("scatter.x8", &VMLAModuleState::ScatterX8),
     vm::MakeNativeFunction("scatter.x16", &VMLAModuleState::ScatterX16),
     vm::MakeNativeFunction("scatter.x32", &VMLAModuleState::ScatterX32),
+    vm::MakeNativeFunction("iota.i8", &VMLAModuleState::IotaI8),
+    vm::MakeNativeFunction("iota.i16", &VMLAModuleState::IotaI16),
+    vm::MakeNativeFunction("iota.i32", &VMLAModuleState::IotaI32),
+    vm::MakeNativeFunction("iota.f32", &VMLAModuleState::IotaF32),
     vm::MakeNativeFunction("tile.x8", &VMLAModuleState::TileX8),
     vm::MakeNativeFunction("tile.x16", &VMLAModuleState::TileX16),
     vm::MakeNativeFunction("tile.x32", &VMLAModuleState::TileX32),

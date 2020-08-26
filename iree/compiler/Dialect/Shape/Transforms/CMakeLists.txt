@@ -23,6 +23,7 @@ iree_cc_library(
   SRCS
     "CleanupPlaceholdersPass.cpp"
     "ConvertHLOToShapeDialectPass.cpp"
+    "ConvertShapeToStandard.cpp"
     "FunctionSignatureExpansionPass.cpp"
     "HoistShapeCalculationsPass.cpp"
     "MaterializeShapeCalculations.cpp"

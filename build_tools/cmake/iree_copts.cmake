@@ -117,6 +117,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
     "-Wno-unused-parameter"
     "-Wno-undef"
+    "-fvisibility=hidden"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
     "/wd4624"
