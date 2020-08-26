@@ -68,7 +68,8 @@ bool canSeparateOps(ArrayRef<Operation *> ops) {
   for (auto currOp = ops.begin(), nextOp = std::next(ops.begin());
        nextOp != ops.end(); ++currOp, ++nextOp) {
     Operation *iter = (*currOp)->getNextNode();
-    while (iter != *nextOp && MemoryEffectOpInterface::hasNoEffect(iter))
+    while (iter != *nextOp && (MemoryEffectOpInterface::hasNoEffect(iter) ||
+                               isa<IREE::PlaceholderOp>(iter)))
       iter = iter->getNextNode();
     if (iter != *nextOp) return false;
   }
