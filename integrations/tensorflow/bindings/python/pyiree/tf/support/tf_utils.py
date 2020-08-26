@@ -171,7 +171,7 @@ def compile_tf_module(
   try:
     # Convert the tf_module into raw TF input MLIR.
     compiler_module = compiler.tf_module_to_compiler_module(
-      tf_module, exported_names, sm_path)
+      tf_module, exported_names, sm_path, pass_pipeline=())
 
     if artifacts_dir is not None:
       tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
@@ -179,7 +179,8 @@ def compile_tf_module(
       with open(tf_mlir_path, "w") as f:
         f.write(compiler_module.to_asm())
 
-    # Now run the passes manually that tf_load_saved_model would usually do.
+    # Now run the passes manually that tf_module_to_compiler_module would
+    # usually do.
     compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
 
     if artifacts_dir is not None:
