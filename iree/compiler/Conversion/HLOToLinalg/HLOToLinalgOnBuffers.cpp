@@ -1516,6 +1516,10 @@ static LogicalResult createAndPropagateBufferUsedForResultTensors(
 namespace {
 struct ConvertHLOToLinalgOnBuffersPass
     : public PassWrapper<ConvertHLOToLinalgOnBuffersPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect>();
+  }
+
   void runOnFunction() override;
 };
 }  // namespace

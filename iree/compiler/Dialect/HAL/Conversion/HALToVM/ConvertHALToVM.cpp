@@ -105,6 +105,10 @@ class ConvertHALToVMPass
   explicit ConvertHALToVMPass(IREE::VM::TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::VM::VMDialect>();
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 

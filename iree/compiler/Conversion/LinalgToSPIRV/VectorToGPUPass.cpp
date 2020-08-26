@@ -51,6 +51,10 @@ static const int subgroupSize = 32;
 
 struct ConvertVectorToGPUPass
     : public PassWrapper<ConvertVectorToGPUPass, OperationPass<FuncOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<gpu::GPUDialect>();
+  }
+
   void runOnOperation() override;
 
  private:

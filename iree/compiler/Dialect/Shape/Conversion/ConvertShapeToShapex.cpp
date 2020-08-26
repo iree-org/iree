@@ -227,6 +227,10 @@ class ConvertTensorCastOp : public OpConversionPattern<TensorCastOp> {
 
 class ConvertShapeToShapex
     : public PassWrapper<ConvertShapeToShapex, OperationPass<ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<iree_compiler::ShapeDialect>();
+  }
+
   void runOnOperation() override {
     ModuleOp module = getOperation();
     MLIRContext *context = &getContext();

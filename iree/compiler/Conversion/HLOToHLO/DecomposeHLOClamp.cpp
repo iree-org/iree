@@ -53,6 +53,10 @@ class DecomposeClampOp : public OpRewritePattern<mhlo::ClampOp> {
 
 struct DecomposeHLOClampPass
     : public PassWrapper<DecomposeHLOClampPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
