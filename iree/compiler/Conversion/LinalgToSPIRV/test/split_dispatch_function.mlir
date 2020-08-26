@@ -229,3 +229,48 @@ module {
 //      CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
 //      CHECK:   %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
 //      CHECK:   linalg.generic {{.*}} %[[IN]], %[[OUT]]
+
+// -----
+
+module {
+  func @predict_ex_dispatch_0() {
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x512x1xf32>
+    %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<4x8x16xf32>
+    %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x512x1xf32>
+    linalg.copy(%2, %0) : memref<1x512x1xf32>, memref<1x512x1xf32>
+    %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<4x8x16xf32>
+    linalg.generic {args_in = 1 : i64, args_out = 1 : i64,
+                    indexing_maps = [affine_map<(d0, d1, d2) -> (-d0 + 3, d1, d2)>,
+                                     affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                    iterator_types = ["parallel", "parallel", "parallel"]} %3, %1 {
+    ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+      linalg.yield %arg0 : f32
+    }: memref<4x8x16xf32>, memref<4x8x16xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+//      CHECK: module attributes {vkspv.entry_point_schedule =
+// CHECK-SAME:   ["predict_ex_dispatch_0_dispatch_0",
+// CHECK-SAME:    "predict_ex_dispatch_0_dispatch_1"]}
+//      CHECK: func @predict_ex_dispatch_0_dispatch_1
+// CHECK-NEXT:   iree.placeholder
+// CHECK-SAME:     binding = @legacy_io::@ret1
+// CHECK-NEXT:   iree.placeholder
+// CHECK-SAME:     binding = @legacy_io::@arg1
+// CHECK-NEXT:   linalg.generic
+//      CHECK:     linalg.yield
+//  CHECK-NOT:   linalg
+//      CHECK:   return
+//      CHECK: func @predict_ex_dispatch_0_dispatch_0
+// CHECK-NEXT:   iree.placeholder
+// CHECK-SAME:     binding = @legacy_io::@ret0
+// CHECK-NEXT:   iree.placeholder
+// CHECK-SAME:     binding = @legacy_io::@arg0
+// CHECK-NEXT:   linalg.copy
+//  CHECK-NOT:   linalg
+//      CHECK:   return
