@@ -18,7 +18,6 @@ load(
     "PYBIND_COPTS",
     "PYBIND_EXTENSION_COPTS",
     "PYBIND_FEATURES",
-    "PYBIND_REGISTER_MLIR_PASSES",
     "PYTHON_CPP_EXTRA_DEPS",
     "iree_py_extension",
     "iree_py_library",
@@ -85,7 +84,6 @@ pybind_cc_library(
     hdrs = [
         "compiler.h",
     ],
-    copts = PYBIND_REGISTER_MLIR_PASSES,
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
         "//iree/tools:init_compiler_modules",

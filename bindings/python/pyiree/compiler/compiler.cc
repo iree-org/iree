@@ -82,12 +82,9 @@ bool LLVMOnceInit() {
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
-  // Depending on the build environment the MLIR Passes may already be
-  // registered. Conditionally register passes until re-registration is
-  // supported.
-#ifdef IREE_REGISTER_MLIR_PASSES
+  // Register all MLIR Core passes.
   mlir::registerMlirPasses();
-#endif
+
   // Register IREE dialects.
   mlir::iree_compiler::registerAllIreePasses();
 

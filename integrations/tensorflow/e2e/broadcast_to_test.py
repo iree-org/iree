@@ -34,6 +34,7 @@ class BroadcastToModule(tf.Module):
 class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
 
   def test_scalar_broadcast_to(self):
+
     def scalar_broadcast_to(module):
       x = np.array(1, dtype=np.float32)
       shape = np.array([3, 3], dtype=np.int32)
@@ -46,4 +47,3 @@ if __name__ == "__main__":
   if hasattr(tf, "enable_v2_behavior"):
     tf.enable_v2_behavior()
   tf.test.main()
-

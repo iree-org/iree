@@ -43,8 +43,6 @@ iree_pyext_library(
     "compiler.cc"
   PYEXT_DEPS
     bindings::python::pyiree::common::PyextCommonLib
-  COPTS
-    ${PYBIND_REGISTER_MLIR_PASSES}
   DEPS
     # Transforms. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::Flow::Transforms

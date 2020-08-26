@@ -35,6 +35,7 @@ class RangeModule(tf.Module):
 class RangeTest(tf_test_utils.TracedModuleTestCase):
 
   def test_range(self):
+
     def range(module):
       start = np.array(3., dtype=np.float32)
       stop = np.array(12., dtype=np.float32)
