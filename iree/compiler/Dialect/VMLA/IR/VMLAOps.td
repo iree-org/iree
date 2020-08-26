@@ -282,6 +282,17 @@ def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {
   }];
 }
 
+def VMLA_IotaOp : VMLA_ElementTypeOp<"iota"> {
+  let arguments = (ins
+    VMLA_Buffer:$dst,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    `out` $dst attr-dict `:` $element_type
+  }];
+}
+
 def VMLA_TileOp : VMLA_ElementTypeOp<"tile", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_Buffer:$src,

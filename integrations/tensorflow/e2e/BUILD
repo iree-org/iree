@@ -66,12 +66,14 @@ VMLA_FAILING = [
 
 # keep sorted
 LLVM_FAILING = [
+    "broadcast_to_test.py",
     "broadcasting_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
+    "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
@@ -80,6 +82,7 @@ LLVM_FAILING = [
 # keep sorted
 VULKAN_FAILING = [
     "bool_test.py",
+    "broadcast_to_test.py",
     "broadcasting_test.py",
     "control_flow_test.py",
     "dynamic_mlp_relu_test.py",
@@ -87,6 +90,7 @@ VULKAN_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
+    "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",

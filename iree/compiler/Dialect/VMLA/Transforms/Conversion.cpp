@@ -113,11 +113,12 @@ class ConversionPass
     // This is skating on thin ice.
     // TODO(silvasean): Legalize ToExtentTensorOp and FromExtentTensorOp.
     conversionTarget.addIllegalOp<Shape::FromExtentTensorOp>();
-    // RankedBroadcastInDimOp is an logically something that should be an
-    // mhlo op (or in a dialect at a similar level of abstraction), but since
-    // it isn't technically in that dialect, we need to special-case mark it as
-    // illegal here.
+    // IotaOp and RankedBroadcastInDimOp is an logically something that should
+    // be an mhlo op (or in a dialect at a similar level of abstraction), but
+    // since it isn't technically in that dialect, we need to special-case mark
+    // it as illegal here.
     // TODO(silvasean): Reconcile the dialect layering here.
+    conversionTarget.addIllegalOp<Shape::IotaOp>();
     conversionTarget.addIllegalOp<Shape::RankedBroadcastInDimOp>();
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,

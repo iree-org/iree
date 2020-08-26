@@ -284,6 +284,7 @@ void populateVMLAToVMPatterns(MLIRContext *context,
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::GatherOp, "vmla.gather");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::ScatterOp, "vmla.scatter");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::BroadcastOp, "vmla.broadcast");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::IotaOp, "vmla.iota");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TileOp, "vmla.tile");
 
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::NotOp, "vmla.not");
