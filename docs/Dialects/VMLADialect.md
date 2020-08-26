@@ -848,6 +848,30 @@ operation ::= `vmla.interface.const` $interface attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer or index
 
+### `vmla.iota` (IREE::VMLA::IotaOp)
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.iota` `out` $dst attr-dict `:` $element_type
+```
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`dst` | buffer
+
 ### `vmla.log` (IREE::VMLA::LogOp)
 
 

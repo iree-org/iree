@@ -221,6 +221,27 @@ with unit value:
 | :----: | ----------- |
 `shape` | Ranked shape type
 
+### `shapex.iota` (Shape::IotaOp)
+
+Creates an iota of the desired 1-D shape.
+
+Creates an iota of the desired 1-D shape.
+
+Usage:
+  %0 = shapex.iota %shp0 : !shapex.ranked_shape<...>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`result_shape` | Ranked shape type
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ranked tensor of any type values
+
 ### `shapex.make_ranked_shape` (Shape::MakeRankedShapeOp)
 
 Makes a ranked_shape from individual dims.
