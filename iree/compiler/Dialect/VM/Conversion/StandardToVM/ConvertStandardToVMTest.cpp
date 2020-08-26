@@ -29,6 +29,10 @@ namespace {
 class ConvertStandardToVMTestPass
     : public PassWrapper<ConvertStandardToVMTestPass,
                          OperationPass<mlir::ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::VM::VMDialect>();
+  }
+
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();

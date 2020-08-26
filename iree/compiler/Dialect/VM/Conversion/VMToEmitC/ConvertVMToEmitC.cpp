@@ -75,6 +75,10 @@ namespace {
 class ConvertVMToEmitCPass
     : public PassWrapper<ConvertVMToEmitCPass,
                          OperationPass<IREE::VM::ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mlir::emitc::EmitCDialect>();
+  }
+
   void runOnOperation() {
     ConversionTarget target(getContext());
 

@@ -510,6 +510,10 @@ struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
   ConvertToGPUPass() = default;
   ConvertToGPUPass(const ConvertToGPUPass &pass) {}
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<gpu::GPUDialect>();
+  }
+
   void runOnFunction() override;
 };
 

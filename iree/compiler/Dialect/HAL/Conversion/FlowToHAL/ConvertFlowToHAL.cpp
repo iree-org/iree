@@ -70,6 +70,10 @@ namespace {
 class ConvertFlowToHALPass
     : public PassWrapper<ConvertFlowToHALPass, OperationPass<ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 

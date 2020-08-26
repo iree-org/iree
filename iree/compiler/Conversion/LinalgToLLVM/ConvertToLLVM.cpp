@@ -305,6 +305,10 @@ class RemoveInterfaceOpPattern : public ConvertToLLVMPattern {
 namespace {
 struct ConvertToLLVMPass
     : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<LLVM::LLVMDialect>();
+  }
+
   void runOnOperation() override;
 };
 

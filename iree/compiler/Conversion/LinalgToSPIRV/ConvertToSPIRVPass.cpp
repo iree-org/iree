@@ -31,6 +31,7 @@
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
@@ -332,6 +333,10 @@ class VectorContractToCoopMatmul final
 /// corresponding SPIR-V ops.
 struct ConvertToSPIRVPass
     : public PassWrapper<ConvertToSPIRVPass, OperationPass<ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<spirv::SPIRVDialect>();
+  }
+
   void runOnOperation() override;
   ConvertToSPIRVPass() {}
   ConvertToSPIRVPass(const ConvertToSPIRVPass &pass) {}
