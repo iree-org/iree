@@ -44,6 +44,10 @@ namespace {
 
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     populateHLOToLinalgOnTensorsConversionPatterns(&getContext(), patterns);

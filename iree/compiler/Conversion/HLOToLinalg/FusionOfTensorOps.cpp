@@ -21,6 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -64,6 +65,10 @@ struct FuseWithHALInterfaceStoreTensor
 /// operations with linalg.tensor_reshape operation.
 struct FusionOfTensorOpsPass
     : public PassWrapper<FusionOfTensorOpsPass, OperationPass<>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, IREE::HAL::HALDialect>();
+  }
+
   void runOnOperation() override {
     OwningRewritePatternList patterns;
     Operation *op = getOperation();
