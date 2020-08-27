@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTarget.h"
 
 #include <cstdlib>
 
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTargetLinker.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/AOT/LLVMAOTTargetLinker.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
