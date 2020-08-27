@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
@@ -32,6 +33,10 @@ namespace {
 
 class ExpandFunctionDynamicDimsPass
     : public PassWrapper<ExpandFunctionDynamicDimsPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect>();
+  }
+
   void runOnFunction() override {
     auto funcOp = getFunction();
     auto &typeExpander = getDynamicShapeTypeExpander();
@@ -46,6 +51,10 @@ class ExpandFunctionDynamicDimsPass
 
 class ExpandFunctionRankedShapeDimsPass
     : public PassWrapper<ExpandFunctionRankedShapeDimsPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect>();
+  }
+
   void runOnFunction() override {
     auto funcOp = getFunction();
     auto &typeExpander = getShapeToPrimitiveTypeExpander();

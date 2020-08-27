@@ -66,6 +66,10 @@ class ConvertDynamicIota : public OpConversionPattern<mhlo::DynamicIotaOp> {
 
 class ConvertHLOToShapePass
     : public PassWrapper<ConvertHLOToShapePass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect>();
+  }
+
   void runOnFunction() override {
     ConversionTarget conversionTarget(getContext());
     OwningRewritePatternList conversionPatterns;

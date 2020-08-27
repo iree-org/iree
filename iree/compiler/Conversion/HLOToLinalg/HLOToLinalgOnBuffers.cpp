@@ -24,6 +24,7 @@
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/APInt.h"
@@ -1517,7 +1518,7 @@ namespace {
 struct ConvertHLOToLinalgOnBuffersPass
     : public PassWrapper<ConvertHLOToLinalgOnBuffersPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
+    registry.insert<linalg::LinalgDialect, IREEDialect>();
   }
 
   void runOnFunction() override;

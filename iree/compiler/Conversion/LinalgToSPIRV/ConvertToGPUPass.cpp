@@ -511,7 +511,7 @@ struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
   ConvertToGPUPass(const ConvertToGPUPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
   }
 
   void runOnFunction() override;
