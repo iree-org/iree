@@ -53,8 +53,8 @@ iree_pyext_library(
     iree::compiler::Dialect::VM::Transforms
     # Targets. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
+    iree::compiler::Dialect::HAL::Target::LLVM::AOT::LLVMAOT
+    iree::compiler::Dialect::HAL::Target::LLVM::IR::LLVMIR
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
