@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/IR/Builders.h"
@@ -28,6 +29,10 @@ namespace {
 
 class TieDynamicShapesPass
     : public PassWrapper<TieDynamicShapesPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect>();
+  }
+
   void runOnFunction() override {
     getFunction().walk([&](Operation *nestedOp) {
       for (auto result : nestedOp->getResults()) {

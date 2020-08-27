@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -106,7 +107,7 @@ class ConvertHALToVMPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
+    registry.insert<IREEDialect, IREE::VM::VMDialect>();
   }
 
   void runOnOperation() override {

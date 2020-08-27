@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -325,6 +326,10 @@ class MaterializeInterfacesPass
   MaterializeInterfacesPass() : targetOptions_(getTargetOptionsFromFlags()) {}
   explicit MaterializeInterfacesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+  }
 
   void runOnOperation() override {
     // Processes all executables within the input module and produce the output
