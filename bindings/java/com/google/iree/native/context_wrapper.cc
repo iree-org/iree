@@ -66,10 +66,10 @@ Status ContextWrapper::RegisterModules(
   return OkStatus();
 }
 
-Status ContextWrapper::ResolveFunction(const FunctionWrapper& function_wrapper,
-                                       iree_string_view_t name) {
+Status ContextWrapper::ResolveFunction(iree_string_view_t name,
+                                       FunctionWrapper* function_wrapper) {
   return iree_vm_context_resolve_function(context_, name,
-                                          function_wrapper.function());
+                                          function_wrapper->function());
 }
 
 int ContextWrapper::id() const { return iree_vm_context_id(context_); }

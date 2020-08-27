@@ -35,8 +35,8 @@ class ContextWrapper {
 
   Status RegisterModules(const std::vector<ModuleWrapper*>& module_wrappers);
 
-  Status ResolveFunction(const FunctionWrapper& function_wrapper,
-                         iree_string_view_t name);
+  Status ResolveFunction(iree_string_view_t name,
+                         FunctionWrapper* function_wrapper);
 
   int id() const;
 
