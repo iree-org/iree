@@ -139,7 +139,7 @@ class EmulatedTimelineSemaphore final : public Semaphore {
       std::function<Status(Semaphore*)> on_semaphore_signal,
       std::function<void(Semaphore*)> on_semaphore_failure,
       std::function<void(absl::Span<VkFence>)> on_fence_signal,
-      ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initialValue);
+      ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value);
 
   ~EmulatedTimelineSemaphore() override;
 
