@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "absl/strings/str_cat.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/resource.h"
 
@@ -52,6 +53,11 @@ class DescriptorSetLayout : public Resource {
     DescriptorType type = DescriptorType::kStorageBuffer;
     // Specifies the memory access performed by the executables.
     MemoryAccessBitfield access = MemoryAccess::kRead | MemoryAccess::kWrite;
+
+    std::string DebugStringShort() const {
+      return absl::StrCat("binding=", binding, ", type=", type,
+                          ", access=", MemoryAccessString(access));
+    }
   };
 };
 

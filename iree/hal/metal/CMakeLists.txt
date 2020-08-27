@@ -24,6 +24,10 @@ iree_cc_library(
   SRCS
     "metal_command_buffer.mm"
   DEPS
+    ::metal_kernel_library
+    ::metal_pipeline_argument_buffer
+    absl::flat_hash_map
+    absl::inlined_vector
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
@@ -62,6 +66,7 @@ iree_cc_library(
     ::metal_command_buffer
     ::metal_command_queue
     ::metal_direct_allocator
+    ::metal_pipeline_argument_buffer
     ::metal_pipeline_cache
     ::metal_shared_event
     absl::strings
@@ -149,6 +154,21 @@ iree_cc_library(
   LINKOPTS
     "-framework Foundation"
     "-framework Metal"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    metal_pipeline_argument_buffer
+  HDRS
+    "metal_pipeline_argument_buffer.h"
+  SRCS
+    "metal_pipeline_argument_buffer.cc"
+  DEPS
+    absl::inlined_vector
+    absl::span
+    iree::hal::descriptor_set_layout
+    iree::hal::executable_layout
   PUBLIC
 )
 

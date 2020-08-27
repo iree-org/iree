@@ -17,10 +17,23 @@
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/metal/metal_kernel_library.h"
+#include "iree/hal/metal/metal_pipeline_argument_buffer.h"
 
 namespace iree {
 namespace hal {
 namespace metal {
+
+namespace {
+
+MTLResourceUsage ConvertResourceUsage(MemoryAccessBitfield memory_access) {
+  MTLResourceUsage usage = 0;
+  if (AllBitsSet(memory_access, MemoryAccess::kRead)) usage |= MTLResourceUsageRead;
+  if (AllBitsSet(memory_access, MemoryAccess::kWrite)) usage |= MTLResourceUsageWrite;
+  return usage;
+}
+
+}  // namespace
 
 // static
 StatusOr<ref_ptr<CommandBuffer>> MetalCommandBuffer::Create(
@@ -110,7 +123,28 @@ Status MetalCommandBuffer::ExecutionBarrier(ExecutionStageBitfield source_stage_
                                             absl::Span<const MemoryBarrier> memory_barriers,
                                             absl::Span<const BufferBarrier> buffer_barriers) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::ExecutionBarrier");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::ExecutionBarrier";
+
+  if (AllBitsSet(source_stage_mask, ExecutionStage::kHost) ||
+      AllBitsSet(target_stage_mask, ExecutionStage::kHost)) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::ExecutionBarrier with host bit set";
+  }
+
+  // If there is a memory barrier specified, we have to place a catch-all barrier for all buffers.
+  // Metal does not provide a more fine-grained control here. But we do have the option to specify a
+  // list of buffers to synchronize if only buffer barriers are specified.
+  if (!memory_barriers.empty()) {
+    [GetOrBeginComputeEncoder() memoryBarrierWithScope:MTLBarrierScopeBuffers];
+  } else if (!buffer_barriers.empty()) {
+    std::vector<id<MTLResource>> buffers;
+    buffers.reserve(buffer_barriers.size());
+    for (const auto& barrier : buffer_barriers) {
+      buffers.push_back(static_cast<MetalBuffer*>(barrier.buffer)->handle());
+    }
+    [GetOrBeginComputeEncoder() memoryBarrierWithResources:buffers.data() count:buffers.size()];
+  }
+
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::SignalEvent(Event* event, ExecutionStageBitfield source_stage_mask) {
@@ -215,20 +249,125 @@ Status MetalCommandBuffer::PushConstants(ExecutableLayout* executable_layout, si
 Status MetalCommandBuffer::PushDescriptorSet(ExecutableLayout* executable_layout, int32_t set,
                                              absl::Span<const DescriptorSet::Binding> bindings) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::PushDescriptorSet");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::PushDescriptorSet";
+  if (set != 0) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::PushDescriptorSet with set number > 0";
+  }
+  auto& push_state = pipeline_state_objects_[executable_layout].push_states[set];
+  push_state.resource_bindings.assign(bindings.begin(), bindings.end());
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::BindDescriptorSet(ExecutableLayout* executable_layout, int32_t set,
                                              DescriptorSet* descriptor_set,
                                              absl::Span<const device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::BindDescriptorSet");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::BindDescriptorSet";
+  if (set != 0) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::BindDescriptorSet with set number > 0";
+  }
+  if (!dynamic_offsets.empty()) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::BindDescriptorSet with dynamic offsets";
+  }
+  pipeline_state_objects_[executable_layout].bind_states[set].descriptor_set = descriptor_set;
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
                                     std::array<uint32_t, 3> workgroups) {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::Dispatch");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalCommandBuffer::Dispatch";
+  IREE_DVLOG(2) << "MetalCommandBuffer::Dispatch";
+
+  auto* kernel_library = static_cast<MetalKernelLibrary*>(executable);
+  IREE_ASSIGN_OR_RETURN(auto metal_kernel, kernel_library->GetKernelForEntryPoint(entry_point));
+  IREE_ASSIGN_OR_RETURN(auto metal_pso, kernel_library->GetPipelineStateForEntryPoint(entry_point));
+
+  id<MTLComputeCommandEncoder> compute_encoder = GetOrBeginComputeEncoder();
+  [compute_encoder setComputePipelineState:metal_pso];
+
+  // TODO(antiagainst): only update the PSO for the current executable.
+  for (const auto& pso_kv : pipeline_state_objects_) {
+    const auto* pipeline_layout = static_cast<MetalPipelineArgumentBufferLayout*>(pso_kv.first);
+    const auto& pso = pso_kv.second;
+    IREE_DVLOG(3) << "Current pipeline layout: " << pipeline_layout->DebugString();
+    IREE_CHECK(pso.push_states.size() <= 1);
+    IREE_CHECK(pso.bind_states.size() <= 1);
+    IREE_CHECK(pso.constant_states.empty());
+
+    IREE_DVLOG(3) << "Encoding push descriptors..";
+    for (const auto& push_kv : pso.push_states) {
+      int32_t set_number = push_kv.first;
+      const PipelineStateObject::PushState& push_state = push_kv.second;
+      IREE_DVLOG(3) << " For set #" << set_number;
+
+      id<MTLArgumentEncoder> argument_encoder =
+          [metal_kernel newArgumentEncoderWithBufferIndex:set_number];  // retained
+      if (!argument_encoder) {
+        return InvalidArgumentErrorBuilder(IREE_LOC)
+               << "Buffer index #" << set_number << " is not an argument buffer";
+      }
+
+      __block id<MTLBuffer> argument_buffer =
+          [metal_handle_.device newBufferWithLength:argument_encoder.encodedLength
+                                            options:MTLResourceStorageModeShared];  // retained
+      if (!argument_buffer) {
+        return InternalErrorBuilder(IREE_LOC)
+               << "Failed to create argument buffer with length=" << argument_encoder.encodedLength;
+      }
+      [metal_handle_ addCompletedHandler:^(id<MTLCommandBuffer>) {
+        [argument_buffer release];
+        [argument_encoder release];
+      }];
+
+      [argument_encoder setArgumentBuffer:argument_buffer offset:0];
+
+      for (const auto& resource_binding : push_state.resource_bindings) {
+        IREE_DVLOG(3) << "  Resource @[" << resource_binding.DebugStringShort() << "]";
+
+        if (resource_binding.length != kWholeBuffer &&
+            resource_binding.length != resource_binding.buffer->allocation_size()) {
+          return UnimplementedErrorBuilder(IREE_LOC)
+                 << "MetalCommandBuffer::Dispatch with sub-buffer";
+        }
+
+        IREE_ASSIGN_OR_RETURN(auto buffer, CastBuffer(resource_binding.buffer));
+        [argument_encoder setBuffer:buffer->handle()
+                             offset:resource_binding.offset
+                            atIndex:resource_binding.binding];
+
+        const auto* set_layout = pipeline_layout->set_layouts()[set_number];
+        const auto* layout_binding = set_layout->GetBindingForIndex(resource_binding.binding);
+        if (!layout_binding) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "Cannot find binding #" << resource_binding.binding
+                 << " in argument buffer layout";
+        }
+        [compute_encoder useResource:buffer->handle()
+                               usage:ConvertResourceUsage(layout_binding->access)];
+      }
+
+      [compute_encoder setBuffer:argument_buffer offset:0 atIndex:set_number];
+    }
+
+    if (!pso.bind_states.empty()) {
+      return UnimplementedErrorBuilder(IREE_LOC)
+             << "MetalCommandBuffer::Dispatch with bound descriptor sets";
+    }
+
+    if (!pso.constant_states.empty()) {
+      return UnimplementedErrorBuilder(IREE_LOC)
+             << "MetalCommandBuffer::Dispatch with push constants";
+    }
+  }
+
+  IREE_DVLOG(2) << "Dispatch workgroup count: (" << workgroups[0] << ", " << workgroups[1] << ", "
+                << workgroups[2] << "), workgroup size: (32, 1, 1)";
+  // TODO(antiagainst): fix workgroup size
+  [compute_encoder dispatchThreadgroups:MTLSizeMake(workgroups[0], workgroups[1], workgroups[2])
+                  threadsPerThreadgroup:MTLSizeMake(32, 1, 1)];
+
+  return OkStatus();
 }
 
 Status MetalCommandBuffer::DispatchIndirect(Executable* executable, int32_t entry_point,
