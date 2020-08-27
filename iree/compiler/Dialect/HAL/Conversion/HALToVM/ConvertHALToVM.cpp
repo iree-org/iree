@@ -96,7 +96,7 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
+// A pass converting the IREE HAL dialect into the IREE VM dialect.
 class ConvertHALToVMPass
     : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
