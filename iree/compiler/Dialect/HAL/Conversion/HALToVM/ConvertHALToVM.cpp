@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -96,7 +97,7 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
+// A pass converting the IREE HAL dialect into the IREE VM dialect.
 class ConvertHALToVMPass
     : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
@@ -106,7 +107,7 @@ class ConvertHALToVMPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
+    registry.insert<IREEDialect, IREE::VM::VMDialect>();
   }
 
   void runOnOperation() override {

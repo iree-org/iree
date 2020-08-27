@@ -49,6 +49,10 @@ static llvm::cl::opt<std::string> vectorOpLowering(
 namespace {
 struct MatMulTileAndVectorizePass
     : PassWrapper<MatMulTileAndVectorizePass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<AffineDialect, scf::SCFDialect, vector::VectorDialect>();
+  }
+
   void runOnFunction() override;
 };
 }  // namespace

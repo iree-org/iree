@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/VMLA/Conversion/VMLAToVM/ConvertVMLAToVM.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -346,6 +347,10 @@ class ConvertVMLAToVMPass
       : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
   explicit ConvertVMLAToVMPass(IREE::VM::TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREEDialect, IREE::VM::VMDialect>();
+  }
 
   void runOnOperation() override {
     auto *context = &getContext();

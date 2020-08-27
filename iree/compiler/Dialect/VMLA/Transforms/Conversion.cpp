@@ -65,6 +65,10 @@ static LogicalResult insertInterfacesToEntryPoints(mlir::ModuleOp moduleOp) {
 class ConversionPass
     : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect, IREE::VMLA::VMLADialect>();
+  }
+
   void runOnOperation() override {
     // First insert vmla.interface arguments to all exported functions.
     // The conversions require that the interface argument is present in order

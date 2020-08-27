@@ -280,7 +280,11 @@ class LowerBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
 class PreConversionLoweringPass
     : public PassWrapper<PreConversionLoweringPass, OperationPass<FuncOp>> {
  public:
-  void runOnOperation() {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect, IREE::VMLA::VMLADialect>();
+  }
+
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
 
     // These patterns should be run greedily as they are not dialect

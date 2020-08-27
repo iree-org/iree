@@ -339,6 +339,10 @@ LogicalResult processBlock(Block &block, OpDispatchPolicy &policy) {
 class IdentifyDispatchRegions2Pass
     : public PassWrapper<IdentifyDispatchRegions2Pass, FunctionPass> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect>();
+  }
+
   void runOnFunction() override {
     // NOTE: we require the DispatchabilityAnalysisPass to have run first.
     auto dispatchability = getCachedParentAnalysis<Dispatchability>();

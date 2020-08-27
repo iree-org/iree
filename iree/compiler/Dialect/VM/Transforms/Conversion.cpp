@@ -82,6 +82,10 @@ class ConversionPass
   explicit ConversionPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<StandardOpsDialect, IREE::VM::VMDialect>();
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
     VMConversionTarget conversionTarget(context);
