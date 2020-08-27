@@ -16,6 +16,7 @@
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/file_io.h"
+#include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"
@@ -65,7 +66,8 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
   return file_io::GetFileContents(input_file);
 }
 
-Status Run(::benchmark::State& state) {
+Status RunFunction(::benchmark::State& state,
+                   const std::string& function_name) {
   IREE_TRACE_SCOPE0("iree-benchmark-module");
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
@@ -92,7 +94,6 @@ Status Run(::benchmark::State& state) {
       &context))
       << "creating context";
 
-  std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
   IREE_RETURN_IF_ERROR(input_module->lookup_function(
       input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
@@ -155,26 +156,40 @@ Status Run(::benchmark::State& state) {
   return OkStatus();
 }
 
-void BM_RunModule(benchmark::State& state) {
+void BM_RunModule(benchmark::State& state, const std::string& function_name) {
   // Delegate to a status-returning function so we can use the status macros.
-  IREE_CHECK_OK(Run(state));
+  IREE_CHECK_OK(RunFunction(state, function_name));
 }
-
-BENCHMARK(BM_RunModule)
-    // By default only the main thread is included in CPU time. Include all the
-    // threads instead.
-    ->MeasureProcessCPUTime()
-    // To make single and multi-threaded benchmarks more comparable, use the
-    // wall time to determine how many iterations to run.
-    // See https://github.com/google/benchmark#cpu-timers,
-    ->UseRealTime()
-    // Report timing in milliseconds, which is the general order of magnitude of
-    // model runs. The benchmark framework will print with precision between 0
-    // and 3 places after the decimal while aiming for three significant digits.
-    // If we end up wanting precision beyond microseconds, we can make this
-    // setting configurable with a custom command line flag.
-    ->Unit(benchmark::kMillisecond);
 
 }  // namespace
 
+void RegisterModuleBenchmarks() {
+  auto function_name = absl::GetFlag(FLAGS_entry_function);
+  auto benchmark_name = "BM_" + function_name;
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [function_name](benchmark::State& state) {
+                                 BM_RunModule(state, function_name);
+                               })
+      // By default only the main thread is included in CPU time. Include all
+      // the threads instead.
+      ->MeasureProcessCPUTime()
+      // To make single and multi-threaded benchmarks more comparable, use the
+      // wall time to determine how many iterations to run. See
+      // https://github.com/google/benchmark#cpu-timers,
+      ->UseRealTime()
+      // Report timing in milliseconds, which is the general order of magnitude
+      // of model runs. The benchmark framework will print with precision
+      // between 0 and 3 places after the decimal while aiming for three
+      // significant digits. If we end up wanting precision beyond microseconds,
+      // we can make this setting configurable with a custom command line flag.
+      ->Unit(benchmark::kMillisecond);
+}
 }  // namespace iree
+
+int main(int argc, char** argv) {
+  ::benchmark::Initialize(&argc, argv);
+  iree::InitializeEnvironment(&argc, &argv);
+  iree::RegisterModuleBenchmarks();
+  ::benchmark::RunSpecifiedBenchmarks();
+  return 0;
+}
