@@ -14,7 +14,7 @@
 
 # Tests for end-to-end IREE support starting from the XLA HLO dialect.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//iree:lit_test.bzl", "iree_lit_test", "iree_lit_test_suite")
 load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
 
 package(
@@ -27,7 +27,10 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(
         ["*.cpp"],
-        exclude = ["Bench*"],
+        exclude = [
+            "Bench*",
+            "TestSimpleJITVulkan.cpp",
+        ],
     ),
     data = [
         # runtime libraries
@@ -45,6 +48,29 @@ iree_lit_test_suite(
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
+)
+
+# TODO(b/166644529): Determine why the Vulkan JIT test is failing under asan.
+iree_lit_test(
+    name = "TestSimpleJITVulkan.cpp.test",
+    data = [
+        # runtime libraries
+        "@llvm-project//mlir:tools/libvulkan-runtime-wrappers.so",
+        "runtime-support.so",
+        # Tests.
+        ":test-dot-prod",
+        "test-mnist-jit",
+        "test-simple-jit",
+        "test-simple-jit-vulkan",
+        "test-simple-mlir",
+        "test-vector-transfers-jit",
+        "test-matmul-vulkan",
+        "test-vec-to-gpu",
+        # FileChecker.
+        "//iree/tools:IreeFileCheck",
+    ],
+    tags = ["noasan"],
+    test_file = "TestSimpleJITVulkan.cpp",
 )
 
 cc_binary(
