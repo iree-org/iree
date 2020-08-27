@@ -31,6 +31,7 @@
 #include "iree/tools/init_mlir_dialects.h"
 #include "iree/tools/init_mlir_passes.h"
 #include "iree/tools/init_targets.h"
+#include "iree/tools/init_xla_dialects.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -38,6 +39,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/Location.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
@@ -73,12 +75,6 @@ bool LLVMOnceInit() {
       llvm::sys::DefaultOneShotPipeSignalHandler);
   llvm::sys::PrintStackTraceOnErrorSignal("pyiree");
 
-  // Register built-in MLIR dialects.
-  mlir::registerMlirDialects();
-
-  // Register IREE dialects, compiler module dialects, and HAL target backends.
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
@@ -95,6 +91,13 @@ bool LLVMOnceInit() {
   std::vector<const char*> default_options = {program_name.c_str(), nullptr};
   llvm::cl::ParseCommandLineOptions(1, default_options.data());
   return true;
+}
+
+void registerDialects(DialectRegistry& registry) {
+  mlir::registerMlirDialects(registry);
+  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
 }
 
 void SetupLLVMModule(pybind11::module m) {
@@ -285,7 +288,7 @@ void DiagnosticCapture::ClearDiagnostics() { diagnostics_.clear(); }
 
 CompilerContextBundle::CompilerContextBundle()
     : default_capture_(&mlir_context_, nullptr) {
-  mlir_context_.loadAllGloballyRegisteredDialects();
+  registerDialects(mlir_context_.getDialectRegistry());
 }
 CompilerContextBundle::~CompilerContextBundle() = default;
 

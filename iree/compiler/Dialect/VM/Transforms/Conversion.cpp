@@ -15,6 +15,7 @@
 #include <tuple>
 
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -83,7 +84,7 @@ class ConversionPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<StandardOpsDialect, IREE::VM::VMDialect>();
+    registry.insert<IREEDialect, IREE::VM::VMDialect, StandardOpsDialect>();
   }
 
   void runOnOperation() override {

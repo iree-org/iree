@@ -30,6 +30,10 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createConversionPass(targetOptions));
+  // The createGlobalInitializationPass operates on vm.module ops, so requires
+  // that the dialect already be registered to be added to the pass pipeline.
+  // TODO(#2958): There should be a better way to do this.
+  passManager.getContext()->loadDialect<VM::VMDialect>();
   passManager.addPass(createGlobalInitializationPass());
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());

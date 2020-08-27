@@ -76,6 +76,8 @@ static llvm::cl::opt<bool> showDialects(
     llvm::cl::init(false));
 
 int main(int argc, char **argv) {
+  llvm::InitLLVM y(argc, argv);
+
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
@@ -91,7 +93,6 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
   mlir::iree_compiler::registerHLOToLinalgPasses();
   mlir::iree_compiler::registerLinalgToLLVMPasses();
-  llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
@@ -133,7 +134,7 @@ int main(int argc, char **argv) {
   if (failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
                                registry, splitInputFile, verifyDiagnostics,
                                verifyPasses, allowUnregisteredDialects,
-                               /*preloadDialectsInContext=*/true))) {
+                               /*preloadDialectsInContext=*/false))) {
     return 1;
   }
 }

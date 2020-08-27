@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Main entry function for custom-opt.
-// Based on the iree-opt main entry function (opt_main.cc).
+// Main entry function for iree-tf-opt and derived binaries.
 //
-// We need this entry function because we want to register the custom
-// dialect, which is missing in IREE's opt main entry function.
+// Based on iree-opt with the addition of TF dialects and passes
 
+#include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
+#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
-#include "iree/samples/custom_modules/dialect/init_dialect.h"
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_iree_dialects.h"
 #include "iree/tools/init_iree_passes.h"
@@ -34,10 +33,19 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_device.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_executor.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
+#include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
+
+#ifdef IREE_HAVE_EMITC_DIALECT
+#include "emitc/InitDialect.h"
+#endif  // IREE_HAVE_EMITC_DIALECT
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
@@ -73,22 +81,41 @@ static llvm::cl::opt<bool> showDialects(
     "show-dialects", llvm::cl::desc("Print the list of registered dialects"),
     llvm::cl::init(false));
 
+void registerTFDialects(mlir::DialectRegistry &registry) {
+  registry.insert<mlir::TF::TensorFlowDialect,
+                  mlir::tf_executor::TensorFlowExecutorDialect,
+                  mlir::tf_device::TensorFlowDeviceDialect,
+                  mlir::tf_saved_model::TensorFlowSavedModelDialect>();
+}
+
+void registerExtensionDialects(mlir::DialectRegistry &registry) {
+  registry.insert<mlir::iree_compiler::tf_strings::TFStringsDialect,
+                  mlir::tf_tensorlist::TfTensorListDialect>();
+}
+
 int main(int argc, char **argv) {
+  // TODO(#2958): There's a lot of duplication with iree-opt here. Factor out
+  // the common functionality.
+  llvm::InitLLVM y(argc, argv);
+
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
+#ifdef IREE_HAVE_EMITC_DIALECT
+  mlir::registerEmitCDialect(registry);
+#endif  // IREE_HAVE_EMITC_DIALECT
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeDialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
-  // Register the custom dialect
-  mlir::iree_compiler::registerCustomDialect(registry);
+  registerTFDialects(registry);
+  registerExtensionDialects(registry);
+
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALConversionPasses();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
   mlir::iree_compiler::registerHLOToLinalgPasses();
   mlir::iree_compiler::registerLinalgToLLVMPasses();
-  llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

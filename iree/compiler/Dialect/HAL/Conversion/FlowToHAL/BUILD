@@ -41,6 +41,8 @@ cc_library(
         "//iree/compiler/Dialect/IREE/Conversion:ConvertToHAL",
         "//iree/compiler/Dialect/IREE/Conversion:PreserveCompilerHints",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
+        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
