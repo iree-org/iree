@@ -84,7 +84,6 @@ VULKAN_FAILING = [
     "bool_test.py",
     "broadcast_to_test.py",
     "broadcasting_test.py",
-    "control_flow_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.

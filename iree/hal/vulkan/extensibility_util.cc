@@ -194,6 +194,9 @@ DeviceExtensions PopulateEnabledDeviceExtensions(
     if (std::strcmp(extension_name, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME) ==
         0) {
       extensions.push_descriptors = true;
+    } else if (std::strcmp(extension_name,
+                           VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
+      extensions.timeline_semaphore = true;
     }
   }
   return extensions;

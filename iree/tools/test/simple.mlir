@@ -6,7 +6,7 @@
 // iree-benchmark-module (only checking exit codes).
 // RUN: iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s -o ${TEST_TMPDIR?}/bc.module && iree-benchmark-module --driver=vmla --entry_function=abs --inputs="i32=-2" --input_file=${TEST_TMPDIR?}/bc.module
 
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s -o ${TEST_TMPDIR?}/bc.module && iree-benchmark-module --driver=vmla --entry_function=abs --inputs="i32=-2" --input_file=${TEST_TMPDIR?}/bc.module)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-translate --iree-hal-target-backends=vulkan-spirv -iree-mlir-to-vm-bytecode-module %s -o ${TEST_TMPDIR?}/bc.module && iree-benchmark-module --driver=vulkan --entry_function=abs --inputs="i32=-2" --input_file=${TEST_TMPDIR?}/bc.module)
 
 // iree-run-mlir
 // RUN: (iree-run-mlir --iree-hal-target-backends=vmla --input-value="i32=-2" %s) | IreeFileCheck %s

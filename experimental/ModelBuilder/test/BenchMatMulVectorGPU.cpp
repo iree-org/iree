@@ -69,6 +69,11 @@ static llvm::cl::opt<bool> enableLICM(
     llvm::cl::desc("Enable loop invariant hoisting optimizations"),
     llvm::cl::value_desc("boolean"), llvm::cl::init(false));
 
+static llvm::cl::opt<std::string> matType("matrix-type",
+                                          llvm::cl::desc("Matrix element type"),
+                                          llvm::cl::value_desc("type"),
+                                          llvm::cl::init("i8xi8xi32"));
+
 static void addLoweringPasses(mlir::PassManager &pm,
                               llvm::ArrayRef<int64_t> numWorkgroups,
                               llvm::ArrayRef<Type> args) {
@@ -135,22 +140,124 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIds(
   return procInfo;
 }
 
-void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
-            bool correctness) {
+struct MatMulF32 {
+  using Type = float;
+  static mlir::Type getMLIRType(MLIRContext &ctx) {
+    return FloatType::getF32(&ctx);
+  }
+};
+
+struct MatMulI8 {
+  using Type = uint8_t;
+  static mlir::Type getMLIRType(MLIRContext &ctx) {
+    return IntegerType::get(8, &ctx);
+  }
+};
+
+struct MatMulI32 {
+  using Type = uint32_t;
+  static mlir::Type getMLIRType(MLIRContext &ctx) {
+    return IntegerType::get(32, &ctx);
+  }
+};
+
+// Class to emulate half float on CPU.
+class fp16 {
+ public:
+  void fromFloat(const float &x) {
+    uint32_t asInt = *(uint32_t *)&x;
+    int sign = (asInt & 0x80000000) >> 31;
+    int exp = ((asInt & 0x7f800000) >> 23) - 127 + 15;
+    int mantissa = (asInt & 0x7FFFFF);
+    if (exp > 31) exp = 31;
+    if (exp < 0) exp = 0;
+    sign = sign << 15;
+    exp = exp << 10;
+    mantissa = mantissa >> (23 - 10);
+    asInt = sign | exp | mantissa;
+    value = asInt;
+  }
+  fp16(const float &x) { fromFloat(x); }
+  fp16 &operator=(const float &x) {
+    fromFloat(x);
+    return *this;
+  }
+  fp16 &operator=(const int &x) {
+    fromFloat((float)x);
+    return *this;
+  }
+  fp16 &operator+=(const fp16 &x) {
+    fromFloat(toFloat() + x.toFloat());
+    return *this;
+  }
+  float toFloat() const {
+    uint32_t asInt = value;
+    int sign = (asInt & 0x8000) >> 15;
+    int exp = ((asInt & 0x7c00) >> 10);
+    int mantissa = (asInt & 0x3FF);
+    sign = sign << 31;
+    if (exp > 0) {
+      exp = (exp + 127 - 15) << 23;
+      mantissa = mantissa << (23 - 10);
+    } else {
+      mantissa = 0;
+    }
+    asInt = sign | exp | mantissa;
+    return *(float *)&asInt;
+  }
+  operator float() { return toFloat(); }
+
+ private:
+  uint16_t value;
+};
+
+struct MatMulF16 {
+  using Type = fp16;
+  static mlir::Type getMLIRType(MLIRContext &ctx) {
+    return FloatType::getF16(&ctx);
+  }
+};
+
+/// Functions to initialize matrix based on the type.
+template <typename T>
+static T getMatA(unsigned idx) {
+  if (std::is_same<T, float>::value || std::is_same<T, fp16>::value)
+    return ((float)(idx % 5) - 1.0f) / 2.0f;
+  else
+    return (3 * idx + 1) % 117;
+}
+
+template <typename T>
+static T getMatB(unsigned idx) {
+  if (std::is_same<T, float>::value || std::is_same<T, fp16>::value)
+    return ((float)(idx % 7) - 1.0f) / 2.0f;
+  else
+    return idx % 127;
+}
+
+template <typename T>
+static bool EqualOrClose(T a, T b) {
+  if (std::is_same<T, float>::value || std::is_same<T, fp16>::value)
+    return fabs((float)a - (float)b) < 0.001f;
+  return a == b;
+}
+
+template <typename SrcT, typename DstT>
+static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
+                   const std::array<int64_t, 3> &nativeSize, bool correctness) {
   const int warpSize = 32;
   const int resRows = m;
   const int resColumns = n;
   const int reductionSize = k;
   StringLiteral funcName = "kernel_matmul";
-  MLIRContext context;
   ModelBuilder modelBuilder;
-
-  auto typeA =
-      modelBuilder.getMemRefType({resRows, reductionSize}, modelBuilder.i8);
-  auto typeB =
-      modelBuilder.getMemRefType({reductionSize, resColumns}, modelBuilder.i8);
-  auto typeC = modelBuilder.getMemRefType({resRows, resColumns},
-                                          modelBuilder.getI32Type());
+  MLIRContext &ctx = *modelBuilder.getContext();
+  auto typeA = modelBuilder.getMemRefType({resRows, reductionSize},
+                                          SrcT::getMLIRType(ctx));
+  auto typeB = modelBuilder.getMemRefType({reductionSize, resColumns},
+                                          SrcT::getMLIRType(ctx));
+  auto typeC =
+      modelBuilder.getMemRefType({resRows, resColumns}, DstT::getMLIRType(ctx));
   // 1. Build the kernel.
   {
     modelBuilder.addGPUAttr();
@@ -164,7 +271,7 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     // Right now we map one workgroup to one warp.
     kernelFunc.setAttr(
         spirv::getEntryPointABIAttrName(),
-        spirv::getEntryPointABIAttr({workgroupSize, 1, 1}, &context));
+        spirv::getEntryPointABIAttr({workgroupSize, 1, 1}, &ctx));
     OpBuilder b(&kernelFunc.getBody());
     ScopedContext scope(b, kernelFunc.getLoc());
 
@@ -183,11 +290,6 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
   CompilationOptions options;
   options.loweringPasses = [&](mlir::PassManager &pm) {
     MatmulCodegenStrategy strategy;
-    // Use hardcoded value for cooperative matrix size. Those will be pulled
-    // from device properties eventually.
-    const int cooperativeMatrixM = 16;
-    const int cooperativeMatrixN = 16;
-    const int cooperativeMatrixK = 32;
 
     linalg::LinalgLoopDistributionOptions WGDistribute;
     WGDistribute.distributionMethod = {
@@ -205,7 +307,7 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
         .tile<linalg::MatmulOp>(
             linalg::LinalgTilingOptions()
                 .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-                .setTileSizes({tileN, tileM, tileK})
+                .setTileSizes({tileM, tileN, tileK})
                 .setDistributionOptions(WGDistribute))
         .setHoistInvariantCode(enableLICM);
     if (useWorkgroupMemory) {
@@ -226,8 +328,6 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
                       {tileN / numSubgroupY, tileM / numSubgroupX, tileK})
                   .setDistributionOptions(SGDistribute));
     }
-    std::array<int64_t, 3> nativeSize = {cooperativeMatrixN, cooperativeMatrixM,
-                                         cooperativeMatrixK};
     strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
         nativeSize);
     modelBuilder.getModuleRef()->walk(
@@ -239,26 +339,30 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
 
   // 3. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
-  auto oneInit = [](unsigned idx, uint8_t *ptr) { ptr[idx] = 2 * idx + 1; };
-  auto incInit = [](unsigned idx, uint8_t *ptr) { ptr[idx] = idx; };
-  auto zeroInit = [](unsigned idx, uint32_t *ptr) { ptr[idx] = 0; };
-  auto A = makeInitializedStridedMemRefDescriptor<uint8_t, 2>(
-      {resRows, reductionSize}, oneInit);
-  auto B = makeInitializedStridedMemRefDescriptor<uint8_t, 2>(
-      {reductionSize, resColumns}, incInit);
-  auto C = makeInitializedStridedMemRefDescriptor<uint32_t, 2>(
+  auto initA = [](unsigned idx, typename SrcT::Type *ptr) {
+    ptr[idx] = getMatA<typename SrcT::Type>(idx);
+  };
+  auto initB = [](unsigned idx, typename SrcT::Type *ptr) {
+    ptr[idx] = getMatB<typename SrcT::Type>(idx);
+  };
+  auto zeroInit = [](unsigned idx, typename DstT::Type *ptr) { ptr[idx] = 0; };
+  auto A = makeInitializedStridedMemRefDescriptor<typename SrcT::Type, 2>(
+      {resRows, reductionSize}, initA);
+  auto B = makeInitializedStridedMemRefDescriptor<typename SrcT::Type, 2>(
+      {reductionSize, resColumns}, initB);
+  auto C = makeInitializedStridedMemRefDescriptor<typename DstT::Type, 2>(
       {resRows, resColumns}, zeroInit);
-  auto CPURes = makeInitializedStridedMemRefDescriptor<uint32_t, 2>(
+  auto CPURes = makeInitializedStridedMemRefDescriptor<typename DstT::Type, 2>(
       {resRows, resColumns}, zeroInit);
 
   // Is checking corretness compare to the value computed on CPU.
   if (correctness) {
     for (int i = 0; i < resRows; i++) {
       for (int j = 0; j < resColumns; j++) {
-        uint32_t acc = (*C)[i][j];
+        typename DstT::Type acc = (*C)[i][j];
         for (int k = 0; k < reductionSize; k++) {
-          uint32_t a = (*A)[i][k];
-          uint32_t b = (*B)[k][j];
+          typename DstT::Type a = (*A)[i][k];
+          typename DstT::Type b = (*B)[k][j];
           acc += a * b;
         }
         (*CPURes)[i][j] = acc;
@@ -274,15 +378,42 @@ void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     bool correct = true;
     for (int i = 0; i < resRows; i++) {
       for (int j = 0; j < resColumns; j++) {
-        if ((*CPURes)[i][j] != (*C)[i][j]) {
+        if (!EqualOrClose((*CPURes)[i][j], (*C)[i][j])) {
           correct = false;
-          printf("mismatch at index(%i, %i) was expecting %i but got %i\n", i,
-                 j, (*CPURes)[i][j], (*C)[i][j]);
+          llvm::errs() << "mismatch at index(" << i << ", " << j
+                       << ") was expecting " << (*CPURes)[i][j] << " but got "
+                       << (*C)[i][j] << "\n";
         }
       }
     }
     if (correct) printf("pass\n");
   }
+}
+
+static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
+                   bool correctness) {
+  std::array<int64_t, 3> nativeMatSize;
+  if (matType == "i8xi8xi32") {
+    nativeMatSize = {16, 16, 32};
+    return matMul<MatMulI8, MatMulI32>(m, n, k, tileM, tileN, tileK,
+                                       nativeMatSize, correctness);
+  }
+  if (matType == "f16xf16xf16") {
+    nativeMatSize = {16, 16, 16};
+    return matMul<MatMulF16, MatMulF16>(m, n, k, tileM, tileN, tileK,
+                                        nativeMatSize, correctness);
+  }
+  if (matType == "f16xf16xf32") {
+    nativeMatSize = {16, 16, 16};
+    return matMul<MatMulF16, MatMulF32>(m, n, k, tileM, tileN, tileK,
+                                        nativeMatSize, correctness);
+  }
+  if (matType == "f32xf32xf32") {
+    nativeMatSize = {1, 1, 1};
+    return matMul<MatMulF32, MatMulF32>(m, n, k, tileM, tileN, tileK,
+                                        nativeMatSize, correctness);
+  }
+  llvm_unreachable("Unsupported matrix type");
 }
 
 int main(int argc, char **argv) {
@@ -300,7 +431,7 @@ int main(int argc, char **argv) {
     n = 256;
     k = 256;
   }
-  printf("Matrix size: %ix%ix%i", m, n, k);
+  printf("Matrix size: %ix%ix%i\n", m, n, k);
   for (int tileK = 32; tileK <= 64; tileK *= 2) {
     for (int tileM = 32; tileM <= 256; tileM *= 2) {
       for (int tileN = 32; tileN <= 256; tileN *= 2) {
