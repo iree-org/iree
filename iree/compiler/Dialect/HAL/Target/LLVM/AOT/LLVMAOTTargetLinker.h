@@ -13,9 +13,12 @@
 // limitations under the License.
 //
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_IR_TARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_IR_TARGET_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGETLINKER_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGETLINKER_H_
 
+#include <string>
+
+#include "iree/base/status.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
 namespace mlir {
@@ -23,13 +26,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Registers the LLVM IR target backends.
-void registerLLVMIRTargetBackends(
-    std::function<LLVMTargetOptions()> queryOptions);
+// Calls linker tool to link objData and returns shared library blob.
+iree::StatusOr<std::string> linkLLVMAOTObjects(
+    const std::string& linkerToolPath, const std::string& objData);
+// Use lld::elf::link for linking objData and returns shared library blob.
+iree::StatusOr<std::string> linkLLVMAOTObjectsWithLLDElf(
+    const std::string& objData);
 
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_IR_TARGET_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_AOT_LLVMAOTTARGETLINKER_H_

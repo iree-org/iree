@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/IR/LLVMIRTarget.h"
 
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"

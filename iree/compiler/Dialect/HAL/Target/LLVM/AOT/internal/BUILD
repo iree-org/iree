@@ -12,39 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
-  return()
-endif()
-
-iree_add_all_subdirs()
-
-iree_cc_library(
-  NAME
-    LLVMIRPasses
-  HDRS
-    "LLVMIRPasses.h"
-  SRCS
-    "LLVMIRPasses.cpp"
-  DEPS
-    ::LLVMTargetOptions
-    LLVMCore
-    LLVMPasses
-    LLVMSupport
-    LLVMTarget
-    MLIRSupport
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cc_library(
-  NAME
-    LLVMTargetOptions
-  HDRS
-    "LLVMTargetOptions.h"
-  SRCS
-    "LLVMTargetOptions.cpp"
-  DEPS
-    LLVMPasses
-    LLVMSupport
-    LLVMTarget
-  PUBLIC
+cc_library(
+    name = "LLVMAOTTargetLinker_internal",
+    srcs = ["LLVMAOTTargetLinker.cpp"],
+    deps = [
+        "//iree/base:status",
+        "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOTTargetLinker_hdrs",
+        "@llvm-project//llvm:Support",
+    ],
 )

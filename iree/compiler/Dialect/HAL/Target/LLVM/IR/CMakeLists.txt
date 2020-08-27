@@ -12,16 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    LLVMAOTTargetLinker_internal
+    LLVMIR
+  HDRS
+    "LLVMIRTarget.h"
   SRCS
-    "LLVMAOTTargetLinker.cpp"
+    "LLVMIRTarget.cpp"
   DEPS
+    LLVMCore
     LLVMSupport
-    iree::base::status
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOTTargetLinker_hdrs
+    LLVMX86CodeGen
+    MLIRTargetLLVMIR
+    iree::compiler::Conversion::LinalgToLLVM
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
+    iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
+    iree::schemas::llvmir_executable_def_cc_fbs
   PUBLIC
 )
