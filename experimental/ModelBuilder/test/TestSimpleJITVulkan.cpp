@@ -43,7 +43,7 @@ using namespace mlir;  // NOLINT
 
 template <unsigned vecSize>
 void testVectorAdd1d() {
-  MLIRContext context;
+  MLIRContext context(/*loadAllDialects=*/false);
   ModelBuilder modelBuilder;
   constexpr int workgroupSize = 32;
   auto typeA = modelBuilder.getMemRefType(vecSize, modelBuilder.f32);

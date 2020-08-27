@@ -14,10 +14,16 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -38,6 +44,15 @@ class TranslateExecutablesPass
   explicit TranslateExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<HALDialect>();
+
+    auto targetBackends = matchTargetBackends(executableOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
+  }
+
   void runOnOperation() override {
     auto executableOp = getOperation();
     auto targetOps = llvm::to_vector<4>(
@@ -53,6 +68,7 @@ class TranslateExecutablesPass
         // logging/pass instrumentation of the parent pass manager.
         PassManager targetPassManager(targetOp.getContext());
         applyPassManagerCLOptions(targetPassManager);
+        targetPassManager.getContext()->loadDialect<AffineDialect>();
         targetBackend->buildTranslationPassPipeline(targetOp,
                                                     targetPassManager);
         if (failed(targetPassManager.run(targetOp.getInnerModule()))) {

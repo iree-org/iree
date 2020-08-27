@@ -206,8 +206,12 @@ struct LinalgTileAndFusePass
   LinalgTileAndFusePass(const LinalgTileAndFusePass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
+    // clang-format off
+    registry.insert<AffineDialect,
+                    gpu::GPUDialect,
+                    linalg::LinalgDialect,
                     scf::SCFDialect>();
+    // clang-format on
   }
 
   void runOnFunction() override;

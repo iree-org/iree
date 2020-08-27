@@ -28,8 +28,12 @@ iree_cc_library(
   DEPS
     LLVMCore
     LLVMSupport
-    LLVMX86CodeGen
+    MLIRAffineOps
+    MLIRLLVMIR
+    MLIRLinalgOps
+    MLIRSCF
     MLIRTargetLLVMIR
+    MLIRVector
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
