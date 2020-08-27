@@ -113,7 +113,7 @@ JNI_FUNC jint JNI_PREFIX(nativeResolveFunction)(JNIEnv* env, jobject thiz,
   const char* native_name = env->GetStringUTFChars(name, /*isCopy=*/nullptr);
 
   auto status = context->ResolveFunction(
-      *function, iree_string_view_t{native_name, strlen(native_name)});
+      iree_string_view_t{native_name, strlen(native_name)}, function);
   env->ReleaseStringUTFChars(name, native_name);
   return (jint)status.code();
 }

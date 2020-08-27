@@ -45,8 +45,8 @@ def _run_test(test_dict):
   """Runs an individual test dict."""
   tf_module_builder_lambda = test_dict["tf_module_builder"]
   tf_module = tf_module_builder_lambda()
-  input_module = compiler.tf_module_to_compiler_module(tf_module,
-                                                       pass_pipeline=())
+  input_module = compiler.tf_module_to_compiler_module(
+      tf_module, pass_pipeline=())
 
   passes = test_dict.get("passes")
   expect_pass_failure = test_dict.get("expect_pass_failure")
