@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "absl/base/thread_annotations.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/ref_ptr.h"
@@ -128,15 +129,17 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   // Creates a timeline semaphore with the given |initial_value|.
   static StatusOr<ref_ptr<Semaphore>> Create(
       ref_ptr<VkDeviceHandle> logical_device,
-      std::function<Status(Semaphore*)> on_signal,
-      std::function<void(Semaphore*)> on_failure,
+      std::function<Status(Semaphore*)> on_semaphore_signal,
+      std::function<void(Semaphore*)> on_semaphore_failure,
+      std::function<void(absl::Span<VkFence>)> on_fence_signal,
       ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initial_value);
 
-  EmulatedTimelineSemaphore(ref_ptr<VkDeviceHandle> logical_device,
-                            std::function<Status(Semaphore*)> on_signal,
-                            std::function<void(Semaphore*)> on_failure,
-                            ref_ptr<TimePointSemaphorePool> semaphore_pool,
-                            uint64_t initialValue);
+  EmulatedTimelineSemaphore(
+      ref_ptr<VkDeviceHandle> logical_device,
+      std::function<Status(Semaphore*)> on_semaphore_signal,
+      std::function<void(Semaphore*)> on_semaphore_failure,
+      std::function<void(absl::Span<VkFence>)> on_fence_signal,
+      ref_ptr<TimePointSemaphorePool> semaphore_pool, uint64_t initialValue);
 
   ~EmulatedTimelineSemaphore() override;
 
@@ -171,16 +174,24 @@ class EmulatedTimelineSemaphore final : public Semaphore {
   // blocking and returns whether the |to_upper_value| is reached.
   StatusOr<bool> TryToAdvanceTimeline(uint64_t to_upper_value)
       ABSL_LOCKS_EXCLUDED(mutex_);
+  // Similar to the above, but also returns the fences that are known to have
+  // already signaled via |signaled_fences|.
+  StatusOr<bool> TryToAdvanceTimeline(
+      uint64_t to_upper_value, absl::InlinedVector<VkFence, 4>* signaled_fences)
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
   std::atomic<uint64_t> signaled_value_;
 
   ref_ptr<VkDeviceHandle> logical_device_;
 
   // Callback to inform that this timeline semaphore has signaled a new value.
-  std::function<Status(Semaphore*)> on_signal_;
+  std::function<Status(Semaphore*)> on_semaphore_signal_;
 
   // Callback to inform that this timeline semaphore has encountered a failure.
-  std::function<void(Semaphore*)> on_failure_;
+  std::function<void(Semaphore*)> on_semaphore_failure_;
+
+  // Callback to inform that the given fences have signaled.
+  std::function<void(absl::Span<VkFence>)> on_fence_signal_;
 
   ref_ptr<TimePointSemaphorePool> semaphore_pool_;
 

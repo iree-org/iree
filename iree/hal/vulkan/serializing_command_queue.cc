@@ -400,6 +400,26 @@ void SerializingCommandQueue::AbortQueueSubmission() {
   pending_fences_.clear();
 }
 
+void SerializingCommandQueue::SignalFences(absl::Span<VkFence> fences) {
+  auto span_contains = [&fences](VkFence fence) {
+    for (VkFence f : fences) {
+      if (f == fence) return true;
+    }
+    return false;
+  };
+
+  absl::MutexLock lock(&mutex_);
+
+  auto it = pending_fences_.begin();
+  while (it != pending_fences_.end()) {
+    if (span_contains((*it)->value())) {
+      it = pending_fences_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 }  // namespace vulkan
 }  // namespace hal
 }  // namespace iree
