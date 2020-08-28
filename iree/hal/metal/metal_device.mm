@@ -22,6 +22,7 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/metal/dispatch_time_util.h"
+#include "iree/hal/metal/metal_capture_manager.h"
 #include "iree/hal/metal/metal_command_buffer.h"
 #include "iree/hal/metal/metal_command_queue.h"
 #include "iree/hal/metal/metal_direct_allocator.h"
@@ -35,14 +36,17 @@ namespace metal {
 
 // static
 StatusOr<ref_ptr<MetalDevice>> MetalDevice::Create(ref_ptr<Driver> driver,
-                                                   const DeviceInfo& device_info) {
-  return assign_ref(new MetalDevice(std::move(driver), device_info));
+                                                   const DeviceInfo& device_info,
+                                                   DebugCaptureManager* debug_capture_manager) {
+  return assign_ref(new MetalDevice(std::move(driver), device_info, debug_capture_manager));
 }
 
-MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info)
+MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info,
+                         DebugCaptureManager* debug_capture_manager)
     : Device(device_info),
       driver_(std::move(driver)),
-      metal_handle_([(__bridge id<MTLDevice>)device_info.device_id() retain]) {
+      metal_handle_([(__bridge id<MTLDevice>)device_info.device_id() retain]),
+      debug_capture_manager_(debug_capture_manager) {
   IREE_TRACE_SCOPE0("MetalDevice::ctor");
 
   // Grab one queue for dispatch and transfer.
@@ -50,6 +54,12 @@ MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info)
   id<MTLCommandQueue> metal_queue = [metal_handle_ newCommandQueue];  // retained
 
   allocator_ = MetalDirectAllocator::Create(metal_handle_, metal_queue);
+
+  if (debug_capture_manager_ && debug_capture_manager_->is_connected()) {
+    // Record a capture covering the duration of this device lifetime.
+    static_cast<MetalCaptureManager*>(debug_capture_manager_)->SetCaptureObject(metal_handle_);
+    debug_capture_manager_->StartCapture();
+  }
 
   command_queue_ = absl::make_unique<MetalCommandQueue>(
       name, CommandCategory::kDispatch | CommandCategory::kTransfer, metal_queue);
@@ -63,8 +73,14 @@ MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info)
 
 MetalDevice::~MetalDevice() {
   IREE_TRACE_SCOPE0("MetalDevice::dtor");
+
+  if (debug_capture_manager_ && debug_capture_manager_->is_capturing()) {
+    debug_capture_manager_->StopCapture();
+  }
+
   [event_listener_ release];
   dispatch_release(wait_notifier_);
+
   [metal_handle_ release];
 }
 

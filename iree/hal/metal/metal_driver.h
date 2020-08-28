@@ -15,6 +15,9 @@
 #ifndef IREE_HAL_METAL_METAL_DRIVER_H_
 #define IREE_HAL_METAL_METAL_DRIVER_H_
 
+#include <memory>
+
+#include "iree/hal/debug_capture_manager.h"
 #include "iree/hal/driver.h"
 
 namespace iree {
@@ -38,9 +41,12 @@ class MetalDriver final : public Driver {
   StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
 
  private:
-  explicit MetalDriver(std::vector<DeviceInfo> devices);
+  MetalDriver(std::vector<DeviceInfo> devices,
+              std::unique_ptr<DebugCaptureManager> debug_capture_manager);
 
   std::vector<DeviceInfo> devices_;
+
+  std::unique_ptr<DebugCaptureManager> debug_capture_manager_;
 };
 
 }  // namespace metal

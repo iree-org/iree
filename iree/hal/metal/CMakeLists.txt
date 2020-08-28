@@ -18,6 +18,25 @@ endif()
 
 iree_cc_library(
   NAME
+    metal_capture_manager
+  HDRS
+    "metal_capture_manager.h"
+  SRCS
+    "metal_capture_manager.mm"
+  DEPS
+    absl::flags
+    iree::base::file_io
+    iree::base::logging
+    iree::base::status
+    iree::base::tracing
+    iree::hal::debug_capture_manager
+  LINKOPTS
+    "-framework Metal"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     metal_command_buffer
   HDRS
     "metal_command_buffer.h"
@@ -63,6 +82,7 @@ iree_cc_library(
   SRCS
     "metal_device.mm"
   DEPS
+    ::metal_capture_manager
     ::metal_command_buffer
     ::metal_command_queue
     ::metal_direct_allocator
@@ -112,6 +132,8 @@ iree_cc_library(
   SRCS
     "metal_driver.mm"
   DEPS
+    absl::flags
+    ::metal_capture_manager
     ::metal_device
     iree::base::status
     iree::base::tracing
