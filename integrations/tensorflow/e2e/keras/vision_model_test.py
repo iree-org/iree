@@ -114,9 +114,8 @@ def initialize_model():
   # an external tf.keras URL.
   weights = 'imagenet' if FLAGS.data == 'imagenet' else None
 
-  model = APP_MODELS[FLAGS.model](weights=weights,
-                                  include_top=FLAGS.include_top,
-                                  input_shape=input_shape)
+  model = APP_MODELS[FLAGS.model](
+      weights=weights, include_top=FLAGS.include_top, input_shape=input_shape)
 
   if FLAGS.data == 'cifar10' and FLAGS.url:
     model = load_cifar10_weights(model)
@@ -132,7 +131,8 @@ class VisionModule(tf.Module):
     # TODO(b/142948097): Add support for dynamic shapes in SPIR-V lowering.
     # Replace input_shape with m.input_shape to make the batch size dynamic.
     self.predict = tf.function(
-        input_signature=[tf.TensorSpec(get_input_shape())])(self.m.call)
+        input_signature=[tf.TensorSpec(get_input_shape())])(
+            self.m.call)
 
 
 @tf_test_utils.compile_module(VisionModule, exported_names=['predict'])
