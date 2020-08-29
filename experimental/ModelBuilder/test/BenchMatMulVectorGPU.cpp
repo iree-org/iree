@@ -135,8 +135,8 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIds(
   Value vSubgroupY = b.create<ConstantIndexOp>(loc, numSubgroupY);
   SmallVector<linalg::ProcInfo, 2> procInfo(2);
   using namespace edsc::op;
-  procInfo[0] = {sg % vSubgroupX, vSubgroupX};
-  procInfo[1] = {sgdiv % vSubgroupY, vSubgroupY};
+  procInfo[0] = {sgdiv % vSubgroupY, vSubgroupY};
+  procInfo[1] = {sg % vSubgroupX, vSubgroupX};
   return procInfo;
 }
 
@@ -325,7 +325,7 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
               linalg::LinalgTilingOptions()
                   .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
                   .setTileSizes(
-                      {tileN / numSubgroupY, tileM / numSubgroupX, tileK})
+                      {tileM / numSubgroupY, tileN / numSubgroupX, tileK})
                   .setDistributionOptions(SGDistribute));
     }
     strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
