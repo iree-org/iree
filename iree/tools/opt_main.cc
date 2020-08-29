@@ -75,6 +75,9 @@ static llvm::cl::opt<bool> showDialects(
     "show-dialects", llvm::cl::desc("Print the list of registered dialects"),
     llvm::cl::init(false));
 
+
+// TODO(#2958): Investigate whether we can use mlir-translate.cpp as an entry
+// point.
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
@@ -131,6 +134,8 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  // TODO(#2958): There's a simpler version of MlirOptMain we should be able to
+  // use.
   if (failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
                                registry, splitInputFile, verifyDiagnostics,
                                verifyPasses, allowUnregisteredDialects,

@@ -57,9 +57,14 @@ static llvm::cl::opt<bool> splitInputFile(
                    "process each chunk independently"),
     llvm::cl::init(false));
 
+// TODO(#2958): We shouldn't need to register dialects here if translations
+// correctly declare the dialects they support.
+// TODO(#2958): Investigate whether we can use mlir-translate.cpp as an entry
+// point.
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
-
+  // TODO(#2958): We shouldn't need to register dialects here if translations
+  // correctly declare the dialects they support.
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
 #ifdef IREE_HAVE_EMITC_DIALECT
