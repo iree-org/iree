@@ -46,11 +46,11 @@ MTLResourceOptions SelectMTLResourceStorageMode(MemoryType memory_type) {
   if (AllBitsSet(memory_type, MemoryType::kDeviceLocal)) {
     if (AllBitsSet(memory_type, MemoryType::kHostVisible)) {
       // Device-local, host-visible.
-#ifdef IREE_PLATFORM_MACOS
-      return MTLResourceStorageModeManaged;
-#else
+      // TODO(antiagainst): Enable using MTLResourceStorageModeManaged on macOS once we have
+      // defined invalidate/flush C APIs and wired up their usage through the stack. At the
+      // moment if we use MTLResourceStorageModeManaged, due to no proper invlidate/flush
+      // actions, the kernel invocations' data read/write will not be properly synchronized.
       return MTLResourceStorageModeShared;
-#endif
     } else {
       // Device-local only.
       return MTLResourceStorageModePrivate;

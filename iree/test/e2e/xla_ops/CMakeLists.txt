@@ -12,6 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_metal-spirv_metal
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "broadcast.mlir"
+    "broadcast_in_dim.mlir"
+    "convert.mlir"
+    "constant.mlir"
+    "cosine.mlir"
+    "exponential.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    metal-spirv
+  DRIVER
+    metal
+)
+
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
