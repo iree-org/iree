@@ -205,6 +205,26 @@ module FlatBuffer. Right now we just encode the MSL source strings and compile
 them at Metal run-time. In the future this should be changed to allow encoding
 the library instead.
 
+### Workgroup/threadgroup size
+
+When dispatching a compute kernel in Metal, we need to specify the number of
+thread groups in grid and the number of threads in thread group. Both are
+3-D vectors. IREE HAL, which follows Vulkan, calls them workgroup count and
+workgroup size, respectively.
+
+In Vulkan programming model, workgroup count and workgroup size are specified at
+different places: the former is given when invoking
+[`vkCmdDispatch()`][vulkan-cmd-dispatch], while the later is encoded in the
+dispatched SPIR-V code. This split does not match the Metal model, where we
+specify both in the API with `dispatchThreads:threadsPerThreadgroup:`.
+
+As said in [shader/kernel compilation](#shader-kernel-compilation), MSL kernels
+are cross compiled from SPIR-V code and then embeded in the module FlatBuffer.
+The module FlatBuffer provides us a way to convey the threadgroup/workgroup size
+information extracted from the SPIR-V code. We encode an additional 3-D vector
+for each entry point and use it as the threadgroup size when later dispatching
+the `MTLFunction` corresponding to the entry point.
+
 ### Resource descriptors
 
 A descriptor is an opaque handle pointing to a resource that is accessed in
@@ -348,3 +368,4 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [spirv-cross]: https://github.com/KhronosGroup/SPIRV-Cross
 [vma]: https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 [vulkan-spirv-target]: https://github.com/google/iree/tree/hal-metal/iree/compiler/Dialect/HAL/Target/VulkanSPIRV
+[vulkan-cmd-dispatch]: https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkCmdDispatch.html

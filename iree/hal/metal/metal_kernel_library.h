@@ -49,29 +49,37 @@ class MetalKernelLibrary final : public Executable {
   // Returns the MTLFunction for the entry point with the given |ordinal|.
   StatusOr<id<MTLFunction>> GetKernelForEntryPoint(int ordinal) const;
 
+  // Returns the threadgroup size for the entry point with the given |ordinal|.
+  StatusOr<MetalThreadgroupSize> GetThreadgroupSizeForEntryPoint(
+      int ordinal) const;
+
   // Returns the pipeline state object for the entry point with the given
   // |ordinal|.
   StatusOr<id<MTLComputePipelineState>> GetPipelineStateForEntryPoint(
       int ordinal) const;
 
  private:
+  struct KernelObjects {
+    id<MTLFunction> function;
+    MetalThreadgroupSize threadgroup_size;
+    // Baked pipeline state object.
+    id<MTLComputePipelineState> pipeline_state;
+  };
+
   // Creates a MetalKernelLibrary assuming all Metal objects are already
   // retained before passing in.
-  MetalKernelLibrary(
-      id<MTLDevice> device, absl::InlinedVector<id<MTLLibrary>, 1> libraries,
-      absl::InlinedVector<id<MTLFunction>, 1> functions,
-      absl::InlinedVector<id<MTLComputePipelineState>, 1> pipelines,
-      std::string tag);
+  MetalKernelLibrary(id<MTLDevice> device,
+                     absl::InlinedVector<id<MTLLibrary>, 1> libraries,
+                     absl::InlinedVector<KernelObjects, 1> kernel_objects,
+                     std::string tag);
 
   // Tag coming from Metal executable FlatBuffer.
   std::string tag_;
 
   id<MTLDevice> device_;
 
-  // Baked pipeline state objects for each entry point ordinal.
   absl::InlinedVector<id<MTLLibrary>, 1> libraries_;
-  absl::InlinedVector<id<MTLFunction>, 1> functions_;
-  absl::InlinedVector<id<MTLComputePipelineState>, 1> pipelines_;
+  absl::InlinedVector<KernelObjects, 1> kernel_objects_;
 };
 
 }  // namespace metal
