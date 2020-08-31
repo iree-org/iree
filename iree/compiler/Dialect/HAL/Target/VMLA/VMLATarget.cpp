@@ -27,7 +27,6 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
@@ -51,7 +50,7 @@ class VMLATargetBackend final : public TargetBackend {
   std::string name() const override { return "vmla"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, VM::VMDialect, VMLA::VMLADialect>();
+    registry.insert<VM::VMDialect, VMLA::VMLADialect>();
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,

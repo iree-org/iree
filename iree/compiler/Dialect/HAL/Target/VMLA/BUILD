@@ -48,7 +48,6 @@ cc_library(
         "//iree/schemas:vmla_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",

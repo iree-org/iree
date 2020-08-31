@@ -27,7 +27,6 @@ iree_cc_library(
     "VMLATarget.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
     MLIRIR
     MLIRPass
     MLIRSupport

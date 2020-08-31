@@ -75,9 +75,6 @@ static llvm::cl::opt<bool> showDialects(
     "show-dialects", llvm::cl::desc("Print the list of registered dialects"),
     llvm::cl::init(false));
 
-
-// TODO(#2958): Investigate whether we can use mlir-translate.cpp as an entry
-// point.
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 

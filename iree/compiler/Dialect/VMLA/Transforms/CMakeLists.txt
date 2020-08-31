@@ -32,7 +32,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms

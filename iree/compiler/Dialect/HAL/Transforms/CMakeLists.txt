@@ -31,16 +31,11 @@ iree_cc_library(
     "TranslateExecutables.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
-    MLIRGPU
     MLIRIR
-    MLIRLinalgOps
     MLIRPass
-    MLIRSCF
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
-    MLIRVector
     absl::strings
     iree::base::signature_mangle
     iree::compiler::Dialect::Flow::IR
@@ -50,7 +45,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::VM::IR
     tensorflow::mlir_hlo
   PUBLIC
 )
