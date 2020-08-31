@@ -31,6 +31,7 @@ cc_library(
         "SplitDispatchFunctionPass.cpp",
         "Utils.cpp",
         "VectorToGPUPass.cpp",
+        "VectorizeMemref.cpp",
     ],
     hdrs = [
         "Attributes.h",

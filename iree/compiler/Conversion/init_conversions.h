@@ -41,6 +41,7 @@ inline void registerLinalgToSPIRVPasses() {
     createSplitDispatchFunctionPass();
     createVectorToGPUPass();
     createMatMulTileAndVectorizeGPUPass();
+    createVectorizeMemref();
     return true;
   }();
   (void)init_once;

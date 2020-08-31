@@ -82,6 +82,9 @@ static void addLoweringPasses(mlir::PassManager &pm,
   pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::iree_compiler::createVectorizeMemref());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::iree_compiler::createConvertToSPIRVPass());
 
   auto &spirvModulePM = pm.nest<mlir::spirv::ModuleOp>();
