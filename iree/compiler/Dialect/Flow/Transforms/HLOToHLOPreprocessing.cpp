@@ -305,6 +305,73 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
   }
 };
 
+// clang-format off
+//
+// Rewrites the following pattern
+//
+// %bcastx = "mhlo.broadcast_in_dim"(%x) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+// %bcasty = "mhlo.broadcast_in_dim"(%y) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+// %result = "BinaryElementwiseOpT"(%bcastx, %bcasty) : (%[[SHAPE_AFTER_BCAST]], %[[SHAPE_AFTER_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+//
+// into
+//
+// %z = "BinaryElementwiseOpT"(%x, %y) : (%[[SHAPE_BEFORE_BCAST]], %[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_BEFORE_BCAST]]
+// %result = "mhlo.broadcast_in_dim"(%z) {} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+//
+// clang-format on
+template <typename BinaryElementwiseOpT>
+class ReorderBroadcastInDimOpAndBinaryElementwiseOp
+    : public OpRewritePattern<BinaryElementwiseOpT> {
+ public:
+  using OpRewritePattern<BinaryElementwiseOpT>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BinaryElementwiseOpT op,
+                                PatternRewriter &rewriter) const override {
+    auto lhsType = op.lhs().getType().template dyn_cast<ShapedType>();
+    auto rhsType = op.rhs().getType().template dyn_cast<ShapedType>();
+    if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
+        lhsType != rhsType) {
+      return failure();
+    }
+
+    auto lhsOp = op.lhs().getDefiningOp();
+    auto rhsOp = op.rhs().getDefiningOp();
+    if (!lhsOp || !rhsOp) {
+      return failure();
+    }
+
+    auto bcastxOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(lhsOp);
+    auto bcastyOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(rhsOp);
+    if (!bcastxOp || !bcastyOp ||
+        bcastxOp.broadcast_dimensions() != bcastyOp.broadcast_dimensions()) {
+      return failure();
+    }
+
+    auto x = bcastxOp.operand();
+    auto y = bcastyOp.operand();
+    auto xType = x.getType().template dyn_cast<ShapedType>();
+    auto yType = y.getType().template dyn_cast<ShapedType>();
+    if (!xType || !yType || !xType.hasStaticShape() || xType != yType) {
+      return failure();
+    }
+
+    auto loc = op.getLoc();
+    auto z = rewriter.create<BinaryElementwiseOpT>(loc, xType, x, y);
+    auto result = rewriter.create<mhlo::BroadcastInDimOp>(
+        loc, op.getType(), z, bcastxOp.broadcast_dimensions());
+    rewriter.replaceOp(op, {result});
+
+    if (lhsOp->hasOneUse()) {
+      rewriter.eraseOp(lhsOp);
+    }
+    if (rhsOp->hasOneUse()) {
+      rewriter.eraseOp(rhsOp);
+    }
+
+    return success();
+  }
+};
+
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
   void runOnFunction() override {
@@ -319,6 +386,22 @@ struct HLOToHLOPreprocessing
     chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape, DecomposeLog1PPattern>(context);
+    patterns.insert<
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::AddOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::Atan2Op>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::ComplexOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::DivOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MaxOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MinOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MulOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::PowOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::RemOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::ShiftLeftOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<
+            mhlo::ShiftRightArithmeticOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<
+            mhlo::ShiftRightLogicalOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::SubOp>>(context);
     if (extractPadFromConv) {
       patterns.insert<ExtractConvOpPaddingAttributes>(context);
     }
