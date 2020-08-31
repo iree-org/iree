@@ -118,6 +118,30 @@ JNI_FUNC jint JNI_PREFIX(nativeResolveFunction)(JNIEnv* env, jobject thiz,
   return (jint)status.code();
 }
 
+JNI_FUNC jint JNI_PREFIX(nativeInvokeFunction)(JNIEnv* env, jobject thiz,
+                                               jlong functionAddress,
+                                               jobjectArray inputs,
+                                               jint inputElementCount,
+                                               jobject output) {
+  ContextWrapper* context = GetContextWrapper(env, thiz);
+  CHECK_NE(context, nullptr);
+
+  const jsize inputs_size = env->GetArrayLength(inputs);
+  std::vector<float*> native_inputs(inputs_size);
+
+  for (int i = 0; i < inputs_size; i++) {
+    jobject input = env->GetObjectArrayElement(inputs, i);
+    float* native_input = (float*)env->GetDirectBufferAddress(input);
+    native_inputs[i] = native_input;
+  }
+
+  auto function = (FunctionWrapper*)functionAddress;
+  float* native_output = (float*)env->GetDirectBufferAddress(output);
+  auto status = context->InvokeFunction(*function, native_inputs,
+                                        (int)inputElementCount, native_output);
+  return (jint)status.code();
+}
+
 JNI_FUNC jint JNI_PREFIX(nativeGetId)(JNIEnv* env, jobject thiz) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
   CHECK_NE(context, nullptr);
