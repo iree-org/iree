@@ -226,7 +226,7 @@ struct ConcatenateOpConversion
     int rank = finalType.getRank();
     llvm::SmallVector<Value, 4> srcIndices(rank, zero);
     llvm::SmallVector<Value, 4> dstIndices(rank, zero);
-    auto concatDimension = srcOp.dimension().getZExtValue();
+    auto concatDimension = srcOp.dimension();
     for (auto srcDstOperand : llvm::zip(srcOp.val(), operands)) {
       Value tensorOperand, bufferOperand;
       std::tie(tensorOperand, bufferOperand) = srcDstOperand;
