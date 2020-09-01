@@ -25,8 +25,6 @@
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
-#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -73,14 +71,7 @@ class ConvertFlowToHALPass
     : public PassWrapper<ConvertFlowToHALPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        IREE::HAL::HALDialect,
-        // The context is not yet available here and runOnOperation is too late
-        // to load the dialects. Therefore we have to register all dialects that
-        // the conversion patterns might create.
-        // TODO(#2958): Register dialects dynamically based on the
-        // HALConversionDialectInterface that are available.
-        IREE::Strings::StringsDialect, IREE::TensorList::TensorListDialect>();
+    registry.insert<IREE::HAL::HALDialect>();
   }
 
   void runOnOperation() override {
