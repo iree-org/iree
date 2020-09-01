@@ -1,9 +1,17 @@
-//===- VectorizeMemref.cpp - Convert memref of scalar to vector------------===//
+// Copyright 2020 Google LLC
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //===----------------------------------------------------------------------===//
 //
 // Pass to convert memref into memref of vector.
@@ -20,28 +28,48 @@ constexpr int kVecSize = kVectorizationSizeInBits / (sizeof(float) * 8);
 
 namespace mlir {
 namespace iree_compiler {
+
+/// Returns true if all uses are transfer read/write operations.
+static bool getUsesIfAllTransferOp(Value v,
+                                   SmallVectorImpl<Operation *> &uses) {
+  for (Operation *userOp : v.getUsers()) {
+    if (isa<DeallocOp>(userOp)) continue;
+    // Only vectorize memref used by vector transfer ops.
+    if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
+      uses.clear();
+      return false;
+    }
+    uses.push_back(userOp);
+  }
+  return true;
+}
+
 /// Returns true of the type is a memref that can be vectorized to vector<4xi32>
-static bool isMemRefAndVectorizable(Type type) {
-  auto memrefType = type.dyn_cast<MemRefType>();
+static bool isMemRefAndVectorizable(Value v,
+                                    SmallVectorImpl<Operation *> &uses) {
+  auto memrefType = v.getType().dyn_cast<MemRefType>();
   // To be able to vectorize the memref it needs to be a scalar memref with a
   // static most inner dimension aligned on the vectorization size.
-  if (!memrefType || memrefType.getElementType().isa<VectorType>() ||
-      (kVectorizationSizeInBits % memrefType.getElementTypeBitWidth() != 0) ||
-      ShapedType::isDynamic(memrefType.getShape().back()) ||
-      ((memrefType.getElementTypeBitWidth() * memrefType.getShape().back()) %
-           kVectorizationSizeInBits !=
-       0))
-    return false;
-  return true;
+  return memrefType && !memrefType.getElementType().isa<VectorType>() &&
+         (kVectorizationSizeInBits % memrefType.getElementTypeBitWidth() ==
+          0) &&
+         !ShapedType::isDynamic(memrefType.getShape().back()) &&
+         ((memrefType.getElementTypeBitWidth() * memrefType.getShape().back()) %
+              kVectorizationSizeInBits ==
+          0) &&
+         getUsesIfAllTransferOp(v, uses);
 }
 
 /// Returns the bitwidth of a scalar or vector type.
 static Optional<unsigned> getBitWidth(Type type) {
-  if (!(type.isIntOrFloat() || type.isa<VectorType>())) return {};
-  if (type.isIntOrFloat()) return type.getIntOrFloatBitWidth();
-  auto vecType = type.cast<VectorType>();
-  auto elementType = vecType.getElementType();
-  return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
+  if (type.isIntOrFloat()) {
+    return type.getIntOrFloatBitWidth();
+  } else if (type.isa<VectorType>()) {
+    auto vecType = type.cast<VectorType>();
+    auto elementType = vecType.getElementType();
+    return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
+  }
+  return {};
 }
 
 namespace {
@@ -79,33 +107,17 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 void MemRefUsageAnalysis::analyzeFunc(FuncOp funcOp) {
   for (Value arg : funcOp.getArguments()) {
     SmallVector<Operation *, 4> vectorUses;
-    if (isMemRefAndVectorizable(arg.getType()) &&
-        allVectorUses(arg, vectorUses)) {
+    if (isMemRefAndVectorizable(arg, vectorUses)) {
       vectorize.insert(arg);
       transferOps.insert(vectorUses.begin(), vectorUses.end());
     }
   }
 }
 
-bool MemRefUsageAnalysis::allVectorUses(Value v,
-                                        SmallVector<Operation *, 4> &uses) {
-  for (Operation *userOp : v.getUsers()) {
-    // Ignore dealloc ops.
-    if (isa<DeallocOp>(userOp)) continue;
-    // Only vectorize memref used by vector transfer ops.
-    if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp))
-      return false;
-    uses.push_back(userOp);
-  }
-  return true;
-}
-
 void MemRefUsageAnalysis::analyzePlaceholder(
     IREE::PlaceholderOp placeholderOp) {
   SmallVector<Operation *, 4> vectorUses;
-  MemRefType memrefType = placeholderOp.getType().dyn_cast<MemRefType>();
-  if (memrefType && isMemRefAndVectorizable(memrefType) &&
-      allVectorUses(placeholderOp, vectorUses)) {
+  if (isMemRefAndVectorizable(placeholderOp, vectorUses)) {
     vectorize.insert(placeholderOp);
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
@@ -113,8 +125,7 @@ void MemRefUsageAnalysis::analyzePlaceholder(
 
 void MemRefUsageAnalysis::analyzeAlloc(AllocOp allocOp) {
   SmallVector<Operation *, 4> vectorUses;
-  if (isMemRefAndVectorizable(allocOp.getType()) &&
-      allVectorUses(allocOp, vectorUses)) {
+  if (isMemRefAndVectorizable(allocOp, vectorUses)) {
     vectorize.insert(allocOp);
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
