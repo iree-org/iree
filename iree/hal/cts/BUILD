@@ -97,6 +97,7 @@ cc_test(
         ":cts_test_base",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
