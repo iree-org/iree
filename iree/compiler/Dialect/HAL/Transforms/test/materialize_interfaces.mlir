@@ -6,7 +6,7 @@
 //  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 //   CHECK-DAG: hal.executable.target "vmla" {
-//   CHECK-DAG:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {
+//   CHECK-DAG:   hal.executable.entry_point @simpleMath_rgn_dispatch_0_entry attributes {
 //  CHECK-SAME:     interface = @legacy_io,
 //  CHECK-SAME:     ordinal = 0 : i32,
 //  CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
