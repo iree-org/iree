@@ -276,7 +276,7 @@ struct TileBatchMatmulPattern
                          linalg::LinalgTilingOptions options,
                          ArrayRef<int64_t> workgroupSize,
                          PatternBenefit benefit = 1)
-      : Base(context, options,
+      : Base(context, options.setDistributionOptions(matmulDistributionOptions),
              linalg::LinalgMarker(
                  ArrayRef<Identifier>(),
                  Identifier::get(getWorkgroupMarker(), context)),
