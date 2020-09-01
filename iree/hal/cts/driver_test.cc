@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/hal/cts/cts_test_base.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/hal/cts/cts_test_base.h"
 
 namespace iree {
 namespace hal {
@@ -43,4 +43,3 @@ INSTANTIATE_TEST_SUITE_P(AllDrivers, DriverTest,
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
-
