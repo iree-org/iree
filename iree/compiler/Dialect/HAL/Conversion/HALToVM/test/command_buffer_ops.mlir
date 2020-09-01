@@ -74,17 +74,29 @@ func @command_buffer_bind_descriptor_set(
 
 // -----
 
+hal.executable @ex {
+  hal.executable.target @target, "target*" {
+    hal.executable.entry_point @entry attributes {interface = @legacy_io, ordinal = 0 : i32, signature = () -> tensor<f32>}
+  }
+}
+
 // CHECK-LABEL: @command_buffer_dispatch
 func @command_buffer_dispatch(%arg0 : !hal.command_buffer, %arg1 : !hal.executable) {
   %c100 = constant 100 : index
   %c200 = constant 200 : index
   %c300 = constant 300 : index
   // CHECK: vm.call @hal.command_buffer.dispatch(%arg0, %arg1, %zero, %c100, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
-  hal.command_buffer.dispatch %arg0, %arg1, entry_point=0, workgroup_xyz=[%c100, %c200, %c300]
+  hal.command_buffer.dispatch.ordinal %arg0, %arg1, entry_point=0, workgroup_xyz=[%c100, %c200, %c300]
   return
 }
 
 // -----
+
+hal.executable @ex {
+  hal.executable.target @target, "target*" {
+    hal.executable.entry_point @entry attributes {interface = @legacy_io, ordinal = 0 : i32, signature = () -> tensor<f32>}
+  }
+}
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 func @command_buffer_dispatch_indirect(
@@ -93,6 +105,6 @@ func @command_buffer_dispatch_indirect(
     %arg2 : !hal.buffer) {
   %c100 = constant 100 : index
   // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %zero, %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i32) -> ()
-  hal.command_buffer.dispatch.indirect %arg0, %arg1, entry_point=0, workgroups=%arg2[%c100]
+  hal.command_buffer.dispatch.indirect.ordinal %arg0, %arg1, entry_point=0, workgroups=%arg2[%c100]
   return
 }

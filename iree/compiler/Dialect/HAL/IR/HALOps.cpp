@@ -855,20 +855,19 @@ void CommandBufferDispatchOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
     Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
     Value workgroupX, Value workgroupY, Value workgroupZ) {
-  build(builder, state, commandBuffer, executable,
-        entryPoint.ordinal().getZExtValue(), workgroupX, workgroupY,
-        workgroupZ);
-}
-
-void CommandBufferDispatchOp::build(Builder &builder, OperationState &state,
-                                    Value commandBuffer, Value executable,
-                                    unsigned entryPointOrdinal,
-                                    Value workgroupX, Value workgroupY,
-                                    Value workgroupZ) {
   state.addOperands(
       {commandBuffer, executable, workgroupX, workgroupY, workgroupZ});
+  // Construct Executable::Target::EntryPoint nested reference.
+  StringRef executableOpSymName =
+      entryPoint.getParentOp()
+          ->getParentOp()
+          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+          .getValue();
   state.addAttribute("entry_point",
-                     builder.getI32IntegerAttr(entryPointOrdinal));
+                     builder.getSymbolRefAttr(
+                         executableOpSymName,
+                         {builder.getSymbolRefAttr(entryPoint.getParentOp()),
+                          builder.getSymbolRefAttr(entryPoint)}));
 }
 
 //===----------------------------------------------------------------------===//

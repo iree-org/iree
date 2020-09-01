@@ -275,17 +275,17 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     if (!spvModuleOp)
       return executableOp.emitError("unable to find spv.module");
 
-    SmallVector<spirv::FuncOp, 2> entryPointFns;
+    SmallVector<spirv::FuncOp, 2> spvEntryPointFns;
     if (!entryPointScheduleAttr) {
       for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
         if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
             SymbolTable::Visibility::Public)
-          entryPointFns.push_back(spvFuncOp);
+          spvEntryPointFns.push_back(spvFuncOp);
       }
-      if (!llvm::hasSingleElement(entryPointFns)) {
+      if (!llvm::hasSingleElement(spvEntryPointFns)) {
         return spvModuleOp.emitError(
                    "expected a single entry point function, found ")
-               << entryPointFns.size();
+               << spvEntryPointFns.size();
       }
     } else {
       llvm::StringMap<spirv::FuncOp> publicFns;
@@ -300,7 +300,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         if (!spvFuncOp)
           return spvModuleOp.emitError("unable to find entry point function ")
                  << entryName;
-        entryPointFns.push_back(spvFuncOp);
+        spvEntryPointFns.push_back(spvFuncOp);
       }
     }
 
@@ -321,7 +321,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // We have multiple entry points to dispatch. Record in the order
     // specified by entry point schedule and insert barrier between sequential
     // ones.
-    for (auto it : llvm::enumerate(entryPointFns)) {
+    for (auto it : llvm::enumerate(spvEntryPointFns)) {
       spirv::FuncOp spvFuncOp = it.value();
       auto workgroupSize = calculateDispatchWorkgroupSize(
           loc, spvModuleOp, spvFuncOp.sym_name(), workload, builder);
@@ -361,10 +361,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                        [](Value v) -> bool { return v == nullptr; }))
         return spvFuncOp.emitError("unable to find workgroup count");
 
-      builder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, /*entryPointOrdinal=*/it.index(),
+      // Ordinals are fixed based on the precomputed schedule, so use
+      // CommandBufferDispatchOrdinalOp instead of CommandBufferDispatchOp.
+      builder.create<IREE::HAL::CommandBufferDispatchOrdinalOp>(
+          loc, commandBuffer, executable,
+          builder.getI32IntegerAttr(/*entryPointOrdinal=*/it.index()),
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);
-      if (it.index() + 1 != entryPointFns.size()) {
+      if (it.index() + 1 != spvEntryPointFns.size()) {
         recordFullExecutionBarrier(commandBuffer, loc, builder);
       }
     }

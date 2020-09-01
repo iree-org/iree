@@ -85,6 +85,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  // Resolve entry point ordinals from nested symbol references prior to
+  // serialization.
+  passManager.addPass(createResolveEntryPointOrdinalsPass());
+
   // TODO(#1036): run this once per hal.executable.target in a nested pass
   // manager so that we have as many passes as hal.executable.target ops.
   if (transformOptions.serializeExecutables) {

@@ -1180,6 +1180,60 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     %y = constant 32 : index
     %z = constant 1 : index
     hal.command_buffer.dispatch %cmd, %executable,
+                                entry_point = @executable::target::entry0,
+                                workgroup_xyz = [%x, %y, %z]
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Executable:$executable,  // TODO(scotttodd): remove this and extract from nested ref?
+    SymbolRefAttr:$entry_point,
+    HAL_Dim:$workgroup_x,
+    HAL_Dim:$workgroup_y,
+    HAL_Dim:$workgroup_z
+  );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
+    `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
+    attr-dict
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state, Value commandBuffer,
+      Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
+      Value workgroupX, Value workgroupY, Value workgroupZ
+    }]>,
+  ];
+}
+
+// TODO(scotttodd): Re-evaluate naming
+//   Currently basic 'dispatch' is used during target backend compilation,
+//   then 'ordinal' is used just before serialization:
+//   - hal.command_buffer.dispatch, hal.command_buffer.dispatch.ordinal
+//
+//   But we could use something different during compilation and use
+//   unqualified 'dispatch' going forward:
+//   - hal.command_buffer.dispatch, hal.command_buffer.dispatch.symbolic
+//   - hal.command_buffer.dispatch, hal.command_buffer.dispatch.reference
+//
+//   Though what about command_buffer.dispatch.indirect?
+//
+//   Another option would be to make hal.command_buffer.dispatch take
+//   either OrdinalAttr OR SymbolRefAttr, then verify later...
+def HAL_CommandBufferDispatchOrdinalOp : HAL_Op<"command_buffer.dispatch.ordinal"> {
+  let summary = [{command buffer dispatch recording operation, using an entry point ordinal}];
+  let description = [{
+    Dispatches an execution request, using an entry point ordinal.
+
+    ```mlir
+    %x = constant 128 : index
+    %y = constant 32 : index
+    %z = constant 1 : index
+    hal.command_buffer.dispatch %cmd, %executable,
                                 entry_point = 0,
                                 workgroup_xyz = [%x, %y, %z]
     ```
@@ -1199,20 +1253,6 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
     attr-dict
   }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &state, Value commandBuffer,
-      Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-      Value workgroupX, Value workgroupY, Value workgroupZ
-    }]>,
-    OpBuilder<[{
-      Builder &builder, OperationState &state, Value commandBuffer,
-      Value executable, unsigned entryPointOrdinal,
-      Value workgroupX, Value workgroupY, Value workgroupZ
-    }]>,
-  ];
 }
 
 def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
@@ -1223,8 +1263,35 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
 
     ```mlir
     hal.command_buffer.dispatch.indirect %cmd, %executable,
-                                         entry_point = 0,
+                                         entry_point = @executable::target::entry0,
                                          workgroups = %buffer[%offset]
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Executable:$executable,  // TODO(scotttodd): remove this and extract from nested ref?
+    SymbolRefAttr:$entry_point,
+    HAL_Buffer:$workgroups_buffer,
+    HAL_DeviceSize:$workgroups_offset
+  );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
+    `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
+  }];
+}
+
+def HAL_CommandBufferDispatchIndirectOrdinalOp : HAL_Op<"command_buffer.dispatch.indirect.ordinal"> {
+  let summary = [{command buffer indirect dispatch recording operation, using an entry point ordinal}];
+  let description = [{
+    Dispatches an execution request with the dispatch parameters loaded from the
+    given buffer, using an entry point ordinal.
+
+    ```mlir
+    hal.command_buffer.dispatch.indirect.ordinal %cmd, %executable,
+                                                 entry_point = 0,
+                                                 workgroups = %buffer[%offset]
     ```
   }];
 
@@ -1589,6 +1656,8 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
     StrAttr:$sym_name,
     StrAttr:$target_backend_filter
     // TODO(benvanik): add compatibility and versioning attributes.
+    // TODO(scotttodd): add linking / preserve_ordinals attribute(s) for targets
+    //                  with special linking requirements
   );
 
   let regions = (region SizedRegion<1>:$body);
