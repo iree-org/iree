@@ -231,12 +231,16 @@ static Optional<MemRefType> getVectorizedMemRefType(
     ConversionPatternRewriter &rewriter, MemRefType type) {
   unsigned elemSize = type.getElementTypeBitWidth();
   unsigned vecSize = kVectorizationSizeInBits / elemSize;
-  Type vec4 = VectorType::get(kVecSize, rewriter.getF32Type());
+  // Pick a new type of element size 32bits.
+  Type newElemType = type.getElementType().isa<IntegerType>()
+                         ? rewriter.getI32Type().cast<Type>()
+                         : rewriter.getF32Type().cast<Type>();
+  Type vecType = VectorType::get(kVecSize, newElemType);
   SmallVector<int64_t, 2> newShape(type.getShape().begin(),
                                    type.getShape().end());
   if (newShape.back() % vecSize != 0) return {};
   newShape.back() = newShape.back() / vecSize;
-  return MemRefType::get(newShape, vec4, {}, type.getMemorySpace());
+  return MemRefType::get(newShape, vecType, {}, type.getMemorySpace());
 }
 
 class ProcessAlloc final : public MemRefConversionPattern<AllocOp> {
@@ -266,10 +270,10 @@ class ProcessIreeBinding final
     auto vecMemRef = getVectorizedMemRefType(rewriter, memrefType);
     if (!vecMemRef) return failure();
     ValueRange dummyOperands;
-    Value newPlacxeholder = rewriter.create<IREE::PlaceholderOp>(
+    Value newPlaceholder = rewriter.create<IREE::PlaceholderOp>(
         placeholder.getLoc(), *vecMemRef, dummyOperands,
         placeholder.getAttrs());
-    rewriter.replaceOp(placeholder, newPlacxeholder);
+    rewriter.replaceOp(placeholder, newPlaceholder);
     return success();
   }
 };
