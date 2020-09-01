@@ -38,7 +38,6 @@ MetalCommandBuffer::~MetalCommandBuffer() {
   [metal_handle_ release];
 }
 
-
 Status MetalCommandBuffer::Begin() {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::Begin");
   is_recording_ = true;
