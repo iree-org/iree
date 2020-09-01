@@ -19,16 +19,19 @@ func @interface_io() {
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
-  // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
-  // CHECK-SAME:     interface = @interface
-  // CHECK-SAME:     ordinal = 0 : i32
-  // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-  hal.executable.entry_point @entry0 attributes {
-    interface = @interface,
-    ordinal = 0 : i32,
-    signature = (tensor<4xf32>) -> tensor<4xf32>,
-    workgroup_size = [4 : index, 1 : index, 1 : index]
+  // CHECK: hal.executable.target @backend, "backend"
+  hal.executable.target @backend, "backend" {
+    // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
+    // CHECK-SAME:     interface = @interface
+    // CHECK-SAME:     ordinal = 0 : i32
+    // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
+    // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    hal.executable.entry_point @entry0 attributes {
+      interface = @interface,
+      ordinal = 0 : i32,
+      signature = (tensor<4xf32>) -> tensor<4xf32>,
+      workgroup_size = [4 : index, 1 : index, 1 : index]
+    }
   }
   // CHECK-DAG: hal.interface @interface
   hal.interface @interface {

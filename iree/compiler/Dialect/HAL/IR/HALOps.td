@@ -1554,7 +1554,10 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
+def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
+    Symbol,
+    HasParent<"IREE::HAL::ExecutableTargetOp">,
+  ]> {
   let summary = [{executable entry point declaration}];
   let description = [{
     An entry point exported by the executable with statically-available

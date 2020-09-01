@@ -92,17 +92,19 @@ hal.executable @exe {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.entry_point @entry attributes {
-    interface = @interface,
-    ordinal = 0 : i32,
-    signature = (tensor<4xf32>) -> tensor<4xf32>,
-    workgroup_size = [32 : index, 1 : index, 1 : index]
-  }
-  hal.executable.entry_point @entry_alias attributes {
-    interface = @interface,
-    ordinal = 0 : i32,
-    signature = (tensor<4xf32>) -> tensor<4xf32>,
-    workgroup_size = [32 : index, 1 : index, 1 : index]
+  hal.executable.target @target, "target" {
+    hal.executable.entry_point @entry attributes {
+      interface = @interface,
+      ordinal = 0 : i32,
+      signature = (tensor<4xf32>) -> tensor<4xf32>,
+      workgroup_size = [32 : index, 1 : index, 1 : index]
+    }
+    hal.executable.entry_point @entry_alias attributes {
+      interface = @interface,
+      ordinal = 0 : i32,
+      signature = (tensor<4xf32>) -> tensor<4xf32>,
+      workgroup_size = [32 : index, 1 : index, 1 : index]
+    }
   }
   hal.executable.binary attributes {
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,
