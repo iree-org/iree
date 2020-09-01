@@ -95,6 +95,8 @@ vm.import @select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>
 vm.import @select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 
+vm.import @finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: shape/structure
 //===----------------------------------------------------------------------===//

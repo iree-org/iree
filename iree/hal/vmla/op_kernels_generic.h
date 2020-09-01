@@ -15,6 +15,8 @@
 #ifndef IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
 #define IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
 
+#include <cmath>
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
@@ -215,6 +217,15 @@ Status Select::Execute(absl::Span<const uint8_t> cond_buffer,
                        absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = cond_buffer[i] ? lhs_buffer[i] : rhs_buffer[i];
+  }
+  return OkStatus();
+}
+
+template <typename T>
+Status Finite::Execute(absl::Span<const T> src_buffer,
+                       absl::Span<bool> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = std::isfinite(src_buffer[i]);
   }
   return OkStatus();
 }
