@@ -1573,6 +1573,8 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
     IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableTargetEndOp">,
+    Symbol,
+    SymbolTable,
   ]> {
   let summary = [{target executable IR}];
   let description = [{
@@ -1581,7 +1583,8 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   }];
 
   let arguments = (ins
-    StrAttr:$target_backend
+    StrAttr:$sym_name,
+    StrAttr:$target_backend_filter
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 
@@ -1590,7 +1593,8 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      OpBuilder &builder, OperationState &state, StringRef targetBackend
+      OpBuilder &builder, OperationState &state, StringRef name,
+      StringRef targetBackendFilter
     }]>,
   ];
 

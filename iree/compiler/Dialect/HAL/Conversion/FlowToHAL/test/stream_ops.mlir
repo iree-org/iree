@@ -5,7 +5,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target "vmla" {
+  hal.executable.target @vmla, "vmla" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : i32,
@@ -79,7 +79,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target "vmla" {
+  hal.executable.target @vmla, "vmla" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : i32,

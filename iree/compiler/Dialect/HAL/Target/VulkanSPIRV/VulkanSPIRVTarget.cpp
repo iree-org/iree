@@ -233,7 +233,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                         IREE::HAL::ExecutableOp executableOp) override {
     OpBuilder targetBuilder(&executableOp.getBlock().back());
     auto targetOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-        sourceOp.getLoc(), name());
+        sourceOp.getLoc(), /*name=*/"vulkan_any",
+        /*targetBackendFilter=*/name());
     OpBuilder containerBuilder(&targetOp.getBlock().back());
 
     auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
@@ -261,7 +262,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend(), name())) {
+      if (matchPattern(executableTargetOp.target_backend_filter(), name())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
         auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
         assert(llvm::hasSingleElement(spvModuleOps));
@@ -387,7 +388,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     spirv::ModuleOp spvModuleOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend(), name())) {
+      if (matchPattern(executableTargetOp.target_backend_filter(), name())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
         assert(!innerModuleOp.getAttr(
             iree_compiler::getEntryPointScheduleAttrName()));
