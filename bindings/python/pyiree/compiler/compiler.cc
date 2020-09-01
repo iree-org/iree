@@ -73,6 +73,7 @@ bool LLVMOnceInit() {
       llvm::sys::DefaultOneShotPipeSignalHandler);
   llvm::sys::PrintStackTraceOnErrorSignal("pyiree");
 
+  mlir::enableGlobalDialectRegistry(true);
   // Register built-in MLIR dialects.
   mlir::registerMlirDialects();
 

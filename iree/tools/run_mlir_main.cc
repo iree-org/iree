@@ -490,6 +490,7 @@ extern "C" int main(int argc, char** argv) {
     }
   }
 
+  mlir::enableGlobalDialectRegistry(true);
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
