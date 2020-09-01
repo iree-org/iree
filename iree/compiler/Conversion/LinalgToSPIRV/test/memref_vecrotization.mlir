@@ -8,7 +8,7 @@
 //       CHECK: %[[MAT:.+]] = vector.transfer_read %[[ARG0]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
 //       CHECK: vector.transfer_write %[[MAT]], %[[ALLOC]][%{{.*}}, %{{.*}}] : vector<32x8xf32>, memref<128x8xvector<4xf32>, 3>
 //       CHECK: dealloc %[[ALLOC]] : memref<128x8xvector<4xf32>, 3>
-func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
+func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = constant 0.000000e+00 : f32
   %0 = alloc() : memref<128x32xf32, 3>
   %v = vector.transfer_read %arg0[%x, %y], %cst : memref<4096x4096xf32>, vector<1x4xf32>
@@ -24,7 +24,7 @@ func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) attributes {spv.e
 // Test that the memref is not vectorized if used by scalar load or store.
 // CHECK-LABEL: func @copy
 //  CHECK-SAME: %[[ARG0:.+]]: memref<4096x4096xf32>
-func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
+func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = constant 0.000000e+00 : f32
   %0 = alloc() : memref<128x32xf32, 3>
   %s = load %arg0[%x, %y] : memref<4096x4096xf32>

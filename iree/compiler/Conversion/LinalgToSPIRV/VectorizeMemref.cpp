@@ -17,6 +17,7 @@
 // Pass to convert memref into memref of vector.
 //
 //===----------------------------------------------------------------------===//
+
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -29,9 +30,11 @@ constexpr int kVecSize = kVectorizationSizeInBits / (sizeof(float) * 8);
 namespace mlir {
 namespace iree_compiler {
 
-/// Returns true if all uses are transfer read/write operations.
+/// Returns true if all uses are transfer read/write operations. If it returns
+/// true also return the uses of memref.
 static bool getUsesIfAllTransferOp(Value v,
                                    SmallVectorImpl<Operation *> &uses) {
+  assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : v.getUsers()) {
     if (isa<DeallocOp>(userOp)) continue;
     // Only vectorize memref used by vector transfer ops.
@@ -44,7 +47,8 @@ static bool getUsesIfAllTransferOp(Value v,
   return true;
 }
 
-/// Returns true of the type is a memref that can be vectorized to vector<4xi32>
+/// Returns true of the type is a memref that can be vectorized to
+/// vector<4xi32>. If it returns true also return the uses of memref.
 static bool isMemRefAndVectorizable(Value v,
                                     SmallVectorImpl<Operation *> &uses) {
   auto memrefType = v.getType().dyn_cast<MemRefType>();
@@ -90,7 +94,6 @@ class MemRefUsageAnalysis {
   void analyzeFunc(FuncOp funcOp);
   void analyzeAlloc(AllocOp allocOp);
   void analyzePlaceholder(IREE::PlaceholderOp placeholderOp);
-  bool allVectorUses(Value v, SmallVector<Operation *, 4> &uses);
   llvm::DenseSet<Value> vectorize;
   llvm::DenseSet<Operation *> transferOps;
 };
