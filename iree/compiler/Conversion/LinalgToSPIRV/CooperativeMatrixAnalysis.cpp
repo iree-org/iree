@@ -14,7 +14,9 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/CooperativeMatrixAnalysis.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 
 using namespace mlir;
@@ -50,7 +52,8 @@ bool isLegalVectorContract(vector::ContractionOp contract) {
 }
 
 bool supportsCooperativeMatrix(Operation* op) {
-  if (isa<vector::TransferReadOp>(op) || isa<vector::TransferWriteOp>(op))
+  if (isa<vector::TransferReadOp, vector::TransferWriteOp, scf::ForOp,
+          scf::YieldOp>(op))
     return true;
   if (isa<vector::ContractionOp>(op) &&
       isLegalVectorContract(cast<vector::ContractionOp>(op)))
@@ -75,12 +78,14 @@ CooperativeMatrixAnalysis::CooperativeMatrixAnalysis(mlir::Operation* op) {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (contract == nullptr) return;
     auto hasVectorDest = [](Operation* op) {
+      if (isa<ConstantOp, AllocOp>(op)) return false;
       for (auto resultType : op->getResultTypes()) {
         if (resultType.isa<VectorType>()) return true;
       }
+      if (op->getNumResults() == 0) return true;
       return false;
     };
-    auto dependentOps = getSlice(op, hasVectorDest);
+    auto dependentOps = getSlice(op, hasVectorDest, hasVectorDest);
     for (auto* dependeOp : dependentOps) {
       // If any instruction cannot use cooperative matrix drop the whole chaine.
       // In the future we can introduce "bitcast" type of conversion to allow
