@@ -788,6 +788,8 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
   patterns.insert<VMLAOpConversion<mhlo::XorOp, IREE::VMLA::XorOp>>(
       context, typeConverter);
+  patterns.insert<VMLAOpConversion<mhlo::NotOp, IREE::VMLA::NotOp>>(
+      context, typeConverter);
   patterns.insert<VMLAOpConversion<mhlo::ExpOp, IREE::VMLA::ExpOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<mhlo::LogOp, IREE::VMLA::LogOp>>(
