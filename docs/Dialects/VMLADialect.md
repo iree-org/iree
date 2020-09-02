@@ -728,6 +728,31 @@ operation ::= `vmla.exp` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
+### `vmla.finite` (IREE::VMLA::FiniteOp)
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.finite` $src`,` `out` $dst attr-dict `:` $element_type
+```
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`dst` | buffer
+
 ### `vmla.floor` (IREE::VMLA::FloorOp)
 
 

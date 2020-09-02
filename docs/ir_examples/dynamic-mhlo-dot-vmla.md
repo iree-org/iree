@@ -1514,6 +1514,7 @@ module {
     vm.import @vmla.select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
@@ -1731,6 +1732,7 @@ vm.module @module {
   vm.import @vmla.select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+  vm.import @vmla.finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.copy.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.copy.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
   vm.import @vmla.copy.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
@@ -1948,6 +1950,7 @@ module {
     vm.import @vmla.select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
@@ -2151,6 +2154,7 @@ module {
     vm.import @vmla.select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.finite.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
     vm.import @vmla.copy.x32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ..., %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ..., %lengths : i32 ...) attributes {sym_visibility = "private"}
