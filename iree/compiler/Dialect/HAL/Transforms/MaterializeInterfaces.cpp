@@ -21,7 +21,6 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -254,10 +253,9 @@ static LogicalResult declareEntryPointOps(
         dispatchEntryOp.setAttr(
             "function_ref", builder.getSymbolRefAttr(thunkFuncOp.getValue()));
 
-        std::string entryName =
-            llvm::formatv("{0}_entry", thunkFuncOp->getName());
         builder.create<IREE::HAL::ExecutableEntryPointOp>(
-            dispatchEntryOp.getLoc(), builder.getStringAttr(entryName),
+            dispatchEntryOp.getLoc(),
+            builder.getStringAttr(thunkFuncOp->getName()),
             builder.getI32IntegerAttr(nextOrdinal++),
             builder.getSymbolRefAttr(interfaceOp),
             TypeAttr::get(sourceFuncOp.getType()));
