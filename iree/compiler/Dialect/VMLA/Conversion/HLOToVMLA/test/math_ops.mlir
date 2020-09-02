@@ -33,3 +33,13 @@ func @clamp(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>)
   // CHECK-NEXT: return %[[BUF]]
   return %0 : tensor<4xf32>
 }
+
+// CHECK-LABEL: @not
+func @not(%arg0 : tensor<4xi1>) -> tensor<4xi1> attributes { sym_visibility = "private" } {
+  // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 4
+  // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
+  // CHECK-NEXT: vmla.not %arg0, out %[[BUF]] : i1
+  %0 = "mhlo.not"(%arg0) : (tensor<4xi1>) -> tensor<4xi1>
+  // CHECK-NEXT: return %[[BUF]]
+  return %0 : tensor<4xi1>
+}
