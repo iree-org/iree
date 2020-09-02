@@ -59,7 +59,6 @@ static llvm::cl::opt<bool> splitInputFile(
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
-  mlir::enableGlobalDialectRegistry(true);
 
   mlir::registerMlirDialects();
 #ifdef IREE_HAVE_EMITC_DIALECT

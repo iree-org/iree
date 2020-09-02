@@ -74,7 +74,6 @@ static llvm::cl::opt<bool> showDialects(
     llvm::cl::init(false));
 
 int main(int argc, char **argv) {
-  mlir::enableGlobalDialectRegistry(true);
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
