@@ -1357,8 +1357,8 @@ ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
   Builder builder(getContext());
   SmallVector<SmallVector<Attribute, 4>, 4> setAttrs;
   for (auto bindingOp : getBlock().getOps<InterfaceBindingOp>()) {
-    int set = bindingOp.set().getZExtValue();
-    int binding = bindingOp.binding().getZExtValue();
+    int set = bindingOp.set();
+    int binding = bindingOp.binding();
     if (set >= setAttrs.size()) setAttrs.resize(set + 1);
     auto &bindingAttrs = setAttrs[set];
     if (binding >= bindingAttrs.size()) bindingAttrs.resize(binding + 1);
