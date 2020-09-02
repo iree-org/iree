@@ -40,6 +40,17 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   // NOTE: we could vary this based on the options, such as by arch/etc.
   std::string name() const override { return "dylib*"; }
 
+  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
+                        IREE::HAL::ExecutableOp executableOp) override {
+    OpBuilder targetBuilder(&executableOp.getBlock().back());
+    auto targetContainerOp =
+        targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
+            sourceOp.getLoc(), /*name=*/"llvm_aot",
+            /*targetBackendFilter=*/name());
+    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
+    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+  }
+
   void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
                                     OpPassManager& passManager) override {
     buildLLVMTransformPassPipeline(passManager);
