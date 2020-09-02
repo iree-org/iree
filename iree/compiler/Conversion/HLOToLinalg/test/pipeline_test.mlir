@@ -46,14 +46,10 @@ module {
   }
 }
 // CHECK-LABEL: func @bug_2882_repro2
-//       CHECK:   %[[RET0:.+]] = iree.placeholder
-//  CHECK-SAME:     binding = @legacy_io::@ret0
-//       CHECK:   %[[RET1:.+]] = iree.placeholder
-//  CHECK-SAME:     binding = @legacy_io::@ret1
-//       CHECK:   %[[ARG1:.+]] = iree.placeholder
-//  CHECK-SAME:     binding = @legacy_io::@arg1
-//       CHECK:   %[[ARG0:.+]] = iree.placeholder
-//  CHECK-SAME:     binding = @legacy_io::@arg0
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0}
+//   CHECK-DAG:   %[[RET1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1}
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1}
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0}
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     %[[ARG0]], %[[ARG1]], %[[RET0]]
 //       CHECK:   linalg.copy(%[[RET0]], %[[RET1]])

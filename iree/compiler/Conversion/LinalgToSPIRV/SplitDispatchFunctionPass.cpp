@@ -28,6 +28,7 @@
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -44,6 +45,8 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
+
+#define DEBUG_TYPE "split-dispatch-function"
 
 namespace mlir {
 namespace iree_compiler {
@@ -178,12 +181,31 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     StringRef newFnName = splitKernels.back();
     builder.setInsertionPointToStart(moduleOp.getBody());
     auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType());
+    LLVM_DEBUG({
+      llvm::dbgs() << "Created new function : func @" << newFn.getName()
+                   << "\n";
+    });
 
     // Copy over all attributes except type and name.
     for (const auto &namedAttr : oldFn.getAttrs()) {
       if (namedAttr.first != impl::getTypeAttrName() &&
-          namedAttr.first != SymbolTable::getSymbolAttrName())
+          namedAttr.first != SymbolTable::getSymbolAttrName() &&
+          namedAttr.first != getNumWorkgroupsFnAttrName())
         newFn.setAttr(namedAttr.first, namedAttr.second);
+    }
+    // Need special handling for the number of workgroups function.
+    if (FuncOp numWorkgroupsFn = getNumWorkgroupsFn(oldFn)) {
+      FuncOp newNumWorkgroupsFn =
+          builder.create<FuncOp>(loc, newFnName.str() + "__num_workgroups__",
+                                 numWorkgroupsFn.getType());
+      newNumWorkgroupsFn.setVisibility(FuncOp::Visibility::Private);
+      newFn.setAttr(getNumWorkgroupsFnAttrName(),
+                    builder.getSymbolRefAttr(newNumWorkgroupsFn));
+      LLVM_DEBUG({
+        llvm::dbgs() << "Added func @" << newNumWorkgroupsFn.getName()
+                     << " as num workgroups fn for func @" << newFn.getName()
+                     << "\n";
+      });
     }
 
     // Collect the closure for the current Linalg op.
@@ -211,6 +233,15 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   moduleOp.setAttr(getEntryPointScheduleAttrName(),
                    builder.getArrayAttr(entryPoints));
 
+  if (FuncOp numWorkgroupsFn = getNumWorkgroupsFn(oldFn)) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "Erased num workgroups fn func @"
+                   << numWorkgroupsFn.getName() << " for func @"
+                   << oldFn.getName() << "\n";
+    });
+    numWorkgroupsFn.erase();
+  }
+  LLVM_DEBUG({ llvm::dbgs() << "Erased func @" << oldFn.getName() << "\n"; });
   oldFn.erase();
   return success();
 }

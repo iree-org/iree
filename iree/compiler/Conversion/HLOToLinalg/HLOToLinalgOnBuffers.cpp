@@ -22,6 +22,7 @@
 
 #include <cstddef>
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
@@ -1348,7 +1349,10 @@ struct HALInterfaceLoadTensorOpEraser final
     // annotation is carried over if exists.
     auto phOp = rewriter.create<IREE::PlaceholderOp>(
         loadOp.getLoc(), bufferType, "interface buffer");
-    phOp.setAttr("binding", loadOp.binding());
+    phOp.setAttr(getBindingAttrName(), loadOp.binding());
+    StringRef attrName = getOperandResultNumAttrName();
+    if (auto operandResultNumAttr = loadOp.getAttr(attrName))
+      phOp.setAttr(attrName, operandResultNumAttr);
     Value buffer = phOp.getResult();
 
     // If the result of the load is already mapped to a buffer, a copy is
@@ -1463,7 +1467,10 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
   // annotation is carried over if exists.
   auto phOp = builder.create<IREE::PlaceholderOp>(op.getLoc(), bufferType,
                                                   "interface buffer");
-  phOp.setAttr("binding", op.binding());
+  phOp.setAttr(getBindingAttrName(), op.binding());
+  StringRef attrName = getOperandResultNumAttrName();
+  if (Attribute operandResultNumAttr = op.getAttr(attrName))
+    phOp.setAttr(attrName, operandResultNumAttr);
   Value buffer = phOp;
   outputBufferMap[op] = buffer;
 
@@ -1576,7 +1583,8 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   target.addIllegalOp<linalg::TensorReshapeOp>();
   target.addDynamicallyLegalDialect<linalg::LinalgDialect>(
       Optional<ConversionTarget::DynamicLegalityCallbackFn>([](Operation *op) {
-        // The generated structured Linalg ops should have buffer semantics.
+        // The generated structured Linalg ops should have buffer
+        // semantics.
         if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
           return linalgOp.hasBufferSemantics();
         }
