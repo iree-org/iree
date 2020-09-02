@@ -331,30 +331,17 @@ class ReorderBroadcastInDimOpAndElementwiseOp
   LogicalResult matchAndRewrite(ElementwiseOpT op,
                                 PatternRewriter &rewriter) const override {
     Operation *operation = op.getOperation();
-    // Sanity check: all elementwise ops shoule have 1 or more operand, only 1
-    // result, and no attribute.
-    assert(operation->getNumOperands() >= 1 &&
-           operation->getNumResults() == 1 && operation->getAttrs().empty());
-
-    // Verify if all operands are of same type and have static shape.
-    auto operands = operation->getOperands();
-    auto operandType = operands[0].getType().template dyn_cast<ShapedType>();
-    for (auto operand : operands.drop_front(1)) {
-      auto type = operand.getType().template dyn_cast<ShapedType>();
-      if (!type || !type.hasStaticShape() || type != operandType) {
-        return failure();
-      }
+    if (operation->getNumOperands() < 1 || operation->getNumResults() != 1 ||
+        !operation->getAttrs().empty()) {
+      return failure();
     }
 
+    auto operands = operation->getOperands();
     // Verify if all operands are from BroadcastInDimOp and its
     // broadcast_dimensions is the same.
     llvm::SmallVector<mhlo::BroadcastInDimOp, 2> bcastOps;
     for (auto operand : operands) {
-      auto defOp = operand.getDefiningOp();
-      if (!defOp) {
-        return failure();
-      }
-      auto bcastOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(defOp);
+      auto bcastOp = operand.getDefiningOp<mhlo::BroadcastInDimOp>();
       if (!bcastOp) {
         return failure();
       }
