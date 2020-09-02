@@ -69,7 +69,6 @@ cc_binary(
         "//iree/tools:init_mlir_passes_and_dialects",
         "//iree/tools:init_targets",
         "//iree/tools:init_xla_dialects",
-        "//iree/tools:iree_opt_main",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
