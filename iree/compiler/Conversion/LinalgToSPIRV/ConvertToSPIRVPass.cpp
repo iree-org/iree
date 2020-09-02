@@ -357,8 +357,7 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
       llvm::to_vector<1>(moduleOp.getOps<IREE::HAL::InterfaceOp>());
   assert(halInterfaceOps.size() == 1);
 
-  unsigned elementCount =
-      halInterfaceOps.front().push_constants()->getZExtValue();
+  unsigned elementCount = *halInterfaceOps.front().push_constants();
   unsigned offset = loadOp.offset().getZExtValue();
 
   // The following function generates SPIR-V ops with i32 types. So it does type
@@ -383,9 +382,9 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
       SymbolTable::lookupNearestSymbolFrom(
           phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
 
-  spirv::GlobalVariableOp varOp = getOrInsertResourceVariable(
-      phOp.getLoc(), convertedType, bindingOp.set().getZExtValue(),
-      bindingOp.binding().getZExtValue(), *moduleOp.getBody());
+  spirv::GlobalVariableOp varOp =
+      getOrInsertResourceVariable(phOp.getLoc(), convertedType, bindingOp.set(),
+                                  bindingOp.binding(), *moduleOp.getBody());
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();
