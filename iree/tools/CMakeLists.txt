@@ -410,7 +410,7 @@ if(${IREE_ENABLE_MLIR})
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
   )
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    add_custom_target(LLVMFileCheck ALL
+    add_custom_target(BundledLLVMFileCheck ALL
       COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
       DEPENDS FileCheck
     )
