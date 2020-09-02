@@ -21,11 +21,14 @@
 #include <array>
 #include <numeric>
 
+#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
+#include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -506,15 +509,16 @@ static Optional<int64_t> getLinearizedCopySize(linalg::CopyOp copyOp) {
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
-struct ConvertToGPUPass : public PassWrapper<ConvertToGPUPass, FunctionPass> {
+struct ConvertToGPUPass
+    : public PassWrapper<ConvertToGPUPass, OperationPass<ModuleOp>> {
   ConvertToGPUPass() = default;
   ConvertToGPUPass(const ConvertToGPUPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect,
+                    ShapeDialect>();
   }
-
-  void runOnFunction() override;
+  void runOnOperation() override;
 };
 
 struct SerializeParallelLoopPattern
@@ -651,11 +655,27 @@ struct MapLinalgOpToGlobalInvocationId
         workgroupSize = {32, 1, 1};
       }
     }
-    rewriter.eraseOp(linalgOp);
     if (failed(updateWorkGroupSize(funcOp, workgroupSize))) return failure();
-    funcOp.setAttr(getWorkgroupCountAttrName(),
-                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
-                       WorkgroupCountMethodology::LinearizeResultShape)));
+
+    // TODO(ravishankarm): The use of the generated function to compute the
+    // number of workgroups works for dynamic shapes as well, but there is an
+    // issue with the shape computation + ha.device.switch creation that needs
+    // to be resolved before the generated function can be used on the host
+    // side. So disabling this approach for dynamic shape case.
+    if (llvm::all_of(linalgOp.getOperands(), [](Value v) {
+          Type t = v.getType();
+          return (t.isa<ShapedType>() &&
+                  t.cast<ShapedType>().hasStaticShape()) ||
+                 t.isIntOrIndexOrFloat();
+        })) {
+      if (failed(createNumWorkgroupsFromLinearizedResultShape(
+              rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()), funcOp,
+              workgroupSize[0])))
+        return failure();
+    } else {
+      funcOp.removeAttr(getNumWorkgroupsFnAttrName());
+    }
+    rewriter.eraseOp(linalgOp);
     return success();
   }
 };
@@ -730,15 +750,7 @@ void populateLinalgTileAndDistributePatterns(
   patterns.insert<TileAndDistributeCopyOp>(context);
 }
 
-void ConvertToGPUPass::runOnFunction() {
-  FuncOp funcOp = getFunction();
-
-  Region &body = funcOp.getBody();
-  if (!llvm::hasSingleElement(body)) {
-    funcOp.emitError("unhandled dispatch function with multiple blocks");
-    return signalPassFailure();
-  }
-
+void ConvertToGPUPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
   // After this pass Linalg and scf.parallel ops should be gone.
@@ -766,11 +778,19 @@ void ConvertToGPUPass::runOnFunction() {
                   MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>,
                   RemoveLinalgRange, SerializeParallelLoopPattern>(context);
 
-  if (failed(applyFullConversion(funcOp, target, patterns)))
-    return signalPassFailure();
+  for (FuncOp funcOp : getOperation().getOps<FuncOp>()) {
+    if (!isEntryPoint(funcOp)) continue;
+    Region &body = funcOp.getBody();
+    if (!llvm::hasSingleElement(body)) {
+      funcOp.emitError("unhandled dispatch function with multiple blocks");
+      return signalPassFailure();
+    }
+    if (failed(applyFullConversion(funcOp, target, patterns)))
+      return signalPassFailure();
+  }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass() {
   return std::make_unique<ConvertToGPUPass>();
 }
 

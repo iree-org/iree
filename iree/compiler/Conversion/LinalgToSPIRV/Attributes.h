@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_ATTRIBUTES_H_
-#define IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_ATTRIBUTES_H_
+#ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_
+#define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_
 
 #include "llvm/ADT/StringRef.h"
 
@@ -26,34 +26,13 @@ inline llvm::StringRef getEntryPointScheduleAttrName() {
   return "vkspv.entry_point_schedule";
 }
 
-/// Enumerates the methods used to compute the number of workgroups to use with
-/// an entry point function. The lowering to SPIR-V sets an integer attribute on
-/// the entry point function with one of these values. It is later used by
-/// `recordDispatch` to compute the number of workgroups for the entry point
-/// function.
-enum class WorkgroupCountMethodology {
-  // TODO(#2134): Remove the `Default` option. This is only a fallback used for
-  // convolution/pooling cases that are currently not working as intended, as
-  // described in the bug.
-  Default = 0,               // Use the default mechanism used by IREE
-  LinearizeResultShape = 1,  // Use the linearized shape of the result of the
-                             // dispatch region
-  ResultShape = 2            // Use the shape of the dispatch region.
-};
-
-/// Returns the name of the attribute to use that propagates the method to use
-/// to compute the number of workgroups to use with an entry point function. The
-/// attribute used is an IntegerAttr with value being one of the enum entries of
-/// WorkgroupCountMethodology.
-// TODO(ravishankarm): The approach to use attributes to propagate the
-// methodology to use to compute number of workgroups is to convoluted. Ideally,
-// the lowering should produce a function that should then just be inlined at
-// the point this is needed.
-inline llvm::StringRef getWorkgroupCountAttrName() {
-  return "vkspv.workgroup_count_from_result_shape";
+/// Attribute on a entry point function that specifies which function computes
+/// the number of workgroups.
+inline llvm::StringRef getNumWorkgroupsFnAttrName() {
+  return "vkspv.num_workgroups_fn";
 }
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_ATTRIBUTES_H_
+#endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_

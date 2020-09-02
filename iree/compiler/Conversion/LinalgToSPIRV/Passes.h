@@ -29,19 +29,27 @@ struct SPIRVCodegenOptions {
   bool useWorkgroupMemory = false;
 };
 
+/// Pass to initialize the function that computes the number of workgroups for
+/// each entry point function. The function is defined, but is populated later.
+std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
+
 /// Pass to tile and fuse linalg operations on buffers. The pass takes as
 /// argument the `workgroupSize` that the tiling should use. Note that the
 /// tile-sizes are the reverse of the workgroup size. So workgroup size along
 /// "x" is used to tile the innermost loop, along "y" for the next innermost (if
 /// it exists) and along "z" for the next loop (if it exists). The workgroup
 /// size is expected to be of size at-most 3.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
+std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
     ArrayRef<int64_t> workGroupSize = {}, ArrayRef<int64_t> tileSizes = {},
     bool useWorkgroupMem = false);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
-std::unique_ptr<OperationPass<FuncOp>> createConvertToGPUPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass();
+
+/// Pass to legalize function that returns number of workgroups to use for
+/// launch to be runnable on the host.
+std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 /// This pass converts remaining interface ops into SPIR-V global variables,
