@@ -206,8 +206,12 @@ struct LinalgTileAndFusePass
   LinalgTileAndFusePass(const LinalgTileAndFusePass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
+    // clang-format off
+    registry.insert<AffineDialect,
+                    gpu::GPUDialect,
+                    linalg::LinalgDialect,
                     scf::SCFDialect>();
+    // clang-format on
   }
 
   void runOnFunction() override;
@@ -276,7 +280,7 @@ struct TileBatchMatmulPattern
                          linalg::LinalgTilingOptions options,
                          ArrayRef<int64_t> workgroupSize,
                          PatternBenefit benefit = 1)
-      : Base(context, options,
+      : Base(context, options.setDistributionOptions(matmulDistributionOptions),
              linalg::LinalgMarker(
                  ArrayRef<Identifier>(),
                  Identifier::get(getWorkgroupMarker(), context)),

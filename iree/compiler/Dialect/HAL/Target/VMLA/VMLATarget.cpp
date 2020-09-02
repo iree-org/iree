@@ -18,8 +18,10 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -46,6 +48,10 @@ class VMLATargetBackend final : public TargetBackend {
   VMLATargetBackend(VMLATargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "vmla"; }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<VM::VMDialect, VMLA::VMLADialect>();
+  }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpPassManager &passManager) override {

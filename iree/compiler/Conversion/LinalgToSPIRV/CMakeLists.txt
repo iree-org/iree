@@ -35,6 +35,7 @@ iree_cc_library(
     "SplitDispatchFunctionPass.cpp"
     "Utils.cpp"
     "VectorToGPUPass.cpp"
+    "VectorizeMemref.cpp"
   DEPS
     LLVMSupport
     MLIRAffineOps

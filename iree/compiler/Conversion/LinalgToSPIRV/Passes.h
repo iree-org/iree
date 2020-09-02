@@ -65,6 +65,11 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 /// Pass to apply tiling and vectorization transformations on linagl::MatMulOp.
 std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
 
+/// Convert memref of scalar to memref of vector of efficent size. This will
+/// allow to convert memory accesses to vector load/store in SPIR-V without
+/// having pointer bitcast.
+std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
+
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
 /// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to

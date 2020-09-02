@@ -56,14 +56,15 @@ static llvm::cl::opt<bool> splitInputFile(
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
-  mlir::enableGlobalDialectRegistry(true);
 
-  mlir::registerMlirDialects();
-  mlir::registerXLADialects();
-  mlir::iree_compiler::registerIreeDialects();
+  mlir::DialectRegistry registry;
+
+  mlir::registerMlirDialects(registry);
+  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
   // Register the custom dialect
-  mlir::iree_compiler::registerCustomDialect();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::iree_compiler::registerCustomDialect(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
   mlir::registerMlirTranslations();
@@ -102,8 +103,8 @@ int main(int argc, char **argv) {
   /// Processes the memory buffer with a new MLIRContext.
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {
-    mlir::MLIRContext context;
-    context.loadAllGloballyRegisteredDialects();
+    mlir::MLIRContext context(/*loadAllDialects=*/false);
+    registry.appendTo(context.getDialectRegistry());
     llvm::SourceMgr sourceMgr;
     sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
     mlir::SourceMgrDiagnosticHandler diagHandler(sourceMgr, &context);

@@ -72,7 +72,7 @@ void testMatMul() {
   const int height = 4;
   const int width = 4;
   StringLiteral funcName = "kernel_matmul";
-  MLIRContext context;
+  MLIRContext context(/*loadAllDialects=*/false);
   ModelBuilder modelBuilder;
   auto typeA = modelBuilder.getMemRefType({width, height}, modelBuilder.f32);
   auto typeB = modelBuilder.getMemRefType({width, height}, modelBuilder.f32);

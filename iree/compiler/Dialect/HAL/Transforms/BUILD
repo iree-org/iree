@@ -43,7 +43,6 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
-        "//iree/compiler/Utils",
         "@com_google_absl//absl/strings",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

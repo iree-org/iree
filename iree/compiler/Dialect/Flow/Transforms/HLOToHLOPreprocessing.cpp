@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/StandardTypes.h"
@@ -374,6 +375,10 @@ class ReorderBroadcastInDimOpAndBinaryElementwiseOp
 
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<shape::ShapeDialect, mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;

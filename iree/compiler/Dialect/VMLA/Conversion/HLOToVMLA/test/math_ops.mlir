@@ -33,3 +33,15 @@ func @clamp(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>)
   // CHECK-NEXT: return %[[BUF]]
   return %0 : tensor<4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @finite
+func @finite(%arg0 : tensor<4xf32>) -> tensor<4xi1> attributes { sym_visibility = "private" } {
+  // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 4
+  // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
+  // CHECK-NEXT: vmla.finite %arg0, out %[[BUF]] : f32
+  %0 = "mhlo.is_finite"(%arg0) : (tensor<4xf32>) -> tensor<4xi1>
+  // CHECK-NEXT: return %[[BUF]]
+  return %0 : tensor<4xi1>
+}

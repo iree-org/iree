@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -49,6 +50,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // directly call TargetBackend::buildTranslationPassPipeline function. For now
   // we need to run each backend translation in isolation and we do that within
   // this pass.
+  // The createTranslateExecutablesPass operates on hal.executable ops, so
+  // requires that the dialect already be loaded before it can be added to the
+  // pass pipeline.
+  // TODO(#2958): This shouldn't be necessary.
+  passManager.getContext()->loadDialect<HALDialect>();
   passManager.addPass(createTranslateExecutablesPass(targetOptions));
 
   // After all executables are translated we allow the backends to link them

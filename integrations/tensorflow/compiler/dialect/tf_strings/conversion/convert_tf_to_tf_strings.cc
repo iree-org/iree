@@ -21,6 +21,7 @@
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/types.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/FuncConversions.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
@@ -89,6 +90,10 @@ class LowerTensorflowToStringsPass
     : public PassWrapper<LowerTensorflowToStringsPass,
                          OperationPass<ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<TFStringsDialect>();
+  }
+
   void runOnOperation() override {
     if (failed(run())) {
       signalPassFailure();
