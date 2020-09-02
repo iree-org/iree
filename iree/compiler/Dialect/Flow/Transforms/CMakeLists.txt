@@ -39,9 +39,9 @@ iree_cc_library(
     "RematerializeDispatchConstants.cpp"
   DEPS
     LLVMSupport
-    MLIRAnalysis
     MLIRIR
     MLIRPass
+    MLIRShape
     MLIRShapeOpsTransforms
     MLIRStandardOps
     MLIRSupport

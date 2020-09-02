@@ -61,6 +61,7 @@
 #include "iree/tools/init_iree_dialects.h"
 #include "iree/tools/init_mlir_dialects.h"
 #include "iree/tools/init_targets.h"
+#include "iree/tools/init_xla_dialects.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -70,6 +71,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
@@ -173,12 +175,12 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
 // Prepares a module for evaluation by running MLIR import and IREE translation.
 // Returns the serialized flatbuffer data.
 StatusOr<std::string> PrepareModule(
-    std::string target_backend,
-    std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+    std::string target_backend, std::unique_ptr<llvm::MemoryBuffer> file_buffer,
+    mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("PrepareModule");
 
-  mlir::MLIRContext context;
-  context.loadAllGloballyRegisteredDialects();
+  mlir::MLIRContext context(/*loadAllDialects=*/false);
+  registry.appendTo(context.getDialectRegistry());
 
   // Parse input MLIR module.
   llvm::SourceMgr source_mgr;
@@ -387,7 +389,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 }
 
 // Translates and runs a single LLVM file buffer.
-Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer,
+                    mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("EvaluateFile");
 
   // TODO(benvanik): move to instance-based registration.
@@ -407,7 +410,8 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
         file_buffer->getBuffer(), file_buffer->getBufferIdentifier());
     IREE_ASSIGN_OR_RETURN(
         auto flatbuffer_data,
-        PrepareModule(target_backend + '*', std::move(cloned_file_buffer)),
+        PrepareModule(target_backend + '*', std::move(cloned_file_buffer),
+                      registry),
         _ << "Translating module");
     IREE_TRACE_FRAME_MARK();
     IREE_RETURN_IF_ERROR(EvaluateFunctions(
@@ -420,7 +424,8 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
 }
 
 // Runs the given .mlir file based on the current flags.
-Status RunFile(const std::string& mlir_filename) {
+Status RunFile(const std::string& mlir_filename,
+               mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("RunFile");
 
   // Load input file/from stdin.
@@ -434,7 +439,7 @@ Status RunFile(const std::string& mlir_filename) {
 
   if (!split_input_file_flag) {
     // Use entire buffer as a single module.
-    return EvaluateFile(std::move(file));
+    return EvaluateFile(std::move(file), registry);
   }
 
   // Split the buffer into separate modules and evaluate independently.
@@ -457,7 +462,7 @@ Status RunFile(const std::string& mlir_filename) {
         sub_source_buffer, full_buffer->getBufferIdentifier() +
                                llvm::Twine(" split at line #") +
                                llvm::Twine(split_line));
-    auto sub_failure = EvaluateFile(std::move(sub_buffer));
+    auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
     if (!sub_failure.ok()) {
       LOG(ERROR) << "Failure for split at line #" << split_line << ": "
                  << sub_failure;
@@ -490,10 +495,11 @@ extern "C" int main(int argc, char** argv) {
     }
   }
 
-  mlir::enableGlobalDialectRegistry(true);
-  mlir::registerMlirDialects();
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::DialectRegistry registry;
+  mlir::registerMlirDialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
+  mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
@@ -516,7 +522,7 @@ extern "C" int main(int argc, char** argv) {
   char** argv_absl_ptr = argv_absl.data();
   iree::InitializeEnvironment(&argc_absl, &argv_absl_ptr);
 
-  auto status = RunFile(input_file_flag);
+  auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {
     std::cerr << "ERROR running file (" << input_file_flag << "): " << status
               << "\n";

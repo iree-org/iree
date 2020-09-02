@@ -322,10 +322,10 @@ if(${IREE_BUILD_COMPILER})
       ::init_iree_passes_and_dialects
       ::init_mlir_passes_and_dialects
       ::init_targets
+      ::init_xla_dialects
       ::vm_util
       LLVMSupport
       MLIRIR
-      MLIRSCFTransforms
       MLIRParser
       MLIRPass
       MLIRSupport

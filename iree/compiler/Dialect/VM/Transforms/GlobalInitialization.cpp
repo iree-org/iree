@@ -180,7 +180,8 @@ class GlobalInitializationPass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createGlobalInitializationPass() {
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createGlobalInitializationPass() {
   return std::make_unique<GlobalInitializationPass>();
 }
 

@@ -32,6 +32,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/Conversion:PreserveCompilerHints",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Conversion/IREEToVM",

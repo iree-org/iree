@@ -329,6 +329,11 @@ class MaterializeInterfacesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
+
+    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
   }
 
   void runOnOperation() override {

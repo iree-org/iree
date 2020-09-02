@@ -89,7 +89,7 @@ void testVecAdd() {
   // Simple test a single warp.
   const int width = warpSize;
   StringLiteral funcName = "kernel_vecadd";
-  MLIRContext context;
+  MLIRContext context(/*loadAllDialects=*/false);
   ModelBuilder modelBuilder;
   auto nVectorType = modelBuilder.getVectorType(width, modelBuilder.f32);
   auto typeA = modelBuilder.getMemRefType({width}, modelBuilder.f32);
