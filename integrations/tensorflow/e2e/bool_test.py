@@ -21,6 +21,10 @@ import tensorflow.compat.v2 as tf
 
 class MathModule(tf.Module):
 
+  @tf.function(input_signature=[])
+  def constant(self):
+    return np.array([True, False, True], dtype=np.bool)
+
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
   def greater_than(self, x):
     return x > 1.0
