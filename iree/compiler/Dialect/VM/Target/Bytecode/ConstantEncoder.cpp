@@ -33,16 +33,6 @@ using flatbuffers::Vector;
 }  // namespace
 
 // TODO(benvanik): switch to LLVM's BinaryStreamWriter to handle endianness.
-static Offset<Vector<uint8_t>> serializeConstantI1Array(
-    DenseIntElementsAttr attr, FlatBufferBuilder &fbb) {
-  uint8_t *bytePtr = nullptr;
-  auto byteVector =
-      fbb.CreateUninitializedVector(attr.getNumElements() * 1, &bytePtr);
-  for (bool value : attr.getBoolValues()) {
-    *(bytePtr++) = value;
-  }
-  return byteVector;
-}
 
 static Offset<Vector<uint8_t>> serializeConstantI8Array(
     DenseIntElementsAttr attr, FlatBufferBuilder &fbb) {
@@ -120,8 +110,6 @@ Offset<Vector<uint8_t>> serializeConstant(Location loc,
                                           FlatBufferBuilder &fbb) {
   if (auto attr = elementsAttr.dyn_cast<DenseIntElementsAttr>()) {
     switch (attr.getType().getElementTypeBitWidth()) {
-      case 1:
-        return serializeConstantI1Array(attr, fbb);
       case 8:
         return serializeConstantI8Array(attr, fbb);
       case 16:
