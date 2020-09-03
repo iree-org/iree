@@ -31,7 +31,7 @@ declare -a excluded_files_patterns=(
 excluded_files_pattern="$(IFS="|" ; echo "${excluded_files_patterns[*]?}")"
 
 readarray -t files < <(\
-  (git diff --name-only "${BASE_REF}" || kill $$) \
+  (git diff --name-only --diff-filter=d "${BASE_REF}" || kill $$) \
     | grep -v -E "${excluded_files_pattern?}")
 
 diff="$(grep --with-filename --line-number --perl-regexp '\t' "${files[@]}")"
