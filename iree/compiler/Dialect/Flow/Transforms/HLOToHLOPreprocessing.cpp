@@ -442,7 +442,7 @@ struct HLOToHLOPreprocessing
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftRightArithmeticOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftRightLogicalOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SubOp>,
-        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AddOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AndOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::OrOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::XorOp>>(context);
     if (extractPadFromConv) {
