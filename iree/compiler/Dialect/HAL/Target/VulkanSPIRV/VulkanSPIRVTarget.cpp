@@ -362,8 +362,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         return spvFuncOp.emitError("unable to find workgroup count");
 
       // Ordinals are fixed based on the precomputed schedule, so use
-      // CommandBufferDispatchOrdinalOp instead of CommandBufferDispatchOp.
-      builder.create<IREE::HAL::CommandBufferDispatchOrdinalOp>(
+      // CommandBufferDispatchOp instead of CommandBufferDispatchSymbolOp.
+      builder.create<IREE::HAL::CommandBufferDispatchOp>(
           loc, commandBuffer, executable,
           builder.getI32IntegerAttr(/*entryPointOrdinal=*/it.index()),
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);

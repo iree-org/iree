@@ -194,13 +194,12 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       VMImportOpConversion<IREE::HAL::CommandBufferBindDescriptorSetOp>>(
       context, importSymbols, typeConverter,
       "hal.command_buffer.bind_descriptor_set");
+  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchOp>>(
+      context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
   patterns
-      .insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchOrdinalOp>>(
-          context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
-  patterns.insert<
-      VMImportOpConversion<IREE::HAL::CommandBufferDispatchIndirectOrdinalOp>>(
-      context, importSymbols, typeConverter,
-      "hal.command_buffer.dispatch.indirect");
+      .insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchIndirectOp>>(
+          context, importSymbols, typeConverter,
+          "hal.command_buffer.dispatch.indirect");
 }
 
 }  // namespace iree_compiler

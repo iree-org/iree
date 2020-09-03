@@ -23,8 +23,8 @@ module {
     %x = "test_hal.workgroup_x"() : () -> index
     %y = "test_hal.workgroup_y"() : () -> index
     %z = "test_hal.workgroup_z"() : () -> index
-    // CHECK: hal.command_buffer.dispatch.ordinal %0, %1, entry_point = 0, workgroup_xyz = [%2, %3, %4]
-    hal.command_buffer.dispatch %cmd, %exe, entry_point = @exe::@target::@entry, workgroup_xyz = [%x, %y, %z]
+    // CHECK: hal.command_buffer.dispatch %0, %1, entry_point = 0, workgroup_xyz = [%2, %3, %4]
+    hal.command_buffer.dispatch.symbol %cmd, %exe, entry_point = @exe::@target::@entry, workgroup_xyz = [%x, %y, %z]
     return
   }
 }
@@ -54,8 +54,8 @@ module {
     %x = "test_hal.workgroup_x"() : () -> index
     %y = "test_hal.workgroup_y"() : () -> index
     %z = "test_hal.workgroup_z"() : () -> index
-    // CHECK: hal.command_buffer.dispatch.ordinal %0, %1, entry_point = 2, workgroup_xyz = [%2, %3, %4]
-    hal.command_buffer.dispatch.ordinal %cmd, %exe, entry_point = 2, workgroup_xyz = [%x, %y, %z]
+    // CHECK: hal.command_buffer.dispatch %0, %1, entry_point = 2, workgroup_xyz = [%2, %3, %4]
+    hal.command_buffer.dispatch %cmd, %exe, entry_point = 2, workgroup_xyz = [%x, %y, %z]
     return
   }
 }
@@ -84,8 +84,8 @@ module {
     %exe = "test_hal.executable"() : () -> !hal.executable
     %buffer = "test_hal.buffer"() : () -> !hal.buffer
     %offset = "test_hal.offset"() : () -> index
-    // CHECK: hal.command_buffer.dispatch.indirect.ordinal %0, %1, entry_point = 0, workgroups = %2[%3]
-    hal.command_buffer.dispatch.indirect %cmd, %exe, entry_point = @exe::@target::@entry, workgroups = %buffer[%offset]
+    // CHECK: hal.command_buffer.dispatch.indirect %0, %1, entry_point = 0, workgroups = %2[%3]
+    hal.command_buffer.dispatch.indirect.symbol %cmd, %exe, entry_point = @exe::@target::@entry, workgroups = %buffer[%offset]
     return
   }
 }
@@ -114,8 +114,8 @@ module {
     %exe = "test_hal.executable"() : () -> !hal.executable
     %buffer = "test_hal.buffer"() : () -> !hal.buffer
     %offset = "test_hal.offset"() : () -> index
-    // CHECK: hal.command_buffer.dispatch.indirect.ordinal %0, %1, entry_point = 0, workgroups = %2[%3]
-    hal.command_buffer.dispatch.indirect.ordinal %cmd, %exe, entry_point = 0, workgroups = %buffer[%offset]
+    // CHECK: hal.command_buffer.dispatch.indirect %0, %1, entry_point = 0, workgroups = %2[%3]
+    hal.command_buffer.dispatch.indirect %cmd, %exe, entry_point = 0, workgroups = %buffer[%offset]
     return
   }
 }

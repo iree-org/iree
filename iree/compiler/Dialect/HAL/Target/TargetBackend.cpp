@@ -149,7 +149,7 @@ LogicalResult TargetBackend::recordDispatch(
   auto workgroupCount = calculateDispatchWorkgroupCount(
       loc, dispatchState.executableOp, dispatchState.entryPointOp, workload,
       builder);
-  builder.create<IREE::HAL::CommandBufferDispatchOp>(
+  builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
       loc, commandBuffer, executable, dispatchState.entryPointOp,
       workgroupCount[0], workgroupCount[1], workgroupCount[2]);
 

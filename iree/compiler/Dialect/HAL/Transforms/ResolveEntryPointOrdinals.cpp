@@ -23,14 +23,15 @@ namespace IREE {
 namespace HAL {
 
 class ResolveCommandBufferDispatchOrdinals
-    : public OpRewritePattern<IREE::HAL::CommandBufferDispatchOp> {
+    : public OpRewritePattern<IREE::HAL::CommandBufferDispatchSymbolOp> {
  public:
-  using OpRewritePattern<IREE::HAL::CommandBufferDispatchOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::HAL::CommandBufferDispatchOp op,
+  using OpRewritePattern<
+      IREE::HAL::CommandBufferDispatchSymbolOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::HAL::CommandBufferDispatchSymbolOp op,
                                 PatternRewriter &rewriter) const override {
     auto entryPointOp = dyn_cast<IREE::HAL::ExecutableEntryPointOp>(
         SymbolTable::lookupNearestSymbolFrom(op, op.entry_point()));
-    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchOrdinalOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchOp>(
         op, op.command_buffer(), op.executable(), entryPointOp.ordinalAttr(),
         op.workgroup_x(), op.workgroup_y(), op.workgroup_z());
     return success();
@@ -38,19 +39,19 @@ class ResolveCommandBufferDispatchOrdinals
 };
 
 class ResolveCommandBufferDispatchIndirectOrdinals
-    : public OpRewritePattern<IREE::HAL::CommandBufferDispatchIndirectOp> {
+    : public OpRewritePattern<
+          IREE::HAL::CommandBufferDispatchIndirectSymbolOp> {
  public:
   using OpRewritePattern<
-      IREE::HAL::CommandBufferDispatchIndirectOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::HAL::CommandBufferDispatchIndirectOp op,
-                                PatternRewriter &rewriter) const override {
+      IREE::HAL::CommandBufferDispatchIndirectSymbolOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferDispatchIndirectSymbolOp op,
+      PatternRewriter &rewriter) const override {
     auto entryPointOp = dyn_cast<IREE::HAL::ExecutableEntryPointOp>(
         SymbolTable::lookupNearestSymbolFrom(op, op.entry_point()));
-    rewriter
-        .replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchIndirectOrdinalOp>(
-            op, op.command_buffer(), op.executable(),
-            entryPointOp.ordinalAttr(), op.workgroups_buffer(),
-            op.workgroups_offset());
+    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchIndirectOp>(
+        op, op.command_buffer(), op.executable(), entryPointOp.ordinalAttr(),
+        op.workgroups_buffer(), op.workgroups_offset());
     return success();
   }
 };

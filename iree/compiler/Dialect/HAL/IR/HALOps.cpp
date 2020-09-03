@@ -851,7 +851,7 @@ void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
 // hal.command_buffer.dispatch
 //===----------------------------------------------------------------------===//
 
-void CommandBufferDispatchOp::build(
+void CommandBufferDispatchSymbolOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
     Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
     Value workgroupX, Value workgroupY, Value workgroupZ) {

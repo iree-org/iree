@@ -1170,17 +1170,17 @@ def HAL_CommandBufferBindDescriptorSetOp :
   ];
 }
 
-def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
-  let summary = [{command buffer dispatch recording operation}];
+def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol"> {
+  let summary = [{command buffer dispatch recording operation, using symbolref}];
   let description = [{
-    Dispatches an execution request.
+    Dispatches an execution request, using a symbol reference to the entry point.
 
     ```mlir
     %x = constant 128 : index
     %y = constant 32 : index
     %z = constant 1 : index
     hal.command_buffer.dispatch %cmd, %executable,
-                                entry_point = @executable::target::entry0,
+                                entry_point = @executable::@target::@entry0,
                                 workgroup_xyz = [%x, %y, %z]
     ```
   }];
@@ -1210,24 +1210,10 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   ];
 }
 
-// TODO(scotttodd): Re-evaluate naming
-//   Currently basic 'dispatch' is used during target backend compilation,
-//   then 'ordinal' is used just before serialization:
-//   - hal.command_buffer.dispatch, hal.command_buffer.dispatch.ordinal
-//
-//   But we could use something different during compilation and use
-//   unqualified 'dispatch' going forward:
-//   - hal.command_buffer.dispatch, hal.command_buffer.dispatch.symbolic
-//   - hal.command_buffer.dispatch, hal.command_buffer.dispatch.reference
-//
-//   Though what about command_buffer.dispatch.indirect?
-//
-//   Another option would be to make hal.command_buffer.dispatch take
-//   either OrdinalAttr OR SymbolRefAttr, then verify later...
-def HAL_CommandBufferDispatchOrdinalOp : HAL_Op<"command_buffer.dispatch.ordinal"> {
-  let summary = [{command buffer dispatch recording operation, using an entry point ordinal}];
+def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
+  let summary = [{command buffer dispatch recording operation}];
   let description = [{
-    Dispatches an execution request, using an entry point ordinal.
+    Dispatches an execution request.
 
     ```mlir
     %x = constant 128 : index
@@ -1255,15 +1241,15 @@ def HAL_CommandBufferDispatchOrdinalOp : HAL_Op<"command_buffer.dispatch.ordinal
   }];
 }
 
-def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
-  let summary = [{command buffer indirect dispatch recording operation}];
+def HAL_CommandBufferDispatchIndirectSymbolOp : HAL_Op<"command_buffer.dispatch.indirect.symbol"> {
+  let summary = [{command buffer indirect dispatch recording operation, using symbolref}];
   let description = [{
     Dispatches an execution request with the dispatch parameters loaded from the
-    given buffer.
+    given buffer, using using a symbol reference to the entry point.
 
     ```mlir
     hal.command_buffer.dispatch.indirect %cmd, %executable,
-                                         entry_point = @executable::target::entry0,
+                                         entry_point = @executable::@target::@entry0,
                                          workgroups = %buffer[%offset]
     ```
   }];
@@ -1282,11 +1268,11 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   }];
 }
 
-def HAL_CommandBufferDispatchIndirectOrdinalOp : HAL_Op<"command_buffer.dispatch.indirect.ordinal"> {
-  let summary = [{command buffer indirect dispatch recording operation, using an entry point ordinal}];
+def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
+  let summary = [{command buffer indirect dispatch recording operation}];
   let description = [{
     Dispatches an execution request with the dispatch parameters loaded from the
-    given buffer, using an entry point ordinal.
+    given buffer.
 
     ```mlir
     hal.command_buffer.dispatch.indirect.ordinal %cmd, %executable,
