@@ -4,7 +4,7 @@ module attributes {
   spv.target_env =
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
-		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @matmul_tile(%arg0 : memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>) {
     linalg.matmul %arg0, %arg1, %arg2 :
       (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>)
@@ -39,7 +39,7 @@ module attributes {
   spv.target_env =
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
-		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @conv_no_padding_tile(%arg0: memref<3x4x3x2xf32>,
                              %arg1: memref<?x?x?x3xf32>, %arg2: memref<?x?x?x2xf32>) {
     linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], strides = [1, 1]}
@@ -54,10 +54,10 @@ module attributes {
 //       CHECK: scf.parallel (%{{.*}}, %{{.*}}, %{{.*}})
 //       CHECK:    %[[ARG1SV:.+]] = subview %[[ARG1]]
 //       CHECK:    %[[ARG2SV:.+]] = subview %[[ARG2]]
-//       CHECK:    %[[ALLOC1:.+]] = alloc() : memref<1x7x36x3xf32, 3>
+//       CHECK:    %[[ALLOC1:.+]] = alloc()
 //       CHECK:    %[[SUBVIEW1:.+]] = subview %[[ALLOC1]]
 //       CHECK:    linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:       "copy_to_workgroup_memory"
 //       CHECK:    linalg.conv(%[[ARG0]], %[[SUBVIEW1]], %[[ARG2SV]])
 //  CHECK-SAME:       "workgroup_memory"
-//       CHECK:    dealloc %[[ALLOC1]] : memref<1x7x36x3xf32, 3>
+//       CHECK:    dealloc %[[ALLOC1]]
