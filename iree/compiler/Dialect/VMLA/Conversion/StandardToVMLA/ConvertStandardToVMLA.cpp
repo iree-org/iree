@@ -44,9 +44,11 @@ struct ConstantOpConversion
     if (!value) return failure();
 
     if (value.getType().getElementType().isInteger(1)) {
-      value = value.mapValues(rewriter.getIntegerType(8), llvm::function_ref<APInt(const APInt& val)>([](const APInt& val) -> APInt {
-        return APInt(8, val.getBoolValue());
-      }));
+      value = value.mapValues(rewriter.getIntegerType(8),
+                              llvm::function_ref<APInt(const APInt &val)>(
+                                  [](const APInt &val) -> APInt {
+                                    return APInt(8, val.getBoolValue());
+                                  }));
     }
 
     rewriter.replaceOpWithNewOp<IREE::VMLA::ConstantOp>(srcOp, value);

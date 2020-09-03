@@ -49,9 +49,11 @@ class AllocatorAllocateConstOpConversion
     // VM supports a minimum of 8-bit elements. Round 1-bit bools to 8-bits.
     auto value = op.value().cast<ElementsAttr>();
     if (value.getType().getElementType().isInteger(1)) {
-      value = value.mapValues(rewriter.getIntegerType(8), llvm::function_ref<APInt(const APInt& val)>([](const APInt& val) -> APInt {
-        return APInt(8, val.getBoolValue());
-      }));
+      value = value.mapValues(rewriter.getIntegerType(8),
+                              llvm::function_ref<APInt(const APInt &val)>(
+                                  [](const APInt &val) -> APInt {
+                                    return APInt(8, val.getBoolValue());
+                                  }));
     }
 
     auto rodataOp =
