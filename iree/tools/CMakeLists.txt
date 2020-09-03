@@ -322,10 +322,10 @@ if(${IREE_BUILD_COMPILER})
       ::init_iree_passes_and_dialects
       ::init_mlir_passes_and_dialects
       ::init_targets
+      ::init_xla_dialects
       ::vm_util
       LLVMSupport
       MLIRIR
-      MLIRSCFTransforms
       MLIRParser
       MLIRPass
       MLIRSupport
@@ -410,7 +410,7 @@ if(${IREE_ENABLE_MLIR})
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
   )
   if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    add_custom_target(LLVMFileCheck ALL
+    add_custom_target(BundledLLVMFileCheck ALL
       COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
       DEPENDS FileCheck
     )

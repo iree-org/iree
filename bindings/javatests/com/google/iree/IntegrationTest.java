@@ -16,17 +16,22 @@
 
 package com.google.iree;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.util.Log;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
@@ -34,6 +39,8 @@ import org.junit.runner.RunWith;
 
 @RunWith(AndroidJUnit4.class)
 public final class IntegrationTest {
+  private static final String TAG = IntegrationTest.class.getCanonicalName();
+
   @Test
   public void throwsExceptionWithoutNativeLib() throws Exception {
     try {
@@ -65,7 +72,29 @@ public final class IntegrationTest {
     Function function = ireeContext.resolveFunction(functionName);
     function.printDebugString();
 
-    // TODO(jennik): Invoke the function.
+    int elementCount = 4;
+    FloatBuffer x = ByteBuffer.allocateDirect(elementCount * /*sizeof(float)=*/4)
+                        .order(ByteOrder.nativeOrder())
+                        .asFloatBuffer()
+                        .put(new float[] {4.0f, 4.0f, 4.0f, 4.0f});
+    FloatBuffer y = ByteBuffer.allocateDirect(elementCount * /*sizeof(float)=*/4)
+                        .order(ByteOrder.nativeOrder())
+                        .asFloatBuffer()
+                        .put(new float[] {2.0f, 2.0f, 2.0f, 2.0f});
+    FloatBuffer[] inputs = {x, y};
+
+    // TODO(jennik): Allocate outputs in C++ rather than here.
+    FloatBuffer outputBuffer = ByteBuffer.allocateDirect(elementCount * /*sizeof(float)=*/4)
+                                   .order(ByteOrder.nativeOrder())
+                                   .asFloatBuffer()
+                                   .put(new float[] {1.0f, 2.0f, 3.0f, 4.0f});
+    ireeContext.invokeFunction(function, inputs, elementCount, outputBuffer);
+
+    float[] output = new float[elementCount];
+    outputBuffer.position(0);
+    outputBuffer.get(output);
+    Log.d(TAG, "Output: " + Arrays.toString(output));
+    assertArrayEquals(new float[] {8.0f, 8.0f, 8.0f, 8.0f}, output, 0.1f);
 
     function.free();
     module.free();
@@ -95,6 +124,29 @@ public final class IntegrationTest {
     String functionName = "module.simple_mul";
     Function function = ireeContext.resolveFunction(functionName);
     function.printDebugString();
+
+    int elementCount = 4;
+    FloatBuffer x = ByteBuffer.allocateDirect(elementCount * /*sizeof(float)=*/4)
+                        .order(ByteOrder.nativeOrder())
+                        .asFloatBuffer()
+                        .put(new float[] {4.0f, 4.0f, 4.0f, 4.0f});
+    FloatBuffer y = ByteBuffer.allocateDirect(elementCount * /*sizeof(float)=*/4)
+                        .order(ByteOrder.nativeOrder())
+                        .asFloatBuffer()
+                        .put(new float[] {2.0f, 2.0f, 2.0f, 2.0f});
+    FloatBuffer[] inputs = {x, y};
+
+    FloatBuffer outputBuffer = ByteBuffer.allocateDirect(elementCount * /*sizeof(float)=*/4)
+                                   .order(ByteOrder.nativeOrder())
+                                   .asFloatBuffer()
+                                   .put(new float[] {1.0f, 2.0f, 3.0f, 4.0f});
+    ireeContext.invokeFunction(function, inputs, elementCount, outputBuffer);
+
+    float[] output = new float[elementCount];
+    outputBuffer.position(0);
+    outputBuffer.get(output);
+    Log.d(TAG, "Output: " + Arrays.toString(output));
+    assertArrayEquals(new float[] {8.0f, 8.0f, 8.0f, 8.0f}, output, 0.1f);
 
     function.free();
     module.free();

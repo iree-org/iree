@@ -62,6 +62,7 @@ iree_pyext_library(
     iree::tools::init_iree_passes_and_dialects
     iree::tools::init_mlir_passes_and_dialects
     iree::tools::init_targets
+    iree::tools::init_xla_dialects
     LLVMSupport
     MLIRIR
     MLIRSCFTransforms

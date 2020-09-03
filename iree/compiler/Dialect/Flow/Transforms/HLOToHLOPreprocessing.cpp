@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/StandardTypes.h"
@@ -285,7 +286,7 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
     const auto &kernelShape = op.rhs().getType().cast<ShapedType>().getShape();
     if (kernelShape[featureInDim] != 1) return failure();
 
-    const auto groupCount = op.feature_group_count().getZExtValue();
+    const auto groupCount = op.feature_group_count();
     if (groupCount == 1) return failure();
     if (kernelShape[featureOutDim] % groupCount != 0) return failure();
 
@@ -374,6 +375,10 @@ class ReorderBroadcastInDimOpAndBinaryElementwiseOp
 
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<shape::ShapeDialect, mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;

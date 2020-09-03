@@ -45,7 +45,7 @@ namespace HAL {
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   TargetOptions executableOptions);
+                                   TargetOptions targetOptions);
 
 void registerHALTransformPassPipeline();
 

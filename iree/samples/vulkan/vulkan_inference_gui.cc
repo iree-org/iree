@@ -595,6 +595,24 @@ int iree::IreeMain(int argc, char** argv) {
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
       iree_allocator_null(), iree_allocator_system(), &bytecode_module));
+  // Query for details about what is in the loaded module.
+  iree_vm_module_signature_t bytecode_module_signature =
+      iree_vm_module_signature(bytecode_module);
+  LOG(INFO) << "Module loaded, have <"
+            << bytecode_module_signature.export_function_count
+            << "> exported functions:";
+  for (int i = 0; i < bytecode_module_signature.export_function_count; ++i) {
+    iree_string_view_t function_name;
+    iree_vm_function_signature_t function_signature;
+    IREE_CHECK_OK(bytecode_module->get_function(
+        bytecode_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
+        /*out_function=*/nullptr, &function_name, &function_signature));
+    LOG(INFO) << "  " << i << ": '"
+              << std::string(function_name.data, function_name.size)
+              << "' with <" << function_signature.argument_count
+              << "> argument(s) and <" << function_signature.result_count
+              << "> result(s)";
+  }
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* iree_context = nullptr;
@@ -602,7 +620,7 @@ int iree::IreeMain(int argc, char** argv) {
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
       iree_instance, modules.data(), modules.size(), iree_allocator_system(),
       &iree_context));
-  LOG(INFO) << "Module loaded and context is ready for use";
+  LOG(INFO) << "Context with modules is ready for use";
 
   // Lookup the entry point function.
   iree_vm_function_t main_function;
@@ -611,6 +629,10 @@ int iree::IreeMain(int argc, char** argv) {
       iree_context,
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
       &main_function));
+  iree_string_view_t main_function_name = iree_vm_function_name(&main_function);
+  LOG(INFO) << "Resolved main function named '"
+            << std::string(main_function_name.data, main_function_name.size)
+            << "'";
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------

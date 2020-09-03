@@ -286,8 +286,7 @@ static void recordPushConstants(Value device, Value commandBuffer,
   }
 
   auto interfaceOp = executableOp.getInterfaceOp();
-  uint64_t maxPushConstants =
-      interfaceOp.push_constants().getValueOr(APInt(32, 0)).getZExtValue();
+  uint64_t maxPushConstants = interfaceOp.push_constants().getValueOr(0);
   (void)maxPushConstants;
   assert(pushConstantValues.size() <= maxPushConstants &&
          "uniform buffer spilling not yet implemented");

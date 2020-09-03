@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include "llvm/Support/CommandLine.h"
+#include "mlir/IR/Dialect.h"
 
 namespace mlir {
 namespace iree_compiler {

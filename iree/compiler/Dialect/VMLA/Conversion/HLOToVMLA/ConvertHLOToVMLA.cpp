@@ -226,7 +226,7 @@ struct ConcatenateOpConversion
     int rank = finalType.getRank();
     llvm::SmallVector<Value, 4> srcIndices(rank, zero);
     llvm::SmallVector<Value, 4> dstIndices(rank, zero);
-    auto concatDimension = srcOp.dimension().getZExtValue();
+    auto concatDimension = srcOp.dimension();
     for (auto srcDstOperand : llvm::zip(srcOp.val(), operands)) {
       Value tensorOperand, bufferOperand;
       std::tie(tensorOperand, bufferOperand) = srcDstOperand;
@@ -684,6 +684,26 @@ struct CompareOpConversion : public OpConversionPattern<mhlo::CompareOp> {
   TypeConverter &typeConverter;
 };
 
+struct FiniteOpConversion : public OpConversionPattern<mhlo::IsFiniteOp> {
+  FiniteOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      mhlo::IsFiniteOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto input_type =
+        srcOp.getOperand().getType().cast<ShapedType>().getElementType();
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    rewriter.createOrFold<IREE::VMLA::FiniteOp>(
+        srcOp.getLoc(), srcOp.getOperand(), dst, TypeAttr::get(input_type));
+    rewriter.replaceOp(srcOp, {dst});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
   ConvertOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -810,6 +830,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
 
   patterns.insert<CompareOpConversion>(context, typeConverter);
+  patterns.insert<FiniteOpConversion>(context, typeConverter);
 
   // Ops that are only used for type information that we erase. We can elide
   // these entirely by just passing on their input values.

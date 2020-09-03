@@ -38,6 +38,11 @@ class ContextWrapper {
   Status ResolveFunction(iree_string_view_t name,
                          FunctionWrapper* function_wrapper);
 
+  // TODO(jennik): Support other input types aside from floats.
+  Status InvokeFunction(const FunctionWrapper& function_wrapper,
+                        const std::vector<float*>& inputs,
+                        int input_element_count, float* output);
+
   int id() const;
 
   ~ContextWrapper();

@@ -73,8 +73,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
     auto bindingName = "arg" + std::to_string(inputType.index());
     if (inputType.value().isa<TensorType>()) {
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName,
-          /*set=*/APInt(32, 0), /*binding=*/APInt(32, binding++),
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::Read);
     } else if (auto indexType = inputType.value().dyn_cast<IndexType>()) {
@@ -100,8 +99,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
     auto bindingName = "ret" + std::to_string(outputType.index());
     if (outputType.value().isa<TensorType>()) {
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName,
-          /*set=*/APInt(32, 0), /*binding=*/APInt(32, binding++),
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::DiscardWrite);
     } else {
@@ -329,6 +327,11 @@ class MaterializeInterfacesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
+
+    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
   }
 
   void runOnOperation() override {

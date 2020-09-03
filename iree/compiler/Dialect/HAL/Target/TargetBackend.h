@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
@@ -148,6 +149,16 @@ class TargetBackend {
   // as needed based on dispatch context.
   virtual void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                                 IREE::HAL::ExecutableOp executableOp);
+
+  // Register dependent dialects for the TargetBackend.
+  // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
+  // expected to register the dialects it will create entities for (Operations,
+  // Types, Attributes), other than dialects that exist in the input. These are
+  // the dialects that will be used in |declareTargetOps| and
+  // |buildTranslationPassPipeline|.
+  // TODO(#1036): We might be able to get rid of this with dynamic pass
+  // registration.
+  virtual void getDependentDialects(DialectRegistry &registry) const {}
 
   // Captured state from the point at which a dispatch is to be recorded.
   struct DispatchState {

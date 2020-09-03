@@ -16,6 +16,7 @@
 
 package com.google.iree;
 
+import java.nio.FloatBuffer;
 import java.util.List;
 
 /** An isolated execution context. */
@@ -63,6 +64,17 @@ final class Context {
     return function;
   }
 
+  public void invokeFunction(
+      Function function, FloatBuffer[] inputs, int inputElementCount, FloatBuffer output)
+      throws Exception {
+    Status status =
+        Status.fromCode(
+            nativeInvokeFunction(function.getNativeAddress(), inputs, inputElementCount, output));
+    if (!status.isOk()) {
+      throw status.toException("Could not invoke function");
+    }
+  }
+
   public int getId() {
     return nativeGetId();
   }
@@ -92,6 +104,10 @@ final class Context {
   private native int nativeRegisterModules(long[] moduleAddresses);
 
   private native int nativeResolveFunction(long functionAddress, String name);
+
+  // TODO(jennik): 'output' should be a Floatbuffer[].
+  private native int nativeInvokeFunction(
+      long functionAddress, FloatBuffer[] inputs, int inputElementCount, FloatBuffer output);
 
   private native void nativeFree();
 
