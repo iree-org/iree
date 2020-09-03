@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the project within the gcr.io/iree-oss/cmake using Kokoro.
+# Build and test IREE's bindings within the gcr.io/iree-oss/bazel-bindings
+# image using Kokoro.
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -31,8 +32,8 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake:latest \
-  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86/build.sh
+  gcr.io/iree-oss/bazel-bindings:latest \
+  build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/bindings/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
