@@ -249,7 +249,7 @@ if __name__ == '__main__':
     print(f'Processing image {image}')
     image_name = posixpath.join(IREE_GCR_URL, image)
     image_tag = f'{image_name}:{args.tag}'
-    image_path = os.path.join(DOCKER_DIR, image.replace('-', '_'))
+    image_path = os.path.join(DOCKER_DIR, image)
 
     if args.pull:
       check_stream_command(['docker', 'pull', image_tag], dry_run=args.dry_run)
