@@ -25,6 +25,11 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/TargetSelect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Target/LLVMIR.h"
 
 namespace mlir {
@@ -39,6 +44,16 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   // NOTE: we could vary this based on the options, such as by arch/etc.
   std::string name() const override { return "dylib*"; }
+
+  void getDependentDialects(DialectRegistry& registry) const override {
+    // clang-format off
+    registry.insert<AffineDialect,
+                    linalg::LinalgDialect,
+                    LLVM::LLVMDialect,
+                    scf::SCFDialect,
+                    vector::VectorDialect>();
+    // clang-format on
+  }
 
   void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
                                     OpPassManager& passManager) override {
