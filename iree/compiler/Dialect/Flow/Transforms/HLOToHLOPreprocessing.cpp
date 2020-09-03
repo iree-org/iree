@@ -331,16 +331,12 @@ class ReorderBroadcastInDimOpAndElementwiseOp
   LogicalResult matchAndRewrite(ElementwiseOpT op,
                                 PatternRewriter &rewriter) const override {
     Operation *operation = op.getOperation();
-    if (operation->getNumOperands() < 1 || operation->getNumResults() != 1 ||
-        !operation->getAttrs().empty()) {
-      return failure();
-    }
+    assert(operation->getNumOperands() >= 1 && operation->getNumResults() == 1);
 
-    auto operands = operation->getOperands();
     // Verify if all operands are from BroadcastInDimOp and its
     // broadcast_dimensions is the same.
     llvm::SmallVector<mhlo::BroadcastInDimOp, 2> bcastOps;
-    for (auto operand : operands) {
+    for (auto operand : operation->getOperands()) {
       auto bcastOp = operand.getDefiningOp<mhlo::BroadcastInDimOp>();
       if (!bcastOp) {
         return failure();
