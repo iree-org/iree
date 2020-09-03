@@ -233,7 +233,7 @@ void extendInboundMetadataOps(llvm::SetVector<Operation *> *subgraph) {
 
       if (auto tieShapeOp = llvm::dyn_cast<Shape::TieShapeOp>(metadataOp)) {
         LLVM_DEBUG(llvm::dbgs() << "    : Duplicating tie_shape op\n");
-        b.setInsertionPointAfter(tieShapeOp);
+        b.setInsertionPointAfter(tieShapeOp.getOperation());
         auto duped = b.create<Shape::TieShapeOp>(
             tieShapeOp.getLoc(), tieShapeOp.getType(), tieShapeOp,
             tieShapeOp.shape());
@@ -270,7 +270,7 @@ void extendOutboundMetadataOps(llvm::SetVector<Operation *> *subgraph) {
 
         if (auto tieShapeOp = llvm::dyn_cast<Shape::TieShapeOp>(metadataOp)) {
           LLVM_DEBUG(llvm::dbgs() << "    : Duplicating tie_shape op\n");
-          b.setInsertionPointAfter(tieShapeOp);
+          b.setInsertionPointAfter(tieShapeOp.getOperation());
           auto duped = b.create<Shape::TieShapeOp>(
               tieShapeOp.getLoc(), tieShapeOp.getType(), tieShapeOp,
               tieShapeOp.shape());
