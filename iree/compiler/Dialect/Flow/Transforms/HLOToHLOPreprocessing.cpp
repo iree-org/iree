@@ -337,11 +337,11 @@ class ReorderBroadcastInDimOpAndElementwiseOp
     // broadcast_dimensions is the same.
     llvm::SmallVector<mhlo::BroadcastInDimOp, 2> bcastOps;
     for (auto operand : operation->getOperands()) {
-      auto bcastOp = operand.getDefiningOp<mhlo::BroadcastInDimOp>();
-      if (!bcastOp) {
+      if (auto bcastOp = operand.getDefiningOp<mhlo::BroadcastInDimOp>()) {
+        bcastOps.push_back(bcastOp);
+      } else {
         return failure();
       }
-      bcastOps.push_back(bcastOp);
     }
 
     if (llvm::any_of(bcastOps, [&bcastOps](mhlo::BroadcastInDimOp bcastOp) {
