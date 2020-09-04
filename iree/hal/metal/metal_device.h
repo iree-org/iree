@@ -92,6 +92,12 @@ class MetalDevice final : public Device {
 
   std::unique_ptr<CommandQueue> command_queue_;
   mutable CommandQueue* common_queue_ = nullptr;
+
+  // A dispatch queue and associated event listener for running Objective-C
+  // blocks. This is typically used to wake up threads waiting on some HAL
+  // semaphore.
+  dispatch_queue_t wait_notifier_;
+  MTLSharedEventListener* event_listener_;
 };
 
 }  // namespace metal

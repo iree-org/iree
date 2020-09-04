@@ -28,8 +28,9 @@ namespace metal {
 class MetalSharedEvent final : public Semaphore {
  public:
   // Creates a MetalSharedEvent with the given |initial_value|.
-  static StatusOr<ref_ptr<Semaphore>> Create(id<MTLDevice> device,
-                                             uint64_t initial_value);
+  static StatusOr<ref_ptr<Semaphore>> Create(
+      id<MTLDevice> device, MTLSharedEventListener* event_listener,
+      uint64_t initial_value);
 
   ~MetalSharedEvent() override;
 
@@ -44,9 +45,14 @@ class MetalSharedEvent final : public Semaphore {
   Status Wait(uint64_t value, Time deadline_ns) override;
 
  private:
-  MetalSharedEvent(id<MTLDevice> device, uint64_t initial_value);
+  MetalSharedEvent(id<MTLDevice> device, MTLSharedEventListener* event_listener,
+                   uint64_t initial_value);
 
   id<MTLSharedEvent> metal_handle_;
+
+  // An event listener for waiting and signaling. Its lifetime is managed by
+  // the parent device.
+  MTLSharedEventListener* event_listener_;
 
   // NOTE: the MTLSharedEvent is the source of truth. We only need to access
   // this status (and thus take the lock) when we want to either signal failure

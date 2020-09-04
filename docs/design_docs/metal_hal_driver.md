@@ -11,6 +11,14 @@ GPU APIs is generally straightforward. This applies to the Metal HAL driver.
 
 ## Overall Design Choices
 
+### Metal Versions
+
+The Metal HAL driver expects Metal 2+. Metal 2 introduces useful features like
+argument buffer, performance shaders, and others, that can improve performance
+and make IREE HAL implementation simpler. Metal 2 was released late 2017.
+Typically Apple software gets updated fairly quickly on various devices, so we
+expect it's already very common now.
+
 ### Programming Languages and Libraries
 
 The Metal HAL driver lives under the [`iree/hal/metal/`][iree-metal] directory.

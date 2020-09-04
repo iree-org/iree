@@ -24,12 +24,14 @@ namespace metal {
 
 // static
 StatusOr<ref_ptr<Semaphore>> MetalSharedEvent::Create(id<MTLDevice> device,
+                                                      MTLSharedEventListener* event_listener,
                                                       uint64_t initial_value) {
-  return assign_ref(new MetalSharedEvent(device, initial_value));
+  return assign_ref(new MetalSharedEvent(device, event_listener, initial_value));
 }
 
-MetalSharedEvent::MetalSharedEvent(id<MTLDevice> device, uint64_t initial_value)
-    : metal_handle_([device newSharedEvent]) {
+MetalSharedEvent::MetalSharedEvent(id<MTLDevice> device, MTLSharedEventListener* event_listener,
+                                   uint64_t initial_value)
+    : metal_handle_([device newSharedEvent]), event_listener_(event_listener) {
   IREE_TRACE_SCOPE0("MetalSharedEvent::ctor");
   metal_handle_.signaledValue = initial_value;
 }
@@ -81,14 +83,10 @@ Status MetalSharedEvent::Wait(uint64_t value, Time deadline_ns) {
   // But marking it as __block serves as good documentation purpose.
   __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
 
-  // Register a listener to the MTLSharedEvent to notify us when the work is done on GPU by
-  // signaling a semaphore. The signaling will happen in a new dispatch queue; the current thread
-  // will wait on the semaphore.
-  dispatch_queue_t wait_notifier = dispatch_queue_create("MetalSharedEvent::Wait Notifier", NULL);
-  MTLSharedEventListener* listener =
-      [[MTLSharedEventListener alloc] initWithDispatchQueue:wait_notifier];
-
-  [metal_handle_ notifyListener:listener
+  // Use a listener to the MTLSharedEvent to notify us when the work is done on GPU bysignaling a
+  // semaphore. The signaling will happen in a new dispatch queue; the current thread will wait on
+  // the semaphore.
+  [metal_handle_ notifyListener:event_listener_
                         atValue:value
                           block:^(id<MTLSharedEvent>, uint64_t) {
                             dispatch_semaphore_signal(work_done);
@@ -96,8 +94,6 @@ Status MetalSharedEvent::Wait(uint64_t value, Time deadline_ns) {
 
   long timed_out = dispatch_semaphore_wait(work_done, timeout);
 
-  [listener release];
-  dispatch_release(wait_notifier);
   dispatch_release(work_done);
 
   if (timed_out) {

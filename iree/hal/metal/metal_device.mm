@@ -49,10 +49,15 @@ MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info)
   common_queue_ = command_queue_.get();
   // MetalCommandQueue retains by itself. Release here to avoid leaking.
   [metal_queue release];
+
+  wait_notifier_ = dispatch_queue_create("com.google.iree.semaphore_wait_notifier", NULL);
+  event_listener_ = [[MTLSharedEventListener alloc] initWithDispatchQueue:wait_notifier_];
 }
 
 MetalDevice::~MetalDevice() {
   IREE_TRACE_SCOPE0("MetalDevice::dtor");
+  [event_listener_ release];
+  dispatch_release(wait_notifier_);
   [metal_handle_ release];
 }
 
@@ -109,7 +114,7 @@ StatusOr<ref_ptr<Event>> MetalDevice::CreateEvent() {
 
 StatusOr<ref_ptr<Semaphore>> MetalDevice::CreateSemaphore(uint64_t initial_value) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateSemaphore");
-  return MetalSharedEvent::Create(metal_handle_, initial_value);
+  return MetalSharedEvent::Create(metal_handle_, event_listener_, initial_value);
 }
 
 Status MetalDevice::WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
@@ -153,16 +158,11 @@ StatusOr<int> MetalDevice::WaitAnySemaphore(absl::Span<const SemaphoreValue> sem
   // Also create a __block variable to store the index for the signaled semaphore.
   __block int signaled_index = 0;
 
-  dispatch_queue_t wait_notifier =
-      dispatch_queue_create("MetalDevice::WaitAnySemaphore Notifier", NULL);
-  MTLSharedEventListener* listener =
-      [[MTLSharedEventListener alloc] initWithDispatchQueue:wait_notifier];
-
   // The dispatch queue created in the above is a serial one. So even if multiple semaphores signal,
   // the semaphore signaling should be serialized.
   for (int i = 0; i < semaphores.size(); ++i) {
     auto* semaphore = static_cast<MetalSharedEvent*>(semaphores[i].semaphore);
-    [semaphore->handle() notifyListener:listener
+    [semaphore->handle() notifyListener:event_listener_
                                 atValue:semaphores[i].value
                                   block:^(id<MTLSharedEvent>, uint64_t) {
                                     dispatch_semaphore_signal(work_done);
@@ -173,8 +173,6 @@ StatusOr<int> MetalDevice::WaitAnySemaphore(absl::Span<const SemaphoreValue> sem
 
   long timed_out = dispatch_semaphore_wait(work_done, timeout);
 
-  [listener release];
-  dispatch_release(wait_notifier);
   dispatch_release(work_done);
 
   if (timed_out) {
