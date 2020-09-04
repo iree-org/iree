@@ -20,7 +20,7 @@
 #include "iree/base/time.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
-#include "iree/hal/metal/apple_time_util.h"
+#include "iree/hal/metal/dispatch_time_util.h"
 #include "iree/hal/metal/metal_command_buffer.h"
 #include "iree/hal/metal/metal_command_queue.h"
 #include "iree/hal/metal/metal_shared_event.h"
@@ -140,7 +140,7 @@ StatusOr<int> MetalDevice::WaitAnySemaphore(absl::Span<const SemaphoreValue> sem
   }
 
   // Otherwise, we need to go down a more complicated path by registering listeners to all
-  // MTLSharedEvnts to notify us when at least one of them has done the work on GPU by signaling a
+  // MTLSharedEvents to notify us when at least one of them has done the work on GPU by signaling a
   // semaphore. The signaling will happen in a new dispatch queue; the current thread will wait on
   // the semaphore.
 

@@ -16,7 +16,7 @@
 
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/metal/apple_time_util.h"
+#include "iree/hal/metal/dispatch_time_util.h"
 #include "iree/hal/metal/metal_command_buffer.h"
 #include "iree/hal/metal/metal_shared_event.h"
 
@@ -69,8 +69,8 @@ Status MetalCommandQueue::WaitIdle(Time deadline_ns) {
 
   dispatch_time_t timeout = DeadlineToDispatchTime(deadline_ns);
 
-  // Submit an empty command buffer and wait it to complete. That will indiate all previous work
-  // are done.
+  // Submit an empty command buffer and wait for it to complete. That will indicate all previous
+  // work has completed too.
   @autoreleasepool {
     id<MTLCommandBuffer> comand_buffer = [metal_handle_ commandBufferWithUnretainedReferences];
     __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);

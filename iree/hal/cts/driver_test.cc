@@ -24,14 +24,15 @@ namespace cts {
 class DriverTest : public CtsTestBase {};
 
 TEST_P(DriverTest, CreateDefaultDevice) {
-  EXPECT_TRUE(IsOk(driver_->CreateDefaultDevice()));
+  LOG(INFO) << "Device details:\n" << device_->DebugString();
 }
 
 TEST_P(DriverTest, EnumerateAndCreateAvailableDevices) {
   IREE_ASSERT_OK_AND_ASSIGN(auto devices, driver_->EnumerateAvailableDevices());
 
-  for (const auto& info : devices) {
-    EXPECT_TRUE(IsOk(driver_->CreateDevice(info)));
+  for (int i = 0; i < devices.size(); ++i) {
+    IREE_ASSERT_OK_AND_ASSIGN(auto device, driver_->CreateDevice(devices[i]));
+    LOG(INFO) << "Device #" << i << " details:\n" << device->DebugString();
   }
 }
 

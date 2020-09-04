@@ -101,9 +101,6 @@ TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
 
 // Waiting all semaphores and all are signaled.
 TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
-  // TODO: fix this.
-  if (driver_->name() == "dylib") GTEST_SKIP();
-
   IREE_ASSERT_OK_AND_ASSIGN(auto a, device_->CreateSemaphore(1u));
   IREE_ASSERT_OK_AND_ASSIGN(auto b, device_->CreateSemaphore(1u));
   IREE_ASSERT_OK(device_->WaitAllSemaphores({{a.get(), 1u}, {b.get(), 1u}},

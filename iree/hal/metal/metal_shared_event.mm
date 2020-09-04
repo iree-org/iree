@@ -16,7 +16,7 @@
 
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/metal/apple_time_util.h"
+#include "iree/hal/metal/dispatch_time_util.h"
 
 namespace iree {
 namespace hal {

@@ -27,7 +27,7 @@ namespace metal {
 namespace {
 
 // Returns an autoreleased array of available Metal GPU devices.
-NSArray<id<MTLDevice>> *GetAvailableMetalDevices() {
+NSArray<id<MTLDevice>>* GetAvailableMetalDevices() {
 #if defined(IREE_PLATFORM_MACOS)
   // For macOS, we might have more than one GPU devices.
   return [MTLCopyAllDevices() autorelease];
@@ -45,7 +45,7 @@ StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create() {
   IREE_TRACE_SCOPE0("MetalDriver::Create");
 
   @autoreleasepool {
-    NSArray<id<MTLDevice>> *devices = GetAvailableMetalDevices();
+    NSArray<id<MTLDevice>>* devices = GetAvailableMetalDevices();
     if (devices == nil) {
       return UnavailableErrorBuilder(IREE_LOC) << "no Metal GPU devices available";
     }
@@ -54,7 +54,7 @@ StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create() {
     for (id<MTLDevice> device in devices) {
       std::string name = std::string([device.name UTF8String]);
       DeviceFeatureBitfield supported_features = DeviceFeature::kNone;
-      DriverDeviceID device_id = reinterpret_cast<DriverDeviceID>((__bridge void *)device);
+      DriverDeviceID device_id = reinterpret_cast<DriverDeviceID>((__bridge void*)device);
       device_infos.emplace_back("metal", std::move(name), supported_features, device_id);
     }
     return assign_ref(new MetalDriver(std::move(device_infos)));
@@ -64,7 +64,7 @@ StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create() {
 MetalDriver::MetalDriver(std::vector<DeviceInfo> devices)
     : Driver("metal"), devices_(std::move(devices)) {
   // Retain all the retained Metal GPU devices.
-  for (const auto &device : devices_) {
+  for (const auto& device : devices_) {
     [(__bridge id<MTLDevice>)device.device_id() retain];
   }
 }
@@ -73,7 +73,7 @@ MetalDriver::~MetalDriver() {
   IREE_TRACE_SCOPE0("MetalDriver::dtor");
 
   // Release all the retained Metal GPU devices.
-  for (const auto &device : devices_) {
+  for (const auto& device : devices_) {
     [(__bridge id<MTLDevice>)device.device_id() release];
   }
 }
@@ -96,10 +96,10 @@ StatusOr<ref_ptr<Device>> MetalDriver::CreateDefaultDevice() {
 StatusOr<ref_ptr<Device>> MetalDriver::CreateDevice(DriverDeviceID device_id) {
   IREE_TRACE_SCOPE0("MetalDriver::CreateDevice");
 
-  for (const DeviceInfo &info : devices_) {
+  for (const DeviceInfo& info : devices_) {
     if (info.device_id() == device_id) return MetalDevice::Create(add_ref(this), info);
   }
-  return InvalidArgumentErrorBuilder(IREE_LOC) << "unkown driver device id: " << device_id;
+  return InvalidArgumentErrorBuilder(IREE_LOC) << "unknown driver device id: " << device_id;
 }
 
 }  // namespace metal
