@@ -20,6 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
@@ -84,6 +85,10 @@ struct TieShapeElider final : public OpRewritePattern<Shape::TieShapeOp> {
 
 struct ResolveShapeOpsPass
     : public PassWrapper<ResolveShapeOpsPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect>();
+  }
+
   void runOnFunction() override;
 };
 }  // namespace
@@ -99,8 +104,9 @@ void ResolveShapeOpsPass::runOnFunction() {
   ConversionTarget target(*context);
   target.addIllegalOp<DimOp>();
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-  if (failed(applyFullConversion(getFunction(), target, dimPatterns)))
+  if (failed(applyFullConversion(getFunction(), target, dimPatterns))) {
     return signalPassFailure();
+  }
 
   OwningRewritePatternList shapePatterns;
   shapePatterns.insert<TieShapeElider>(context);

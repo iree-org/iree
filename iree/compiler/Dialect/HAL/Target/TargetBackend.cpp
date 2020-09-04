@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include "llvm/Support/CommandLine.h"
+#include "mlir/IR/Dialect.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -70,13 +71,13 @@ bool TargetBackend::matchPattern(StringRef value, StringRef pattern) {
   return false;
 }
 
-void TargetBackend::constructTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                                       IREE::HAL::ExecutableOp executableOp) {
+void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
+                                     IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
       sourceOp.getLoc(), name());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-  containerBuilder.clone(*sourceOp.getInnerModule().getOperation());
+  containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
 
 std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupSize(

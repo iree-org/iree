@@ -48,9 +48,7 @@ PLATFORM_VULKAN_DEPS = select({
 })
 
 # A platform-sensitive list of dependencies for tests using Vulkan.
-PLATFORM_VULKAN_TEST_DEPS = [
-    "//iree/testing:gtest_main",
-]
+PLATFORM_VULKAN_TEST_DEPS = []
 
 # Driver modules that register themselves at link time.
 IREE_DRIVER_MODULES = [
@@ -94,3 +92,16 @@ def cc_binary(linkopts = [], **kwargs):
         ],
         **kwargs
     )
+
+def iree_cmake_extra_content(content = "", inline = False):
+    """Tool for inserting arbitrary content during Bazel->CMake conversion.
+
+    This does nothing in Bazel, while the contents are inserted as-is in
+    converted CMakeLists.txt files.
+
+    Args:
+      content: The text to insert into the converted file.
+      inline: If true, the content will be inserted inline. Otherwise, it will
+        be inserted near the top of the converted file.
+    """
+    pass

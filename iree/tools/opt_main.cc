@@ -76,21 +76,23 @@ static llvm::cl::opt<bool> showDialects(
     llvm::cl::init(false));
 
 int main(int argc, char **argv) {
-  mlir::registerMlirDialects();
+  llvm::InitLLVM y(argc, argv);
+
+  mlir::DialectRegistry registry;
+  mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
 #ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCDialect();
+  mlir::registerEmitCDialect(registry);
 #endif  // IREE_HAVE_EMITC_DIALECT
-  mlir::registerXLADialects();
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALConversionPasses();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
   mlir::iree_compiler::registerHLOToLinalgPasses();
   mlir::iree_compiler::registerLinalgToLLVMPasses();
-  llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
@@ -108,11 +110,10 @@ int main(int argc, char **argv) {
                                     "IREE modular optimizer driver\n");
 
   if (showDialects) {
-    llvm::outs() << "Registered Dialects:\n";
-    mlir::MLIRContext context;
-    for (mlir::Dialect *dialect : context.getRegisteredDialects()) {
-      llvm::outs() << dialect->getNamespace() << "\n";
-    }
+    llvm::outs() << "Available Dialects:\n";
+    interleave(
+        registry, llvm::outs(),
+        [](auto &registryEntry) { llvm::outs() << registryEntry.first; }, "\n");
     return 0;
   }
 
@@ -130,7 +131,12 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
-                                  splitInputFile, verifyDiagnostics,
-                                  verifyPasses, allowUnregisteredDialects));
+  // TODO(#2958): There's a simpler version of MlirOptMain we should be able to
+  // use.
+  if (failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
+                               registry, splitInputFile, verifyDiagnostics,
+                               verifyPasses, allowUnregisteredDialects,
+                               /*preloadDialectsInContext=*/false))) {
+    return 1;
+  }
 }

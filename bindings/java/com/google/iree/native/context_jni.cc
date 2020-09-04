@@ -113,8 +113,32 @@ JNI_FUNC jint JNI_PREFIX(nativeResolveFunction)(JNIEnv* env, jobject thiz,
   const char* native_name = env->GetStringUTFChars(name, /*isCopy=*/nullptr);
 
   auto status = context->ResolveFunction(
-      *function, iree_string_view_t{native_name, strlen(native_name)});
+      iree_string_view_t{native_name, strlen(native_name)}, function);
   env->ReleaseStringUTFChars(name, native_name);
+  return (jint)status.code();
+}
+
+JNI_FUNC jint JNI_PREFIX(nativeInvokeFunction)(JNIEnv* env, jobject thiz,
+                                               jlong functionAddress,
+                                               jobjectArray inputs,
+                                               jint inputElementCount,
+                                               jobject output) {
+  ContextWrapper* context = GetContextWrapper(env, thiz);
+  CHECK_NE(context, nullptr);
+
+  const jsize inputs_size = env->GetArrayLength(inputs);
+  std::vector<float*> native_inputs(inputs_size);
+
+  for (int i = 0; i < inputs_size; i++) {
+    jobject input = env->GetObjectArrayElement(inputs, i);
+    float* native_input = (float*)env->GetDirectBufferAddress(input);
+    native_inputs[i] = native_input;
+  }
+
+  auto function = (FunctionWrapper*)functionAddress;
+  float* native_output = (float*)env->GetDirectBufferAddress(output);
+  auto status = context->InvokeFunction(*function, native_inputs,
+                                        (int)inputElementCount, native_output);
   return (jint)status.code();
 }
 

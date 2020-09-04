@@ -36,7 +36,7 @@ func @exportedTensor(%arg0 : tensor<4x4xi64>, %arg1 : tensor<5x5xi64>) -> tensor
 // CHECK-LABEL: func @unrecognizedArgument
 // CHECK-SAME: iree.reflection = {f_partial = "I4!U1!"}
 // expected-warning @+1 {{Argument #0 of function unrecognizedArgument is not a recognized public ABI type and the function may not be invokable by standard tools}}
-func @unrecognizedArgument(%arg0 : i1) -> ()
+func @unrecognizedArgument(%arg0 : i3) -> ()
     attributes {iree.module.export}
 {
   return
@@ -46,11 +46,11 @@ func @unrecognizedArgument(%arg0 : i1) -> ()
 // CHECK-LABEL: func @unrecognizedResult
 // CHECK-SAME: iree.reflection = {f_partial = "R4!U1!"}
 // expected-warning @+1 {{Result #0 of function unrecognizedResult is not a recognized public ABI type and the function may not be invokable by standard tools}}
-func @unrecognizedResult() -> (i1)
+func @unrecognizedResult() -> (i3)
     attributes {iree.module.export}
 {
-  %0 = constant 0 : i1
-  return %0 : i1
+  %0 = constant 0 : i3
+  return %0 : i3
 }
 
 // -----

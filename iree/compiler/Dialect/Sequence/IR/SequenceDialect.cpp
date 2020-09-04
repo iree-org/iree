@@ -31,7 +31,7 @@ namespace Sequence {
 static DialectRegistration<SequenceDialect> sequence_dialect;
 
 SequenceDialect::SequenceDialect(MLIRContext* context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<SequenceDialect>()) {
   addTypes<SequenceType>();
 
 #define GET_OP_LIST
@@ -53,17 +53,8 @@ Type SequenceDialect::parseType(DialectAsmParser& parser) const {
 }
 
 void SequenceDialect::printType(Type type, DialectAsmPrinter& os) const {
-  switch (type.getKind()) {
-    case TypeKind::Sequence: {
-      auto targetType = type.cast<SequenceType>().getTargetType();
-      os << "of<";
-      os.printType(targetType);
-      os << ">";
-      break;
-    }
-    default:
-      llvm_unreachable("unhandled sequence type");
-  }
+  if (auto sequenceType = type.dyn_cast<SequenceType>())
+    os << "of<" << sequenceType.getTargetType() << ">";
 }
 
 }  // namespace Sequence

@@ -67,6 +67,9 @@ class TimePointFence final : public RefObject<TimePointFence>,
   // under the hood.
   VkResult GetStatus();
 
+  // Resets the status to unsignaled (VK_NOT_READY).
+  void ResetStatus();
+
   // Returns the pool from which this fence comes.
   TimePointFencePool* pool() const { return pool_; }
 
@@ -117,7 +120,7 @@ struct TimePointSemaphore final : public IntrusiveLinkBase<void> {
 // all the semaphores in the same submission to a `VkQueue`.
 class TimePointFencePool final : public RefObject<TimePointFencePool> {
  public:
-  static constexpr int kMaxInFlightFenceCount = 128;
+  static constexpr int kMaxInFlightFenceCount = 64;
 
   // Creates a new pool and pre-allocates `kMaxInFlightFenceCount` fences.
   static StatusOr<ref_ptr<TimePointFencePool>> Create(

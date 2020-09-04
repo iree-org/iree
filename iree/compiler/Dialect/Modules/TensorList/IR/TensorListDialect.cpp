@@ -56,7 +56,8 @@ class TensorListToVMConversionInterface : public VMConversionDialectInterface {
 }  // namespace
 
 TensorListDialect::TensorListDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context,
+              TypeID::get<TensorListDialect>()) {
   addInterfaces<TensorListToVMConversionInterface>();
 
   addTypes<TensorListType>();

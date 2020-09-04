@@ -18,6 +18,7 @@
 #include <cinttypes>
 #include <cstdio>
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -27,7 +28,6 @@
 #include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/memory.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api_detail.h"
@@ -63,27 +63,28 @@ namespace hal {
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
-  if (!out_shape_rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_shape_rank);
   *out_shape_rank = 0;
 
   auto str_value = absl::string_view(value.data, value.size);
   if (str_value.empty()) {
-    return IREE_STATUS_OK;
+    return iree_ok_status();  // empty shape
   }
 
   absl::InlinedVector<iree_hal_dim_t, 6> dims;
   for (auto dim_str : absl::StrSplit(str_value, 'x')) {
     int dim_value = 0;
     if (!absl::SimpleAtoi(dim_str, &dim_value)) {
-      LOG(ERROR) << "Invalid shape dimension '" << dim_str
-                 << "' while parsing shape '" << str_value << "'";
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "shape[%zu] invalid value '%.*s' of '%.*s'",
+                              dims.size(), (int)dim_str.size(), dim_str.data(),
+                              (int)value.size, value.data);
     }
     if (dim_value < 0) {
-      LOG(ERROR) << "Unsupported shape dimension '" << dim_str << "'";
-      return IREE_STATUS_INVALID_ARGUMENT;
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "shape[%zu] unsupported value %d of '%.*s'",
+                              dims.size(), dim_value, (int)value.size,
+                              value.data);
     }
     dims.push_back(dim_value);
   }
@@ -91,12 +92,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_shape(
     *out_shape_rank = dims.size();
   }
   if (dims.size() > shape_capacity) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
   if (out_shape) {
     std::memcpy(out_shape, dims.data(), dims.size() * sizeof(*out_shape));
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -112,7 +113,8 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
                           buffer ? buffer_capacity - buffer_length : 0,
                           (i < shape_rank - 1) ? "%dx" : "%d", shape[i]);
     if (n < 0) {
-      return IREE_STATUS_FAILED_PRECONDITION;
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "snprintf failed to write dimension %zu", i);
     } else if (buffer && n >= buffer_capacity - buffer_length) {
       buffer = nullptr;
     }
@@ -121,14 +123,13 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
   if (out_buffer_length) {
     *out_buffer_length = buffer_length;
   }
-  return buffer ? IREE_STATUS_OK : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
     iree_string_view_t value, iree_hal_element_type_t* out_element_type) {
-  if (!out_element_type) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_element_type);
   *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
 
   auto str_value = absl::string_view(value.data, value.size);
@@ -148,16 +149,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
     numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
     str_value.remove_prefix(1);
   } else {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unhandled element type prefix in '%.*s'",
+                            (int)value.size, value.data);
   }
 
   uint32_t bit_count = 0;
   if (!absl::SimpleAtoi(str_value, &bit_count) || bit_count > 0xFFu) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "out of range bit count in '%.*s'", (int)value.size,
+                            value.data);
   }
 
   *out_element_type = iree_hal_make_element_type(numerical_type, bit_count);
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
@@ -185,12 +190,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
       buffer, buffer_capacity, "%s%d", prefix,
       static_cast<int32_t>(iree_hal_element_bit_count(element_type)));
   if (n < 0) {
-    return IREE_STATUS_FAILED_PRECONDITION;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   }
   if (out_buffer_length) {
     *out_buffer_length = n;
   }
-  return n >= buffer_capacity ? IREE_STATUS_OUT_OF_RANGE : IREE_STATUS_OK;
+  return n >= buffer_capacity ? iree_status_from_code(IREE_STATUS_OUT_OF_RANGE)
+                              : iree_ok_status();
 }
 
 // Parses a string of two character pairs representing hex numbers into bytes.
@@ -224,82 +230,94 @@ static void iree_hal_hex_string_to_bytes(const char* from, uint8_t* to,
 
 // Parses a signal element string, assuming that the caller has validated that
 // |out_data| has enough storage space for the parsed element data.
-static bool iree_hal_parse_element_unsafe(iree_string_view_t data_str,
-                                          iree_hal_element_type_t element_type,
-                                          uint8_t* out_data) {
+static iree_status_t iree_hal_parse_element_unsafe(
+    iree_string_view_t data_str, iree_hal_element_type_t element_type,
+    uint8_t* out_data) {
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_SINT_8: {
       int32_t temp = 0;
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > INT8_MAX) {
-        return false;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<int8_t*>(out_data) = static_cast<int8_t>(temp);
-      return true;
+      return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_UINT_8: {
       uint32_t temp = 0;
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > UINT8_MAX) {
-        return false;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<uint8_t*>(out_data) = static_cast<uint8_t>(temp);
-      return true;
+      return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_SINT_16: {
       int32_t temp = 0;
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > INT16_MAX) {
-        return false;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<int16_t*>(out_data) = static_cast<int16_t>(temp);
-      return true;
+      return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_UINT_16: {
       uint32_t temp = 0;
       if (!absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
                             &temp) ||
           temp > UINT16_MAX) {
-        return false;
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
       }
       *reinterpret_cast<uint16_t*>(out_data) = static_cast<uint16_t>(temp);
-      return true;
+      return iree_ok_status();
     }
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<int32_t*>(out_data));
+                              reinterpret_cast<int32_t*>(out_data))
+                 ? iree_ok_status()
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<uint32_t*>(out_data));
+                              reinterpret_cast<uint32_t*>(out_data))
+                 ? iree_ok_status()
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<int64_t*>(out_data));
+                              reinterpret_cast<int64_t*>(out_data))
+                 ? iree_ok_status()
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       return absl::SimpleAtoi(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<uint64_t*>(out_data));
+                              reinterpret_cast<uint64_t*>(out_data))
+                 ? iree_ok_status()
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      LOG(ERROR) << "Unimplemented parser for element format FLOAT_16";
-      return false;
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "float16 parsing not implemented");
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       return absl::SimpleAtof(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<float*>(out_data));
+                              reinterpret_cast<float*>(out_data))
+                 ? iree_ok_status()
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       return absl::SimpleAtod(absl::string_view(data_str.data, data_str.size),
-                              reinterpret_cast<double*>(out_data));
+                              reinterpret_cast<double*>(out_data))
+                 ? iree_ok_status()
+                 : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     default: {
       // Treat any unknown format as binary.
       iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
       if (data_str.size != element_size * 2) {
-        LOG(ERROR) << "Element hex byte count mismatch (expected "
-                   << element_size * 2 << " chars, have " << data_str.size
-                   << ")";
-        return false;
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "binary hex element count mismatch: buffer "
+                                "length=%zu < expected=%zu",
+                                data_str.size, element_size * 2);
       }
       iree_hal_hex_string_to_bytes(data_str.data, out_data, element_size);
-      return true;
+      return iree_ok_status();
     }
   }
 }
@@ -309,13 +327,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element(
     iree_byte_span_t data_ptr) {
   iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
   if (data_ptr.data_length < element_size) {
-    LOG(ERROR) << "Output data buffer overflow (needed " << element_size
-               << ", have " << data_ptr.data_length << ")";
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "output data buffer overflow: data_length=%zu < element_size=%zu",
+        data_ptr.data_length, element_size);
   }
-  return iree_hal_parse_element_unsafe(data_str, element_type, data_ptr.data)
-             ? IREE_STATUS_OK
-             : IREE_STATUS_INVALID_ARGUMENT;
+  return iree_hal_parse_element_unsafe(data_str, element_type, data_ptr.data);
 }
 
 // Converts a sequence of bytes into hex number strings.
@@ -350,8 +367,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
     iree_host_size_t* out_buffer_length) {
   iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
   if (data.data_length < element_size) {
-    LOG(ERROR) << "Data buffer underflow on element format";
-    return IREE_STATUS_OUT_OF_RANGE;
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "data buffer underflow: data_length=%zu < element_size=%zu",
+        data.data_length, element_size);
   }
   int n = 0;
   switch (element_type) {
@@ -388,8 +407,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
                         *reinterpret_cast<const uint64_t*>(data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      LOG(ERROR) << "Unimplemented parser for element format FLOAT_16";
-      return IREE_STATUS_UNIMPLEMENTED;
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "parser for float16 not yet implemented");
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       n = std::snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
                         *reinterpret_cast<const float*>(data.data));
@@ -408,14 +427,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element(
     }
   }
   if (n < 0) {
-    return IREE_STATUS_FAILED_PRECONDITION;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   } else if (buffer && n >= buffer_capacity) {
     buffer = nullptr;
   }
   if (out_buffer_length) {
     *out_buffer_length = n;
   }
-  return buffer ? IREE_STATUS_OK : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
@@ -426,7 +446,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
   iree_host_size_t element_capacity = data_ptr.data_length / element_size;
   if (iree_string_view_is_empty(data_str)) {
     memset(data_ptr.data, 0, data_ptr.data_length);
-    return IREE_STATUS_OK;
+    return iree_ok_status();
   }
   size_t src_i = 0;
   size_t dst_i = 0;
@@ -444,33 +464,29 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
       continue;
     }
     if (dst_i >= element_capacity) {
-      LOG(ERROR)
-          << "Output data buffer overflow (too many elements present, have >= "
-          << dst_i << ", expected " << element_capacity << ")";
-      return IREE_STATUS_OUT_OF_RANGE;
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "output data buffer overflow: element_capacity=%zu < dst_i=%zu+",
+          element_capacity, dst_i);
     }
-    if (!iree_hal_parse_element_unsafe(
-            iree_string_view_t{data_str.data + token_start,
-                               src_i - 2 - token_start + 1},
-            element_type, data_ptr.data + dst_i * element_size)) {
-      return IREE_STATUS_INVALID_ARGUMENT;
-    }
+    IREE_RETURN_IF_ERROR(iree_hal_parse_element_unsafe(
+        iree_string_view_t{data_str.data + token_start,
+                           src_i - 2 - token_start + 1},
+        element_type, data_ptr.data + dst_i * element_size));
     ++dst_i;
     token_start = std::string::npos;
   }
   if (token_start != std::string::npos) {
     if (dst_i >= element_capacity) {
-      LOG(ERROR)
-          << "Output data buffer overflow (too many elements present, have > "
-          << dst_i << ", expected " << element_capacity << ")";
-      return IREE_STATUS_OUT_OF_RANGE;
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "output data overflow: element_capacity=%zu < dst_i=%zu",
+          element_capacity, dst_i);
     }
-    if (!iree_hal_parse_element_unsafe(
-            iree_string_view_t{data_str.data + token_start,
-                               data_str.size - token_start},
-            element_type, data_ptr.data + dst_i * element_size)) {
-      return IREE_STATUS_INVALID_ARGUMENT;
-    }
+    IREE_RETURN_IF_ERROR(iree_hal_parse_element_unsafe(
+        iree_string_view_t{data_str.data + token_start,
+                           data_str.size - token_start},
+        element_type, data_ptr.data + dst_i * element_size));
     ++dst_i;
   }
   if (dst_i == 1 && element_capacity > 1) {
@@ -480,13 +496,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_buffer_elements(
       memcpy(p, data_ptr.data, element_size);
     }
   } else if (dst_i < element_capacity) {
-    LOG(ERROR)
-        << "Input data string contains fewer elements than the underlying "
-           "buffer (expected "
-        << element_capacity << ", have " << dst_i << ")";
-    return IREE_STATUS_OUT_OF_RANGE;
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "input data string underflow: dst_i=%zu < element_capacity=%zu", dst_i,
+        element_capacity);
   }
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_format_buffer_elements_recursive(
@@ -522,7 +537,11 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
     iree_device_size_t dim_stride =
         dim_length * iree_hal_element_byte_count(element_type);
     if (data.data_length < dim_stride * shape[0]) {
-      return IREE_STATUS_OUT_OF_RANGE;
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "input data underflow: data_length=%zu < expected=%zu",
+          data.data_length,
+          static_cast<iree_host_size_t>(dim_stride * shape[0]));
     }
     iree_const_byte_span_t subdata;
     subdata.data = data.data;
@@ -550,7 +569,11 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
     iree_device_size_t element_stride =
         iree_hal_element_byte_count(element_type);
     if (data.data_length < max_count * element_stride) {
-      return IREE_STATUS_OUT_OF_RANGE;
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "input data underflow; data_length=%zu < expected=%zu",
+          data.data_length,
+          static_cast<iree_host_size_t>(max_count * element_stride));
     }
     *max_element_count -= max_count;
     iree_const_byte_span_t subdata;
@@ -579,7 +602,8 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
   if (out_buffer_length) {
     *out_buffer_length = buffer_length;
   }
-  return buffer ? IREE_STATUS_OK : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_buffer_elements(
@@ -609,25 +633,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_allocator_create_host_local(iree_allocator_t allocator,
                                      iree_hal_allocator** out_allocator) {
   IREE_TRACE_SCOPE0("iree_hal_allocator_create_host_local");
-  if (!out_allocator) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_allocator);
   *out_allocator =
       reinterpret_cast<iree_hal_allocator_t*>(new host::HostLocalAllocator());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
     const iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_device_size_t* out_allocation_size) {
-  if (!out_allocation_size) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(shape);
+  IREE_ASSERT_ARGUMENT(out_allocation_size);
   *out_allocation_size = 0;
-  if (!allocator) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
   // TODO(benvanik): layout/padding.
   iree_device_size_t byte_length = iree_hal_element_byte_count(element_type);
@@ -635,7 +654,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
     byte_length *= shape[i];
   }
   *out_allocation_size = byte_length;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
@@ -643,25 +662,27 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     const iree_hal_dim_t* indices, iree_host_size_t indices_count,
     iree_device_size_t* out_offset) {
-  if (!out_offset) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(shape);
+  IREE_ASSERT_ARGUMENT(indices);
+  IREE_ASSERT_ARGUMENT(out_offset);
   *out_offset = 0;
-  if (!allocator) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   if (shape_rank != indices_count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "shape rank/indices mismatch: %zu != %zu",
+                            shape_rank, indices_count);
   }
 
   // TODO(benvanik): layout/padding.
   iree_device_size_t offset = 0;
-  for (int i = 0; i < indices_count; ++i) {
+  for (iree_host_size_t i = 0; i < indices_count; ++i) {
     if (indices[i] >= shape[i]) {
-      return IREE_STATUS_OUT_OF_RANGE;
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "index[%zu] out of bounds: %d >= %d", i,
+                              indices[i], shape[i]);
     }
     iree_device_size_t axis_offset = indices[i];
-    for (int j = i + 1; j < shape_rank; ++j) {
+    for (iree_host_size_t j = i + 1; j < shape_rank; ++j) {
       axis_offset *= shape[j];
     }
     offset += axis_offset;
@@ -669,7 +690,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
   offset *= iree_hal_element_byte_count(element_type);
 
   *out_offset = offset;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
@@ -678,16 +699,23 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_device_size_t* out_start_offset, iree_device_size_t* out_length) {
-  if (!out_start_offset || !out_length) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(shape);
+  IREE_ASSERT_ARGUMENT(start_indices);
+  IREE_ASSERT_ARGUMENT(lengths);
+  IREE_ASSERT_ARGUMENT(out_start_offset);
+  IREE_ASSERT_ARGUMENT(out_length);
   *out_start_offset = 0;
   *out_length = 0;
-  if (!allocator) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+  if (indices_count != lengths_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "indices/lengths mismatch: %zu != %zu",
+                            indices_count, lengths_count);
   }
-  if (indices_count != lengths_count || indices_count != shape_rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+  if (shape_rank != indices_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "shape rank/indices mismatch: %zu != %zu",
+                            shape_rank, indices_count);
   }
 
   // TODO(benvanik): layout/padding.
@@ -712,12 +740,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
   // we have strides.
   auto offset_length = end_byte_offset - start_byte_offset + element_size;
   if (subspan_length != offset_length) {
-    return IREE_STATUS_UNIMPLEMENTED;
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "non-contiguous range region computation not implemented");
   }
 
   *out_start_offset = start_byte_offset;
   *out_length = subspan_length;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
@@ -725,23 +755,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
     iree_hal_buffer_usage_t buffer_usage, iree_host_size_t allocation_size,
     iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_allocator_allocate_buffer");
-  if (!out_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = nullptr;
-  auto* handle = reinterpret_cast<Allocator*>(allocator);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
-  IREE_API_ASSIGN_OR_RETURN(
+  auto* handle = reinterpret_cast<Allocator*>(allocator);
+  IREE_ASSIGN_OR_RETURN(
       auto buffer,
       handle->Allocate(static_cast<MemoryTypeBitfield>(memory_type),
                        static_cast<BufferUsageBitfield>(buffer_usage),
                        allocation_size));
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
@@ -750,16 +776,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
     iree_hal_buffer_usage_t buffer_usage, iree_byte_span_t data,
     iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_allocator_wrap_buffer");
-  if (!out_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = nullptr;
-  auto* handle = reinterpret_cast<Allocator*>(allocator);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
-  IREE_API_ASSIGN_OR_RETURN(
+  auto* handle = reinterpret_cast<Allocator*>(allocator);
+  IREE_ASSIGN_OR_RETURN(
       auto buffer,
       handle->WrapMutable(static_cast<MemoryTypeBitfield>(memory_type),
                           static_cast<MemoryAccessBitfield>(allowed_access),
@@ -767,7 +789,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
                           data.data, data.data_length));
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -781,36 +803,30 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
     iree_device_size_t byte_length, iree_allocator_t allocator,
     iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_subspan");
-
-  if (!out_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = nullptr;
 
-  if (!buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   auto handle = add_ref(reinterpret_cast<Buffer*>(buffer));
-
-  IREE_API_ASSIGN_OR_RETURN(auto new_handle,
-                            Buffer::Subspan(handle, byte_offset, byte_length));
+  IREE_ASSIGN_OR_RETURN(auto new_handle,
+                        Buffer::Subspan(handle, byte_offset, byte_length));
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(new_handle.release());
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
 iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer) {
+  IREE_ASSERT_ARGUMENT(buffer);
   const auto* handle = reinterpret_cast<const Buffer*>(buffer);
-  CHECK(handle) << "NULL buffer handle";
   return reinterpret_cast<iree_hal_allocator_t*>(handle->allocator());
 }
 
 IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_byte_length(const iree_hal_buffer_t* buffer) {
+  IREE_ASSERT_ARGUMENT(buffer);
   const auto* handle = reinterpret_cast<const Buffer*>(buffer);
-  CHECK(handle) << "NULL buffer handle";
   return handle->byte_length();
 }
 
@@ -818,12 +834,9 @@ IREE_API_EXPORT iree_status_t
 iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
                      iree_device_size_t byte_length) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_zero");
+  IREE_ASSERT_ARGUMENT(buffer);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  if (!buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  IREE_API_RETURN_IF_ERROR(handle->Fill8(byte_offset, byte_length, 0));
-  return IREE_STATUS_OK;
+  return handle->Fill8(byte_offset, byte_length, 0);
 }
 
 IREE_API_EXPORT iree_status_t
@@ -831,39 +844,30 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
                      iree_device_size_t byte_length, const void* pattern,
                      iree_host_size_t pattern_length) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_fill");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(pattern);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  if (!buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  IREE_API_RETURN_IF_ERROR(
-      handle->Fill(byte_offset, byte_length, pattern, pattern_length));
-  return IREE_STATUS_OK;
+  return handle->Fill(byte_offset, byte_length, pattern, pattern_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
     iree_hal_buffer_t* buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_read_data");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  if (!buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  IREE_API_RETURN_IF_ERROR(
-      handle->ReadData(source_offset, target_buffer, data_length));
-  return IREE_STATUS_OK;
+  return handle->ReadData(source_offset, target_buffer, data_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
     iree_hal_buffer_t* buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_write_data");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(source_buffer);
   auto* handle = reinterpret_cast<Buffer*>(buffer);
-  if (!buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  IREE_API_RETURN_IF_ERROR(
-      handle->WriteData(target_offset, source_buffer, data_length));
-  return IREE_STATUS_OK;
+  return handle->WriteData(target_offset, source_buffer, data_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
@@ -871,23 +875,16 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_mapped_memory_t* out_mapped_memory) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_map");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_mapped_memory);
 
-  if (!out_mapped_memory) {
-    LOG(ERROR) << "output mapped memory not set";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   std::memset(out_mapped_memory, 0, sizeof(*out_mapped_memory));
 
-  if (!buffer) {
-    LOG(ERROR) << "buffer not set";
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
-  IREE_API_ASSIGN_OR_RETURN(
-      auto mapping, buffer_handle->MapMemory<uint8_t>(
-                        static_cast<MemoryAccessBitfield>(memory_access),
-                        byte_offset, byte_length));
+  IREE_ASSIGN_OR_RETURN(auto mapping,
+                        buffer_handle->MapMemory<uint8_t>(
+                            static_cast<MemoryAccessBitfield>(memory_access),
+                            byte_offset, byte_length));
 
   static_assert(sizeof(iree_hal_mapped_memory_t::reserved) >=
                     sizeof(MappedMemory<uint8_t>),
@@ -900,23 +897,19 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
   out_mapped_memory->contents = {mapping_storage->unsafe_data(),
                                  mapping_storage->size()};
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_unmap(
     iree_hal_buffer_t* buffer, iree_hal_mapped_memory_t* mapped_memory) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_map");
-  auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
-  if (!buffer_handle || !mapped_memory) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(mapped_memory);
   auto* mapping =
       reinterpret_cast<MappedMemory<uint8_t>*>(mapped_memory->reserved);
   mapping->reset();
-
   std::memset(mapped_memory, 0, sizeof(*mapped_memory));
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -928,14 +921,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
     iree_host_size_t allocation_size, iree_allocator_t contents_allocator,
     iree_allocator_t allocator, iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_heap_buffer_allocate");
-
-  if (!out_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = nullptr;
 
   if (!allocation_size) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocation size must be >= 0");
   }
 
   auto handle = HeapBuffer::Allocate(
@@ -945,7 +936,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(
       static_cast<Buffer*>(handle.release()));
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
@@ -954,14 +945,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
     iree_allocator_t contents_allocator, iree_allocator_t allocator,
     iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_heap_buffer_allocate_copy");
+  IREE_ASSERT_ARGUMENT(out_buffer);
 
-  if (!out_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   *out_buffer = nullptr;
 
   if (!contents.data || !contents.data_length) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no contents specified (0 length)");
   }
 
   auto handle = HeapBuffer::AllocateCopy(
@@ -970,7 +960,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
       contents.data_length);
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
@@ -978,14 +968,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
     iree_hal_buffer_usage_t usage, iree_byte_span_t contents,
     iree_allocator_t allocator, iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_heap_buffer_wrap");
+  IREE_ASSERT_ARGUMENT(out_buffer);
 
-  if (!out_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   *out_buffer = nullptr;
 
   if (!contents.data || !contents.data_length) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no contents specified (0 length)");
   }
 
   auto handle =
@@ -995,7 +984,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
                               contents.data, contents.data_length);
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1009,14 +998,13 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_create");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_buffer_view);
 
-  if (!out_buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   *out_buffer_view = nullptr;
-
-  if (!buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+  if (shape_rank > 0 && !shape) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no shape dimensions specified");
   }
 
   // Allocate and initialize the iree_hal_buffer_view struct.
@@ -1033,13 +1021,13 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
   buffer_view->byte_length =
       iree_hal_element_byte_count(buffer_view->element_type);
   buffer_view->shape_rank = shape_rank;
-  for (int i = 0; i < shape_rank; ++i) {
+  for (iree_host_size_t i = 0; i < shape_rank; ++i) {
     buffer_view->shape[i] = shape[i];
     buffer_view->byte_length *= shape[i];
   }
 
   *out_buffer_view = buffer_view;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
@@ -1047,9 +1035,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
-  if (!out_buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_buffer_view);
 
   // NOTE: we rely on the compute range call to do parameter validation.
   iree_device_size_t start_offset = 0;
@@ -1072,19 +1058,19 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
     const iree_hal_buffer_view_t* buffer_view) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->buffer;
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL
 iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->shape_rank;
 }
 
 IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t index) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   if (index > buffer_view->shape_rank) {
     return 0;
   }
@@ -1093,7 +1079,7 @@ IREE_API_EXPORT iree_host_size_t IREE_API_CALL iree_hal_buffer_view_shape_dim(
 
 IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   iree_host_size_t element_count = 1;
   for (iree_host_size_t i = 0; i < buffer_view->shape_rank; ++i) {
     element_count *= buffer_view->shape[i];
@@ -1104,51 +1090,49 @@ iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
     const iree_hal_buffer_view_t* buffer_view, iree_host_size_t rank_capacity,
     iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
+  IREE_ASSERT_ARGUMENT(buffer_view);
+  IREE_ASSERT_ARGUMENT(out_shape);
   if (out_shape_rank) {
     *out_shape_rank = 0;
-  }
-  if (!buffer_view || !out_shape) {
-    return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   if (out_shape_rank) {
     *out_shape_rank = buffer_view->shape_rank;
   }
   if (rank_capacity < buffer_view->shape_rank) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    // Not an error; just a size query.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
 
-  for (int i = 0; i < buffer_view->shape_rank; ++i) {
+  for (iree_host_size_t i = 0; i < buffer_view->shape_rank; ++i) {
     out_shape[i] = buffer_view->shape[i];
   }
 
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
 iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->element_type;
 }
 
 IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_element_byte_count(buffer_view->element_type);
 }
 
 IREE_API_EXPORT iree_device_size_t IREE_API_CALL
 iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view) {
-  CHECK(buffer_view) << "NULL buffer_view handle";
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return buffer_view->byte_length;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
     const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset) {
-  if (!buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_allocator_compute_offset(
       iree_hal_buffer_allocator(buffer_view->buffer), buffer_view->shape,
       buffer_view->shape_rank, buffer_view->element_type, indices,
@@ -1160,9 +1144,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_device_size_t* out_start_offset, iree_device_size_t* out_length) {
-  if (!buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_allocator_compute_range(
       iree_hal_buffer_allocator(buffer_view->buffer), buffer_view->shape,
       buffer_view->shape_rank, buffer_view->element_type, start_indices,
@@ -1173,6 +1155,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
     iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_parse");
+  IREE_ASSERT_ARGUMENT(buffer_allocator);
 
   // Strip whitespace that may come along (linefeeds/etc).
   auto string_view =
@@ -1182,7 +1165,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_parse(
   if (string_view.empty()) {
     // Empty lines are invalid; need at least the shape/type information.
     *out_buffer_view = nullptr;
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "empty string input");
   }
 
   // The part of the string corresponding to the shape, e.g. 1x2x3.
@@ -1276,14 +1259,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_format");
+  IREE_ASSERT_ARGUMENT(buffer_view);
   if (out_buffer_length) {
     *out_buffer_length = 0;
   }
   if (buffer && buffer_capacity) {
     buffer[0] = 0;
-  }
-  if (!buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   iree_status_t status;
@@ -1308,7 +1289,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
                                    buffer ? buffer + buffer_length : nullptr,
                                    &shape_length);
     buffer_length += shape_length;
-    if (status == IREE_STATUS_OUT_OF_RANGE) {
+    if (iree_status_is_out_of_range(status)) {
+      status = iree_status_ignore(status);
       buffer = nullptr;
     } else if (!iree_status_is_ok(status)) {
       return status;
@@ -1324,7 +1306,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
       buffer_view->element_type, buffer ? buffer_capacity - buffer_length : 0,
       buffer ? buffer + buffer_length : nullptr, &element_type_length);
   buffer_length += element_type_length;
-  if (status == IREE_STATUS_OUT_OF_RANGE) {
+  if (iree_status_is_out_of_range(status)) {
+    status = iree_status_ignore(status);
     buffer = nullptr;
   } else if (!iree_status_is_ok(status)) {
     return status;
@@ -1347,7 +1330,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
       buffer ? buffer + buffer_length : nullptr, &elements_length);
   buffer_length += elements_length;
   iree_hal_buffer_unmap(buffer_view->buffer, &mapped_buffer);
-  if (status == IREE_STATUS_OUT_OF_RANGE) {
+  if (iree_status_is_out_of_range(status)) {
+    status = iree_status_ignore(status);
     buffer = nullptr;
   } else if (!iree_status_is_ok(status)) {
     return status;
@@ -1356,7 +1340,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_format(
   if (out_buffer_length) {
     *out_buffer_length = buffer_length;
   }
-  return buffer ? IREE_STATUS_OK : IREE_STATUS_OUT_OF_RANGE;
+  return buffer ? iree_ok_status()
+                : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1370,16 +1355,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
     iree_hal_command_category_t command_categories, iree_allocator_t allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_create");
-  if (!out_command_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = nullptr;
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto command_buffer,
       handle->CreateCommandBuffer(
           static_cast<CommandBufferModeBitfield>(mode),
@@ -1387,27 +1368,23 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
 
   *out_command_buffer =
       reinterpret_cast<iree_hal_command_buffer_t*>(command_buffer.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_begin");
+  IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(handle->Begin());
+  return handle->Begin();
 }
 
 IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_end");
+  IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(handle->End());
+  return handle->End();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1420,10 +1397,8 @@ iree_hal_command_buffer_execution_barrier(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_execution_barrier");
+  IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   // TODO(benvanik): refactor the C++ types to use the C types for storage so
   // that we can safely map between the two. For now assume size equality
   // is layout equality (as compilers aren't allowed to reorder structs).
@@ -1431,7 +1406,7 @@ iree_hal_command_buffer_execution_barrier(
                 "Expecting identical layout");
   static_assert(sizeof(BufferBarrier) == sizeof(iree_hal_buffer_barrier_t),
                 "Expecting identical layout");
-  return ToApiStatus(handle->ExecutionBarrier(
+  return handle->ExecutionBarrier(
       static_cast<ExecutionStageBitfield>(source_stage_mask),
       static_cast<ExecutionStageBitfield>(target_stage_mask),
       absl::MakeConstSpan(
@@ -1439,7 +1414,7 @@ iree_hal_command_buffer_execution_barrier(
           memory_barrier_count),
       absl::MakeConstSpan(
           reinterpret_cast<const BufferBarrier*>(buffer_barriers),
-          buffer_barrier_count)));
+          buffer_barrier_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
@@ -1447,13 +1422,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
     iree_device_size_t target_offset, iree_device_size_t length,
     const void* pattern, iree_host_size_t pattern_length) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_fill_buffer");
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(
-      handle->FillBuffer(reinterpret_cast<Buffer*>(target_buffer),
-                         target_offset, length, pattern, pattern_length));
+  return handle->FillBuffer(reinterpret_cast<Buffer*>(target_buffer),
+                            target_offset, length, pattern, pattern_length);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1464,13 +1437,13 @@ iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
                                       iree_device_size_t target_offset,
                                       iree_device_size_t length) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_update_buffer");
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(handle->UpdateBuffer(
-      source_buffer, source_offset, reinterpret_cast<Buffer*>(target_buffer),
-      target_offset, length));
+  return handle->UpdateBuffer(source_buffer, source_offset,
+                              reinterpret_cast<Buffer*>(target_buffer),
+                              target_offset, length);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
@@ -1478,13 +1451,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_copy_buffer");
+  IREE_ASSERT_ARGUMENT(command_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(handle->CopyBuffer(
+  return handle->CopyBuffer(
       reinterpret_cast<Buffer*>(source_buffer), source_offset,
-      reinterpret_cast<Buffer*>(target_buffer), target_offset, length));
+      reinterpret_cast<Buffer*>(target_buffer), target_offset, length);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1493,19 +1464,22 @@ iree_hal_command_buffer_push_constants(
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_push_constants");
-  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle || !executable_layout || !values) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  } else if (values_length == 0) {
-    return IREE_STATUS_OK;
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(values);
+  if (values_length == 0) {
+    return iree_ok_status();
   }
   if ((values_length % 4) != 0) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid alignment %zu, must be 4-byte aligned",
+                            values_length);
   }
-  return ToApiStatus(handle->PushConstants(
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  return handle->PushConstants(
       reinterpret_cast<ExecutableLayout*>(executable_layout), offset,
       absl::MakeConstSpan(reinterpret_cast<const uint32_t*>(values),
-                          values_length / sizeof(uint32_t))));
+                          values_length / sizeof(uint32_t)));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1515,15 +1489,12 @@ iree_hal_command_buffer_push_descriptor_set(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_push_descriptor_set");
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(executable_layout);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (!executable_layout) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   if (binding_count && !bindings) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "bindings/binding_count mismatch");
   }
 
   // TODO(benvanik): refactor the C++ types to use the C types for storage so
@@ -1532,11 +1503,11 @@ iree_hal_command_buffer_push_descriptor_set(
   static_assert(sizeof(DescriptorSet::Binding) ==
                     sizeof(iree_hal_descriptor_set_binding_t),
                 "Expecting identical layout");
-  return ToApiStatus(handle->PushDescriptorSet(
+  return handle->PushDescriptorSet(
       reinterpret_cast<ExecutableLayout*>(executable_layout), set,
       absl::MakeConstSpan(
           reinterpret_cast<const DescriptorSet::Binding*>(bindings),
-          binding_count)));
+          binding_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1547,22 +1518,20 @@ iree_hal_command_buffer_bind_descriptor_set(
     iree_host_size_t dynamic_offset_count,
     const iree_device_size_t* dynamic_offsets) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_bind_descriptor_set");
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(descriptor_set);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (!executable_layout) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   if (dynamic_offset_count && !dynamic_offsets) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "dynamic_offset_count/dynamic_offsets mismatch");
   }
   static_assert(sizeof(iree_device_size_t) == sizeof(device_size_t),
                 "Device sizes must match");
-  return ToApiStatus(handle->BindDescriptorSet(
+  return handle->BindDescriptorSet(
       reinterpret_cast<ExecutableLayout*>(executable_layout), set,
       reinterpret_cast<DescriptorSet*>(descriptor_set),
-      absl::MakeConstSpan(dynamic_offsets, dynamic_offset_count)));
+      absl::MakeConstSpan(dynamic_offsets, dynamic_offset_count));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
@@ -1570,16 +1539,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_dispatch");
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(executable);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (!executable) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(handle->Dispatch(reinterpret_cast<Executable*>(executable),
-                                      entry_point,
-                                      {workgroup_x, workgroup_y, workgroup_z}));
+  return handle->Dispatch(reinterpret_cast<Executable*>(executable),
+                          entry_point, {workgroup_x, workgroup_y, workgroup_z});
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1589,16 +1553,13 @@ iree_hal_command_buffer_dispatch_indirect(
     iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_dispatch_indirect");
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_ASSERT_ARGUMENT(executable);
+  IREE_ASSERT_ARGUMENT(workgroups_buffer);
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (!executable || workgroups_buffer) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  return ToApiStatus(handle->DispatchIndirect(
+  return handle->DispatchIndirect(
       reinterpret_cast<Executable*>(executable), entry_point,
-      reinterpret_cast<Buffer*>(workgroups_buffer), workgroups_offset));
+      reinterpret_cast<Buffer*>(workgroups_buffer), workgroups_offset);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1614,20 +1575,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
     iree_allocator_t allocator,
     iree_hal_descriptor_set_t** out_descriptor_set) {
   IREE_TRACE_SCOPE0("iree_hal_descriptor_set_create");
-  if (!out_descriptor_set) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(set_layout);
+  IREE_ASSERT_ARGUMENT(out_descriptor_set);
   *out_descriptor_set = nullptr;
-  if (!set_layout) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   if (binding_count && !bindings) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "binding_count/bindings mismatch");
   }
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
   // TODO(benvanik): refactor the C++ types to use the C types for storage so
   // that we can safely map between the two. For now assume size equality
@@ -1635,7 +1591,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
   static_assert(sizeof(DescriptorSet::Binding) ==
                     sizeof(iree_hal_descriptor_set_binding_t),
                 "Expecting identical layout");
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto descriptor_set,
       handle->CreateDescriptorSet(
           reinterpret_cast<DescriptorSetLayout*>(set_layout),
@@ -1645,7 +1601,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
 
   *out_descriptor_set =
       reinterpret_cast<iree_hal_descriptor_set_t*>(descriptor_set.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1663,17 +1619,14 @@ iree_hal_descriptor_set_layout_create(
     iree_allocator_t allocator,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
   IREE_TRACE_SCOPE0("iree_hal_descriptor_set_layout_create");
-  if (!out_descriptor_set_layout) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_descriptor_set_layout);
   *out_descriptor_set_layout = nullptr;
   if (binding_count && !bindings) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "binding_count/bindings mismatch");
   }
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
   // TODO(benvanik): refactor the C++ types to use the C types for storage so
   // that we can safely map between the two. For now assume size equality
@@ -1681,7 +1634,7 @@ iree_hal_descriptor_set_layout_create(
   static_assert(sizeof(DescriptorSetLayout::Binding) ==
                     sizeof(iree_hal_descriptor_set_layout_binding_t),
                 "Expecting identical layout");
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto descriptor_set_layout,
       handle->CreateDescriptorSetLayout(
           static_cast<DescriptorSetLayout::UsageType>(usage_type),
@@ -1692,7 +1645,7 @@ iree_hal_descriptor_set_layout_create(
   *out_descriptor_set_layout =
       reinterpret_cast<iree_hal_descriptor_set_layout_t*>(
           descriptor_set_layout.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1703,15 +1656,15 @@ IREE_HAL_API_RETAIN_RELEASE(device, Device);
 
 IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
 iree_hal_device_allocator(iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) return nullptr;
   return reinterpret_cast<iree_hal_allocator_t*>(handle->allocator());
 }
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_hal_device_id(iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) return IREE_STRING_VIEW_EMPTY;
   const auto& id = handle->info().id();
   return iree_string_view_t{id.data(), id.size()};
 }
@@ -1721,9 +1674,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
     uint64_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches) {
   IREE_TRACE_SCOPE0("iree_hal_device_queue_submit");
+  IREE_ASSERT_ARGUMENT(device);
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  if (batch_count > 0 && !batches) return IREE_STATUS_INVALID_ARGUMENT;
+  if (batch_count > 0 && !batches) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "batch_count/batches mismatch");
+  }
 
   // We need to allocate storage to marshal in the semaphores. Ideally we'd
   // change the C++ API to make this 1:1 with a reinterpret_cast, however that
@@ -1771,7 +1727,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_device_queue_submit(
   // the number and types of queues they support.
   uint64_t queue_index = queue_affinity % handle->dispatch_queues().size();
   auto* command_queue = handle->dispatch_queues()[queue_index];
-  return ToApiStatus(command_queue->Submit(dst_batches));
+  return command_queue->Submit(dst_batches);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1779,9 +1735,9 @@ iree_hal_device_wait_semaphores_with_deadline(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_time_t deadline_ns) {
   IREE_TRACE_SCOPE0("iree_hal_device_wait_semaphores_with_deadline");
+  IREE_ASSERT_ARGUMENT(device);
+  if (!semaphore_list || semaphore_list->count == 0) return iree_ok_status();
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  if (!semaphore_list || semaphore_list->count == 0) return IREE_STATUS_OK;
 
   absl::InlinedVector<SemaphoreValue, 4> semaphore_values(
       semaphore_list->count);
@@ -1791,27 +1747,22 @@ iree_hal_device_wait_semaphores_with_deadline(
         semaphore_list->payload_values[i]};
   }
 
-  Status wait_status;
   switch (wait_mode) {
-    case IREE_HAL_WAIT_MODE_ALL:
-      wait_status =
-          handle->WaitAllSemaphores(semaphore_values, Time(deadline_ns));
-      break;
-    case IREE_HAL_WAIT_MODE_ANY:
-      wait_status = std::move(handle->WaitAnySemaphore(semaphore_values,
-                                                       Time(deadline_ns)))
-                        .status();
-      break;
-    default:
-      return IREE_STATUS_INVALID_ARGUMENT;
+    case IREE_HAL_WAIT_MODE_ALL: {
+      return handle->WaitAllSemaphores(semaphore_values, Time(deadline_ns));
+    }
+    case IREE_HAL_WAIT_MODE_ANY: {
+      IREE_ASSIGN_OR_RETURN(
+          int wake_index,
+          handle->WaitAnySemaphore(semaphore_values, Time(deadline_ns)));
+      (void)wake_index;
+      return iree_ok_status();
+    }
+    default: {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unhandled wait_mode");
+    }
   }
-
-  // NOTE: we avoid capturing stack traces on deadline exceeded as it's not a
-  // real error.
-  if (IsDeadlineExceeded(wait_status)) {
-    return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED);
-  }
-  return ToApiStatus(wait_status);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1836,20 +1787,13 @@ iree_hal_driver_query_available_devices(
     iree_hal_device_info_t** out_device_infos,
     iree_host_size_t* out_device_info_count) {
   IREE_TRACE_SCOPE0("iree_hal_driver_query_available_devices");
-  if (!out_device_info_count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(out_device_infos);
+  IREE_ASSERT_ARGUMENT(out_device_info_count);
   *out_device_info_count = 0;
-  if (!out_device_infos) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   auto* handle = reinterpret_cast<Driver*>(driver);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
-  IREE_API_ASSIGN_OR_RETURN(auto device_infos,
-                            handle->EnumerateAvailableDevices());
+  IREE_ASSIGN_OR_RETURN(auto device_infos, handle->EnumerateAvailableDevices());
   size_t total_string_size = 0;
   for (const auto& device_info : device_infos) {
     total_string_size += device_info.name().size();
@@ -1875,26 +1819,22 @@ iree_hal_driver_query_available_devices(
   }
 
   *out_device_infos = device_info_storage;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_create_device(
     iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
     iree_allocator_t allocator, iree_hal_device_t** out_device) {
   IREE_TRACE_SCOPE0("iree_hal_driver_create_device");
-  if (!out_device) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(out_device);
   *out_device = nullptr;
   auto* handle = reinterpret_cast<Driver*>(driver);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
-  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDevice(device_id));
+  IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDevice(device_id));
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1902,18 +1842,13 @@ iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
                                       iree_allocator_t allocator,
                                       iree_hal_device_t** out_device) {
   IREE_TRACE_SCOPE0("iree_hal_driver_create_default_device");
-  if (!out_device) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(out_device);
   *out_device = nullptr;
   auto* handle = reinterpret_cast<Driver*>(driver);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
+  IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1931,13 +1866,9 @@ iree_hal_driver_registry_query_available_drivers(
     iree_allocator_t allocator, iree_string_view_t** out_driver_names,
     iree_host_size_t* out_driver_count) {
   IREE_TRACE_SCOPE0("iree_hal_driver_registry_query_available_drivers");
-  if (!out_driver_count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_driver_names);
+  IREE_ASSERT_ARGUMENT(out_driver_count);
   *out_driver_count = 0;
-  if (!out_driver_names) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
   auto* registry = DriverRegistry::shared_registry();
   auto available_drivers = registry->EnumerateAvailableDrivers();
@@ -1965,7 +1896,7 @@ iree_hal_driver_registry_query_available_drivers(
   }
 
   *out_driver_names = driver_name_storage;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1973,18 +1904,15 @@ iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
                                        iree_allocator_t allocator,
                                        iree_hal_driver_t** out_driver) {
   IREE_TRACE_SCOPE0("iree_hal_driver_registry_create_driver");
-  if (!out_driver) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = nullptr;
 
   auto* registry = DriverRegistry::shared_registry();
-  IREE_API_ASSIGN_OR_RETURN(
-      auto driver,
-      registry->Create(absl::string_view(driver_name.data, driver_name.size)));
+  IREE_ASSIGN_OR_RETURN(auto driver, registry->Create(absl::string_view(
+                                         driver_name.data, driver_name.size)));
 
   *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2004,29 +1932,22 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
     iree_allocator_t allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_TRACE_SCOPE0("iree_hal_executable_cache_create");
-  if (!out_executable_cache) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_executable_cache);
   *out_executable_cache = nullptr;
+
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
   auto executable_cache = handle->CreateExecutableCache();
-
   *out_executable_cache = reinterpret_cast<iree_hal_executable_cache_t*>(
       executable_cache.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
     iree_hal_executable_format_t format) {
+  IREE_ASSERT_ARGUMENT(executable_cache);
   auto* handle = reinterpret_cast<ExecutableCache*>(executable_cache);
-  if (!handle) {
-    return false;
-  }
   return handle->CanPrepareFormat(format);
 }
 
@@ -2038,21 +1959,15 @@ iree_hal_executable_cache_prepare_executable(
     iree_const_byte_span_t executable_data, iree_allocator_t allocator,
     iree_hal_executable_t** out_executable) {
   IREE_TRACE_SCOPE0("iree_hal_executable_cache_prepare_executable");
-  if (!out_executable) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(executable_cache);
+  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = nullptr;
   auto* handle = reinterpret_cast<ExecutableCache*>(executable_cache);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (!executable_layout) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
   ExecutableSpec spec;
   spec.executable_data = {executable_data.data, executable_data.data_length};
-  IREE_API_ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto executable,
       handle->PrepareExecutable(
           reinterpret_cast<ExecutableLayout*>(executable_layout),
@@ -2060,7 +1975,7 @@ iree_hal_executable_cache_prepare_executable(
 
   *out_executable =
       reinterpret_cast<iree_hal_executable_t*>(executable.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2075,19 +1990,16 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_host_size_t push_constants, iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_TRACE_SCOPE0("iree_hal_executable_layout_create");
-  if (!out_executable_layout) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_executable_layout);
   *out_executable_layout = nullptr;
   if (set_layout_count && !set_layouts) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "set_layout_count/set_layouts mismatch");
   }
 
-  IREE_API_ASSIGN_OR_RETURN(
+  auto* handle = reinterpret_cast<Device*>(device);
+  IREE_ASSIGN_OR_RETURN(
       auto executable_layout,
       handle->CreateExecutableLayout(
           absl::MakeConstSpan(
@@ -2097,7 +2009,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
 
   *out_executable_layout = reinterpret_cast<iree_hal_executable_layout_t*>(
       executable_layout.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2110,57 +2022,52 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_create(
     iree_hal_device_t* device, uint64_t initial_value,
     iree_allocator_t allocator, iree_hal_semaphore_t** out_semaphore) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_create");
-  if (!out_semaphore) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = nullptr;
-  auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
 
-  IREE_API_ASSIGN_OR_RETURN(auto semaphore,
-                            handle->CreateSemaphore(initial_value));
+  auto* handle = reinterpret_cast<Device*>(device);
+  IREE_ASSIGN_OR_RETURN(auto semaphore, handle->CreateSemaphore(initial_value));
 
   *out_semaphore = reinterpret_cast<iree_hal_semaphore_t*>(semaphore.release());
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
-  if (!out_value) return IREE_STATUS_INVALID_ARGUMENT;
+  IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_ASSERT_ARGUMENT(out_value);
   *out_value = 0;
+
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  auto result = handle->Query();
-  if (!result.ok()) return ToApiStatus(std::move(result).status());
-  *out_value = result.value();
-  return IREE_STATUS_OK;
+  IREE_ASSIGN_OR_RETURN(uint64_t value, handle->Query());
+  *out_value = value;
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_signal");
+  IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  return ToApiStatus(handle->Signal(new_value));
+  return handle->Signal(new_value);
 }
 
 IREE_API_EXPORT void IREE_API_CALL
 iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_fail");
+  IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) return;
-  handle->Fail(FromApiStatus(status, IREE_LOC));
+  handle->Fail(std::move(status));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
                                       uint64_t value, iree_time_t deadline_ns) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_deadline");
+  IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  return ToApiStatus(handle->Wait(value, Time(deadline_ns)));
+  return handle->Wait(value, Time(deadline_ns));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -2168,9 +2075,9 @@ iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
                                      uint64_t value,
                                      iree_duration_t timeout_ns) {
   IREE_TRACE_SCOPE0("iree_hal_semaphore_wait_with_timeout");
+  IREE_ASSERT_ARGUMENT(semaphore);
   auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
-  return ToApiStatus(handle->Wait(value, Duration(timeout_ns)));
+  return handle->Wait(value, Duration(timeout_ns));
 }
 
 }  // namespace hal

@@ -19,7 +19,6 @@
 #include <cstring>
 
 #include "iree/base/logging.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -95,9 +94,9 @@ Status HostBuffer::CopyDataImpl(device_size_t target_offset,
                                 device_size_t data_length) {
   // This is pretty terrible. Let's not do this.
   // TODO(benvanik): a way for allocators to indicate transfer compat.
-  ASSIGN_OR_RETURN(auto source_data,
-                   source_buffer->MapMemory<uint8_t>(
-                       MemoryAccess::kRead, source_offset, data_length));
+  IREE_ASSIGN_OR_RETURN(auto source_data,
+                        source_buffer->MapMemory<uint8_t>(
+                            MemoryAccess::kRead, source_offset, data_length));
   CHECK_EQ(data_length, source_data.size());
   auto data_ptr = static_cast<uint8_t*>(data_);
   std::memcpy(data_ptr + target_offset, source_data.data(), data_length);

@@ -43,7 +43,7 @@ struct SequenceTypeStorage : public TypeStorage {
 
 SequenceType SequenceType::get(Type targetType) {
   assert(targetType && "sequence targetType required");
-  return Base::get(targetType.getContext(), TypeKind::Sequence, targetType);
+  return Base::get(targetType.getContext(), targetType);
 }
 
 SequenceType SequenceType::getChecked(Type targetType, Location location) {
@@ -51,7 +51,7 @@ SequenceType SequenceType::getChecked(Type targetType, Location location) {
     emitError(location) << "null target type: " << targetType;
     return SequenceType();
   }
-  return Base::getChecked(location, TypeKind::Sequence, targetType);
+  return Base::getChecked(location, targetType);
 }
 
 Type SequenceType::getTargetType() { return getImpl()->targetType; }

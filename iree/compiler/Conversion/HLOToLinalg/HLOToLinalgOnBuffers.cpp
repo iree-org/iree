@@ -24,6 +24,7 @@
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/APInt.h"
@@ -66,10 +67,11 @@ static Attribute getInitValueAsConst(Value init) {
   if (!matchPattern(init, m_Constant(&attr))) return {};
   auto type = attr.getType().dyn_cast<ShapedType>();
   if (!type || type.getRank() != 0) return {};
-  if (auto intType = type.getElementType().dyn_cast<IntegerType>())
+  if (auto intType = type.getElementType().dyn_cast<IntegerType>()) {
     return IntegerAttr::get(intType, attr.getValue<APInt>({}));
-  else if (auto floatType = type.getElementType().dyn_cast<FloatType>())
+  } else if (auto floatType = type.getElementType().dyn_cast<FloatType>()) {
     return FloatAttr::get(floatType, attr.getValue<APFloat>({}));
+  }
   return {};
 }
 
@@ -254,14 +256,17 @@ static DotOperationType getDotOperationType(mhlo::DotOp dotOp) {
            a == b;
   };
   if (lhsShape.size() == 1 && rhsShape.size() == 1 &&
-      shapeMatches(lhsShape[0], rhsShape[0]))
+      shapeMatches(lhsShape[0], rhsShape[0])) {
     return DotOperationType::VectorDot;
+  }
   if (lhsShape.size() == 2 && rhsShape.size() == 1 &&
-      shapeMatches(lhsShape[1], rhsShape[0]))
+      shapeMatches(lhsShape[1], rhsShape[0])) {
     return DotOperationType::MatrixVector;
+  }
   if (rhsShape.size() == 2 && rhsShape.size() == 2 &&
-      shapeMatches(lhsShape[1], rhsShape[0]))
+      shapeMatches(lhsShape[1], rhsShape[0])) {
     return DotOperationType::MatrixMatrix;
+  }
   return DotOperationType::Unsupported;
 }
 
@@ -292,6 +297,64 @@ struct DotOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
+// mhlo.dot_general conversion patterns.
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Converts mhlo.dot_general operation to linalg.batchmatmul op
+struct DotGeneralOpConversion
+    : public ConvertToLinalgBufferOp<DotGeneralOpConversion,
+                                     mhlo::DotGeneralOp> {
+  using ConvertToLinalgBufferOp<DotGeneralOpConversion,
+                                mhlo::DotGeneralOp>::ConvertToLinalgBufferOp;
+  LogicalResult apply(mhlo::DotGeneralOp op, ArrayRef<Value> inputBuffers,
+                      ArrayRef<Value> resultBuffers,
+                      ConversionPatternRewriter &rewriter) const {
+    auto extract1DVector = [](DenseIntElementsAttr elements) {
+      SmallVector<int64_t, 6> ret;
+      for (const APInt &element : elements) {
+        ret.push_back(element.getLimitedValue());
+      }
+      return ret;
+    };
+    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
+    auto lhsBatchingDims =
+        extract1DVector(dimNumbers.lhs_batching_dimensions());
+    auto rhsBatchingDims =
+        extract1DVector(dimNumbers.rhs_batching_dimensions());
+    auto lhsContractingDims =
+        extract1DVector(dimNumbers.lhs_contracting_dimensions());
+    auto rhsContractingDims =
+        extract1DVector(dimNumbers.rhs_contracting_dimensions());
+    if (lhsBatchingDims.size() != 1 || lhsBatchingDims[0] != 0) {
+      return rewriter.notifyMatchFailure(
+          op, "expected lhs batching dimensions exactly {0}");
+    }
+    if (rhsBatchingDims.size() != 1 || rhsBatchingDims[0] != 0) {
+      return rewriter.notifyMatchFailure(
+          op, "expected rhs batching dimensions exactly {0}");
+    }
+    if (lhsContractingDims.size() != 1 || lhsContractingDims[0] != 2) {
+      return rewriter.notifyMatchFailure(
+          op, "expected lhs contracting dimensions exactly {2}");
+    }
+    if (rhsContractingDims.size() != 1 || rhsContractingDims[0] != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "expected rhs contracting dimensions exactly {1}");
+    }
+    if (failed(zeroFillBuffer(op.getLoc(), resultBuffers[0], rewriter))) {
+      return rewriter.notifyMatchFailure(op,
+                                         "failed to zero fill result buffer");
+    }
+    rewriter.create<linalg::BatchMatmulOp>(
+        op.getLoc(), TypeRange{},
+        ValueRange{inputBuffers[0], inputBuffers[1], resultBuffers[0]});
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
 // mhlo.convolution conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
@@ -317,8 +380,9 @@ LogicalResult ConvOpConversion::apply(
     // batch_count, spatial_dims..., input_feature_count.
     if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
         dimensionNumbers.input_feature_dimension().getInt() !=
-            (inputSpatialRank + 1))
+            (inputSpatialRank + 1)) {
       return failure();
+    }
 
     const int kernelSpatialRank =
         llvm::size(dimensionNumbers.kernel_spatial_dimensions());
@@ -327,8 +391,9 @@ LogicalResult ConvOpConversion::apply(
     if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
             kernelSpatialRank ||
         dimensionNumbers.kernel_output_feature_dimension().getInt() !=
-            (kernelSpatialRank + 1))
+            (kernelSpatialRank + 1)) {
       return failure();
+    }
 
     const int outputSpatialRank =
         llvm::size(dimensionNumbers.output_spatial_dimensions());
@@ -336,12 +401,14 @@ LogicalResult ConvOpConversion::apply(
     // batch_count, spatial_dims.., output_feature_count.
     if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
         dimensionNumbers.output_feature_dimension().getInt() !=
-            (outputSpatialRank + 1))
+            (outputSpatialRank + 1)) {
       return failure();
+    }
 
     if (inputSpatialRank != outputSpatialRank ||
-        inputSpatialRank != kernelSpatialRank)
+        inputSpatialRank != kernelSpatialRank) {
       return failure();
+    }
 
     auto inputSpatialDim = dimensionNumbers.input_spatial_dimensions().begin();
     auto kernelSpatialDim =
@@ -353,8 +420,9 @@ LogicalResult ConvOpConversion::apply(
       const int dim = i + 1;
       if ((*inputSpatialDim++).getZExtValue() != dim ||
           (*outputSpatialDim++).getZExtValue() != dim ||
-          (*kernelSpatialDim++).getZExtValue() != i)
+          (*kernelSpatialDim++).getZExtValue() != i) {
         return failure();
+      }
     }
   }
 
@@ -396,8 +464,7 @@ LogicalResult ConvOpConversion::apply(
   auto groupSize =
       shape[op.dimension_numbers().kernel_output_feature_dimension().getInt()];
   // Depthwise conv path...
-  if (op.feature_group_count().getZExtValue() > 1u &&
-      op.feature_group_count().getZExtValue() == numGroups) {
+  if (op.feature_group_count() > 1u && op.feature_group_count() == numGroups) {
     // Lowering depthwise convolution to linalg.generic op. The idea is to use
     // the group convolution formulation to perform the separable depthwise
     // convolution as the following, given an n-dimensional input x and filter w
@@ -511,7 +578,7 @@ LogicalResult ConcatenateOpConversion::apply(
     mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   Location loc = op.getLoc();
-  int dim = op.dimension().getSExtValue();
+  int dim = op.dimension();
   int rank = inputBuffers[0].getType().cast<ShapedType>().getRank();
 
   SmallVector<Attribute, 2> indexingMaps;
@@ -669,8 +736,9 @@ LogicalResult SliceOpConversion::apply(
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
   auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
-  if (!argType || !argType.hasRank())
+  if (!argType || !argType.hasRank()) {
     return op.emitError("expected known-rank args");
+  }
 
   SmallVector<Value, 3> offsets, sizes, strides;
   for (int i = 0, e = argType.getRank(); i < e; ++i) {
@@ -718,8 +786,8 @@ LogicalResult TorchIndexSelectOpConversion::apply(
     mhlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   mhlo::TorchIndexSelectOp::Adaptor adaptor(inputBuffers);
-  int axis = op.dim().getSExtValue();
-  int batch = op.batch_dims().getSExtValue();
+  int axis = op.dim();
+  int batch = op.batch_dims();
   auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
   int nIndices = indexShapeType.getRank();
   auto inputShapeType = adaptor.input().getType().dyn_cast<ShapedType>();
@@ -731,9 +799,12 @@ LogicalResult TorchIndexSelectOpConversion::apply(
   int rank = output.getType().cast<ShapedType>().getRank();
   SmallVector<Attribute, 2> indexingMaps;
   SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < batch; ++i) exprs.push_back(rewriter.getAffineDimExpr(i));
-  for (int i = 0, e = nIndices - batch; i < e; ++i)
+  for (int i = 0; i < batch; ++i) {
+    exprs.push_back(rewriter.getAffineDimExpr(i));
+  }
+  for (int i = 0, e = nIndices - batch; i < e; ++i) {
     exprs.push_back(rewriter.getAffineDimExpr(axis + i));
+  }
   indexingMaps.emplace_back(AffineMapAttr::get(
       AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext())));
   indexingMaps.emplace_back(
@@ -763,10 +834,13 @@ LogicalResult TorchIndexSelectOpConversion::apply(
   SmallVector<Value, 4> indices;
   Value castedValue = rewriter.create<IndexCastOp>(
       loc, block->getArgument(rank), rewriter.getIndexType());
-  for (int i = 0; i < axis; ++i) indices.push_back(block->getArgument(i));
-  indices.push_back(castedValue);
-  for (int i = axis + nIndices - batch; i < rank; ++i)
+  for (int i = 0; i < axis; ++i) {
     indices.push_back(block->getArgument(i));
+  }
+  indices.push_back(castedValue);
+  for (int i = axis + nIndices - batch; i < rank; ++i) {
+    indices.push_back(block->getArgument(i));
+  }
 
   Value res = rewriter.create<LoadOp>(loc, adaptor.input(), indices);
   rewriter.create<linalg::YieldOp>(loc, res);
@@ -822,8 +896,9 @@ LogicalResult ReduceWindowOpConversion::apply(
 
   // Create a fake window dimension.
   SmallVector<int64_t, 4> shapes;
-  for (auto dim : op.window_dimensions().getValues<int64_t>())
+  for (auto dim : op.window_dimensions().getValues<int64_t>()) {
     shapes.push_back(dim);
+  }
   Type type = rewriter.getIntegerType(32);
   auto memrefType = MemRefType::get(shapes, type);
   auto fakeWindowDims = rewriter.create<AllocOp>(loc, memrefType);
@@ -889,8 +964,9 @@ static AffineMap getTransposeMapForReduction(MLIRContext *context, int rank,
   for (auto dim : reductionDims) s.insert(dim);
 
   SmallVector<unsigned, 4> permutation;
-  for (int i = 0; i < rank; ++i)
+  for (int i = 0; i < rank; ++i) {
     if (!s.count(i)) permutation.push_back(i);
+  }
   for (auto dim : reductionDims) permutation.push_back(dim);
 
   auto map = AffineMap::getPermutationMap(permutation, context);
@@ -1002,8 +1078,9 @@ LogicalResult ReduceOpConversion::apply(
   auto loc = reduceOp.getLoc();
   DenseIntElementsAttr dimensionsAttr = reduceOp.dimensions();
   SmallVector<int, 4> reductionDims;
-  for (const auto &dim : dimensionsAttr.getIntValues())
+  for (const auto &dim : dimensionsAttr.getIntValues()) {
     reductionDims.push_back(dim.getSExtValue());
+  }
 
   // Check if initVal is constant. If so, inline the value into the region.
   Attribute initConstVal = getInitValueAsConst(initVal);
@@ -1020,16 +1097,18 @@ LogicalResult ReduceOpConversion::apply(
   SmallVector<Attribute, 3> indexingMaps;
   indexingMaps.emplace_back(AffineMapAttr::get(getTransposeMapForReduction(
       rewriter.getContext(), nInputRank, reductionDims)));
-  if (!initConstVal)
+  if (!initConstVal) {
     indexingMaps.emplace_back(AffineMapAttr::get(
         AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())));
+  }
   // The indexing map of `dst` should drop the reduction loops. Since the
   // reduction loops now are all in the innermost, drops `reductionDims.size()`
   // dimensions. We don't need an inverse permutation here because they are the
   // same.
   SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0, e = nInputRank - reductionDims.size(); i < e; ++i)
+  for (int i = 0, e = nInputRank - reductionDims.size(); i < e; ++i) {
     exprs.push_back(rewriter.getAffineDimExpr(i));
+  }
   indexingMaps.emplace_back(AffineMapAttr::get(
       exprs.empty()
           ? AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())
@@ -1038,7 +1117,9 @@ LogicalResult ReduceOpConversion::apply(
 
   SmallVector<Type, 2> resultTypes = {};
   SmallVector<Value, 2> linalgOpArgs = {inputBuffers[0]};
-  if (!initConstVal) linalgOpArgs.push_back(inputBuffers[1]);
+  if (!initConstVal) {
+    linalgOpArgs.push_back(inputBuffers[1]);
+  }
   linalgOpArgs.push_back(resultBuffers[0]);
   if (failed(zeroFillBuffer(loc, resultBuffers[0], rewriter))) {
     rewriter.notifyMatchFailure(reduceOp, "failed to zero fill result buffer");
@@ -1141,8 +1222,9 @@ struct LinalgOpOnTensorConversion
     // type.
     TypeConverter::SignatureConversion signatureConverter(numIndices +
                                                           numTensorOperands);
-    for (int i = 0; i < numIndices; ++i)
+    for (int i = 0; i < numIndices; ++i) {
       signatureConverter.addInputs(i, rewriter.getIndexType());
+    }
     for (auto arg : llvm::enumerate(opArgs)) {
       if (arg.index() < numTensorOperands) {
         signatureConverter.addInputs(
@@ -1224,13 +1306,15 @@ struct ShapeOpPattern final : public OpConversionPattern<Shape::TieShapeOp> {
       Shape::TieShapeOp shapeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     Shape::TieShapeOp::Adaptor adaptor(operands);
-    if (Value buffer = resolveResult(shapeOp.operand(), adaptor.operand(),
-                                     shapeOp.result(), resultTensorToBufferMap))
+    if (Value buffer =
+            resolveResult(shapeOp.operand(), adaptor.operand(),
+                          shapeOp.result(), resultTensorToBufferMap)) {
       rewriter.replaceOp(shapeOp, buffer);
-    else
+    } else {
       rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(
           shapeOp, getMemrefTypeForTensor(shapeOp.result()), adaptor.operand(),
           adaptor.shape());
+    }
     return success();
   }
 
@@ -1250,8 +1334,9 @@ struct HALInterfaceLoadTensorOpEraser final
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceLoadTensorOp loadOp,
                                 ArrayRef<Value> operands,
                                 ConversionPatternRewriter &rewriter) const {
-    if (!matchPattern(loadOp.offset(), m_Zero()))
+    if (!matchPattern(loadOp.offset(), m_Zero())) {
       return loadOp.emitError("unhandled non-zero offset");
+    }
 
     // Get the corresponding memref type from the tensor type.
     auto tensorType = loadOp.result().getType().cast<RankedTensorType>();
@@ -1363,8 +1448,9 @@ struct HALInterfaceStoreTensorOpEraser final
 static LogicalResult createAndPropagateBufferUsedForResultTensor(
     IREE::HAL::InterfaceStoreTensorOp op, OutputBufferMap &outputBufferMap,
     TensorToBufferMap &resultTensorToBufferMap, OpBuilder &builder) {
-  if (!matchPattern(op.offset(), m_Zero()))
+  if (!matchPattern(op.offset(), m_Zero())) {
     return op.emitError("unhandled non-zero offset");
+  }
 
   // Get the corresponding memref type from the tensor type.
   Value tensor = op.operand();
@@ -1395,11 +1481,11 @@ static LogicalResult createAndPropagateBufferUsedForResultTensor(
     }
     if (auto tensorReshapeOp =
             tensor.getDefiningOp<linalg::TensorReshapeOp>()) {
-      if (!tensorReshapeOp.result().hasOneUse()) break;
+      tensor = tensorReshapeOp.src();
+      if (resultTensorToBufferMap.count(tensor)) break;
       auto newReshapeOp = builder.create<linalg::ReshapeOp>(
           op.getLoc(), getMemrefTypeForTensor(tensorReshapeOp.getSrcType()),
           buffer, tensorReshapeOp.reassociation());
-      tensor = tensorReshapeOp.src();
       buffer = newReshapeOp.result();
       resultTensorToBufferMap.insert(std::make_pair(tensor, buffer));
       continue;
@@ -1430,6 +1516,10 @@ static LogicalResult createAndPropagateBufferUsedForResultTensors(
 namespace {
 struct ConvertHLOToLinalgOnBuffersPass
     : public PassWrapper<ConvertHLOToLinalgOnBuffersPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, IREEDialect>();
+  }
+
   void runOnFunction() override;
 };
 }  // namespace
@@ -1440,7 +1530,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
   patterns.insert<
       ConvOpConversion, ConcatenateOpConversion,
       DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
-      LinalgOpOnTensorConversion<linalg::GenericOp>,
+      DotGeneralOpConversion, LinalgOpOnTensorConversion<linalg::GenericOp>,
       LinalgOpOnTensorConversion<linalg::IndexedGenericOp>, PadOpConversion,
       ReduceOpConversion, ReduceWindowOpConversion, SliceOpConversion,
       TensorReshapeOpConversion, TorchIndexSelectOpConversion>(
@@ -1460,8 +1550,9 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   OutputBufferMap outputBufferMap;
   TensorToBufferMap resultTensorToBufferMap;
   if (failed(createAndPropagateBufferUsedForResultTensors(
-          funcOp, outputBufferMap, resultTensorToBufferMap)))
+          funcOp, outputBufferMap, resultTensorToBufferMap))) {
     return signalPassFailure();
+  }
 
   OwningRewritePatternList patterns;
   populateHLOToLinalgOnBuffersConversionPatterns(context, patterns,
@@ -1486,8 +1577,9 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   target.addDynamicallyLegalDialect<linalg::LinalgDialect>(
       Optional<ConversionTarget::DynamicLegalityCallbackFn>([](Operation *op) {
         // The generated structured Linalg ops should have buffer semantics.
-        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op))
+        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
           return linalgOp.hasBufferSemantics();
+        }
         // The other Linalg ops (like linalg.yield) are okay.
         return true;
       }));

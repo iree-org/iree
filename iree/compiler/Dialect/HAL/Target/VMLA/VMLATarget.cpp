@@ -18,8 +18,10 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -47,6 +49,10 @@ class VMLATargetBackend final : public TargetBackend {
 
   std::string name() const override { return "vmla"; }
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<VM::VMDialect, VMLA::VMLADialect>();
+  }
+
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpPassManager &passManager) override {
     IREE::VMLA::buildVMLATransformPassPipeline(passManager);
@@ -55,7 +61,8 @@ class VMLATargetBackend final : public TargetBackend {
     // iree.module.export.
     passManager.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
 
-    IREE::VM::buildVMTransformPassPipeline(passManager);
+    IREE::VM::buildVMTransformPassPipeline(
+        passManager, IREE::VM::getTargetOptionsFromFlags());
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,

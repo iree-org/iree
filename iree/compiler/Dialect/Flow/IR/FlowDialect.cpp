@@ -33,8 +33,8 @@ static DialectRegistration<FlowDialect> flow_dialect;
 
 namespace {
 
-struct FlowFolderInterface : public OpFolderDialectInterface {
-  using OpFolderDialectInterface::OpFolderDialectInterface;
+struct FlowFolderInterface : public DialectFoldInterface {
+  using DialectFoldInterface::DialectFoldInterface;
 
   bool shouldMaterializeInto(Region *region) const override {
     // TODO(benvanik): redirect constants to the region scope when small.
@@ -45,7 +45,7 @@ struct FlowFolderInterface : public OpFolderDialectInterface {
 }  // namespace
 
 FlowDialect::FlowDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
   addInterfaces<FlowFolderInterface>();
 
 #define GET_OP_LIST

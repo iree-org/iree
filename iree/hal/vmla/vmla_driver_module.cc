@@ -32,7 +32,7 @@ StatusOr<ref_ptr<Driver>> CreateVMLADriver() { return VMLADriver::Create(); }
 }  // namespace iree
 
 IREE_REGISTER_MODULE_INITIALIZER(iree_hal_vmla_driver, {
-  QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
+  IREE_QCHECK_OK(::iree::hal::DriverRegistry::shared_registry()->Register(
       "vmla", ::iree::hal::vmla::CreateVMLADriver));
 });
 IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(iree_hal, iree_hal_vmla_driver);

@@ -14,10 +14,20 @@
 
 # HAL implementation for jitting CPU code from LLVMIR.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_HAL_DRIVER_LLVM})
+  return()
+endif()
+""",
 )
 
 cc_library(
@@ -86,7 +96,6 @@ cc_library(
     hdrs = ["llvmjit_executable_cache.h"],
     deps = [
         ":llvmjit_executable",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:executable",

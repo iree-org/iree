@@ -25,6 +25,7 @@ namespace iree_compiler {
 // Options that can be used to configure SPIR-V codegeneration.
 struct SPIRVCodegenOptions {
   SmallVector<int64_t, 3> workgroupSize = {};
+  SmallVector<int64_t, 3> tileSizes = {};
   bool useWorkgroupMemory = false;
 };
 
@@ -35,7 +36,8 @@ struct SPIRVCodegenOptions {
 /// it exists) and along "z" for the next loop (if it exists). The workgroup
 /// size is expected to be of size at-most 3.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
-    ArrayRef<int64_t> workGroupSize = {}, bool useWorkgroupMem = false);
+    ArrayRef<int64_t> workGroupSize = {}, ArrayRef<int64_t> tileSizes = {},
+    bool useWorkgroupMem = false);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
@@ -60,6 +62,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createSplitDispatchFunctionPass();
 /// vector size equal to subgroup size are distributed across the subgroup.
 std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 
+/// Pass to apply tiling and vectorization transformations on linagl::MatMulOp.
+std::unique_ptr<FunctionPass> createMatMulTileAndVectorizeGPUPass();
+
+/// Convert memref of scalar to memref of vector of efficent size. This will
+/// allow to convert memory accesses to vector load/store in SPIR-V without
+/// having pointer bitcast.
+std::unique_ptr<OperationPass<ModuleOp>> createVectorizeMemref();
+
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
 /// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
@@ -69,8 +79,8 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorToGPUPass();
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
                                      const SPIRVCodegenOptions &options);
 
-/// Poplate passes needed to lower loop.parallel to workgroups.
-void populateParallelLoopToWorkgroupPatterns(
+/// Populate patterns to tile and distribute linalg operations.
+void populateLinalgTileAndDistributePatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 }  // namespace iree_compiler
 }  // namespace mlir

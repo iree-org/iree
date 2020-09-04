@@ -130,9 +130,10 @@ LLVMJITExecutable::PrepareDispatch(const DispatchParams& params) {
     for (size_t binding = 0; binding < params.set_bindings[set].size();
          ++binding) {
       const auto& io_binding = params.set_bindings[set][binding];
-      ASSIGN_OR_RETURN(auto memory, io_binding.buffer->MapMemory<uint8_t>(
-                                        MemoryAccessBitfield::kWrite,
-                                        io_binding.offset, io_binding.length));
+      IREE_ASSIGN_OR_RETURN(auto memory,
+                            io_binding.buffer->MapMemory<uint8_t>(
+                                MemoryAccessBitfield::kWrite, io_binding.offset,
+                                io_binding.length));
       auto data = memory.mutable_data();
       dispatch_state->args.push_back(data);
     }

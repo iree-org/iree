@@ -47,8 +47,29 @@ class ConvertDynamicBroadcastInDim
   }
 };
 
+class ConvertDynamicIota : public OpConversionPattern<mhlo::DynamicIotaOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      mhlo::DynamicIotaOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto resultTy = op.getType().cast<ShapedType>();
+    if (resultTy.getRank() != 1) {
+      return failure();
+    }
+
+    auto rankedShape = rewriter.create<Shape::FromExtentTensorOp>(
+        op.getLoc(), op.getOperand());
+    rewriter.replaceOpWithNewOp<Shape::IotaOp>(op, op.getType(), rankedShape);
+    return success();
+  }
+};
+
 class ConvertHLOToShapePass
     : public PassWrapper<ConvertHLOToShapePass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<ShapeDialect>();
+  }
+
   void runOnFunction() override {
     ConversionTarget conversionTarget(getContext());
     OwningRewritePatternList conversionPatterns;
@@ -59,6 +80,9 @@ class ConvertHLOToShapePass
 
     conversionTarget.addIllegalOp<mhlo::DynamicBroadcastInDimOp>();
     conversionPatterns.insert<ConvertDynamicBroadcastInDim>(&getContext());
+
+    conversionTarget.addIllegalOp<mhlo::DynamicIotaOp>();
+    conversionPatterns.insert<ConvertDynamicIota>(&getContext());
 
     if (failed(applyPartialConversion(getFunction(), conversionTarget,
                                       conversionPatterns))) {

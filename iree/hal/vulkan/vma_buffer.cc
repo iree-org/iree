@@ -14,7 +14,6 @@
 
 #include "iree/hal/vulkan/vma_buffer.h"
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -48,8 +47,9 @@ VmaBuffer::~VmaBuffer() {
 
 Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
                            const void* pattern, device_size_t pattern_length) {
-  ASSIGN_OR_RETURN(auto mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
-                                                    byte_offset, byte_length));
+  IREE_ASSIGN_OR_RETURN(
+      auto mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, byte_offset,
+                                       byte_length));
   void* data_ptr = static_cast<void*>(mapping.mutable_data());
   switch (pattern_length) {
     case 1: {
@@ -81,7 +81,7 @@ Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
 
 Status VmaBuffer::ReadDataImpl(device_size_t source_offset, void* data,
                                device_size_t data_length) {
-  ASSIGN_OR_RETURN(
+  IREE_ASSIGN_OR_RETURN(
       auto mapping,
       MapMemory<uint8_t>(MemoryAccess::kRead, source_offset, data_length));
   std::memcpy(data, mapping.data(), mapping.byte_length());
@@ -90,9 +90,9 @@ Status VmaBuffer::ReadDataImpl(device_size_t source_offset, void* data,
 
 Status VmaBuffer::WriteDataImpl(device_size_t target_offset, const void* data,
                                 device_size_t data_length) {
-  ASSIGN_OR_RETURN(auto mapping,
-                   MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
-                                      target_offset, data_length));
+  IREE_ASSIGN_OR_RETURN(auto mapping,
+                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
+                                           target_offset, data_length));
   std::memcpy(mapping.mutable_data(), data, mapping.byte_length());
   return OkStatus();
 }
@@ -103,13 +103,13 @@ Status VmaBuffer::CopyDataImpl(device_size_t target_offset,
                                device_size_t data_length) {
   // This is pretty terrible. Let's not do this.
   // TODO(benvanik): a way for allocators to indicate transfer compat.
-  ASSIGN_OR_RETURN(auto source_mapping,
-                   source_buffer->MapMemory<uint8_t>(
-                       MemoryAccess::kRead, source_offset, data_length));
+  IREE_ASSIGN_OR_RETURN(auto source_mapping,
+                        source_buffer->MapMemory<uint8_t>(
+                            MemoryAccess::kRead, source_offset, data_length));
   CHECK_EQ(data_length, source_mapping.size());
-  ASSIGN_OR_RETURN(auto target_mapping,
-                   MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
-                                      target_offset, data_length));
+  IREE_ASSIGN_OR_RETURN(auto target_mapping,
+                        MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
+                                           target_offset, data_length));
   CHECK_EQ(data_length, target_mapping.size());
   std::memcpy(target_mapping.mutable_data() + target_offset,
               source_mapping.data(), data_length);

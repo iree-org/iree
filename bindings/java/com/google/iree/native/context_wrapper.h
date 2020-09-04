@@ -35,8 +35,13 @@ class ContextWrapper {
 
   Status RegisterModules(const std::vector<ModuleWrapper*>& module_wrappers);
 
-  Status ResolveFunction(const FunctionWrapper& function_wrapper,
-                         iree_string_view_t name);
+  Status ResolveFunction(iree_string_view_t name,
+                         FunctionWrapper* function_wrapper);
+
+  // TODO(jennik): Support other input types aside from floats.
+  Status InvokeFunction(const FunctionWrapper& function_wrapper,
+                        const std::vector<float*>& inputs,
+                        int input_element_count, float* output);
 
   int id() const;
 

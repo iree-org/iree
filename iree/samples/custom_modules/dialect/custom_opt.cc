@@ -74,13 +74,14 @@ static llvm::cl::opt<bool> showDialects(
     llvm::cl::init(false));
 
 int main(int argc, char **argv) {
-  mlir::registerMlirDialects();
+  mlir::DialectRegistry registry;
+  mlir::registerMlirDialects(registry);
   mlir::registerMlirPasses();
-  mlir::registerXLADialects();
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   // Register the custom dialect
-  mlir::iree_compiler::registerCustomDialect();
+  mlir::iree_compiler::registerCustomDialect(registry);
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALConversionPasses();
   mlir::iree_compiler::registerHALTargetBackends();
@@ -105,11 +106,10 @@ int main(int argc, char **argv) {
                                     "IREE modular optimizer driver\n");
 
   if (showDialects) {
-    llvm::outs() << "Registered Dialects:\n";
-    mlir::MLIRContext context;
-    for (mlir::Dialect *dialect : context.getRegisteredDialects()) {
-      llvm::outs() << dialect->getNamespace() << "\n";
-    }
+    llvm::outs() << "Available Dialects:\n";
+    interleave(
+        registry, llvm::outs(),
+        [](auto &registryEntry) { llvm::outs() << registryEntry.first; }, "\n");
     return 0;
   }
 
@@ -127,7 +127,10 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
-                                  splitInputFile, verifyDiagnostics,
-                                  verifyPasses, allowUnregisteredDialects));
+  if (failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
+                               registry, splitInputFile, verifyDiagnostics,
+                               verifyPasses, allowUnregisteredDialects,
+                               /*preloadDialectsInContext=*/false))) {
+    return 1;
+  }
 }

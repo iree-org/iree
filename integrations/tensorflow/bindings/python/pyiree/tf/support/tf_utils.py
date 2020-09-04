@@ -19,7 +19,7 @@
 import os
 import random
 import re
-import tempfile
+from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -33,32 +33,22 @@ flags.DEFINE_bool("keep_saved_model", False,
 FLAGS = flags.FLAGS
 
 
-def set_random_seed(seed=0):
+def set_random_seed(seed: int = 0) -> None:
   """Set random seed for tf, np and random."""
   tf.random.set_seed(seed)
   random.seed(seed)
   np.random.seed(seed)
 
 
-def uniform(shape, dtype=np.float32):
+def uniform(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
   return np.random.uniform(size=shape).astype(dtype)
 
 
-def ndarange(shape, dtype=np.float32):
+def ndarange(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
   return np.arange(np.prod(shape), dtype=dtype).reshape(shape)
 
 
-def backends_to_str(backend_infos):
-  """Creates a normalized string representing the provided backends."""
-  normalized_names = []
-  for backend_info in backend_infos:
-    # Remove unusual characters and ensure names don't end or start in "_".
-    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
-    normalized_names.append(name.strip("_"))
-  return "__".join(normalized_names)
-
-
-def to_mlir_type(dtype):
+def to_mlir_type(dtype: np.dtype) -> str:
   """Returns a string that denotes the type `dtype` in MLIR style."""
   bits = dtype.itemsize * 8
   if np.issubdtype(dtype, np.integer):
@@ -69,7 +59,8 @@ def to_mlir_type(dtype):
     raise TypeError(f"Expected integer or floating type, but got {dtype}")
 
 
-def get_shape_and_dtype(array, allow_non_mlir_dtype=False):
+def get_shape_and_dtype(array: np.ndarray,
+                        allow_non_mlir_dtype: bool = False) -> str:
   shape_dtype = [str(dim) for dim in list(array.shape)]
   if np.issubdtype(array.dtype, np.number):
     shape_dtype.append(to_mlir_type(array.dtype))
@@ -80,7 +71,8 @@ def get_shape_and_dtype(array, allow_non_mlir_dtype=False):
   return "x".join(shape_dtype)
 
 
-def save_input_values(inputs, artifacts_dir=None):
+def save_input_values(inputs: Sequence[np.ndarray],
+                      artifacts_dir: str = None) -> str:
   """Saves input values with IREE tools format if `artifacts_dir` is set."""
   result = []
   for array in inputs:
@@ -97,26 +89,57 @@ def save_input_values(inputs, artifacts_dir=None):
   return result
 
 
-def compile_tf_module(tf_module,
-                      backend_infos=(),
-                      exported_names=(),
-                      artifacts_dir=None):
+def backends_to_str(backend_infos: Sequence["BackendInfo"]) -> str:
+  """Creates a normalized string representing the provided backends."""
+  normalized_names = []
+  for backend_info in backend_infos:
+    # Remove unusual characters and ensure names don't end or start in "_".
+    name = re.sub("[^0-9a-zA-Z_]+", "_", backend_info.name)
+    normalized_names.append(name.strip("_"))
+  return "__".join(normalized_names)
+
+
+def _get_backends_path(artifact_name: str,
+                       backend_infos: Sequence["BackendInfo"],
+                       artifacts_dir: str) -> str:
+  """Gets the path to save artifact_name under for the specified backend(s)."""
+  backends_string = backends_to_str(backend_infos)
+  # Put the artifact in a directory if there's only one backend.
+  if len(backend_infos) == 1:
+    backend_dir = os.path.join(artifacts_dir, backends_string)
+    os.makedirs(backend_dir, exist_ok=True)
+    return os.path.join(artifacts_dir, backends_string, artifact_name)
+  else:
+    return os.path.join(artifacts_dir, f"{artifact_name}__{backends_string}")
+
+
+def compile_tf_module(
+    tf_module: Type[tf.Module],
+    backend_infos: Sequence["BackendInfo"] = (),
+    exported_names: Sequence[str] = (),
+    artifacts_dir: str = None
+) -> Tuple[compiler.binding.OpaqueBlob, Union[str, None]]:
   """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
 
   The artifact this creates is not callable. See IreeCompiledModule for an API
   that returns a module that can be called without any further steps.
 
   If artifacts_dir is provided then the following artifacts will be saved:
-    saved_model:
+    backend_name/saved_model:
       A TF SavedModel directory containing the files used translate the
-      tf.Module into an IREE module.
+      tf.Module into an IREE module. Only saved if '--keep_saved_model=True'.
     tf_input.mlir:
       MLIR for the module in TF's input dialect.
     iree_input.mlir:
       The MLIR above translated to IREE via compiler.TF_IMPORT_PASS_PIPELINE.
-    compiled__backends.vmfb:
+    backend_name/compiled.vmfb:
       A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
-  Here 'backends' is a '__' delimited list of iree backends (e.g. vmla__llvm_ir)
+
+  If multiple backends are specified, then instead of saving the SavedModel and
+  compiled 'vmfb' under 'backend_name/', they will be saved as follows:
+    - 'saved_model__{backends}'
+    - 'compiled__{backends}.vmfb'
+  where 'backends' is a '__' delimited list (e.g. iree_vmla__iree_llvmjit).
 
   Args:
     tf_module: A tf.Module.
@@ -127,80 +150,73 @@ def compile_tf_module(tf_module,
       should be saved.
 
   Returns:
-    A compiled IREE module blob.
+    A compiled IREE module blob and the path to the compiled VM FlatBuffer if
+    artifacts_dir is provided.
   """
 
-  def _compile_from_path(sm_path):
-    """Helper function for compile_tf_module."""
-    if artifacts_dir is not None:
-      # Set up a crash reproducer for debugging.
-      compiler.Context.default_crash_reproducer_path = os.path.join(
-          artifacts_dir, f"reproducer__{backends_string}.mlir")
-    try:
-      # We break up the compilation here so we can save intermediary artifacts.
-      compiler_context = compiler.Context()
-
-      # Convert the tf_module into raw TF input MLIR.
-      compiler_module = compiler.tf_load_saved_model(
-          sm_path,
-          exported_names=exported_names,
-          compiler_context=compiler_context,
-          pass_pipeline=())
-
-      if artifacts_dir is not None:
-        tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
-        logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
-        with open(tf_mlir_path, "w") as f:
-          f.write(compiler_module.to_asm())
-
-      # Now run the passes manually that tf_load_saved_model would usually do.
-      compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
-
-      if artifacts_dir is not None:
-        iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
-        logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
-        with open(iree_mlir_path, "w") as f:
-          f.write(compiler_module.to_asm())
-
-      target_backends = []
-      for backend_info in backend_infos:
-        target_backends.extend(backend_info.compiler_targets)
-      compiled_module = compiler_module.compile(target_backends=target_backends)
-
-      if artifacts_dir is not None:
-        compiled_name = f"compiled__{backends_string}.vmfb"
-        compiled_path = os.path.join(artifacts_dir, compiled_name)
-        logging.info("Saving compiled IREE module to: %s", compiled_path)
-        with open(compiled_path, "wb") as f:
-          f.write(compiled_module)
-
-      return compiled_module
-    except Exception:  # pylint: disable=broad-except
-      if artifacts_dir is not None:
-        # Disable the crash reproducer (to avoid inadvertently overwriting it).
-        compiler.Context.default_crash_reproducer_path = None
-      raise
-
-  options = tf.saved_model.SaveOptions(save_debug_info=True)
-  backends_string = backends_to_str(backend_infos)
   if artifacts_dir is not None and FLAGS.keep_saved_model:
     # Create a saved model for these target backends to avoid a race condition
     # when running a test suite.
     # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = os.path.join(artifacts_dir, f"saved_model__{backends_string}")
-    tf.saved_model.save(tf_module, sm_path, options=options)
-    return _compile_from_path(sm_path)
+    sm_path = _get_backends_path("saved_model", backend_infos, artifacts_dir)
   else:
-    # Round-trip the saved model through a temporary directory.
-    with tempfile.TemporaryDirectory() as sm_path:
-      tf.saved_model.save(tf_module, sm_path, options=options)
-      return _compile_from_path(sm_path)
+    sm_path = None
+
+  if artifacts_dir is not None:
+    # Set up a crash reproducer for debugging.
+    backends_string = backends_to_str(backend_infos)
+    compiler.Context.default_crash_reproducer_path = os.path.join(
+        artifacts_dir, f"reproducer__{backends_string}.mlir")
+
+  try:
+    # Convert the tf_module into raw TF input MLIR.
+    compiler_module = compiler.tf_module_to_compiler_module(
+        tf_module, exported_names, sm_path, pass_pipeline=())
+
+    if artifacts_dir is not None:
+      tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
+      logging.info("Saving raw TF input MLIR to: %s", tf_mlir_path)
+      with open(tf_mlir_path, "w") as f:
+        f.write(compiler_module.to_asm())
+
+    # Now run the passes manually that tf_module_to_compiler_module would
+    # usually do.
+    compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
+
+    if artifacts_dir is not None:
+      iree_mlir_path = os.path.join(artifacts_dir, "iree_input.mlir")
+      logging.info("Saving IREE input MLIR to: %s", iree_mlir_path)
+      with open(iree_mlir_path, "w") as f:
+        f.write(compiler_module.to_asm())
+
+    target_backends = []
+    for backend_info in backend_infos:
+      target_backends.extend(backend_info.compiler_targets)
+    compiled_module = compiler_module.compile(target_backends=target_backends)
+
+    compiled_path = None
+    if artifacts_dir is not None:
+      compiled_path = _get_backends_path("compiled", backend_infos,
+                                         artifacts_dir)
+      compiled_path = f"{compiled_path}.vmfb"
+      logging.info("Saving compiled IREE module to: %s", compiled_path)
+      with open(compiled_path, "wb") as f:
+        f.write(compiled_module)
+
+  except Exception:  # pylint: disable=broad-except
+    if artifacts_dir is not None:
+      # Disable the crash reproducer (to avoid inadvertently overwriting it).
+      compiler.Context.default_crash_reproducer_path = None
+    raise
+
+  return compiled_module, compiled_path
 
 
 class CompiledModule(object):
   """Base class for the TF and IREE compiled modules."""
 
-  def __init__(self, module_class, backend_info, exported_names, artifacts_dir):
+  def __init__(self, module_class: Type[tf.Module], backend_info: "BackendInfo",
+               exported_names: Sequence[str], artifacts_dir: str):
     """Shared base constructor – not useful on its own."""
     self._module_class = module_class
     self._backend_info = backend_info
@@ -209,22 +225,42 @@ class CompiledModule(object):
 
     # Public attributes:
     self.backend = self._backend_info.name
+    self.backend_driver = self._backend_info.driver
     self.module_name = self._module_class.__name__
+    self.compiled_path = None
 
   def create_reinitialized(self):
     """Duplicates this module with its initial state without recompiling."""
     raise NotImplementedError()
+
+  @staticmethod
+  def supports_cxx_serialization():
+    raise NotImplementedError()
+
+
+class _IreeFunctionWrapper(object):
+  """Wraps an IREE function, making it callable."""
+
+  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction):
+    self._context = context
+    self._f = f
+
+  def __call__(self, *args):
+    return self._f(*args)
+
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    return self._f.get_serialized_values()
 
 
 class IreeCompiledModule(CompiledModule):
   """Iree compiled module."""
 
   def __init__(self,
-               module_class,
-               backend_info,
-               exported_names=(),
-               artifacts_dir=None,
-               _create_reinitialized_args=None):
+               module_class: Type[tf.Module],
+               backend_info: "BackendInfo",
+               exported_names: Sequence[str] = (),
+               artifacts_dir: str = None,
+               _create_reinitialized_dict: Dict[str, Any] = None):
     """Compile a tf.Module to the target backend in backend_info.
 
     Args:
@@ -235,13 +271,13 @@ class IreeCompiledModule(CompiledModule):
         module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
-      _create_reinitialized_args: used internally.
+      _create_reinitialized_dict: used internally.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
-    if _create_reinitialized_args is None:
+    if _create_reinitialized_dict is None:
       set_random_seed()
-      self._module_blob = compile_tf_module(
+      self._module_blob, self.compiled_path = compile_tf_module(
           tf_module=module_class(),
           backend_infos=[backend_info],
           exported_names=exported_names,
@@ -250,37 +286,72 @@ class IreeCompiledModule(CompiledModule):
       self._config = rt.Config(driver_name=backend_info.driver)
     else:
       # Called from self.create_reinitialized()
-      self._module_blob, self._module, self._config = _create_reinitialized_args
+      self._module_blob = _create_reinitialized_dict["_module_blob"]
+      self._module = _create_reinitialized_dict["_module"]
+      self._config = _create_reinitialized_dict["_config"]
+      self.compiled_path = _create_reinitialized_dict["compiled_path"]
 
     # Holds all of the module's mutable state.
     self._context = rt.SystemContext(
         modules=[self._module], config=self._config)
 
-  def create_reinitialized(self):
+  def create_reinitialized(self) -> "IreeCompiledModule":
     """Duplicates this module with its initial state without recompiling."""
     default_args = [
         self._module_class, self._backend_info, self._exported_names,
         self._artifacts_dir
     ]
-    create_reinitialized_args = [self._module_blob, self._module, self._config]
-    return IreeCompiledModule(*default_args, create_reinitialized_args)
+    create_reinitialized_dict = {
+        "_module_blob": self._module_blob,
+        "_module": self._module,
+        "_config": self._config,
+        "compiled_path": self.compiled_path
+    }
+    return IreeCompiledModule(*default_args, create_reinitialized_dict)
 
-  def __getattr__(self, attr):
+  def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.
     m = self._context.modules[self._module.name]
     f = m[attr]
     return _IreeFunctionWrapper(self._context, f)
 
+  @staticmethod
+  def supports_cxx_serialization() -> bool:
+    return True
 
-class _IreeFunctionWrapper(object):
-  """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context, f):
-    self._context = context
+class _TfFunctionWrapper(object):
+  """Wraps a TF function, normalizing it to numpy."""
+
+  def __init__(self, f: Callable[..., Any]):
     self._f = f
 
-  def __call__(self, *args):
-    return self._f(*args)
+  def _convert_to_numpy(self, tensor: Any) -> Any:
+    if not isinstance(tensor, tf.Tensor):
+      return tensor
+    result = tensor.numpy()
+    if np.isscalar(result):
+      # convert_to_tensor isn't reversible via .numpy()
+      result = np.array(result)
+    if result.dtype == np.bool:
+      # IREE interprets bools as int8s, so we modify this for comparison.
+      result = result.astype(dtype=np.int8)
+    return result
+
+  def __call__(self, *args, **kwargs):
+    # TensorFlow will auto-convert all inbound args.
+    results = self._f(*args, **kwargs)
+    # Then unmarshal them to numpy in the same way that the other backends do.
+    # Handle single result (technically ambiguous with return of a tuple,
+    # which is sad).
+    if not isinstance(results, tuple):
+      results = (results,)
+    return tf.nest.map_structure(
+        self._convert_to_numpy, *results, check_types=False)
+
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    """Dummy function to match _IreeFunctionWrapper's API."""
+    return (), ()
 
 
 class TfCompiledModule(CompiledModule):
@@ -291,10 +362,10 @@ class TfCompiledModule(CompiledModule):
   """
 
   def __init__(self,
-               module_class,
-               backend_info,
-               exported_names=(),
-               artifacts_dir=None):
+               module_class: Type[tf.Module],
+               backend_info: "BackendInfo",
+               exported_names: Sequence[str] = (),
+               artifacts_dir: str = None):
     """Wrap a tf.Module in a TFCompiledModule facade.
 
     Args:
@@ -310,12 +381,12 @@ class TfCompiledModule(CompiledModule):
     set_random_seed()
     self._tf_module = module_class()
 
-  def create_reinitialized(self):
+  def create_reinitialized(self) -> "TfCompiledModule":
     """Duplicates this module with the starting state of module_class."""
     return TfCompiledModule(self._module_class, self._backend_info,
                             self._exported_names, self._artifacts_dir)
 
-  def __getattr__(self, attr):
+  def __getattr__(self, attr: str) -> _TfFunctionWrapper:
     # Try to resolve it as a function.
     exported = not self._exported_names or attr in self._exported_names
     if not hasattr(self._tf_module, attr) or not exported:
@@ -326,35 +397,13 @@ class TfCompiledModule(CompiledModule):
           f"The TensorFlow module does not have a callable attr '{attr}'")
     return _TfFunctionWrapper(f)
 
-
-class _TfFunctionWrapper(object):
-  """Wraps a TF function, normalizing it to numpy."""
-
-  def __init__(self, f):
-    self._f = f
-
-  def _convert_to_numpy(self, tensor):
-    if not isinstance(tensor, tf.Tensor):
-      return tensor
-    result = tensor.numpy()
-    if np.isscalar(result):
-      # convert_to_tensor isn't reversible via .numpy()
-      result = np.array(result)
-    return result
-
-  def __call__(self, *args, **kwargs):
-    # TensorFlow will auto-convert all inbound args.
-    results = self._f(*args, **kwargs)
-    # Then unmarshal them to numpy in the same way that the other backends do.
-    # Handle single result (technically ambiguous with return of a tuple,
-    # which is sad).
-    if not isinstance(results, tuple):
-      results = (results,)
-    return tf.nest.map_structure(
-        self._convert_to_numpy, *results, check_types=False)
+  @staticmethod
+  def supports_cxx_serialization() -> bool:
+    return False
 
 
 class BackendInfo:
+  """Contains information for compiling the specified backend."""
 
   _name_to_info = {
       "tf": {
@@ -379,8 +428,8 @@ class BackendInfo:
       },
   }
 
-  def __init__(self, backend_name, artifact_name=None):
-    """Contains information for compiling the specified backend.
+  def __init__(self, backend_name: str, artifact_name: str = None):
+    """Creates a BackendInfo with the compilation details for backend_name.
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
@@ -402,12 +451,15 @@ class BackendInfo:
     self.compiler_targets = info["compiler_targets"]
     self.name = backend_name if artifact_name is None else artifact_name
 
-  def compile(self, module, exported_names=(), artifacts_dir=None):
+  def compile(self,
+              module: Type[tf.Module],
+              exported_names: Sequence[str] = (),
+              artifacts_dir: str = None) -> CompiledModule:
     """Creates a `CompiledModule` for this backend."""
     return self._compiled_module_class(module, self, exported_names,
                                        artifacts_dir)
 
   @classmethod
-  def get_all_backends(cls):
+  def get_all_backends(cls) -> Sequence["BackendInfo"]:
     """Returns a list of all BackendInfo configurations."""
     return [BackendInfo(backend_name) for backend_name in cls._name_to_info]

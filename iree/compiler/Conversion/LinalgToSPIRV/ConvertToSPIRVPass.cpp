@@ -31,6 +31,7 @@
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
@@ -332,6 +333,10 @@ class VectorContractToCoopMatmul final
 /// corresponding SPIR-V ops.
 struct ConvertToSPIRVPass
     : public PassWrapper<ConvertToSPIRVPass, OperationPass<ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<spirv::SPIRVDialect>();
+  }
+
   void runOnOperation() override;
   ConvertToSPIRVPass() {}
   ConvertToSPIRVPass(const ConvertToSPIRVPass &pass) {}
@@ -352,8 +357,7 @@ LogicalResult HALInterfaceLoadConstantConverter::matchAndRewrite(
       llvm::to_vector<1>(moduleOp.getOps<IREE::HAL::InterfaceOp>());
   assert(halInterfaceOps.size() == 1);
 
-  unsigned elementCount =
-      halInterfaceOps.front().push_constants()->getZExtValue();
+  unsigned elementCount = *halInterfaceOps.front().push_constants();
   unsigned offset = loadOp.offset().getZExtValue();
 
   // The following function generates SPIR-V ops with i32 types. So it does type
@@ -378,9 +382,9 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
       SymbolTable::lookupNearestSymbolFrom(
           phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
 
-  spirv::GlobalVariableOp varOp = getOrInsertResourceVariable(
-      phOp.getLoc(), convertedType, bindingOp.set().getZExtValue(),
-      bindingOp.binding().getZExtValue(), *moduleOp.getBody());
+  spirv::GlobalVariableOp varOp =
+      getOrInsertResourceVariable(phOp.getLoc(), convertedType, bindingOp.set(),
+                                  bindingOp.binding(), *moduleOp.getBody());
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();

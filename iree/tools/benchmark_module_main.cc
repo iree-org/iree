@@ -15,9 +15,8 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
-#include "iree/base/api_util.h"
 #include "iree/base/file_io.h"
-#include "iree/base/source_location.h"
+#include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"
@@ -67,46 +66,43 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
   return file_io::GetFileContents(input_file);
 }
 
-Status Run(::benchmark::State& state) {
+Status RunFunction(::benchmark::State& state,
+                   const std::string& function_name) {
   IREE_TRACE_SCOPE0("iree-benchmark-module");
 
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
       << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
+  IREE_RETURN_IF_ERROR(
+      iree_vm_instance_create(iree_allocator_system(), &instance))
       << "creating instance";
 
-  ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
+  IREE_ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
   iree_vm_module_t* input_module = nullptr;
-  RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
+  IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
   iree_hal_device_t* device = nullptr;
-  RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(absl::GetFlag(FLAGS_driver), &device));
   iree_vm_module_t* hal_module = nullptr;
-  RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
   iree_vm_context_t* context = nullptr;
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
-  RETURN_IF_ERROR(FromApiStatus(iree_vm_context_create_with_modules(
-                                    instance, modules.data(), modules.size(),
-                                    IREE_ALLOCATOR_SYSTEM, &context),
-                                IREE_LOC))
+  IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+      instance, modules.data(), modules.size(), iree_allocator_system(),
+      &context))
       << "creating context";
 
-  std::string function_name = absl::GetFlag(FLAGS_entry_function);
   iree_vm_function_t function;
-  RETURN_IF_ERROR(FromApiStatus(
-      input_module->lookup_function(
-          input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-          iree_string_view_t{function_name.data(), function_name.size()},
-          &function),
-      IREE_LOC))
+  IREE_RETURN_IF_ERROR(input_module->lookup_function(
+      input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      iree_string_view_t{function_name.data(), function_name.size()},
+      &function))
       << "looking up function '" << function_name << "'";
 
-  RETURN_IF_ERROR(ValidateFunctionAbi(function));
-  ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
+  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
   vm::ref<iree_vm_list_t> inputs;
   if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
@@ -114,30 +110,30 @@ Status Run(::benchmark::State& state) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Expected only one of inputs and inputs_file to be set";
     }
-    ASSIGN_OR_RETURN(inputs, ParseToVariantListFromFile(
-                                 input_descs, iree_hal_device_allocator(device),
-                                 absl::GetFlag(FLAGS_inputs_file)));
+    IREE_ASSIGN_OR_RETURN(
+        inputs, ParseToVariantListFromFile(input_descs,
+                                           iree_hal_device_allocator(device),
+                                           absl::GetFlag(FLAGS_inputs_file)));
   } else {
-    ASSIGN_OR_RETURN(inputs, ParseToVariantList(
-                                 input_descs, iree_hal_device_allocator(device),
-                                 absl::GetFlag(FLAGS_inputs)));
+    IREE_ASSIGN_OR_RETURN(
+        inputs,
+        ParseToVariantList(input_descs, iree_hal_device_allocator(device),
+                           absl::GetFlag(FLAGS_inputs)));
   }
 
-  ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
 
   // Execute once to make sure any first-iteration outliers are eliminated (e.g.
   // JITing the SPIR-V) and clearly separate out benchmark-related problems in
   // future debugging.
   {
     vm::ref<iree_vm_list_t> outputs;
-    RETURN_IF_ERROR(FromApiStatus(
+    IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
-                            IREE_ALLOCATOR_SYSTEM, &outputs),
-        IREE_LOC));
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                       outputs.get(), IREE_ALLOCATOR_SYSTEM),
-        IREE_LOC));
+                            iree_allocator_system(), &outputs));
+    IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
+                                        inputs.get(), outputs.get(),
+                                        iree_allocator_system()));
   }
 
   for (auto _ : state) {
@@ -146,12 +142,13 @@ Status Run(::benchmark::State& state) {
     vm::ref<iree_vm_list_t> outputs;
     IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
                                       output_descs.size(),
-                                      IREE_ALLOCATOR_SYSTEM, &outputs));
+                                      iree_allocator_system(), &outputs));
     IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr,
                                  inputs.get(), outputs.get(),
-                                 IREE_ALLOCATOR_SYSTEM));
+                                 iree_allocator_system()));
   }
 
+  inputs.reset();
   iree_vm_module_release(hal_module);
   iree_vm_module_release(input_module);
   iree_hal_device_release(device);
@@ -160,26 +157,40 @@ Status Run(::benchmark::State& state) {
   return OkStatus();
 }
 
-void BM_RunModule(benchmark::State& state) {
+void BM_RunModule(benchmark::State& state, const std::string& function_name) {
   // Delegate to a status-returning function so we can use the status macros.
-  CHECK_OK(Run(state));
+  IREE_CHECK_OK(RunFunction(state, function_name));
 }
-
-BENCHMARK(BM_RunModule)
-    // By default only the main thread is included in CPU time. Include all the
-    // threads instead.
-    ->MeasureProcessCPUTime()
-    // To make single and multi-threaded benchmarks more comparable, use the
-    // wall time to determine how many iterations to run.
-    // See https://github.com/google/benchmark#cpu-timers,
-    ->UseRealTime()
-    // Report timing in milliseconds, which is the general order of magnitude of
-    // model runs. The benchmark framework will print with precision between 0
-    // and 3 places after the decimal while aiming for three significant digits.
-    // If we end up wanting precision beyond microseconds, we can make this
-    // setting configurable with a custom command line flag.
-    ->Unit(benchmark::kMillisecond);
 
 }  // namespace
 
+void RegisterModuleBenchmarks() {
+  auto function_name = absl::GetFlag(FLAGS_entry_function);
+  auto benchmark_name = "BM_" + function_name;
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [function_name](benchmark::State& state) {
+                                 BM_RunModule(state, function_name);
+                               })
+      // By default only the main thread is included in CPU time. Include all
+      // the threads instead.
+      ->MeasureProcessCPUTime()
+      // To make single and multi-threaded benchmarks more comparable, use the
+      // wall time to determine how many iterations to run. See
+      // https://github.com/google/benchmark#cpu-timers,
+      ->UseRealTime()
+      // Report timing in milliseconds, which is the general order of magnitude
+      // of model runs. The benchmark framework will print with precision
+      // between 0 and 3 places after the decimal while aiming for three
+      // significant digits. If we end up wanting precision beyond microseconds,
+      // we can make this setting configurable with a custom command line flag.
+      ->Unit(benchmark::kMillisecond);
+}
 }  // namespace iree
+
+int main(int argc, char** argv) {
+  ::benchmark::Initialize(&argc, argv);
+  iree::InitializeEnvironment(&argc, &argv);
+  iree::RegisterModuleBenchmarks();
+  ::benchmark::RunSpecifiedBenchmarks();
+  return 0;
+}

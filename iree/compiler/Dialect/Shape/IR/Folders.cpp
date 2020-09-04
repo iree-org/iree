@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Utils/PatternUtils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"

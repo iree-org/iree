@@ -39,8 +39,6 @@ extern "C" {
 // better to reserve the exact desired element count first.
 typedef struct iree_vm_list iree_vm_list_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Returns the size in bytes required to store a list with the given element
 // type and capacity. This storage size can be used to stack allocate or reserve
 // memory that is then used by iree_vm_list_initialize to avoid dynamic
@@ -190,8 +188,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_set_variant(
 // variant is a ref then it will be retained.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_list_push_variant(iree_vm_list_t* list, const iree_vm_variant_t* value);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

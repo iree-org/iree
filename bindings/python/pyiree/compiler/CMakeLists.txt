@@ -43,8 +43,6 @@ iree_pyext_library(
     "compiler.cc"
   PYEXT_DEPS
     bindings::python::pyiree::common::PyextCommonLib
-  COPTS
-    ${PYBIND_REGISTER_MLIR_PASSES}
   DEPS
     # Transforms. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::Flow::Transforms
@@ -55,8 +53,8 @@ iree_pyext_library(
     iree::compiler::Dialect::VM::Transforms
     # Targets. Adopted from the Bazel variable COMPILER::DEPS.
     iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMAOT
-    iree::compiler::Dialect::HAL::Target::LLVM::LLVMIR
+    iree::compiler::Dialect::HAL::Target::LLVM::AOT::LLVMAOT
+    iree::compiler::Dialect::HAL::Target::LLVM::IR::LLVMIR
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
@@ -64,6 +62,7 @@ iree_pyext_library(
     iree::tools::init_iree_passes_and_dialects
     iree::tools::init_mlir_passes_and_dialects
     iree::tools::init_targets
+    iree::tools::init_xla_dialects
     LLVMSupport
     MLIRIR
     MLIRSCFTransforms

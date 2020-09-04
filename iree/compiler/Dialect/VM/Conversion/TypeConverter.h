@@ -15,16 +15,27 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_
 
+#include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VM {
 
-class VMTypeConverter : public TypeConverter {
+class TypeConverter : public mlir::TypeConverter {
  public:
-  VMTypeConverter();
+  explicit TypeConverter(
+      TargetOptions targetOptions = getTargetOptionsFromFlags());
+
+  const TargetOptions& targetOptions() const { return targetOptions_; }
+
+ private:
+  TargetOptions targetOptions_;
 };
 
+}  // namespace VM
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 

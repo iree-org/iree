@@ -12,53 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if(NOT ${IREE_TARGET_BACKEND_LLVM-IR})
+  return()
+endif()
+
 iree_add_all_subdirs()
-
-iree_cc_library(
-  NAME
-    LLVMIR
-  HDRS
-    "LLVMIRTarget.h"
-  SRCS
-    "LLVMIRTarget.cpp"
-  DEPS
-    ::LLVMIRPasses
-    ::LLVMTargetOptions
-    LLVMCore
-    LLVMSupport
-    LLVMX86CodeGen
-    MLIRTargetLLVMIR
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Dialect::HAL::Target
-    iree::schemas::llvmir_executable_def_cc_fbs
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    LLVMAOT
-  HDRS
-    "LLVMAOTTarget.h"
-  SRCS
-    "LLVMAOTTarget.cpp"
-  DEPS
-    ::LLVMAOTTargetLinker
-    ::LLVMIRPasses
-    ::LLVMTargetOptions
-    LLVMAArch64AsmParser
-    LLVMAArch64CodeGen
-    LLVMARMAsmParser
-    LLVMARMCodeGen
-    LLVMCore
-    LLVMSupport
-    LLVMX86AsmParser
-    LLVMX86CodeGen
-    MLIRTargetLLVMIR
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Dialect::HAL::Target
-    iree::schemas::dylib_executable_def_cc_fbs
-  PUBLIC
-)
 
 iree_cc_library(
   NAME
@@ -88,26 +46,5 @@ iree_cc_library(
     LLVMPasses
     LLVMSupport
     LLVMTarget
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    LLVMAOTTargetLinker
-  HDRS
-    "LLVMAOTTargetLinker.h"
-  DEPS
-    iree::compiler::Dialect::HAL::Target::LLVM::internal::LLVMAOTTargetLinker_internal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    LLVMAOTTargetLinker_hdrs
-  HDRS
-    "LLVMAOTTargetLinker.h"
-  DEPS
-    ::LLVMTargetOptions
-    iree::base::status
   PUBLIC
 )

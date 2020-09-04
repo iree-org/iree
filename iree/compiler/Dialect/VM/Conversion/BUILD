@@ -23,12 +23,14 @@ cc_library(
     srcs = [
         "ConversionTarget.cpp",
         "ImportUtils.cpp",
+        "TargetOptions.cpp",
         "TypeConverter.cpp",
     ],
     hdrs = [
         "ConversionDialectInterface.h",
         "ConversionTarget.h",
         "ImportUtils.h",
+        "TargetOptions.h",
         "TypeConverter.h",
     ],
     deps = [

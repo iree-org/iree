@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -204,6 +205,10 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 class InlineDeviceSwitchesPass
     : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<FuncOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREEDialect>();
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<IREE::HAL::DeviceSwitchOp, 4> switchOps;

@@ -70,13 +70,17 @@ namespace {
 class ConvertFlowToHALPass
     : public PassWrapper<ConvertFlowToHALPass, OperationPass<ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 
     SmallVector<const HALConversionDialectInterface *, 4> conversionInterfaces;
     // Gather all interfaces from registered dialects.
     // These will perform the tensor->buffer mapping for their ops.
-    for (auto *dialect : context->getRegisteredDialects()) {
+    for (auto *dialect : context->getLoadedDialects()) {
       if (auto *conversionInterface =
               dialect
                   ->getRegisteredInterface<HALConversionDialectInterface>()) {

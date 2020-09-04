@@ -71,15 +71,19 @@ class SerializingCommandQueue final : public CommandQueue {
   // Aborts all deferred submissions and waits for submitted work to complete.
   void AbortQueueSubmission();
 
- private:
-  // A submission batch together with the fence to singal its status.
-  struct FencedSubmission : IntrusiveLinkBase<void> {
-    SubmissionBatch batch;
-    ref_ptr<TimePointFence> fence;
+  // Informs this queue that the given |fences| are known to have signaled.
+  void SignalFences(absl::Span<VkFence> fences);
 
-    FencedSubmission(const SubmissionBatch& batch,
-                     ref_ptr<TimePointFence> fence)
-        : batch(batch), fence(std::move(fence)) {}
+ private:
+  struct PendingBatch {
+    absl::InlinedVector<SemaphoreValue, 4> wait_semaphores;
+    absl::InlinedVector<CommandBuffer*, 4> command_buffers;
+    absl::InlinedVector<SemaphoreValue, 4> signal_semaphores;
+  };
+  // A submission batch together with the fence to singal its status.
+  struct FencedSubmission : public IntrusiveLinkBase<void> {
+    PendingBatch batch;
+    ref_ptr<TimePointFence> fence;
   };
 
   // Processes deferred submissions in this queue and returns whether there are

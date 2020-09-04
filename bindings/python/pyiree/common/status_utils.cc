@@ -35,7 +35,7 @@ PyObject* StatusToPyExcClass(const Status& status) {
 }
 
 PyObject* ApiStatusToPyExcClass(iree_status_t status) {
-  switch (status) {
+  switch (iree_status_code(status)) {
     case IREE_STATUS_INVALID_ARGUMENT:
       return PyExc_ValueError;
     case IREE_STATUS_OUT_OF_RANGE:
@@ -51,15 +51,17 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
 
 pybind11::error_already_set StatusToPyExc(const Status& status) {
   assert(!status.ok());
-  PyErr_SetString(StatusToPyExcClass(status), status.error_message().c_str());
+  PyErr_SetString(StatusToPyExcClass(status), status.ToString().c_str());
   return pybind11::error_already_set();
 }
 
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message) {
-  assert(status != IREE_STATUS_OK);
-  auto full_message = absl::StrCat(message, ": ", static_cast<int>(status));
+  assert(!iree_status_is_ok(status));
+  auto full_message = absl::StrCat(
+      message, ": ", iree_status_code_string(iree_status_code(status)));
   PyErr_SetString(ApiStatusToPyExcClass(status), full_message.c_str());
+  iree_status_ignore(status);
   return pybind11::error_already_set();
 }
 

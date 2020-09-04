@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Types.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -37,7 +38,11 @@ void populateTFStringsToHALPatterns(MLIRContext *ctx,
 // use tensor types.
 class TfStringsToHALConversionInterface : public HALConversionDialectInterface {
  public:
-  using HALConversionDialectInterface::HALConversionDialectInterface;
+  TfStringsToHALConversionInterface(Dialect *dialect)
+      : HALConversionDialectInterface(dialect) {
+    dialect->getContext()->loadDialect<IREE::Strings::StringsDialect>();
+  }
+
   void setupConversionTarget(ConversionTarget &target,
                              OwningRewritePatternList &patterns,
                              TypeConverter &typeConverter) const override {

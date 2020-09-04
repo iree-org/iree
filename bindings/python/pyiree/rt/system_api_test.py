@@ -17,6 +17,7 @@
 
 import re
 
+from absl import logging
 from absl.testing import absltest
 import numpy as np
 from pyiree import compiler
@@ -68,7 +69,7 @@ class SystemApiTest(absltest.TestCase):
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     f_repr = repr(f)
-    print(f_repr)
+    logging.info("f_repr: %s", f_repr)
     self.assertRegex(
         f_repr,
         re.escape(
@@ -91,6 +92,19 @@ class SystemApiTest(absltest.TestCase):
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     results = f(arg0, arg1)
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
+
+  def test_serialize_values(self):
+    ctx = rt.SystemContext()
+    self.assertTrue(ctx.is_dynamic)
+    ctx.add_module(create_simple_mul_module())
+    self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
+    f = ctx.modules.arithmetic["simple_mul"]
+    arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
+    arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+    results = f(arg0, arg1)
+    inputs, outputs = f.get_serialized_values()
+    self.assertEqual(inputs, ("4xf32=1 2 3 4", "4xf32=4 5 6 7"))
+    self.assertEqual(outputs, ("4xf32=4 10 18 28",))
 
   def test_load_module(self):
     arithmetic = rt.load_module(create_simple_mul_module())

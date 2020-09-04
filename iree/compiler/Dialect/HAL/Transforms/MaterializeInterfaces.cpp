@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -72,8 +73,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
     auto bindingName = "arg" + std::to_string(inputType.index());
     if (inputType.value().isa<TensorType>()) {
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName,
-          /*set=*/APInt(32, 0), /*binding=*/APInt(32, binding++),
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::Read);
     } else if (auto indexType = inputType.value().dyn_cast<IndexType>()) {
@@ -99,8 +99,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
     auto bindingName = "ret" + std::to_string(outputType.index());
     if (outputType.value().isa<TensorType>()) {
       interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interfaceLoc, bindingName,
-          /*set=*/APInt(32, 0), /*binding=*/APInt(32, binding++),
+          interfaceLoc, bindingName, /*set=*/0, /*binding=*/binding++,
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::DiscardWrite);
     } else {
@@ -130,22 +129,28 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
 //     Such an ordering can be useful for downstream code generation because
 //     it can often be necessary to reference primitives in the materialization
 //     of binding-based loads (i.e. for size calculations, etc). For any
-//     stronger guarnatees or inter-load ordering constraints, downstream
+//     stronger guarantees or inter-load ordering constraints, downstream
 //     code generation must explicitly take non-determinism of argument
 //     ordering into account.
 static Optional<FuncOp> createDispatchEntryThunk(
-    FuncOp sourceFuncOp, IREE::HAL::InterfaceOp interfaceOp) {
+    FuncOp sourceFuncOp, IREE::HAL::InterfaceOp interfaceOp,
+    IREE::HAL::ExecutableTargetOp targetOp) {
+  // Clone the source FuncOp into the target then manipulate it into a
+  // dispatch entry thunk.
+  auto clonedFuncOp = sourceFuncOp.clone();
+  targetOp.getInnerModule().push_back(clonedFuncOp);
+
   // Functions take all I/O through the interface API.
-  auto sourceFuncType = sourceFuncOp.getType();
-  auto thunkFuncType = FunctionType::get({}, {}, sourceFuncOp.getContext());
-  auto thunkFuncOp = FuncOp::create(sourceFuncOp.getLoc(),
-                                    sourceFuncOp.getName(), thunkFuncType);
+  auto sourceFuncType = clonedFuncOp.getType();
+  auto thunkFuncType = FunctionType::get({}, {}, clonedFuncOp.getContext());
+  auto thunkFuncOp = FuncOp::create(clonedFuncOp.getLoc(),
+                                    clonedFuncOp.getName(), thunkFuncType);
   SymbolTable::setSymbolVisibility(thunkFuncOp,
                                    SymbolTable::Visibility::Public);
-  sourceFuncOp.setName((sourceFuncOp.getName() + "_impl").str());
-  SymbolTable::setSymbolVisibility(sourceFuncOp,
+  clonedFuncOp.setName((clonedFuncOp.getName() + "_impl").str());
+  SymbolTable::setSymbolVisibility(clonedFuncOp,
                                    SymbolTable::Visibility::Private);
-  sourceFuncOp.getParentRegion()->getBlocks().front().push_front(thunkFuncOp);
+  clonedFuncOp.getParentRegion()->getBlocks().front().push_front(thunkFuncOp);
 
   // For now we only support tensor types, so bindings are in order.
   // In the future we will want to provide N:M mappings (as well as the
@@ -194,7 +199,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
       operands.push_back(loadOp.getResult());
       ++pushConstantOffset;
     } else {
-      sourceFuncOp.emitError() << "function argument type " << inputType
+      clonedFuncOp.emitError() << "function argument type " << inputType
                                << " is not valid for interface I/O";
       return llvm::None;
     }
@@ -203,7 +208,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
 
   // Call the original entry function.
   auto callOp = thunkEntryBuilder.create<mlir::CallOp>(thunkFuncOp.getLoc(),
-                                                       sourceFuncOp, operands);
+                                                       clonedFuncOp, operands);
 
   // Push all results to the bindings.
   for (auto result : callOp.getResults()) {
@@ -222,38 +227,44 @@ static Optional<FuncOp> createDispatchEntryThunk(
 
 // Adds the entry point ops with assigned ordinals for each entry function.
 // The entry points will all use the provided |interfaceOp|.
-static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
-                                          IREE::HAL::ExecutableOp targetOp,
-                                          IREE::HAL::InterfaceOp interfaceOp) {
-  // Insert interface bindings into the flow module so that symbol references
-  // work. This hacks around our isolated module handling used by the legacy
-  // backend translation API needing the source in a specific state.
-  auto inlinedInterfaceOp = interfaceOp.clone();
-  SymbolTable::setSymbolVisibility(inlinedInterfaceOp,
-                                   SymbolTable::Visibility::Private);
-  sourceOp.getInnerModule().push_back(inlinedInterfaceOp);
+static LogicalResult declareEntryPointOps(
+    IREE::Flow::ExecutableOp sourceExecutableOp,
+    IREE::HAL::ExecutableOp targetExecutableOp,
+    IREE::HAL::InterfaceOp interfaceOp) {
+  auto targetOps =
+      targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>();
+  for (auto targetOp : targetOps) {
+    OpBuilder builder(&targetOp.getBlock().front());
 
-  OpBuilder builder(targetOp.getContext());
-  builder.setInsertionPointAfter(interfaceOp);
-  int nextOrdinal = 0;
-  for (auto &op : sourceOp.getBlock()) {
-    if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
-      auto sourceFuncOp = sourceOp.getInnerModule().lookupSymbol<FuncOp>(
-          dispatchEntryOp.function_ref());
-      auto thunkFuncOp = createDispatchEntryThunk(sourceFuncOp, interfaceOp);
-      if (!thunkFuncOp.hasValue()) {
-        return failure();
+    // For each Flow entry point, create a HAL entry point and dispatch thunk.
+    int nextOrdinal = 0;
+    for (auto &op : sourceExecutableOp.getBlock()) {
+      if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
+        auto sourceFuncOp =
+            sourceExecutableOp.getInnerModule().lookupSymbol<FuncOp>(
+                dispatchEntryOp.function_ref());
+        auto thunkFuncOp =
+            createDispatchEntryThunk(sourceFuncOp, interfaceOp, targetOp);
+        if (!thunkFuncOp.hasValue()) {
+          return failure();
+        }
+        dispatchEntryOp.setAttr(
+            "function_ref", builder.getSymbolRefAttr(thunkFuncOp.getValue()));
+
+        builder.create<IREE::HAL::ExecutableEntryPointOp>(
+            dispatchEntryOp.getLoc(),
+            builder.getStringAttr(thunkFuncOp->getName()),
+            builder.getI32IntegerAttr(nextOrdinal++),
+            builder.getSymbolRefAttr(interfaceOp),
+            TypeAttr::get(sourceFuncOp.getType()));
       }
-      dispatchEntryOp.setAttr("function_ref",
-                              builder.getSymbolRefAttr(thunkFuncOp.getValue()));
-
-      builder.create<IREE::HAL::ExecutableEntryPointOp>(
-          dispatchEntryOp.getLoc(),
-          builder.getStringAttr(thunkFuncOp->getName()),
-          builder.getI32IntegerAttr(nextOrdinal++),
-          builder.getSymbolRefAttr(interfaceOp),
-          TypeAttr::get(sourceFuncOp.getType()));
     }
+
+    // Copy interface bindings into the target module so symbol references work.
+    auto inlinedInterfaceOp = interfaceOp.clone();
+    SymbolTable::setSymbolVisibility(inlinedInterfaceOp,
+                                     SymbolTable::Visibility::Private);
+    targetOp.getInnerModule().push_back(inlinedInterfaceOp);
   }
   return success();
 }
@@ -261,9 +272,9 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
 // Creates zero or more hal.executable.target ops for each target backend.
 // The source op will contain the flow.executable contents and any attributes
 // the backend wants to carry along during transformation.
-static LogicalResult constructTargetOps(TargetOptions targetOptions,
-                                        IREE::Flow::ExecutableOp sourceOp,
-                                        IREE::HAL::ExecutableOp executableOp) {
+static LogicalResult declareTargetOps(TargetOptions targetOptions,
+                                      IREE::Flow::ExecutableOp sourceOp,
+                                      IREE::HAL::ExecutableOp executableOp) {
   // The user has specified what targets they want as a set of patterns. This
   // matches against those patterns so vulkan-* may match vulkan-v1.1 and
   // vulkan-v1.2.
@@ -288,7 +299,7 @@ static LogicalResult constructTargetOps(TargetOptions targetOptions,
   // Materialize all of the hal.executable.target ops for all backends we are
   // targeting. Note that each backend may create zero or more target ops.
   for (auto &targetBackend : targetBackends) {
-    targetBackend->constructTargetOps(sourceOp, executableOp);
+    targetBackend->declareTargetOps(sourceOp, executableOp);
   }
 
   // Ensure that at least one target op got created. If it didn't that means
@@ -314,6 +325,15 @@ class MaterializeInterfacesPass
   explicit MaterializeInterfacesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+
+    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
+  }
+
   void runOnOperation() override {
     // Processes all executables within the input module and produce the output
     // HAL ops. We should ensure all deduping is performed prior to this when
@@ -335,15 +355,15 @@ class MaterializeInterfacesPass
         return signalPassFailure();
       }
 
+      // Embed the hal.executable.target ops for each source.
+      if (failed(declareTargetOps(targetOptions_, sourceOp, exectuableOp))) {
+        return signalPassFailure();
+      }
+
       // Annotate the entry points.
       // TODO(benvanik): allow entry points to use different interfaces.
       if (failed(declareEntryPointOps(sourceOp, exectuableOp,
                                       interfaceOp.getValue()))) {
-        return signalPassFailure();
-      }
-
-      // Embed the hal.executable.target ops for each source.
-      if (failed(constructTargetOps(targetOptions_, sourceOp, exectuableOp))) {
         return signalPassFailure();
       }
 

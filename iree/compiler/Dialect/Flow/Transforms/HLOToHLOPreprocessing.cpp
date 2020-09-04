@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/StandardTypes.h"
@@ -30,8 +31,13 @@ namespace Flow {
 namespace {
 
 static llvm::cl::opt<bool> extractPadFromConv(
-    "iree-extract-pad-from-conv",
+    "iree-flow-extract-pad-from-conv",
     llvm::cl::desc("Extract padding attributes from conv op"),
+    llvm::cl::init(true));
+
+static llvm::cl::opt<bool> conv1x1toDot(
+    "iree-flow-1x1-conv-to-dot",
+    llvm::cl::desc("Rewrites mhlo.conv with 1x1 filter into mhlo.dot"),
     llvm::cl::init(true));
 
 static bool isAllZero(DenseIntElementsAttr attr) {
@@ -48,6 +54,23 @@ static bool hasPadding(OpTy op) {
   return llvm::any_of(padding.getValue(),
                       [](APInt v) -> bool { return !v.isNullValue(); });
 }
+
+class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
+ public:
+  using OpRewritePattern<mhlo::Log1pOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::Log1pOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto type = op.operand().getType().cast<TensorType>();
+    DenseElementsAttr attr =
+        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
+    auto one = rewriter.create<ConstantOp>(loc, attr);
+    auto x = rewriter.create<mhlo::AddOp>(loc, op.operand(), one);
+    rewriter.replaceOpWithNewOp<mhlo::LogOp>(op, x);
+    return success();
+  }
+};
 
 class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
  public:
@@ -151,6 +174,104 @@ class ExtractReduceWindowOpPaddingAttributes
   }
 };
 
+// Rewrites an n-d (n, d1, d2, d3, ..., ci) * (1, 1, 1, ..., ci, co)
+// as (n * d1 * d2 * d3, ..., ci) . (ci, co)
+class Lower1x1ConvolutionToDotOp : public OpRewritePattern<mhlo::ConvOp> {
+ public:
+  using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ConvOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only 1x1 convolution no groups will match.
+    if (op.feature_group_count() != 1) return failure();
+
+    Value input = op.lhs();
+    Value filter = op.rhs();
+    Value output = op.getResult();
+    auto inputShapeType = input.getType().dyn_cast_or_null<RankedTensorType>();
+    auto filterShapeType =
+        filter.getType().dyn_cast_or_null<RankedTensorType>();
+    auto outputShapeType =
+        output.getType().dyn_cast_or_null<RankedTensorType>();
+
+    if (!inputShapeType || !filterShapeType || !outputShapeType) {
+      return failure();
+    }
+
+    auto inputShape = inputShapeType.getShape();
+    auto filterShape = filterShapeType.getShape();
+
+    auto inputBatchDim =
+        op.dimension_numbers().input_batch_dimension().getInt();
+    auto inputFeatureDim =
+        op.dimension_numbers().input_feature_dimension().getInt();
+    auto kernelInputFeatureDim =
+        op.dimension_numbers().kernel_input_feature_dimension().getInt();
+    auto kernelOutputFeatureDim =
+        op.dimension_numbers().kernel_output_feature_dimension().getInt();
+
+    // Match input (n, d1, d2, ..., ci) format
+    if (inputFeatureDim != (inputShape.size() - 1) || inputBatchDim != 0) {
+      return failure();
+    }
+
+    // Match filter (k1, k2, ..., ci, co) format
+    if (kernelInputFeatureDim != (filterShape.size() - 2) ||
+        kernelOutputFeatureDim != (filterShape.size() - 1)) {
+      return failure();
+    }
+
+    // Check 1x1x... kernel spatial size.
+    for (auto dim : op.dimension_numbers().kernel_spatial_dimensions()) {
+      if (filterShape[dim.getZExtValue()] != 1) return failure();
+    }
+
+    // Check dilation & strides are ones.
+    if (op.window_strides()) {
+      for (auto stride : op.window_strides()->getValues<int64_t>()) {
+        if (stride != 1) return failure();
+      }
+    }
+    if (op.rhs_dilation()) {
+      for (auto dilation : op.rhs_dilation()->getValues<int64_t>()) {
+        if (dilation != 1) return failure();
+      }
+    }
+
+    int64_t spatialSize = inputShape[0];
+    for (auto dim : op.dimension_numbers().input_spatial_dimensions()) {
+      spatialSize *= inputShape[dim.getZExtValue()];
+    }
+
+    Type reshapedInputType =
+        RankedTensorType::get({spatialSize, inputShape[inputFeatureDim]},
+                              inputShapeType.getElementType());
+    Type reshapedFilterTYpe =
+        RankedTensorType::get({filterShape[kernelInputFeatureDim],
+                               filterShape[kernelOutputFeatureDim]},
+                              filterShapeType.getElementType());
+    Type dotResultType = RankedTensorType::get(
+        {spatialSize, filterShape[kernelOutputFeatureDim]},
+        outputShapeType.getElementType());
+
+    Value reshapedInput =
+        rewriter.create<mhlo::ReshapeOp>(op.getLoc(), reshapedInputType, input);
+    Value reshapedFilter = rewriter.create<mhlo::ReshapeOp>(
+        op.getLoc(), reshapedFilterTYpe, filter);
+
+    Value dotResult = rewriter.create<mhlo::DotOp>(
+        op.getLoc(), dotResultType, reshapedInput, reshapedFilter,
+        rewriter.getStrArrayAttr({"HIGHEST", "HIGHEST"}));
+
+    Value reshapedResult = rewriter.create<mhlo::ReshapeOp>(
+        op.getLoc(), outputShapeType, dotResult);
+
+    rewriter.replaceOp(op, reshapedResult);
+
+    return success();
+  }
+};
+
 // Adjust the shape of depthwise_conv filter where is applied by mhlo.
 class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
  public:
@@ -165,7 +286,7 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
     const auto &kernelShape = op.rhs().getType().cast<ShapedType>().getShape();
     if (kernelShape[featureInDim] != 1) return failure();
 
-    const auto groupCount = op.feature_group_count().getZExtValue();
+    const auto groupCount = op.feature_group_count();
     if (groupCount == 1) return failure();
     if (kernelShape[featureOutDim] % groupCount != 0) return failure();
 
@@ -185,8 +306,79 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
   }
 };
 
+// clang-format off
+//
+// Rewrites the following pattern
+//
+// %bcastx = "mhlo.broadcast_in_dim"(%x) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+// %bcasty = "mhlo.broadcast_in_dim"(%y) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+// %result = "BinaryElementwiseOpT"(%bcastx, %bcasty) : (%[[SHAPE_AFTER_BCAST]], %[[SHAPE_AFTER_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+//
+// into
+//
+// %z = "BinaryElementwiseOpT"(%x, %y) : (%[[SHAPE_BEFORE_BCAST]], %[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_BEFORE_BCAST]]
+// %result = "mhlo.broadcast_in_dim"(%z) {} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+//
+// clang-format on
+template <typename BinaryElementwiseOpT>
+class ReorderBroadcastInDimOpAndBinaryElementwiseOp
+    : public OpRewritePattern<BinaryElementwiseOpT> {
+ public:
+  using OpRewritePattern<BinaryElementwiseOpT>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BinaryElementwiseOpT op,
+                                PatternRewriter &rewriter) const override {
+    auto lhsType = op.lhs().getType().template dyn_cast<ShapedType>();
+    auto rhsType = op.rhs().getType().template dyn_cast<ShapedType>();
+    if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
+        lhsType != rhsType) {
+      return failure();
+    }
+
+    auto lhsOp = op.lhs().getDefiningOp();
+    auto rhsOp = op.rhs().getDefiningOp();
+    if (!lhsOp || !rhsOp) {
+      return failure();
+    }
+
+    auto bcastxOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(lhsOp);
+    auto bcastyOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(rhsOp);
+    if (!bcastxOp || !bcastyOp ||
+        bcastxOp.broadcast_dimensions() != bcastyOp.broadcast_dimensions()) {
+      return failure();
+    }
+
+    auto x = bcastxOp.operand();
+    auto y = bcastyOp.operand();
+    auto xType = x.getType().template dyn_cast<ShapedType>();
+    auto yType = y.getType().template dyn_cast<ShapedType>();
+    if (!xType || !yType || !xType.hasStaticShape() || xType != yType) {
+      return failure();
+    }
+
+    auto loc = op.getLoc();
+    auto z = rewriter.create<BinaryElementwiseOpT>(loc, xType, x, y);
+    auto result = rewriter.create<mhlo::BroadcastInDimOp>(
+        loc, op.getType(), z, bcastxOp.broadcast_dimensions());
+    rewriter.replaceOp(op, {result});
+
+    if (lhsOp->hasOneUse()) {
+      rewriter.eraseOp(lhsOp);
+    }
+    if (rhsOp->hasOneUse()) {
+      rewriter.eraseOp(rhsOp);
+    }
+
+    return success();
+  }
+};
+
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<shape::ShapeDialect, mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
@@ -198,9 +390,28 @@ struct HLOToHLOPreprocessing
     // whether it was legalized away at a higher level.
     chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape>(context);
+                    AdjustDepthwiseFilterShape, DecomposeLog1PPattern>(context);
+    patterns.insert<
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::AddOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::Atan2Op>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::ComplexOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::DivOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MaxOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MinOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MulOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::PowOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::RemOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::ShiftLeftOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<
+            mhlo::ShiftRightArithmeticOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<
+            mhlo::ShiftRightLogicalOp>,
+        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::SubOp>>(context);
     if (extractPadFromConv) {
       patterns.insert<ExtractConvOpPaddingAttributes>(context);
+    }
+    if (conv1x1toDot) {
+      patterns.insert<Lower1x1ConvolutionToDotOp>(context);
     }
     applyPatternsAndFoldGreedily(getOperation(), patterns);
   }

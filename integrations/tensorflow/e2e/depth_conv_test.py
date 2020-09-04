@@ -19,7 +19,7 @@ from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
 
-class Conv2dModule(tf.Module):
+class DepthConv2dModule(tf.Module):
 
   # TODO(ataei): Add dilation and strided tests.
   @tf.function(input_signature=[
@@ -63,7 +63,7 @@ class Conv2dModule(tf.Module):
         img, kernel, [1, 1, 1, 1], "SAME", name="result")
 
 
-@tf_test_utils.compile_module(Conv2dModule)
+@tf_test_utils.compile_module(DepthConv2dModule)
 class ConvTest(tf_test_utils.TracedModuleTestCase):
 
   def test_batched_feature_unpadded(self):

@@ -15,8 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_
 #define IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_
 
-#include "iree/compiler/Dialect/IREE/IR/IREEAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
+#include "mlir/IR/Attributes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -69,8 +69,6 @@ class TargetEnvAttr
   /// Returns the dictionary attribute containing various Vulkan capabilities
   /// bits.
   CapabilitiesAttr getCapabilitiesAttr();
-
-  static bool kindof(unsigned kind) { return kind == AttrKind::TargetEnv; }
 
   static LogicalResult verifyConstructionInvariants(
       Location loc, IntegerAttr version, IntegerAttr revision,

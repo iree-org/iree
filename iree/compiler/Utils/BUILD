@@ -24,12 +24,10 @@ cc_library(
     name = "Utils",
     srcs = [
         "GraphUtils.cpp",
-        "TypeConversionUtils.cpp",
     ],
     hdrs = [
         "GraphUtils.h",
         "PatternUtils.h",
-        "TypeConversionUtils.h",
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",

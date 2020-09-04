@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -23,7 +27,10 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineOps
+    MLIRGPU
     MLIRIR
+    MLIRLinalgOps
     MLIRParser
     MLIRPass
     MLIRSPIRV
@@ -31,12 +38,12 @@ iree_cc_library(
     MLIRSPIRVTransforms
     MLIRSupport
     MLIRTransforms
+    MLIRVector
     flatbuffers
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils
     iree::schemas::spirv_executable_def_cc_fbs

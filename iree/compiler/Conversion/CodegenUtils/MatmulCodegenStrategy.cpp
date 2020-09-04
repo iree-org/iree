@@ -134,11 +134,12 @@ static void substitute(scf::ForOp forOp, SmallVectorImpl<AffineExpr> &exprs,
   dims.push_back(forOp.getInductionVar());
 }
 
-/// Traverse the .
-static void substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
+/// Substitue dimensions coming from forOp or AffineMin. Return false if it has
+/// unknown dimension operands.
+static bool substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
                        SmallVectorImpl<Value> &dims,
                        SmallVectorImpl<Value> &symbols) {
-  MLIRContext *ctx = minOp.getContext();
+  if (minOp.getDimOperands().empty()) return false;
   for (Value v : minOp.getDimOperands()) {
     if (auto forOp = scf::getForInductionVarOwner(v)) {
       substitute(forOp, exprs, dims, symbols);
@@ -148,18 +149,11 @@ static void substitute(AffineMinOp minOp, SmallVectorImpl<AffineExpr> &exprs,
       substitute(parentMinOp, exprs, dims, symbols);
       continue;
     }
-    exprs.push_back(getAffineDimExpr(dims.size(), ctx));
-    dims.push_back(v);
+    // If couldn't substitue the dimension give up and use the original map.
+    return false;
   }
+  return true;
 }
-
-/// Perform folding of chains of AffineMinOp.
-struct AffineMinCanonicalizationPattern : public OpRewritePattern<AffineMinOp> {
-  using OpRewritePattern<AffineMinOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineMinOp minOp,
-                                PatternRewriter &rewriter) const override;
-};
 
 LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
     AffineMinOp minOp, PatternRewriter &rewriter) const {
@@ -172,17 +166,23 @@ LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
       min = std::min(min, cstExpr.getValue());
   if (min == std::numeric_limits<int64_t>::max()) return failure();
 
+  MLIRContext *ctx = minOp.getContext();
+  AffineMap map;
+  SmallVector<Value, 4> operands;
   SmallVector<AffineExpr, 4> exprs;
   SmallVector<Value, 4> dims, symbols;
-  substitute(minOp, exprs, dims, symbols);
+  if (substitute(minOp, exprs, dims, symbols)) {
+    operands = dims;
+    operands.append(symbols.begin(), symbols.end());
 
-  SmallVector<Value, 4> operands = dims;
-  operands.append(symbols.begin(), symbols.end());
-
-  MLIRContext *ctx = minOp.getContext();
-  auto map = AffineMap::get(dims.size(), symbols.size(), exprs, ctx);
-  LLVM_DEBUG(llvm::dbgs() << "Substitution map: " << map << "\n");
-
+    map = AffineMap::get(dims.size(), symbols.size(), exprs, ctx);
+    LLVM_DEBUG(llvm::dbgs() << "Substitution map: " << map << "\n");
+  } else {
+    map = minOp.getAffineMap();
+    operands = minOp.getDimOperands();
+    operands.append(minOp.getSymbolOperands().begin(),
+                    minOp.getSymbolOperands().end());
+  }
   SmallVector<AffineExpr, 4> modExprs;
   for (unsigned idx = 0, e = map.getNumResults(); idx < e; ++idx)
     modExprs.push_back(getAffineDimExpr(idx, ctx) % min);
@@ -226,12 +226,21 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
 
   OwningRewritePatternList stage2Patterns =
       linalg::getLinalgTilingCanonicalizationPatterns(context);
-  stage2Patterns.insert<AffineMinCanonicalizationPattern>(context);
+  // Add extra patterns to canonicalize AffineMin in combination with scf loops
+  // operations after tiling.
+  stage2Patterns.insert<AffineMinCanonicalizationPattern,
+                        AffineMinSCFCanonicalizationPattern>(context);
 
-  auto stage3Transforms = [this](Operation *op) {
-    // Some of these may be too aggressive as a stage 3 that is applied on each
-    // stage 1 application and may have to be split out to post staged patterns
-    // application (in which case they could just be passes, TBD).
+  auto stage3Transforms = [](Operation *op) {
+    promoteSingleIterationLoops(cast<FuncOp>(op));
+    return success();
+  };
+  linalg::applyStagedPatterns(func, stage1Patterns, stage2Patterns,
+                              stage3Transforms);
+
+  auto postStageTransforms = [this](Operation *op) {
+    // Run LICM and hoisting patterns after all the stages as we want to
+    // unrolling before moving transfer ops out of the loop.
     if (hoistInvariantCode) {
       PassManager pm(op->getContext());
       pm.addPass(createLoopInvariantCodeMotionPass());
@@ -241,11 +250,8 @@ void MatmulCodegenStrategy::transform(FuncOp func) const {
       hoistRedundantVectorTransfers(cast<FuncOp>(op));
       hoistRedundantCopies(cast<FuncOp>(op));
     }
-    promoteSingleIterationLoops(cast<FuncOp>(op));
-    return success();
   };
-  linalg::applyStagedPatterns(func, stage1Patterns, stage2Patterns,
-                              stage3Transforms);
+  postStageTransforms(func);
   if (lowering != nullptr) lowering(func);
 }
 

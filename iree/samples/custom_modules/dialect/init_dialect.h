@@ -26,14 +26,17 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Add custom dialect to the provided registry.
+inline void registerCustomDialect(DialectRegistry &registry) {
+  registry.insert<IREE::Custom::CustomDialect>();
+}
+
 // This function should be called before creating any MLIRContext if one expect
 // all the possible dialects to be made available to the context automatically.
 inline void registerCustomDialect() {
-  static bool init_once = []() {
-    registerDialect<IREE::Custom::CustomDialect>();
-    return true;
-  }();
-  (void)init_once;
+  static bool initOnce =
+      ([]() { registerCustomDialect(getGlobalDialectRegistry()); }(), true);
+  (void)initOnce;
 }
 }  // namespace iree_compiler
 }  // namespace mlir

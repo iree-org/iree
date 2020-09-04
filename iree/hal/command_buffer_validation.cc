@@ -241,8 +241,8 @@ Status ValidatingCommandBuffer::ExecutionBarrier(
   DVLOG(3) << "CommandBuffer::ExecutionBarrier(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer |
-                                     CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer |
+                                          CommandCategory::kDispatch));
 
   return impl_->ExecutionBarrier(source_stage_mask, target_stage_mask,
                                  memory_barriers, buffer_barriers);
@@ -253,7 +253,7 @@ Status ValidatingCommandBuffer::SignalEvent(
   DVLOG(3) << "CommandBuffer::SignalEvent(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
   return impl_->SignalEvent(event, source_stage_mask);
 }
@@ -263,7 +263,7 @@ Status ValidatingCommandBuffer::ResetEvent(
   DVLOG(3) << "CommandBuffer::ResetEvent(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
   return impl_->ResetEvent(event, source_stage_mask);
 }
@@ -276,7 +276,7 @@ Status ValidatingCommandBuffer::WaitEvents(
   DVLOG(3) << "CommandBuffer::WaitEvents(...)";
 
   // TODO(benvanik): additional synchronization validation.
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
   return impl_->WaitEvents(events, source_stage_mask, target_stage_mask,
                            memory_barriers, buffer_barriers);
@@ -291,12 +291,12 @@ Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
            << ", " << target_offset << ", " << length << ", ??, "
            << pattern_length << ")";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(
       ValidateCompatibleMemoryType(target_buffer, MemoryType::kDeviceVisible));
-  RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
-  RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
-  RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
+  IREE_RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
+  IREE_RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
 
   // Ensure the value length is supported.
   if (pattern_length != 1 && pattern_length != 2 && pattern_length != 4) {
@@ -322,10 +322,10 @@ Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
 Status ValidatingCommandBuffer::DiscardBuffer(Buffer* buffer) {
   DVLOG(3) << "CommandBuffer::DiscardBuffer(" << buffer->DebugString() << ")";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(
       ValidateCompatibleMemoryType(buffer, MemoryType::kDeviceVisible));
-  RETURN_IF_ERROR(ValidateUsage(buffer, BufferUsage::kNone));
+  IREE_RETURN_IF_ERROR(ValidateUsage(buffer, BufferUsage::kNone));
 
   return impl_->DiscardBuffer(buffer);
 }
@@ -339,12 +339,12 @@ Status ValidatingCommandBuffer::UpdateBuffer(const void* source_buffer,
            << source_offset << ", " << target_buffer->DebugString() << ", "
            << target_offset << ", " << length << ")";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
-  RETURN_IF_ERROR(
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(
       ValidateCompatibleMemoryType(target_buffer, MemoryType::kDeviceVisible));
-  RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
-  RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
-  RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
+  IREE_RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
+  IREE_RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
 
   return impl_->UpdateBuffer(source_buffer, source_offset, target_buffer,
                              target_offset, length);
@@ -359,7 +359,7 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
            << ", " << source_offset << ", " << target_buffer->DebugString()
            << ", " << target_offset << ", " << length << ")";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
 
   // At least source or destination must be device-visible to enable
   // host->device, device->host, and device->device.
@@ -374,12 +374,12 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
            << MemoryTypeString(target_buffer->memory_type());
   }
 
-  RETURN_IF_ERROR(ValidateAccess(source_buffer, MemoryAccess::kRead));
-  RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
-  RETURN_IF_ERROR(ValidateUsage(source_buffer, BufferUsage::kTransfer));
-  RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
-  RETURN_IF_ERROR(ValidateRange(source_buffer, source_offset, length));
-  RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
+  IREE_RETURN_IF_ERROR(ValidateAccess(source_buffer, MemoryAccess::kRead));
+  IREE_RETURN_IF_ERROR(ValidateAccess(target_buffer, MemoryAccess::kWrite));
+  IREE_RETURN_IF_ERROR(ValidateUsage(source_buffer, BufferUsage::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateUsage(target_buffer, BufferUsage::kTransfer));
+  IREE_RETURN_IF_ERROR(ValidateRange(source_buffer, source_offset, length));
+  IREE_RETURN_IF_ERROR(ValidateRange(target_buffer, target_offset, length));
 
   // Check for overlap - just like memcpy we don't handle that.
   if (Buffer::TestOverlap(source_buffer, source_offset, length, target_buffer,
@@ -400,7 +400,7 @@ Status ValidatingCommandBuffer::PushConstants(
            << executable_layout->DebugString() << ", " << offset << ", "
            << absl::StrJoin(values, ", ") << ")";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
   // TODO(benvanik): validate offset and value count with layout.
 
@@ -415,7 +415,7 @@ Status ValidatingCommandBuffer::PushDescriptorSet(
            << absl::StrJoin(bindings, ", ", DescriptorSetBindingFormatter())
            << "])";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate bindings.
@@ -432,7 +432,7 @@ Status ValidatingCommandBuffer::BindDescriptorSet(
            << descriptor_set->DebugString() << ", ["
            << absl::StrJoin(dynamic_offsets, ", ") << "])";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate dynamic offsets (both count and offsets).
@@ -447,12 +447,13 @@ Status ValidatingCommandBuffer::ValidateDispatchBindings(Executable* executable,
   // rights, and usage.
   // TODO(benvanik): add validation by walking executable layout.
   // for (const auto& binding : bindings) {
-  //   RETURN_IF_ERROR(ValidateCompatibleMemoryType(binding.buffer,
+  //   IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(binding.buffer,
   //                                                MemoryType::kDeviceVisible))
   //       << "input buffer: " << MemoryAccessString(binding.access) << " "
   //       << binding.buffer->DebugStringShort();
-  //   RETURN_IF_ERROR(ValidateAccess(binding.buffer, binding.access));
-  //   RETURN_IF_ERROR(ValidateUsage(binding.buffer, BufferUsage::kDispatch));
+  //   IREE_RETURN_IF_ERROR(ValidateAccess(binding.buffer, binding.access));
+  //   IREE_RETURN_IF_ERROR(ValidateUsage(binding.buffer,
+  //   BufferUsage::kDispatch));
   // TODO(benvanik): validate it matches the executable expectations.
   // TODO(benvanik): validate buffer contains enough data for shape+size.
   // }
@@ -468,8 +469,8 @@ Status ValidatingCommandBuffer::Dispatch(Executable* executable,
   DVLOG(3) << "CommandBuffer::Dispatch(" << executable->DebugString() << ", "
            << entry_point << ", [" << absl::StrJoin(workgroups, ", ") << "])";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
-  RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
 
   return impl_->Dispatch(executable, entry_point, workgroups);
 }
@@ -481,17 +482,18 @@ Status ValidatingCommandBuffer::DispatchIndirect(
            << ", " << entry_point << ", " << workgroups_buffer->DebugString()
            << ", " << workgroups_offset << ")";
 
-  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
-  RETURN_IF_ERROR(ValidateCompatibleMemoryType(workgroups_buffer,
-                                               MemoryType::kDeviceVisible))
+  IREE_RETURN_IF_ERROR(ValidateCompatibleMemoryType(workgroups_buffer,
+                                                    MemoryType::kDeviceVisible))
       << "input buffer: " << workgroups_buffer->DebugStringShort();
-  RETURN_IF_ERROR(ValidateAccess(workgroups_buffer, MemoryAccess::kRead));
-  RETURN_IF_ERROR(ValidateUsage(workgroups_buffer, BufferUsage::kDispatch));
-  RETURN_IF_ERROR(ValidateRange(workgroups_buffer, workgroups_offset,
-                                sizeof(uint32_t) * 3));
+  IREE_RETURN_IF_ERROR(ValidateAccess(workgroups_buffer, MemoryAccess::kRead));
+  IREE_RETURN_IF_ERROR(
+      ValidateUsage(workgroups_buffer, BufferUsage::kDispatch));
+  IREE_RETURN_IF_ERROR(ValidateRange(workgroups_buffer, workgroups_offset,
+                                     sizeof(uint32_t) * 3));
 
-  RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
+  IREE_RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
 
   return impl_->DispatchIndirect(executable, entry_point, workgroups_buffer,
                                  workgroups_offset);

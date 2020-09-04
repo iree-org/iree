@@ -64,20 +64,12 @@ class ListType
   }
 
   Type getElementType();
-
-  static bool kindof(unsigned kind) { return kind == TypeKind::List; }
 };
 
 /// An opaque ref object that comes from an external source.
 class OpaqueType : public Type::TypeBase<OpaqueType, Type, TypeStorage> {
  public:
   using Base::Base;
-
-  static bool kindof(unsigned kind) { return kind == TypeKind::Opaque; }
-
-  static OpaqueType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::Opaque);
-  }
 };
 
 /// A ref_ptr containing a reference to a ref-object-compatible type.
@@ -106,8 +98,6 @@ class RefType : public Type::TypeBase<RefType, Type, detail::RefTypeStorage> {
   }
 
   Type getObjectType();
-
-  static bool kindof(unsigned kind) { return kind == TypeKind::Ref; }
 };
 
 }  // namespace VM

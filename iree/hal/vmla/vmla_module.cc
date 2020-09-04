@@ -31,12 +31,11 @@ static iree_vm_ref_type_descriptor_t Interface_descriptor = {0};
 IREE_VM_DEFINE_TYPE_ADAPTERS(Buffer, iree::hal::vmla::Buffer);
 IREE_VM_DEFINE_TYPE_ADAPTERS(Interface, iree::hal::vmla::Interface);
 
-#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor)             \
-  descriptor.type_name = iree_make_cstring_view(name);                 \
-  descriptor.offsetof_counter = type::offsetof_counter();              \
-  descriptor.destroy = type::DirectDestroy;                            \
-  RETURN_IF_ERROR(                                                     \
-      FromApiStatus(iree_vm_ref_register_type(&descriptor), IREE_LOC)) \
+#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor)     \
+  descriptor.type_name = iree_make_cstring_view(name);         \
+  descriptor.offsetof_counter = type::offsetof_counter();      \
+  descriptor.destroy = type::DirectDestroy;                    \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor)) \
       << "Failed to register type " << name;
 
 namespace iree {
@@ -62,8 +61,7 @@ Status ModuleRegisterTypes() {
 StatusOr<vm::ref<Buffer>> Buffer::Allocate(size_t byte_length,
                                            iree_allocator_t allocator) {
   void* data = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_allocator_malloc(allocator, byte_length, &data), IREE_LOC))
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, byte_length, &data))
       << "Failed to allocate buffer of size " << byte_length;
 
   auto buffer = vm::assign_ref(new Buffer());
@@ -209,7 +207,8 @@ class VMLAModuleState final {
   StatusOr<vm::ref<Buffer>> InterfaceBinding(vm::ref<Interface> interface,
                                              int32_t set, int32_t binding) {
     IREE_TRACE_SCOPE0("VMLAModuleState::InterfaceBinding");
-    ASSIGN_OR_RETURN(const auto& value, interface->GetBinding(set, binding));
+    IREE_ASSIGN_OR_RETURN(const auto& value,
+                          interface->GetBinding(set, binding));
     return vm::retain_ref(value.buffer);
   }
 
@@ -236,7 +235,7 @@ class VMLAModuleState final {
 
   StatusOr<vm::ref<Buffer>> BufferClone(vm::ref<Buffer> src) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferClone");
-    ASSIGN_OR_RETURN(auto dst, Buffer::Allocate(src->size(), allocator_));
+    IREE_ASSIGN_OR_RETURN(auto dst, Buffer::Allocate(src->size(), allocator_));
     std::memcpy(dst->data(), src->data(), dst->size());
     return std::move(dst);
   }
@@ -291,10 +290,10 @@ class VMLAModuleState final {
     if (byte_length == kVMLAWholeBuffer) {
       byte_length = src->size() - src_byte_offset;
     }
-    ASSIGN_OR_RETURN(auto src_bytes,
-                     src->RangeAs<const uint8_t>(src_byte_offset, byte_length));
-    ASSIGN_OR_RETURN(auto dst_bytes,
-                     dst->RangeAs<uint8_t>(dst_byte_offset, byte_length));
+    IREE_ASSIGN_OR_RETURN(auto src_bytes, src->RangeAs<const uint8_t>(
+                                              src_byte_offset, byte_length));
+    IREE_ASSIGN_OR_RETURN(auto dst_bytes,
+                          dst->RangeAs<uint8_t>(dst_byte_offset, byte_length));
     std::memcpy(dst_bytes.data(), src_bytes.data(), dst_bytes.size());
     return OkStatus();
   }
@@ -322,14 +321,20 @@ class VMLAModuleState final {
   StatusOr<int32_t> BufferLoadI32(vm::ref<Buffer> src,
                                   iree_vmla_size_t byte_offset) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferLoadI32");
-    ASSIGN_OR_RETURN(auto data,
-                     src->RangeAs<int32_t>(byte_offset, sizeof(int32_t)));
+    IREE_ASSIGN_OR_RETURN(auto data,
+                          src->RangeAs<int32_t>(byte_offset, sizeof(int32_t)));
     return data[0];
   }
 
   //===--------------------------------------------------------------------===//
   // Common helpers for defining ops
   //===--------------------------------------------------------------------===//
+
+#define IREE_VMLA_NONARY_OP(name, kernel, type)    \
+  Status name(vm::ref<Buffer> dst) {               \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);  \
+    return kernel::Execute<type>(dst->As<type>()); \
+  }
 
 #define IREE_VMLA_UNARY_OP(name, kernel, type)                      \
   Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
@@ -409,6 +414,13 @@ class VMLAModuleState final {
   IREE_VMLA_SELECT_OP(SelectX8, uint8_t);
   IREE_VMLA_SELECT_OP(SelectX16, uint16_t);
   IREE_VMLA_SELECT_OP(SelectX32, uint32_t);
+
+#define IREE_VMLA_UNARY_PREDICATE_OP(name, kernel, type)            \
+  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
+    return kernel::Execute<type>(src->As<type>(), dst->As<bool>()); \
+  }
+  IREE_VMLA_UNARY_PREDICATE_OP(FiniteF32, kernels::Finite, float);
 
   //===--------------------------------------------------------------------===//
   // VMLA Ops: shape/structure
@@ -506,6 +518,11 @@ class VMLAModuleState final {
   IREE_VMLA_BROADCAST_OP(BroadcastX8, uint8_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX32, uint32_t);
+
+  IREE_VMLA_NONARY_OP(IotaI8, kernels::Iota, int8_t);
+  IREE_VMLA_NONARY_OP(IotaI16, kernels::Iota, int16_t);
+  IREE_VMLA_NONARY_OP(IotaI32, kernels::Iota, int32_t);
+  IREE_VMLA_NONARY_OP(IotaF32, kernels::Iota, float_t);
 
 #define IREE_VMLA_TILE_OP(name, type)                                     \
   Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
@@ -673,7 +690,7 @@ class VMLAModuleState final {
           absl::MakeConstSpan(raw_inputs_data + i * input_stride, input_stride);
       auto output_example =
           absl::MakeSpan(raw_dst_data + i * output_stride, output_stride);
-      RETURN_IF_ERROR(kernels::Conv2D::Execute(
+      IREE_RETURN_IF_ERROR(kernels::Conv2D::Execute(
           input_example, input_example_shape, filter_buffer, filter_shape_4d,
           output_example, output_example_shape, window_strides_2d, pad_h, pad_w,
           dilation, feature_group_count));
@@ -720,7 +737,7 @@ class VMLAModuleState final {
                                           dst_batch_stride);
       buffers.dst_shape = dst_batch_element_shape2;
 
-      RETURN_IF_ERROR(kernels::MatMul::Execute(
+      IREE_RETURN_IF_ERROR(kernels::MatMul::Execute(
           kernel_state_->mat_mul_state.get(), buffers));
     }
     return OkStatus();
@@ -833,6 +850,10 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("scatter.x8", &VMLAModuleState::ScatterX8),
     vm::MakeNativeFunction("scatter.x16", &VMLAModuleState::ScatterX16),
     vm::MakeNativeFunction("scatter.x32", &VMLAModuleState::ScatterX32),
+    vm::MakeNativeFunction("iota.i8", &VMLAModuleState::IotaI8),
+    vm::MakeNativeFunction("iota.i16", &VMLAModuleState::IotaI16),
+    vm::MakeNativeFunction("iota.i32", &VMLAModuleState::IotaI32),
+    vm::MakeNativeFunction("iota.f32", &VMLAModuleState::IotaF32),
     vm::MakeNativeFunction("tile.x8", &VMLAModuleState::TileX8),
     vm::MakeNativeFunction("tile.x16", &VMLAModuleState::TileX16),
     vm::MakeNativeFunction("tile.x32", &VMLAModuleState::TileX32),
@@ -917,6 +938,7 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("clamp.f32", &VMLAModuleState::ClampF32),
     vm::MakeNativeFunction("floor.f32", &VMLAModuleState::FloorF32),
     vm::MakeNativeFunction("ceil.f32", &VMLAModuleState::CeilF32),
+    vm::MakeNativeFunction("finite.f32", &VMLAModuleState::FiniteF32),
 
     vm::MakeNativeFunction("convert.i8.i16", &VMLAModuleState::ConvertI8I16),
     vm::MakeNativeFunction("convert.i8.i32", &VMLAModuleState::ConvertI8I32),
@@ -1003,7 +1025,7 @@ Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module) {
   }
   *out_module = nullptr;
   auto module = std::make_unique<VMLAModule>(allocator);
-  RETURN_IF_ERROR(module->Initialize());
+  IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
   return OkStatus();
 }

@@ -15,13 +15,21 @@
 #include "experimental/ModelBuilder/ModelBuilder.h"
 
 #include "mlir/Dialect/Affine/EDSC/Builders.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/OpenMP/OpenMPDialect.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/InitAllDialects.h"
 
 using namespace mlir;
 using namespace mlir::edsc;
@@ -31,15 +39,7 @@ using namespace mlir::edsc::intrinsics;
 thread_local MLIRContext mlir::ModelBuilder::ctx;
 
 void ModelBuilder::registerAllDialects() {
-  registerDialect<AffineDialect>();
-  registerDialect<gpu::GPUDialect>();
-  registerDialect<LLVM::LLVMDialect>();
-  registerDialect<linalg::LinalgDialect>();
-  registerDialect<scf::SCFDialect>();
-  registerDialect<omp::OpenMPDialect>();
-  registerDialect<spirv::SPIRVDialect>();
-  registerDialect<StandardOpsDialect>();
-  registerDialect<vector::VectorDialect>();
+  // TODO: remove.
 }
 
 mlir::ModelBuilder::ModelBuilder()
@@ -49,7 +49,17 @@ mlir::ModelBuilder::ModelBuilder()
       loc(module->getLoc()),
       i8(IntegerType::get(8, &ctx)),
       f32(FloatType::getF32(&ctx)),
-      f64(FloatType::getF64(&ctx)) {}
+      f64(FloatType::getF64(&ctx)) {
+  ctx.getOrLoadDialect<AffineDialect>();
+  ctx.getOrLoadDialect<gpu::GPUDialect>();
+  ctx.getOrLoadDialect<LLVM::LLVMDialect>();
+  ctx.getOrLoadDialect<linalg::LinalgDialect>();
+  ctx.getOrLoadDialect<scf::SCFDialect>();
+  ctx.getOrLoadDialect<omp::OpenMPDialect>();
+  ctx.getOrLoadDialect<spirv::SPIRVDialect>();
+  ctx.getOrLoadDialect<StandardOpsDialect>();
+  ctx.getOrLoadDialect<vector::VectorDialect>();
+}
 
 Value mlir::ModelBuilder::constant_f32(float v) {
   return std_constant_float(llvm::APFloat(v),
@@ -86,6 +96,7 @@ static spirv::TargetEnvAttr getTargetEnv(MLIRContext *context) {
       spirv::Version::V_1_0,
       {spirv::Capability::Shader, spirv::Capability::CooperativeMatrixNV,
        spirv::Capability::Int8, spirv::Capability::Float16,
+       spirv::Capability::StorageUniform16,
        spirv::Capability::StorageBuffer8BitAccess,
        spirv::Capability::Float16Buffer},
       {spirv::Extension::SPV_KHR_storage_buffer_storage_class,

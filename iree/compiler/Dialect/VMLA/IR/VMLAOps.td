@@ -186,6 +186,16 @@ def VMLA_SelectOp : VMLA_ElementTypeOp<"select"> {
   }];
 }
 
+def VMLA_FiniteOp : VMLA_Op<"finite", [VMLA_OpInterface]> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Buffer:$dst,
+    VMLA_FloatTypeAttr:$element_type
+  );
+
+  let assemblyFormat = "$src`,` `out` $dst attr-dict `:` $element_type";
+}
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: shape/structure
 //===----------------------------------------------------------------------===//
@@ -279,6 +289,17 @@ def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {
   let assemblyFormat = [{
     $src`(`$src_shape `:` type($src_shape)`)``,`
     `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
+}
+
+def VMLA_IotaOp : VMLA_ElementTypeOp<"iota"> {
+  let arguments = (ins
+    VMLA_Buffer:$dst,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    `out` $dst attr-dict `:` $element_type
   }];
 }
 

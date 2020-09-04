@@ -22,20 +22,19 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Identifier.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/FoldUtils.h"
 
 #define DEBUG_TYPE "iree-linalg-tile-and-fuse-buffer"
-
-static std::string PromotionMarker = "promotion";
 
 namespace mlir {
 namespace iree_compiler {
@@ -81,26 +80,24 @@ class TileSizeCalculator {
     workgroupSize.resize(3, 1);
   }
 
-  /// Compute the tile sizes based on workgroup size specified.
-  LogicalResult setTileSizesBasedOnWorkgroupSize(
-      ArrayRef<int64_t> vWorkGroupSize) {
-    if (!vWorkGroupSize.empty()) {
-      vWorkGroupSize = dropTrailingOnes(vWorkGroupSize);
-      workgroupSize.assign(vWorkGroupSize.begin(), vWorkGroupSize.end());
-      auto rev = reverse(workgroupSize);
-      tileSizes.assign(rev.begin(), rev.end());
-    }
-    return success();
+  /// Set tile sizes to use.
+  void setTileSizes(ArrayRef<int64_t> sizes) {
+    tileSizes.assign(sizes.begin(), sizes.end());
+  }
+
+  /// Set workgroup size to use.
+  void setWorkgroupSize(ArrayRef<int64_t> sizes) {
+    workgroupSize.assign(sizes.begin(), sizes.end());
   }
 
   /// Compute the tile sizes based on the Linalg Ops within the dispatch region.
-  LogicalResult setTileSizesBasedOnOps(ArrayRef<linalg::LinalgOp> linalgOps);
+  LogicalResult inferTileAndWorkgroupSize(ArrayRef<linalg::LinalgOp> linalgOps);
 
   /// Get the current tile size computed.
   ArrayRef<int64_t> getTileSizes() const { return tileSizes; }
 
   /// Returns the workgroup size to use based on the tile sizes.
-  ArrayRef<int64_t> getWorkGroupSize() const { return workgroupSize; }
+  ArrayRef<int64_t> getWorkgroupSize() const { return workgroupSize; }
 
  private:
   /// Current tile size configuration.
@@ -114,7 +111,7 @@ class TileSizeCalculator {
 };
 }  // namespace
 
-LogicalResult TileSizeCalculator::setTileSizesBasedOnOps(
+LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
     ArrayRef<linalg::LinalgOp> linalgOps) {
   tileSizes.clear();
   if (linalgOps.empty()) {
@@ -130,15 +127,23 @@ LogicalResult TileSizeCalculator::setTileSizesBasedOnOps(
     Convolution = 0x1,
     Matmul = 0x2,
     Pooling = 0x4,
+    BatchMatmul = 0x8,
   };
   uint32_t opInfo = OpInfo::None;
   for (linalg::LinalgOp linalgOp : linalgOps) {
     Operation *op = linalgOp.getOperation();
-    if (isa<linalg::ConvOp>(op)) opInfo |= OpInfo::Convolution;
-    if (isa<linalg::MatmulOp>(op)) opInfo |= OpInfo::Matmul;
-    if (isa<linalg::PoolingMaxOp>(op)) opInfo |= OpInfo::Pooling;
-    if (isa<linalg::PoolingMinOp>(op)) opInfo |= OpInfo::Pooling;
-    if (isa<linalg::PoolingSumOp>(op)) opInfo |= OpInfo::Pooling;
+    if (isa<linalg::ConvOp>(op))
+      opInfo |= OpInfo::Convolution;
+    else if (isa<linalg::MatmulOp>(op))
+      opInfo |= OpInfo::Matmul;
+    else if (isa<linalg::BatchMatmulOp>(op))
+      opInfo |= OpInfo::BatchMatmul;
+    else if (isa<linalg::PoolingMaxOp>(op))
+      opInfo |= OpInfo::Pooling;
+    else if (isa<linalg::PoolingMinOp>(op))
+      opInfo |= OpInfo::Pooling;
+    else if (isa<linalg::PoolingSumOp>(op))
+      opInfo |= OpInfo::Pooling;
   }
   // If there are no tilable ops, there is nothing to do here.
   if (!opInfo) return success();
@@ -155,10 +160,6 @@ LogicalResult TileSizeCalculator::setTileSizesBasedOnOps(
   unsigned maxWorkgroupSize =
       resourceLimits.max_compute_workgroup_invocations().getInt();
   if (opInfo & OpInfo::Convolution) {
-    // TODO(ravishankarm): This tiling is meant to enable promotion to workgroup
-    // memory, but doesnt actually get us to a state where we can do this. The
-    // promotion is possible only when the subviews created are constant
-    // size. For now this doesnt really matter. Revisit this later.
     int64_t tileSizeX = 32;
     int64_t tileSizeY = maxWorkgroupSize / 32;
     tileSizes = {1, tileSizeY, tileSizeX};
@@ -169,6 +170,11 @@ LogicalResult TileSizeCalculator::setTileSizesBasedOnOps(
     // TODO: For now just hard wire this, but we can do better.
     tileSizes = {8, 8, 4};
     workgroupSize = {8, 8, 1};
+    return success();
+  }
+  if (opInfo & OpInfo::BatchMatmul) {
+    tileSizes = {2, 8, 8, 4};
+    workgroupSize = {8, 8, 2};
     return success();
   }
   if (opInfo & OpInfo::Pooling) {
@@ -186,78 +192,68 @@ LogicalResult TileSizeCalculator::setTileSizesBasedOnOps(
 // Pass and patterns
 //===----------------------------------------------------------------------===//
 
-/// Allocation callback for allocation workgroup local memory.
-static Value allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
-                                     ArrayRef<Value> boundingSubViewSize,
-                                     OperationFolder *folder) {
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape(boundingSubViewSize.size(),
-                                ShapedType::kDynamicSize);
-  return b.create<AllocOp>(
-      subview.getLoc(),
-      MemRefType::get(shape, subview.getType().getElementType(), {},
-                      getWorkgroupMemorySpace()),
-      boundingSubViewSize);
-}
-
-/// Deallocation callback for allocation workgroup local memory.
-static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  auto allocOp = buffer.getDefiningOp<AllocOp>();
-  b.create<DeallocOp>(allocOp.getLoc(), buffer);
-  return success();
-}
-
-/// Insert barrier after `op`.
-static void insertBarrierAfter(OpBuilder &b, Location loc, Operation *op) {
-  OpBuilder::InsertionGuard guard(b);
-  b.setInsertionPointAfter(op);
-  b.create<spirv::ControlBarrierOp>(loc, spirv::Scope::Workgroup,
-                                    spirv::Scope::Workgroup,
-                                    spirv::MemorySemantics::AcquireRelease);
-}
-
-/// Function used as callback for copyin/copyout in promotion pattern used to
-/// promote subviews to workgroup memory.
-static LogicalResult copyToFromWorkgroupMemory(
-    OpBuilder &b, Value src, Value dst, StringRef marker = PromotionMarker) {
-  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
-  setMarker(copyOp, marker);
-  return success();
-}
-
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 struct LinalgTileAndFusePass
     : public PassWrapper<LinalgTileAndFusePass, FunctionPass> {
-  LinalgTileAndFusePass(ArrayRef<int64_t> workGroupSize = {},
-                        bool useWorkgroupMem = false)
-      : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {
+  LinalgTileAndFusePass(ArrayRef<int64_t> workgroupSize = {},
+                        ArrayRef<int64_t> tileSizes = {},
+                        bool useWorkgroupMem = false) {
+    this->workgroupSize = workgroupSize;
+    this->tileSizes = tileSizes;
     this->useWorkgroupMemory = useWorkgroupMem;
   }
   LinalgTileAndFusePass(const LinalgTileAndFusePass &pass) {}
 
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry.insert<AffineDialect,
+                    gpu::GPUDialect,
+                    linalg::LinalgDialect,
+                    scf::SCFDialect>();
+    // clang-format on
+  }
+
   void runOnFunction() override;
 
+ private:
   Option<bool> useWorkgroupMemory{
       *this, "use-workgroup-memory",
       llvm::cl::desc("Promote subviews to use workgroup memory"),
       llvm::cl::init(false)};
 
- private:
-  SmallVector<int64_t, 3> workGroupSize;
+  ListOption<int64_t> workgroupSize{
+      *this, "workgroup-size",
+      llvm::cl::desc("Override the default workgroup size"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+
+  ListOption<int64_t> tileSizes{
+      *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
 };
+
+static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
+    [](OpBuilder &builder, Location loc,
+       ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+      return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
+          builder, loc, parallelLoopRanges.size());
+    },
+    {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+     linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
 /// Pattern for tiling operations. Updates the workgroup size in the surrounding
 /// function operation if tiling succeeds.
-template <typename OpTy>
-struct TilingPattern : public linalg::LinalgTilingPattern<OpTy> {
-  using Base = linalg::LinalgTilingPattern<OpTy>;
-  TilingPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
-                ArrayRef<int64_t> workgroupSize,
-                linalg::LinalgMarker marker = linalg::LinalgMarker(),
-                PatternBenefit benefit = 1)
-      : Base(context, options, marker, benefit),
+struct TileMatmulPattern
+    : public linalg::LinalgTilingPattern<linalg::MatmulOp> {
+  using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
+  TileMatmulPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
+                    ArrayRef<int64_t> workgroupSize, PatternBenefit benefit = 1)
+      : Base(context, options.setDistributionOptions(matmulDistributionOptions),
+             linalg::LinalgMarker(
+                 ArrayRef<Identifier>(),
+                 Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
+                                 context)),
+             benefit),
         workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
 
   virtual LogicalResult matchAndRewrite(Operation *op,
@@ -277,12 +273,60 @@ struct TilingPattern : public linalg::LinalgTilingPattern<OpTy> {
   SmallVector<int64_t, 3> workgroupSize;
 };
 
+struct TileBatchMatmulPattern
+    : public linalg::LinalgTilingPattern<linalg::BatchMatmulOp> {
+  using Base = linalg::LinalgTilingPattern<linalg::BatchMatmulOp>;
+  TileBatchMatmulPattern(MLIRContext *context,
+                         linalg::LinalgTilingOptions options,
+                         ArrayRef<int64_t> workgroupSize,
+                         PatternBenefit benefit = 1)
+      : Base(context, options.setDistributionOptions(matmulDistributionOptions),
+             linalg::LinalgMarker(
+                 ArrayRef<Identifier>(),
+                 Identifier::get(getWorkgroupMarker(), context)),
+             benefit),
+        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    FuncOp funcOp = op->getParentOfType<FuncOp>();
+    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
+        failed(updateWorkGroupSize(funcOp, this->workgroupSize))) {
+      return failure();
+    }
+    funcOp.setAttr(getWorkgroupCountAttrName(),
+                   rewriter.getI32IntegerAttr(static_cast<int32_t>(
+                       WorkgroupCountMethodology::ResultShape)));
+    return success();
+  }
+
+  SmallVector<int64_t, 3> workgroupSize;
+};
+
+static linalg::LinalgLoopDistributionOptions convPoolDistributionOptions = {
+    [](OpBuilder &builder, Location loc,
+       ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+      return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
+          builder, loc, parallelLoopRanges.size());
+    },
+    {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
+     linalg::DistributionMethod::Cyclic}};
+
 /// Pattern for tiling convolution and pooling operations. Currently is just a
 /// way to not tile when the operation has padding.
 template <typename OpTy>
-struct TileConvPoolPattern : public TilingPattern<OpTy> {
-  using Base = TilingPattern<OpTy>;
-  using Base::TilingPattern;
+struct TileConvPoolPattern : public linalg::LinalgTilingPattern<OpTy> {
+  using Base = linalg::LinalgTilingPattern<OpTy>;
+  TileConvPoolPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
+                      ArrayRef<int64_t> workgroupSize,
+                      PatternBenefit benefit = 1)
+      : Base(context,
+             options.setDistributionOptions(convPoolDistributionOptions),
+             linalg::LinalgMarker(
+                 ArrayRef<Identifier>(),
+                 Identifier::get(getWorkgroupMarker(), context)),
+             benefit),
+        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
@@ -296,28 +340,69 @@ struct TileConvPoolPattern : public TilingPattern<OpTy> {
                        WorkgroupCountMethodology::Default)));
     return success();
   }
+
+  SmallVector<int64_t, 3> workgroupSize;
 };
 
-/// Pattern to promote subviews to memory.
-// TODO(ravishankarm): Generalize this for other operations.
-struct PromoteSubviewsPattern
+//===----------------------------------------------------------------------===//
+// Patterns to promote subviews to workgroup memory
+//===----------------------------------------------------------------------===//
+
+/// Function used as callback for copyin/copyout in promotion pattern used to
+/// promote subviews to workgroup memory when the number of threads is known to
+/// be greater than equal to the number of iteration of loops the copy is
+/// lowered to.
+static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
+  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
+  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
+  return success();
+}
+
+/// Pattern to promote matmul operands to workgroup memory.
+struct PromoteMatmulSubviewsPattern
     : public linalg::LinalgPromotionPattern<linalg::MatmulOp> {
-  PromoteSubviewsPattern(MLIRContext *context,
-                         linalg::LinalgPromotionOptions options,
-                         linalg::LinalgMarker marker = linalg::LinalgMarker(),
-                         PatternBenefit benefit = 1)
+  PromoteMatmulSubviewsPattern(
+      MLIRContext *context, linalg::LinalgPromotionOptions options,
+      linalg::LinalgMarker marker = linalg::LinalgMarker(),
+      PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<linalg::MatmulOp>(
             context,
             options.setOperandsToPromote({0, 1}).setUseFullTileBuffers(
                 {false, false}),
-            marker, benefit) {}
+            linalg::LinalgMarker(
+                Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
+                                context),
+                Identifier::get(getWorkgroupMemoryNumItemsGENumItersMarker(),
+                                context)),
+            benefit) {}
+};
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    if (!hasWorkGroupMarker(op)) return failure();
-    return linalg::LinalgPromotionPattern<linalg::MatmulOp>::matchAndRewrite(
-        op, rewriter);
-  }
+/// Patterns to promote convolution operands to workgroup memory.
+// TODO(ravishankarm): This pattern is only promoting the image subview to
+// workgroup memory. In reality we should also be able to promote the filter
+// subview to workgroup memory as well. Since none of the loops used to access
+// the filter are tiled, this would mean the entire filter is moved to workgroup
+// memory. Two reasons this is not done right now:
+// 1) Linalg when tiling doesnt create a subview for the filter (since none of
+//    its dimensions are tiled. This needs to be relaxed (maybe by using an
+//    option.
+// 2) Maybe there are better alternatives for handling filter (using different
+//    StorageClasses, since for inference workloads these are model
+//    constants. This is TBD.
+struct PromoteConvolutionSubviewsPattern
+    : public linalg::LinalgPromotionPattern<linalg::ConvOp> {
+  PromoteConvolutionSubviewsPattern(
+      MLIRContext *context, linalg::LinalgPromotionOptions options,
+      linalg::LinalgMarker marker = linalg::LinalgMarker(),
+      PatternBenefit benefit = 1)
+      : linalg::LinalgPromotionPattern<linalg::ConvOp>(
+            context,
+            options.setOperandsToPromote({1}).setUseFullTileBuffers(
+                {false, false}),
+            linalg::LinalgMarker(
+                Identifier::get(getWorkgroupMarker(), context),
+                Identifier::get(getWorkgroupMemoryMarker(), context)),
+            benefit) {}
 };
 }  // namespace
 
@@ -334,38 +419,38 @@ void LinalgTileAndFusePass::runOnFunction() {
   if (linalgOps.empty()) return;
 
   TileSizeCalculator tileSizeCalculator(funcOp);
-  if (workGroupSize.empty()) {
+  if (tileSizes.empty()) {
     // Get the tile sizes to use for the lowering.
     SmallVector<int64_t, 3> tileSizes;
     SmallVector<linalg::LinalgOp, 1> opsVec(linalgOps.begin(), linalgOps.end());
-    if (failed(tileSizeCalculator.setTileSizesBasedOnOps(opsVec)))
+    if (failed(tileSizeCalculator.inferTileAndWorkgroupSize(opsVec)))
       return signalPassFailure();
   } else {
-    tileSizeCalculator.setTileSizesBasedOnWorkgroupSize(workGroupSize);
+    tileSizeCalculator.setTileSizes(tileSizes);
+    if (!workgroupSize.empty())
+      tileSizeCalculator.setWorkgroupSize(workgroupSize);
   }
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";
-    llvm::dbgs() << "# workgroup sizes at start: [";
-    interleaveComma(workGroupSize, llvm::dbgs());
+    llvm::dbgs() << "# workgroup sizes: [";
+    interleaveComma(tileSizeCalculator.getWorkgroupSize(), llvm::dbgs());
     llvm::dbgs() << "]\ntile sizes: [";
     interleaveComma(tileSizeCalculator.getTileSizes(), llvm::dbgs());
     llvm::dbgs() << "]\n";
   });
 
   OwningRewritePatternList tilingPatterns;
-  tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>,
-                        TilingPattern<linalg::MatmulOp>,
-                        TileConvPoolPattern<linalg::PoolingMaxOp>,
-                        TileConvPoolPattern<linalg::PoolingMinOp>,
-                        TileConvPoolPattern<linalg::PoolingSumOp>>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setTileSizes(tileSizeCalculator.getTileSizes())
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      tileSizeCalculator.getWorkGroupSize(),
-      linalg::LinalgMarker(ArrayRef<Identifier>(),
-                           Identifier::get(getWorkGroupMarker(), context)));
+  tilingPatterns
+      .insert<TileConvPoolPattern<linalg::ConvOp>, TileMatmulPattern,
+              TileBatchMatmulPattern, TileConvPoolPattern<linalg::PoolingMaxOp>,
+              TileConvPoolPattern<linalg::PoolingMinOp>,
+              TileConvPoolPattern<linalg::PoolingSumOp>>(
+          context,
+          linalg::LinalgTilingOptions()
+              .setTileSizes(tileSizeCalculator.getTileSizes())
+              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
+          tileSizeCalculator.getWorkgroupSize());
   applyPatternsAndFoldGreedily(getOperation(), tilingPatterns);
 
   if (useWorkgroupMemory) {
@@ -373,31 +458,15 @@ void LinalgTileAndFusePass::runOnFunction() {
     // sure that the allocated scratchspace memory is constant sizes which
     // requires some folding to trigger.
     OwningRewritePatternList promotionPatterns;
-    promotionPatterns.insert<PromoteSubviewsPattern>(
+    promotionPatterns.insert<PromoteMatmulSubviewsPattern,
+                             PromoteConvolutionSubviewsPattern>(
         context,
         linalg::LinalgPromotionOptions()
             .setAllocationDeallocationFns(allocateWorkgroupMemory,
                                           deallocateWorkgroupMemory)
-            .setCopyInOutFns(
-                [&](OpBuilder &b, Value src, Value dst) -> LogicalResult {
-                  return copyToFromWorkgroupMemory(b, src, dst);
-                },
-                [&](OpBuilder &b, Value src, Value dst) -> LogicalResult {
-                  return copyToFromWorkgroupMemory(b, src, dst);
-                }),
-        linalg::LinalgMarker(Identifier::get(getWorkGroupMarker(), context),
-                             Identifier::get(PromotionMarker, context)));
+            .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory));
     applyPatternsAndFoldGreedily(getOperation(), promotionPatterns);
   }
-
-  // Add barrier after all linalg operations marked with workitem marker.
-  OpBuilder builder(context);
-  funcOp.walk([&builder](linalg::LinalgOp linalgOp) {
-    if (hasMarker(linalgOp, PromotionMarker)) {
-      setWorkGroupMarker(linalgOp);
-      insertBarrierAfter(builder, linalgOp.getLoc(), linalgOp);
-    }
-  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -405,8 +474,9 @@ void LinalgTileAndFusePass::runOnFunction() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
-    ArrayRef<int64_t> workGroupSize, bool useWorkgroupMemory) {
-  return std::make_unique<LinalgTileAndFusePass>(workGroupSize,
+    ArrayRef<int64_t> workgroupSize, ArrayRef<int64_t> tileSizes,
+    bool useWorkgroupMemory) {
+  return std::make_unique<LinalgTileAndFusePass>(workgroupSize, tileSizes,
                                                  useWorkgroupMemory);
 }
 

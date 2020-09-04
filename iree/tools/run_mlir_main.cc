@@ -44,9 +44,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/base/init.h"
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -63,6 +61,7 @@
 #include "iree/tools/init_iree_dialects.h"
 #include "iree/tools/init_mlir_dialects.h"
 #include "iree/tools/init_targets.h"
+#include "iree/tools/init_xla_dialects.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -72,6 +71,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
@@ -161,15 +161,13 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
   if (target_backends.empty()) {
     iree_string_view_t* driver_names = nullptr;
     iree_host_size_t driver_count = 0;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_driver_registry_query_available_drivers(
-                          IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count),
-                      IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_driver_registry_query_available_drivers(
+        iree_allocator_system(), &driver_names, &driver_count));
     for (int i = 0; i < driver_count; ++i) {
       target_backends.push_back(
           std::string(driver_names[i].data, driver_names[i].size));
     }
-    iree_allocator_free(IREE_ALLOCATOR_SYSTEM, driver_names);
+    iree_allocator_free(iree_allocator_system(), driver_names);
   }
   return target_backends;
 }
@@ -177,11 +175,12 @@ StatusOr<std::vector<std::string>> GetTargetBackends() {
 // Prepares a module for evaluation by running MLIR import and IREE translation.
 // Returns the serialized flatbuffer data.
 StatusOr<std::string> PrepareModule(
-    std::string target_backend,
-    std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+    std::string target_backend, std::unique_ptr<llvm::MemoryBuffer> file_buffer,
+    mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("PrepareModule");
 
-  mlir::MLIRContext context;
+  mlir::MLIRContext context(/*loadAllDialects=*/false);
+  registry.appendTo(context.getDialectRegistry());
 
   // Parse input MLIR module.
   llvm::SourceMgr source_mgr;
@@ -201,15 +200,18 @@ StatusOr<std::string> PrepareModule(
 
   // Translate from MLIR to IREE bytecode.
   LOG(INFO) << "Compiling for target backend '" << target_backend << "'...";
-  auto executable_options =
+  auto hal_target_options =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
-  executable_options.targets = {std::move(target_backend)};
+  hal_target_options.targets = {std::move(target_backend)};
+  auto vm_target_options =
+      mlir::iree_compiler::IREE::VM::getTargetOptionsFromFlags();
   mlir::PassManager pass_manager(mlir_module->getContext());
   mlir::applyPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
-      pass_manager, executable_options);
-  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(pass_manager);
+      pass_manager, hal_target_options);
+  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(
+      pass_manager, vm_target_options);
   pass_manager.addPass(
       mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(pass_manager.run(mlir_module.get()))) {
@@ -272,7 +274,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
   IREE_TRACE_SCOPE0("EvaluateFunction");
 
   std::cout << "EXEC @" << export_name << std::endl;
-  ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   vm::ref<iree_vm_list_t> inputs;
   if (!input_values_file_flag.empty()) {
     if (!input_values_flag.empty()) {
@@ -280,33 +282,31 @@ Status EvaluateFunction(iree_vm_context_t* context,
              << "Expected only one of input_values and "
                 "input_values_file to be set";
     }
-    ASSIGN_OR_RETURN(inputs,
-                     ParseToVariantListFromFile(input_descs, allocator,
-                                                input_values_file_flag));
+    IREE_ASSIGN_OR_RETURN(inputs,
+                          ParseToVariantListFromFile(input_descs, allocator,
+                                                     input_values_file_flag));
   } else {
     auto input_values_list = absl::MakeConstSpan(
         input_values_flag.empty() ? nullptr : &input_values_flag.front(),
         input_values_flag.size());
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         inputs, ParseToVariantList(input_descs, allocator, input_values_list));
   }
 
-  ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_list_create(/*element_type=*/nullptr, output_descs.size(),
-                          IREE_ALLOCATOR_SYSTEM, &outputs),
-      IREE_LOC));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
+                                           output_descs.size(),
+                                           iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                     outputs.get(), IREE_ALLOCATOR_SYSTEM),
-      IREE_LOC));
+  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
+                                      inputs.get(), outputs.get(),
+                                      iree_allocator_system()));
 
   // Print outputs.
-  RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
+  IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get()));
 
   return OkStatus();
 }
@@ -324,7 +324,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   // We do this first so that if we fail validation we know prior to dealing
   // with devices.
   iree_vm_module_t* bytecode_module = nullptr;
-  RETURN_IF_ERROR(LoadBytecodeModule(flatbuffer_data, &bytecode_module));
+  IREE_RETURN_IF_ERROR(LoadBytecodeModule(flatbuffer_data, &bytecode_module));
 
   if (!run_flag) {
     // Just wanted verification; return without running.
@@ -333,19 +333,17 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   iree_hal_device_t* device = nullptr;
-  RETURN_IF_ERROR(CreateDevice(driver_name, &device));
+  IREE_RETURN_IF_ERROR(CreateDevice(driver_name, &device));
   iree_vm_module_t* hal_module = nullptr;
-  RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
     iree_string_view_t export_name_isv;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
-                          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                          ordinal, &function, &export_name_isv),
-                      IREE_LOC))
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+        bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function,
+        &export_name_isv))
         << "Looking up function export " << ordinal;
     absl::string_view export_name(export_name_isv.data, export_name_isv.size);
     if (absl::StartsWith(export_name, "__") ||
@@ -353,22 +351,21 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       // Skip internal or special functions.
       return OkStatus();
     }
-    RETURN_IF_ERROR(ValidateFunctionAbi(function));
+    IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test
     // runner).
     iree_vm_context_t* context = nullptr;
     std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-    RETURN_IF_ERROR(FromApiStatus(iree_vm_context_create_with_modules(
-                                      instance, modules.data(), modules.size(),
-                                      IREE_ALLOCATOR_SYSTEM, &context),
-                                  IREE_LOC))
+    IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+        instance, modules.data(), modules.size(), iree_allocator_system(),
+        &context))
         << "Creating context";
 
     // Invoke the function and print results.
-    RETURN_IF_ERROR(EvaluateFunction(context, iree_hal_device_allocator(device),
-                                     function, export_name))
+    IREE_RETURN_IF_ERROR(EvaluateFunction(
+        context, iree_hal_device_allocator(device), function, export_name))
         << "Evaluating export function " << ordinal;
 
     iree_vm_context_release(context);
@@ -392,30 +389,32 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 }
 
 // Translates and runs a single LLVM file buffer.
-Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer,
+                    mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("EvaluateFile");
 
   // TODO(benvanik): move to instance-based registration.
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
       << "Registering HAL types";
 
   iree_vm_instance_t* instance = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
+  IREE_RETURN_IF_ERROR(
+      iree_vm_instance_create(iree_allocator_system(), &instance))
       << "Create instance";
 
-  ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
+  IREE_ASSIGN_OR_RETURN(auto target_backends, GetTargetBackends());
   for (const auto& target_backend : target_backends) {
     // Prepare the module for execution and evaluate it.
     IREE_TRACE_FRAME_MARK();
     auto cloned_file_buffer = llvm::MemoryBuffer::getMemBufferCopy(
         file_buffer->getBuffer(), file_buffer->getBufferIdentifier());
-    ASSIGN_OR_RETURN(
+    IREE_ASSIGN_OR_RETURN(
         auto flatbuffer_data,
-        PrepareModule(target_backend + '*', std::move(cloned_file_buffer)),
+        PrepareModule(target_backend + '*', std::move(cloned_file_buffer),
+                      registry),
         _ << "Translating module");
     IREE_TRACE_FRAME_MARK();
-    RETURN_IF_ERROR(EvaluateFunctions(
+    IREE_RETURN_IF_ERROR(EvaluateFunctions(
         instance, BackendToDriverName(target_backend), flatbuffer_data))
         << "Evaluating functions";
   }
@@ -425,7 +424,8 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
 }
 
 // Runs the given .mlir file based on the current flags.
-Status RunFile(const std::string& mlir_filename) {
+Status RunFile(const std::string& mlir_filename,
+               mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("RunFile");
 
   // Load input file/from stdin.
@@ -439,7 +439,7 @@ Status RunFile(const std::string& mlir_filename) {
 
   if (!split_input_file_flag) {
     // Use entire buffer as a single module.
-    return EvaluateFile(std::move(file));
+    return EvaluateFile(std::move(file), registry);
   }
 
   // Split the buffer into separate modules and evaluate independently.
@@ -462,7 +462,7 @@ Status RunFile(const std::string& mlir_filename) {
         sub_source_buffer, full_buffer->getBufferIdentifier() +
                                llvm::Twine(" split at line #") +
                                llvm::Twine(split_line));
-    auto sub_failure = EvaluateFile(std::move(sub_buffer));
+    auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
     if (!sub_failure.ok()) {
       LOG(ERROR) << "Failure for split at line #" << split_line << ": "
                  << sub_failure;
@@ -495,9 +495,11 @@ extern "C" int main(int argc, char** argv) {
     }
   }
 
-  mlir::registerMlirDialects();
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::DialectRegistry registry;
+  mlir::registerMlirDialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
+  mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
@@ -520,7 +522,7 @@ extern "C" int main(int argc, char** argv) {
   char** argv_absl_ptr = argv_absl.data();
   iree::InitializeEnvironment(&argc_absl, &argv_absl_ptr);
 
-  auto status = RunFile(input_file_flag);
+  auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {
     std::cerr << "ERROR running file (" << input_file_flag << "): " << status
               << "\n";

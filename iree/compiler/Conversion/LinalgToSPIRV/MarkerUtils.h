@@ -22,7 +22,7 @@
 #ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MARKERUTILS_H_
 #define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MARKERUTILS_H_
 
-#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -30,23 +30,31 @@ namespace mlir {
 class Operation;
 namespace iree_compiler {
 
-/// Marker to denote that a linalg operation is to be partitioned to workitems.
-StringRef getWorkGroupMarker();
+/// Marker to denote that a linalg operation is to be partitioned to
+/// workitems. No assumption can be made about the number of woritems in the
+/// workgroup and number of iterations, i.e. a cyclic distribution is required.
+StringRef getWorkgroupMarker();
+StringRef getWorkgroupMemoryMarker();
+
+/// Marker to denote that a linalg operation is to be partitioned to workitems
+/// with the assumption that the number of workitems in the workgroup is greater
+/// than equal to the number of iterations.
+StringRef getWorkgroupNumItemsGENumItersMarker();
+StringRef getWorkgroupMemoryNumItemsGENumItersMarker();
+
+/// Marker for copy operations that are moving data from StorageClass to
+/// Workgroup memory.
+StringRef getCopyToWorkgroupMemoryMarker();
+
+/// Marker for operations that are going to be vectorized.
+StringRef getVectorizeMarker();
 
 /// Returns true if an operation has the specified `marker`. When `marker` is
 /// empty, returns true if the operation has any marker.
-bool hasMarker(Operation *, StringRef marker = "");
-
-/// Returns true if an operation has marker to denote that it is to be
-/// partitioned to workitems.
-bool hasWorkGroupMarker(Operation *);
+bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
 
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
-
-/// Sets marker to denote that a linalg operation is to be partitioned to
-/// workitems.
-void setWorkGroupMarker(Operation *);
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -31,11 +31,14 @@ __all__ = [
     "tf_load_saved_model",
     "tf_load_signature_def_saved_model",
     "tf_compile_saved_model",
+    "tf_module_to_compiler_module",
 ]
 
+import tempfile
 from typing import Collection, Optional, Sequence
 
 from . import binding as binding
+import tensorflow as tf
 
 # Native aliases (matches those in the generic compiler).
 llvm = binding.llvm
@@ -92,22 +95,21 @@ TF_IMPORT_PASS_PIPELINE = (
 )
 
 
-def tf_load_saved_model(
-    saved_model_dir: str,
-    compiler_context: Optional[Context] = None,
-    exported_names: Collection[str] = (),
-    pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE) -> Module:
+def tf_load_saved_model(saved_model_dir: str,
+                        exported_names: Collection[str] = (),
+                        pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
+                        compiler_context: Optional[Context] = None) -> Module:
   """Loads a TensorFlow saved model from its persistent representation.
 
   See also tf_compile_saved_model() for a one-shot API to load and compile.
 
   Args:
     saved_model_dir: Directory of the saved model.
-    compiler_context: The pyiree.compiler.Context() backing the module.
     exported_names: Optional tuple of strings representing the exported names to
       keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
+    compiler_context: The pyiree.compiler.Context() backing the module.
 
   Returns:
     An MLIR Module suitable for compilation by the IREE compiler.
@@ -125,20 +127,20 @@ def tf_load_saved_model(
 
 def tf_load_signature_def_saved_model(
     saved_model_dir: str,
-    compiler_context: Optional[Context] = None,
     tags: Collection[str] = set(),
     exported_names: Collection[str] = [],
-    pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE) -> Module:
+    pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
+    compiler_context: Optional[Context] = None) -> Module:
   """Loads a TensorFlow SignatureDef saved model from persistent representation.
 
   Args:
     saved_model_dir: Directory of the saved model.
-    compiler_context: The pyiree.compiler.Context() backing the module.
     tags: Optional tuple of tags to use when loading the model.
     exported_names: Optional tuple of strings representing the exported names to
       keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
+    compiler_context: The pyiree.compiler.Context() backing the module.
 
   Returns:
     An MLIR Module suitable for compilation by the IREE compiler.
@@ -156,26 +158,62 @@ def tf_load_signature_def_saved_model(
 
 def tf_compile_saved_model(
     saved_model_dir: str,
-    compiler_context: Optional[Context] = None,
     exported_names: Collection[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
-    target_backends: Collection[str] = ()
-) -> binding.OpaqueBlob:
+    target_backends: Collection[str] = (),
+    compiler_context: Optional[Context] = None) -> binding.OpaqueBlob:
   """Loads and compiles a TensorFlow saved model in one shot.
 
   Args:
     saved_model_dir: Directory of the saved model.
-    compiler_context: The pyiree.compiler.Context() backing the module.
     exported_names: Optional tuple of strings representing the exported names to
       keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     target_backends: The specific target backends to compile for (defaults to
       all compiled in targets).
+    compiler_context: The pyiree.compiler.Context() backing the module.
 
   Returns:
     An OpaqueBlob representing the compiled module.
   """
-  input_module = tf_load_saved_model(saved_model_dir, compiler_context,
-                                     exported_names, pass_pipeline)
+  input_module = tf_load_saved_model(saved_model_dir, exported_names,
+                                     pass_pipeline, compiler_context)
   return input_module.compile(target_backends=target_backends)
+
+
+def tf_module_to_compiler_module(
+    module: tf.Module,
+    exported_names: Collection[str] = (),
+    sm_path: str = None,
+    pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
+    compiler_context: Optional[Context] = None) -> Module:
+  """Converts a tf.Module into a MLIR module.
+
+  Args:
+    module: The tf.Module instance to convert to MLIR
+    exported_names: Optional tuple of strings representing the exported names to
+      keep.
+    sm_path: the path to save the tf.Module to, if any. Defaults to None.
+    pass_pipeline: Passes to run on the imported module prior to returning.
+      Defaults to TF_IMPORT_PASS_PIPELINE.
+    compiler_context: The pyiree.compiler.Context() backing the module.
+
+  Returns:
+    An MLIR Module suitable for compilation by the IREE compiler.
+    This can be further compiled to an IREE blob by calling
+    .compile_to_sequencer_blob.
+  """
+
+  def _convert(sm_path):
+    options = tf.saved_model.SaveOptions(save_debug_info=True)
+    tf.saved_model.save(module, sm_path, options=options)
+    return tf_load_saved_model(sm_path, exported_names, pass_pipeline,
+                               compiler_context)
+
+  if sm_path is None:
+    with tempfile.TemporaryDirectory() as sm_path:
+      compiler_module = _convert(sm_path)
+  else:
+    compiler_module = _convert(sm_path)
+  return compiler_module

@@ -117,6 +117,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
     "-Wno-unused-parameter"
     "-Wno-undef"
+    "-fvisibility=hidden"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
     "/wd4624"
@@ -177,6 +178,35 @@ if(${IREE_ENABLE_TSAN})
   else()
     message(FATAL_ERROR "The compiler does not support thread sanitizer")
   endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# Size-optimized build flags
+#-------------------------------------------------------------------------------
+
+  # TODO(#898): add a dedicated size-constrained configuration.
+if(${IREE_SIZE_OPTIMIZED})
+  iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
+    MSVC_OR_CLANG_CL
+      "/GS-"
+      "/GL"
+      "/Gw"
+      "/Gy"
+      "/DNDEBUG"
+      "/DIREE_STATUS_MODE=0"
+  )
+  iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
+    MSVC_OR_CLANG_CL
+      "/LTCG"
+      "/opt:ref,icf"
+  )
+  # TODO(#898): make this only impact the runtime (IREE_RUNTIME_DEFAULT_...).
+  set(IREE_DEFAULT_COPTS
+      "${IREE_DEFAULT_COPTS}"
+      "${IREE_SIZE_OPTIMIZED_DEFAULT_COPTS}")
+  set(IREE_DEFAULT_LINKOPTS
+      "${IREE_DEFAULT_LINKOPTS}"
+      "${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -297,6 +327,8 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
 )
 
 #-------------------------------------------------------------------------------

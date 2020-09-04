@@ -106,7 +106,6 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, {3}Storage> {
   using Base::Base;
 
   static StringRef getKindName() { return "{2}"; }
-  static bool kindof(unsigned kind) { return kind == AttrKind::{1}; }
 
 )",
                 structAttr.getDescription(), structAttr.getStructClassName(),
@@ -332,8 +331,7 @@ static void emitAttrFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
                   structAttr.getAllFields().front().getName());
   }
 
-  os << formatv("  return Base::get(context, AttrKind::{0}",
-                structAttr.getStructClassName());
+  os << formatv("  return Base::get(context");
   if (!structAttr.getAllFields().empty()) {
     os << ",\n                   ";
     interleaveComma(structAttr.getAllFields(), os,

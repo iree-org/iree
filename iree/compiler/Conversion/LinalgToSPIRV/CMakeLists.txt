@@ -30,10 +30,12 @@ iree_cc_library(
     "CooperativeMatrixAnalysis.cpp"
     "LinalgTileAndFusePass.cpp"
     "MarkerUtils.cpp"
+    "MatMulVectorizationTest.cpp"
     "Passes.cpp"
     "SplitDispatchFunctionPass.cpp"
     "Utils.cpp"
     "VectorToGPUPass.cpp"
+    "VectorizeMemref.cpp"
   DEPS
     LLVMSupport
     MLIRAffineOps
@@ -50,6 +52,7 @@ iree_cc_library(
     MLIRSCFToSPIRV
     MLIRSPIRV
     MLIRSPIRVTransforms
+    MLIRSideEffectInterfaces
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport

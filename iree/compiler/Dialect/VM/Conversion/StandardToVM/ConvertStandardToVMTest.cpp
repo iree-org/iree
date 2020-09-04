@@ -29,13 +29,20 @@ namespace {
 class ConvertStandardToVMTestPass
     : public PassWrapper<ConvertStandardToVMTestPass,
                          OperationPass<mlir::ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::VM::VMDialect>();
+  }
+
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();
     target.addIllegalDialect<StandardOpsDialect>();
 
+    IREE::VM::TypeConverter typeConverter(
+        IREE::VM::getTargetOptionsFromFlags());
+
     OwningRewritePatternList patterns;
-    populateStandardToVMPatterns(&getContext(), patterns);
+    populateStandardToVMPatterns(&getContext(), typeConverter, patterns);
 
     // NOTE: we allow other dialects besides just VM during this pass as we are
     // only trying to eliminate the std ops. When used as part of a larger set

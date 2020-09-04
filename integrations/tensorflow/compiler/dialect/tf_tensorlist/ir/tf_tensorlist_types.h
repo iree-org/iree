@@ -20,20 +20,10 @@
 namespace mlir {
 namespace tf_tensorlist {
 
-namespace TypeKind {
-enum Kind {
-  kTensorList = iree_compiler::IREE::TypeKind::FIRST_TF_TENSORLIST_TYPE,
-};
-}  // namespace TypeKind
-
 class TensorListType
     : public Type::TypeBase<TensorListType, Type, TypeStorage> {
  public:
   using Base::Base;
-  static bool kindof(unsigned kind) { return kind == TypeKind::kTensorList; }
-  static TensorListType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::kTensorList);
-  }
 };
 
 }  // namespace tf_tensorlist

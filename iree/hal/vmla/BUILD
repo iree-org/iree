@@ -14,10 +14,20 @@
 
 # A VMLA (VM-based Linear Algebra) runtime HAL backend.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_HAL_DRIVER_VMLA})
+  return()
+endif()
+""",
 )
 
 cc_library(
@@ -48,7 +58,7 @@ cc_test(
     deps = [
         ":op_kernels",
         "//iree/base:memory",
-        "//iree/base:status_matchers",
+        "//iree/testing:gtest",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/container:inlined_vector",
     ],
@@ -60,7 +70,6 @@ cc_library(
     hdrs = ["vmla_cache.h"],
     deps = [
         ":vmla_executable",
-        "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:allocator",
@@ -100,7 +109,6 @@ cc_library(
     deps = [
         ":vmla_device",
         ":vmla_module",
-        "//iree/base:api_util",
         "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",
@@ -128,7 +136,6 @@ cc_library(
     hdrs = ["vmla_executable.h"],
     deps = [
         ":vmla_module",
-        "//iree/base:api_util",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:executable",

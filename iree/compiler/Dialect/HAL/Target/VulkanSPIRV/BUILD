@@ -12,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+  return()
+endif()
+""",
 )
 
 cc_library(
@@ -31,13 +41,15 @@ cc_library(
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Dialect/Vulkan/Utils",
         "//iree/schemas:spirv_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",
@@ -45,6 +57,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
     ],
 )

@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListDialect.h"
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -36,7 +37,10 @@ void populateTensorListToHALPatterns(MLIRContext *context,
 class TfTensorListToHALConversionInterface
     : public HALConversionDialectInterface {
  public:
-  using HALConversionDialectInterface::HALConversionDialectInterface;
+  TfTensorListToHALConversionInterface(Dialect *dialect)
+      : HALConversionDialectInterface(dialect) {
+    dialect->getContext()->loadDialect<IREE::TensorList::TensorListDialect>();
+  }
 
   void setupConversionTarget(ConversionTarget &target,
                              OwningRewritePatternList &patterns,

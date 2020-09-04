@@ -23,15 +23,17 @@
 #   tar: target - for one of the target CompiledModules
 
 import copy
+import glob
 import inspect
 import os
+import pickle
 import sys
 import tempfile
+from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
 import numpy as np
-from pyiree.tf import compiler
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
@@ -46,31 +48,23 @@ flags.DEFINE_string(
 flags.DEFINE_bool(
     "summarize", True,
     "Summarize the inputs and outputs of each module trace logged to disk.")
-flags.DEFINE_bool(
-    "log_all_traces", False,
-    "Log all traces to logging.info, even if comparison passes.")
+flags.DEFINE_bool("log_all_traces", False,
+                  "Log all traces to logging.info, even if comparison passes.")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
 
-def _setup_artifacts_dir(module_name):
+def _setup_artifacts_dir(module_name: str) -> str:
   parent_dir = FLAGS.artifacts_dir
   if parent_dir is None:
     parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
-
-  # If the artifacts already exist then we overwrite/update them.
-  try:
-    # Use try/except instead of os.path.exists to address a race condition
-    # between multiple tests targets.
-    os.makedirs(artifacts_dir)
-  except IOError:
-    pass
+  os.makedirs(artifacts_dir, exist_ok=True)
   return artifacts_dir
 
 
-def _parse_target_backends():
+def _parse_target_backends() -> Tuple[Sequence[str], Sequence[str]]:
   """Decodes --target_backends and creates unique names for their artifacts."""
   backend_names = FLAGS.target_backends.split(",")
   backend_to_index = {k: 0 for k in backend_names if backend_names.count(k) > 1}
@@ -89,7 +83,7 @@ def _parse_target_backends():
   return backend_names, artifact_names
 
 
-def get_target_backends():
+def get_target_backends() -> Sequence[tf_utils.BackendInfo]:
   """Gets the BackendInfo instances to compare with the reference backend.
 
   By default all backends in BackendInfo will be used. Specific backends to
@@ -111,7 +105,7 @@ def get_target_backends():
   return backends
 
 
-def _indent(input_str, indentation=2):
+def _indent(input_str: str, indentation: int = 2) -> str:
   """Indents a string by the specified number of spaces, defaulting to 2."""
   spaces = " " * indentation
   lines = input_str.split("\n")
@@ -120,11 +114,27 @@ def _indent(input_str, indentation=2):
   return "\n".join(lines)
 
 
+def _zfill_width(length: int) -> Union[int, None]:
+  return int(np.ceil(np.log10(length))) if length else None
+
+
 class ModuleCall:
 
-  def __init__(self, method_name, inputs, outputs, rtol=1e-6, atol=1e-6):
+  def __init__(self,
+               method: str,
+               inputs: Tuple[Any],
+               outputs: Tuple[Any],
+               serialized_inputs: Tuple[str],
+               serialized_outputs: Tuple[str],
+               rtol: float = 1e-6,
+               atol: float = 1e-6):
     """Records the details of a call to a CompiledModule."""
-    self.method = method_name
+    self.method = method
+
+    for value in inputs:
+      if isinstance(value, tf.Tensor):
+        raise TypeError("Expected inputs to be native python types or numpy "
+                        f"arrays, but got {type(value)}")
 
     # Deepcopy to safegard against mutation.
     self.inputs = copy.deepcopy(inputs)
@@ -134,14 +144,17 @@ class ModuleCall:
       outputs = tuple()
     self.outputs = outputs if isinstance(outputs, tuple) else (outputs,)
 
+    self.serialized_inputs = serialized_inputs
+    self.serialized_outputs = serialized_outputs
+
     self.rtol = rtol
     self.atol = atol
 
-  def get_tolerances(self):
+  def get_tolerances(self) -> Tuple[float, float]:
     """Gets the floating point tolerances associated with this call."""
     return self.rtol, self.atol
 
-  def _get_shape_and_dtype(self, value):
+  def _get_shape_and_dtype(self, value: Any) -> str:
     if isinstance(value, np.ndarray):
       return tf_utils.get_shape_and_dtype(value, allow_non_mlir_dtype=True)
     else:
@@ -169,11 +182,66 @@ class ModuleCall:
     np.set_printoptions(**prior_printoptions)
     return result
 
+  def serialize(self, call_dir: str) -> None:
+    """Stores a serialized copy of this call.
+
+    Can be loaded via ModuleCall.load(call_dir)
+
+    Args:
+      call_dir: str, the path to the directory to serialize this call to.
+    """
+    os.makedirs(call_dir, exist_ok=True)
+
+    metadata = {
+        "method": self.method,
+        "serialized_inputs": self.serialized_inputs,
+        "serialized_outputs": self.serialized_outputs,
+        "rtol": self.rtol,
+        "atol": self.atol
+    }
+    with open(os.path.join(call_dir, "metadata.pkl"), "wb") as f:
+      pickle.dump(metadata, f)
+
+    width = _zfill_width(len(self.inputs))
+    for i, value in enumerate(self.inputs):
+      path = os.path.join(call_dir, f"input_{str(i).zfill(width)}.pkl")
+      with open(path, "wb") as f:
+        pickle.dump(value, f)
+
+    width = _zfill_width(len(self.outputs))
+    for i, value in enumerate(self.outputs):
+      path = os.path.join(call_dir, f"output_{str(i).zfill(width)}.pkl")
+      with open(path, "wb") as f:
+        pickle.dump(value, f)
+
+  @staticmethod
+  def load(call_dir: str) -> "ModuleCall":
+    """Loads and returns a trace serialized with ModuleCall.serialize."""
+    with open(os.path.join(call_dir, "metadata.pkl"), "rb") as f:
+      kwargs = pickle.load(f)
+
+    for result_type in ["input", "output"]:
+      key = f"{result_type}s"  # inputs or outputs
+      kwargs[key] = []
+
+      files = glob.glob(os.path.join(call_dir, f"{result_type}_*.pkl"))
+      for filename in sorted(files):
+        with open(filename, "rb") as f:
+          kwargs[key].append(pickle.load(f))
+
+      # Convert to tuple to match python's return type for multiple results.
+      kwargs[key] = tuple(kwargs[key])
+
+    return ModuleCall(**kwargs)
+
 
 class Trace:
   """Stores the inputs and outputs of a series of calls to a module."""
 
-  def __init__(self, module, function):
+  def __init__(self,
+               module: tf_utils.CompiledModule,
+               function: Union[Callable[["TracedModule"], None], None],
+               _load_dict: Dict[str, Any] = None):
     """Extracts metadata from module and function and initializes.
 
     Example usage:
@@ -186,20 +254,36 @@ class Trace:
     Args:
       module: the module who's outputs this trace will record.
       function: the function that module will be traced on.
+      _load_dict: used internally
     """
-    # Extract metadata from module and function.
-    self.module_name = module.module_name
-    self.backend = module.backend
-    self.function_name = function.__name__
-    self.function_sourcefile = inspect.getsourcefile(function)
-    source, start_line = inspect.getsourcelines(function)
-    self.function_line_numbers = (start_line, start_line + len(source))
-    self.function_source = "".join(source)
+    if _load_dict is None:
+      # Extract metadata from module and function.
+      self.module_name = module.module_name
+      self.compiled_path = module.compiled_path
+      self.backend_name = module.backend
+      self.supports_cxx_serialization = module.supports_cxx_serialization()
+      self.backend_driver = module.backend_driver
+      self.function_name = function.__name__
+      self.function_sourcefile = inspect.getsourcefile(function)
+      source, start_line = inspect.getsourcelines(function)
+      self.function_line_numbers = (start_line, start_line + len(source))
+      self.function_source = "".join(source)
 
-    self.calls = []
+      self.calls = []
+    else:
+      self.module_name = _load_dict["module_name"]
+      self.compiled_path = _load_dict["compiled_path"]
+      self.backend_name = _load_dict["backend_name"]
+      self.supports_cxx_serialization = _load_dict["supports_cxx_serialization"]
+      self.backend_driver = _load_dict["backend_driver"]
+      self.function_name = _load_dict["function_name"]
+      self.function_sourcefile = _load_dict["function_sourcefile"]
+      self.function_line_numbers = _load_dict["function_line_numbers"]
+      self.function_source = _load_dict["function_source"]
+      self.calls = _load_dict["calls"]
 
   def __str__(self):
-    header = (f"Trace of {self.module_name} compiled to '{self.backend}' "
+    header = (f"Trace of {self.module_name} compiled to '{self.backend_name}' "
               f"on function '{self.function_name}':")
     # Give each call a number so it's easier to compare between multiple traces.
     calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
@@ -211,7 +295,7 @@ class Trace:
       yield call
 
   @staticmethod
-  def compare_traces(ref_trace, tar_trace):
+  def compare_traces(ref_trace: "Trace", tar_trace: "Trace") -> bool:
     traces_match = True
 
     # Check that all method invocations match.
@@ -240,15 +324,17 @@ class Trace:
 
       if not calls_match:
         logging.error("Comparision between '%s' and '%s' failed on method '%s'",
-                      ref_trace.backend, tar_trace.backend, ref_call.method)
-        logging.error("Reference call '%s':\n%s", ref_trace.backend, ref_call)
-        logging.error("Target call '%s':\n%s", tar_trace.backend, tar_call)
+                      ref_trace.backend_name, tar_trace.backend_name,
+                      ref_call.method)
+        logging.error("Reference call '%s':\n%s", ref_trace.backend_name,
+                      ref_call)
+        logging.error("Target call '%s':\n%s", tar_trace.backend_name, tar_call)
 
       traces_match = traces_match and calls_match
     return traces_match
 
   @staticmethod
-  def _check_same(ref, tar, rtol, atol):
+  def _check_same(ref: Any, tar: Any, rtol: float, atol: float) -> bool:
     """Checks that ref and tar have identical datastructures and values."""
     # Check for matching types.
     if not isinstance(tar, type(ref)):
@@ -314,17 +400,11 @@ class Trace:
       raise TypeError(f"Encountered results with unexpected type {type(ref)}")
     return True
 
-  def _get_trace_dir(self, artifacts_dir):
-    trace_dir = os.path.join(artifacts_dir, "traces")
-    if not os.path.exists(trace_dir):
-      os.makedirs(trace_dir)
-    return trace_dir
-
-  def save_plaintext(self, artifacts_dir, summarize=True):
+  def save_plaintext(self, trace_dir: str, summarize: bool = True) -> None:
     """Saves a human-readable string representation of this trace to disk.
 
     Args:
-      artifacts_dir: the base directory to save the trace in.
+      trace_dir: str, path to the directory to save the trace in.
       summarize: a bool controlling whether numpy should summarize the inputs
         and outputs if they're large. Setting this to False is very slow for
         large outputs.
@@ -335,18 +415,83 @@ class Trace:
         threshold=None if summarize else sys.maxsize,
         edgeitems=10)  # Can show more items since they won't clutter the logs.
 
-    trace_dir = self._get_trace_dir(artifacts_dir)
-    path = os.path.join(trace_dir, f"{self.function_name}__{self.backend}.txt")
+    path = os.path.join(trace_dir, "log.txt")
     with open(path, "w") as f:
       f.write(str(self))
       f.write("\n")
 
     np.set_printoptions(**prior_printoptions)
 
+  def serialize(self, trace_dir: str) -> None:
+    """Stores a serialized copy of this trace in trace_dir.
+
+    It can be loaded via `Trace.load(trace_dir)`.
+
+    Args:
+      trace_dir: str, path to the directory to serialize the trace to.
+    """
+
+    # Python serialization.
+    metadata = {
+        "module_name": self.module_name,
+        "compiled_path": self.compiled_path,
+        "backend_name": self.backend_name,
+        "supports_cxx_serialization": self.supports_cxx_serialization,
+        "backend_driver": self.backend_driver,
+        "function_name": self.function_name,
+        "function_sourcefile": self.function_sourcefile,
+        "function_line_numbers": self.function_line_numbers,
+        "function_source": self.function_source
+    }
+    with open(os.path.join(trace_dir, "metadata.pkl"), "wb") as f:
+      pickle.dump(metadata, f)
+
+    width = _zfill_width(len(self.calls))
+    for i, call in enumerate(self.calls):
+      call_dir = os.path.join(trace_dir, f"call_{str(i).zfill(width)}")
+      call.serialize(call_dir)
+
+    # C++ Serialization.
+    if self.supports_cxx_serialization:
+      flaglines = []
+      if self.compiled_path is not None:
+        flaglines.append(f"--input_file={self.compiled_path}")
+      flaglines.append(f"--driver={self.backend_driver}")
+      inputs_str = ", ".join(self.calls[0].serialized_inputs)
+      flaglines.append(f"--inputs={inputs_str}")
+      flaglines.append(f"--entry_function={self.calls[0].method}")
+
+      with open(os.path.join(trace_dir, "flagfile"), "w") as f:
+        f.writelines(line + "\n" for line in flaglines)
+
+  @staticmethod
+  def load(trace_dir: str) -> "Trace":
+    """Loads and returns a trace serialized with Trace.serialize.
+
+    Args:
+      trace_dir: str, path to the directory of the serialized trace.
+
+    Returns:
+      A Trace deserialized from trace_dir.
+    """
+    with open(os.path.join(trace_dir, "metadata.pkl"), "rb") as f:
+      load_dict = pickle.load(f)
+    call_dirs = sorted(glob.glob(os.path.join(trace_dir, "call_*")))
+    calls = [ModuleCall.load(call_dir) for call_dir in call_dirs]
+    load_dict["calls"] = calls
+    return Trace(module=None, function=None, _load_dict=load_dict)
+
+
+def _get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
+  trace_dir = os.path.join(artifacts_dir, trace.backend_name, "traces",
+                           trace.function_name)
+  os.makedirs(trace_dir, exist_ok=True)
+  return trace_dir
+
 
 class TracedModule:
 
-  def __init__(self, module, trace):
+  def __init__(self, module: tf_utils.CompiledModule, trace: Trace):
     """Wraps a CompiledModule so that all inputs and outputs are traced.
 
     The TracedModule returned will have an API almost identical to that of the
@@ -363,7 +508,7 @@ class TracedModule:
     self._module = module
     self._trace = trace
 
-  def _trace_call(self, method, method_name):
+  def _trace_call(self, method: Callable[..., Any], method_name: str):
     """Decorates a CompiledModule method to capture its inputs and outputs."""
 
     def call(*args, **kwargs):
@@ -376,8 +521,10 @@ class TracedModule:
 
       # Run the method and record the details of the call.
       outputs = method(*args, **kwargs)
+      serialized_inputs, serialized_outputs = method.get_serialized_values()
       self._trace.calls.append(
-          ModuleCall(method_name, args, outputs, **tolerances))
+          ModuleCall(method_name, args, outputs, serialized_inputs,
+                     serialized_outputs, **tolerances))
       return outputs
 
     return call
@@ -395,7 +542,9 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-def compile_module(module_class, exported_names=()):
+def compile_module(
+    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
+) -> Callable[[Any], Any]:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
 
   A CompiledModule is created for each backend in --target_backends. They can
@@ -425,23 +574,29 @@ def compile_module(module_class, exported_names=()):
   return decorator
 
 
+# Will be initialized by TracedModuleTestCase.setUpClass
+# Global variables are used because storing the compiler context on the cls
+# causes cleaning up refcounts to fail, and tf.test.TestCase wipes the variables
+# on the class instance (self.*) before each unittest.
+# TODO(#2900): Move these back to class variables when we figure out issues with
+# refcounting.
+_global_ref_module = None
+_global_tar_modules = None
+
+
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
   # Will be initialized by the @compile_module decorator.
   _module_class = None
   _exported_names = ()
 
-  # Will be initialized in setUpClass.
-  _ref_module = None
-  _tar_modules = None
-
   @classmethod
-  def _compile(cls, backend_info):
+  def _compile(cls, backend_info: tf_utils.BackendInfo):
     return backend_info.compile(cls._module_class, cls._exported_names,
                                 cls._artifacts_dir)
 
   @classmethod
-  def setUpClass(cls):
+  def setUpClass(cls) -> None:
     # Ran before any of the unit tests.
     super().setUpClass()
     if cls._module_class is None:
@@ -452,25 +607,30 @@ class TracedModuleTestCase(tf.test.TestCase):
     # Setup the directory for saving compilation artifacts and traces.
     cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
 
-    # Create a CompiledModule for the reference backend and each target backend.
+    # Get the backend information for this test.
     ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
                                             f"{FLAGS.reference_backend}_ref")
-    cls._ref_module = cls._compile(ref_backend_info)
-
     tar_backend_infos = get_target_backends()
-    cls._tar_modules = [
+
+    global _global_ref_module
+    global _global_tar_modules
+    _global_ref_module = cls._compile(ref_backend_info)
+    _global_tar_modules = [
         cls._compile(backend_info) for backend_info in tar_backend_infos
     ]
 
-  def setUp(self):
-    # Ran before each unit test.
+  def setUp(self) -> None:
+    # Runs before each unit test.
     super().setUp()
-    self._ref_module.create_reinitialized()
-    self._tar_modules = [
-        module.create_reinitialized() for module in self._tar_modules
+    global _global_ref_module
+    global _global_tar_modules
+    _global_ref_module = _global_ref_module.create_reinitialized()
+    _global_tar_modules = [
+        module.create_reinitialized() for module in _global_tar_modules
     ]
 
-  def compare_backends(self, trace_function):
+  def compare_backends(self, trace_function: Callable[[TracedModule],
+                                                      None]) -> None:
     """Run the reference and target backends on trace_function and compare them.
 
     Random seeds for tensorflow, numpy and python are set before each invocation
@@ -480,15 +640,17 @@ class TracedModuleTestCase(tf.test.TestCase):
       trace_function: a function accepting a TracedModule as its argument.
     """
     # Create Traces for each backend.
-    ref_trace = Trace(self._ref_module, trace_function)
-    tar_traces = [Trace(module, trace_function) for module in self._tar_modules]
+    ref_trace = Trace(_global_ref_module, trace_function)
+    tar_traces = [
+        Trace(module, trace_function) for module in _global_tar_modules
+    ]
 
     # Run the traces through trace_function with their associated modules.
     tf_utils.set_random_seed()
-    trace_function(TracedModule(self._ref_module, ref_trace))
+    trace_function(TracedModule(_global_ref_module, ref_trace))
     if FLAGS.log_all_traces:
       logging.info(ref_trace)
-    for module, trace in zip(self._tar_modules, tar_traces):
+    for module, trace in zip(_global_tar_modules, tar_traces):
       tf_utils.set_random_seed()
       trace_function(TracedModule(module, trace))
       if FLAGS.log_all_traces:
@@ -498,29 +660,32 @@ class TracedModuleTestCase(tf.test.TestCase):
     failed_backend_indices = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
-                   ref_trace.backend, tar_trace.backend)
+                   ref_trace.backend_name, tar_trace.backend_name)
       traces_match = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
 
     # Save the results to disk before validating.
-    ref_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
+    ref_trace_dir = _get_trace_dir(self._artifacts_dir, ref_trace)
+    ref_trace.save_plaintext(ref_trace_dir, FLAGS.summarize)
+    ref_trace.serialize(ref_trace_dir)
     for tar_trace in tar_traces:
-      tar_trace.save_plaintext(self._artifacts_dir, FLAGS.summarize)
+      tar_trace_dir = _get_trace_dir(self._artifacts_dir, tar_trace)
+      tar_trace.save_plaintext(tar_trace_dir, FLAGS.summarize)
+      tar_trace.serialize(tar_trace_dir)
 
     # Validate results.
     if failed_backend_indices:
       # Extract info for logging.
-      failed_backends = [tar_traces[i].backend for i in failed_backend_indices]
-      failure_info = (
+      failed_backends = [
+          tar_traces[i].backend_name for i in failed_backend_indices
+      ]
+      self.fail(
           "Comparision between the reference backend and the following targets "
           f"failed: {failed_backends}. The errors above show the inputs and "
-          "outputs the non-matching calls.")
-
-      # This condition is always True, but is useful for context in the logs.
-      self.assertEmpty(failed_backends, failure_info)
+          "outputs of the non-matching calls.")
 
   @classmethod
-  def tearDownClass(cls):
-    # Ran after all unit tests are completed.
+  def tearDownClass(cls) -> None:
+    # Runs after all unit tests are completed.
     super().tearDownClass()

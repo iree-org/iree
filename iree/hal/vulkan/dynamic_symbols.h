@@ -57,10 +57,10 @@ struct FunctionPtrInfo;
 // https://github.com/KhronosGroup/Vulkan-Hpp#extensions--per-device-function-pointers
 //
 // Usage:
-//  ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
+//  IREE_ASSIGN_OR_RETURN(auto syms, DynamicSymbols::CreateFromSystemLoader());
 //  VkInstance instance = VK_NULL_HANDLE;
 //  syms->vkCreateInstance(..., &instance);
-//  RETURN_IF_ERROR(syms->LoadFromInstance(instance));
+//  IREE_RETURN_IF_ERROR(syms->LoadFromInstance(instance));
 struct DynamicSymbols : public RefObject<DynamicSymbols> {
   using GetProcAddrFn =
       std::function<PFN_vkVoidFunction(const char* function_name)>;

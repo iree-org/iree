@@ -19,9 +19,9 @@
 #include <set>
 
 #include "iree/base/status.h"
-#include "iree/base/status_matchers.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -62,9 +62,9 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
       GTEST_SKIP();
       return;
     }
-    ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
+    IREE_ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
     LOG(INFO) << "Creating default device...";
-    ASSERT_OK_AND_ASSIGN(device_, driver_->CreateDefaultDevice());
+    IREE_ASSERT_OK_AND_ASSIGN(device_, driver_->CreateDefaultDevice());
     LOG(INFO) << "Created device '" << device_->info().name() << "'";
   }
 
@@ -95,7 +95,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     if (IsUnavailable(driver_or.status())) {
       unavailable_driver_names.insert(driver_name);
     }
-    RETURN_IF_ERROR(driver_or.status());
+    IREE_RETURN_IF_ERROR(driver_or.status());
     return std::move(driver_or.value());
   }
 };

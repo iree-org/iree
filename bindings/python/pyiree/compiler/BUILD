@@ -18,7 +18,6 @@ load(
     "PYBIND_COPTS",
     "PYBIND_EXTENSION_COPTS",
     "PYBIND_FEATURES",
-    "PYBIND_REGISTER_MLIR_PASSES",
     "PYTHON_CPP_EXTRA_DEPS",
     "iree_py_extension",
     "iree_py_library",
@@ -43,8 +42,8 @@ COMPILER_DEPS = [
 
     # Targets.
     "//iree/compiler/Dialect/HAL/Target/VMLA",
-    "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMAOT",
-    "//iree/compiler/Dialect/HAL/Target/LLVM:LLVMIR",
+    "//iree/compiler/Dialect/HAL/Target/LLVM/AOT:LLVMAOT",
+    "//iree/compiler/Dialect/HAL/Target/LLVM/IR:LLVMIR",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     "//iree/compiler/Dialect/VM/Target:init_targets",
     "//iree/compiler/Dialect/VM/Target/Bytecode",
@@ -85,14 +84,13 @@ pybind_cc_library(
     hdrs = [
         "compiler.h",
     ],
-    copts = PYBIND_REGISTER_MLIR_PASSES,
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
         "//iree/tools:init_compiler_modules",
         "//iree/tools:init_iree_passes_and_dialects",
         "//iree/tools:init_mlir_passes_and_dialects",
-        "//iree/base:localfile",
         "//iree/tools:init_targets",
+        "//iree/tools:init_xla_dialects",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",

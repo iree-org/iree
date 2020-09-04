@@ -27,6 +27,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Creates a pass to fuse operations on tensors.
+std::unique_ptr<Pass> createFusionOfTensorOpsPass();
+
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 
@@ -48,7 +51,7 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
 using TensorToBufferMap = DenseMap<Value, Value>;
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
-    TensorToBufferMap const &outputTensorToBuffer);
+    TensorToBufferMap const &resultTensorToBufferMap);
 
 /// Populates passes to convert from XLA-HLO to Linalg on buffers as well as
 /// handling some IREE specific conversions (like iree.interface.* and

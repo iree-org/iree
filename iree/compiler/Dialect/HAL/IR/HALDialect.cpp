@@ -81,7 +81,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 }  // namespace
 
 HALDialect::HALDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
   addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
 
   addAttributes<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,

@@ -22,16 +22,23 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
@@ -63,6 +70,11 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
           "Workgroup size to use for XLA-HLO to Linalg to SPIR-V path"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
+  static llvm::cl::list<unsigned> clTileSizes(
+      "iree-spirv-tile-size",
+      llvm::cl::desc("Tile size to use for tiling Linalg operations"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
   static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
       llvm::cl::desc(
@@ -70,9 +82,10 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(Vulkan::swiftShaderTargetEnvAssembly));
 
   VulkanSPIRVTargetOptions targetOptions;
-  for (unsigned dim : clWorkgroupSize) {
-    targetOptions.codegenOptions.workgroupSize.push_back(dim);
-  }
+  targetOptions.codegenOptions.workgroupSize.assign(clWorkgroupSize.begin(),
+                                                    clWorkgroupSize.end());
+  targetOptions.codegenOptions.tileSizes.assign(clTileSizes.begin(),
+                                                clTileSizes.end());
   targetOptions.codegenOptions.useWorkgroupMemory = clUseWorkgroupMemory;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   return targetOptions;
@@ -223,21 +236,32 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   // NOTE: we could vary this based on the options such as 'vulkan-v1.1'.
   std::string name() const override { return "vulkan*"; }
 
-  void constructTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                          IREE::HAL::ExecutableOp executableOp) override {
-    // Attach SPIR-V target environment to the hal.executable.target op.
-    // If we had multiple target environments we would generate one target op
-    // per environment.
-    spirv::TargetEnvAttr spvTargetEnv =
-        getSPIRVTargetEnv(options_.vulkanTargetEnv, sourceOp.getContext());
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry.insert<AffineDialect,
+                    Vulkan::VulkanDialect,
+                    gpu::GPUDialect,
+                    linalg::LinalgDialect,
+                    scf::SCFDialect,
+                    spirv::SPIRVDialect,
+                    vector::VectorDialect>();
+    // clang-format on
+  }
 
+  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
+                        IREE::HAL::ExecutableOp executableOp) override {
     OpBuilder targetBuilder(&executableOp.getBlock().back());
     auto targetOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
         sourceOp.getLoc(), name());
     OpBuilder containerBuilder(&targetOp.getBlock().back());
-    auto innerModuleOp =
-        containerBuilder.clone(*sourceOp.getInnerModule().getOperation());
-    innerModuleOp->setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
+
+    auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+    // Attach SPIR-V target environment to the target's ModuleOp.
+    // If we had multiple target environments we would generate one target op
+    // per environment, with each setting its own environment attribute.
+    spirv::TargetEnvAttr spvTargetEnv =
+        getSPIRVTargetEnv(options_.vulkanTargetEnv, sourceOp.getContext());
+    innerModuleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,

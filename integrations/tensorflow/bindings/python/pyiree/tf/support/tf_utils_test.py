@@ -19,9 +19,9 @@ import tempfile
 
 from absl import logging
 from absl.testing import parameterized
+import numpy as np
 from pyiree.tf.support import tf_utils
 import tensorflow as tf
-import numpy as np
 
 
 class ConstantModule(tf.Module):
@@ -64,13 +64,13 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   def test_artifact_saving(self, backend_infos):
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
-      iree_compiled_module = tf_utils.compile_tf_module(
+      iree_compiled_module, compiled_path = tf_utils.compile_tf_module(
           tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
 
       artifacts_to_check = [
           'tf_input.mlir',
           'iree_input.mlir',
-          f'compiled__{tf_utils.backends_to_str(backend_infos)}.vmfb',
+          compiled_path,
       ]
       for artifact in artifacts_to_check:
         artifact_path = os.path.join(artifacts_dir, artifact)

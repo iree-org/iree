@@ -13,7 +13,7 @@ that TensorFlow should be version 2.0+. This can be checked with
 See [Install TensorFlow with pip](https://www.tensorflow.org/install/pip) for
 instructions.
 
-## Vulkan setup
+## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
 [the doc](../../../docs/vulkan_and_spirv.md)), then you can run the manual test
@@ -48,7 +48,7 @@ vmla_module.predict(...)
 By default the TensorFlow SavedModels will not be kept. This can be overridden
 via the `--keep_saved_model` flag.
 
-## Running tests
+## Running Tests
 
 For locally running tests and iterating on backend development, `bazel run` is
 preferred.
@@ -150,7 +150,77 @@ bazel test :e2e_tests_failing
 bazel test :e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ```
 
-## Debugging tests
+## Generated Artifacts
+
+By default, running an E2E test generates a number of compilation, debugging and
+benchmarking artifacts in `/tmp/iree/modules/`. The location of these artifacts
+can be changed via the `--artifacts_dir` flag. The generated directory structure
+for each module is as follows:
+
+```
+/tmp/iree/modules/ModuleName
+├── tf_input.mlir        # MLIR for ModuleName in TF's input dialect
+├── iree_input.mlir      # tf_input.mlir translated to IREE MLIR
+├── backend_name_1       # e.g. iree_vmla, tf or tf_ref
+│   ├── compiled.vmfb    # flatbuffer of ModuleName compiled to this backend
+│   ├── saved_model      # Only created if --keep_saved_model is specified.
+│   └── traces
+│       ├── trace_1      # Directory storing logs and serialization for each trace.
+│       │   └── log.txt  # A more detailed version of the test logs
+│       └── trace_2
+│           └── log.txt
+└── backend_name_2
+    └── ...
+```
+
+Traces for a particular test can be loaded via the `Trace.load(trace_dir)`
+method. For example:
+
+```python
+ref_trace = Trace.load("/tmp/iree/modules/ModuleName/tf_ref/traces/predict/")
+tar_trace = Trace.load("/tmp/iree/modules/ModuleName/iree_vmla/traces/predict/")
+abs_diff = np.abs(ref_trace.calls[0].outputs[0] - tar_trace.calls[0].outputs[0])
+print(np.mean(abs_diff))
+```
+
+Traces are named after the trace functions defined in their unittests. So in the
+`SimpleArithmeticModule` example above, the `trace_dir` would be
+`/tmp/iree/modules/SimpleArithmeticModule/iree_vmla/traces/simple_mul/`.
+
+## Benchmarking E2E Modules
+
+Abseil flagfiles containing all of the data that `iree-benchmark-module` needs
+to run are generated for each `Trace` in our E2E tests. This allows for any
+module we test to be easily benchmarked on valid inputs. The process for
+benchmarking a vision model can thus be reduced to the following:
+
+```shell
+# Generate benchmarking artifacts for all vision models:
+bazel test integrations/tensorflow/e2e/keras:vision_external_tests
+
+# Benchmark ResNet50 with cifar10 weights on vmla:
+bazel run iree/tools:iree-benchmark-module -- \
+  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_vmla/traces/predict/flagfile
+
+# Benchmark ResNet50 with cifar10 weights on llvmjit:
+bazel run iree/tools:iree-benchmark-module -- \
+  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_llvmjit/traces/predict/flagfile
+```
+
+Duplicate flags provided after the flagfile will take precedence. For example:
+
+```shell
+bazel run iree/tools:iree-benchmark-module -- \
+  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_llvmjit/traces/predict/flagfile  \
+  --input_file=/path/to/custom/compiled.vmfb
+```
+
+Currently, this only supports benchmarking the first module call in a trace. We
+plan to extend this to support benchmarking all of the calls in the trace, and
+also plan to support verifying outputs during the warm-up phase of the
+benchmark.
+
+## Debugging Tests
 
 If the compiler fails to compile the program, then it will create a crash
 reproducer (see [MLIR documentation](https://mlir.llvm.org/docs/WritingAPass/)),
@@ -159,7 +229,7 @@ debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
 
-## Test harnesses
+## Test Harnesses
 
 ### Simple function tests
 

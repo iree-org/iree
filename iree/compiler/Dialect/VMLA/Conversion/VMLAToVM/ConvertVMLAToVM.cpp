@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/VMLA/Conversion/VMLAToVM/ConvertVMLAToVM.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -254,9 +255,10 @@ class VMLAConvImportOpConversion
 };
 }  // namespace
 
-void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
-                              OwningRewritePatternList &patterns,
-                              TypeConverter &typeConverter) {
+void populateVMLAToVMPatterns(MLIRContext *context,
+                              TypeConverter &typeConverter,
+                              SymbolTable &importSymbols,
+                              OwningRewritePatternList &patterns) {
   patterns.insert<VMLAConstantOpConversion>(context, typeConverter);
   patterns.insert<EraseNonVMOp>(Shape::ConstRankedShapeOp::getOperationName(),
                                 context);
@@ -275,6 +277,7 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::CmpOp, "vmla.cmp");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::SelectOp, "vmla.select");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::FiniteOp, "vmla.finite");
 
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::CopyOp, "vmla.copy");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TransposeOp, "vmla.transpose");
@@ -283,6 +286,7 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::GatherOp, "vmla.gather");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::ScatterOp, "vmla.scatter");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::BroadcastOp, "vmla.broadcast");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::IotaOp, "vmla.iota");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TileOp, "vmla.tile");
 
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::NotOp, "vmla.not");
@@ -340,11 +344,20 @@ namespace {
 class ConvertVMLAToVMPass
     : public PassWrapper<ConvertVMLAToVMPass, OperationPass<ModuleOp>> {
  public:
+  ConvertVMLAToVMPass()
+      : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
+  explicit ConvertVMLAToVMPass(IREE::VM::TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREEDialect, IREE::VM::VMDialect>();
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
-    VMTypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter(targetOptions_);
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
@@ -355,11 +368,11 @@ class ConvertVMLAToVMPass
         innerModuleOp);
 
     OwningRewritePatternList conversionPatterns;
-    populateStandardToVMPatterns(context, conversionPatterns);
+    populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);
-    populateVMLAToVMPatterns(context, importSymbols, conversionPatterns,
-                             typeConverter);
+    populateVMLAToVMPatterns(context, typeConverter, importSymbols,
+                             conversionPatterns);
 
     // Usually shape conversion patterns come in at a higher level, but for
     // this standalone pass, they must be provided directly.
@@ -371,12 +384,16 @@ class ConvertVMLAToVMPass
       return signalPassFailure();
     }
   }
+
+ private:
+  IREE::VM::TargetOptions targetOptions_;
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertVMLAToVMPass() {
-  return std::make_unique<ConvertVMLAToVMPass>();  // NOLINT
+std::unique_ptr<OperationPass<ModuleOp>> createConvertVMLAToVMPass(
+    IREE::VM::TargetOptions targetOptions) {
+  return std::make_unique<ConvertVMLAToVMPass>(targetOptions);
 }
 
 static PassRegistration<ConvertVMLAToVMPass> pass(

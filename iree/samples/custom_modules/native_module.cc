@@ -14,11 +14,11 @@
 
 #include "iree/samples/custom_modules/native_module.h"
 
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/base/api_util.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/module_abi_cc.h"
@@ -53,6 +53,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_custom_message, iree_custom_message_t);
 iree_status_t iree_custom_message_create(iree_string_view_t value,
                                          iree_allocator_t allocator,
                                          iree_custom_message_t** out_message) {
+  IREE_ASSERT_ARGUMENT(out_message);
   // Note that we allocate the message and the string value together.
   iree_custom_message_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
@@ -63,12 +64,13 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
   message->value.size = value.size;
   memcpy((void*)message->value.data, value.data, message->value.size);
   *out_message = message;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 iree_status_t iree_custom_message_wrap(iree_string_view_t value,
                                        iree_allocator_t allocator,
                                        iree_custom_message_t** out_message) {
+  IREE_ASSERT_ARGUMENT(out_message);
   iree_custom_message_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_message_t), (void**)&message));
@@ -76,7 +78,7 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
   message->allocator = allocator;
   message->value = value;  // Unowned.
   *out_message = message;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 void iree_custom_message_destroy(void* ptr) {
@@ -87,17 +89,20 @@ void iree_custom_message_destroy(void* ptr) {
 iree_status_t iree_custom_message_read_value(iree_custom_message_t* message,
                                              char* buffer,
                                              size_t buffer_capacity) {
+  IREE_ASSERT_ARGUMENT(message);
+  IREE_ASSERT_ARGUMENT(buffer);
   if (buffer_capacity < message->value.size + 1) {
-    return IREE_STATUS_OUT_OF_RANGE;
+    // Not an error; just a size query.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
   memcpy(buffer, message->value.data, message->value.size);
   buffer[message->value.size] = 0;
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 iree_status_t iree_custom_native_module_register_types() {
   if (iree_custom_message_descriptor.type) {
-    return IREE_STATUS_OK;  // Already registered.
+    return iree_ok_status();  // Already registered.
   }
   iree_custom_message_descriptor.type_name =
       iree_make_cstring_view("custom.message");
@@ -130,16 +135,14 @@ class CustomModuleState final {
   Status Initialize(int32_t unique_id) {
     // Allocate a unique ID to demonstrate per-context state.
     auto str_buffer = "ctx_" + std::to_string(unique_id);
-    RETURN_IF_ERROR(FromApiStatus(
+    IREE_RETURN_IF_ERROR(
         iree_custom_message_create(iree_make_cstring_view(str_buffer.c_str()),
-                                   allocator_, &unique_message_),
-        IREE_LOC));
+                                   allocator_, &unique_message_));
 
     // Setup a host-local allocator we can use because this sample doesn't have
     // a real device allocator.
-    RETURN_IF_ERROR(FromApiStatus(iree_hal_allocator_create_host_local(
-                                      allocator_, &host_local_allocator_),
-                                  IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_create_host_local(
+        allocator_, &host_local_allocator_));
 
     return OkStatus();
   }
@@ -157,17 +160,13 @@ class CustomModuleState final {
           string_value.size() + 1, &string_value[0], &actual_length);
       string_value.resize(actual_length);
     } while (iree_status_is_out_of_range(status));
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC);
-    }
+    IREE_RETURN_IF_ERROR(std::move(status));
 
     // Pack the string contents into a message.
     vm::ref<iree_custom_message_t> message;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_custom_message_create(
-            iree_string_view_t{string_value.data(), string_value.size()},
-            IREE_ALLOCATOR_SYSTEM, &message),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_custom_message_create(
+        iree_string_view_t{string_value.data(), string_value.size()},
+        iree_allocator_system(), &message));
     return std::move(message);
   }
 
@@ -178,13 +177,10 @@ class CustomModuleState final {
     auto input_string =
         absl::string_view(message->value.data, message->value.size);
     vm::ref<iree_hal_buffer_view_t> buffer_view;
-    iree_status_t status = iree_hal_buffer_view_parse(
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
         iree_string_view_t{input_string.data(), input_string.size()},
-        host_local_allocator_.get(), allocator_, &buffer_view);
-    if (!iree_status_is_ok(status)) {
-      return FromApiStatus(status, IREE_LOC)
-             << "Parsing value '" << input_string << "'";
-    }
+        host_local_allocator_.get(), allocator_, &buffer_view))
+        << "Parsing value '" << input_string << "'";
     return std::move(buffer_view);
   }
 
@@ -202,10 +198,8 @@ class CustomModuleState final {
   StatusOr<vm::ref<iree_custom_message_t>> Reverse(
       vm::ref<iree_custom_message_t> message) {
     vm::ref<iree_custom_message_t> reversed_message;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_custom_message_create(message->value, message->allocator,
-                                   &reversed_message),
-        IREE_LOC));
+    IREE_RETURN_IF_ERROR(iree_custom_message_create(
+        message->value, message->allocator, &reversed_message));
     char* str_ptr = const_cast<char*>(reversed_message->value.data);
     for (int low = 0, high = reversed_message->value.size - 1; low < high;
          ++low, --high) {
@@ -224,7 +218,7 @@ class CustomModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = IREE_ALLOCATOR_SYSTEM;
+  iree_allocator_t allocator_ = iree_allocator_system();
 
   // HAL buffer allocator that uses host-local memory. This is just for this
   // test as we don't actually use a HAL device and don't have a real device
@@ -272,7 +266,7 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
   StatusOr<std::unique_ptr<CustomModuleState>> CreateState(
       iree_allocator_t allocator) override {
     auto state = std::make_unique<CustomModuleState>(allocator);
-    RETURN_IF_ERROR(state->Initialize(next_unique_id_++));
+    IREE_RETURN_IF_ERROR(state->Initialize(next_unique_id_++));
     return state;
   }
 
@@ -289,16 +283,13 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t iree_custom_native_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
       "custom", allocator, absl::MakeConstSpan(kCustomModuleFunctions));
-  auto status = module->Initialize();
-  if (!status.ok()) {
-    return ToApiStatus(status);
-  }
+  IREE_RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return iree_ok_status();
 }
 
 }  // namespace samples

@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if(NOT ${IREE_HAL_DRIVER_DYLIB})
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -88,7 +92,6 @@ iree_cc_library(
     "dylib_executable_cache.cc"
   DEPS
     ::dylib_executable
-    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::executable

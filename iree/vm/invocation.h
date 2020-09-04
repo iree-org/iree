@@ -29,8 +29,6 @@ extern "C" {
 typedef struct iree_vm_invocation iree_vm_invocation_t;
 typedef struct iree_vm_invocation_policy iree_vm_invocation_policy_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Synchronously invokes a function in the VM.
 //
 // |policy| is used to schedule the invocation relative to other pending or
@@ -93,8 +91,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invocation_await(
 // A no-op if the invocation has already completed.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_invocation_abort(iree_vm_invocation_t* invocation);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

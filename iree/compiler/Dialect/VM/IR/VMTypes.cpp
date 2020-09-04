@@ -64,11 +64,11 @@ bool ListType::isCompatible(Type type) {
 }
 
 ListType ListType::get(Type elementType) {
-  return Base::get(elementType.getContext(), TypeKind::List, elementType);
+  return Base::get(elementType.getContext(), elementType);
 }
 
 ListType ListType::getChecked(Type elementType, Location location) {
-  return Base::getChecked(location, TypeKind::List, elementType);
+  return Base::getChecked(location, elementType);
 }
 
 Type ListType::getElementType() { return getImpl()->elementType; }
@@ -111,11 +111,11 @@ bool RefType::isCompatible(Type type) {
 }
 
 RefType RefType::get(Type objectType) {
-  return Base::get(objectType.getContext(), TypeKind::Ref, objectType);
+  return Base::get(objectType.getContext(), objectType);
 }
 
 RefType RefType::getChecked(Type objectType, Location location) {
-  return Base::getChecked(location, TypeKind::Ref, objectType);
+  return Base::getChecked(location, objectType);
 }
 
 Type RefType::getObjectType() { return getImpl()->objectType; }

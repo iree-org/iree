@@ -48,22 +48,21 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
                                                    if (file) fclose(file);
                                                  }};
   if (file == nullptr) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno, absl::StrCat("Failed to open file '", path, "'"), IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to open file '" << path << "'";
   }
   if (std::fseek(file.get(), 0, SEEK_END) == -1) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno, absl::StrCat("Failed to seek file '", path, "'"), IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to seek file '" << path << "'";
   }
   size_t file_size = std::ftell(file.get());
   if (file_size == -1L) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno, absl::StrCat("Failed to read file length '", path, "'"),
-        IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to read file length for '" << path << "'";
   }
   if (std::fseek(file.get(), 0, SEEK_SET) == -1) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno, absl::StrCat("Failed to seek file '", path, "'"), IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to seek back in file '" << path << "'";
   }
   std::string contents;
   contents.resize(file_size);
@@ -82,8 +81,8 @@ Status SetFileContents(const std::string& path, absl::string_view content) {
                                                    if (file) fclose(file);
                                                  }};
   if (file == nullptr) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno, absl::StrCat("Failed to open file '", path, "'"), IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to open file '" << path << "'";
   }
   if (std::fwrite(const_cast<char*>(content.data()), content.size(), 1,
                   file.get()) != 1) {
@@ -96,8 +95,8 @@ Status SetFileContents(const std::string& path, absl::string_view content) {
 Status DeleteFile(const std::string& path) {
   IREE_TRACE_SCOPE0("file_io::DeleteFile");
   if (::remove(path.c_str()) == -1) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno, absl::StrCat("Failed to delete file '", path, "'"), IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to delete file '" << path << "'";
   }
   return OkStatus();
 }
@@ -106,11 +105,9 @@ Status MoveFile(const std::string& source_path,
                 const std::string& destination_path) {
   IREE_TRACE_SCOPE0("file_io::MoveFile");
   if (::rename(source_path.c_str(), destination_path.c_str()) == -1) {
-    return ErrnoToCanonicalStatusBuilder(
-        errno,
-        absl::StrCat("Failed to rename file '", source_path, "' to '",
-                     destination_path, "'"),
-        IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to rename file '" << source_path << "' to '"
+           << destination_path << "'";
   }
   return OkStatus();
 }
@@ -142,11 +139,9 @@ StatusOr<std::string> GetTempFile(absl::string_view base_name) {
   if (::mkstemp(&template_path[0]) != -1) {
     return template_path;  // Should have been modified by mkstemp.
   } else {
-    return ErrnoToCanonicalStatusBuilder(
-        errno,
-        absl::StrCat("Failed to create temp file with template '",
-                     template_path, "'"),
-        IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(errno, IREE_LOC)
+           << "Failed to create temp file with template '" << template_path
+           << "'";
   }
 }
 

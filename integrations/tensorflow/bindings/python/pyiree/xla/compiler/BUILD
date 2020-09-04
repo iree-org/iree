@@ -92,6 +92,7 @@ iree_py_test(
     srcs = ["xla_module_proto_test.py"],
     python_version = "PY3",
     tags = [
+        "manual",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [

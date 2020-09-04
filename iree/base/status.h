@@ -15,18 +15,8 @@
 #ifndef IREE_BASE_STATUS_H_
 #define IREE_BASE_STATUS_H_
 
-#if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/base/google_internal/status_google.h"
-#else
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
-#include "iree/base/internal/status_errno.h"
-#include "iree/base/internal/status_errors.h"
-#include "iree/base/internal/status_macros.h"
-#include "iree/base/internal/status_win32_errors.h"
 #include "iree/base/internal/statusor.h"
-#endif  // IREE_CONFIG_GOOGLE_INTERNAL
-
-#include "iree/base/source_location.h"  // IWYU pragma: export
 
 #endif  // IREE_BASE_STATUS_H_

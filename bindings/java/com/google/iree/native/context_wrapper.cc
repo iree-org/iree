@@ -14,8 +14,9 @@
 
 #include "bindings/java/com/google/iree/native/context_wrapper.h"
 
-#include "iree/base/api_util.h"
+#include "iree/base/api.h"
 #include "iree/base/logging.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 namespace java {
@@ -34,47 +35,109 @@ std::vector<iree_vm_module_t*> GetModulesFromModuleWrappers(
 }  // namespace
 
 Status ContextWrapper::Create(const InstanceWrapper& instance_wrapper) {
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_context_create(instance_wrapper.instance(),
-                                           IREE_ALLOCATOR_SYSTEM, &context_),
-                    IREE_LOC));
-  RETURN_IF_ERROR(CreateDefaultModules());
+  IREE_RETURN_IF_ERROR(iree_vm_context_create(
+      instance_wrapper.instance(), iree_allocator_system(), &context_));
+  IREE_RETURN_IF_ERROR(CreateDefaultModules());
   std::vector<iree_vm_module_t*> default_modules = {hal_module_};
-  return FromApiStatus(
-      iree_vm_context_register_modules(context_, default_modules.data(),
-                                       default_modules.size()),
-      IREE_LOC);
+  IREE_RETURN_IF_ERROR(iree_vm_context_register_modules(
+      context_, default_modules.data(), default_modules.size()));
+  return OkStatus();
 }
 
 Status ContextWrapper::CreateWithModules(
     const InstanceWrapper& instance_wrapper,
     const std::vector<ModuleWrapper*>& module_wrappers) {
   auto modules = GetModulesFromModuleWrappers(module_wrappers);
-  RETURN_IF_ERROR(CreateDefaultModules());
+  IREE_RETURN_IF_ERROR(CreateDefaultModules());
 
   // The ordering of modules matters, so default modules need to be at the
   // beginning of the vector.
   modules.insert(modules.begin(), hal_module_);
 
-  return FromApiStatus(iree_vm_context_create_with_modules(
-                           instance_wrapper.instance(), modules.data(),
-                           modules.size(), IREE_ALLOCATOR_SYSTEM, &context_),
-                       IREE_LOC);
+  IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
+      instance_wrapper.instance(), modules.data(), modules.size(),
+      iree_allocator_system(), &context_));
+  return OkStatus();
 }
 
 Status ContextWrapper::RegisterModules(
     const std::vector<ModuleWrapper*>& module_wrappers) {
   auto modules = GetModulesFromModuleWrappers(module_wrappers);
-  return FromApiStatus(iree_vm_context_register_modules(
-                           context_, modules.data(), modules.size()),
-                       IREE_LOC);
+  IREE_RETURN_IF_ERROR(iree_vm_context_register_modules(
+      context_, modules.data(), modules.size()));
+  return OkStatus();
 }
 
-Status ContextWrapper::ResolveFunction(const FunctionWrapper& function_wrapper,
-                                       iree_string_view_t name) {
-  return FromApiStatus(iree_vm_context_resolve_function(
-                           context_, name, function_wrapper.function()),
-                       IREE_LOC);
+Status ContextWrapper::ResolveFunction(iree_string_view_t name,
+                                       FunctionWrapper* function_wrapper) {
+  return iree_vm_context_resolve_function(context_, name,
+                                          function_wrapper->function());
+}
+
+Status ContextWrapper::InvokeFunction(const FunctionWrapper& function_wrapper,
+                                      const std::vector<float*>& inputs,
+                                      int input_element_count, float* output) {
+  vm::ref<iree_vm_list_t> input_list;
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(
+      /*element_type=*/nullptr, input_element_count, iree_allocator_system(),
+      &input_list));
+
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(device_);
+  iree_hal_memory_type_t input_memory_type =
+      static_cast<iree_hal_memory_type_t>(IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                                          IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
+  iree_hal_buffer_usage_t input_buffer_usage =
+      static_cast<iree_hal_buffer_usage_t>(IREE_HAL_BUFFER_USAGE_ALL |
+                                           IREE_HAL_BUFFER_USAGE_CONSTANT);
+
+  for (auto input : inputs) {
+    // Write the input into a mappable buffer.
+    iree_hal_buffer_t* input_buffer = nullptr;
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+        allocator, input_memory_type, input_buffer_usage,
+        sizeof(float) * input_element_count, &input_buffer));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_write_data(
+        input_buffer, 0, input, input_element_count * sizeof(float)));
+
+    // Wrap the input buffers in buffer views.
+    iree_hal_buffer_view_t* input_buffer_view = nullptr;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+        input_buffer, /*shape=*/&input_element_count,
+        /*shape_rank=*/1, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        iree_allocator_system(), &input_buffer_view));
+    iree_hal_buffer_release(input_buffer);
+
+    // Marshal the input buffer views through the input VM variant list.
+    auto input_buffer_view_ref =
+        iree_hal_buffer_view_move_ref(input_buffer_view);
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_push_ref_move(input_list.get(), &input_buffer_view_ref));
+  }
+
+  // Prepare outputs list to accept results from the invocation.
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
+                                           4 * sizeof(float),
+                                           iree_allocator_system(), &outputs));
+
+  // Synchronously invoke the function.
+  IREE_RETURN_IF_ERROR(iree_vm_invoke(context_, *function_wrapper.function(),
+                                      /*policy=*/nullptr, input_list.get(),
+                                      outputs.get(), iree_allocator_system()));
+
+  // Read back the results into the given output buffer.
+  auto* output_buffer_view =
+      reinterpret_cast<iree_hal_buffer_view_t*>(iree_vm_list_get_ref_deref(
+          outputs.get(), 0, iree_hal_buffer_view_get_descriptor()));
+  auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
+  iree_hal_mapped_memory_t mapped_memory;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map(output_buffer,
+                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                           IREE_WHOLE_BUFFER, &mapped_memory));
+  memcpy(output, mapped_memory.contents.data,
+         mapped_memory.contents.data_length);
+  iree_hal_buffer_unmap(output_buffer, &mapped_memory);
+  return OkStatus();
 }
 
 int ContextWrapper::id() const { return iree_vm_context_id(context_); }
@@ -88,16 +151,13 @@ ContextWrapper::~ContextWrapper() {
 
 // TODO(jennik): Also create default string and tensorlist modules.
 Status ContextWrapper::CreateDefaultModules() {
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_driver_registry_create_driver(iree_make_cstring_view("vmla"),
-                                             IREE_ALLOCATOR_SYSTEM, &driver_),
-      IREE_LOC));
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_driver_create_default_device(
-                                    driver_, IREE_ALLOCATOR_SYSTEM, &device_),
-                                IREE_LOC));
-  return FromApiStatus(
-      iree_hal_module_create(device_, IREE_ALLOCATOR_SYSTEM, &hal_module_),
-      IREE_LOC);
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
+      iree_make_cstring_view("vmla"), iree_allocator_system(), &driver_));
+  IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
+      driver_, iree_allocator_system(), &device_));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
+  return OkStatus();
 }
 
 }  // namespace java

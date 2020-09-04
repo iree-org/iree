@@ -123,8 +123,8 @@ struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
     SmallVector<int32_t, 4> padding{0, 0, 0, 0};
     SmallVector<int32_t, 4> lhsDilation{1, 1};
     SmallVector<int32_t, 4> rhsDilation{1, 1};
-    int32_t featureGroupCount = op.feature_group_count().getZExtValue();
-    int32_t batchGroupCount = op.batch_group_count().getZExtValue();
+    int32_t featureGroupCount = op.feature_group_count();
+    int32_t batchGroupCount = op.batch_group_count();
 
     auto fill_optional = [](auto filed, SmallVector<int32_t, 4> *vec) {
       if (filed.hasValue()) {

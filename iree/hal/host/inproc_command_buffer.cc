@@ -45,7 +45,7 @@ Status InProcCommandBuffer::ExecutionBarrier(
     absl::Span<const MemoryBarrier> memory_barriers,
     absl::Span<const BufferBarrier> buffer_barriers) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::ExecutionBarrier");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<ExecutionBarrierCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<ExecutionBarrierCmd>());
   cmd->source_stage_mask = source_stage_mask;
   cmd->target_stage_mask = target_stage_mask;
   cmd->memory_barriers = AppendStructSpan(memory_barriers);
@@ -56,7 +56,7 @@ Status InProcCommandBuffer::ExecutionBarrier(
 Status InProcCommandBuffer::SignalEvent(
     Event* event, ExecutionStageBitfield source_stage_mask) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::SignalEvent");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<SignalEventCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<SignalEventCmd>());
   cmd->event = event;
   cmd->source_stage_mask = source_stage_mask;
   return OkStatus();
@@ -65,7 +65,7 @@ Status InProcCommandBuffer::SignalEvent(
 Status InProcCommandBuffer::ResetEvent(
     Event* event, ExecutionStageBitfield source_stage_mask) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::ResetEvent");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<ResetEventCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<ResetEventCmd>());
   cmd->event = event;
   cmd->source_stage_mask = source_stage_mask;
   return OkStatus();
@@ -77,7 +77,7 @@ Status InProcCommandBuffer::WaitEvents(
     absl::Span<const MemoryBarrier> memory_barriers,
     absl::Span<const BufferBarrier> buffer_barriers) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::WaitEvents");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<WaitEventsCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<WaitEventsCmd>());
   cmd->events = AppendStructSpan(events);
   cmd->source_stage_mask = source_stage_mask;
   cmd->target_stage_mask = target_stage_mask;
@@ -92,7 +92,7 @@ Status InProcCommandBuffer::FillBuffer(Buffer* target_buffer,
                                        const void* pattern,
                                        size_t pattern_length) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::FillBuffer");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<FillBufferCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<FillBufferCmd>());
   cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
   cmd->length = length;
@@ -103,7 +103,7 @@ Status InProcCommandBuffer::FillBuffer(Buffer* target_buffer,
 
 Status InProcCommandBuffer::DiscardBuffer(Buffer* buffer) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::DiscardBuffer");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DiscardBufferCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DiscardBufferCmd>());
   cmd->buffer = buffer;
   return OkStatus();
 }
@@ -114,7 +114,7 @@ Status InProcCommandBuffer::UpdateBuffer(const void* source_buffer,
                                          device_size_t target_offset,
                                          device_size_t length) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::UpdateBuffer");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<UpdateBufferCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<UpdateBufferCmd>());
   cmd->source_buffer = AppendCmdData(source_buffer, source_offset, length);
   cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
@@ -128,7 +128,7 @@ Status InProcCommandBuffer::CopyBuffer(Buffer* source_buffer,
                                        device_size_t target_offset,
                                        device_size_t length) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::CopyBuffer");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<CopyBufferCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<CopyBufferCmd>());
   cmd->source_buffer = source_buffer;
   cmd->source_offset = source_offset;
   cmd->target_buffer = target_buffer;
@@ -141,7 +141,7 @@ Status InProcCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
                                           size_t offset,
                                           absl::Span<const uint32_t> values) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::PushConstants");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushConstantsCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushConstantsCmd>());
   cmd->executable_layout = executable_layout;
   cmd->offset = offset;
   cmd->values = AppendStructSpan(values);
@@ -152,7 +152,7 @@ Status InProcCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     absl::Span<const DescriptorSet::Binding> bindings) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::PushDescriptorSet");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushDescriptorSetCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushDescriptorSetCmd>());
   cmd->executable_layout = executable_layout;
   cmd->set = set;
   cmd->bindings = AppendStructSpan(bindings);
@@ -164,7 +164,7 @@ Status InProcCommandBuffer::BindDescriptorSet(
     DescriptorSet* descriptor_set,
     absl::Span<const device_size_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::BindDescriptorSet");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<BindDescriptorSetCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<BindDescriptorSetCmd>());
   cmd->executable_layout = executable_layout;
   cmd->set = set;
   cmd->descriptor_set = descriptor_set;
@@ -176,7 +176,7 @@ Status InProcCommandBuffer::Dispatch(Executable* executable,
                                      int32_t entry_point,
                                      std::array<uint32_t, 3> workgroups) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::Dispatch");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchCmd>());
   cmd->executable = executable;
   cmd->entry_point = entry_point;
   cmd->workgroups = workgroups;
@@ -188,7 +188,7 @@ Status InProcCommandBuffer::DispatchIndirect(Executable* executable,
                                              Buffer* workgroups_buffer,
                                              device_size_t workgroups_offset) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::DispatchIndirect");
-  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchIndirectCmd>());
+  IREE_ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchIndirectCmd>());
   cmd->executable = executable;
   cmd->entry_point = entry_point;
   cmd->workgroups_buffer = workgroups_buffer;
@@ -233,7 +233,7 @@ void* InProcCommandBuffer::AppendCmdData(const void* source_buffer,
 Status InProcCommandBuffer::Process(CommandBuffer* command_processor) const {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::Process");
 
-  RETURN_IF_ERROR(command_processor->Begin());
+  IREE_RETURN_IF_ERROR(command_processor->Begin());
 
   // Process each command in the order they were recorded.
   auto* cmd_list = &current_cmd_list_;
@@ -248,7 +248,7 @@ Status InProcCommandBuffer::Process(CommandBuffer* command_processor) const {
     }
   }
 
-  RETURN_IF_ERROR(command_processor->End());
+  IREE_RETURN_IF_ERROR(command_processor->End());
 
   return OkStatus();
 }

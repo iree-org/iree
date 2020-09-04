@@ -32,8 +32,8 @@ cc_library(
     ],
     deps = [
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
+        "//iree/testing:gtest",
 
         # HAL driver modules.
         "//iree/hal/dylib:dylib_driver_module",  # build-cleaner: keep
@@ -49,9 +49,9 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -61,9 +61,9 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -73,9 +73,9 @@ cc_test(
     deps = [
         ":cts_test_base",
         "//iree/base:status",
-        "//iree/base:status_matchers",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -86,6 +86,7 @@ cc_test(
         ":cts_test_base",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -96,5 +97,6 @@ cc_test(
         ":cts_test_base",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )

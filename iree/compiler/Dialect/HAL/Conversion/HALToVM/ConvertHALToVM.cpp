@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -96,15 +97,24 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
+// A pass converting the IREE HAL dialect into the IREE VM dialect.
 class ConvertHALToVMPass
     : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
+  ConvertHALToVMPass()
+      : targetOptions_(IREE::VM::getTargetOptionsFromFlags()) {}
+  explicit ConvertHALToVMPass(IREE::VM::TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREEDialect, IREE::VM::VMDialect>();
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
-    VMTypeConverter typeConverter;
+    IREE::VM::TypeConverter typeConverter(targetOptions_);
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
@@ -115,7 +125,7 @@ class ConvertHALToVMPass
         innerModuleOp);
 
     OwningRewritePatternList conversionPatterns;
-    populateStandardToVMPatterns(context, conversionPatterns);
+    populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);
     populateHALToVMPatterns(context, importSymbols, conversionPatterns,
@@ -127,12 +137,16 @@ class ConvertHALToVMPass
       return signalPassFailure();
     }
   }
+
+ private:
+  IREE::VM::TargetOptions targetOptions_;
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass() {
-  return std::make_unique<ConvertHALToVMPass>();  // NOLINT
+std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
+    IREE::VM::TargetOptions targetOptions) {
+  return std::make_unique<ConvertHALToVMPass>(targetOptions);
 }
 
 static PassRegistration<ConvertHALToVMPass> pass(

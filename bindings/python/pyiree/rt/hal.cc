@@ -32,7 +32,7 @@ class HalMappedMemory {
   ~HalMappedMemory() {
     if (bv_) {
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv_);
-      CHECK_EQ(iree_hal_buffer_unmap(buffer, &mapped_memory_), IREE_STATUS_OK);
+      IREE_CHECK_OK(iree_hal_buffer_unmap(buffer, &mapped_memory_));
       iree_hal_buffer_view_release(bv_);
     }
   }
@@ -95,7 +95,7 @@ std::vector<std::string> HalDriver::Query() {
   iree_string_view_t* driver_names;
   iree_host_size_t driver_count;
   CheckApiStatus(iree_hal_driver_registry_query_available_drivers(
-                     IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count),
+                     iree_allocator_system(), &driver_names, &driver_count),
                  "Error querying drivers");
 
   std::vector<std::string> drivers;
@@ -111,7 +111,7 @@ HalDriver HalDriver::Create(const std::string& driver_name) {
   iree_hal_driver_t* driver;
   CheckApiStatus(iree_hal_driver_registry_create_driver(
                      {driver_name.data(), driver_name.size()},
-                     IREE_ALLOCATOR_SYSTEM, &driver),
+                     iree_allocator_system(), &driver),
                  "Error creating driver");
   return HalDriver::CreateRetained(driver);
 }
@@ -119,7 +119,7 @@ HalDriver HalDriver::Create(const std::string& driver_name) {
 HalDevice HalDriver::CreateDefaultDevice() {
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_default_device(
-                     raw_ptr(), IREE_ALLOCATOR_SYSTEM, &device),
+                     raw_ptr(), iree_allocator_system(), &device),
                  "Error creating default device");
   return HalDevice::CreateRetained(device);
 }

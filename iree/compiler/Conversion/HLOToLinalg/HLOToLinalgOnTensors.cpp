@@ -44,6 +44,10 @@ namespace {
 
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     populateHLOToLinalgOnTensorsConversionPatterns(&getContext(), patterns);
@@ -56,13 +60,13 @@ struct ConvertHLOToLinalgOnTensorsPass
     // Don't convert the body of reduction ops.
     target.addDynamicallyLegalDialect<mhlo::MhloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
-            [](Operation* op) {
+            [](Operation *op) {
               auto parentOp = op->getParentRegion()->getParentOp();
               return isa<mhlo::ReduceOp>(parentOp) ||
                      isa<mhlo::ReduceWindowOp>(parentOp);
             }));
     // Let the rest fall through.
-    target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
+    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
     if (failed(applyPartialConversion(getFunction(), target, patterns))) {
       signalPassFailure();
@@ -73,7 +77,7 @@ struct ConvertHLOToLinalgOnTensorsPass
 }  // namespace
 
 void populateHLOToLinalgOnTensorsConversionPatterns(
-    MLIRContext* context, OwningRewritePatternList& patterns) {
+    MLIRContext *context, OwningRewritePatternList &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
 }
 

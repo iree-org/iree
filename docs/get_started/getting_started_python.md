@@ -10,7 +10,7 @@ Python bindings you must build from source.
 ## Prerequisites
 
 You should already have IREE cloned and building on your machine. See the other
-[getting started guides](.) for instructions.
+[getting started guides](../get-started) for instructions.
 
 > Note:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Support is best with Bazel.
@@ -62,7 +62,7 @@ $ bazel test \
 
 See
 [start_colab_kernel.py](https://github.com/google/iree/blob/main/colab/start_colab_kernel.py)
-and [Using Colab](https://github.com/google/iree/blob/main/docs/using_colab.md)
-for setup instructions, then take a look through the
+and [Using Colab](../using_iree/using_colab.md) for setup instructions, then
+take a look through the
 [Colab directory](https://github.com/google/iree/tree/main/colab) for some
 sample notebooks.

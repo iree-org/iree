@@ -14,7 +14,7 @@
 
 # Test coverage across backends for e2e tests is defined directly in the BUILD
 # files. A coverage table generated from this file can be viewed here:
-#   https://google.github.io/iree/TensorFlowE2ECoverage
+#   https://google.github.io/iree/tf-e2e-coverage
 # Updates made to test suite names should also be reflected here:
 #   https://github.com/google/iree/blob/main/scripts/update_e2e_coverage.py
 
@@ -66,12 +66,15 @@ VMLA_FAILING = [
 
 # keep sorted
 LLVM_FAILING = [
+    "broadcast_to_test.py",
     "broadcasting_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "finite_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
+    "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
     "strings_test.py",
@@ -79,16 +82,18 @@ LLVM_FAILING = [
 
 # keep sorted
 VULKAN_FAILING = [
+    "bool_test.py",
+    "broadcast_to_test.py",
     "broadcasting_test.py",
-    "control_flow_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "finite_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_test.py",
+    "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "sliding_window_test.py",  # TODO(#2659) Failing on nvidia, passing on swiftshader.
     "strings_test.py",
 ]
 

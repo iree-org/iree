@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS")
+load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT ${IREE_TARGET_BACKEND_VMLA} OR NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV}
+   OR NOT ${IREE_HAL_DRIVER_VMLA} OR NOT ${IREE_HAL_DRIVER_VULKAN})
+  return()
+endif()
+""",
 )
 
 iree_bytecode_module(
@@ -42,16 +51,18 @@ cc_test(
     tags = ["driver=vulkan"],
     deps = [
         ":simple_embedding_test_bytecode_module_cc",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
         "//iree/base:api",
-        "//iree/base:api_util",
         "//iree/base:logging",
         "//iree/hal:api",
         "//iree/modules/hal",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.

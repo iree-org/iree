@@ -41,6 +41,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -67,9 +68,9 @@ bool canSeparateOps(ArrayRef<Operation *> ops) {
   for (auto currOp = ops.begin(), nextOp = std::next(ops.begin());
        nextOp != ops.end(); ++currOp, ++nextOp) {
     Operation *iter = (*currOp)->getNextNode();
-    while (isa<linalg::ReshapeOp, SubViewOp>(iter)) {
+    while (iter != *nextOp && (MemoryEffectOpInterface::hasNoEffect(iter) ||
+                               isa<IREE::PlaceholderOp>(iter)))
       iter = iter->getNextNode();
-    }
     if (iter != *nextOp) return false;
   }
 
@@ -150,10 +151,10 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   // there is nothing to do.
   Block &fnBody = oldFn.getBlocks().front();
 
-  // Collect all Linalg and scf.parallel ops for distributing.
+  // Collect all Linalg and scf.parallel ops for splitting.
   SmallVector<Operation *, 4> separableOps;
   for (Operation &op : fnBody)
-    if (isa<linalg::LinalgOp>(op) || isa<scf::ParallelOp>(op))
+    if (isa<linalg::LinalgOp, scf::ParallelOp, scf::ForOp>(op))
       separableOps.push_back(&op);
 
   if (separableOps.size() <= 1) return success();

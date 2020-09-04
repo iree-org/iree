@@ -76,7 +76,8 @@ Status NativeTimelineSemaphore::Signal(uint64_t value) {
   signal_info.semaphore = handle_;
   signal_info.value = value;
   return VkResultToStatus(logical_device_->syms()->vkSignalSemaphore(
-      *logical_device_, &signal_info));
+                              *logical_device_, &signal_info),
+                          IREE_LOC);
 }
 
 void NativeTimelineSemaphore::Fail(Status status) {
@@ -130,13 +131,13 @@ Status NativeTimelineSemaphore::Wait(uint64_t value, Time deadline_ns) {
       *logical_device_, &wait_info, timeout_ns);
   if (result == VK_ERROR_DEVICE_LOST) {
     // Nothing we do now matters.
-    return VkResultToStatus(result);
+    return VkResultToStatus(result, IREE_LOC);
   } else if (result == VK_TIMEOUT) {
     return DeadlineExceededErrorBuilder(IREE_LOC)
            << "Deadline exceeded waiting for semaphore";
   }
 
-  return VkResultToStatus(result);
+  return VkResultToStatus(result, IREE_LOC);
 }
 
 }  // namespace vulkan

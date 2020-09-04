@@ -19,6 +19,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <vector>
+
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
@@ -81,6 +83,8 @@ InstanceExtensions PopulateEnabledInstanceExtensions(
 struct DeviceExtensions {
   // VK_KHR_push_descriptor is enabled and vkCmdPushDescriptorSetKHR is valid.
   bool push_descriptors : 1;
+  // VK_KHR_timeline_semaphore is enabled.
+  bool timeline_semaphore : 1;
 };
 
 // Returns a bitfield with all of the provided extension names.

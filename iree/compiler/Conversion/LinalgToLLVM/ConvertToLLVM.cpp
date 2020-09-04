@@ -130,9 +130,8 @@ class RemoveMakeRankedShape : public ConvertToLLVMPattern {
 /// `bOp`. Note that this ignores the offset.
 bool operator<(IREE::HAL::InterfaceBindingOp aOp,
                IREE::HAL::InterfaceBindingOp bOp) {
-  if (aOp.set().getZExtValue() == bOp.set().getZExtValue())
-    return aOp.binding().getZExtValue() < bOp.binding().getZExtValue();
-  return aOp.set().getZExtValue() < bOp.set().getZExtValue();
+  if (aOp.set() == bOp.set()) return aOp.binding() < bOp.binding();
+  return aOp.set() < bOp.set();
 }
 
 // Change signature of entry function to func
@@ -305,6 +304,10 @@ class RemoveInterfaceOpPattern : public ConvertToLLVMPattern {
 namespace {
 struct ConvertToLLVMPass
     : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<LLVM::LLVMDialect>();
+  }
+
   void runOnOperation() override;
 };
 

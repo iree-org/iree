@@ -18,7 +18,6 @@
 #ifndef IREE_BASE_ALIGNMENT_H_
 #define IREE_BASE_ALIGNMENT_H_
 
-#include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
 
 #ifdef __cplusplus

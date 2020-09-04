@@ -14,6 +14,8 @@
 
 iree_add_all_subdirs()
 
+# bazel_to_cmake: DO NOT EDIT, IREE_HAL_DRIVER_MODULES is custom logic
+
 iree_cc_library(
   NAME
     cts_test_base
@@ -23,13 +25,10 @@ iree_cc_library(
     iree::tools::sanitizer_suppressions.txt
   DEPS
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
-    iree::hal::dylib::dylib_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
+    iree::testing::gtest
     iree::testing::gtest_main
+    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
   PUBLIC
 )
@@ -42,7 +41,6 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
     iree::testing::gtest
 )
@@ -55,7 +53,6 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
     iree::testing::gtest
 )
@@ -68,7 +65,6 @@ iree_cc_test(
   DEPS
     ::cts_test_base
     iree::base::status
-    iree::base::status_matchers
     iree::hal::driver_registry
     iree::testing::gtest
 )

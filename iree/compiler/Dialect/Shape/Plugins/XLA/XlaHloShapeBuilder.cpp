@@ -158,6 +158,13 @@ Value rewriteShapexRankedBroadcastInDim(RankedShapeType resultShape,
   return bidOp.result_shape();
 }
 
+Value rewriteShapexIota(RankedShapeType resultShape,
+                        iree_compiler::Shape::IotaOp iotaOp,
+                        OpBuilder &builder) {
+  if (!iotaOp) return nullptr;
+  return iotaOp.result_shape();
+}
+
 Value rewriteTranspose(RankedShapeType resultShape, TransposeOp transposeOp,
                        OpBuilder &builder) {
   if (!transposeOp) return nullptr;
@@ -329,8 +336,8 @@ Value rewriteTorchIndexSelect(RankedShapeType resultShape,
   int64_t indicesRank = indicesType.getRank();
 
   std::vector<int64_t> shape(paramsType.getShape());
-  int64_t axisValue = axis.getSExtValue();
-  int64_t batchDimValue = batchDim.getSExtValue();
+  int64_t axisValue = axis;
+  int64_t batchDimValue = batchDim;
 
   // For neg axis values, we wrap around params,
   // e.g. axis = -1 => params[:-1]
@@ -460,6 +467,7 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   b.insertOpRankedShapeBuilder<DotOp>(rewriteXlaDotOpShape);
   b.insertOpRankedShapeBuilder<RankedBroadcastInDimOp>(
       rewriteShapexRankedBroadcastInDim);
+  b.insertOpRankedShapeBuilder<iree_compiler::Shape::IotaOp>(rewriteShapexIota);
   b.insertOpRankedShapeBuilder<ReduceOp>(rewriteReduce);
   b.insertOpRankedShapeBuilder<TransposeOp>(rewriteTranspose);
   b.insertOpRankedShapeBuilder<mhlo::DotGeneralOp>(rewriteDotGeneral);

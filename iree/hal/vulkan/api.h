@@ -84,8 +84,6 @@ typedef struct iree_hal_vulkan_syms iree_hal_vulkan_syms_t;
 // iree::hal::vulkan::DynamicSymbols
 //===----------------------------------------------------------------------===//
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Loads Vulkan functions by invoking |vkGetInstanceProcAddr|.
 //
 // |vkGetInstanceProcAddr| can be obtained in whatever way suites the calling
@@ -110,13 +108,9 @@ iree_hal_vulkan_syms_create_from_system_loader(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::vulkan Extensibility Util
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // Gets the names of the Vulkan extensions used for a given set of |features|.
 //
@@ -157,13 +151,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
     iree_hal_vulkan_features_t features, iree_host_size_t layers_capacity,
     const char** out_layers, iree_host_size_t* out_layers_count);
 
-#endif  // IREE_API_NO_PROTOTYPES
-
 //===----------------------------------------------------------------------===//
 // iree::hal::vulkan::VulkanDriver
 //===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
 
 // TODO(scotttodd): Allow applications to provide their own allocators here
 
@@ -226,8 +216,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
     VkDevice logical_device, iree_hal_vulkan_queue_set_t compute_queue_set,
     iree_hal_vulkan_queue_set_t transfer_queue_set,
     iree_hal_device_t** out_device);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"

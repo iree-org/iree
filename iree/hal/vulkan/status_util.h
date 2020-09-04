@@ -23,20 +23,21 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
-// RETURN_IF_ERROR but implicitly converts the VkResult return value to
+// IREE_RETURN_IF_ERROR but implicitly converts the VkResult return value to
 // a Status.
 //
 // Usage:
 //   VK_RETURN_IF_ERROR(vkDoThing(...));
 #define VK_RETURN_IF_ERROR(expr) \
-  RETURN_IF_ERROR(::iree::hal::vulkan::VkResultToStatus(expr))
+  IREE_RETURN_IF_ERROR(::iree::hal::vulkan::VkResultToStatus(expr, IREE_LOC))
 
-// CHECK_OK but implicitly converts the VkResults return value to a
+// IREE_CHECK_OK but implicitly converts the VkResults return value to a
 // Status and checks that it is OkStatus.
 //
 // Usage:
 //   VK_CHECK_OK(vkDoThing(...));
-#define VK_CHECK_OK(expr) CHECK_OK(::iree::hal::vulkan::VkResultToStatus(expr))
+#define VK_CHECK_OK(expr) \
+  IREE_CHECK_OK(::iree::hal::vulkan::VkResultToStatus(expr, IREE_LOC))
 
 // Converts a VkResult to a Status object.
 //
@@ -78,7 +79,7 @@ namespace vulkan {
 // - VK_ERROR_NOT_PERMITTED_EXT           -> PermissionDeniedError("VK...")
 // - VK_ERROR_INVALID_DEVICE_ADDRESS_EXT  -> OutOfRangeError("VK...")
 // - VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT -> InternalError("VK...")
-Status VkResultToStatus(VkResult result);
+Status VkResultToStatus(VkResult result, SourceLocation loc);
 
 }  // namespace vulkan
 }  // namespace hal

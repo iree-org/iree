@@ -20,9 +20,9 @@
 
 #include <vector>
 
-#include "iree/base/status_matchers.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree {
 namespace hal {
@@ -50,7 +50,7 @@ TEST(BufferTest, Allocate) {
   // Data should be zeroed by default.
   std::vector<uint8_t> zero_data(buffer->allocation_size());
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(zero_data));
 }
 
@@ -73,12 +73,12 @@ TEST(BufferTest, AllocateCopy) {
 
   // Data should have been copied.
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Modify the source data and ensure it is not reflected in the buffer.
   src_data[0] = 0x88;
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Not(Eq(src_data)));
 }
 
@@ -103,8 +103,8 @@ TEST(BufferTest, AllocateCopyTyped) {
 
   // Data should have been copied.
   std::vector<int32_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(),
-                             actual_data.size() * sizeof(int32_t)));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(),
+                                  actual_data.size() * sizeof(int32_t)));
   EXPECT_THAT(actual_data, Eq(src_data));
 }
 
@@ -119,12 +119,12 @@ TEST(BufferTest, WrapConstant) {
 
   // src_data and buffer should match after the wrapping.
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Modify the source data directly.
   src_data[0] = 123;
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Attempts to modify the buffer should fail.
@@ -144,17 +144,17 @@ TEST(BufferTest, WrapMutable) {
 
   // src_data and buffer should match after the wrapping.
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Modify the source data directly.
   src_data[0] = 123;
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Modify the source data via the Buffer and ensure reflected in src_data.
   std::vector<uint8_t> new_data = {3, 2, 1, 0};
-  EXPECT_OK(buffer->WriteData(0, new_data.data(), new_data.size()));
+  IREE_EXPECT_OK(buffer->WriteData(0, new_data.data(), new_data.size()));
   EXPECT_THAT(src_data, Eq(new_data));
 }
 
@@ -187,10 +187,10 @@ TEST(BufferTest, DoesOverlap) {
                                    parent_buffer.get(), 1, 0));
 
   // Subspans should offset within their allocation.
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer_0,
-                       Buffer::Subspan(parent_buffer, 1, 2));
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer_1,
-                       Buffer::Subspan(parent_buffer, 2, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer_0,
+                            Buffer::Subspan(parent_buffer, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer_1,
+                            Buffer::Subspan(parent_buffer, 2, 2));
   EXPECT_FALSE(Buffer::DoesOverlap(subspan_buffer_0.get(), 0, 1,
                                    subspan_buffer_1.get(), 0, 1));
   EXPECT_TRUE(Buffer::DoesOverlap(subspan_buffer_0.get(), 1, 1,
@@ -216,43 +216,44 @@ TEST(BufferTest, Subspan) {
   ASSERT_TRUE(parent_buffer);
 
   // Create a subspan of the buffer.
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
-                       Buffer::Subspan(parent_buffer, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
+                            Buffer::Subspan(parent_buffer, 1, 2));
   ASSERT_TRUE(subspan_buffer);
   EXPECT_EQ(1, subspan_buffer->byte_offset());
   EXPECT_EQ(2, subspan_buffer->byte_length());
 
   // Modifications to either buffer should appear in the other.
-  EXPECT_OK(subspan_buffer->Fill8(1, kWholeBuffer, 0xFFu));
+  IREE_EXPECT_OK(subspan_buffer->Fill8(1, kWholeBuffer, 0xFFu));
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(parent_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(
+      parent_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 1, 0xFF, 3));
 
   // Subspans should be able to create subspans.
   // NOTE: offset is from the original buffer.
-  ASSERT_OK_AND_ASSIGN(auto subsubspan_buffer,
-                       Buffer::Subspan(subspan_buffer, 1, 1));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subsubspan_buffer,
+                            Buffer::Subspan(subspan_buffer, 1, 1));
   ASSERT_TRUE(subsubspan_buffer);
   EXPECT_EQ(2, subsubspan_buffer->byte_offset());
   EXPECT_EQ(1, subsubspan_buffer->byte_length());
 
   // Zero length subspans are fine.
-  ASSERT_OK_AND_ASSIGN(auto zero_subspan_buffer,
-                       Buffer::Subspan(parent_buffer, 0, 0));
+  IREE_ASSERT_OK_AND_ASSIGN(auto zero_subspan_buffer,
+                            Buffer::Subspan(parent_buffer, 0, 0));
   ASSERT_TRUE(zero_subspan_buffer);
   EXPECT_EQ(0, zero_subspan_buffer->byte_offset());
   EXPECT_EQ(0, zero_subspan_buffer->byte_length());
 
   // Subspan with kWholeBuffer should get the remaining size (or zero).
-  ASSERT_OK_AND_ASSIGN(auto whole_subspan_buffer,
-                       Buffer::Subspan(parent_buffer, 1, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(auto whole_subspan_buffer,
+                            Buffer::Subspan(parent_buffer, 1, kWholeBuffer));
   ASSERT_TRUE(whole_subspan_buffer);
   EXPECT_EQ(1, whole_subspan_buffer->byte_offset());
   EXPECT_EQ(3, whole_subspan_buffer->byte_length());
 
   // Zero length subspans are fine.
-  ASSERT_OK(Buffer::Subspan(subspan_buffer, 2, 0));
-  ASSERT_OK(Buffer::Subspan(subspan_buffer, 2, kWholeBuffer));
+  IREE_ASSERT_OK(Buffer::Subspan(subspan_buffer, 2, 0));
+  IREE_ASSERT_OK(Buffer::Subspan(subspan_buffer, 2, kWholeBuffer));
 }
 
 TEST(BufferTest, SubspanIdentity) {
@@ -277,8 +278,8 @@ TEST(BufferTest, SubspanOutOfRange) {
   ASSERT_TRUE(parent_buffer);
 
   // Create a subspan of the buffer.
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
-                       Buffer::Subspan(parent_buffer, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
+                            Buffer::Subspan(parent_buffer, 1, 2));
   ASSERT_TRUE(subspan_buffer);
   EXPECT_EQ(1, subspan_buffer->byte_offset());
   EXPECT_EQ(2, subspan_buffer->byte_length());
@@ -299,34 +300,34 @@ TEST(BufferTest, Fill8) {
 
   // Data should be zeroed by default.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 0, 0, 0, 0));
 
   // Fill with a sentinel.
-  EXPECT_OK(buffer->Fill8(0, buffer->allocation_size(), 0x33u));
+  IREE_EXPECT_OK(buffer->Fill8(0, buffer->allocation_size(), 0x33u));
 
   // Verify data.
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x33, 0x33, 0x33, 0x33));
 
   // Zero fills are fine.
-  EXPECT_OK(buffer->Fill8(0, 0, 0x44u));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->Fill8(0, 0, 0x44u));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x33, 0x33, 0x33, 0x33));
 
   // Fill the remaining parts of the buffer by using kWholeBuffer.
-  EXPECT_OK(buffer->Fill8(2, kWholeBuffer, 0x55u));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->Fill8(2, kWholeBuffer, 0x55u));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x33, 0x55, 0x55, 0x55));
 
   // Fill a small region of the buffer.
-  EXPECT_OK(buffer->Fill8(1, 1, 0x66u));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->Fill8(1, 1, 0x66u));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x66, 0x55, 0x55, 0x55));
 
   // Whole buffer helper.
-  EXPECT_OK(buffer->Fill8(0x99u));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->Fill8(0x99u));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x99, 0x99, 0x99, 0x99, 0x99));
 }
 
@@ -335,7 +336,7 @@ TEST(BufferTest, Fill8OutOfRange) {
   ASSERT_TRUE(buffer);
 
   // Fill with a sentinel.
-  EXPECT_OK(buffer->Fill8(0, buffer->allocation_size(), 0x33u));
+  IREE_EXPECT_OK(buffer->Fill8(0, buffer->allocation_size(), 0x33u));
 
   // Try to fill with invalid ranges.
   EXPECT_TRUE(IsOutOfRange(buffer->Fill8(1, 444, 0x44u)));
@@ -345,7 +346,7 @@ TEST(BufferTest, Fill8OutOfRange) {
 
   // Ensure nothing happened with the bad ranges.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x33, 0x33, 0x33, 0x33, 0x33));
 }
 
@@ -370,9 +371,9 @@ TEST(BufferTest, Fill8Subspan) {
 
   // Test on subspan.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 1, 3));
-  EXPECT_OK(subspan_buffer->Fill8(2, kWholeBuffer, 0xDDu));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 1, 3));
+  IREE_EXPECT_OK(subspan_buffer->Fill8(2, kWholeBuffer, 0xDDu));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 0, 0, 0xDD, 0));
 }
 
@@ -382,34 +383,34 @@ TEST(BufferTest, Fill16) {
 
   // Data should be zeroed by default.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 0, 0, 0, 0, 0, 0, 0, 0));
 
   // Fill with a sentinel.
-  EXPECT_OK(buffer->Fill16(0, 4, 0x1122u));
+  IREE_EXPECT_OK(buffer->Fill16(0, 4, 0x1122u));
 
   // Verify data.
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x22, 0x11, 0x22, 0x11, 0, 0, 0, 0, 0));
 
   // Zero fills are fine.
-  EXPECT_OK(buffer->Fill16(0, 0, 0x5566u));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->Fill16(0, 0, 0x5566u));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0x22, 0x11, 0x22, 0x11, 0, 0, 0, 0, 0));
 
   // Fill the remaining parts of the buffer by using kWholeBuffer.
   auto aligned_buffer = HeapBuffer::Allocate(BufferUsage::kMapping, 8);
-  EXPECT_OK(aligned_buffer->Fill16(4, kWholeBuffer, 0x5566u));
+  IREE_EXPECT_OK(aligned_buffer->Fill16(4, kWholeBuffer, 0x5566u));
   std::vector<uint8_t> aligned_actual_data(aligned_buffer->allocation_size());
-  EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
-                                     aligned_actual_data.size()));
+  IREE_EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
+                                          aligned_actual_data.size()));
   EXPECT_THAT(aligned_actual_data,
               ElementsAre(0, 0, 0, 0, 0x66, 0x55, 0x66, 0x55));
 
   // Whole buffer helper.
-  EXPECT_OK(aligned_buffer->Fill16(0x5566u));
-  EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
-                                     aligned_actual_data.size()));
+  IREE_EXPECT_OK(aligned_buffer->Fill16(0x5566u));
+  IREE_EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
+                                          aligned_actual_data.size()));
   EXPECT_THAT(aligned_actual_data,
               ElementsAre(0x66, 0x55, 0x66, 0x55, 0x66, 0x55, 0x66, 0x55));
 }
@@ -454,13 +455,13 @@ TEST(BufferTest, Fill16Subspan) {
   ASSERT_TRUE(buffer);
 
   // Fill with a sentinel.
-  EXPECT_OK(buffer->Fill16(0, 4, 0x1122u));
+  IREE_EXPECT_OK(buffer->Fill16(0, 4, 0x1122u));
 
   // Test on subspan.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 2, 4));
-  EXPECT_OK(subspan_buffer->Fill16(2, kWholeBuffer, 0xAABBu));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 2, 4));
+  IREE_EXPECT_OK(subspan_buffer->Fill16(2, kWholeBuffer, 0xAABBu));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data,
               ElementsAre(0x22, 0x11, 0x22, 0x11, 0xBB, 0xAA, 0, 0, 0));
 }
@@ -471,36 +472,36 @@ TEST(BufferTest, Fill32) {
 
   // Data should be zeroed by default.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 0, 0, 0, 0, 0, 0, 0, 0));
 
   // Fill with a sentinel.
-  EXPECT_OK(buffer->Fill32(0, 8, 0x11223344u));
+  IREE_EXPECT_OK(buffer->Fill32(0, 8, 0x11223344u));
 
   // Verify data.
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data,
               ElementsAre(0x44, 0x33, 0x22, 0x11, 0x44, 0x33, 0x22, 0x11, 0));
 
   // Zero fills are fine.
-  EXPECT_OK(buffer->Fill32(0, 0, 0x55667788u));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->Fill32(0, 0, 0x55667788u));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data,
               ElementsAre(0x44, 0x33, 0x22, 0x11, 0x44, 0x33, 0x22, 0x11, 0));
 
   // Fill the remaining parts of the buffer by using kWholeBuffer.
   auto aligned_buffer = HeapBuffer::Allocate(BufferUsage::kMapping, 8);
-  EXPECT_OK(aligned_buffer->Fill32(4, kWholeBuffer, 0x55667788u));
+  IREE_EXPECT_OK(aligned_buffer->Fill32(4, kWholeBuffer, 0x55667788u));
   std::vector<uint8_t> aligned_actual_data(aligned_buffer->allocation_size());
-  EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
-                                     aligned_actual_data.size()));
+  IREE_EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
+                                          aligned_actual_data.size()));
   EXPECT_THAT(aligned_actual_data,
               ElementsAre(0, 0, 0, 0, 0x88, 0x77, 0x66, 0x55));
 
   // Whole buffer helper.
-  EXPECT_OK(aligned_buffer->Fill32(0x55667788u));
-  EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
-                                     aligned_actual_data.size()));
+  IREE_EXPECT_OK(aligned_buffer->Fill32(0x55667788u));
+  IREE_EXPECT_OK(aligned_buffer->ReadData(0, aligned_actual_data.data(),
+                                          aligned_actual_data.size()));
   EXPECT_THAT(aligned_actual_data,
               ElementsAre(0x88, 0x77, 0x66, 0x55, 0x88, 0x77, 0x66, 0x55));
 }
@@ -545,13 +546,13 @@ TEST(BufferTest, Fill32Subspan) {
   ASSERT_TRUE(buffer);
 
   // Fill with a sentinel.
-  EXPECT_OK(buffer->Fill32(0, 8, 0x11223344u));
+  IREE_EXPECT_OK(buffer->Fill32(0, 8, 0x11223344u));
 
   // Test on subspan.
   std::vector<uint8_t> actual_data(buffer->allocation_size());
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 4, 4));
-  EXPECT_OK(subspan_buffer->Fill32(0, kWholeBuffer, 0xAABBCCDDu));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 4, 4));
+  IREE_EXPECT_OK(subspan_buffer->Fill32(0, kWholeBuffer, 0xAABBCCDDu));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data,
               ElementsAre(0x44, 0x33, 0x22, 0x11, 0xDD, 0xCC, 0xBB, 0xAA, 0));
 }
@@ -565,16 +566,16 @@ TEST(BufferTest, ReadData) {
 
   // Read the data back.
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Reading zero bytes is valid.
   std::vector<uint8_t> zero_data(0);
-  EXPECT_OK(buffer->ReadData(1, zero_data.data(), 0));
+  IREE_EXPECT_OK(buffer->ReadData(1, zero_data.data(), 0));
 
   // Read a portion of the data.
   std::vector<uint8_t> partial_data(2);
-  EXPECT_OK(buffer->ReadData(1, partial_data.data(), 2));
+  IREE_EXPECT_OK(buffer->ReadData(1, partial_data.data(), 2));
   EXPECT_THAT(partial_data, ElementsAre(1, 2));
 }
 
@@ -611,8 +612,8 @@ TEST(BufferTest, ReadDataSubspan) {
 
   // Test on subspan.
   std::vector<uint8_t> subspan_data(1);
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 1, 2));
-  EXPECT_OK(subspan_buffer->ReadData(1, subspan_data.data(), 1));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 1, 2));
+  IREE_EXPECT_OK(subspan_buffer->ReadData(1, subspan_data.data(), 1));
   EXPECT_THAT(subspan_data, ElementsAre(2));
 }
 
@@ -625,25 +626,26 @@ TEST(BufferTest, WriteData) {
 
   // Read the data back - should still match.
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(src_data));
 
   // Write over the entire buffer.
   std::vector<uint8_t> new_data = {10, 20, 30, 40};
-  EXPECT_OK(buffer->WriteData(0, new_data.data(), new_data.size()));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->WriteData(0, new_data.data(), new_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(new_data));
 
   // Writing zero bytes is valid.
   std::vector<uint8_t> zero_data;
-  EXPECT_OK(buffer->WriteData(0, zero_data.data(), 0));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->WriteData(0, zero_data.data(), 0));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(new_data));
 
   // Write over a portion of the buffer.
   std::vector<uint8_t> partial_data = {99};
-  EXPECT_OK(buffer->WriteData(1, partial_data.data(), partial_data.size()));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(
+      buffer->WriteData(1, partial_data.data(), partial_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(10, 99, 30, 40));
 }
 
@@ -689,10 +691,10 @@ TEST(BufferTest, WriteDataSubspan) {
 
   // Test on subspan.
   std::vector<uint8_t> subspan_data = {0xAA};
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 1, 2));
-  EXPECT_OK(subspan_buffer->WriteData(1, subspan_data.data(), 1));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer, Buffer::Subspan(buffer, 1, 2));
+  IREE_EXPECT_OK(subspan_buffer->WriteData(1, subspan_data.data(), 1));
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 1, 0xAA, 3));
 }
 
@@ -709,30 +711,36 @@ TEST(BufferTest, CopyData) {
   ASSERT_TRUE(dst_buffer);
 
   // Copy of length 0 should not change the dest buffer.
-  EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 0, 0));
+  IREE_EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 0, 0));
   std::vector<uint8_t> actual_data(dst_data.size());
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, Eq(dst_data));
 
   // Copy a subrange of the buffer.
-  EXPECT_OK(dst_buffer->CopyData(1, src_buffer.get(), 2, 2));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(dst_buffer->CopyData(1, src_buffer.get(), 2, 2));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 2, 3, 3, 4));
 
   // Copy the entire buffer using kWholeBuffer. This will adjust sizes
   // to ensure that the min buffer is taken. We test both src and dst buffer
   // offset/length calculations (note that some may end up as 0 copies).
-  EXPECT_OK(dst_buffer->CopyData(3, src_buffer.get(), 0, kWholeBuffer));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(dst_buffer->CopyData(3, src_buffer.get(), 0, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 2, 3, 0, 1));
-  EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 2, kWholeBuffer));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 2, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(2, 3, 3, 0, 1));
-  EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 3, kWholeBuffer));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(dst_buffer->CopyData(0, src_buffer.get(), 3, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(3, 3, 3, 0, 1));
-  EXPECT_OK(dst_buffer->CopyData(4, src_buffer.get(), 0, kWholeBuffer));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(dst_buffer->CopyData(4, src_buffer.get(), 0, kWholeBuffer));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(3, 3, 3, 0, 0));
 }
 
@@ -772,8 +780,9 @@ TEST(BufferTest, CopyDataOverlapping) {
 
   // Test overlap. Non-overlapping regions should be fine, otherwise fail.
   std::vector<uint8_t> actual_data(dst_data.size());
-  EXPECT_OK(dst_buffer->CopyData(0, dst_buffer.get(), 4, 1));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(dst_buffer->CopyData(0, dst_buffer.get(), 4, 1));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(4, 1, 2, 3, 4));
   EXPECT_TRUE(
       IsInvalidArgument(dst_buffer->CopyData(2, dst_buffer.get(), 0, 3)));
@@ -817,12 +826,14 @@ TEST(BufferTest, CopyDataSubspan) {
 
   // Test on subspan.
   std::vector<uint8_t> actual_data(dst_data.size());
-  ASSERT_OK_AND_ASSIGN(auto subspan_src_buffer,
-                       Buffer::Subspan(src_buffer, 1, 3));
-  ASSERT_OK_AND_ASSIGN(auto subspan_dst_buffer,
-                       Buffer::Subspan(dst_buffer, 2, 3));
-  EXPECT_OK(subspan_dst_buffer->CopyData(1, subspan_src_buffer.get(), 1, 2));
-  EXPECT_OK(dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_src_buffer,
+                            Buffer::Subspan(src_buffer, 1, 3));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_dst_buffer,
+                            Buffer::Subspan(dst_buffer, 2, 3));
+  IREE_EXPECT_OK(
+      subspan_dst_buffer->CopyData(1, subspan_src_buffer.get(), 1, 2));
+  IREE_EXPECT_OK(
+      dst_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 1, 2, 2, 3));
 }
 
@@ -838,29 +849,29 @@ TEST(BufferTest, MapMemory) {
   ASSERT_TRUE(buffer);
 
   // 0-length mappings are valid.
-  ASSERT_OK_AND_ASSIGN(auto mapping,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 0, 0));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 0, 0));
   EXPECT_TRUE(mapping.empty());
   EXPECT_EQ(0, mapping.size());
   EXPECT_EQ(0, mapping.byte_length());
   EXPECT_NE(nullptr, mapping.data());
-  ASSERT_OK_AND_ASSIGN(auto span, mapping.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto span, mapping.Subspan());
   EXPECT_TRUE(span.empty());
   mapping.reset();
 
   // Map the whole buffer for reading.
-  ASSERT_OK_AND_ASSIGN(mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kRead,
-                                                           0, kWholeBuffer));
+  IREE_ASSERT_OK_AND_ASSIGN(mapping, buffer->MapMemory<uint8_t>(
+                                         MemoryAccess::kRead, 0, kWholeBuffer));
   EXPECT_EQ(src_data.size(), mapping.size());
-  ASSERT_OK_AND_ASSIGN(span, mapping.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(span, mapping.Subspan());
   EXPECT_THAT(span, ElementsAre(0, 1, 2, 3, 4, 5, 6));
   mapping.reset();
 
   // Map a portion of the buffer for reading.
-  ASSERT_OK_AND_ASSIGN(mapping,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kRead, 1, 2));
   EXPECT_EQ(2, mapping.size());
-  ASSERT_OK_AND_ASSIGN(span, mapping.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(span, mapping.Subspan());
   EXPECT_THAT(span, ElementsAre(1, 2));
   mapping.reset();
 }
@@ -875,11 +886,11 @@ TEST(BufferTest, MapMemoryNonByte) {
   // Map the buffer as non-byte values.
   // Note that we'll round down to the number of valid elements at the
   // alignment.
-  ASSERT_OK_AND_ASSIGN(auto mapping16,
-                       buffer->MapMemory<uint16_t>(MemoryAccess::kRead));
+  IREE_ASSERT_OK_AND_ASSIGN(auto mapping16,
+                            buffer->MapMemory<uint16_t>(MemoryAccess::kRead));
   EXPECT_EQ(3, mapping16.size());
   EXPECT_LE(6, mapping16.byte_length());
-  ASSERT_OK_AND_ASSIGN(auto span16, mapping16.Subspan());
+  IREE_ASSERT_OK_AND_ASSIGN(auto span16, mapping16.Subspan());
   EXPECT_THAT(span16, ElementsAre(0x0100, 0x0302, 0x0504));
   mapping16.reset();
 }
@@ -931,14 +942,14 @@ TEST(BufferTest, MapMemoryWrite) {
   ASSERT_TRUE(buffer);
 
   // Map and modify the data. We should see it when we read back.
-  ASSERT_OK_AND_ASSIGN(auto mapping,
-                       buffer->MapMemory<uint8_t>(MemoryAccess::kWrite, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mapping, buffer->MapMemory<uint8_t>(MemoryAccess::kWrite, 1, 2));
   auto mutable_data = mapping.mutable_data();
   mutable_data[0] = 0xAA;
   mutable_data[1] = 0xBB;
   mapping.reset();
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 0xAA, 0xBB, 3, 4, 5, 6));
 }
 
@@ -953,9 +964,10 @@ TEST(BufferTest, MapMemoryDiscard) {
   // so we just trust that it's been discarded. It's a hint, anyway. We can be
   // sure that the data we didn't want to discard is the same though.
   std::vector<uint8_t> actual_data(src_data.size());
-  ASSERT_OK_AND_ASSIGN(auto mapping, buffer->MapMemory<uint8_t>(
-                                         MemoryAccess::kDiscardWrite, 1, 2));
-  EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mapping,
+      buffer->MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, 1, 2));
+  IREE_EXPECT_OK(buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, _, _, 3, 4, 5, 6));
   mapping.reset();
 }
@@ -966,17 +978,19 @@ TEST(BufferTest, MapMemorySubspan) {
       BufferUsage::kTransfer | BufferUsage::kMapping, MemoryAccess::kAll,
       src_data.data(), src_data.size());
   ASSERT_TRUE(parent_buffer);
-  ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
-                       Buffer::Subspan(parent_buffer, 1, 3));
-  ASSERT_OK_AND_ASSIGN(auto mapping, subspan_buffer->MapMemory<uint8_t>(
-                                         MemoryAccess::kDiscardWrite, 1, 2));
+  IREE_ASSERT_OK_AND_ASSIGN(auto subspan_buffer,
+                            Buffer::Subspan(parent_buffer, 1, 3));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto mapping,
+      subspan_buffer->MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, 1, 2));
   auto* mutable_data = mapping.mutable_data();
   mutable_data[0] = 0xCC;
   mutable_data[1] = 0xDD;
   mapping.reset();
 
   std::vector<uint8_t> actual_data(src_data.size());
-  EXPECT_OK(parent_buffer->ReadData(0, actual_data.data(), actual_data.size()));
+  IREE_EXPECT_OK(
+      parent_buffer->ReadData(0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ElementsAre(0, 1, 0xCC, 0xDD, 4, 5, 6));
 
   // Just here to make coverage happy; they are currently no-ops on the host.
@@ -986,12 +1000,12 @@ TEST(BufferTest, MapMemorySubspan) {
   auto external_buffer = HeapBuffer::WrapMutable(
       MemoryType::kHostVisible | MemoryType::kHostCached, MemoryAccess::kAll,
       BufferUsage::kAll, absl::MakeSpan(external_data));
-  ASSERT_OK_AND_ASSIGN(auto external_subspan_buffer,
-                       Buffer::Subspan(external_buffer, 0, 1));
-  ASSERT_OK_AND_ASSIGN(
+  IREE_ASSERT_OK_AND_ASSIGN(auto external_subspan_buffer,
+                            Buffer::Subspan(external_buffer, 0, 1));
+  IREE_ASSERT_OK_AND_ASSIGN(
       mapping, external_subspan_buffer->MapMemory<uint8_t>(MemoryAccess::kAll));
-  EXPECT_OK(mapping.Invalidate());
-  EXPECT_OK(mapping.Flush());
+  IREE_EXPECT_OK(mapping.Invalidate());
+  IREE_EXPECT_OK(mapping.Flush());
 }
 
 }  // namespace

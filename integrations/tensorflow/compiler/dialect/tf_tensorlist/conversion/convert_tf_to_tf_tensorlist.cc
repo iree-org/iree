@@ -14,6 +14,7 @@
 
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -27,6 +28,9 @@ namespace tf_tensorlist {
 class ConvertTfToTfTensorList
     : public PassWrapper<ConvertTfToTfTensorList, OperationPass<FuncOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<TfTensorListDialect>();
+  }
   void runOnOperation() override;
 };
 
@@ -102,7 +106,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   // want to blindly update all variant types to tensorlist. So here we do a
   // targeted rewrite.
   auto *tfTensorListDialect =
-      func.getContext()->getRegisteredDialect<TfTensorListDialect>();
+      func.getContext()->getLoadedDialect<TfTensorListDialect>();
   auto tensorListType = TensorListType::get(func.getContext());
   SmallVector<Value, 8> typeConversionWorklist;
   func.walk([&](Operation *op) {

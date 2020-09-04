@@ -14,6 +14,7 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -37,6 +38,15 @@ class TranslateExecutablesPass
       : executableOptions_(getTargetOptionsFromFlags()) {}
   explicit TranslateExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<HALDialect>();
+
+    auto targetBackends = matchTargetBackends(executableOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
+  }
 
   void runOnOperation() override {
     auto executableOp = getOperation();

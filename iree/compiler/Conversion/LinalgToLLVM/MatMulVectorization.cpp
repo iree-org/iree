@@ -19,6 +19,19 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::opt<bool> useL1TilesOnly(
+    "iree-codegen-linalg-to-llvm-matmul-use-l1-tiles-only",
+    llvm::cl::desc("If specified only L1 tiling applies, tiling for reduction "
+                   "dim is set l1-tile-size, other dimension are tiled by "
+                   "at most l1-reigster-max-tile-size"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<int> l1RegisterMaxTileSize(
+    "iree-codegen-linalg-to-llvm-matmul-l1-register-max-tile-size",
+    llvm::cl::desc(
+        "Max tile size for M & N dimensions when use-l1-tiles-only is set"),
+    llvm::cl::init(8));
+
 static llvm::cl::opt<int> l1TileSize(
     "iree-codegen-linalg-to-llvm-matmul-l1-tile-size",
     llvm::cl::desc("Specify the size of L1 tile for matmul vector lowering"),
@@ -49,6 +62,10 @@ static llvm::cl::opt<std::string> vectorOpLowering(
 namespace {
 struct MatMulTileAndVectorizePass
     : PassWrapper<MatMulTileAndVectorizePass, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<AffineDialect, scf::SCFDialect, vector::VectorDialect>();
+  }
+
   void runOnFunction() override;
 };
 }  // namespace
@@ -56,16 +73,42 @@ struct MatMulTileAndVectorizePass
 void MatMulTileAndVectorizePass::runOnFunction() {
   FuncOp fn = getFunction();
   MatmulCodegenStrategy strategy;
-  strategy
-      .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
-          {l3TileSize, l3TileSize, l3TileSize}))
-      .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
-          {l2TileSize, l2TileSize, l2TileSize}))
-      .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
-          {l1TileSize, l1TileSize, l1TileSize}))
-      .vectorize<linalg::MatmulOp>()
-      .setVectorTransferToSCFOptions(
-          VectorTransferToSCFOptions().setUnroll(unrollVectorTransfer));
+
+  if (useL1TilesOnly) {
+    auto matmulOps = llvm::to_vector<1>(fn.getOps<linalg::MatmulOp>());
+    if (matmulOps.size() != 1) return;
+
+    auto lhsShapeType =
+        matmulOps[0].getInput(0).getType().dyn_cast_or_null<ShapedType>();
+    auto rhsShapeType =
+        matmulOps[0].getInput(1).getType().dyn_cast_or_null<ShapedType>();
+
+    if (!lhsShapeType || !rhsShapeType) return;
+
+    auto lhsShape = lhsShapeType.getShape();
+    auto rhsShape = rhsShapeType.getShape();
+
+    int M = lhsShape[0], N = rhsShape[1];
+    auto tileDim = [](int dim, int maxSize) -> int {
+      for (int i = maxSize; i > 0; --i) {
+        if (dim % i == 0) return i;
+      }
+      return 1;
+    };
+    strategy.tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
+        {tileDim(M, l1RegisterMaxTileSize), tileDim(N, l1RegisterMaxTileSize),
+         l1TileSize}));
+  } else {
+    strategy
+        .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
+            {l3TileSize, l3TileSize, l3TileSize}))
+        .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
+            {l2TileSize, l2TileSize, l2TileSize}))
+        .tile<linalg::MatmulOp>(linalg::LinalgTilingOptions().setTileSizes(
+            {l1TileSize, l1TileSize, l1TileSize}));
+  }
+  strategy.vectorize<linalg::MatmulOp>().setVectorTransferToSCFOptions(
+      VectorTransferToSCFOptions().setUnroll(unrollVectorTransfer));
   if (vectorOpLowering == "outer_product") {
     strategy.setVectorTransformsOptions(
         vector::VectorTransformsOptions().setVectorTransformsOptions(

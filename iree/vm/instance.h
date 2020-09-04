@@ -34,8 +34,6 @@ extern "C" {
 // Thread-safe.
 typedef struct iree_vm_instance iree_vm_instance_t;
 
-#ifndef IREE_API_NO_PROTOTYPES
-
 // Creates a new instance. This should be shared with all contexts in an
 // application to ensure that resources are tracked properly and threads are
 // managed correctly.
@@ -50,8 +48,6 @@ iree_vm_instance_retain(iree_vm_instance_t* instance);
 // Releases the given |instance| from the caller.
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_instance_release(iree_vm_instance_t* instance);
-
-#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"
