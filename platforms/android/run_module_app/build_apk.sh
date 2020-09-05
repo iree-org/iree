@@ -1,0 +1,294 @@
+#!/bin/bash
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+#########################
+# Script input parameters
+#########################
+
+echo "=== A script for building iree-run-module apk ==="
+echo "This script wraps iree-run-module together with a"
+echo "specific IREE VM module and invocation information."
+echo ""
+echo "At a minimum, it expects the following env vars:"
+echo "* ANDROID_SDK_ROOT"
+echo "* ANDROID_NDK_ROOT"
+echo "* ANDROID_SDK_BUILD_TOOLS_VERSION"
+echo "See the script for details and more controls."
+echo "===-------------------------------------------==="
+echo ""
+
+print_usage_and_exit() {
+  echo "Usage: $0 <artifact-directory> "
+  echo "       --driver <driver>"
+  echo "       --module_file <input-module-file> "
+  echo "       --entry_function <entry-function> "
+  echo "       --inputs_file <input-buffer-file> "
+  exit 1
+}
+
+while (( "$#" )); do
+  case "$1" in
+    --driver)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_DRIVER=$2
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
+      ;;
+    --module_file)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_INPUT_MODULE_FILE=$(readlink -f $2)
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
+      ;;
+    --entry_function)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_ENTRY_FUNCTION=$2
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
+      ;;
+    --inputs_file)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_INPUT_BUFFER_FILE=$(readlink -f $2)
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
+      ;;
+    -*|--*=) # Unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # Positional arguments
+      if [[ -z ${IREE_ARTIFACT_ROOT+x} ]]; then
+        IREE_ARTIFACT_ROOT=$(readlink -f $1)
+      else
+        echo "Error: <artifact-directory> already set to ${IREE_ARTIFACT_ROOT}" >&2
+        print_usage_and_exit
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z ${IREE_ARTIFACT_ROOT+x} ]] || [[ -z ${IREE_INPUT_MODULE_FILE+x} ]] || \
+   [[ -z ${IREE_ENTRY_FUNCTION+x} ]] || [[ -z ${IREE_INPUT_BUFFER_FILE+x} ]] || \
+   [[ -z ${IREE_DRIVER+x} ]]; then
+  echo "Error: missing necessary parameters" >&2
+  print_usage_and_exit
+fi
+
+#################################
+# IREE Android app configurations
+#################################
+
+# The final Android APK name; default to "iree-run-module.apk".
+IREE_APK_NAME=${IREE_APK_NAME:-iree-run-module}
+# The CMAKE build type for compiling IREE. default to Release.
+IREE_BUILD_TYPE=${IREE_BUILD_TYPE:-Release}
+# The target Android API level; default to Android 10 (API level 29).
+IREE_ANDROID_API_LEVEL=${IREE_ANDROID_API_LEVEL:-29}
+# The target Android platform ABI; default to arm64-v8a.
+IREE_ANDROID_ABI=${IREE_ANDROID_ABI:-arm64-v8a}
+
+################################
+# Android SDK/NDK configurations
+################################
+
+# Android SDK root; must be provided as environment variable.
+# By default Android Studio uses
+# * $HOME/Android/Sdk for Linux.
+# * $HOME/Library/Android/sdk for macOS.
+# * $%LOCALAPPDATA%\Android\sdk for Windows.
+ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:?environment variable not set}
+# Android NDK root; must be provided as environment variable.
+ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:?environment variable not set}
+# Android SDK build tools version; default to empty given it's hard to
+# provide a default.
+# This typically should be provided by the caller and corresponds to a
+# directory under ${ANDROID_SDK_ROOT}/build-tools/, but there are cases where
+# an empty string is actually valid. For example, on Ubuntu, one can install
+# the SDK build tools via `apt install android-sdk-build-tools`, which will
+# then install it under /usr/lib/android-sdk/build-tools/.
+ANDROID_SDK_BUILD_TOOLS_VERSION=${ANDROID_SDK_BUILD_TOOLS_VERSION:-}
+# Key store for signing apk files; default to Android debug keystore created
+# by Android Studio.
+ANDROID_KEYSTORE=${ANDROID_KEYSTORE:-${HOME}/.android/debug.keystore}
+
+######################
+# IREE build toolchain
+######################
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+NINJA_BIN=${NINJA_BIN:-$(which ninja)}
+CLANG_BIN=${CLANG_BIN:-$(which clang)}
+CLANGXX_BIN=${CLANGXX_BIN:-$(which clang++)}
+
+JAVAC_BIN=${JAVAC_BIN:-$(which javac)}
+
+##################################
+# IREE source/artifact directories
+##################################
+
+# IREE project source root.
+IREE_SOURCE_ROOT=$(dirname $(readlink -f $0))/../../../
+# iree-run-module Android app source root.
+IREE_NATIVE_APP_SOURCE_ROOT=${IREE_SOURCE_ROOT}/platforms/android/run_module_app
+
+# Directory for IREE native code intermediate intermediate artifacts.
+IREE_NATIVE_LIB_BUILD_DIR=${IREE_ARTIFACT_ROOT}/iree/${IREE_BUILD_TYPE}
+# Directory for IREE native libraries.
+IREE_NATIVE_LIB_DIR=${IREE_ARTIFACT_ROOT}/libs/lib/${IREE_ANDROID_ABI}
+# Directory for Android app assets.
+IREE_ASSET_DIR=${IREE_ARTIFACT_ROOT}/assets
+# Directory for Android app R.class.
+IREE_RESOURCE_GEN_DIR=${IREE_ARTIFACT_ROOT}/rclass
+
+#########################
+# Android build toolchain
+#########################
+
+ANDROID_SDK_BUILD_TOOLS_DIR=${ANDROID_SDK_ROOT}/build-tools/${ANDROID_SDK_BUILD_TOOLS_VERSION}
+ANDROID_SDK_PLATFORMS_DIR=${ANDROID_SDK_ROOT}/platforms/android-${IREE_ANDROID_API_LEVEL}
+
+AAPT_BIN=${ANDROID_SDK_BUILD_TOOLS_DIR}/aapt
+DX_BIN=${ANDROID_SDK_BUILD_TOOLS_DIR}/dx
+ZIPALIGN_BIN=${ANDROID_SDK_BUILD_TOOLS_DIR}/zipalign
+APKSIGNER_BIN=${ANDROID_SDK_BUILD_TOOLS_DIR}/apksigner
+
+if [[ ! -x ${AAPT_BIN} ]] || [[ ! -x ${DX_BIN} ]] || [[ ! -x ${ZIPALIGN_BIN} ]] || [[ ! -x ${APKSIGNER_BIN} ]]; then
+  if [[ -z "${ANDROID_SDK_BUILD_TOOLS_VERSION}" ]]; then
+    echo "Error: 'ANDROID_SDK_BUILD_TOOLS_VERSION' environment variable not set" &>2
+  else
+    echo "Error: '${ANDROID_SDK_BUILD_TOOLS_DIR}' does not point to a valid Android SDK build tools directory containing aapt/apksigner/dx/zipalign" &>2
+  fi
+  exit 1
+fi
+
+AAPT_ADD="${AAPT_BIN} add"
+AAPT_PACK="${AAPT_BIN} package -f -I ${ANDROID_SDK_PLATFORMS_DIR}/android.jar"
+DX="${DX_BIN} --dex"
+ZIPALIGN="${ZIPALIGN_BIN} -f -p 4"
+APKSIGN="${APKSIGNER_BIN} sign"
+
+JAVAC="${JAVAC_BIN} -classpath ${ANDROID_SDK_PLATFORMS_DIR}/android.jar -sourcepath ${IREE_RESOURCE_GEN_DIR} -d ${IREE_ARTIFACT_ROOT}"
+
+#############################
+# Build IREE native libraries
+#############################
+
+if [[ ! -d ${IREE_NATIVE_LIB_BUILD_DIR} ]]; then
+  mkdir -p ${IREE_NATIVE_LIB_BUILD_DIR}
+fi
+
+echo ">>> Building IREE native libraries <<<"
+
+IREE_NATIVE_LIB_NAME=platforms_android_run_module_app_iree_run_module_app
+
+pushd ${IREE_NATIVE_LIB_BUILD_DIR}
+"${CMAKE_BIN}" "${IREE_SOURCE_ROOT}" -G Ninja \
+  -DCMAKE_BUILD_TYPE=${IREE_BUILD_TYPE} \
+  -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake" \
+  -DANDROID_ABI=${IREE_ANDROID_ABI} \
+  -DANDROID_PLATFORM=android-${IREE_ANDROID_API_LEVEL} \
+  -DIREE_HOST_C_COMPILER="${CLANG_BIN}" \
+  -DIREE_HOST_CXX_COMPILER="${CLANGXX_BIN}" \
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_BUILD_TESTS=ON \
+  -DIREE_BUILD_SAMPLES=OFF
+${NINJA_BIN} ${IREE_NATIVE_LIB_NAME}
+popd
+
+#####################
+# Package Android app
+#####################
+
+rm -rf ${IREE_ARTIFACT_ROOT}/*.apk
+
+echo ">>> Generating AndroidManifest.xml <<<"
+
+# Create an AndroidManifest.xml with proper target SDK version.
+rm -rf ${IREE_ARTIFACT_ROOT}/AndroidManifest.xml
+IREE_ANDROID_API_LEVEL=${IREE_ANDROID_API_LEVEL} envsubst \
+  < ${IREE_NATIVE_APP_SOURCE_ROOT}/AndroidManifest.xml.template \
+  > ${IREE_ARTIFACT_ROOT}/AndroidManifest.xml
+
+echo ">>> Preparing shared libraries and vm module information <<<"
+
+# Find the compiled iree_run_module_app shared library and symlink it to a
+# known location for packaging.
+rm -rf ${IREE_NATIVE_LIB_DIR} && mkdir -p ${IREE_NATIVE_LIB_DIR}
+IREE_NATIVE_LIB=$(find ${IREE_NATIVE_LIB_BUILD_DIR} -name "lib${IREE_NATIVE_LIB_NAME}.so")
+# Note: the target link name must match with
+# run_module_app/AndroidManifest.xml.template.
+ln -sf ${IREE_NATIVE_LIB} ${IREE_NATIVE_LIB_DIR}/libiree_run_module_app.so
+
+# Copy the VM FlatBuffer and iree-run-module invocation related information
+# over as assets.
+rm -rf ${IREE_ASSET_DIR} && mkdir -p ${IREE_ASSET_DIR}
+# Note: the following files must match with run_module_app/src/main.cc.
+cp ${IREE_INPUT_MODULE_FILE} ${IREE_ASSET_DIR}/module.vmfb
+cp ${IREE_INPUT_BUFFER_FILE} ${IREE_ASSET_DIR}/inputs.txt
+echo -n ${IREE_ENTRY_FUNCTION} > ${IREE_ASSET_DIR}/entry_function.txt
+echo -n ${IREE_DRIVER} > ${IREE_ASSET_DIR}/driver.txt
+
+echo ">>> Compiling app resources <<<"
+
+# Generate the R.java for resources.
+rm -rf ${IREE_RESOURCE_GEN_DIR} && mkdir -p ${IREE_RESOURCE_GEN_DIR}
+${AAPT_PACK} --non-constant-id -m \
+  -M ${IREE_ARTIFACT_ROOT}/AndroidManifest.xml \
+  -S ${IREE_NATIVE_APP_SOURCE_ROOT}/res \
+  -J ${IREE_RESOURCE_GEN_DIR} \
+  --generate-dependencies
+
+# Compile the R.java and create classes.dex out of it for Android.
+echo "Using javac: '${JAVAC_BIN}'"
+rm -rf ${IREE_ARTIFACT_ROOT}/classes.dex ${IREE_ARTIFACT_ROOT}/com/
+${JAVAC} ${IREE_RESOURCE_GEN_DIR}/com/google/iree/run_module/*.java
+${DX} --output="${IREE_ARTIFACT_ROOT}/classes.dex" ${IREE_ARTIFACT_ROOT}
+
+echo ">>> Packaging apk file <<<"
+
+# Package assets and shared libraries into an apk file.
+${AAPT_PACK} -m \
+  -M ${IREE_ARTIFACT_ROOT}/AndroidManifest.xml \
+  -S ${IREE_NATIVE_APP_SOURCE_ROOT}/res \
+  -A ${IREE_ARTIFACT_ROOT}/assets \
+  -F "${IREE_ARTIFACT_ROOT}/${IREE_APK_NAME}.unaligned.apk" \
+  --shared-lib ${IREE_ARTIFACT_ROOT}/libs
+
+pushd ${IREE_ARTIFACT_ROOT}
+# Also package the resources into the apk file.
+${AAPT_ADD} ${IREE_APK_NAME}.unaligned.apk classes.dex
+echo ">>> Aligning apk file <<<"
+${ZIPALIGN} ${IREE_APK_NAME}.unaligned.apk ${IREE_APK_NAME}.apk
+echo ">>> Signing apk file <<<"
+echo "NOTE: if you are using the Android Studio's debug keystore, the password is 'android'."
+${APKSIGN} --ks ${ANDROID_KEYSTORE} --min-sdk-version 28 ${IREE_APK_NAME}.apk
+popd
+
+echo ">>> Done: '${IREE_ARTIFACT_ROOT}/${IREE_APK_NAME}.apk' <<<"
