@@ -60,7 +60,6 @@ SAVED_MODEL_TF_RUNTIME_DEPS = [
 })
 
 TF_XLA_PASS_DEPS = [
-    "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
     "//integrations/tensorflow/compiler:tensorflow",
     "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
 ]

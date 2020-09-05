@@ -32,8 +32,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-static DialectRegistration<ShapeDialect> base_dialect;
-
 // Used to control inlining behavior.
 struct ShapeInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
