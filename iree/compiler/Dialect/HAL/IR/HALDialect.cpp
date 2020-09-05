@@ -33,8 +33,6 @@ namespace HAL {
 
 namespace {
 
-static DialectRegistration<HALDialect> hal_dialect;
-
 // Used to control inlining behavior.
 struct HALInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;

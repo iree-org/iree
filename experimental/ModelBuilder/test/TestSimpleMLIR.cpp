@@ -132,7 +132,6 @@ void testMemRefVectorAdd() {
 }
 
 int main(int argc, char **argv) {
-  ModelBuilder::registerAllDialects();
   testValueVectorAdd();
   testMemRefVectorAdd();
 }

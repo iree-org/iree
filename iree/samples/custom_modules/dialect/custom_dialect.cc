@@ -31,8 +31,6 @@ namespace Custom {
 
 namespace {
 
-static DialectRegistration<CustomDialect> custom_dialect;
-
 // Exposes conversion patterns that transition tensors to buffers during the
 // Flow->HAL dialect lowering. This is only required if the dialect has ops that
 // use tensor types.

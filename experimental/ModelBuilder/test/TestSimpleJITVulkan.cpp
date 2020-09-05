@@ -43,7 +43,7 @@ using namespace mlir;  // NOLINT
 
 template <unsigned vecSize>
 void testVectorAdd1d() {
-  MLIRContext context(/*loadAllDialects=*/false);
+  MLIRContext context;
   ModelBuilder modelBuilder;
   constexpr int workgroupSize = 32;
   auto typeA = modelBuilder.getMemRefType(vecSize, modelBuilder.f32);
@@ -118,7 +118,6 @@ void testVectorAdd1d() {
 }
 
 int main(int argc, char **argv) {
-  ModelBuilder::registerAllDialects();
   iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.

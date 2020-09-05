@@ -72,7 +72,7 @@ void testMatMul() {
   const int height = 4;
   const int width = 4;
   StringLiteral funcName = "kernel_matmul";
-  MLIRContext context(/*loadAllDialects=*/false);
+  MLIRContext context;
   ModelBuilder modelBuilder;
   auto typeA = modelBuilder.getMemRefType({width, height}, modelBuilder.f32);
   auto typeB = modelBuilder.getMemRefType({width, height}, modelBuilder.f32);
@@ -162,7 +162,6 @@ void testMatMul() {
 }
 
 int main(int argc, char **argv) {
-  ModelBuilder::registerAllDialects();
   iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
