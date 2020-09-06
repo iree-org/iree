@@ -61,16 +61,13 @@ namespace {
 // creation. These are safe to call with no instance parameter and should be
 // exported by all loaders/ICDs.
 static constexpr const FunctionPtrInfo kInstancelessFunctionPtrInfos[] = {
-    REQUIRED_PFN_FUNCTION_PTR(vkCreateInstance, false)                        //
-    REQUIRED_PFN_FUNCTION_PTR(vkEnumerateInstanceLayerProperties, false)      //
-    REQUIRED_PFN_FUNCTION_PTR(vkEnumerateInstanceExtensionProperties, false)  //
-};
+    IREE_VULKAN_DYNAMIC_SYMBOL_INSTANCELESS_TABLE(INS_PFN_FUNCTION_PTR)};
 
 // Defines the table of FunctionPtrInfos for dynamic loading that must wait
 // until an instance has been created to be resolved.
 static constexpr const FunctionPtrInfo kDynamicFunctionPtrInfos[] = {
-    IREE_VULKAN_DYNAMIC_SYMBOL_TABLES(INS_PFN_FUNCTION_PTR,
-                                      DEV_PFN_FUNCTION_PTR)};
+    IREE_VULKAN_DYNAMIC_SYMBOL_INSTANCE_DEVICE_TABLES(INS_PFN_FUNCTION_PTR,
+                                                      DEV_PFN_FUNCTION_PTR)};
 
 static const char* kVulkanLoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_ANDROID)
