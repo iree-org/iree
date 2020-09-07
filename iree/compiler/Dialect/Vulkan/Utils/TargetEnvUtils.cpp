@@ -100,8 +100,13 @@ spirv::ResourceLimitsAttr convertResourceLimits(
   MLIRContext *context = vkTargetEnv.getContext();
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
   return spirv::ResourceLimitsAttr::get(
+      /*vendor_id=*/nullptr,
+      /*device_id=*/nullptr,
+      /*device_type=*/nullptr,
+      /*max_compute_shared_memory_size=*/nullptr,
       vkCapabilities.maxComputeWorkGroupInvocations(),
-      vkCapabilities.maxComputeWorkGroupSize(), context);
+      vkCapabilities.maxComputeWorkGroupSize(),
+      /*subgroup_size=*/nullptr, context);
 }
 }  // anonymous namespace
 
