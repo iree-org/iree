@@ -38,11 +38,18 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
+// Defines the list of symbols that can be queried from vkGetInstanceProcAddr
+// before Vulkan instance creation.
+#define IREE_VULKAN_DYNAMIC_SYMBOL_INSTANCELESS_TABLE(INS_PFN) \
+  INS_PFN(REQUIRED, vkCreateInstance)                          \
+  INS_PFN(REQUIRED, vkEnumerateInstanceExtensionProperties)    \
+  INS_PFN(REQUIRED, vkEnumerateInstanceLayerProperties)        \
+  INS_PFN(OPTIONAL, vkEnumerateInstanceVersion)
+
+// Defines the list of instance/device symbols that are queried from
+// vkGetInstanceProcAddr/vkGetDeviceProcAddr after Vulkan instance/device
+// creation.
 #define IREE_VULKAN_DYNAMIC_SYMBOL_COMMON_TABLE(INS_PFN, DEV_PFN)       \
-  INS_PFN(REQUIRED, vkCreateInstance)                                   \
-  INS_PFN(REQUIRED, vkEnumerateInstanceExtensionProperties)             \
-  INS_PFN(REQUIRED, vkEnumerateInstanceLayerProperties)                 \
-  INS_PFN(REQUIRED, vkEnumerateInstanceVersion)                         \
   DEV_PFN(REQUIRED, vkBeginCommandBuffer)                               \
   DEV_PFN(EXCLUDED, vkCmdBeginConditionalRenderingEXT)                  \
   DEV_PFN(OPTIONAL, vkCmdBeginDebugUtilsLabelEXT)                       \
@@ -485,7 +492,12 @@ namespace vulkan {
   IREE_VULKAN_DYNAMIC_SYMBOL_TABLE_XLIB_KHR(INS_PFN, DEV_PFN)        \
   IREE_VULKAN_DYNAMIC_SYMBOL_TABLE_XLIB_XRANDR_EXT(INS_PFN, DEV_PFN)
 
+#define IREE_VULKAN_DYNAMIC_SYMBOL_INSTANCE_DEVICE_TABLES(INS_PFN, DEV_PFN) \
+  IREE_VULKAN_DYNAMIC_SYMBOL_COMMON_TABLE(INS_PFN, DEV_PFN)                 \
+  IREE_VULKAN_DYNAMIC_SYMBOL_PLATFORM_TABLES(INS_PFN, DEV_PFN)
+
 #define IREE_VULKAN_DYNAMIC_SYMBOL_TABLES(INS_PFN, DEV_PFN) \
+  IREE_VULKAN_DYNAMIC_SYMBOL_INSTANCELESS_TABLE(INS_PFN)    \
   IREE_VULKAN_DYNAMIC_SYMBOL_COMMON_TABLE(INS_PFN, DEV_PFN) \
   IREE_VULKAN_DYNAMIC_SYMBOL_PLATFORM_TABLES(INS_PFN, DEV_PFN)
 

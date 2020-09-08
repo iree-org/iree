@@ -44,7 +44,7 @@ bool isIndexOp(Operation *op) {
   // TODO(laurenzo): Curate this list more specifically (or have a better
   // mechanism for determining).
   return isa<Shape::RankedBroadcastInDimOp>(op) ||
-         isa<mhlo::BroadcastInDimOp>(op) ||
+         isa<mhlo::BroadcastInDimOp>(op) || isa<mhlo::BroadcastOp>(op) ||
          isa<mhlo::DynamicBroadcastInDimOp>(op) ||
          isa<mhlo::DynamicReshapeOp>(op) || isa<mhlo::DynamicSliceOp>(op) ||
          isa<mhlo::ReshapeOp>(op) || isa<mhlo::SliceOp>(op) ||

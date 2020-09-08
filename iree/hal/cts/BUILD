@@ -80,8 +80,8 @@ cc_test(
 )
 
 cc_test(
-    name = "device_creation_test",
-    srcs = ["device_creation_test.cc"],
+    name = "driver_test",
+    srcs = ["driver_test.cc"],
     deps = [
         ":cts_test_base",
         "//iree/hal:driver_registry",

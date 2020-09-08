@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
   /// Processes the memory buffer with a new MLIRContext.
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {
-    mlir::MLIRContext context(/*loadAllDialects=*/false);
+    mlir::MLIRContext context;
     registry.appendTo(context.getDialectRegistry());
     llvm::SourceMgr sourceMgr;
     sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());

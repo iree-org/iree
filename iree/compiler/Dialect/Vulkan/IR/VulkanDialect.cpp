@@ -26,8 +26,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Vulkan {
 
-static DialectRegistration<VulkanDialect> vkDialect;
-
 VulkanDialect::VulkanDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VulkanDialect>()) {
   addAttributes<TargetEnvAttr>();

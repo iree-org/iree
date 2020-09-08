@@ -124,3 +124,23 @@ func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tens
 }
 
 // TODO(benvanik): windowed reduction.
+
+// -----
+
+// CHECK-LABEL: @clone_broadcas
+func @clone_broadcast(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
+  %splatCst = constant dense<1.0> : tensor<f32>
+  // CHECK: flow.dispatch.region
+  // CHECK:     "mhlo.broadcast"
+  // CHECK:     mhlo.add
+  // CHECK: flow.dispatch.region
+  // CHECK:     "mhlo.dot"
+  // CHECK: flow.dispatch.region
+  // CHECK:     "mhlo.broadcast"
+  // CHECK:     mhlo.add
+  %0 = "mhlo.broadcast"(%splatCst) {broadcast_sizes = dense<[4, 4]> : tensor<2xi64>} : (tensor<f32>) -> tensor<4x4xf32>
+  %1 = "mhlo.add"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %2 = "mhlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %3 = "mhlo.add"(%0, %2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  return %3: tensor<4x4xf32>
+}
