@@ -71,9 +71,9 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
-    device_creation_test
+    driver_test
   SRCS
-    "device_creation_test.cc"
+    "driver_test.cc"
   DEPS
     ::cts_test_base
     iree::hal::driver_registry
