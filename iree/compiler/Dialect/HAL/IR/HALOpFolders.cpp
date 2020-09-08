@@ -256,6 +256,36 @@ void BufferViewBufferOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// iree::hal::CommandBuffer
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Skips a hal.command_buffer.device accessor when the device was created in
+/// the same scope.
+struct SkipCommandBufferDeviceOp
+    : public OpRewritePattern<CommandBufferDeviceOp> {
+  using OpRewritePattern<CommandBufferDeviceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CommandBufferDeviceOp op,
+                                PatternRewriter &rewriter) const override {
+    if (auto createOp = dyn_cast_or_null<CommandBufferCreateOp>(
+            op.command_buffer().getDefiningOp())) {
+      rewriter.replaceOp(op, createOp.device());
+      return success();
+    }
+    return failure();
+  }
+};
+
+}  // namespace
+
+void CommandBufferDeviceOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SkipCommandBufferDeviceOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.device.switch
 //===----------------------------------------------------------------------===//
 
