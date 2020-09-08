@@ -83,7 +83,7 @@ Status MetalSharedEvent::Wait(uint64_t value, Time deadline_ns) {
   // But marking it as __block serves as good documentation purpose.
   __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
 
-  // Use a listener to the MTLSharedEvent to notify us when the work is done on GPU bysignaling a
+  // Use a listener to the MTLSharedEvent to notify us when the work is done on GPU by signaling a
   // semaphore. The signaling will happen in a new dispatch queue; the current thread will wait on
   // the semaphore.
   [metal_handle_ notifyListener:event_listener_

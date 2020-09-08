@@ -15,9 +15,9 @@ GPU APIs is generally straightforward. This applies to the Metal HAL driver.
 
 The Metal HAL driver expects Metal 2+. Metal 2 introduces useful features like
 argument buffer, performance shaders, and others, that can improve performance
-and make IREE HAL implementation simpler. Metal 2 was released late 2017.
-Typically Apple software gets updated fairly quickly on various devices, so we
-expect it's already very common now.
+and make IREE HAL implementation simpler. Metal 2 was released late 2017 and
+are supported since macOS High Sierra and iOS 11. It is already dominant
+([macOS][macos-version-share], [iOS][ios-version-share]) right now.
 
 ### Programming Languages and Libraries
 
@@ -124,6 +124,8 @@ A listener is registered on the `MTLSharedEvent` with
 `notifyListener:atValue:block:` to singal a semaphore to wake the current
 thread, which is put into sleep by waiting on the semaphore.
 
+[macos-version-share]: https://gs.statcounter.com/macos-version-market-share/desktop/worldwide
+[ios-version-share]: https://developer.apple.com/support/app-store/
 [iree-hal]: https://github.com/google/iree/tree/main/iree/hal
 [iree-metal]: https://github.com/google/iree/tree/main/iree/hal/metal
 [iree-refptr]: https://github.com/google/iree/blob/main/iree/base/ref_ptr.h
