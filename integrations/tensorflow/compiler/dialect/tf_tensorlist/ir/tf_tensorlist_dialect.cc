@@ -20,8 +20,6 @@
 namespace mlir {
 namespace tf_tensorlist {
 
-static DialectRegistration<TfTensorListDialect> registration;
-
 //===----------------------------------------------------------------------===//
 // TfTensorListDialect Dialect
 //===----------------------------------------------------------------------===//

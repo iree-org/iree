@@ -31,8 +31,6 @@ namespace VM {
 
 #include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"
 
-static DialectRegistration<VMDialect> vm_dialect;
-
 namespace {
 
 // Used for custom printing support.

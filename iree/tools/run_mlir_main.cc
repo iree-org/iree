@@ -179,7 +179,7 @@ StatusOr<std::string> PrepareModule(
     mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("PrepareModule");
 
-  mlir::MLIRContext context(/*loadAllDialects=*/false);
+  mlir::MLIRContext context;
   registry.appendTo(context.getDialectRegistry());
 
   // Parse input MLIR module.

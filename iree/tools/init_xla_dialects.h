@@ -34,13 +34,6 @@ inline void registerXLADialects(DialectRegistry &registry) {
   // clang-format on
 }
 
-// This function should be called before creating any MLIRContext if one expect
-// all the possible dialects to be made available to the context automatically.
-inline void registerXLADialects() {
-  static bool initOnce =
-      ([]() { registerXLADialects(getGlobalDialectRegistry()); }(), true);
-  (void)initOnce;
-}
 }  // namespace mlir
 
 #endif  // IREE_TOOLS_INIT_XLA_DIALECTS_H_

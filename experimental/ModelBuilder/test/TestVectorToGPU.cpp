@@ -89,7 +89,7 @@ void testVecAdd() {
   // Simple test a single warp.
   const int width = warpSize;
   StringLiteral funcName = "kernel_vecadd";
-  MLIRContext context(/*loadAllDialects=*/false);
+  MLIRContext context;
   ModelBuilder modelBuilder;
   auto nVectorType = modelBuilder.getVectorType(width, modelBuilder.f32);
   auto typeA = modelBuilder.getMemRefType({width}, modelBuilder.f32);
@@ -149,7 +149,6 @@ void testVecAdd() {
 }
 
 int main(int argc, char **argv) {
-  ModelBuilder::registerAllDialects();
   iree::Initializer::RunInitializers();
   // Allow LLVM setup through command line and parse the
   // test specific option for a runtime support library.
