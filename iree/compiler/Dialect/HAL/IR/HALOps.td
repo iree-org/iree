@@ -1173,15 +1173,15 @@ def HAL_CommandBufferBindDescriptorSetOp :
 def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol"> {
   let summary = [{command buffer dispatch recording operation, using symbolref}];
   let description = [{
-    Dispatches an execution request, using a symbol reference to the entry point.
+    Dispatches an execution request, using a nested symbol reference to the entry point.
 
     ```mlir
     %x = constant 128 : index
     %y = constant 32 : index
     %z = constant 1 : index
-    hal.command_buffer.dispatch %cmd, %executable,
-                                entry_point = @executable::@target::@entry0,
-                                workgroup_xyz = [%x, %y, %z]
+    hal.command_buffer.dispatch.symbol %cmd, %executable,
+                                       entry_point = @executable::@target::@entry0,
+                                       workgroup_xyz = [%x, %y, %z]
     ```
   }];
 
@@ -1245,12 +1245,12 @@ def HAL_CommandBufferDispatchIndirectSymbolOp : HAL_Op<"command_buffer.dispatch.
   let summary = [{command buffer indirect dispatch recording operation, using symbolref}];
   let description = [{
     Dispatches an execution request with the dispatch parameters loaded from the
-    given buffer, using using a symbol reference to the entry point.
+    given buffer, using using a nested symbol reference to the entry point.
 
     ```mlir
-    hal.command_buffer.dispatch.indirect %cmd, %executable,
-                                         entry_point = @executable::@target::@entry0,
-                                         workgroups = %buffer[%offset]
+    hal.command_buffer.dispatch.indirect.symbol %cmd, %executable,
+                                                entry_point = @executable::@target::@entry0,
+                                                workgroups = %buffer[%offset]
     ```
   }];
 
@@ -1275,9 +1275,9 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     given buffer.
 
     ```mlir
-    hal.command_buffer.dispatch.indirect.ordinal %cmd, %executable,
-                                                 entry_point = 0,
-                                                 workgroups = %buffer[%offset]
+    hal.command_buffer.dispatch.indirect %cmd, %executable,
+                                         entry_point = 0,
+                                         workgroups = %buffer[%offset]
     ```
   }];
 

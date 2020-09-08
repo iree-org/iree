@@ -848,7 +848,7 @@ void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.command_buffer.dispatch
+// hal.command_buffer.dispatch.symbol
 //===----------------------------------------------------------------------===//
 
 void CommandBufferDispatchSymbolOp::build(
