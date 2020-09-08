@@ -63,6 +63,7 @@ cc_test(
         "//iree/base:status",
         "//iree/hal:driver_registry",
         "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
