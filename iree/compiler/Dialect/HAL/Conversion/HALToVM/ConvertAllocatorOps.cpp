@@ -46,18 +46,8 @@ class AllocatorAllocateConstOpConversion
                       std::to_string(allocateUniqueId(parentFuncOp)))
                          .str();
 
-    // VM supports a minimum of 8-bit elements. Round 1-bit bools to 8-bits.
-    auto value = op.value().cast<ElementsAttr>();
-    if (value.getType().getElementType().isInteger(1)) {
-      value = value.mapValues(rewriter.getIntegerType(8),
-                              llvm::function_ref<APInt(const APInt &val)>(
-                                  [](const APInt &val) -> APInt {
-                                    return APInt(8, val.getBoolValue());
-                                  }));
-    }
-
     auto rodataOp =
-        rewriter.create<IREE::VM::RodataOp>(op.getLoc(), constName, value);
+        rewriter.create<IREE::VM::RodataOp>(op.getLoc(), constName, op.value());
     rewriter.restoreInsertionPoint(ip);
     auto loadRodataOp =
         rewriter.create<IREE::VM::ConstRefRodataOp>(op.getLoc(), rodataOp);

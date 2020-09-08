@@ -57,9 +57,16 @@ class ConstantTensorOpConversion
         IREE::HAL::BufferUsageBitfield::All |
         IREE::HAL::BufferUsageBitfield::Constant;
 
+    auto elementsAttr = constantOp.getValue().cast<ElementsAttr>();
+    auto elementsTy = elementsAttr.getType().cast<ShapedType>();
+    if (elementsTy.getElementType().isInteger(1)) {
+      elementsAttr = elementsAttr.mapValues(rewriter.getIntegerType(8),  llvm::function_ref<APInt(const APInt& val)>([](const APInt& val) -> APInt {
+          return APInt(8, val.getBoolValue());
+      }));
+    }
+
     auto buffer = rewriter.createOrFold<IREE::HAL::AllocatorAllocateConstOp>(
-        constantOp.getLoc(), allocator, memoryTypes, bufferUsage,
-        constantOp.getValue().cast<ElementsAttr>());
+        constantOp.getLoc(), allocator, memoryTypes, bufferUsage, elementsAttr);
 
     // TODO(benvanik): implement resource sets.
     rewriter.create<IREE::HAL::ExDeferReleaseOp>(constantOp.getLoc(), buffer);
