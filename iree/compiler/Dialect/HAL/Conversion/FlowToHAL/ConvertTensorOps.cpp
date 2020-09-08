@@ -60,9 +60,12 @@ class ConstantTensorOpConversion
     auto elementsAttr = constantOp.getValue().cast<ElementsAttr>();
     auto elementsTy = elementsAttr.getType().cast<ShapedType>();
     if (elementsTy.getElementType().isInteger(1)) {
-      elementsAttr = elementsAttr.mapValues(rewriter.getIntegerType(8),  llvm::function_ref<APInt(const APInt& val)>([](const APInt& val) -> APInt {
-          return APInt(8, val.getBoolValue());
-      }));
+      elementsAttr =
+          elementsAttr.mapValues(rewriter.getIntegerType(8),
+                                 llvm::function_ref<APInt(const APInt &val)>(
+                                     [](const APInt &val) -> APInt {
+                                       return APInt(8, val.getBoolValue());
+                                     }));
     }
 
     auto buffer = rewriter.createOrFold<IREE::HAL::AllocatorAllocateConstOp>(
