@@ -109,7 +109,7 @@ func @command_buffer_bind_descriptor_set(%arg0 : !hal.command_buffer) {
 // CHECK-LABEL: @command_buffer_dispatch
 func @command_buffer_dispatch(%arg0 : !hal.command_buffer) {
   hal.executable @ex {
-    hal.executable.target @backend, "backend" {
+    hal.executable.target @backend, filter="backend" {
       hal.executable.entry_point @entry0 attributes {
         interface = @interface, ordinal = 0 : i32, signature = (tensor<f32>) -> tensor<f32>
       }
@@ -129,7 +129,7 @@ func @command_buffer_dispatch(%arg0 : !hal.command_buffer) {
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 func @command_buffer_dispatch_indirect(%arg0 : !hal.command_buffer) {
   hal.executable @ex {
-    hal.executable.target @backend, "backend" {
+    hal.executable.target @backend, filter="backend" {
       hal.executable.entry_point @entry0 attributes {
         interface = @interface, ordinal = 0 : i32, signature = (tensor<f32>) -> tensor<f32>
       }

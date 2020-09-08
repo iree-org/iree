@@ -5,7 +5,7 @@ hal.executable @exe {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @backend, "backend" {
+  hal.executable.target @backend, filter="backend" {
     hal.executable.entry_point @entry attributes {
       interface = @interface,
       ordinal = 0 : i32,

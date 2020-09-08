@@ -1230,7 +1230,8 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
-      failed(parser.parseComma()) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("filter")) ||
+      failed(parser.parseEqual()) ||
       failed(parser.parseAttribute(targetBackendFilterAttr,
                                    "target_backend_filter",
                                    result->attributes)) ||
@@ -1248,7 +1249,7 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
 static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
-  p << ", \"" << op.target_backend_filter() << "\"";
+  p << ", filter=\"" << op.target_backend_filter() << "\"";
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(),

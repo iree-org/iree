@@ -19,8 +19,8 @@ func @interface_io() {
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
-  // CHECK: hal.executable.target @backend, "backend"
-  hal.executable.target @backend, "backend" {
+  // CHECK: hal.executable.target @backend, filter="backend"
+  hal.executable.target @backend, filter="backend" {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : i32
