@@ -45,7 +45,6 @@ class AllocatorAllocateConstOpConversion
     auto constName = (parentFuncOp.getName() + "_const_" +
                       std::to_string(allocateUniqueId(parentFuncOp)))
                          .str();
-
     auto rodataOp =
         rewriter.create<IREE::VM::RodataOp>(op.getLoc(), constName, op.value());
     rewriter.restoreInsertionPoint(ip);
