@@ -59,10 +59,12 @@ class ConvertTieShapePattern : public ConvertToLLVMPattern {
     auto shape = rankedShapeType.getAllDims();
 
     // Update memref descriptor shape and strides.
+    // dynamic dim maybe in mid location, like shapex.ranked_shape<[128,?,128]
+    int dynIdx = 0;
     for (int i = 0; i < shape.size(); ++i) {
       if (shape[i] == ShapedType::kDynamicSize) {
         sourceMemRef.setSize(rewriter, loc, i,
-                             makeRankedShapeOp.dynamic_dimensions()[i]);
+                             makeRankedShapeOp.dynamic_dimensions()[dynIdx++]);
       } else {
         sourceMemRef.setConstantSize(rewriter, loc, i, shape[i]);
       }
