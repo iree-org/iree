@@ -57,16 +57,22 @@ static llvm::cl::opt<bool> splitInputFile(
                    "process each chunk independently"),
     llvm::cl::init(false));
 
+// TODO(#2958): We shouldn't need to register dialects here if translations
+// correctly declare the dialects they support.
+// TODO(#2958): Investigate whether we can use mlir-translate.cpp as an entry
+// point.
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
-
-  mlir::registerMlirDialects();
+  // TODO(#2958): We shouldn't need to register dialects here if translations
+  // correctly declare the dialects they support.
+  mlir::DialectRegistry registry;
+  mlir::registerMlirDialects(registry);
 #ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCDialect();
+  mlir::registerEmitCDialect(registry);
 #endif  // IREE_HAVE_EMITC_DIALECT
-  mlir::registerXLADialects();
-  mlir::iree_compiler::registerIreeDialects();
-  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerIreeDialects(registry);
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
   mlir::registerMlirTranslations();
@@ -108,8 +114,8 @@ int main(int argc, char **argv) {
   /// Processes the memory buffer with a new MLIRContext.
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {
-    mlir::MLIRContext context;
-    context.loadAllGloballyRegisteredDialects();
+    mlir::MLIRContext context(/*loadAllDialects=*/false);
+    registry.appendTo(context.getDialectRegistry());
     llvm::SourceMgr sourceMgr;
     sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
     mlir::SourceMgrDiagnosticHandler diagHandler(sourceMgr, &context);

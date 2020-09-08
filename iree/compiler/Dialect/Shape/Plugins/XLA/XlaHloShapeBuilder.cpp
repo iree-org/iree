@@ -336,8 +336,8 @@ Value rewriteTorchIndexSelect(RankedShapeType resultShape,
   int64_t indicesRank = indicesType.getRank();
 
   std::vector<int64_t> shape(paramsType.getShape());
-  int64_t axisValue = axis.getSExtValue();
-  int64_t batchDimValue = batchDim.getSExtValue();
+  int64_t axisValue = axis;
+  int64_t batchDimValue = batchDim;
 
   // For neg axis values, we wrap around params,
   // e.g. axis = -1 => params[:-1]

@@ -16,10 +16,12 @@
 #include "iree/base/signature_mangle.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/RegionGraphTraits.h"
 #include "mlir/IR/SymbolTable.h"
@@ -164,6 +166,10 @@ class TFSavedModelLowerGlobalTensors
     : public PassWrapper<TFSavedModelLowerGlobalTensors,
                          OperationPass<ModuleOp>> {
  public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect, IREEDialect>();
+  }
+
   void runOnOperation() override {
     if (failed(importTfSavedModelGlobalTensorsToIREEFlow(getOperation()))) {
       signalPassFailure();

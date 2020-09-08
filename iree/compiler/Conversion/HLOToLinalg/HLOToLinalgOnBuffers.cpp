@@ -464,8 +464,7 @@ LogicalResult ConvOpConversion::apply(
   auto groupSize =
       shape[op.dimension_numbers().kernel_output_feature_dimension().getInt()];
   // Depthwise conv path...
-  if (op.feature_group_count().getZExtValue() > 1u &&
-      op.feature_group_count().getZExtValue() == numGroups) {
+  if (op.feature_group_count() > 1u && op.feature_group_count() == numGroups) {
     // Lowering depthwise convolution to linalg.generic op. The idea is to use
     // the group convolution formulation to perform the separable depthwise
     // convolution as the following, given an n-dimensional input x and filter w
@@ -579,7 +578,7 @@ LogicalResult ConcatenateOpConversion::apply(
     mhlo::ConcatenateOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   Location loc = op.getLoc();
-  int dim = op.dimension().getSExtValue();
+  int dim = op.dimension();
   int rank = inputBuffers[0].getType().cast<ShapedType>().getRank();
 
   SmallVector<Attribute, 2> indexingMaps;
@@ -787,8 +786,8 @@ LogicalResult TorchIndexSelectOpConversion::apply(
     mhlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
   mhlo::TorchIndexSelectOp::Adaptor adaptor(inputBuffers);
-  int axis = op.dim().getSExtValue();
-  int batch = op.batch_dims().getSExtValue();
+  int axis = op.dim();
+  int batch = op.batch_dims();
   auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
   int nIndices = indexShapeType.getRank();
   auto inputShapeType = adaptor.input().getType().dyn_cast<ShapedType>();

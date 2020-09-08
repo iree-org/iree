@@ -14,9 +14,11 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
@@ -285,7 +287,7 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
     const auto &kernelShape = op.rhs().getType().cast<ShapedType>().getShape();
     if (kernelShape[featureInDim] != 1) return failure();
 
-    const auto groupCount = op.feature_group_count().getZExtValue();
+    const auto groupCount = op.feature_group_count();
     if (groupCount == 1) return failure();
     if (kernelShape[featureOutDim] % groupCount != 0) return failure();
 
@@ -307,7 +309,9 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
 
 // clang-format off
 //
-// Rewrites the following pattern
+// Reorder BroadcastInDimOp and N-ary elementwise op.
+//
+// Rewrites the following pattern (take binary elementwise op as example)
 //
 // %bcastx = "mhlo.broadcast_in_dim"(%x) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
 // %bcasty = "mhlo.broadcast_in_dim"(%y) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
@@ -316,56 +320,68 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
 // into
 //
 // %z = "BinaryElementwiseOpT"(%x, %y) : (%[[SHAPE_BEFORE_BCAST]], %[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_BEFORE_BCAST]]
-// %result = "mhlo.broadcast_in_dim"(%z) {} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
+// %result = "mhlo.broadcast_in_dim"(%z) {broadcast_dimensions = %[[BCAST_DIMS]]} : (%[[SHAPE_BEFORE_BCAST]]) -> %[[SHAPE_AFTER_BCAST]]
 //
 // clang-format on
-template <typename BinaryElementwiseOpT>
-class ReorderBroadcastInDimOpAndBinaryElementwiseOp
-    : public OpRewritePattern<BinaryElementwiseOpT> {
+template <typename ElementwiseOpT>
+class ReorderBroadcastInDimOpAndElementwiseOp
+    : public OpRewritePattern<ElementwiseOpT> {
  public:
-  using OpRewritePattern<BinaryElementwiseOpT>::OpRewritePattern;
+  using OpRewritePattern<ElementwiseOpT>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(BinaryElementwiseOpT op,
+  LogicalResult matchAndRewrite(ElementwiseOpT op,
                                 PatternRewriter &rewriter) const override {
-    auto lhsType = op.lhs().getType().template dyn_cast<ShapedType>();
-    auto rhsType = op.rhs().getType().template dyn_cast<ShapedType>();
-    if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
-        lhsType != rhsType) {
+    Operation *operation = op.getOperation();
+    assert(operation->getNumOperands() >= 1 && operation->getNumResults() == 1);
+
+    // Verify if all operands are from BroadcastInDimOp and its
+    // broadcast_dimensions is the same.
+    llvm::SmallVector<mhlo::BroadcastInDimOp, 2> bcastOps;
+    for (auto operand : operation->getOperands()) {
+      if (auto bcastOp = operand.getDefiningOp<mhlo::BroadcastInDimOp>()) {
+        bcastOps.push_back(bcastOp);
+      } else {
+        return failure();
+      }
+    }
+
+    if (llvm::any_of(bcastOps, [&bcastOps](mhlo::BroadcastInDimOp bcastOp) {
+          return bcastOp.broadcast_dimensions() !=
+                 bcastOps[0].broadcast_dimensions();
+        })) {
       return failure();
     }
 
-    auto lhsOp = op.lhs().getDefiningOp();
-    auto rhsOp = op.rhs().getDefiningOp();
-    if (!lhsOp || !rhsOp) {
-      return failure();
+    // Verify if all operands of BroadcastInDimOp are of same type and have
+    // static shape.
+    auto bcastOperandType =
+        bcastOps[0].operand().getType().template dyn_cast<ShapedType>();
+    llvm::SmallVector<Value, 2> bcastOperands;
+    for (auto bcastOp : bcastOps) {
+      auto bcastOperand = bcastOp.operand();
+      auto type = bcastOperand.getType().template dyn_cast<ShapedType>();
+      if (!type || !type.hasStaticShape() || type != bcastOperandType) {
+        return failure();
+      }
+      bcastOperands.push_back(bcastOperand);
     }
 
-    auto bcastxOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(lhsOp);
-    auto bcastyOp = llvm::dyn_cast<mhlo::BroadcastInDimOp>(rhsOp);
-    if (!bcastxOp || !bcastyOp ||
-        bcastxOp.broadcast_dimensions() != bcastyOp.broadcast_dimensions()) {
-      return failure();
-    }
+    // Some elementwise ops, mhlo::RealOp for example, do not have
+    // SameOperandsAndResultType trait, so resultType might be different
+    // from bcastOperandType.
+    auto elementType = getElementTypeOrSelf(op.getResult());
+    auto resultShape = bcastOperandType.getShape();
+    auto resultType = RankedTensorType::get(resultShape, elementType);
 
-    auto x = bcastxOp.operand();
-    auto y = bcastyOp.operand();
-    auto xType = x.getType().template dyn_cast<ShapedType>();
-    auto yType = y.getType().template dyn_cast<ShapedType>();
-    if (!xType || !yType || !xType.hasStaticShape() || xType != yType) {
-      return failure();
-    }
+    Value result =
+        rewriter.create<ElementwiseOpT>(op.getLoc(), resultType, bcastOperands);
+    rewriter.replaceOpWithNewOp<mhlo::BroadcastInDimOp>(
+        op, op.getType(), result, bcastOps[0].broadcast_dimensions());
 
-    auto loc = op.getLoc();
-    auto z = rewriter.create<BinaryElementwiseOpT>(loc, xType, x, y);
-    auto result = rewriter.create<mhlo::BroadcastInDimOp>(
-        loc, op.getType(), z, bcastxOp.broadcast_dimensions());
-    rewriter.replaceOp(op, {result});
-
-    if (lhsOp->hasOneUse()) {
-      rewriter.eraseOp(lhsOp);
-    }
-    if (rhsOp->hasOneUse()) {
-      rewriter.eraseOp(rhsOp);
+    for (auto bcastOp : bcastOps) {
+      if (bcastOp.getOperation()->use_empty()) {
+        rewriter.eraseOp(bcastOp);
+      }
     }
 
     return success();
@@ -374,6 +390,10 @@ class ReorderBroadcastInDimOpAndBinaryElementwiseOp
 
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<shape::ShapeDialect, mhlo::MhloDialect>();
+  }
+
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
@@ -386,22 +406,50 @@ struct HLOToHLOPreprocessing
     chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape, DecomposeLog1PPattern>(context);
+
+    // Unary elementwise op.
     patterns.insert<
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::AddOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::Atan2Op>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::ComplexOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::DivOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MaxOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MinOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::MulOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::PowOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::RemOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::ShiftLeftOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<
-            mhlo::ShiftRightArithmeticOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<
-            mhlo::ShiftRightLogicalOp>,
-        ReorderBroadcastInDimOpAndBinaryElementwiseOp<mhlo::SubOp>>(context);
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AbsOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::CeilOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ConvertOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ClzOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::CosOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ExpOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::Expm1Op>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::FloorOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ImagOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::IsFiniteOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::LogOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::Log1pOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::LogisticOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::NotOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::NegOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::PopulationCountOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::RealOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::RoundOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::RsqrtOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SignOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SinOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SqrtOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::TanhOp>>(context);
+    // Binary elementwise op.
+    patterns.insert<
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AddOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::Atan2Op>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ComplexOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::DivOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::MaxOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::MinOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::MulOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::PowOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::RemOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftLeftOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftRightArithmeticOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftRightLogicalOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SubOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AndOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::OrOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::XorOp>>(context);
     if (extractPadFromConv) {
       patterns.insert<ExtractConvOpPaddingAttributes>(context);
     }

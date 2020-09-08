@@ -65,6 +65,24 @@ extern "C" int main(int argc, char** argv) {
   LOG(INFO) << "Function name: "
             << std::string(function.name().data, function.name().size);
 
+  float input_x[] = {2.0f, 2.0f, 2.0f, 2.0f};
+  float input_y[] = {4.0f, 4.0f, 4.0f, 4.0f};
+  std::vector<float*> input{input_x, input_y};
+  float output[4] = {0.0f, 1.0f, 2.0f, 3.0f};
+  int element_count = 4;
+
+  auto invoke_status =
+      context->InvokeFunction(function, input, element_count, output);
+  if (!context_status.ok()) {
+    LOG(ERROR) << "Invoke function error: " << function_status.code();
+    return 1;
+  }
+
+  LOG(INFO) << "Function output:";
+  for (int i = 0; i < element_count; i++) {
+    LOG(INFO) << output[i];
+  }
+
   return 0;
 }
 

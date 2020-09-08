@@ -52,7 +52,12 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:VectorOps",
     ],
 )
 

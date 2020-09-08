@@ -277,6 +277,7 @@ void populateVMLAToVMPatterns(MLIRContext *context,
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::CmpOp, "vmla.cmp");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::SelectOp, "vmla.select");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::FiniteOp, "vmla.finite");
 
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::CopyOp, "vmla.copy");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TransposeOp, "vmla.transpose");
