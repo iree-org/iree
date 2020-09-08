@@ -19,14 +19,26 @@ package(
 )
 
 cc_library(
-    name = "init_conversions",
+    name = "LinalgToVector",
+    srcs = [
+        "LoadStoreVectorization.cpp",
+    ],
     hdrs = [
-        "init_conversions.h",
+        "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Conversion/HLOToLinalg",
-        "//iree/compiler/Conversion/LinalgToLLVM",
-        "//iree/compiler/Conversion/LinalgToSPIRV",
-        "//iree/compiler/Conversion/LinalgToVector",
+        "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
     ],
 )

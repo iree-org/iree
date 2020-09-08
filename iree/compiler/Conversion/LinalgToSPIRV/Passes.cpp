@@ -22,6 +22,7 @@
 
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
+#include "iree/compiler/Conversion/LinalgToVector/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
@@ -67,6 +68,11 @@ struct SPIRVCodegenClOpts : public PassPipelineOptions<SPIRVCodegenClOpts> {
       llvm::cl::desc(
           "Enable use of workgroup memory in SPIR-V code generation pipeline"),
       llvm::cl::init(false)};
+  Option<bool> useVectorPass{
+      *this, "use-vector-pass",
+      llvm::cl::desc("Enable use of Linalg vectorization in SPIR-V code "
+                     "generation pipeline"),
+      llvm::cl::init(false)};
 };
 
 static void addLinalgToSPIRVPasses(OpPassManager &pm,
@@ -101,8 +107,11 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
   pm.addPass(createSplitDispatchFunctionPass());
-  pm.addPass(createLinalgTileAndFusePass(
-      options.workgroupSize, options.tileSizes, options.useWorkgroupMemory));
+  pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
+                                         options.useWorkgroupMemory));
+  if (options.useVectorPass) {
+    pm.addPass(createLoadStoreVectorizationPass());
+  }
   pm.addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
