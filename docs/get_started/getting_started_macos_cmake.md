@@ -121,9 +121,11 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
 ### Further Reading
 
 *   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md) <!-- TODO:
+    [Developer Overview](../developing_iree/developer_overview.md).
+*   To understand how IREE implements HAL over Metal, see
+    [Metal HAL Driver](../design_docs/metal_hal_driver.md).
+<!-- TODO:
     Link to macOS versions of these guides once they are developed.
-*   To target GPUs using Vulkan, see
-    [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 *   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md) -->
+    [Getting Started with Python](getting_started_python.md)
+-->

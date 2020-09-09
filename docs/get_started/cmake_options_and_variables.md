@@ -89,6 +89,21 @@ Use lld when linking. Defaults to `OFF`. This option is equivalent to
 `-DIREE_USE_LINKER=lld`. The option `IREE_ENABLE_LLD` and `IREE_USE_LINKER` can
 not be set at the same time.
 
+#### `IREE_ENABLE_ASAN`:BOOL
+
+Enable [address sanitizer](https://clang.llvm.org/docs/AddressSanitizer.html)
+if the current build type is Debug and the compiler supports it.
+
+#### `IREE_ENABLE_MSAN`:BOOL
+
+Enable [memory sanitizer](https://clang.llvm.org/docs/MemorySanitizer.html)
+if the current build type is Debug and the compiler supports it.
+
+#### `IREE_ENABLE_TSAN`:BOOL
+
+Enable [thread sanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html)
+if the current build type is Debug and the compiler supports it.
+
 #### `IREE_MLIR_DEP_MODE`:STRING
 
 Defines the MLIR dependency mode. Case-sensitive. Can be `BUNDLED`, `DISABLED`
