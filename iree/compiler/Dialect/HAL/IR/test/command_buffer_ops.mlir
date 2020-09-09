@@ -44,8 +44,8 @@ func @command_buffer_begin_end(%arg0 : !hal.command_buffer) {
 
 // CHECK-LABEL: @command_buffer_device
 func @command_buffer_device(%arg0 : !hal.command_buffer) {
-  // CHECK: %device = hal.command_buffer.device %arg0 : !hal.device
-  %device = hal.command_buffer.device %arg0 : !hal.device
+  // CHECK: %0 = hal.command_buffer.device %arg0 : !hal.device
+  %0 = hal.command_buffer.device %arg0 : !hal.device
   return
 }
 

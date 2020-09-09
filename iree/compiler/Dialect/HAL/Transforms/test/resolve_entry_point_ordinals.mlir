@@ -22,7 +22,9 @@ module {
     %x = "test_hal.workgroup_x"() : () -> index
     %y = "test_hal.workgroup_y"() : () -> index
     %z = "test_hal.workgroup_z"() : () -> index
-    // CHECK: hal.command_buffer.dispatch %0, %1, entry_point = 0, workgroup_xyz = [%2, %3, %4]
+    // CHECK: %[[DEVICE:.+]] = hal.command_buffer.device %0
+    // CHECK: %[[EXE:.+]] = hal.executable.lookup %[[DEVICE]], @exe
+    // CHECK: hal.command_buffer.dispatch %0, %[[EXE]], entry_point = 0, workgroup_xyz = [%1, %2, %3]
     hal.command_buffer.dispatch.symbol %cmd, @exe::@target::@entry, workgroup_xyz = [%x, %y, %z]
     return
   }
@@ -34,11 +36,12 @@ module {
 module {
   func @dispatch_already_using_ordinals() {
     %cmd = "test_hal.command_buffer"() : () -> !hal.command_buffer
+    %exe = "test_hal.executable"() : () -> !hal.executable
     %x = "test_hal.workgroup_x"() : () -> index
     %y = "test_hal.workgroup_y"() : () -> index
     %z = "test_hal.workgroup_z"() : () -> index
     // CHECK: hal.command_buffer.dispatch %0, %1, entry_point = 2, workgroup_xyz = [%2, %3, %4]
-    hal.command_buffer.dispatch %cmd, 2, workgroup_xyz = [%x, %y, %z]
+    hal.command_buffer.dispatch %cmd, %exe, entry_point = 2, workgroup_xyz = [%x, %y, %z]
     return
   }
 }
@@ -66,7 +69,9 @@ module {
     %cmd = "test_hal.command_buffer"() : () -> !hal.command_buffer
     %buffer = "test_hal.buffer"() : () -> !hal.buffer
     %offset = "test_hal.offset"() : () -> index
-    // CHECK: hal.command_buffer.dispatch.indirect %0, %1, entry_point = 0, workgroups = %2[%3]
+    // CHECK: %[[DEVICE:.+]] = hal.command_buffer.device %0
+    // CHECK: %[[EXE:.+]] = hal.executable.lookup %[[DEVICE]], @exe
+    // CHECK: hal.command_buffer.dispatch.indirect %0, %[[EXE]], entry_point = 0, workgroups = %1[%2]
     hal.command_buffer.dispatch.indirect.symbol %cmd, @exe::@target::@entry, workgroups = %buffer[%offset]
     return
   }
@@ -78,10 +83,11 @@ module {
 module {
   func @dispatch_indirect_already_using_ordinals() {
     %cmd = "test_hal.command_buffer"() : () -> !hal.command_buffer
+    %exe = "test_hal.executable"() : () -> !hal.executable
     %buffer = "test_hal.buffer"() : () -> !hal.buffer
     %offset = "test_hal.offset"() : () -> index
     // CHECK: hal.command_buffer.dispatch.indirect %0, %1, entry_point = 0, workgroups = %2[%3]
-    hal.command_buffer.dispatch.indirect %cmd, 0, workgroups = %buffer[%offset]
+    hal.command_buffer.dispatch.indirect %cmd, %exe, entry_point = 0, workgroups = %buffer[%offset]
     return
   }
 }

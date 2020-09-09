@@ -27,7 +27,6 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
-    //  CHECK-DAG: %[[EXE:.+]] = hal.executable.lookup {{.+}}, @ex0 : !hal.executable
     //  CHECK-DAG: %[[EXE_LAYOUT:.+]] = hal.executable_layout.lookup
     //      CHECK: hal.command_buffer.push_descriptor_set %[[CMD]], %[[EXE_LAYOUT]], set=0, bindings=[0 = (%arg0, %c0, %sz_3), 1 = (%buffer_1, %c0, %sz_4)]
     //      CHECK: hal.command_buffer.dispatch.symbol {{.+}}, @ex0::@vmla::@entry0, workgroup_xyz
