@@ -52,6 +52,8 @@ cd ${ROOT_DIR}
 # Copy docs in source tree over
 cp README.md ${BUILD_DIR}/doc/index.md
 cp -rf docs/* ${BUILD_DIR}/doc/
+cp integrations/tensorflow/e2e/README.md \
+  ${BUILD_DIR}/doc/developing_iree/tensorflow_integrations.md
 
 # Update op_coverage.md
 scripts/update_op_coverage.py ${BUILD_DIR}
