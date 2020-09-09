@@ -59,6 +59,12 @@ class ConstantTensorOpConversion
 
     auto elementsAttr = constantOp.getValue().cast<ElementsAttr>();
     auto elementsTy = elementsAttr.getType().cast<ShapedType>();
+
+    // Expand boolean elements to the minimum bit widht supported by the HAL
+    // (8-bits).
+    // To improve memory bandwidth and increase computae we should prefer to
+    // pack 1-bit tensors into wider storage before this lossy conversion. For
+    // example bitwise ops on 8x32xi1 can be converted to ops on tensor<8xi32>.
     if (elementsTy.getElementType().isInteger(1)) {
       elementsAttr =
           elementsAttr.mapValues(rewriter.getIntegerType(8),
