@@ -2,7 +2,7 @@
 layout: default
 permalink: developing-iree/repository-management
 title: "IREE Repository Management"
-nav_order: 5
+nav_order: 6
 parent: Developing IREE
 ---
 

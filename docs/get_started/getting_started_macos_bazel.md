@@ -139,9 +139,7 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
 *   For an introduction to IREE's project structure and developer tools, see
     [Developer Overview](../developing_iree/developer_overview.md).
 *   To understand how IREE implements HAL over Metal, see
-    [Metal HAL Driver](../design_docs/metal_hal_driver.md).
-<!-- TODO:
-    Link to macOS versions of these guides once they are developed.
+    [Metal HAL Driver](../design_docs/metal_hal_driver.md). <!-- TODO: Link to
+    macOS versions of these guides once they are developed.
 *   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)
--->
+    [Getting Started with Python](getting_started_python.md) -->
