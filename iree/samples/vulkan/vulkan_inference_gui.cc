@@ -647,7 +647,9 @@ int iree::IreeMain(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Main loop.
   bool done = false;
+  int frame_number = 0;
   while (!done) {
+    frame_number++;
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
@@ -776,7 +778,7 @@ int iree::IreeMain(int argc, char** argv) {
             iree_vm_list_push_ref_retain(inputs.get(), signal_semaphore));
         iree_vm_value_t signal_value;
         signal_value.type = IREE_VM_VALUE_TYPE_I32;
-        signal_value.i32 = 1;
+        signal_value.i32 = frame_number;
         IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &signal_value));
 
         // Prepare outputs list to accept results from the invocation.
