@@ -261,9 +261,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # IREE compilation flags
 #-------------------------------------------------------------------------------
 
-string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
-string(JOIN " " CMAKE_C_FLAGS_DEBUG ${IREE_C_FLAGS_DEBUG_LIST})
-string(JOIN " " CMAKE_CXX_FLAGS_DEBUG ${IREE_CXX_FLAGS_DEBUG_LIST})
+iree_append_list_to_string(CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
+iree_append_list_to_string(CMAKE_C_FLAGS_DEBUG ${IREE_C_FLAGS_DEBUG_LIST})
+iree_append_list_to_string(CMAKE_CXX_FLAGS_DEBUG ${IREE_CXX_FLAGS_DEBUG_LIST})
 
 set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
 set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)
