@@ -134,8 +134,9 @@ extern "C" {
 #endif  // __cplusplus
 
 #if defined(_WIN32)
-#define IREE_API_CALL __stdcall
-#define IREE_API_PTR IREE_API_CALL
+// TODO(benvanik): __stdcall, if exporting as a shared library/DLL.
+#define IREE_API_CALL
+#define IREE_API_PTR
 #else
 #define IREE_API_CALL
 #define IREE_API_PTR
@@ -420,7 +421,7 @@ typedef enum {
   IREE_STATUS_DATA_LOSS = 15,
   IREE_STATUS_UNAUTHENTICATED = 16,
 
-  IREE_STATUS_CODE_MASK = 0x1F,
+  IREE_STATUS_CODE_MASK = 0x1Fu,
 } iree_status_code_t;
 
 // Opaque status structure containing an iree_status_code_t and optional status
@@ -544,7 +545,8 @@ typedef void* iree_status_t;
 
 // We cut out all status storage code when not used.
 #if IREE_STATUS_FEATURES == 0
-#define IREE_STATUS_IMPL_MAKE_(code, ...) (code)
+#define IREE_STATUS_IMPL_MAKE_(code, ...) \
+  (iree_status_t)(uintptr_t)((code)&IREE_STATUS_CODE_MASK)
 #undef IREE_STATUS_IMPL_RETURN_IF_API_ERROR_
 #define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, expr, ...) \
   iree_status_t var = (expr);                                 \

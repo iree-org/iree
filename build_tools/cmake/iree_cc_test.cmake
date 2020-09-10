@@ -92,6 +92,11 @@ function(iree_cc_test)
     PRIVATE
       ${_RULE_COPTS}
   )
+  target_link_options(${_NAME}
+    PRIVATE
+      ${_RULE_LINKOPTS}
+      ${IREE_DEFAULT_LINKOPTS}
+  )
   iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
   # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)

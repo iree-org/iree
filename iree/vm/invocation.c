@@ -17,50 +17,93 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-#define VMMAX(a, b) (((a) > (b)) ? (a) : (b))
-#define VMMIN(a, b) (((a) < (b)) ? (a) : (b))
+// Marshals caller arguments from the variant list to the ABI convention.
+static iree_status_t iree_vm_invoke_marshal_inputs(
+    iree_string_view_t cconv_arguments, iree_vm_list_t* inputs,
+    iree_byte_span_t arguments) {
+  // We are 1:1 right now with no variadic args, so do a quick verification on
+  // the input list.
+  if (!inputs) {
+    if (cconv_arguments.size > 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "no input provided to a function that has inputs");
+    }
+    return iree_ok_status();
+  } else if (cconv_arguments.size != iree_vm_list_size(inputs)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "input list and function mismatch; expected %zu "
+                            "arguments but passed %zu",
+                            cconv_arguments.size, iree_vm_list_size(inputs));
+  }
 
-// Marshals a variant list of values into callee registers.
-// The |out_dst_reg_list| will be populated with the register ordinals and must
-// be preallocated to store iree_vm_list_size inputs.
-static iree_status_t iree_vm_stack_frame_marshal_inputs(
-    iree_vm_list_t* inputs, const iree_vm_registers_t dst_regs,
-    iree_vm_register_list_t* out_dst_reg_list) {
-  iree_host_size_t count = iree_vm_list_size(inputs);
-  uint16_t i32_reg = 0;
-  uint16_t ref_reg = 0;
-  out_dst_reg_list->size = (uint16_t)count;
-  for (iree_host_size_t i = 0; i < count; ++i) {
-    iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(inputs, i, &variant));
-    if (iree_vm_type_def_is_ref(&variant.type)) {
-      out_dst_reg_list->registers[i] =
-          ref_reg | IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT;
-      iree_vm_ref_t* reg_ref = &dst_regs.ref[ref_reg++];
-      memset(reg_ref, 0, sizeof(*reg_ref));
-      iree_vm_ref_retain(&variant.ref, reg_ref);
-    } else {
-      out_dst_reg_list->registers[i] = i32_reg;
-      dst_regs.i32[i32_reg++] = variant.i32;
+  uint8_t* p = arguments.data;
+  for (iree_host_size_t cconv_i = 0, arg_i = 0; cconv_i < cconv_arguments.size;
+       ++cconv_i, ++arg_i) {
+    switch (cconv_arguments.data[cconv_i]) {
+      case IREE_VM_CCONV_TYPE_INT32: {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            inputs, arg_i, IREE_VM_VALUE_TYPE_I32, &value));
+        memcpy(p, &value.i32, sizeof(int32_t));
+        p += sizeof(int32_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_INT64: {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            inputs, arg_i, IREE_VM_VALUE_TYPE_I64, &value));
+        memcpy(p, &value.i64, sizeof(int64_t));
+        p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_REF: {
+        // TODO(benvanik): see if we can't remove this retain by instead relying
+        // on the caller still owning the list.
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_get_ref_retain(inputs, arg_i, (iree_vm_ref_t*)p));
+        p += sizeof(iree_vm_ref_t);
+      } break;
     }
   }
   return iree_ok_status();
 }
 
-// Marshals callee return registers into a variant list.
-static iree_status_t iree_vm_stack_frame_marshal_outputs(
-    const iree_vm_registers_t src_regs,
-    const iree_vm_register_list_t* src_reg_list, iree_vm_list_t* outputs) {
-  for (int i = 0; i < src_reg_list->size; ++i) {
-    uint16_t reg = src_reg_list->registers[i];
-    if (reg & IREE_REF_REGISTER_TYPE_BIT) {
-      iree_vm_ref_t* value = &src_regs.ref[reg & src_regs.ref_mask];
-      IREE_RETURN_IF_ERROR(iree_vm_list_push_ref_move(outputs, value));
-    } else {
-      iree_vm_value_t value;
-      value.type = IREE_VM_VALUE_TYPE_I32;
-      value.i32 = src_regs.i32[reg & src_regs.i32_mask];
-      IREE_RETURN_IF_ERROR(iree_vm_list_push_value(outputs, &value));
+// Marshals callee results from the ABI convention to the variant list.
+static iree_status_t iree_vm_invoke_marshal_outputs(
+    iree_string_view_t cconv_results, iree_byte_span_t results,
+    iree_vm_list_t* outputs) {
+  if (!outputs) {
+    if (cconv_results.size > 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "no output provided to a function that has outputs");
+    }
+    return iree_ok_status();
+  }
+
+  // Resize the output list to hold all results (and kill anything that may
+  // have been in there).
+  IREE_RETURN_IF_ERROR(iree_vm_list_resize(outputs, 0));
+  IREE_RETURN_IF_ERROR(iree_vm_list_resize(outputs, cconv_results.size));
+
+  uint8_t* p = results.data;
+  for (iree_host_size_t cconv_i = 0, arg_i = 0; cconv_i < cconv_results.size;
+       ++cconv_i, ++arg_i) {
+    switch (cconv_results.data[cconv_i]) {
+      case IREE_VM_CCONV_TYPE_INT32: {
+        iree_vm_value_t value = iree_vm_value_make_i32(*(int32_t*)p);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
+        p += sizeof(int32_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_INT64: {
+        iree_vm_value_t value = iree_vm_value_make_i64(*(int64_t*)p);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
+        p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_REF: {
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_set_ref_move(outputs, arg_i, (iree_vm_ref_t*)p));
+        p += sizeof(iree_vm_ref_t);
+      } break;
     }
   }
   return iree_ok_status();
@@ -74,70 +117,51 @@ static iree_status_t iree_vm_invoke_within(
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(stack);
 
-  // TODO(#2075): disabled because check_test is invoking native methods.
-  // These checks should be nice and simple as we don't support variadic
-  // args/results in bytecode.
-  iree_host_size_t input_count = inputs ? iree_vm_list_size(inputs) : 0;
-  iree_host_size_t output_count = outputs ? iree_vm_list_capacity(outputs) : 0;
-  // iree_vm_function_signature_t signature =
-  //     iree_vm_function_signature(&function);
-  // if (input_count != signature.argument_count) {
-  //   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  // } else if (!outputs && signature.result_count > 0) {
-  //   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-  // }
+  iree_vm_function_signature_t signature =
+      iree_vm_function_signature(&function);
+  iree_string_view_t cconv_arguments = iree_string_view_empty();
+  iree_string_view_t cconv_results = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+      &signature, &cconv_arguments, &cconv_results));
 
-  // Keep the I/O count reasonable to limit stack usage. If we end up passing
-  // this many things (such as for nested variadic lists/etc) we should instead
-  // use list objects as they'll be significantly more efficient.
-  if (input_count > 1024 || output_count > 1024) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "input/output count overflow");
-  }
-
-  // Allocate storage for marshaling arguments into the callee stack frame.
-  iree_vm_register_list_t* argument_registers =
-      (iree_vm_register_list_t*)iree_alloca(sizeof(iree_vm_register_list_t) +
-                                            input_count * sizeof(uint16_t));
-  argument_registers->size = (uint16_t)input_count;
-  iree_vm_register_list_t* result_registers =
-      (iree_vm_register_list_t*)iree_alloca(sizeof(iree_vm_register_list_t) +
-                                            output_count * sizeof(uint16_t));
-  result_registers->size = (uint16_t)output_count;
-
-  // Enter the [external] frame, which will have storage space for the
-  // argument and result registers.
-  iree_host_size_t register_count = VMMAX(input_count, output_count);
-  iree_vm_stack_frame_t* external_frame = NULL;
+  // Marshal the input arguments into the VM ABI and preallocate the result
+  // buffer.
+  // NOTE: today we don't support variadic arguments through this interface.
+  iree_byte_span_t arguments = iree_make_byte_span(NULL, 0);
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+      cconv_arguments, /*segment_size_list=*/NULL, &arguments.data_length));
+  arguments.data = iree_alloca(arguments.data_length);
+  memset(arguments.data, 0, arguments.data_length);
   IREE_RETURN_IF_ERROR(
-      iree_vm_stack_external_enter(stack, iree_make_cstring_view("invoke"),
-                                   register_count, &external_frame));
+      iree_vm_invoke_marshal_inputs(cconv_arguments, inputs, arguments));
 
-  // Marshal inputs into the external stack frame registers.
-  if (inputs) {
-    IREE_RETURN_IF_ERROR(iree_vm_stack_frame_marshal_inputs(
-        inputs, external_frame->registers, argument_registers));
-  }
+  // Allocate the result output that will be populated by the callee.
+  iree_byte_span_t results = iree_make_byte_span(NULL, 0);
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+      cconv_results, /*segment_size_list=*/NULL, &results.data_length));
+  results.data = iree_alloca(results.data_length);
+  memset(results.data, 0, results.data_length);
 
   // Perform execution. Note that for synchronous execution we expect this to
   // complete without yielding.
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = function;
-  call.argument_registers = argument_registers;
-  call.result_registers = result_registers;
+  call.arguments = arguments;
+  call.results = results;
   iree_vm_execution_result_t result;
-  IREE_RETURN_IF_ERROR(function.module->begin_call(function.module->self, stack,
-                                                   &call, &result));
-
-  // Read back the outputs from the [external] marshaling stack frame.
-  external_frame = iree_vm_stack_current_frame(stack);
-  if (outputs) {
-    IREE_RETURN_IF_ERROR(iree_vm_stack_frame_marshal_outputs(
-        external_frame->registers, result_registers, outputs));
+  iree_status_t status =
+      function.module->begin_call(function.module->self, stack, &call, &result);
+  if (!iree_status_is_ok(status)) {
+    iree_vm_function_call_release(&call, &signature);
+    return status;
   }
 
-  return iree_vm_stack_external_leave(stack);
+  // Read back the outputs from the result buffer.
+  IREE_RETURN_IF_ERROR(
+      iree_vm_invoke_marshal_outputs(cconv_results, results, outputs));
+
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(

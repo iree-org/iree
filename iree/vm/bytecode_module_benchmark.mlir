@@ -36,30 +36,30 @@ vm.module @bytecode_module_benchmark {
   }
 
   // Measures the cost of a call to an imported function.
-  vm.import @benchmark.imported_func(%arg : i32) -> i32
+  vm.import @native_import_module.add_1(%arg : i32) -> i32
   vm.export @call_imported_func
   vm.func @call_imported_func(%arg0 : i32) -> i32 {
-    %0 = vm.call @benchmark.imported_func(%arg0) : (i32) -> i32
-    %1 = vm.call @benchmark.imported_func(%0) : (i32) -> i32
-    %2 = vm.call @benchmark.imported_func(%1) : (i32) -> i32
-    %3 = vm.call @benchmark.imported_func(%2) : (i32) -> i32
-    %4 = vm.call @benchmark.imported_func(%3) : (i32) -> i32
-    %5 = vm.call @benchmark.imported_func(%4) : (i32) -> i32
-    %6 = vm.call @benchmark.imported_func(%5) : (i32) -> i32
-    %7 = vm.call @benchmark.imported_func(%6) : (i32) -> i32
-    %8 = vm.call @benchmark.imported_func(%7) : (i32) -> i32
-    %9 = vm.call @benchmark.imported_func(%8) : (i32) -> i32
-    %10 = vm.call @benchmark.imported_func(%9) : (i32) -> i32
-    %11 = vm.call @benchmark.imported_func(%10) : (i32) -> i32
-    %12 = vm.call @benchmark.imported_func(%11) : (i32) -> i32
-    %13 = vm.call @benchmark.imported_func(%12) : (i32) -> i32
-    %14 = vm.call @benchmark.imported_func(%13) : (i32) -> i32
-    %15 = vm.call @benchmark.imported_func(%14) : (i32) -> i32
-    %16 = vm.call @benchmark.imported_func(%15) : (i32) -> i32
-    %17 = vm.call @benchmark.imported_func(%16) : (i32) -> i32
-    %18 = vm.call @benchmark.imported_func(%17) : (i32) -> i32
-    %19 = vm.call @benchmark.imported_func(%18) : (i32) -> i32
-    %20 = vm.call @benchmark.imported_func(%19) : (i32) -> i32
+    %0 = vm.call @native_import_module.add_1(%arg0) : (i32) -> i32
+    %1 = vm.call @native_import_module.add_1(%0) : (i32) -> i32
+    %2 = vm.call @native_import_module.add_1(%1) : (i32) -> i32
+    %3 = vm.call @native_import_module.add_1(%2) : (i32) -> i32
+    %4 = vm.call @native_import_module.add_1(%3) : (i32) -> i32
+    %5 = vm.call @native_import_module.add_1(%4) : (i32) -> i32
+    %6 = vm.call @native_import_module.add_1(%5) : (i32) -> i32
+    %7 = vm.call @native_import_module.add_1(%6) : (i32) -> i32
+    %8 = vm.call @native_import_module.add_1(%7) : (i32) -> i32
+    %9 = vm.call @native_import_module.add_1(%8) : (i32) -> i32
+    %10 = vm.call @native_import_module.add_1(%9) : (i32) -> i32
+    %11 = vm.call @native_import_module.add_1(%10) : (i32) -> i32
+    %12 = vm.call @native_import_module.add_1(%11) : (i32) -> i32
+    %13 = vm.call @native_import_module.add_1(%12) : (i32) -> i32
+    %14 = vm.call @native_import_module.add_1(%13) : (i32) -> i32
+    %15 = vm.call @native_import_module.add_1(%14) : (i32) -> i32
+    %16 = vm.call @native_import_module.add_1(%15) : (i32) -> i32
+    %17 = vm.call @native_import_module.add_1(%16) : (i32) -> i32
+    %18 = vm.call @native_import_module.add_1(%17) : (i32) -> i32
+    %19 = vm.call @native_import_module.add_1(%18) : (i32) -> i32
+    %20 = vm.call @native_import_module.add_1(%19) : (i32) -> i32
     vm.return %20 : i32
   }
 

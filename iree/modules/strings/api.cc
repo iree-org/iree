@@ -25,9 +25,8 @@
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
 #include "iree/modules/strings/strings_module.h"
-#include "iree/vm/bytecode_module.h"
 #include "iree/vm/module.h"
-#include "iree/vm/module_abi_cc.h"
+#include "iree/vm/native_module_cc.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 

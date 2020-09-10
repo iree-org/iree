@@ -80,7 +80,7 @@ iree_cc_library(
     iree::modules::hal
     iree::testing::gtest
     iree::vm
-    iree::vm::module_abi_cc
+    iree::vm::native_module_cc
   TESTONLY
   PUBLIC
 )

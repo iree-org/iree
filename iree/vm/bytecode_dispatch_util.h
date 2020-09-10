@@ -31,6 +31,78 @@
 //===----------------------------------------------------------------------===//
 // Shared data structures
 //===----------------------------------------------------------------------===//
+//
+// Register bounds checking
+// ------------------------
+// All accesses into the register lists are truncated to the valid range for the
+// typed bank. This allows us to directly use the register ordinals from the
+// bytecode without needing to perform any validation at load-time or run-time.
+// The worst that can happen is that the bytecode program being executed doesn't
+// work as intended - which, with a working compiler, shouldn't happen. Though
+// there are cases where the runtime produces the register values and may know
+// that they are in range it's a good habit to always mask the ordinal by the
+// type-specific mask so that it's not possible for out of bounds accesses to
+// sneak in. The iree_vm_registers_t struct is often kept in cache and the
+// masking is cheap relative to any other validation we could be performing.
+//
+// Alternative register widths
+// ---------------------------
+// Registers in the VM are just a blob of memory and not physical device
+// registers. They have a natural width of 32-bits as that covers a majority of
+// our usage for i32/f32 but can be accessed at larger widths such as 64-bits or
+// more for vector operations. The base of each frame's register memory is
+// 16-byte aligned and accessing any individual register as a 32-bit value is
+// always 4-byte aligned.
+//
+// Supporting other register widths is "free" in that the registers for all
+// widths alias the same register storage memory. This is similar to how
+// physical registers work in x86 where each register can be accessed at
+// different sizes (like EAX/RAX alias and the SIMD registers alias as XMM1 is
+// 128-bit, YMM1 is 256-bit, and ZMM1 is 512-bit but all the same storage).
+//
+// The requirements for doing this is that the base alignment for any register
+// must be a multiple of 4 (due to the native 32-bit storage) AND aligned to the
+// natural size of the register (so 8 bytes for i64, 16 bytes for v128, etc).
+// This alignment can easily be done by masking off the low bits such that we
+// know for any valid `reg` ordinal aligned to 4 bytes `reg/N` will still be
+// within register storage. For example, i64 registers are accessed as `reg&~1`
+// to align to 8 bytes starting at byte 0 of the register storage.
+//
+// Transferring between register types can be done with vm.ext.* and vm.trunc.*
+// ops. For example, vm.trunc.i64.i32 will read an 8 byte register and write a
+// two 4 byte registers (effectively) with hi=0 and lo=the lower 32-bits of the
+// value.
+
+// Pointers to typed register storage.
+typedef struct {
+  // Ordinal mask defining which ordinal bits are valid. All i32 indexing must
+  // be ANDed with this mask.
+  uint16_t i32_mask;
+  // 16-byte aligned i32 register array.
+  int32_t* i32;
+  // Ordinal mask defining which ordinal bits are valid. All ref indexing must
+  // be ANDed with this mask.
+  uint16_t ref_mask;
+  // Naturally aligned ref register array.
+  iree_vm_ref_t* ref;
+} iree_vm_registers_t;
+
+// Storage associated with each stack frame of a bytecode function.
+// NOTE: we cannot store pointers to the stack in here as the stack may be
+// reallocated.
+typedef struct {
+  // Pointer to a register list within the stack frame where return registers
+  // will be stored by callees upon return.
+  const iree_vm_register_list_t* return_registers;
+
+  // Counts of each register type rounded up to the next power of two.
+  iree_host_size_t i32_register_count;
+  iree_host_size_t ref_register_count;
+
+  // Relative byte offsets from the head of this struct.
+  iree_host_size_t i32_register_offset;
+  iree_host_size_t ref_register_offset;
+} iree_vm_bytecode_frame_storage_t;
 
 // Interleaved src-dst register sets for branch register remapping.
 // This structure is an overlay for the bytecode that is serialized in a
@@ -67,7 +139,7 @@ static inline const iree_vm_type_def_t* iree_vm_map_type(
 #define IREE_DISPATCH_LOG_OPCODE(op_name) \
   fprintf(stderr, "DISPATCH %d %s\n", (int)pc, op_name)
 #define IREE_DISPATCH_LOG_CALL(target_function) \
-  fprintf(stderr, "CALL -> %s\n", iree_vm_function_name(&target_function).data);
+  fprintf(stderr, "CALL -> %s\n", iree_vm_function_name(target_function).data);
 #else
 #define IREE_DISPATCH_LOG_OPCODE(...)
 #define IREE_DISPATCH_LOG_CALL(...)

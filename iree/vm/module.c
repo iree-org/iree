@@ -17,6 +17,124 @@
 #include <string.h>
 
 #include "iree/base/atomics.h"
+#include "iree/vm/ref.h"
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_function_call_get_cconv_fragments(
+    const iree_vm_function_signature_t* signature,
+    iree_string_view_t* out_arguments, iree_string_view_t* out_results) {
+  memset(out_arguments, 0, sizeof(*out_arguments));
+  memset(out_results, 0, sizeof(*out_results));
+  iree_string_view_t cconv = signature->calling_convention;
+  if (!cconv.size) {
+    // No cconv string, so function is `()->()`.
+    return iree_ok_status();
+  } else if (cconv.data[0] != '0') {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "unsupported cconv version %c", cconv.data[0]);
+  }
+  iree_string_view_t cconv_body = iree_string_view_substr(cconv, 1, INTPTR_MAX);
+  if (iree_string_view_split(cconv_body, '.', out_arguments, out_results) ==
+      -1) {
+    *out_arguments = cconv_body;
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT bool IREE_API_CALL
+iree_vm_function_call_is_variadic_cconv(iree_string_view_t cconv) {
+  return iree_string_view_find_char(cconv, IREE_VM_CCONV_TYPE_SPAN_START, 0) !=
+         IREE_STRING_VIEW_NPOS;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_function_call_compute_cconv_fragment_size(
+    iree_string_view_t cconv_fragment,
+    const iree_vm_register_list_t* segment_size_list,
+    iree_host_size_t* out_required_size) {
+  iree_host_size_t required_size = 0;
+  for (iree_host_size_t i = 0, seg_i = 0; i < cconv_fragment.size;
+       ++i, ++seg_i) {
+    switch (cconv_fragment.data[i]) {
+      case IREE_VM_CCONV_TYPE_INT32:
+        required_size += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_INT64:
+        required_size += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        required_size += sizeof(iree_vm_ref_t);
+        break;
+      case IREE_VM_CCONV_TYPE_SPAN_START: {
+        if (IREE_UNLIKELY(!segment_size_list) ||
+            IREE_UNLIKELY(seg_i >= segment_size_list->size)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "variadic argument found but segment size "
+                                  "list is missing/underflowed");
+        }
+        iree_host_size_t span_count = segment_size_list->registers[seg_i];
+        required_size += sizeof(int32_t);  // count
+        iree_host_size_t span_size = 0;
+        for (i = i + 1; i < cconv_fragment.size &&
+                        cconv_fragment.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
+             ++i) {
+          switch (cconv_fragment.data[i]) {
+            case IREE_VM_CCONV_TYPE_INT32:
+              span_size += sizeof(int32_t);
+              break;
+            case IREE_VM_CCONV_TYPE_INT64:
+              span_size += sizeof(int64_t);
+              break;
+            case IREE_VM_CCONV_TYPE_REF:
+              span_size += sizeof(iree_vm_ref_t);
+              break;
+            default:
+              return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "unsupported cconv span type %c",
+                                      cconv_fragment.data[i]);
+          }
+        }
+        required_size += span_size * span_count;
+      } break;
+      default:
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "unsupported cconv type %c",
+                                cconv_fragment.data[i]);
+    }
+  }
+  *out_required_size = required_size;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void IREE_API_CALL
+iree_vm_function_call_release(iree_vm_function_call_t* call,
+                              const iree_vm_function_signature_t* signature) {
+  if (!call->arguments.data_length || !call->results.data_length) {
+    return;
+  }
+  iree_string_view_t cconv = signature->calling_convention;
+  if (cconv.size == 0 || cconv.data[0] != '0') return;
+  uint8_t* p = call->arguments.data;
+  for (iree_host_size_t i = 1; i < cconv.size; ++i) {
+    char c = cconv.data[i];
+    if (c == '.') {
+      // Switch to results.
+      p = call->results.data;
+    }
+    switch (c) {
+      case IREE_VM_CCONV_TYPE_INT32:
+        p += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_INT64:
+        p += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        iree_vm_ref_release((iree_vm_ref_t*)p);
+        p += sizeof(iree_vm_ref_t);
+        break;
+    }
+  }
+}
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
