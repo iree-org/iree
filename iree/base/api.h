@@ -173,6 +173,16 @@ extern "C" {
 #define IREE_MUST_USE_RESULT
 #endif  // IREE_HAVE_ATTRIBUTE(nodiscard)
 
+// `restrict` keyword, not supported by some older compilers.
+// We define our own macro in case dependencies use `restrict` differently.
+#if defined _MSC_VER && _MSC_VER >= 1900
+#define IREE_RESTRICT __restrict
+#elif defined _MSC_VER
+#define IREE_RESTRICT
+#else
+#define IREE_RESTRICT restrict
+#endif  // _MSC_VER
+
 // Compiler hint that can be used to indicate conditions that are very very very
 // likely or unlikely. This is most useful for ensuring that unlikely cases such
 // as error handling are moved off the mainline code path such that the code is

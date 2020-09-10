@@ -46,7 +46,7 @@ static inline uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
 // compiler should ensure this is the case when it can occur.
 static void iree_vm_bytecode_dispatch_remap_branch_registers(
     const iree_vm_registers_t regs,
-    const iree_vm_register_remap_list_t* restrict remap_list) {
+    const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list) {
   for (int i = 0; i < remap_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
@@ -67,7 +67,7 @@ static void iree_vm_bytecode_dispatch_remap_branch_registers(
 // memory consumption if used effectively prior to yields/waits.
 static void iree_vm_bytecode_dispatch_discard_registers(
     const iree_vm_registers_t regs,
-    const iree_vm_register_list_t* restrict reg_list) {
+    const iree_vm_register_list_t* IREE_RESTRICT reg_list) {
   for (int i = 0; i < reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     uint16_t reg = reg_list->registers[i];
@@ -246,8 +246,8 @@ static iree_status_t iree_vm_bytecode_external_enter(
 // |results| and we don't validate that here.
 static iree_status_t iree_vm_bytecode_external_leave(
     iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
-    const iree_vm_registers_t* restrict callee_registers,
-    const iree_vm_register_list_t* restrict src_reg_list,
+    const iree_vm_registers_t* IREE_RESTRICT callee_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     iree_string_view_t cconv_results, iree_byte_span_t results) {
   // Marshal results from registers to the ABI results buffer.
   uint8_t* p = results.data;
@@ -284,8 +284,8 @@ static iree_status_t iree_vm_bytecode_external_leave(
 // |dst_reg_list| will be stashed for use when leaving the frame.
 static iree_status_t iree_vm_bytecode_internal_enter(
     iree_vm_stack_t* stack, iree_vm_module_t* module, int32_t function_ordinal,
-    const iree_vm_register_list_t* restrict src_reg_list,
-    const iree_vm_register_list_t* restrict dst_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   // Stash the destination register list for result values on the caller.
@@ -340,7 +340,7 @@ static iree_status_t iree_vm_bytecode_internal_enter(
 static iree_status_t iree_vm_bytecode_internal_leave(
     iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
     const iree_vm_registers_t callee_registers,
-    const iree_vm_register_list_t* restrict src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Remaps registers from source to destination across frames.
@@ -386,10 +386,10 @@ static iree_status_t iree_vm_bytecode_internal_leave(
 static void iree_vm_bytecode_populate_import_cconv_arguments(
     iree_string_view_t cconv_arguments,
     const iree_vm_registers_t caller_registers,
-    const iree_vm_register_list_t* restrict segment_size_list,
-    const iree_vm_register_list_t* restrict src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     iree_byte_span_t storage) {
-  uint8_t* restrict p = storage.data;
+  uint8_t* IREE_RESTRICT p = storage.data;
   for (iree_host_size_t i = 0, seg_i = 0, reg_i = 0; i < cconv_arguments.size;
        ++i, ++seg_i) {
     switch (cconv_arguments.data[i]) {
@@ -470,7 +470,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
 static iree_status_t iree_vm_bytecode_issue_import_call(
     iree_vm_stack_t* stack, const iree_vm_function_call_t call,
     iree_string_view_t cconv_results,
-    const iree_vm_register_list_t* restrict dst_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
     iree_vm_registers_t* out_caller_registers,
     iree_vm_execution_result_t* out_result) {
@@ -492,7 +492,7 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
 
   // Marshal outputs from the ABI results buffer to registers.
   iree_vm_registers_t caller_registers = *out_caller_registers;
-  uint8_t* restrict p = call.results.data;
+  uint8_t* IREE_RESTRICT p = call.results.data;
   for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
        ++i) {
     uint16_t dst_reg = dst_reg_list->registers[i];
@@ -526,8 +526,8 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
 static iree_status_t iree_vm_bytecode_call_import(
     iree_vm_stack_t* stack, const iree_vm_bytecode_module_state_t* module_state,
     uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
-    const iree_vm_register_list_t* restrict src_reg_list,
-    const iree_vm_register_list_t* restrict dst_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
     iree_vm_registers_t* out_caller_registers,
     iree_vm_execution_result_t* out_result) {
@@ -567,9 +567,9 @@ static iree_status_t iree_vm_bytecode_call_import(
 static iree_status_t iree_vm_bytecode_call_import_variadic(
     iree_vm_stack_t* stack, const iree_vm_bytecode_module_state_t* module_state,
     uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
-    const iree_vm_register_list_t* restrict segment_size_list,
-    const iree_vm_register_list_t* restrict src_reg_list,
-    const iree_vm_register_list_t* restrict dst_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
     iree_vm_registers_t* out_caller_registers,
     iree_vm_execution_result_t* out_result) {
@@ -637,9 +637,9 @@ iree_status_t iree_vm_bytecode_dispatch(
   // The hope is that the compiler decides to keep these in registers (as
   // they are touched for every instruction executed). The frame will change
   // as we call into different functions.
-  const iree_vm_bytecode_module_state_t* restrict module_state =
+  const iree_vm_bytecode_module_state_t* IREE_RESTRICT module_state =
       (iree_vm_bytecode_module_state_t*)current_frame->module_state;
-  const uint8_t* restrict bytecode_data =
+  const uint8_t* IREE_RESTRICT bytecode_data =
       module->bytecode_data.data +
       module->function_descriptor_table[current_frame->function.ordinal]
           .bytecode_offset;
