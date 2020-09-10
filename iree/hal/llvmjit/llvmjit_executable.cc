@@ -51,7 +51,8 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   llvm::SMDiagnostic sm_diagnostic;
   auto module = llvm::parseAssembly(*mem_buffer, sm_diagnostic, *llvm_context);
   if (!module) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "Can't parse LLVMIR Module";
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Can't parse LLVMIR Module: " << sm_diagnostic.getMessage().str();
   }
   auto dataLayout = module->getDataLayout();
   const auto entry_points = module_def->entry_points();
@@ -71,7 +72,8 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
           dataLayout.getGlobalPrefix());
   if (!dylib_serarch_generator) {
     return UnavailableErrorBuilder(IREE_LOC)
-           << "Can't resolve symbols in current process";
+           << "Can't resolve symbols in current process: "
+           << llvm::toString(dylib_serarch_generator.takeError());
   }
 
   auto& main_jitdylib = ll_jit->getMainJITDylib();
@@ -84,7 +86,8 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
     auto func_symbol = executable->ll_jit_->lookup(func_name->str());
     if (!func_symbol) {
       return NotFoundErrorBuilder(IREE_LOC)
-             << "Can't JIT compile function : " << func_name;
+             << "Can't JIT compile function '" << func_name
+             << "': " << llvm::toString(func_symbol.takeError());
     }
     executable->symbols_.push_back(func_symbol.get());
   }
