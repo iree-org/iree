@@ -34,6 +34,7 @@ include(CMakeParseArguments)
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 # SHARED: If set, will compile to a shared object.
+# WHOLEARCHIVE: If set, links all symbols from "ALWAYSLINK" libraries.
 #
 # Note:
 # By default, iree_cc_library will always create a library named iree_${NAME},
@@ -68,7 +69,7 @@ include(CMakeParseArguments)
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;ALWAYSLINK;TESTONLY;SHARED"
+    "PUBLIC;ALWAYSLINK;TESTONLY;SHARED;WHOLEARCHIVE"
     "NAME"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -108,6 +109,9 @@ function(iree_cc_library)
       add_library(${_NAME} SHARED "")
     else()
       add_library(${_NAME} STATIC "")
+      if (_RULE_WHOLEARCHIVE)
+        message(FATAL_ERROR "WHOLEARCHIVE must be set together with SHARED")
+      endif()
     endif()
 
     target_sources(${_NAME}
@@ -127,13 +131,17 @@ function(iree_cc_library)
         ${IREE_DEFAULT_COPTS}
     )
 
+  if(_RULE_WHOLEARCHIVE)
+      iree_whole_archive_link(${_NAME} ${_RULE_DEPS})
+    else()
+      target_link_libraries(${_NAME} PUBLIC ${_RULE_DEPS})
+    endif()
     target_link_libraries(${_NAME}
-      PUBLIC
-        ${_RULE_DEPS}
       PRIVATE
         ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
     )
+
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
     target_compile_definitions(${_NAME}
       PUBLIC
