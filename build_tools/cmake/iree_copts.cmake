@@ -133,57 +133,6 @@ set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
-# Sanitizer configurations
-#-------------------------------------------------------------------------------
-
-include(CheckCXXCompilerFlag)
-if(${IREE_ENABLE_ASAN})
-  if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    message(FATAL_ERROR "IREE_ENABLE_ASAN requires Debug build")
-  endif()
-  set(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
-  check_cxx_compiler_flag(-fsanitize=address COMPILER_SUPPORTS_ASAN)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(${COMPILER_SUPPORTS_ASAN})
-    list(APPEND IREE_C_FLAGS_DEBUG_LIST "-fsanitize=address")
-    list(APPEND IREE_CXX_FLAGS_DEBUG_LIST "-fsanitize=address")
-  else()
-    message(FATAL_ERROR "The compiler does not support address sanitizer "
-                        "or is missing configuration for address sanitizer")
-  endif()
-endif()
-if(${IREE_ENABLE_MSAN})
-  if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    message(FATAL_ERROR "IREE_ENABLE_MSAN requires Debug build")
-  endif()
-  set(CMAKE_REQUIRED_FLAGS "-fsanitize=memory")
-  check_cxx_compiler_flag(-fsanitize=memory COMPILER_SUPPORTS_MSAN)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(${COMPILER_SUPPORTS_MSAN})
-    list(APPEND IREE_C_FLAGS_DEBUG_LIST "-fsanitize=memory")
-    list(APPEND IREE_CXX_FLAGS_DEBUG_LIST "-fsanitize=memory")
-  else()
-    message(FATAL_ERROR "The compiler does not support memory sanitizer "
-                        "or is missing configuration for address sanitizer")
-  endif()
-endif()
-if(${IREE_ENABLE_TSAN})
-  if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-    message(FATAL_ERROR "IREE_ENABLE_TSAN requires Debug build")
-  endif()
-  set(CMAKE_REQUIRED_FLAGS "-fsanitize=thread")
-  check_cxx_compiler_flag(-fsanitize=thread COMPILER_SUPPORTS_TSAN)
-  unset(CMAKE_REQUIRED_FLAGS)
-  if(${COMPILER_SUPPORTS_TSAN})
-    list(APPEND IREE_C_FLAGS_DEBUG_LIST "-fsanitize=thread")
-    list(APPEND IREE_CXX_FLAGS_DEBUG_LIST "-fsanitize=thread")
-  else()
-    message(FATAL_ERROR "The compiler does not support thread sanitizer "
-                        "or is missing configuration for address sanitizer")
-  endif()
-endif()
-
-#-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------
 
