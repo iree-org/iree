@@ -609,9 +609,10 @@ int iree::IreeMain(int argc, char** argv) {
         /*out_function=*/nullptr, &function_name, &function_signature));
     LOG(INFO) << "  " << i << ": '"
               << std::string(function_name.data, function_name.size)
-              << "' with <" << function_signature.argument_count
-              << "> argument(s) and <" << function_signature.result_count
-              << "> result(s)";
+              << "' with calling convention '"
+              << std::string(function_signature.calling_convention.data,
+                             function_signature.calling_convention.size)
+              << "'";
   }
 
   // Allocate a context that will hold the module state across invocations.
@@ -622,9 +623,9 @@ int iree::IreeMain(int argc, char** argv) {
       &iree_context));
   LOG(INFO) << "Context with modules is ready for use";
 
-  // Lookup the entry point function.
+  // Lookup the async entry point function.
   iree_vm_function_t main_function;
-  const char kMainFunctionName[] = "module.simple_mul";
+  const char kMainFunctionName[] = "module.simple_mul$async";
   IREE_CHECK_OK(iree_vm_context_resolve_function(
       iree_context,
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
@@ -633,6 +634,14 @@ int iree::IreeMain(int argc, char** argv) {
   LOG(INFO) << "Resolved main function named '"
             << std::string(main_function_name.data, main_function_name.size)
             << "'";
+
+  // Create wait and signal semaphores for async execution.
+  vm::ref<iree_hal_semaphore_t> wait_semaphore;
+  IREE_CHECK_OK(iree_hal_semaphore_create(
+      iree_vk_device, 0ull, iree_allocator_system(), &wait_semaphore));
+  vm::ref<iree_hal_semaphore_t> signal_semaphore;
+  IREE_CHECK_OK(iree_hal_semaphore_create(
+      iree_vk_device, 0ull, iree_allocator_system(), &signal_semaphore));
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -744,10 +753,17 @@ int iree::IreeMain(int argc, char** argv) {
             &input1_buffer_view));
         iree_hal_buffer_release(input0_buffer);
         iree_hal_buffer_release(input1_buffer);
-        // Marshal input buffer views through a VM variant list.
+        // Marshal inputs through a VM variant list.
+        // [wait_semaphore|wait_value|arg0|arg1|signal_semaphore|signal_value]
         vm::ref<iree_vm_list_t> inputs;
-        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 2,
+        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 6,
                                           iree_allocator_system(), &inputs));
+        IREE_CHECK_OK(
+            iree_vm_list_push_ref_retain(inputs.get(), wait_semaphore));
+        iree_vm_value_t wait_value;
+        wait_value.type = IREE_VM_VALUE_TYPE_I32;
+        wait_value.i32 = 0;
+        IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &wait_value));
         auto input0_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input0_buffer_view);
         auto input1_buffer_view_ref =
@@ -756,6 +772,12 @@ int iree::IreeMain(int argc, char** argv) {
             iree_vm_list_push_ref_move(inputs.get(), &input0_buffer_view_ref));
         IREE_CHECK_OK(
             iree_vm_list_push_ref_move(inputs.get(), &input1_buffer_view_ref));
+        IREE_CHECK_OK(
+            iree_vm_list_push_ref_retain(inputs.get(), signal_semaphore));
+        iree_vm_value_t signal_value;
+        signal_value.type = IREE_VM_VALUE_TYPE_I32;
+        signal_value.i32 = 1;
+        IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &signal_value));
 
         // Prepare outputs list to accept results from the invocation.
         vm::ref<iree_vm_list_t> outputs;
@@ -763,10 +785,17 @@ int iree::IreeMain(int argc, char** argv) {
                                           kElementCount * sizeof(float),
                                           iree_allocator_system(), &outputs));
 
-        // Synchronously invoke the function.
+        // Asynchronously invoke the function.
         IREE_CHECK_OK(iree_vm_invoke(iree_context, main_function,
                                      /*policy=*/nullptr, inputs.get(),
                                      outputs.get(), iree_allocator_system()));
+
+        // Wait for completion.
+        // TODO(scotttodd): Samples showing non-blocking async execution
+        //   * poll during update loop
+        //   * pipeline execution (use signal from one as wait for another)
+        IREE_CHECK_OK(iree_hal_semaphore_wait_with_timeout(
+            signal_semaphore.get(), 1, IREE_TIME_INFINITE_FUTURE));
 
         // Read back the results.
         DLOG(INFO) << "Reading back results...";
@@ -810,6 +839,9 @@ int iree::IreeMain(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Cleanup
+  iree_hal_semaphore_release(wait_semaphore.get());
+  iree_hal_semaphore_release(signal_semaphore.get());
+
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
   iree_vm_context_release(iree_context);

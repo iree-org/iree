@@ -322,11 +322,14 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
   // Postfix with signal semaphore and its value.
   asyncInputTypes.push_back(HAL::SemaphoreType::get(ctx));
   asyncInputTypes.push_back(moduleBuilder.getIndexType());
+
   // TODO(scotttodd): populate async export attributes
-  //   * iree.module.export with a name
   //   * iree.reflection (considering new args?)
   //   * iree.abi.stub
   SmallVector<NamedAttribute, 1> asyncExportAttrs;
+  asyncExportAttrs.push_back(moduleBuilder.getNamedAttr(
+      "iree.module.export",
+      StringAttr::get((exportName + "$async").str(), ctx)));
 
   auto asyncType = FunctionType::get(asyncInputTypes, resultTypes, ctx);
   auto asyncName = (rawCalleeFuncOp.getName() + "$async").str();
