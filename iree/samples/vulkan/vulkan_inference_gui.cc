@@ -609,9 +609,10 @@ int iree::IreeMain(int argc, char** argv) {
         /*out_function=*/nullptr, &function_name, &function_signature));
     LOG(INFO) << "  " << i << ": '"
               << std::string(function_name.data, function_name.size)
-              << "' with <" << function_signature.argument_count
-              << "> argument(s) and <" << function_signature.result_count
-              << "> result(s)";
+              << "' with calling convention '"
+              << std::string(function_signature.calling_convention.data,
+                             function_signature.calling_convention.size)
+              << "'";
   }
 
   // Allocate a context that will hold the module state across invocations.
