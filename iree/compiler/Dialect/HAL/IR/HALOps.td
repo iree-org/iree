@@ -1002,7 +1002,7 @@ def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
 }
 
 def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
-  let summary = [{command buffer device query pseudo-op}];
+  let summary = [{command buffer device query operation}];
   let description = [{
     Used during conversion to access the device used to create a command buffer.
   }];
