@@ -22,42 +22,6 @@ namespace iree {
 namespace hal {
 namespace metal {
 
-namespace {
-
-// Returns the repeated byte in |pattern| of |pattern_length| bytes. Returns absl::nullopt if
-// |pattern| does not contain repeated bytes.
-StatusOr<uint8_t> GetRepeatedBytePattern(const void* pattern, size_t pattern_length) {
-  switch (pattern_length) {
-    case 1: {
-      uint8_t pattern_value = *static_cast<const uint8_t*>(pattern);
-      return pattern_value;
-    }
-    case 2: {
-      uint16_t pattern_value = *static_cast<const uint16_t*>(pattern);
-      uint8_t high_byte = pattern_value >> 8;
-      uint8_t low_byte = pattern_value & 0xff;
-      if (high_byte != low_byte) {
-        return InvalidArgumentErrorBuilder(IREE_LOC) << "non-repeated bytes in pattern";
-      }
-      return low_byte;
-    }
-    case 4: {
-      uint32_t pattern_value = *static_cast<const uint32_t*>(pattern);
-      uint8_t low_byte = pattern_value & 0xff;
-      for (int shift_amount : {8, 16, 24}) {
-        if (low_byte != ((pattern_value >> shift_amount) & 0xff)) {
-          return InvalidArgumentErrorBuilder(IREE_LOC) << "non-repeated bytes in pattern";
-        }
-      }
-      return low_byte;
-    }
-    default:
-      return InvalidArgumentErrorBuilder(IREE_LOC) << "unsupported pattern length";
-  }
-}
-
-}  // namespace
-
 // static
 StatusOr<ref_ptr<CommandBuffer>> MetalCommandBuffer::Create(
     CommandBufferModeBitfield mode, CommandCategoryBitfield command_categories,
@@ -186,9 +150,13 @@ Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, device_size_t targe
 
   // Note that fillBuffer:range:value: only accepts a single byte as the pattern but FillBuffer
   // can accept 1/2/4 bytes. If the pattern itself contains repeated bytes, we can call into
-  // fillBuffer:range:value:. Otherwise we may need to find another way. Leave that as
-  // unimplemented for now.
-  IREE_ASSIGN_OR_RETURN(uint8_t byte_pattern, GetRepeatedBytePattern(pattern, pattern_length));
+  // fillBuffer:range:value:. Otherwise we may need to find another way. Just implement the case
+  // where we have a single byte to fill for now.
+  if (pattern_length != 1) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "MetalCommandBuffer::FillBuffer with non-1-byte pattern";
+  }
+  uint8_t byte_pattern = *reinterpret_cast<const uint8_t*>(pattern);
 
   [GetOrBeginBlitEncoder() fillBuffer:target_device_buffer->handle()
                                 range:NSMakeRange(target_offset, length)

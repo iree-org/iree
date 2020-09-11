@@ -87,30 +87,30 @@ TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
   // Fill the device buffer with segments of different values so that we can
   // test both fill and offset/size.
 
-  uint8_t i8_val = 0x07;
+  uint8_t val1 = 0x07;
   IREE_EXPECT_OK(command_buffer->FillBuffer(device_buffer.get(),
                                             /*target_offset=*/0,
                                             /*length=*/kBufferNumBytes / 4,
-                                            &i8_val,
+                                            &val1,
                                             /*pattern_length=*/1));
-  std::memset(reference_buffer.data(), i8_val, kBufferNumBytes / 4);
+  std::memset(reference_buffer.data(), val1, kBufferNumBytes / 4);
 
-  uint16_t i16_val = 0xbebe;
+  uint8_t val2 = 0xbe;
   IREE_EXPECT_OK(
       command_buffer->FillBuffer(device_buffer.get(),
                                  /*target_offset=*/kBufferNumBytes / 4,
-                                 /*length=*/kBufferNumBytes / 4, &i16_val,
-                                 /*pattern_length=*/2));
-  std::memset(reference_buffer.data() + kBufferNumBytes / 4, i16_val & 0xff,
+                                 /*length=*/kBufferNumBytes / 4, &val2,
+                                 /*pattern_length=*/1));
+  std::memset(reference_buffer.data() + kBufferNumBytes / 4, val2,
               kBufferNumBytes / 4);
 
-  uint32_t i32_val = 0x54545454;
+  uint8_t val3 = 0x54;
   IREE_EXPECT_OK(
       command_buffer->FillBuffer(device_buffer.get(),
                                  /*target_offset=*/kBufferNumBytes / 2,
-                                 /*length=*/kBufferNumBytes / 2, &i32_val,
-                                 /*pattern_length=*/4));
-  std::memset(reference_buffer.data() + kBufferNumBytes / 2, i32_val & 0xff,
+                                 /*length=*/kBufferNumBytes / 2, &val3,
+                                 /*pattern_length=*/1));
+  std::memset(reference_buffer.data() + kBufferNumBytes / 2, val3,
               kBufferNumBytes / 2);
 
   IREE_EXPECT_OK(command_buffer->End());
