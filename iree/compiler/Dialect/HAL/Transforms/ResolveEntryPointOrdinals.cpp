@@ -31,8 +31,19 @@ class ResolveCommandBufferDispatchOrdinals
                                 PatternRewriter &rewriter) const override {
     auto entryPointOp = dyn_cast<IREE::HAL::ExecutableEntryPointOp>(
         SymbolTable::lookupNearestSymbolFrom(op, op.entry_point()));
+
+    // Lookup the device for our command buffer, then the executable from the
+    // entry point's nested reference.
+    auto device = rewriter.createOrFold<IREE::HAL::CommandBufferDeviceOp>(
+        op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
+        op.command_buffer());
+    auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
+        entryPointOp.getParentOp()->getParentOp());
+    auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
+        op.getLoc(), device, executableOp.sym_name());
+
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchOp>(
-        op, op.command_buffer(), op.executable(), entryPointOp.ordinalAttr(),
+        op, op.command_buffer(), executable, entryPointOp.ordinalAttr(),
         op.workgroup_x(), op.workgroup_y(), op.workgroup_z());
     return success();
   }
@@ -49,8 +60,19 @@ class ResolveCommandBufferDispatchIndirectOrdinals
       PatternRewriter &rewriter) const override {
     auto entryPointOp = dyn_cast<IREE::HAL::ExecutableEntryPointOp>(
         SymbolTable::lookupNearestSymbolFrom(op, op.entry_point()));
+
+    // Lookup the device for our command buffer, then the executable from the
+    // entry point's nested reference.
+    auto device = rewriter.createOrFold<IREE::HAL::CommandBufferDeviceOp>(
+        op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
+        op.command_buffer());
+    auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
+        entryPointOp.getParentOp()->getParentOp());
+    auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
+        op.getLoc(), device, executableOp.sym_name());
+
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchIndirectOp>(
-        op, op.command_buffer(), op.executable(), entryPointOp.ordinalAttr(),
+        op, op.command_buffer(), executable, entryPointOp.ordinalAttr(),
         op.workgroups_buffer(), op.workgroups_offset());
     return success();
   }

@@ -75,6 +75,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // been expanded to primitives.
   passManager.addPass(createPublicABIGenerationPass());
 
+  // Resolve entry point ordinals from nested symbol references prior to
+  // serialization. As this pass creates lookup ops it should run before
+  // MaterializeResourceCachesPass.
+  passManager.addPass(createResolveEntryPointOrdinalsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+
   // Gather cachable resources such as executables and descriptor sets and
   // cache them at initialization-time.
   passManager.addPass(createMaterializeResourceCachesPass(targetOptions));
@@ -85,10 +92,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
-
-  // Resolve entry point ordinals from nested symbol references prior to
-  // serialization.
-  passManager.addPass(createResolveEntryPointOrdinalsPass());
 
   // TODO(#1036): run this once per hal.executable.target in a nested pass
   // manager so that we have as many passes as hal.executable.target ops.

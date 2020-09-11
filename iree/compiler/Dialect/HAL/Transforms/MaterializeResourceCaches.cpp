@@ -65,7 +65,7 @@ class MaterializeResourceCachesPass
     // loads from variables.
     for (auto funcOp : moduleOp.getOps<FuncOp>()) {
       for (auto &block : funcOp) {
-        for (auto &op : llvm::make_early_inc_range(block)) {
+        block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
             replaceDescriptorSetLayoutLookupOp(lookupOp);
           } else if (auto lookupOp = dyn_cast<ExecutableLayoutLookupOp>(op)) {
@@ -73,7 +73,7 @@ class MaterializeResourceCachesPass
           } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
             replaceExecutableLookupOp(lookupOp);
           }
-        }
+        });
       }
     }
 

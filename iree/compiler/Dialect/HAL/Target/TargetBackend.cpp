@@ -139,20 +139,18 @@ LogicalResult TargetBackend::recordDispatch(
       {
           dispatchState.workload,
           dispatchState.commandBuffer,
-          dispatchState.executable,
       });
   auto &entryBlock = region->front();
   auto workload = entryBlock.getArgument(0);
   auto commandBuffer = entryBlock.getArgument(1);
-  auto executable = entryBlock.getArgument(2);
 
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
   auto workgroupCount = calculateDispatchWorkgroupCount(
       loc, dispatchState.executableOp, dispatchState.entryPointOp, workload,
       builder);
   builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-      loc, commandBuffer, executable, dispatchState.entryPointOp,
-      workgroupCount[0], workgroupCount[1], workgroupCount[2]);
+      loc, commandBuffer, dispatchState.entryPointOp, workgroupCount[0],
+      workgroupCount[1], workgroupCount[2]);
 
   builder.create<IREE::HAL::ReturnOp>(loc);
   return success();
