@@ -52,6 +52,17 @@ class LLVMIRTargetBackend final : public TargetBackend {
     // clang-format on
   }
 
+  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
+                        IREE::HAL::ExecutableOp executableOp) override {
+    OpBuilder targetBuilder(&executableOp.getBlock().back());
+    auto targetContainerOp =
+        targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
+            sourceOp.getLoc(), /*name=*/"llvm_ir",
+            /*targetBackendFilter=*/name());
+    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
+    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+  }
+
   void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
                                     OpPassManager& passManager) override {
     buildLLVMTransformPassPipeline(passManager);

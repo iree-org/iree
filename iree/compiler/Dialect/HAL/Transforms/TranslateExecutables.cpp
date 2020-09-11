@@ -55,9 +55,9 @@ class TranslateExecutablesPass
     for (auto targetOp : targetOps) {
       // TODO(#1036): this will be what we want the dynamic pass manager to
       // do for us: we want to nest all of the backend passes on a source op
-      // that matches their target_backend pattern.
+      // that matches their target_backend_filter pattern.
       for (auto &targetBackend :
-           matchTargetBackends({targetOp.target_backend().str()})) {
+           matchTargetBackends({targetOp.target_backend_filter().str()})) {
         // Run the nested pass manager. This is effectively the same as
         // launching a new iree-opt, and as such won't integrate well with the
         // logging/pass instrumentation of the parent pass manager.
@@ -68,7 +68,7 @@ class TranslateExecutablesPass
         if (failed(targetPassManager.run(targetOp.getInnerModule()))) {
           targetOp.emitError() << "failed to run translation of source "
                                   "executable to target executable for backend "
-                               << targetOp.target_backend();
+                               << targetOp.target_backend_filter();
           return signalPassFailure();
         }
       }
