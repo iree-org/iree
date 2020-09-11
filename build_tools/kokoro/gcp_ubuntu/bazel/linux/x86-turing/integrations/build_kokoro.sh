@@ -34,7 +34,7 @@ docker run \
   --rm \
   --env IREE_VULKAN_DISABLE=0 \
   --gpus all \
-  gcr.io/iree-oss/bazel-nvidia:prod \
+  gcr.io/iree-oss/bazel-nvidia@sha256:77866668ac679de65f5008c3c3df0e5dbf2944a431c88a8c1b6b2e8ab7f8c65d \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-turing/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
