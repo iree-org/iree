@@ -28,8 +28,6 @@ namespace Sequence {
 
 #include "iree/compiler/Dialect/Sequence/IR/SequenceOpInterface.cpp.inc"
 
-static DialectRegistration<SequenceDialect> sequence_dialect;
-
 SequenceDialect::SequenceDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<SequenceDialect>()) {
   addTypes<SequenceType>();

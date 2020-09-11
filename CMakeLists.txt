@@ -236,6 +236,7 @@ option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
 
 include(iree_macros)
 include(iree_copts)
+include(iree_whole_archive_link)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
@@ -260,9 +261,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # IREE compilation flags
 #-------------------------------------------------------------------------------
 
-string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
-string(JOIN " " CMAKE_C_FLAGS_DEBUG ${IREE_C_FLAGS_DEBUG_LIST})
-string(JOIN " " CMAKE_CXX_FLAGS_DEBUG ${IREE_CXX_FLAGS_DEBUG_LIST})
+iree_append_list_to_string(CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
+iree_append_list_to_string(CMAKE_C_FLAGS_DEBUG ${IREE_C_FLAGS_DEBUG_LIST})
+iree_append_list_to_string(CMAKE_CXX_FLAGS_DEBUG ${IREE_CXX_FLAGS_DEBUG_LIST})
 
 set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
 set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)

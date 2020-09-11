@@ -27,8 +27,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-static DialectRegistration<IREEDialect> base_dialect;
-
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<IREEDialect>()) {
   addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType, IREE::PtrType>();

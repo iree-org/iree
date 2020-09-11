@@ -27,8 +27,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/api.h"
 #include "iree/modules/strings/api_detail.h"
-#include "iree/vm/bytecode_module.h"
-#include "iree/vm/module_abi_cc.h"
+#include "iree/vm/native_module_cc.h"
 
 static iree_vm_ref_type_descriptor_t strings_string_descriptor = {0};
 static iree_vm_ref_type_descriptor_t strings_string_tensor_descriptor = {0};

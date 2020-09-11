@@ -35,18 +35,29 @@ typedef struct iree_vm_stack_frame iree_vm_stack_frame_t;
 // to hash codes.
 typedef int64_t iree_vm_source_offset_t;
 
+// A key-value pair of module/function reflection information.
+typedef struct {
+  iree_string_view_t key;
+  iree_string_view_t value;
+} iree_vm_reflection_attr_t;
+
 // A variable-length list of registers.
 //
 // This structure is an overlay for the bytecode that is serialized in a
 // matching format, though it can be stack allocated as needed.
+//
+// TODO(benvanik): this should be made private to the bytecode module, but is
+// used for toll-free variadic argument lists here. We could just define an
+// identical structure (and static_assert) to at least rename it to something
+// sensible (iree_vm_segment_size_list_t).
 typedef struct {
   uint16_t size;
   uint16_t registers[];
 } iree_vm_register_list_t;
 static_assert(iree_alignof(iree_vm_register_list_t) == 2,
-              "Expecting byte alignment (to avoid padding)");
+              "expecting byte alignment (to avoid padding)");
 static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
-              "Expect no padding in the struct");
+              "expect no padding in the struct");
 
 // Describes the type of a function reference.
 enum iree_vm_function_linkage_e {
@@ -76,24 +87,38 @@ typedef struct {
   iree_vm_function_linkage_t linkage;
   // Ordinal within the module in the linkage scope.
   uint16_t ordinal;
-
-  // TODO(#1979): move register info to iree_vm_function_signature_t.
-  // Total number of valid i32 registers used by the function.
-  uint16_t i32_register_count;
-  // Total number of valid ref registers used by the function.
-  uint16_t ref_register_count;
 } iree_vm_function_t;
-static_assert(sizeof(iree_vm_function_t) == 8 + sizeof(void*),
+static_assert(sizeof(iree_vm_function_t) <= 2 * sizeof(void*),
               "Must remain small as stored on the stack");
 
 // Describes the expected calling convention and arguments/results of a
 // function.
 typedef struct {
-  // TODO(#1979): rework to add useful information here (types, etc).
-  // Total number of arguments to the function.
-  iree_host_size_t argument_count;
-  // Total number of results from the function.
-  iree_host_size_t result_count;
+  // The VM calling convention declaration used to marshal arguments and
+  // results into and out of the function.
+  // Optional for imports and internal functions but required for exports.
+  //
+  // Format:
+  // - '0': version 0 prefix
+  // - Zero or more arguments:
+  //   - 'i': int32_t integer (i32)
+  //   - 'I': int64_t integer (i64)
+  //   - 'r': ref-counted type pointer (!vm.ref<?>)
+  //   - '[' ... ']': variadic list of flattened tuples of a specified type
+  // - EOL or '.'
+  // - Zero or more results:
+  //   - 'i' or 'I'
+  //   - 'r'
+  //
+  // Examples:
+  //   `0` or `0.`: () -> ()
+  //   `0i` or `0i.`: (i32) -> ()
+  //   `0ii[ii].i`: (i32, i32, tuple<i32, i32>...) -> i32
+  //   `0ir[ir].r`: (i32, !vm.ref<?>, tuple<i32, !vm.ref<?>>) -> !vm.ref<?>
+  //
+  // Users of this field must verify the version prefix in the first byte before
+  // using the declaration.
+  iree_string_view_t calling_convention;
 } iree_vm_function_signature_t;
 
 // Describes the imports, exports, and capabilities of a module.
@@ -112,24 +137,113 @@ typedef struct {
 // VM functions and accessing this state.
 typedef struct iree_vm_module_state iree_vm_module_state_t;
 
-// Function call arguments.
+// Function call data.
+//
+// Arguments and results are encoded following a standard format shared across
+// all module types. This allows implementations that have different storage
+// types (such as physical machine registers vs. virtual registers) to use the
+// same cross-module calling convention.
+//
+// Callees can assume that callers have properly allocated and setup the
+// argument and result buffers and need not verify them. This works only because
+// the calling convention format is directly queried from the callee module.
+//
+// Encoding:
+// - each int is encoded as a 4-byte aligned value
+// - each ref is encoded as a 4-byte aligned iree_vm_ref_t value
+// - variadic tuples are encoded as a 4-byte count prefix and the tuple values
+//
+// For example, (i32, tuple<!vm.ref<?>, i32>..., i32) is encoded as:
+//    4b: i32
+//    4b: tuple count
+//    repeated:
+//      8b-16b: iree_vm_ref_t
+//      4b: i32
+//    4b: i32
+//
+// Example sequence:
+//  1. ModuleA wants to call SomeFunction from ModuleB
+//  2. ModuleA imports SomeFunction from ModuleB and gets its
+//     iree_vm_function_signature_t during import resolution
+//  3. ModuleA checks that it understands/supports that calling convention
+//     with error handling if needed (e.g. if ModuleB is newer and uses a newer
+//     version that ModuleA wasn't compiled knowing about, or ModuleB is ancient
+//     and uses a deprecated version that ModuleA has already dropped)
+//  4. ModuleA prepares argument and result buffers according to the calling
+//     convention defined by ModuleB and calls SomeFunction
+//  5. ModuleB handles the call, trusting that the input and output buffers are
+//     as expected
+//
+// NOTE: we could switch to using libffi, but I didn't want to require that for
+// all uses and didn't want to enable the issues that can arise when crossing
+// device boundaries. With what we have here we can rather easily serialize the
+// argument/result buffers and map them between independent address spaces.
+// Instead, implementing a native_module-alike of libffi_module would be a
+// better layering for callee modules.
 typedef struct {
   // Function to call.
   iree_vm_function_t function;
-  // Optional list of source argument registers within the caller frame.
-  // The arguments will be copied or moved from the caller to the callee upon
-  // function entry.
-  const iree_vm_register_list_t* argument_registers;
-  // Optional variadic argument segment size list that can be provided to call
-  // functions with variadic arguments. Each element represents one value per
-  // logical operand group in the call with non-variadic arguments having a
-  // value of 1 and variadic arguments having a value in the range of 0 to N.
-  const iree_vm_register_list_t* variadic_segment_size_list;
-  // Optional list of target result registers within the caller frame.
-  // When the target function returns the register will be copied from the
-  // callee frame to the caller frame.
-  const iree_vm_register_list_t* result_registers;
+
+  // Argument buffer in the format described above.
+  // This is only read on beginning the function and need not live beyond that.
+  //
+  // Refs contained will be moved into the target function or released if not
+  // needed. Callers must ensure they move or retain arguments when populating
+  // the arguments buffer.
+  iree_byte_span_t arguments;
+
+  // Storage for the result buffer; assumed undefined and then populated with
+  // data in a format described above. This is required for both the beginning
+  // of function invocation as well as each resume (as any may actually return
+  // control flow).
+  //
+  // Refs contained will be retained in the results buffer and callers must
+  // either move or release them upon return from the call.
+  iree_byte_span_t results;
 } iree_vm_function_call_t;
+
+#define IREE_VM_CCONV_TYPE_INT32 'i'
+#define IREE_VM_CCONV_TYPE_INT64 'I'
+#define IREE_VM_CCONV_TYPE_REF 'r'
+#define IREE_VM_CCONV_TYPE_SPAN_START '['
+#define IREE_VM_CCONV_TYPE_SPAN_END ']'
+
+// Returns the arguments and results fragments from the function signature.
+// Either may be empty if they have no values.
+//
+// Example:
+//  ``          -> arguments = ``, results = ``
+//  `0`         -> arguments = ``, results = ``
+//  `0ri`       -> arguments = `ri`, results = ``
+//  `0.ir`      -> arguments = ``, results = `ir`
+//  `0i[i].rr`  -> arguments = `i[i]`, results = `rr`
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_function_call_get_cconv_fragments(
+    const iree_vm_function_signature_t* signature,
+    iree_string_view_t* out_arguments, iree_string_view_t* out_results);
+
+// Returns true if the given cconv contains one or more variadic types.
+IREE_API_EXPORT bool IREE_API_CALL
+iree_vm_function_call_is_variadic_cconv(iree_string_view_t cconv);
+
+// Returns the required size, in bytes, to store the data in the given cconv
+// fragment (like `iI[ri]r`).
+//
+// The provided |segment_size_list| is used for variadic arguments/results. Each
+// entry represents one of the top level arguments with spans being flattened.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_function_call_compute_cconv_fragment_size(
+    iree_string_view_t cconv_fragment,
+    const iree_vm_register_list_t* segment_size_list,
+    iree_host_size_t* out_required_size);
+
+// Releases any retained refs within the call (either arguments or results).
+// This needs only be called if a call fails as implementations are required to
+// clean up the arguments as they are marshaled in and callers are required to
+// clean up the results as they are marshaled out.
+IREE_API_EXPORT void IREE_API_CALL
+iree_vm_function_call_release(iree_vm_function_call_t* call,
+                              const iree_vm_function_signature_t* signature);
 
 // Results of an iree_vm_module_execute request.
 typedef struct {
@@ -189,7 +303,8 @@ typedef struct iree_vm_module {
   // state.
   iree_status_t(IREE_API_PTR* resolve_import)(
       void* self, iree_vm_module_state_t* module_state,
-      iree_host_size_t ordinal, iree_vm_function_t function);
+      iree_host_size_t ordinal, const iree_vm_function_t* function,
+      const iree_vm_function_signature_t* signature);
 
   // Begins a function call with the given |call| arguments.
   // Execution may yield in the case of asynchronous code and require one or

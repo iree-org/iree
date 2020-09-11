@@ -31,8 +31,6 @@ namespace VMLA {
 
 namespace {
 
-static DialectRegistration<VMLADialect> vmla_dialect;
-
 class VMLAToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;

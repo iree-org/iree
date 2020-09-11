@@ -70,39 +70,39 @@ TargetOptions getTargetOptionsFromFlags();
 //   -> flow.executable @my_exe
 //   [[-iree-hal-materialize-interfaces]]
 //   -> hal.executable @my_exe
-//      + hal.executable.target "vulkan-spirv-v1.1-mobile"
+//      + hal.executable.target @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
 //          hal.executable.entry_point @my_entry
 //          module { ... }
-//      + hal.executable.target "vulkan-spirv-v1.1-desktop"
+//      + hal.executable.target @spirv-v1.1-desktop filter="spirv-v1.1-desktop*"
 //          hal.executable.entry_point @my_entry
 //          module { ... }
-//      + hal.executable.target "vulkan-spirv-v1.2-desktop"
+//      + hal.executable.target @spirv-v1.2-desktop filter="spirv-v1.2-desktop*"
 //          hal.executable.entry_point @my_entry
 //          module { ... }
 //   [[-iree-hal-translate-executables]]
 //   -> hal.executable @my_exe
-//      + hal.executable.target "vulkan-spirv-v1.1-mobile"
+//      + hal.executable.target @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
 //          hal.executable.entry_point @my_entry_1
 //          hal.executable.entry_point @my_entry_2
 //          hal.executable.entry_point @my_entry_3
 //          module { spv.module { ... } }
-//      + hal.executable.target "vulkan-spirv-v1.1-desktop"
+//      + hal.executable.target @spirv-v1.1-desktop filter="spirv-v1.1-desktop*"
 //          hal.executable.entry_point @my_entry
 //          module { spv.module { ... } }
-//      + hal.executable.target "vulkan-spirv-v1.2-desktop"
+//      + hal.executable.target @spirv-v1.2-desktop filter="spirv-v1.2-desktop*"
 //          hal.executable.entry_point @my_entry
 //          module { spv.module { ... } }
 //   [[-iree-hal-link-executables]]
 //   -> TODO(benvanik): linkage rules.
 //   [[-iree-hal-serialize-executables]]
 //   -> hal.executable @my_exe
-//      + hal.executable.binary "vulkan-spirv-v1.1-mobile" "spirv-binary"
+//      + hal.executable.binary attributes { ... }
 //          data blob...
-//      + hal.executable.binary "vulkan-spirv-v1.1-mobile" "smolv-binary"
+//      + hal.executable.binary attributes { ... }
 //          data blob...
-//      + hal.executable.binary "vulkan-spirv-v1.1-desktop" "spirv-binary"
+//      + hal.executable.binary attributes { ... }
 //          data blob...
-//      + hal.executable.binary "vulkan-spirv-v1.2-desktop" "spirv-binary"
+//      + hal.executable.binary attributes { ... }
 //          data blob...
 class TargetBackend {
  public:
@@ -118,9 +118,11 @@ class TargetBackend {
 
   virtual ~TargetBackend() = default;
 
-  // Returns the name of the backend as expected to be matched with a call to
-  // matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
+  // Returns a name for the backend used to differentiate between other targets.
   virtual std::string name() const = 0;
+  // Returns a filter pattern for the backend as expected to be matched with a
+  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
+  virtual std::string filter_pattern() const = 0;
 
   // Creates an interface representing the bindings and push constants required
   // to dispatch the executable. Interfaces used across backends and executables

@@ -52,13 +52,6 @@ inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format on
 }
 
-// This function should be called before creating any MLIRContext if one expect
-// all the possible dialects to be made available to the context automatically.
-inline void registerMlirDialects() {
-  static bool initOnce =
-      ([]() { registerMlirDialects(getGlobalDialectRegistry()); }(), true);
-  (void)initOnce;
-}
 }  // namespace mlir
 
 #endif  // IREE_TOOLS_INIT_MLIR_DIALECTS_H_

@@ -28,8 +28,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Check {
 
-static DialectRegistration<CheckDialect> check_dialect;
-
 namespace {
 class CheckToVmConversionInterface : public VMConversionDialectInterface {
  public:

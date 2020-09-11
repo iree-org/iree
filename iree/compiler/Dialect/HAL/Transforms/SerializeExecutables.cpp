@@ -44,7 +44,7 @@ class SerializeExecutablesPass
         executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>());
     for (auto targetOp : targetOps) {
       for (auto &targetBackend :
-           matchTargetBackends({targetOp.target_backend().str()})) {
+           matchTargetBackends({targetOp.target_backend_filter().str()})) {
         // Ask the target backend to serialize the executable. Note that it may
         // create one or more hal.executable.binary ops in the case of
         // multi-architecture binaries.
@@ -52,7 +52,7 @@ class SerializeExecutablesPass
         if (failed(targetBackend->serializeExecutable(targetOp,
                                                       executableBuilder))) {
           targetOp.emitError() << "failed to serialize op to target backend "
-                               << targetOp.target_backend();
+                               << targetOp.target_backend_filter();
           return signalPassFailure();
         }
       }

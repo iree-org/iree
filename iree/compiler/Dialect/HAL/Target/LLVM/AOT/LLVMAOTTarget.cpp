@@ -42,8 +42,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   LLVMAOTTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {}
 
-  // NOTE: we could vary this based on the options, such as by arch/etc.
-  std::string name() const override { return "dylib*"; }
+  // NOTE: we could vary these based on the options, such as by arch/etc.
+  std::string name() const override { return "llvm_aot"; }
+  std::string filter_pattern() const override { return "dylib*"; }
 
   void getDependentDialects(DialectRegistry& registry) const override {
     // clang-format off

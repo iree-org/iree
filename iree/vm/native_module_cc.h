@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_MODULE_ABI_CC_H_
-#define IREE_VM_MODULE_ABI_CC_H_
+#ifndef IREE_VM_NATIVE_MODULE_CC_H_
+#define IREE_VM_NATIVE_MODULE_CC_H_
 
 #include <cstring>
 #include <memory>
@@ -23,7 +23,7 @@
 #include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "iree/vm/module.h"
-#include "iree/vm/module_abi_packing.h"
+#include "iree/vm/module_abi_packing.h"  // IWYU pragma: export
 #include "iree/vm/stack.h"
 
 #ifndef __cplusplus
@@ -139,19 +139,22 @@ class NativeModule {
       std::memset(out_signature, 0, sizeof(*out_signature));
     }
     auto* module = FromModulePointer(self);
-    if (ordinal > module->dispatch_table_.size()) {
+    if (IREE_UNLIKELY(ordinal > module->dispatch_table_.size())) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "function out of bounds: 0 < %zu < %zu", ordinal,
                               module->dispatch_table_.size());
     }
+    const auto& dispatch_function = module->dispatch_table_[ordinal];
     if (out_function) {
       out_function->module = module->interface();
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT;
       out_function->ordinal = ordinal;
     }
     if (out_name) {
-      const auto& dispatch_function = module->dispatch_table_[ordinal];
-      *out_name = iree_make_cstring_view(dispatch_function.name);
+      *out_name = dispatch_function.name;
+    }
+    if (out_signature) {
+      out_signature->calling_convention = dispatch_function.cconv;
     }
     return iree_ok_status();
   }
@@ -162,7 +165,7 @@ class NativeModule {
                                             iree_vm_function_t* out_function) {
     IREE_ASSERT_ARGUMENT(out_function);
     std::memset(out_function, 0, sizeof(*out_function));
-    if (!name.data || !name.size) {
+    if (IREE_UNLIKELY(!name.data || !name.size)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "function name empty");
     }
@@ -171,9 +174,7 @@ class NativeModule {
     out_function->module = module->interface();
     out_function->linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT;
     for (int i = 0; i < module->dispatch_table_.size(); ++i) {
-      if (iree_string_view_compare(
-              name, iree_make_cstring_view(module->dispatch_table_[i].name)) ==
-          0) {
+      if (iree_string_view_equal(name, module->dispatch_table_[i].name)) {
         out_function->ordinal = i;
         return iree_ok_status();
       }
@@ -201,10 +202,10 @@ class NativeModule {
     if (module_state) delete FromStatePointer(module_state);
   }
 
-  static iree_status_t ModuleResolveImport(void* self,
-                                           iree_vm_module_state_t* module_state,
-                                           iree_host_size_t ordinal,
-                                           iree_vm_function_t function) {
+  static iree_status_t ModuleResolveImport(
+      void* self, iree_vm_module_state_t* module_state,
+      iree_host_size_t ordinal, const iree_vm_function_t* function,
+      const iree_vm_function_signature_t* signature) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "C++ API does not support imports");
   }
@@ -215,7 +216,8 @@ class NativeModule {
     IREE_ASSERT_ARGUMENT(out_result);
     std::memset(out_result, 0, sizeof(*out_result));
     auto* module = FromModulePointer(self);
-    if (call->function.ordinal >= module->dispatch_table_.size()) {
+    if (IREE_UNLIKELY(call->function.ordinal >=
+                      module->dispatch_table_.size())) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "function ordinal out of bounds: 0 < %u < %zu",
                               call->function.ordinal,
@@ -223,14 +225,22 @@ class NativeModule {
     }
     const auto& info = module->dispatch_table_[call->function.ordinal];
 
-    iree_vm_module_state_t* module_state = nullptr;
-    IREE_RETURN_IF_ERROR(iree_vm_stack_query_module_state(
-        stack, call->function.module, &module_state));
+    // NOTE: VM stack is currently unused. We could stash things here for the
+    // debugger or use it for coroutine state.
+    iree_host_size_t frame_size = 0;
 
-    auto* state = FromStatePointer(module_state);
-    IREE_RETURN_IF_ERROR(info.call(info.ptr, state, stack, call, out_result))
-        << "while executing " << module->name_ << "." << info.name;
-    return iree_ok_status();
+    iree_vm_stack_frame_t* callee_frame = NULL;
+    IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(
+        stack, &call->function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
+        /*frame_cleanup_fn=*/nullptr, &callee_frame));
+
+    auto* state = FromStatePointer(callee_frame->module_state);
+    IREE_RETURN_IF_ERROR(info.call(info.ptr, state, stack, call, out_result),
+                         "while invoking C++ function %s.%.*s", module->name_,
+                         (int)info.name.size, info.name.data);
+
+    return iree_vm_stack_function_leave(stack);
+    ;
   }
 
   const char* name_;
@@ -243,4 +253,4 @@ class NativeModule {
 }  // namespace vm
 }  // namespace iree
 
-#endif  // IREE_VM_MODULE_ABI_CC_H_
+#endif  // IREE_VM_NATIVE_MODULE_CC_H_

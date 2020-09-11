@@ -75,7 +75,7 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-      sourceOp.getLoc(), name());
+      sourceOp.getLoc(), name(), filter_pattern());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
@@ -135,24 +135,22 @@ LogicalResult TargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
     DeviceSwitchBuilder &switchBuilder) {
   auto *region = switchBuilder.addConditionRegion(
-      IREE::HAL::DeviceMatchIDAttr::get(name(), loc.getContext()),
+      IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
           dispatchState.workload,
           dispatchState.commandBuffer,
-          dispatchState.executable,
       });
   auto &entryBlock = region->front();
   auto workload = entryBlock.getArgument(0);
   auto commandBuffer = entryBlock.getArgument(1);
-  auto executable = entryBlock.getArgument(2);
 
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
   auto workgroupCount = calculateDispatchWorkgroupCount(
       loc, dispatchState.executableOp, dispatchState.entryPointOp, workload,
       builder);
-  builder.create<IREE::HAL::CommandBufferDispatchOp>(
-      loc, commandBuffer, executable, dispatchState.entryPointOp,
-      workgroupCount[0], workgroupCount[1], workgroupCount[2]);
+  builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
+      loc, commandBuffer, dispatchState.entryPointOp, workgroupCount[0],
+      workgroupCount[1], workgroupCount[2]);
 
   builder.create<IREE::HAL::ReturnOp>(loc);
   return success();

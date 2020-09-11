@@ -61,6 +61,7 @@ DOC_TITLE_DICT = {
     'getting_started_python.md': 'Python',
     'milestones.md': 'Short-term Focus Areas',
     'design_roadmap.md': 'Long-term Design Roadmap',
+    'tensorflow_integrations.md': 'TensorFlow Integrations and Benchmarking',
 }
 
 # A dictionary containing source file to permanent link mappings.
@@ -114,7 +115,8 @@ NAVI_ORDER_DICT = {
     'contributor_tips.md': 2,
     'testing_guide.md': 3,
     'benchmarking.md': 4,
-    'repository_management.md': 5,
+    'tensorflow_integrations.md': 5,
+    'repository_management.md': 6,
 
     # Within 'Using IREE' use explicit ordering.
     'using_colab.md': 1,

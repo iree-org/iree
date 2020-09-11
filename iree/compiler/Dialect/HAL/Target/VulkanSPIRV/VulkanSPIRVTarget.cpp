@@ -233,8 +233,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
       : options_(std::move(options)) {}
 
-  // NOTE: we could vary this based on the options such as 'vulkan-v1.1'.
-  std::string name() const override { return "vulkan*"; }
+  // NOTE: we could vary these based on the options such as 'vulkan-v1.1'.
+  std::string name() const override { return "vulkan_spirv"; }
+  std::string filter_pattern() const override { return "vulkan*"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -252,7 +253,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                         IREE::HAL::ExecutableOp executableOp) override {
     OpBuilder targetBuilder(&executableOp.getBlock().back());
     auto targetOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-        sourceOp.getLoc(), name());
+        sourceOp.getLoc(), name(), filter_pattern());
     OpBuilder containerBuilder(&targetOp.getBlock().back());
 
     auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
@@ -280,7 +281,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend(), name())) {
+      if (matchPattern(executableTargetOp.target_backend_filter(),
+                       filter_pattern())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
         auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
         assert(llvm::hasSingleElement(spvModuleOps));
@@ -293,17 +295,17 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     if (!spvModuleOp)
       return executableOp.emitError("unable to find spv.module");
 
-    SmallVector<spirv::FuncOp, 2> entryPointFns;
+    SmallVector<spirv::FuncOp, 2> spvEntryPointFns;
     if (!entryPointScheduleAttr) {
       for (spirv::FuncOp spvFuncOp : spvModuleOp.getOps<spirv::FuncOp>()) {
         if (SymbolTable::getSymbolVisibility(spvFuncOp) ==
             SymbolTable::Visibility::Public)
-          entryPointFns.push_back(spvFuncOp);
+          spvEntryPointFns.push_back(spvFuncOp);
       }
-      if (!llvm::hasSingleElement(entryPointFns)) {
+      if (!llvm::hasSingleElement(spvEntryPointFns)) {
         return spvModuleOp.emitError(
                    "expected a single entry point function, found ")
-               << entryPointFns.size();
+               << spvEntryPointFns.size();
       }
     } else {
       llvm::StringMap<spirv::FuncOp> publicFns;
@@ -318,12 +320,12 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
         if (!spvFuncOp)
           return spvModuleOp.emitError("unable to find entry point function ")
                  << entryName;
-        entryPointFns.push_back(spvFuncOp);
+        spvEntryPointFns.push_back(spvFuncOp);
       }
     }
 
     auto *region = switchBuilder.addConditionRegion(
-        IREE::HAL::DeviceMatchIDAttr::get(name(), loc.getContext()),
+        IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
         {
             dispatchState.workload,
             dispatchState.commandBuffer,
@@ -339,7 +341,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // We have multiple entry points to dispatch. Record in the order
     // specified by entry point schedule and insert barrier between sequential
     // ones.
-    for (auto it : llvm::enumerate(entryPointFns)) {
+    for (auto it : llvm::enumerate(spvEntryPointFns)) {
       spirv::FuncOp spvFuncOp = it.value();
       auto workgroupSize = calculateDispatchWorkgroupSize(
           loc, spvModuleOp, spvFuncOp.sym_name(), workload, builder);
@@ -379,10 +381,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                        [](Value v) -> bool { return v == nullptr; }))
         return spvFuncOp.emitError("unable to find workgroup count");
 
+      // Ordinals are fixed based on the precomputed schedule, so use
+      // CommandBufferDispatchOp instead of CommandBufferDispatchSymbolOp.
       builder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, /*entryPointOrdinal=*/it.index(),
+          loc, commandBuffer, executable,
+          builder.getI32IntegerAttr(/*entryPointOrdinal=*/it.index()),
           workgroupCount[0], workgroupCount[1], workgroupCount[2]);
-      if (it.index() + 1 != entryPointFns.size()) {
+      if (it.index() + 1 != spvEntryPointFns.size()) {
         recordFullExecutionBarrier(commandBuffer, loc, builder);
       }
     }
@@ -406,7 +411,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     spirv::ModuleOp spvModuleOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend(), name())) {
+      if (matchPattern(executableTargetOp.target_backend_filter(),
+                       filter_pattern())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
         assert(!innerModuleOp.getAttr(
             iree_compiler::getEntryPointScheduleAttrName()));

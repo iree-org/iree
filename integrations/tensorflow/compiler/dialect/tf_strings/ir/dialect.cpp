@@ -28,10 +28,6 @@ namespace tf_strings {
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/op_interface.cpp.inc"
 
-namespace {
-static DialectRegistration<TFStringsDialect> tf_strings_dialect;
-}  // namespace
-
 TFStringsDialect::TFStringsDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context, TypeID::get<TFStringsDialect>()) {
   addInterfaces<TfStringsToHALConversionInterface>();

@@ -33,8 +33,6 @@ namespace TensorList {
 
 namespace {
 
-static DialectRegistration<TensorListDialect> registration;
-
 class TensorListToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;

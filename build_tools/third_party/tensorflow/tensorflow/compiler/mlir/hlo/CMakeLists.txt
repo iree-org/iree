@@ -34,7 +34,6 @@ external_cc_library(
     ${TF_MLIR_HLO_SRC_ROOT}
   SRCS
     "lib/Dialect/mhlo/IR/chlo_ops.cc"
-    "lib/Dialect/mhlo/IR/dialect_registration.cc"
     "lib/Dialect/mhlo/IR/hlo_ops.cc"
     "lib/Dialect/mhlo/IR/infer_fusibility_op_interface.cc"
     "lib/Dialect/mhlo/IR/lhlo_ops.cc"
