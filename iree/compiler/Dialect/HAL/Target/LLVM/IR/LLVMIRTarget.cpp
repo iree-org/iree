@@ -39,7 +39,6 @@ class LLVMIRTargetBackend final : public TargetBackend {
   LLVMIRTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {}
 
-
   // NOTE: we could vary these based on the options, such as by arch/etc.
   std::string name() const override { return "llvm_ir"; }
   std::string filter_pattern() const override { return "llvm-ir*"; }
