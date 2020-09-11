@@ -144,7 +144,7 @@ IREE [`hal::Buffer`][hal-buffer] maps Metal `MTLBuffer`. See
 
 ### Storage type
 
-Metal provides four four [`MTLStorageMode`][mtl-storage-mode]:
+Metal provides four [`MTLStorageMode`][mtl-storage-mode] options:
 
 * `MTLStorageModeShared`: The resource is stored in system memory and is
   accessible to both the CPU and the GPU.

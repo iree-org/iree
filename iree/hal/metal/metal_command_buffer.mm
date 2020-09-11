@@ -176,18 +176,17 @@ Status MetalCommandBuffer::FillBuffer(Buffer* target_buffer, device_size_t targe
 
   target_offset += target_buffer->byte_offset();
 
-#ifdef IREE_PLATFORM_MACOS
   // Per the spec for fillBuffer:range:value: "The alignment and length of the range must both be a
-  // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS."
+  // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS." Although iOS/tvOS is more relaxed on
+  // this front, we still require 4-byte alignment for uniformity across IREE.
   if (target_offset % 4 != 0) {
     return UnimplementedErrorBuilder(IREE_LOC)
            << "MetalCommandBuffer::FillBuffer with offset that is not a multiple of 4 bytes";
   }
-#endif
 
   // Note that fillBuffer:range:value: only accepts a single byte as the pattern but FillBuffer
   // can accept 1/2/4 bytes. If the pattern itself contains repeated bytes, we can call into
-  // fillBuffer:rnage:value:. Otherwise we may need to find another way. Leave that as
+  // fillBuffer:range:value:. Otherwise we may need to find another way. Leave that as
   // unimplemented for now.
   IREE_ASSIGN_OR_RETURN(uint8_t byte_pattern, GetRepeatedBytePattern(pattern, pattern_length));
 
@@ -222,14 +221,13 @@ Status MetalCommandBuffer::CopyBuffer(Buffer* source_buffer, device_size_t sourc
   source_offset += source_buffer->byte_offset();
   target_offset += target_buffer->byte_offset();
 
-#ifdef IREE_PLATFORM_MACOS
   // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
-  // offset must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
+  // offset must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS. Although iOS/tvOS
+  // is more relaxed on this front, we still require 4-byte alignment for uniformity across IREE.
   if (source_offset % 4 != 0 || target_offset % 4 != 0) {
     return UnimplementedErrorBuilder(IREE_LOC)
            << "MetalCommandBuffer::CopyBuffer with offset that is not a multiple of 4 bytes";
   }
-#endif
 
   [GetOrBeginBlitEncoder() copyFromBuffer:source_device_buffer->handle()
                              sourceOffset:source_offset

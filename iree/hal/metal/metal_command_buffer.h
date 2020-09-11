@@ -94,7 +94,7 @@ class MetalCommandBuffer final : public CommandBuffer {
 
   StatusOr<MetalBuffer*> CastBuffer(Buffer* buffer) const;
 
-  // Gets or begins an active MTLBitCommandEncoder. This also ends all previous
+  // Gets or begins an active MTLBlitCommandEncoder. This also ends all previous
   // encoded compute commands if any.
   id<MTLBlitCommandEncoder> GetOrBeginBlitEncoder();
   void EndBlitEncoder();

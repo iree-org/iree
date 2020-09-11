@@ -86,7 +86,7 @@ class MetalBuffer final : public Buffer {
   // that does not have that property natively, e.g., MTLStorageModeManaged.
   // Under such circumstances, we need to perform the invalidate/flush operation
   // "automatically" for users.
-  bool NeedToAutoSynchronize() const;
+  bool requires_autosync() const;
 
   // We need to hold an reference to the queue so that we can encode
   // synchronizeResource commands for synchronizing the buffer with

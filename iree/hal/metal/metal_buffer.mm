@@ -88,9 +88,6 @@ Status MetalBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_lengt
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Unsupported scalar data size: " << pattern_length;
   }
-  if (NeedToAutoSynchronize()) {
-    IREE_RETURN_IF_ERROR(mapping.Flush());
-  }
   return OkStatus();
 }
 
@@ -98,9 +95,6 @@ Status MetalBuffer::ReadDataImpl(device_size_t source_offset, void* data,
                                  device_size_t data_length) {
   IREE_ASSIGN_OR_RETURN(auto mapping,
                         MapMemory<uint8_t>(MemoryAccess::kRead, source_offset, data_length));
-  if (NeedToAutoSynchronize()) {
-    IREE_RETURN_IF_ERROR(mapping.Invalidate());
-  }
   std::memcpy(data, mapping.data(), mapping.byte_length());
   return OkStatus();
 }
@@ -110,9 +104,6 @@ Status MetalBuffer::WriteDataImpl(device_size_t target_offset, const void* data,
   IREE_ASSIGN_OR_RETURN(
       auto mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite, target_offset, data_length));
   std::memcpy(mapping.mutable_data(), data, mapping.byte_length());
-  if (NeedToAutoSynchronize()) {
-    IREE_RETURN_IF_ERROR(mapping.Flush());
-  }
   return OkStatus();
 }
 
@@ -127,9 +118,6 @@ Status MetalBuffer::CopyDataImpl(device_size_t target_offset, Buffer* source_buf
                                                                 target_offset, data_length));
   CHECK_EQ(data_length, target_mapping.size());
   std::memcpy(target_mapping.mutable_data(), source_mapping.data(), data_length);
-  if (NeedToAutoSynchronize()) {
-    IREE_RETURN_IF_ERROR(target_mapping.Flush());
-  }
   return OkStatus();
 }
 
@@ -149,11 +137,19 @@ Status MetalBuffer::MapMemoryImpl(MappingMode mapping_mode, MemoryAccessBitfield
   }
 #endif  // !NDEBUG
 
+  if (requires_autosync()) {
+    IREE_RETURN_IF_ERROR(InvalidateMappedMemoryImpl(local_byte_offset, local_byte_length));
+  }
+
   return OkStatus();
 }
 
 Status MetalBuffer::UnmapMemoryImpl(device_size_t local_byte_offset,
                                     device_size_t local_byte_length, void* data) {
+  if (requires_autosync()) {
+    IREE_RETURN_IF_ERROR(FlushMappedMemoryImpl(local_byte_offset, local_byte_length));
+  }
+
   return OkStatus();
 }
 
@@ -191,7 +187,7 @@ Status MetalBuffer::FlushMappedMemoryImpl(device_size_t local_byte_offset,
   return OkStatus();
 }
 
-bool MetalBuffer::NeedToAutoSynchronize() const {
+bool MetalBuffer::requires_autosync() const {
   // We only need to perform "automatic" resource synchronization if it's MTLStorageModeManaged,
   // which is only available on macOS.
 #ifdef IREE_PLATFORM_MACOS
