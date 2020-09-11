@@ -2837,7 +2837,7 @@ module {
     %view = hal.buffer_view.create %4#0, shape = [%4#1, %4#2], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -2974,7 +2974,7 @@ module {
     %view = hal.buffer_view.create %4#0, shape = [%4#1, %4#2], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3073,7 +3073,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
   hal.check_success %0, "semaphore wait failed"
   %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3218,7 +3218,7 @@ module {
     %view = hal.buffer_view.create %4#0, shape = [%4#1, %4#2], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3551,7 +3551,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg5, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1332xi8>, format = 1447906369 : i32} {
+  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1524xi8>, format = 1447906369 : i32} {
   }
 }
 
@@ -3664,7 +3664,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
   hal.check_success %0, "semaphore wait failed"
   %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3675,7 +3675,7 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 ```
 ### IR Dump After CSE
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
   hal.check_success %0, "semaphore wait failed"
   %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3723,7 +3723,7 @@ module {
       hal.interface.binding @arg5, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1332xi8>, format = 1447906369 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1524xi8>, format = 1447906369 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: index {iree.reflection = {}}, %arg2: index, %arg3: !hal.buffer {iree.reflection = {}}, %arg4: index {iree.reflection = {}}, %arg5: index) -> (!hal.buffer {iree.reflection = {}}, index {iree.reflection = {}}, index) attributes {iree.module.export = "dot$raw"} {
@@ -3771,7 +3771,7 @@ module {
     %view = hal.buffer_view.create %4#0, shape = [%4#1, %4#2], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3820,7 +3820,7 @@ module {
       hal.interface.binding @arg5, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1332xi8>, format = 1447906369 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<1524xi8>, format = 1447906369 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: index {iree.reflection = {}}, %arg2: index, %arg3: !hal.buffer {iree.reflection = {}}, %arg4: index {iree.reflection = {}}, %arg5: index) -> (!hal.buffer {iree.reflection = {}}, index {iree.reflection = {}}, index) attributes {iree.module.export = "dot$raw"} {
@@ -3868,7 +3868,7 @@ module {
     %view = hal.buffer_view.create %4#0, shape = [%4#1, %4#2], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3918,7 +3918,7 @@ module {
     }
     vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1332xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1524xi8>
     vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -4006,6 +4006,7 @@ module {
       vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
       vm.return %ref : !vm.ref<!hal.buffer_view>
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4101,7 +4102,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1332xi8>
+  vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1524xi8>
   vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -4189,6 +4190,7 @@ vm.module @module {
     vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
     vm.return %ref : !vm.ref<!hal.buffer_view>
   }
+  vm.export @dot$async
   vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
   vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4269,7 +4271,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1332xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1524xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) {
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
@@ -4406,6 +4408,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4507,7 +4510,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1332xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1524xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) {
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
@@ -4644,6 +4647,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4745,7 +4749,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1332xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1524xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) {
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
@@ -4882,6 +4886,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4955,7 +4960,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1332xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_vmla opaque<"", "0xDEADBEEF"> : vector<1524xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: i32, %arg2: i32, %arg3: !vm.ref<!hal.buffer>, %arg4: i32, %arg5: i32) -> (!vm.ref<!hal.buffer>, i32, i32) {
       %c50 = vm.const.i32 50 : i32
       %c15 = vm.const.i32 15 : i32
@@ -5092,6 +5097,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}

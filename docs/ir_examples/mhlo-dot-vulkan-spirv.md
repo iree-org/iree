@@ -3308,7 +3308,7 @@ module {
     %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3545,7 +3545,7 @@ module {
     %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3646,7 +3646,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
   hal.check_success %0, "semaphore wait failed"
   %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -3891,7 +3891,7 @@ module {
     %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -4103,7 +4103,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
   hal.check_success %0, "semaphore wait failed"
   %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -4114,7 +4114,7 @@ func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %a
 ```
 ### IR Dump After CSE
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
   hal.check_success %0, "semaphore wait failed"
   %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -4210,7 +4210,7 @@ module {
     %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -4307,7 +4307,7 @@ module {
     %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     return %view : !hal.buffer_view
   }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
     %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
@@ -4449,6 +4449,7 @@ module {
       vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
       vm.return %ref : !vm.ref<!hal.buffer_view>
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4636,6 +4637,7 @@ vm.module @module {
     vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
     vm.return %ref : !vm.ref<!hal.buffer_view>
   }
+  vm.export @dot$async
   vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
   vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4857,6 +4859,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -5099,6 +5102,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -5341,6 +5345,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -5553,6 +5558,7 @@ module {
     ^bb4:  // pred: ^bb1
       vm.fail %c2, "unreachable location reached"
     }
+    vm.export @dot$async
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
