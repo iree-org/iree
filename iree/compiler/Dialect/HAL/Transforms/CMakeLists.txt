@@ -27,6 +27,7 @@ iree_cc_library(
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
     "PublicAbiGeneration.cpp"
+    "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"
   DEPS

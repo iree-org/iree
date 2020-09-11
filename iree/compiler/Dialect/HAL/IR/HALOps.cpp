@@ -848,27 +848,26 @@ void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.command_buffer.dispatch
+// hal.command_buffer.dispatch.symbol
 //===----------------------------------------------------------------------===//
 
-void CommandBufferDispatchOp::build(
+void CommandBufferDispatchSymbolOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
     Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
     Value workgroupX, Value workgroupY, Value workgroupZ) {
-  build(builder, state, commandBuffer, executable,
-        entryPoint.ordinal().getZExtValue(), workgroupX, workgroupY,
-        workgroupZ);
-}
-
-void CommandBufferDispatchOp::build(Builder &builder, OperationState &state,
-                                    Value commandBuffer, Value executable,
-                                    unsigned entryPointOrdinal,
-                                    Value workgroupX, Value workgroupY,
-                                    Value workgroupZ) {
   state.addOperands(
       {commandBuffer, executable, workgroupX, workgroupY, workgroupZ});
+  // Construct Executable::Target::EntryPoint nested reference.
+  StringRef executableOpSymName =
+      entryPoint.getParentOp()
+          ->getParentOp()
+          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+          .getValue();
   state.addAttribute("entry_point",
-                     builder.getI32IntegerAttr(entryPointOrdinal));
+                     builder.getSymbolRefAttr(
+                         executableOpSymName,
+                         {builder.getSymbolRefAttr(entryPoint.getParentOp()),
+                          builder.getSymbolRefAttr(entryPoint)}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1214,16 +1213,27 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void ExecutableTargetOp::build(OpBuilder &builder, OperationState &state,
-                               StringRef targetBackend) {
+                               StringRef symName,
+                               StringRef targetBackendFilter) {
   ensureTerminator(*state.addRegion(), builder, state.location);
-  state.addAttribute("target_backend", builder.getStringAttr(targetBackend));
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(symName));
+  state.addAttribute("target_backend_filter",
+                     builder.getStringAttr(targetBackendFilter));
 }
 
 static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
                                            OperationState *result) {
   auto *body = result->addRegion();
-  StringAttr targetBackendAttr;
-  if (failed(parser.parseAttribute(targetBackendAttr, "target_backend",
+  StringAttr nameAttr;
+  StringAttr targetBackendFilterAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("filter")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(targetBackendFilterAttr,
+                                   "target_backend_filter",
                                    result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
       failed(parser.parseOptionalRegion(*body, llvm::None, llvm::None))) {
@@ -1237,10 +1247,13 @@ static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
 }
 
 static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
-  p << op.getOperationName();
-  p << " \"" << op.target_backend() << "\"";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"target_backend"});
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  p << ", filter=\"" << op.target_backend_filter() << "\"";
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(),
+                       "target_backend_filter"});
   if (!op.body().empty()) {
     p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/false);

@@ -41,6 +41,7 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
                                  ModuleOp targetModuleOp);
 
 namespace detail {
+size_t getSegmentSpanSize(Type spanType);
 Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter);
@@ -79,7 +80,8 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
       if (!flattenedAttrs) return failure();
       state.addOperands(*flattenedAttrs);
       if (importOp.isFuncArgumentVariadic(input.index())) {
-        segmentSizes.push_back(flattenedAttrs->size());
+        segmentSizes.push_back(flattenedAttrs->size() /
+                               detail::getSegmentSpanSize(inputType));
       } else {
         assert(flattenedAttrs->size() == 1 &&
                "expected non-variadic attribute to have a single value");

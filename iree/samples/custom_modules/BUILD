@@ -67,6 +67,6 @@ cc_library(
         "//iree/hal:api",
         "//iree/modules/hal",
         "//iree/vm",
-        "//iree/vm:module_abi_cc",
+        "//iree/vm:native_module_cc",
     ],
 )

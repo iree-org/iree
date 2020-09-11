@@ -75,7 +75,7 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-      sourceOp.getLoc(), name());
+      sourceOp.getLoc(), /*name=*/name(), /*targetBackendFilter=*/name());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
@@ -150,7 +150,7 @@ LogicalResult TargetBackend::recordDispatch(
   auto workgroupCount = calculateDispatchWorkgroupCount(
       loc, dispatchState.executableOp, dispatchState.entryPointOp, workload,
       builder);
-  builder.create<IREE::HAL::CommandBufferDispatchOp>(
+  builder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
       loc, commandBuffer, executable, dispatchState.entryPointOp,
       workgroupCount[0], workgroupCount[1], workgroupCount[2]);
 

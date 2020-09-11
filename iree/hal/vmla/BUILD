@@ -166,7 +166,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/vm",
-        "//iree/vm:module_abi_cc",
+        "//iree/vm:native_module_cc",
         "@com_google_absl//absl/types:span",
     ],
 )

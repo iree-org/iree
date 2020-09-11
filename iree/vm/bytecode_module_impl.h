@@ -40,6 +40,20 @@
 extern "C" {
 #endif  // __cplusplus
 
+#define VMMAX(a, b) (((a) > (b)) ? (a) : (b))
+#define VMMIN(a, b) (((a) < (b)) ? (a) : (b))
+
+// Maximum register count per bank.
+// This determines the bits required to reference registers in the VM bytecode.
+#define IREE_I32_REGISTER_COUNT 0x7FFF
+#define IREE_REF_REGISTER_COUNT 0x7FFF
+
+#define IREE_I32_REGISTER_MASK 0x7FFF
+
+#define IREE_REF_REGISTER_TYPE_BIT 0x8000
+#define IREE_REF_REGISTER_MOVE_BIT 0x4000
+#define IREE_REF_REGISTER_MASK 0x3FFF
+
 // A loaded bytecode module.
 typedef struct {
   // Interface routing to the bytecode module functions.
@@ -69,6 +83,28 @@ typedef struct {
   iree_vm_type_def_t* type_table;
 } iree_vm_bytecode_module_t;
 
+// A resolved and split import in the module state table.
+//
+// NOTE: a table of these are stored per module per context so ideally we'd
+// only store the absolute minimum information to reduce our fixed overhead.
+// There's a big tradeoff though as a few extra bytes here can avoid non-trivial
+// work per import function invocation.
+typedef struct {
+  // Import function in the source module.
+  iree_vm_function_t function;
+
+  // Pre-parsed argument/result calling convention string fragments.
+  // For example, 0ii.r will be split to arguments=ii and results=r.
+  iree_string_view_t arguments;
+  iree_string_view_t results;
+
+  // Precomputed argument/result size requirements for marshaling values.
+  // Only usable for non-variadic signatures. Results are always usable as they
+  // don't support variadic values (yet).
+  uint16_t argument_buffer_size;
+  uint16_t result_buffer_size;
+} iree_vm_bytecode_import_t;
+
 // Per-instance module state.
 // This is allocated with a provided allocator as a single flat allocation.
 // This struct is a prefix to the allocation pointing into the dynamic offsets
@@ -91,7 +127,7 @@ typedef struct {
 
   // Resolved function imports.
   iree_host_size_t import_count;
-  iree_vm_function_t* import_table;
+  iree_vm_bytecode_import_t* import_table;
 
   // Allocator used for the state itself and any runtime allocations needed.
   iree_allocator_t allocator;
@@ -100,10 +136,12 @@ typedef struct {
 // Begins (or resumes) execution of the current frame and continues until
 // either a yield or return. |out_result| will contain the result status for
 // continuation, if needed.
-iree_status_t iree_vm_bytecode_dispatch(
-    iree_vm_bytecode_module_t* module,
-    iree_vm_bytecode_module_state_t* module_state, iree_vm_stack_t* stack,
-    iree_vm_stack_frame_t* entry_frame, iree_vm_execution_result_t* out_result);
+iree_status_t iree_vm_bytecode_dispatch(iree_vm_stack_t* stack,
+                                        iree_vm_bytecode_module_t* module,
+                                        const iree_vm_function_call_t* call,
+                                        iree_string_view_t cconv_arguments,
+                                        iree_string_view_t cconv_results,
+                                        iree_vm_execution_result_t* out_result);
 
 #ifdef __cplusplus
 }  // extern "C"

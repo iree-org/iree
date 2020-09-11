@@ -34,9 +34,8 @@ iree_cc_library(
     iree::hal::api
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
     iree::vm::module
-    iree::vm::module_abi_cc
+    iree::vm::native_module_cc
     iree::vm::ref
     iree::vm::stack
   PUBLIC

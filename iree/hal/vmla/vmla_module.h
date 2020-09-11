@@ -27,7 +27,7 @@
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/vm/api.h"
-#include "iree/vm/module_abi_cc.h"
+#include "iree/vm/native_module_cc.h"
 
 namespace iree {
 namespace hal {

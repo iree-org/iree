@@ -331,13 +331,6 @@ static iree_status_t iree_vm_bytecode_module_get_function(
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
       out_function->ordinal =
           iree_vm_ExportFunctionDef_internal_ordinal(export_def);
-
-      const iree_vm_FunctionDescriptor_t* function_descriptor =
-          &module->function_descriptor_table[out_function->ordinal];
-      out_function->i32_register_count =
-          function_descriptor->i32_register_count;
-      out_function->ref_register_count =
-          function_descriptor->ref_register_count;
     }
   } else {
     iree_vm_InternalFunctionDef_vec_t internal_functions =
@@ -356,13 +349,6 @@ static iree_status_t iree_vm_bytecode_module_get_function(
       out_function->module = &module->interface;
       out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
       out_function->ordinal = (uint16_t)ordinal;
-
-      const iree_vm_FunctionDescriptor_t* function_descriptor =
-          &module->function_descriptor_table[ordinal];
-      out_function->i32_register_count =
-          function_descriptor->i32_register_count;
-      out_function->ref_register_count =
-          function_descriptor->ref_register_count;
     }
   }
 
@@ -371,10 +357,11 @@ static iree_status_t iree_vm_bytecode_module_get_function(
     out_name->size = flatbuffers_string_len(name);
   }
   if (out_signature && signature) {
-    out_signature->argument_count = flatbuffers_int32_vec_len(
-        iree_vm_FunctionSignatureDef_argument_types(signature));
-    out_signature->result_count = flatbuffers_int32_vec_len(
-        iree_vm_FunctionSignatureDef_result_types(signature));
+    flatbuffers_string_t calling_convention =
+        iree_vm_FunctionSignatureDef_calling_convention(signature);
+    out_signature->calling_convention.data = calling_convention;
+    out_signature->calling_convention.size =
+        flatbuffers_string_len(calling_convention);
   }
 
   return iree_ok_status();
@@ -546,9 +533,10 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
 
   if (state) {
     state->import_count = import_function_count;
-    state->import_table = (iree_vm_function_t*)(base_ptr + offset);
+    state->import_table = (iree_vm_bytecode_import_t*)(base_ptr + offset);
   }
-  offset += iree_align(import_function_count * sizeof(iree_vm_function_t), 16);
+  offset +=
+      iree_align(import_function_count * sizeof(*state->import_table), 16);
 
   return offset;
 }
@@ -609,7 +597,8 @@ static void iree_vm_bytecode_module_free_state(
 
 static iree_status_t iree_vm_bytecode_module_resolve_import(
     void* self, iree_vm_module_state_t* module_state, iree_host_size_t ordinal,
-    iree_vm_function_t function) {
+    const iree_vm_function_t* function,
+    const iree_vm_function_signature_t* signature) {
   IREE_ASSERT_ARGUMENT(module_state);
   iree_vm_bytecode_module_state_t* state =
       (iree_vm_bytecode_module_state_t*)module_state;
@@ -618,8 +607,35 @@ static iree_status_t iree_vm_bytecode_module_resolve_import(
                             "import ordinal out of range (0 < %zu < %zu)",
                             ordinal, state->import_count);
   }
-  // TODO(benvanik): verify signature.
-  state->import_table[ordinal] = function;
+
+  iree_vm_bytecode_import_t* import = &state->import_table[ordinal];
+  import->function = *function;
+
+  // Split up arguments/results into fragments so that we can avoid scanning
+  // during calling.
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+      signature, &import->arguments, &import->results));
+
+  // Precalculate bytes required to marshal argument/results across the ABI
+  // boundary.
+  iree_host_size_t argument_buffer_size = 0;
+  iree_host_size_t result_buffer_size = 0;
+  if (!iree_vm_function_call_is_variadic_cconv(import->arguments)) {
+    // NOTE: variadic types don't support precalculation and the vm.call.import
+    // dispatch code will handle calculating it per-call.
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+        import->arguments, /*segment_size_list=*/NULL, &argument_buffer_size));
+  }
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+      import->results, /*segment_size_list=*/NULL, &result_buffer_size));
+  if (argument_buffer_size > 16 * 1024 || result_buffer_size > 16 * 1024) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "ABI marshaling buffer overflow on import %zu",
+                            ordinal);
+  }
+  import->argument_buffer_size = (uint16_t)argument_buffer_size;
+  import->result_buffer_size = (uint16_t)result_buffer_size;
+
   return iree_ok_status();
 }
 
@@ -649,19 +665,36 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
                             module->function_descriptor_count);
   }
 
-  // Enter function (as this is the initial call).
-  // The callee's return will take care of storing the output registers when it
-  // actually does return, either immediately or in the future via a resume.
-  iree_vm_stack_frame_t* callee_frame = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_stack_function_enter(stack, function, call->argument_registers,
-                                   call->result_registers, &callee_frame));
+  // Grab calling convention string. This is not great as we are guaranteed to
+  // have a bunch of cache misses, but without putting it on the descriptor
+  // (which would duplicate data and slow down normal intra-module calls)
+  // there's not a good way around it. In the grand scheme of things users
+  // should be keeping their calls across this boundary relatively fat (compared
+  // to the real work they do), so this only needs to be fast enough to blend
+  // into the noise. Similar to JNI, P/Invoke, etc you don't want to have
+  // imports that cost less to execute than the marshaling overhead (dozens to
+  // hundreds of instructions).
+  iree_vm_InternalFunctionDef_vec_t internal_functions =
+      iree_vm_BytecodeModuleDef_internal_functions(module->def);
+  iree_vm_InternalFunctionDef_table_t function_def =
+      iree_vm_InternalFunctionDef_vec_at(internal_functions, function.ordinal);
+  flatbuffers_string_t calling_convention =
+      iree_vm_FunctionSignatureDef_calling_convention(
+          iree_vm_InternalFunctionDef_signature(function_def));
+  iree_vm_function_signature_t signature;
+  memset(&signature, 0, sizeof(signature));
+  signature.calling_convention.data = calling_convention;
+  signature.calling_convention.size =
+      flatbuffers_string_len(calling_convention);
+  iree_string_view_t cconv_arguments = iree_string_view_empty();
+  iree_string_view_t cconv_results = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+      &signature, &cconv_arguments, &cconv_results));
 
   // Jump into the dispatch routine to execute bytecode until the function
   // either returns (synchronous) or yields (asynchronous).
-  return iree_vm_bytecode_dispatch(
-      module, (iree_vm_bytecode_module_state_t*)callee_frame->module_state,
-      stack, callee_frame, out_result);
+  return iree_vm_bytecode_dispatch(stack, module, call, cconv_arguments,
+                                   cconv_results, out_result);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(

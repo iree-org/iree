@@ -96,7 +96,7 @@ LogicalResult mapRawAbiTypes(
   return success();
 }
 
-LogicalResult generateSynchronousBody(
+LogicalResult generateAsynchronousBody(
     FuncOp rawCalleeFuncOp, FuncOp funcOp, OpBuilder moduleBuilder,
     SmallVectorImpl<Type> &inputTypes,
     SmallVectorImpl<RawSignatureParser::Description> &inputDescs,
@@ -107,10 +107,20 @@ LogicalResult generateSynchronousBody(
   Block *entryBlock = funcOp.addEntryBlock();
   OpBuilder builder = OpBuilder::atBlockEnd(entryBlock);
 
+  // TODO(#1285): Pass semaphores into raw function so modules can run async
+  // Wait until the wait semaphore reaches the wait value.
+  auto waitSemaphore = entryBlock->getArgument(0);
+  auto waitValue = entryBlock->getArgument(1);
+  auto waitOp = builder.create<HAL::SemaphoreAwaitOp>(
+      loc, builder.getIntegerType(32), waitSemaphore, waitValue);
+  builder.create<HAL::CheckSuccessOp>(loc, waitOp.getResult(),
+                                      "semaphore wait failed");
+
   // Build call operands.
   SmallVector<Value, 4> callOperands;
   for (const auto &input : llvm::enumerate(inputDescs)) {
-    auto blockArg = entryBlock->getArgument(input.index());
+    // Skip first two arguments (wait semaphore, wait value).
+    auto blockArg = entryBlock->getArgument(input.index() + 2);
     switch (input.value().type) {
       case RawSignatureParser::Type::kBuffer: {
         // Pass the backing buffer.
@@ -211,42 +221,53 @@ LogicalResult generateSynchronousBody(
     }
   }
 
-  // Add the return.
-  builder.create<mlir::ReturnOp>(loc, funcResults);
-  return success();
-}
-
-LogicalResult generateAsynchronousBody(FuncOp funcOp, FuncOp syncFuncOp,
-                                       OpBuilder moduleBuilder) {
-  auto loc = funcOp.getLoc();
-  Block *entryBlock = funcOp.addEntryBlock();
-  OpBuilder builder = OpBuilder::atBlockEnd(entryBlock);
-
-  // Wait until the wait semaphore reaches the wait value.
-  auto waitSemaphore = entryBlock->getArgument(0);
-  auto waitValue = entryBlock->getArgument(1);
-  auto waitOp = builder.create<HAL::SemaphoreAwaitOp>(
-      loc, builder.getIntegerType(32), waitSemaphore, waitValue);
-  builder.create<HAL::CheckSuccessOp>(loc, waitOp.getResult(),
-                                      "semaphore wait failed");
-
-  // Trim the first (wait semaphore/value) and last (signal semaphore/value)
-  // two arguments.
-  SmallVector<Value, 4> callSyncArguments;
-  for (int i = 2; i < entryBlock->getNumArguments() - 2; ++i) {
-    callSyncArguments.push_back(entryBlock->getArguments()[i]);
-  }
-  // Call the sync op, passing through our arguments.
-  auto callSyncOp = builder.create<CallOp>(loc, syncFuncOp, callSyncArguments);
-
+  // TODO(#1285): Pass semaphores into raw function so modules can run async
   // Signal the signal semaphore to its signal value.
   auto signalSemaphore =
       entryBlock->getArgument(entryBlock->getNumArguments() - 2);
   auto signalValue = entryBlock->getArgument(entryBlock->getNumArguments() - 1);
   builder.create<HAL::SemaphoreSignalOp>(loc, signalSemaphore, signalValue);
 
-  // Return results of the sync op.
-  builder.create<mlir::ReturnOp>(loc, callSyncOp.getResults());
+  // Add the return.
+  builder.create<mlir::ReturnOp>(loc, funcResults);
+  return success();
+}
+
+LogicalResult generateSynchronousBody(FuncOp funcOp, FuncOp asyncFuncOp,
+                                      OpBuilder moduleBuilder) {
+  auto loc = funcOp.getLoc();
+  Block *entryBlock = funcOp.addEntryBlock();
+  OpBuilder builder = OpBuilder::atBlockEnd(entryBlock);
+
+  Value zero = builder.createOrFold<ConstantOp>(loc, builder.getIndexAttr(0));
+  Value one = builder.createOrFold<ConstantOp>(loc, builder.getIndexAttr(1));
+
+  auto device = builder.create<IREE::HAL::ExSharedDeviceOp>(loc);
+  auto semaphore = builder.create<IREE::HAL::SemaphoreCreateOp>(
+      loc, IREE::HAL::SemaphoreType::get(builder.getContext()),
+      device.getResult(), zero);
+
+  // Construct async arguments:
+  //     wait_semaphore, wait_value, args, signal_semaphore, signal_value
+  SmallVector<Value, 4> callAsyncArguments;
+  callAsyncArguments.push_back(semaphore);
+  callAsyncArguments.push_back(zero);
+  for (const auto &arg : entryBlock->getArguments()) {
+    callAsyncArguments.push_back(arg);
+  }
+  callAsyncArguments.push_back(semaphore);
+  callAsyncArguments.push_back(one);
+  auto callAsyncOp =
+      builder.create<CallOp>(loc, asyncFuncOp, callAsyncArguments);
+
+  // Wait until the semaphore reaches the signal value.
+  auto waitOp = builder.create<HAL::SemaphoreAwaitOp>(
+      loc, builder.getIntegerType(32), semaphore, one);
+  builder.create<HAL::CheckSuccessOp>(loc, waitOp.getResult(),
+                                      "semaphore wait failed");
+
+  // Return results of the async op.
+  builder.create<mlir::ReturnOp>(loc, callAsyncOp.getResults());
 
   return success();
 }
@@ -289,6 +310,39 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
   }
   assert(resultTypes.size() == resultDescs.size());
 
+  // Create the new asynchronous function export.
+  SmallVector<Type, 4> asyncInputTypes;
+  // Prefix with wait semaphore and its value.
+  // TODO(scotttodd): SemaphoreValue wrapper for single {semaphore, value}
+  // TODO(scotttodd): SemaphoreList wrapper for list of SemaphoreValues
+  asyncInputTypes.push_back(HAL::SemaphoreType::get(ctx));
+  asyncInputTypes.push_back(moduleBuilder.getIndexType());
+  for (const auto &inputType : inputTypes) {
+    asyncInputTypes.push_back(inputType);
+  }
+  // Postfix with signal semaphore and its value.
+  asyncInputTypes.push_back(HAL::SemaphoreType::get(ctx));
+  asyncInputTypes.push_back(moduleBuilder.getIndexType());
+
+  // TODO(scotttodd): populate async export attributes
+  //   * iree.reflection (considering new args?)
+  //   * iree.abi.stub
+  SmallVector<NamedAttribute, 1> asyncExportAttrs;
+  asyncExportAttrs.push_back(moduleBuilder.getNamedAttr(
+      "iree.module.export",
+      StringAttr::get((exportName + "$async").str(), ctx)));
+
+  auto asyncType = FunctionType::get(asyncInputTypes, resultTypes, ctx);
+  auto asyncName = (rawCalleeFuncOp.getName() + "$async").str();
+  auto asyncFuncOp =
+      moduleBuilder.create<FuncOp>(loc, asyncName, asyncType, asyncExportAttrs);
+
+  if (failed(generateAsynchronousBody(rawCalleeFuncOp, asyncFuncOp,
+                                      moduleBuilder, inputTypes, inputDescs,
+                                      resultTypes, resultDescs))) {
+    return failure();
+  }
+
   // Create the new synchronous function export.
   SmallVector<NamedAttribute, 1> syncExportAttrs;
   syncExportAttrs.push_back(moduleBuilder.getNamedAttr(
@@ -303,38 +357,7 @@ LogicalResult generateRawAbiFunctions(OpBuilder &moduleBuilder,
   auto syncFuncOp =
       moduleBuilder.create<FuncOp>(loc, syncName, syncType, syncExportAttrs);
 
-  if (failed(generateSynchronousBody(rawCalleeFuncOp, syncFuncOp, moduleBuilder,
-                                     inputTypes, inputDescs, resultTypes,
-                                     resultDescs))) {
-    return failure();
-  }
-
-  // Create the new asynchronous function export.
-  SmallVector<Type, 4> asyncInputTypes;
-  // Prefix with wait semaphore and its value.
-  // TODO(scotttodd): SemaphoreValue wrapper for single {semaphore, value}
-  // TODO(scotttodd): SemaphoreList wrapper for list of SemaphoreValues
-  asyncInputTypes.push_back(HAL::SemaphoreType::get(ctx));
-  asyncInputTypes.push_back(moduleBuilder.getIndexType());
-  for (const auto &inputType : inputTypes) {
-    asyncInputTypes.push_back(inputType);
-  }
-  // Postfix with signal semaphore and its value.
-  asyncInputTypes.push_back(HAL::SemaphoreType::get(ctx));
-  asyncInputTypes.push_back(moduleBuilder.getIndexType());
-  // TODO(scotttodd): populate async export attributes
-  //   * iree.module.export with a name
-  //   * iree.reflection (considering new args?)
-  //   * iree.abi.stub
-  SmallVector<NamedAttribute, 1> asyncExportAttrs;
-
-  auto asyncType = FunctionType::get(asyncInputTypes, resultTypes, ctx);
-  auto asyncName = (rawCalleeFuncOp.getName() + "$async").str();
-  auto asyncFuncOp =
-      moduleBuilder.create<FuncOp>(loc, asyncName, asyncType, asyncExportAttrs);
-
-  if (failed(
-          generateAsynchronousBody(asyncFuncOp, syncFuncOp, moduleBuilder))) {
+  if (failed(generateSynchronousBody(syncFuncOp, asyncFuncOp, moduleBuilder))) {
     return failure();
   }
 

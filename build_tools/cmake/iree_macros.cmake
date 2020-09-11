@@ -42,6 +42,17 @@ function(iree_to_bool VARIABLE VALUE)
   endif()
 endfunction()
 
+# iree_append_list_to_string
+#
+# Joins ${ARGN} together as a string separated by " " and appends it to
+# ${VARIABLE}.
+function(iree_append_list_to_string VARIABLE)
+  if(NOT "${ARGN}" STREQUAL "")
+    string(JOIN " " _ARGN_STR ${ARGN})
+    set(${VARIABLE} "${${VARIABLE}} ${_ARGN_STR}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 
 #-------------------------------------------------------------------------------
 # Packages and Paths

@@ -434,8 +434,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                                device, rewriter);
   for (auto targetOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-    for (auto &targetBackend :
-         IREE::HAL::matchTargetBackends({targetOp.target_backend().str()})) {
+    for (auto &targetBackend : IREE::HAL::matchTargetBackends(
+             {targetOp.target_backend_filter().str()})) {
       auto entryPointOps =
           targetOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
       if (entryPointOps.empty()) {

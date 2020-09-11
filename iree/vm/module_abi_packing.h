@@ -59,252 +59,355 @@ struct remove_cvref {
   typedef std::remove_cv_t<std::remove_reference_t<T>> type;
 };
 
-// Counts the total number of leaf elements in a type tree.
-// For example:
-//   LeafCount<int>::value == 1
-//   LeafCount<std::tuple<int, int>> == 2
-//   LeafCount<std::tuple<int, std::tuple<int, int>>>::value == 3
+}  // namespace impl
+
 template <typename T>
-struct LeafCount {
-  constexpr static int value = 1;
-};
-template <typename... Ts>
-struct LeafCount<std::tuple<Ts...>> {
-  template <int I, typename... Tail>
-  struct Adder;
-  template <int I, typename T, typename... Tail>
-  struct Adder<I, T, Tail...> {
-    constexpr static int value =
-        LeafCount<T>::value + Adder<sizeof...(Tail), Tail...>::value;
-  };
-  template <typename T, typename... Tail>
-  struct Adder<1, T, Tail...> {
-    constexpr static int value = LeafCount<T>::value;
-  };
-  constexpr static int value = Adder<sizeof...(Ts), Ts...>::value;
+using enable_if_primitive =
+    typename std::enable_if<std::is_arithmetic<T>::value ||
+                            std::is_enum<T>::value>::type;
+template <typename T>
+using enable_if_not_primitive = typename std::enable_if<!(
+    std::is_arithmetic<T>::value || std::is_enum<T>::value)>::type;
+
+//===----------------------------------------------------------------------===//
+// Compile-time string literals
+//===----------------------------------------------------------------------===//
+
+// Compile-time constant string.
+// This allows us to concat string literals and produce a single flattened
+// char[] containing the results. Includes a \0 so the character storage is
+// length N + 1 and can be accessed as a c_str.
+//
+// Use the `literal` helper function to define a const string literal without
+// needing the size.
+//
+// Example:
+//  // produces: const_string<2>("ab")
+//  constexpr const auto str = literal("a") + literal("b");
+template <size_t N>
+class const_string {
+ public:
+  constexpr const_string(const char (&data)[N + 1])
+      : const_string(data, std::make_index_sequence<N>()) {}
+  template <size_t N1, typename std::enable_if<(N1 <= N), bool>::type = true>
+  constexpr const_string(const const_string<N1>& lhs,
+                         const const_string<N - N1>& rhs)
+      : const_string{lhs, rhs, std::make_index_sequence<N1>{},
+                     std::make_index_sequence<N - N1>{}} {}
+
+  constexpr std::size_t size() const { return N; }
+  constexpr const char* data() const { return data_; }
+  constexpr const char* c_str() const { return data_; }
+  constexpr operator const char*() const { return data_; }
+  constexpr char operator[](size_t i) const { return data_[i]; }
+
+ private:
+  template <size_t... PACK>
+  constexpr const_string(const char (&data)[N + 1],
+                         std::index_sequence<PACK...>)
+      : data_{data[PACK]..., '\0'} {}
+  template <size_t N1, size_t... PACK1, size_t... PACK2>
+  constexpr const_string(const const_string<N1>& lhs,
+                         const const_string<N - N1>& rhs,
+                         std::index_sequence<PACK1...>,
+                         std::index_sequence<PACK2...>)
+      : data_{lhs[PACK1]..., rhs[PACK2]..., '\0'} {}
+
+  const char data_[N + 1];
 };
 
-}  // namespace impl
+template <size_t N1, size_t N2>
+constexpr auto operator+(const const_string<N1>& lhs,
+                         const const_string<N2>& rhs) {
+  return const_string<N1 + N2>(lhs, rhs);
+}
+
+// Defines a compile-time constant string literal.
+template <size_t N_PLUS_1>
+constexpr auto literal(const char (&data)[N_PLUS_1]) {
+  return const_string<N_PLUS_1 - 1>(data);
+}
+
+constexpr auto concat_impl() { return literal(""); }
+template <typename T>
+constexpr auto concat_impl(const T& lhs) {
+  return lhs;
+}
+template <typename T, typename... Ts>
+constexpr auto concat_impl(const T& lhs, const Ts&... s) {
+  return lhs + concat_impl(s...);
+}
+
+// Concatenates one or more const_string values into a new const_string.
+//
+// Example:
+//  constexpr const auto abc = concat_literals(literal("a"),
+//                                             literal("b"),
+//                                             literal("c"));
+template <typename... Ts>
+constexpr auto concat_literals(const Ts&... s) {
+  return concat_impl(s...);
+}
+
+template <size_t C, typename T>
+struct splat_impl {
+  static constexpr auto apply(const T& v) {
+    return concat_literals(v, splat_impl<C - 1, T>::apply(v));
+  }
+};
+template <typename T>
+struct splat_impl<1, T> {
+  static constexpr auto apply(const T& v) { return v; }
+};
+
+// Splats a single const_string value C times.
+//
+// Example:
+//  constexpr const auto aaa = splat_literal<3>(literal("a"));
+template <size_t C, typename T>
+constexpr auto splat_literal(const T& v) {
+  return splat_impl<C, T>::apply(v);
+}
+
+//===----------------------------------------------------------------------===//
+// Calling convention format generation
+//===----------------------------------------------------------------------===//
+// Prototyped here: https://godbolt.org/z/Tvhh7M
+
+template <typename T>
+struct cconv_map;
+
+template <typename T>
+struct cconv_map {
+  static constexpr const auto conv_chars = literal("i");
+};
+
+template <>
+struct cconv_map<int64_t> {
+  static constexpr const auto conv_chars = literal("I");
+};
+template <>
+struct cconv_map<uint64_t> {
+  static constexpr const auto conv_chars = literal("I");
+};
+
+template <>
+struct cconv_map<opaque_ref> {
+  static constexpr const auto conv_chars = literal("r");
+};
+template <typename T>
+struct cconv_map<ref<T>> {
+  static constexpr const auto conv_chars = literal("r");
+};
+template <>
+struct cconv_map<absl::string_view> {
+  static constexpr const auto conv_chars = literal("r");
+};
+
+template <typename U, size_t S>
+struct cconv_map<std::array<U, S>> {
+  static constexpr const auto conv_chars = splat_literal<S>(
+      cconv_map<typename impl::remove_cvref<U>::type>::conv_chars);
+};
+
+template <typename... Ts>
+struct cconv_map<std::tuple<Ts...>> {
+  static constexpr const auto conv_chars = concat_literals(
+      cconv_map<typename impl::remove_cvref<Ts>::type>::conv_chars...);
+};
+
+template <typename U>
+struct cconv_map<absl::Span<U>> {
+  static constexpr const auto conv_chars = concat_literals(
+      literal("["), cconv_map<typename impl::remove_cvref<U>::type>::conv_chars,
+      literal("]"));
+};
+
+template <typename Result, typename... Params>
+struct cconv_storage {
+  static const iree_string_view_t value() {
+    static constexpr const auto value = concat_literals(
+        literal("0"),
+        concat_literals(
+            cconv_map<
+                typename impl::remove_cvref<Params>::type>::conv_chars...),
+        literal("."),
+        concat_literals(
+            cconv_map<typename impl::remove_cvref<Result>::type>::conv_chars));
+    static constexpr const auto str =
+        iree_string_view_t{value.data(), value.size()};
+    return str;
+  }
+};
+
+template <typename... Params>
+struct cconv_storage_void {
+  static const iree_string_view_t value() {
+    static constexpr const auto value = concat_literals(
+        literal("0"),
+        concat_literals(
+            cconv_map<
+                typename impl::remove_cvref<Params>::type>::conv_chars...));
+    static constexpr const auto str =
+        iree_string_view_t{value.data(), value.size()};
+    return str;
+  }
+};
 
 //===----------------------------------------------------------------------===//
 // Parameter unpacking
 //===----------------------------------------------------------------------===//
 
+// TODO(benvanik): see if we can't use `extern template` to share
+// implementations of these and prevent code bloat across many modules.
+// We can also try some non-templated base functions (like "UnpackI32") that the
+// templated ones simply wrap with type casts.
+
 namespace impl {
-template <typename T>
+
+using params_ptr_t = uint8_t*;
+
+template <typename T, typename EN = void>
 struct ParamUnpack;
-}  // namespace impl
+template <>
+struct ParamUnpack<opaque_ref>;
+template <typename T>
+struct ParamUnpack<ref<T>>;
+template <typename T>
+struct ParamUnpack<const ref<T>>;
+template <>
+struct ParamUnpack<absl::string_view>;
+template <typename U, size_t S>
+struct ParamUnpack<std::array<U, S>>;
+template <typename... Ts>
+struct ParamUnpack<std::tuple<Ts...>>;
+template <typename U>
+struct ParamUnpack<absl::Span<U>, enable_if_not_primitive<U>>;
+template <typename U>
+struct ParamUnpack<absl::Span<U>, enable_if_primitive<U>>;
 
 struct Unpacker {
-  // Register storage for the caller frame the registers will be sourced from.
-  const iree_vm_registers_t* registers;
-  // Argument register list within the caller frame storage.
-  const iree_vm_register_list_t* argument_list;
-  // Optional variadic argument segment sizes.
-  const iree_vm_register_list_t* variadic_segment_size_list;
-  // Current flattened argument ordinal mapping into the argument_list list.
-  int argument_ordinal = 0;
-  // Ordinal of the current variadic segment in the variadic_segment_size_list.
-  int segment_ordinal = 0;
-  // Current unpack status, set to failure on the first error encountered.
-  Status status;
-
   template <typename... Ts>
   static StatusOr<std::tuple<typename impl::ParamUnpack<
       typename std::remove_reference<Ts>::type>::storage_type...>>
-  LoadSequence(const iree_vm_registers_t* registers,
-               const iree_vm_register_list_t* argument_list,
-               const iree_vm_register_list_t* variadic_segment_size_list) {
-    // TODO(#1991): verify argument_list and variadic_segment_size_list are
-    // valid to unpack (counts match expectations, etc).
+  LoadSequence(iree_byte_span_t storage) {
     auto params = std::make_tuple(
         typename impl::ParamUnpack<
             typename impl::remove_cvref<Ts>::type>::storage_type()...);
-    Unpacker unpacker(registers, argument_list, variadic_segment_size_list);
-    ApplyLoad<Ts...>(&unpacker, params,
+    Status status;
+    params_ptr_t ptr = storage.data;
+    ApplyLoad<Ts...>(status, ptr, params,
                      std::make_index_sequence<sizeof...(Ts)>());
-    IREE_RETURN_IF_ERROR(std::move(unpacker.status));
+    IREE_RETURN_IF_ERROR(std::move(status));
+    params_ptr_t limit = storage.data + storage.data_length;
+    if (IREE_UNLIKELY(ptr != limit)) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "argument buffer unpacking failure; consumed "
+             << (reinterpret_cast<intptr_t>(ptr) -
+                 reinterpret_cast<intptr_t>(storage.data))
+             << " of " << storage.data_length << " bytes";
+    }
     return std::move(params);
   }
 
  private:
-  Unpacker(const iree_vm_registers_t* registers,
-           const iree_vm_register_list_t* argument_list,
-           const iree_vm_register_list_t* variadic_segment_size_list)
-      : registers(registers),
-        argument_list(argument_list),
-        variadic_segment_size_list(variadic_segment_size_list) {}
-
   template <typename... Ts, typename T, size_t... I>
-  static void ApplyLoad(Unpacker* unpacker, T&& params,
+  static void ApplyLoad(Status& status, params_ptr_t& ptr, T&& params,
                         std::index_sequence<I...>) {
     impl::order_sequence{
-        (impl::ParamUnpack<typename std::tuple_element<
-             I, std::tuple<Ts...>>::type>::Load(unpacker, std::get<I>(params)),
+        (impl::ParamUnpack<typename impl::remove_cvref<
+             typename std::tuple_element<I, std::tuple<Ts...>>::type>::type>::
+             Load(status, ptr, std::get<I>(params)),
          0)...};
   }
 };
 
-namespace impl {
-
+// Common primitive types (`i32`, `i64`, `f32`, enums, etc).
 template <typename T>
-struct ParamUnpack {
+struct ParamUnpack<T, enable_if_primitive<T>> {
   using storage_type = T;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    out_param = static_cast<T>(
-        unpacker->registers->i32[reg & unpacker->registers->i32_mask]);
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    out_param = *reinterpret_cast<const T*>(ptr);
+    ptr += sizeof(T);
   }
 };
 
-template <>
-struct ParamUnpack<int64_t> {
-  using storage_type = int64_t;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    out_param = static_cast<int64_t>(
-        unpacker->registers->i32[reg & (unpacker->registers->i32_mask & ~1)]);
-  }
-};
-
-template <>
-struct ParamUnpack<uint64_t> {
-  using storage_type = uint64_t;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    out_param = static_cast<uint64_t>(
-        unpacker->registers->i32[reg & (unpacker->registers->i32_mask & ~1)]);
-  }
-};
-
+// An opaque ref type (`vm.ref<?>`), possibly null.
 template <>
 struct ParamUnpack<opaque_ref> {
   using storage_type = opaque_ref;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    auto* reg_ptr =
-        &unpacker->registers->ref[reg & unpacker->registers->ref_mask];
-    if (iree_vm_ref_is_null(reg_ptr)) {
-      unpacker->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                         << "argument " << (unpacker->segment_ordinal - 1)
-                         << " (" << typeid(storage_type).name() << ")"
-                         << " must not be a null";
-    } else {
-      iree_vm_ref_retain_or_move(reg & IREE_REF_REGISTER_MOVE_BIT, reg_ptr,
-                                 &out_param);
-    }
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    iree_vm_ref_move(reinterpret_cast<iree_vm_ref_t*>(ptr), &out_param);
+    ptr += sizeof(iree_vm_ref_t);
   }
 };
 
-template <>
-struct ParamUnpack<absl::optional<opaque_ref>> {
-  using storage_type = absl::optional<opaque_ref>;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    auto* reg_ptr =
-        &unpacker->registers->ref[reg & unpacker->registers->ref_mask];
-    if (!iree_vm_ref_is_null(reg_ptr)) {
-      out_param = {opaque_ref()};
-      iree_vm_ref_retain_or_move(reg & IREE_REF_REGISTER_MOVE_BIT, reg_ptr,
-                                 &out_param.value());
-    }
-  }
-};
-
+// A `vm.ref<T>` type, possibly null.
+// Ownership is transferred to the parameter.
 template <typename T>
 struct ParamUnpack<ref<T>> {
   using storage_type = ref<T>;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    auto* reg_ptr =
-        &unpacker->registers->ref[reg & unpacker->registers->ref_mask];
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
+    ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
-      if (reg & IREE_REF_REGISTER_MOVE_BIT) {
-        out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
-        memset(reg_ptr, 0, sizeof(*reg_ptr));
-      } else {
-        out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
-      }
-    } else if (reg_ptr->type != IREE_VM_REF_TYPE_NULL) {
-      unpacker->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                         << "Parameter " << (unpacker->segment_ordinal - 1)
-                         << " contains a reference to the wrong type; have "
-                         << iree_vm_ref_type_name(reg_ptr->type).data
-                         << " but expected "
-                         << ref_type_descriptor<T>::get()->type_name.data
-                         << " (" << typeid(storage_type).name() << ")";
+      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      memset(reg_ptr, 0, sizeof(*reg_ptr));
+    } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
+      status = InvalidArgumentErrorBuilder(IREE_LOC)
+               << "Parameter contains a reference to the wrong type; have "
+               << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
+               << ref_type_descriptor<T>::get()->type_name.data << " ("
+               << typeid(storage_type).name() << ")";
     } else {
-      unpacker->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                         << "Parameter " << (unpacker->segment_ordinal - 1)
-                         << " (" << typeid(storage_type).name()
-                         << ") must not be null";
-    }
-  }
-};
-
-template <typename T>
-struct ParamUnpack<absl::optional<ref<T>>> {
-  using storage_type = absl::optional<ref<T>>;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    auto* reg_ptr =
-        &unpacker->registers->ref[reg & unpacker->registers->ref_mask];
-    if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
-      iree_vm_ref_retain_or_move(reg & IREE_REF_REGISTER_MOVE_BIT, reg_ptr,
-                                 &out_param.value());
-    } else if (reg_ptr->type != IREE_VM_REF_TYPE_NULL) {
-      unpacker->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                         << "Parameter " << (unpacker->segment_ordinal - 1)
-                         << " contains a reference to the wrong type; have "
-                         << iree_vm_ref_type_name(reg_ptr->type).data
-                         << " but expected "
-                         << ref_type_descriptor<T>::get()->type_name.data
-                         << " (" << typeid(storage_type).name() << ")";
-    } else {
-      // NOTE: null is allowed here!
       out_param = {};
     }
   }
 };
 
+// TODO(benvanik): merge with above somehow?
+template <typename T>
+struct ParamUnpack<const ref<T>> {
+  using storage_type = ref<T>;
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
+    ptr += sizeof(iree_vm_ref_t);
+    if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
+      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      memset(reg_ptr, 0, sizeof(*reg_ptr));
+    } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
+      status = InvalidArgumentErrorBuilder(IREE_LOC)
+               << "Parameter contains a reference to the wrong type; have "
+               << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
+               << ref_type_descriptor<T>::get()->type_name.data << " ("
+               << typeid(storage_type).name() << ")";
+    } else {
+      out_param = {};
+    }
+  }
+};
+
+// An `iree.byte_buffer` containing a string.
+// The string view is aliased directly into the underlying byte buffer.
 template <>
 struct ParamUnpack<absl::string_view> {
   using storage_type = absl::string_view;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    ++unpacker->segment_ordinal;
-    uint16_t reg =
-        unpacker->argument_list->registers[unpacker->argument_ordinal++];
-    auto* reg_ptr =
-        &unpacker->registers->ref[reg & unpacker->registers->ref_mask];
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
+    ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type ==
         ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type) {
       auto byte_span =
           reinterpret_cast<iree_vm_ro_byte_buffer_t*>(reg_ptr->ptr)->data;
       out_param = absl::string_view{
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
-    } else if (reg_ptr->type != IREE_VM_REF_TYPE_NULL) {
-      unpacker->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                         << "Parameter " << (unpacker->segment_ordinal - 1)
-                         << " contains a reference to the wrong type; have "
-                         << iree_vm_ref_type_name(reg_ptr->type).data
-                         << " but expected "
-                         << ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
-                                ->type_name.data
-                         << " (" << typeid(storage_type).name() << ")";
+    } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
+      status = InvalidArgumentErrorBuilder(IREE_LOC)
+               << "Parameter contains a reference to the wrong type; have "
+               << iree_vm_ref_type_name(reg_ptr->type).data << " but expected "
+               << ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
+                      ->type_name.data
+               << " (" << typeid(storage_type).name() << ")";
     } else {
       // NOTE: empty string is allowed here!
       out_param = {};
@@ -312,55 +415,66 @@ struct ParamUnpack<absl::string_view> {
   }
 };
 
-template <typename U, size_t S>
-struct ParamUnpack<std::array<U, S>>;
-template <typename... Ts>
-struct ParamUnpack<std::tuple<Ts...>>;
-template <typename U>
-struct ParamUnpack<absl::Span<U>>;
-
+// Arrays are C++ ABI only representing a fixed repeated field (`i32, i32`).
 template <typename U, size_t S>
 struct ParamUnpack<std::array<U, S>> {
   using element_type = typename impl::remove_cvref<U>::type;
   using storage_type = std::array<element_type, S>;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    for (int i = 0; i < S; ++i) {
-      ParamUnpack::Load(unpacker, out_param[i]);
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    for (size_t i = 0; i < S; ++i) {
+      ParamUnpack::Load(status, ptr, out_param[i]);
     }
   }
 };
 
+// Tuples (`tuple<i32, i64>`) expand to just their flattened contents.
 template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>> {
   using storage_type = std::tuple<typename impl::remove_cvref<Ts>::type...>;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    UnpackTuple(unpacker, out_param, std::make_index_sequence<sizeof...(Ts)>());
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    UnpackTuple(status, ptr, out_param,
+                std::make_index_sequence<sizeof...(Ts)>());
   }
   template <size_t... I>
-  static void UnpackTuple(Unpacker* unpacker, storage_type& params,
-                          std::index_sequence<I...>) {
+  static void UnpackTuple(Status& status, params_ptr_t& ptr,
+                          storage_type& params, std::index_sequence<I...>) {
     impl::order_sequence{
         (ParamUnpack<typename std::tuple_element<I, std::tuple<Ts...>>::type>::
-             Load(unpacker, std::get<I>(params)),
+             Load(status, ptr, std::get<I>(params)),
          0)...};
   }
 };
 
+// Complex variadic span (like `tuple<i32, tuple<ref<...>, i64>>...`).
+// We need to allocate storage here so that we can marshal the element type out.
+// In the future we could check that all subelements are primitives and alias if
+// the host machine endianness is the same.
 template <typename U>
-struct ParamUnpack<absl::Span<U>> {
+struct ParamUnpack<absl::Span<U>, enable_if_not_primitive<U>> {
   using element_type = typename impl::remove_cvref<U>::type;
   using storage_type = absl::InlinedVector<element_type, 16>;
-  static void Load(Unpacker* unpacker, storage_type& out_param) {
-    const uint16_t count = unpacker->variadic_segment_size_list
-                               ->registers[unpacker->segment_ordinal++];
-    // TODO(benvanik): this may be too many, but it's better than nothing.
-    out_param.reserve(count);
-    int32_t original_segment_ordinal = unpacker->segment_ordinal;
-    while (unpacker->segment_ordinal - original_segment_ordinal < count) {
-      out_param.push_back({});
-      ParamUnpack<element_type>::Load(unpacker, out_param.back());
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    iree_host_size_t count = *reinterpret_cast<const int32_t*>(ptr);
+    ptr += sizeof(int32_t);
+    out_param.resize(count);
+    for (iree_host_size_t i = 0; i < count; ++i) {
+      ParamUnpack<element_type>::Load(status, ptr, out_param[i]);
     }
-    unpacker->segment_ordinal = original_segment_ordinal;
+  }
+};
+
+// Simple primitive variadic span (like `i32...`). We can alias directly into
+// the argument buffer so long as endianness matches.
+template <typename U>
+struct ParamUnpack<absl::Span<U>, enable_if_primitive<U>> {
+  using element_type = U;
+  using storage_type = absl::Span<const element_type>;
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    iree_host_size_t count = *reinterpret_cast<const int32_t*>(ptr);
+    ptr += sizeof(int32_t);
+    out_param =
+        absl::MakeConstSpan(reinterpret_cast<const element_type*>(ptr), count);
+    ptr += sizeof(element_type) * count;
   }
 };
 
@@ -371,99 +485,31 @@ struct ParamUnpack<absl::Span<U>> {
 //===----------------------------------------------------------------------===//
 
 namespace impl {
-template <typename T>
-struct ResultPack;
-}  // namespace impl
 
-struct Packer {
-  // Caller frame register storage.
-  const iree_vm_registers_t* registers;
-  // Registers within the caller frame to store results into.
-  const iree_vm_register_list_t* result_list;
-  // Current flattened result ordinal mapping into the result_list list.
-  int result_ordinal = 0;
-  // Result packing status used to return packing failures.
-  Status status;
-
-  template <typename Results>
-  static Status StoreSequence(const iree_vm_registers_t* registers,
-                              const iree_vm_register_list_t* result_list,
-                              Results results) {
-    static const int kLeafResultCount = impl::LeafCount<Results>::value;
-    if (kLeafResultCount > 0 &&
-        (!result_list || result_list->size != kLeafResultCount)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Function returns results but no result registers provided or "
-                "result count mismatch";
-    }
-
-    Packer state(registers, result_list);
-    impl::ResultPack<Results>::Store(&state, std::move(results));
-    return std::move(state.status);
-  }
-
- private:
-  Packer(const iree_vm_registers_t* registers,
-         const iree_vm_register_list_t* result_list)
-      : registers(registers), result_list(result_list) {}
-};
-
-namespace impl {
+using result_ptr_t = uint8_t*;
 
 template <typename T>
 struct ResultPack {
-  static void Store(Packer* packer, T value) {
-    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
-    packer->registers->i32[reg & packer->registers->i32_mask] =
-        static_cast<int32_t>(value);
-  }
-};
-
-template <>
-struct ResultPack<int64_t> {
-  static void Store(Packer* packer, int64_t value) {
-    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
-    packer->registers->i32[reg & (packer->registers->i32_mask & ~1)] =
-        static_cast<int64_t>(value);
-  }
-};
-
-template <>
-struct ResultPack<uint64_t> {
-  static void Store(Packer* packer, uint64_t value) {
-    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
-    packer->registers->i32[reg & (packer->registers->i32_mask & ~1)] =
-        static_cast<uint64_t>(value);
+  static void Store(result_ptr_t& ptr, T value) {
+    *reinterpret_cast<T*>(ptr) = value;
+    ptr += sizeof(T);
   }
 };
 
 template <>
 struct ResultPack<opaque_ref> {
-  static void Store(Packer* packer, opaque_ref value) {
-    if (!value) {
-      packer->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                       << "Result (" << typeid(opaque_ref).name()
-                       << ") must not be null";
-      return;
-    }
-    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
-    auto* reg_ptr = &packer->registers->ref[reg & packer->registers->ref_mask];
-    iree_vm_ref_move(value.get(), reg_ptr);
+  static void Store(result_ptr_t& ptr, opaque_ref value) {
+    iree_vm_ref_move(value.get(), reinterpret_cast<iree_vm_ref_t*>(ptr));
+    ptr += sizeof(iree_vm_ref_t);
   }
 };
 
 template <typename T>
 struct ResultPack<ref<T>> {
-  static void Store(Packer* packer, ref<T> value) {
-    if (!value) {
-      packer->status = InvalidArgumentErrorBuilder(IREE_LOC)
-                       << "Result (" << typeid(ref<T>).name()
-                       << ") must not be null";
-      return;
-    }
-    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
-    auto* reg_ptr = &packer->registers->ref[reg & packer->registers->ref_mask];
-    iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
+  static void Store(result_ptr_t& ptr, ref<T> value) {
+    iree_vm_ref_wrap_assign(value.release(), value.type(),
+                            reinterpret_cast<iree_vm_ref_t*>(ptr));
+    ptr += sizeof(iree_vm_ref_t);
   }
 };
 
@@ -472,37 +518,26 @@ struct ResultPack<std::array<U, S>>;
 template <typename... Ts>
 struct ResultPack<std::tuple<Ts...>>;
 
-template <typename T>
-struct ResultPack<absl::optional<ref<T>>> {
-  static void Store(Packer* packer, absl::optional<ref<T>> value) {
-    uint16_t reg = packer->result_list->registers[packer->result_ordinal++];
-    auto* reg_ptr = &packer->registers->ref[reg & packer->registers->ref_mask];
-    if (value.has_value()) {
-      iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
-    }
-  }
-};
-
 template <typename U, size_t S>
 struct ResultPack<std::array<U, S>> {
-  static void Store(Packer* packer, std::array<U, S> value) {
-    for (int i = 0; i < S; ++i) {
-      ResultPack<U>::Store(packer, std::move(value[i]));
+  static void Store(result_ptr_t& ptr, std::array<U, S> value) {
+    for (size_t i = 0; i < S; ++i) {
+      ResultPack<U>::Store(ptr, std::move(value[i]));
     }
   }
 };
 
 template <typename... Ts>
 struct ResultPack<std::tuple<Ts...>> {
-  static void Store(Packer* packer, std::tuple<Ts...> results) {
-    PackTuple(packer, results, std::make_index_sequence<sizeof...(Ts)>());
+  static void Store(result_ptr_t& ptr, std::tuple<Ts...> results) {
+    PackTuple(ptr, results, std::make_index_sequence<sizeof...(Ts)>());
   }
   template <typename... T, size_t... I>
-  static inline void PackTuple(Packer* packer, std::tuple<T...>& value,
+  static inline void PackTuple(result_ptr_t& ptr, std::tuple<T...>& value,
                                std::index_sequence<I...>) {
     impl::order_sequence{
         (ResultPack<typename std::tuple_element<I, std::tuple<T...>>::type>::
-             Store(packer, std::move(std::get<I>(value))),
+             Store(ptr, std::move(std::get<I>(value))),
          0)...};
   }
 };
@@ -517,30 +552,24 @@ template <typename Owner, typename Results, typename... Params>
 struct DispatchFunctor {
   using FnPtr = StatusOr<Results> (Owner::*)(Params...);
 
-  template <typename T, size_t... I>
-  constexpr static auto TupleToArray(const T& t, std::index_sequence<I...>) {
-    return std::array<uint16_t, std::tuple_size<T>::value>{std::get<I>(t)...};
-  }
-
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
                      const iree_vm_function_call_t* call,
                      iree_vm_execution_result_t* out_result) {
-    iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
+    // Marshal arguments into types/locals we can forward to the function.
     IREE_ASSIGN_OR_RETURN(
-        auto params, Unpacker::LoadSequence<Params...>(
-                         &caller_frame->registers, call->argument_registers,
-                         call->variadic_segment_size_list));
+        auto params, impl::Unpacker::LoadSequence<Params...>(call->arguments));
 
-    auto results_or =
+    // Call the target function with the params.
+    IREE_ASSIGN_OR_RETURN(
+        auto results,
         ApplyFn(reinterpret_cast<FnPtr>(ptr), self, std::move(params),
-                std::make_index_sequence<sizeof...(Params)>());
-    if (!results_or.ok()) {
-      return std::move(results_or).status();
-    }
+                std::make_index_sequence<sizeof...(Params)>()));
 
-    return Packer::StoreSequence<Results>(&caller_frame->registers,
-                                          call->result_registers,
-                                          std::move(results_or).value());
+    // Marshal call results back into the ABI results buffer.
+    impl::result_ptr_t result_ptr = call->results.data;
+    impl::ResultPack<Results>::Store(result_ptr, std::move(results));
+
+    return OkStatus();
   }
 
   template <typename T, size_t... I>
@@ -550,6 +579,7 @@ struct DispatchFunctor {
   }
 };
 
+// A DispatchFunctor specialization for methods with no return values.
 template <typename Owner, typename... Params>
 struct DispatchFunctorVoid {
   using FnPtr = Status (Owner::*)(Params...);
@@ -557,17 +587,8 @@ struct DispatchFunctorVoid {
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
                      const iree_vm_function_call_t* call,
                      iree_vm_execution_result_t* out_result) {
-    if (call->result_registers && call->result_registers->size > 0) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Function returns no results but was provided result registers";
-    }
-
-    iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
     IREE_ASSIGN_OR_RETURN(
-        auto params, Unpacker::LoadSequence<Params...>(
-                         &caller_frame->registers, call->argument_registers,
-                         call->variadic_segment_size_list));
-
+        auto params, impl::Unpacker::LoadSequence<Params...>(call->arguments));
     return ApplyFn(reinterpret_cast<FnPtr>(ptr), self, std::move(params),
                    std::make_index_sequence<sizeof...(Params)>());
   }
@@ -583,7 +604,8 @@ struct DispatchFunctorVoid {
 
 template <typename Owner>
 struct NativeFunction {
-  const char* name;
+  iree_string_view_t name;
+  iree_string_view_t cconv;
   void (Owner::*const ptr)();
   Status (*const call)(void (Owner::*ptr)(), Owner* self,
                        iree_vm_stack_t* stack,
@@ -593,16 +615,22 @@ struct NativeFunction {
 
 template <typename Owner, typename Result, typename... Params>
 constexpr NativeFunction<Owner> MakeNativeFunction(
-    const char* name, StatusOr<Result> (Owner::*fn)(Params...)) {
+    absl::string_view name, StatusOr<Result> (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
-  return {name, (void (Owner::*)())fn, &dispatch_functor_t::Call};
+  return {{name.data(), name.size()},
+          packing::cconv_storage<Result, Params...>::value(),
+          (void (Owner::*)())fn,
+          &dispatch_functor_t::Call};
 }
 
 template <typename Owner, typename... Params>
 constexpr NativeFunction<Owner> MakeNativeFunction(
-    const char* name, Status (Owner::*fn)(Params...)) {
+    absl::string_view name, Status (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
-  return {name, (void (Owner::*)())fn, &dispatch_functor_t::Call};
+  return {{name.data(), name.size()},
+          packing::cconv_storage_void<Params...>::value(),
+          (void (Owner::*)())fn,
+          &dispatch_functor_t::Call};
 }
 
 }  // namespace vm

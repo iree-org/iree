@@ -858,6 +858,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
   }
   SmallVector<Type, 4> flatOperandTypes;
   SmallVector<Type, 4> segmentTypes;
+  SmallVector<int16_t, 4> segmentSizes;
   int segmentIndex = 0;
   while (failed(parser.parseOptionalRParen())) {
     Type operandType;
@@ -867,20 +868,23 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
     }
     bool isVariadic = succeeded(parser.parseOptionalEllipsis());
     if (isVariadic) {
+      int flatSegmentSize = flatSegmentSizes[segmentIndex];
       if (auto tupleType = operandType.dyn_cast<TupleType>()) {
-        for (int i = 0; i < flatSegmentSizes[segmentIndex] / tupleType.size();
-             ++i) {
+        for (int i = 0; i < flatSegmentSize / tupleType.size(); ++i) {
           for (auto type : tupleType) {
             flatOperandTypes.push_back(type);
           }
         }
+        segmentSizes.push_back(flatSegmentSize / tupleType.size());
       } else {
-        for (int i = 0; i < flatSegmentSizes[segmentIndex]; ++i) {
+        for (int i = 0; i < flatSegmentSize; ++i) {
           flatOperandTypes.push_back(operandType);
         }
+        segmentSizes.push_back(flatSegmentSize);
       }
     } else {
       flatOperandTypes.push_back(operandType);
+      segmentSizes.push_back(-1);
     }
     segmentTypes.push_back(operandType);
     ++segmentIndex;
@@ -901,9 +905,9 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
   result->addAttribute(
       "segment_sizes",
       DenseIntElementsAttr::get(
-          VectorType::get({static_cast<int64_t>(flatSegmentSizes.size())},
+          VectorType::get({static_cast<int64_t>(segmentSizes.size())},
                           parser.getBuilder().getIntegerType(16)),
-          flatSegmentSizes));
+          segmentSizes));
   result->addAttribute("segment_types",
                        parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
                            llvm::map_range(segmentTypes, [&](Type type) {
@@ -932,16 +936,15 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
         } else {
           p << '[';
           if (auto tupleType = segmentType.dyn_cast<TupleType>()) {
-            int tupleCount = segmentSize / tupleType.size();
-            for (int i = 0; i < tupleCount; ++i) {
+            for (size_t i = 0; i < segmentSize; ++i) {
               p << '(';
               SmallVector<Value, 4> tupleOperands;
-              for (int i = 0; i < tupleType.size(); ++i) {
+              for (size_t j = 0; j < tupleType.size(); ++j) {
                 tupleOperands.push_back(op.getOperand(operand++));
               }
               p << tupleOperands;
               p << ')';
-              if (i < tupleCount - 1) p << ", ";
+              if (i < segmentSize - 1) p << ", ";
             }
           } else {
             SmallVector<Value, 4> segmentOperands;
@@ -1011,13 +1014,13 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
   // of the already parsed comma to avoid checking for a comma later on.
   bool trailingComma = false;
   OpAsmParser::OperandType status = condition;
-  if (succeeded(parser.parseComma()) &&
+  if (succeeded(parser.parseOptionalComma()) &&
       !parser.parseOptionalOperand(status).hasValue()) {
     trailingComma = true;
   }
 
   StringAttr messageAttr;
-  if ((trailingComma || succeeded(parser.parseComma())) &&
+  if ((trailingComma || succeeded(parser.parseOptionalComma())) &&
       failed(
           parser.parseAttribute(messageAttr, "message", result->attributes))) {
     return failure();
