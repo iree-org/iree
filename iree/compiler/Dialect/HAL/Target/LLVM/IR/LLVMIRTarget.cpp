@@ -39,8 +39,9 @@ class LLVMIRTargetBackend final : public TargetBackend {
   LLVMIRTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {}
 
-  // NOTE: we could vary this based on the options, such as by arch/etc.
-  std::string name() const override { return "llvm-ir*"; }
+  // NOTE: we could vary these based on the options, such as by arch/etc.
+  std::string name() const override { return "llvm_ir"; }
+  std::string filter_pattern() const override { return "llvm-ir*"; }
 
   void getDependentDialects(DialectRegistry& registry) const override {
     // clang-format off
@@ -50,17 +51,6 @@ class LLVMIRTargetBackend final : public TargetBackend {
                     scf::SCFDialect,
                     vector::VectorDialect>();
     // clang-format on
-  }
-
-  void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
-                        IREE::HAL::ExecutableOp executableOp) override {
-    OpBuilder targetBuilder(&executableOp.getBlock().back());
-    auto targetContainerOp =
-        targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-            sourceOp.getLoc(), /*name=*/"llvm_ir",
-            /*targetBackendFilter=*/name());
-    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
   }
 
   void buildTranslationPassPipeline(ExecutableTargetOp targetOp,

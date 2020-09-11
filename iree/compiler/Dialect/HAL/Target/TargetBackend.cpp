@@ -75,7 +75,7 @@ void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-      sourceOp.getLoc(), /*name=*/name(), /*targetBackendFilter=*/name());
+      sourceOp.getLoc(), name(), filter_pattern());
   OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
   containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
@@ -135,7 +135,7 @@ LogicalResult TargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
     DeviceSwitchBuilder &switchBuilder) {
   auto *region = switchBuilder.addConditionRegion(
-      IREE::HAL::DeviceMatchIDAttr::get(name(), loc.getContext()),
+      IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
           dispatchState.workload,
           dispatchState.commandBuffer,

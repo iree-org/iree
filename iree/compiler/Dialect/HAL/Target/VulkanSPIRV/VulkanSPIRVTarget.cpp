@@ -233,8 +233,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
       : options_(std::move(options)) {}
 
-  // NOTE: we could vary this based on the options such as 'vulkan-v1.1'.
-  std::string name() const override { return "vulkan*"; }
+  // NOTE: we could vary these based on the options such as 'vulkan-v1.1'.
+  std::string name() const override { return "vulkan_spirv"; }
+  std::string filter_pattern() const override { return "vulkan*"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -252,8 +253,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                         IREE::HAL::ExecutableOp executableOp) override {
     OpBuilder targetBuilder(&executableOp.getBlock().back());
     auto targetOp = targetBuilder.create<IREE::HAL::ExecutableTargetOp>(
-        sourceOp.getLoc(), /*name=*/"vulkan_any",
-        /*targetBackendFilter=*/name());
+        sourceOp.getLoc(), name(), filter_pattern());
     OpBuilder containerBuilder(&targetOp.getBlock().back());
 
     auto innerModuleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
@@ -281,7 +281,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend_filter(), name())) {
+      if (matchPattern(executableTargetOp.target_backend_filter(),
+                       filter_pattern())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
         auto spvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
         assert(llvm::hasSingleElement(spvModuleOps));
@@ -324,7 +325,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
 
     auto *region = switchBuilder.addConditionRegion(
-        IREE::HAL::DeviceMatchIDAttr::get(name(), loc.getContext()),
+        IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
         {
             dispatchState.workload,
             dispatchState.commandBuffer,
@@ -410,7 +411,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     spirv::ModuleOp spvModuleOp;
     for (auto executableTargetOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-      if (matchPattern(executableTargetOp.target_backend_filter(), name())) {
+      if (matchPattern(executableTargetOp.target_backend_filter(),
+                       filter_pattern())) {
         ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
         assert(!innerModuleOp.getAttr(
             iree_compiler::getEntryPointScheduleAttrName()));
