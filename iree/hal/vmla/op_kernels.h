@@ -197,6 +197,9 @@ struct And {
   static Status Execute(absl::Span<const T> lhs_buffer,
                         absl::Span<const T> rhs_buffer,
                         absl::Span<T> dst_buffer);
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
+                        absl::Span<T> dst_buffer);
 };
 
 struct Or {
@@ -210,6 +213,9 @@ struct Xor {
   template <typename T>
   static Status Execute(absl::Span<const T> lhs_buffer,
                         absl::Span<const T> rhs_buffer,
+                        absl::Span<T> dst_buffer);
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
                         absl::Span<T> dst_buffer);
 };
 
@@ -461,6 +467,6 @@ struct PoolingMax {
 }  // namespace iree
 
 #include "iree/hal/vmla/op_kernels_generic.h"  // IWYU pragma: export
-#include "iree/hal/vmla/op_kernels_ruy.h"  // IWYU pragma: export
+#include "iree/hal/vmla/op_kernels_ruy.h"      // IWYU pragma: export
 
 #endif  // IREE_HAL_VMLA_OP_KERNELS_H_

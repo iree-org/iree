@@ -27,6 +27,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -35,6 +36,29 @@ namespace HAL {
 
 int32_t getRoundedElementByteWidth(Type type) {
   return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+}
+
+TensorType convertTensorTypeToABIType(TensorType sourceType) {
+  assert(sourceType.hasRank() && "only ranked tensors are supported");
+  Type sourceElementType = sourceType.getElementType();
+  Type targetElementType = sourceElementType;
+  if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
+    int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
+    targetElementType =
+        IntegerType::get(targetByteWidth * 8, sourceElementType.getContext());
+  }
+  return RankedTensorType::get(sourceType.getShape(), targetElementType);
+}
+
+Value convertABITensorType(Location loc, Value sourceValue,
+                           TensorType targetType, OpBuilder &builder) {
+  auto sourceType = sourceValue.getType().cast<TensorType>();
+  if (sourceType == targetType) {
+    return sourceValue;
+  }
+  // TODO(benvanik): use a type converter or a dialect interface.
+  return builder.createOrFold<mhlo::ConvertOp>(loc, sourceValue,
+                                               targetType.getElementType());
 }
 
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,

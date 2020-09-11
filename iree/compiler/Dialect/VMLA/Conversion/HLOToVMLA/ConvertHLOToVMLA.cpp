@@ -691,12 +691,12 @@ struct FiniteOpConversion : public OpConversionPattern<mhlo::IsFiniteOp> {
   LogicalResult matchAndRewrite(
       mhlo::IsFiniteOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    auto input_type =
+    auto inputType =
         srcOp.getOperand().getType().cast<ShapedType>().getElementType();
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
-    rewriter.createOrFold<IREE::VMLA::FiniteOp>(
-        srcOp.getLoc(), srcOp.getOperand(), dst, TypeAttr::get(input_type));
+    rewriter.createOrFold<IREE::VMLA::FiniteOp>(srcOp.getLoc(), rawOperands[0],
+                                                dst, TypeAttr::get(inputType));
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }
@@ -724,9 +724,18 @@ struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
 
     // VMLA does not support tensors of i1. tensor<*xi1> will be converted to
     // tensor<*xi8>.
-    if (srcType.getElementTypeBitWidth() == 1 &&
-        dstType.getElementTypeBitWidth() == 8) {
-      rewriter.replaceOp(srcOp, rawOperands);
+    if ((srcType.getElementTypeBitWidth() == 1 &&
+         dstType.getElementTypeBitWidth() == 8) ||
+        (srcType.getElementTypeBitWidth() == 8 &&
+         dstType.getElementTypeBitWidth() == 1)) {
+      auto dst = VMLAConversionTarget::allocateOutputBuffer(
+          srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+      auto bitMask = rewriter.createOrFold<mlir::ConstantIntOp>(
+          srcOp.getLoc(), 1, rewriter.getI32Type());
+      rewriter.createOrFold<IREE::VMLA::AndBroadcastOp>(
+          srcOp.getLoc(), rawOperands[0], bitMask, dst,
+          TypeAttr::get(rewriter.getIntegerType(8)), false);
+      rewriter.replaceOp(srcOp, {dst});
     } else {
       return VMLAConversionTarget::applyDefaultBufferRewrite(
           srcOp, rawOperands, VMLAOpSemantics::kDefault,

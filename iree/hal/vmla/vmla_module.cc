@@ -233,19 +233,19 @@ class VMLAModuleState final {
     return Buffer::Allocate(byte_length, allocator_);
   }
 
-  StatusOr<vm::ref<Buffer>> BufferClone(vm::ref<Buffer> src) {
+  StatusOr<vm::ref<Buffer>> BufferClone(const vm::ref<Buffer>& src) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferClone");
     IREE_ASSIGN_OR_RETURN(auto dst, Buffer::Allocate(src->size(), allocator_));
     std::memcpy(dst->data(), src->data(), dst->size());
     return std::move(dst);
   }
 
-  StatusOr<iree_vmla_size_t> BufferByteLength(vm::ref<Buffer> buffer) {
+  StatusOr<iree_vmla_size_t> BufferByteLength(const vm::ref<Buffer>& buffer) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferByteLength");
     return buffer->size();
   }
 
-  StatusOr<vm::ref<Buffer>> BufferView(vm::ref<Buffer> src,
+  StatusOr<vm::ref<Buffer>> BufferView(const vm::ref<Buffer>& src,
                                        iree_vmla_size_t byte_offset,
                                        iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferView");
@@ -283,8 +283,10 @@ class VMLAModuleState final {
     return Buffer::Wrap(data, data_length, external_allocator);
   }
 
-  Status BufferCopy(vm::ref<Buffer> src, iree_vmla_size_t src_byte_offset,
-                    vm::ref<Buffer> dst, iree_vmla_size_t dst_byte_offset,
+  Status BufferCopy(const vm::ref<Buffer>& src,
+                    iree_vmla_size_t src_byte_offset,
+                    const vm::ref<Buffer>& dst,
+                    iree_vmla_size_t dst_byte_offset,
                     iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferCopy");
     if (byte_length == kVMLAWholeBuffer) {
@@ -298,7 +300,7 @@ class VMLAModuleState final {
     return OkStatus();
   }
 
-  Status BufferFill(vm::ref<Buffer> value, vm::ref<Buffer> dst) {
+  Status BufferFill(const vm::ref<Buffer>& value, const vm::ref<Buffer>& dst) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferFill");
     if (value->size() == 1) {
       // Fast-path for single-byte memset values.
@@ -318,7 +320,7 @@ class VMLAModuleState final {
     return OkStatus();
   }
 
-  StatusOr<int32_t> BufferLoadI32(vm::ref<Buffer> src,
+  StatusOr<int32_t> BufferLoadI32(const vm::ref<Buffer>& src,
                                   iree_vmla_size_t byte_offset) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferLoadI32");
     IREE_ASSIGN_OR_RETURN(auto data,
@@ -331,27 +333,36 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_NONARY_OP(name, kernel, type)    \
-  Status name(vm::ref<Buffer> dst) {               \
+  Status name(const vm::ref<Buffer>& dst) {        \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);  \
     return kernel::Execute<type>(dst->As<type>()); \
   }
 
-#define IREE_VMLA_UNARY_OP(name, kernel, type)                      \
-  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
-    return kernel::Execute<type>(src->As<type>(), dst->As<type>()); \
+#define IREE_VMLA_UNARY_OP(name, kernel, type)                          \
+  Status name(const vm::ref<Buffer>& src, const vm::ref<Buffer>& dst) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                       \
+    return kernel::Execute<type>(src->As<type>(), dst->As<type>());     \
   }
 
-#define IREE_VMLA_BINARY_OP(name, kernel, type)                                \
-  Status name(vm::ref<Buffer> lhs, vm::ref<Buffer> rhs, vm::ref<Buffer> dst) { \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
-    return kernel::Execute<type>(lhs->As<type>(), rhs->As<type>(),             \
-                                 dst->As<type>());                             \
+#define IREE_VMLA_BINARY_OP(name, kernel, type)                       \
+  Status name(const vm::ref<Buffer>& lhs, const vm::ref<Buffer>& rhs, \
+              const vm::ref<Buffer>& dst) {                           \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                     \
+    return kernel::Execute<type>(lhs->As<type>(), rhs->As<type>(),    \
+                                 dst->As<type>());                    \
+  }
+
+#define IREE_VMLA_BINARY_BROADCAST_OP(name, kernel, type)                 \
+  Status name(const vm::ref<Buffer>& lhs, int32_t rhs,                    \
+              const vm::ref<Buffer>& dst) {                               \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                         \
+    return kernel::Execute<type>(lhs->As<type>(), static_cast<type>(rhs), \
+                                 dst->As<type>());                        \
   }
 
 #define IREE_VMLA_TERNARY_OP(name, kernel, type)                              \
-  Status name(vm::ref<Buffer> a, vm::ref<Buffer> b, vm::ref<Buffer> c,        \
-              vm::ref<Buffer> dst) {                                          \
+  Status name(const vm::ref<Buffer>& a, const vm::ref<Buffer>& b,             \
+              const vm::ref<Buffer>& c, const vm::ref<Buffer>& dst) {         \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
     return kernel::Execute<type>(a->As<type>(), b->As<type>(), c->As<type>(), \
                                  dst->As<type>());                            \
@@ -370,55 +381,55 @@ class VMLAModuleState final {
     kGE = 5,
   };
 
-#define IREE_VMLA_COMPARE_OP(name, type)                                   \
-  Status name(int32_t predicate, vm::ref<Buffer> lhs, vm::ref<Buffer> rhs, \
-              vm::ref<Buffer> dst) {                                       \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                          \
-    switch (static_cast<CmpPredicate>(predicate)) {                        \
-      case CmpPredicate::kEQ:                                              \
-        return kernels::CompareEQ::Execute<type>(                          \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
-      case CmpPredicate::kNE:                                              \
-        return kernels::CompareNE::Execute<type>(                          \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
-      case CmpPredicate::kLT:                                              \
-        return kernels::CompareLT::Execute<type>(                          \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
-      case CmpPredicate::kLE:                                              \
-        return kernels::CompareLE::Execute<type>(                          \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
-      case CmpPredicate::kGT:                                              \
-        return kernels::CompareGT::Execute<type>(                          \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
-      case CmpPredicate::kGE:                                              \
-        return kernels::CompareGE::Execute<type>(                          \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
-      default:                                                             \
-        return InvalidArgumentErrorBuilder(IREE_LOC)                       \
-               << "Unsupported predicate " << predicate;                   \
-    }                                                                      \
+#define IREE_VMLA_COMPARE_OP(name, type)                                \
+  Status name(int32_t predicate, const vm::ref<Buffer>& lhs,            \
+              const vm::ref<Buffer>& rhs, const vm::ref<Buffer>& dst) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                       \
+    switch (static_cast<CmpPredicate>(predicate)) {                     \
+      case CmpPredicate::kEQ:                                           \
+        return kernels::CompareEQ::Execute<type>(                       \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
+      case CmpPredicate::kNE:                                           \
+        return kernels::CompareNE::Execute<type>(                       \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
+      case CmpPredicate::kLT:                                           \
+        return kernels::CompareLT::Execute<type>(                       \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
+      case CmpPredicate::kLE:                                           \
+        return kernels::CompareLE::Execute<type>(                       \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
+      case CmpPredicate::kGT:                                           \
+        return kernels::CompareGT::Execute<type>(                       \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
+      case CmpPredicate::kGE:                                           \
+        return kernels::CompareGE::Execute<type>(                       \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());      \
+      default:                                                          \
+        return InvalidArgumentErrorBuilder(IREE_LOC)                    \
+               << "Unsupported predicate " << predicate;                \
+    }                                                                   \
   }
   IREE_VMLA_COMPARE_OP(CmpI8, int8_t);
   IREE_VMLA_COMPARE_OP(CmpI16, int16_t);
   IREE_VMLA_COMPARE_OP(CmpI32, int32_t);
   IREE_VMLA_COMPARE_OP(CmpF32, float);
 
-#define IREE_VMLA_SELECT_OP(name, type)                                       \
-  Status name(vm::ref<Buffer> cond, vm::ref<Buffer> lhs, vm::ref<Buffer> rhs, \
-              vm::ref<Buffer> dst) {                                          \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
-    return kernels::Select::Execute<type>(cond->As<uint8_t>(),                \
-                                          lhs->As<type>(), rhs->As<type>(),   \
-                                          dst->As<type>());                   \
+#define IREE_VMLA_SELECT_OP(name, type)                                     \
+  Status name(const vm::ref<Buffer>& cond, const vm::ref<Buffer>& lhs,      \
+              const vm::ref<Buffer>& rhs, const vm::ref<Buffer>& dst) {     \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                           \
+    return kernels::Select::Execute<type>(cond->As<uint8_t>(),              \
+                                          lhs->As<type>(), rhs->As<type>(), \
+                                          dst->As<type>());                 \
   }
   IREE_VMLA_SELECT_OP(SelectX8, uint8_t);
   IREE_VMLA_SELECT_OP(SelectX16, uint16_t);
   IREE_VMLA_SELECT_OP(SelectX32, uint32_t);
 
-#define IREE_VMLA_UNARY_PREDICATE_OP(name, kernel, type)            \
-  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
-    return kernel::Execute<type>(src->As<type>(), dst->As<bool>()); \
+#define IREE_VMLA_UNARY_PREDICATE_OP(name, kernel, type)                \
+  Status name(const vm::ref<Buffer>& src, const vm::ref<Buffer>& dst) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                       \
+    return kernel::Execute<type>(src->As<type>(), dst->As<bool>());     \
   }
   IREE_VMLA_UNARY_PREDICATE_OP(FiniteF32, kernels::Finite, float);
 
@@ -427,9 +438,9 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_COPY_OP(name, size)                                     \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
-              absl::Span<const int32_t> src_indices, vm::ref<Buffer> dst, \
-              iree_vmla_shape_t dst_shape,                                \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,    \
+              absl::Span<const int32_t> src_indices,                      \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape,    \
               absl::Span<const int32_t> dst_indices,                      \
               absl::Span<const int32_t> lengths) {                        \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                         \
@@ -442,9 +453,9 @@ class VMLAModuleState final {
   IREE_VMLA_COPY_OP(CopyX32, sizeof(uint32_t));
 
 #define IREE_VMLA_TRANSPOSE_OP(name, type)                                     \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
-              absl::Span<const int32_t> permutation, vm::ref<Buffer> dst,      \
-              iree_vmla_shape_t dst_shape) {                                   \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,         \
+              absl::Span<const int32_t> permutation,                           \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape) {       \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Transpose::Execute<type>(src->As<type>(), dst->As<type>(), \
                                              src_shape, permutation);          \
@@ -454,8 +465,8 @@ class VMLAModuleState final {
   IREE_VMLA_TRANSPOSE_OP(TransposeX32, uint32_t);
 
 #define IREE_VMLA_REVERSE_OP(name, type)                                     \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,              \
-              absl::Span<const int32_t> dims, vm::ref<Buffer> dst,           \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,       \
+              absl::Span<const int32_t> dims, const vm::ref<Buffer>& dst,    \
               iree_vmla_shape_t dst_shape) {                                 \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
     return kernels::Reverse::Execute<type>(src->As<type>(), dst->As<type>(), \
@@ -466,9 +477,9 @@ class VMLAModuleState final {
   IREE_VMLA_REVERSE_OP(ReverseX32, uint32_t);
 
 #define IREE_VMLA_PAD_OP(name, type)                                       \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,            \
-              vm::ref<Buffer> value, iree_vmla_shape_t value_shape,        \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,            \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,     \
+              const vm::ref<Buffer>& value, iree_vmla_shape_t value_shape, \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape,     \
               absl::Span<const int32_t> edge_padding_low,                  \
               absl::Span<const int32_t> edge_padding_high,                 \
               absl::Span<const int32_t> interior_padding) {                \
@@ -481,39 +492,39 @@ class VMLAModuleState final {
   IREE_VMLA_PAD_OP(PadX16, uint16_t);
   IREE_VMLA_PAD_OP(PadX32, uint32_t);
 
-#define IREE_VMLA_GATHER_OP(name, type)                                  \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,          \
-              vm::ref<Buffer> indices, iree_vmla_shape_t indices_shape,  \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,          \
-              const int32_t dim, const int32_t batch_dims) {             \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                        \
-    return kernels::Gather::Execute<type>(                               \
-        src->As<type>(), indices->As<int>(), dst->As<type>(), src_shape, \
-        indices_shape, dst_shape, dim, batch_dims);                      \
+#define IREE_VMLA_GATHER_OP(name, type)                                        \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,         \
+              const vm::ref<Buffer>& indices, iree_vmla_shape_t indices_shape, \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape,         \
+              const int32_t dim, const int32_t batch_dims) {                   \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Gather::Execute<type>(                                     \
+        src->As<type>(), indices->As<int>(), dst->As<type>(), src_shape,       \
+        indices_shape, dst_shape, dim, batch_dims);                            \
   }
   IREE_VMLA_GATHER_OP(GatherX8, uint8_t);
   IREE_VMLA_GATHER_OP(GatherX16, uint16_t);
   IREE_VMLA_GATHER_OP(GatherX32, uint32_t);
 
-#define IREE_VMLA_SCATTER_OP(name, type)                                 \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,          \
-              vm::ref<Buffer> indices, iree_vmla_shape_t indices_shape,  \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {        \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                        \
-    return kernels::Scatter::Execute<type>(                              \
-        src->As<type>(), indices->As<int>(), dst->As<type>(), src_shape, \
-        indices_shape, dst_shape);                                       \
+#define IREE_VMLA_SCATTER_OP(name, type)                                       \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,         \
+              const vm::ref<Buffer>& indices, iree_vmla_shape_t indices_shape, \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape) {       \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Scatter::Execute<type>(                                    \
+        src->As<type>(), indices->As<int>(), dst->As<type>(), src_shape,       \
+        indices_shape, dst_shape);                                             \
   }
   IREE_VMLA_SCATTER_OP(ScatterX8, uint8_t);
   IREE_VMLA_SCATTER_OP(ScatterX16, uint16_t);
   IREE_VMLA_SCATTER_OP(ScatterX32, uint32_t);
 
-#define IREE_VMLA_BROADCAST_OP(name, type)                        \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,   \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) { \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                 \
-    return kernels::Broadcast::Execute<type>(src->As<type>(),     \
-                                             dst->As<type>());    \
+#define IREE_VMLA_BROADCAST_OP(name, type)                               \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,   \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                        \
+    return kernels::Broadcast::Execute<type>(src->As<type>(),            \
+                                             dst->As<type>());           \
   }
   IREE_VMLA_BROADCAST_OP(BroadcastX8, uint8_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
@@ -525,8 +536,8 @@ class VMLAModuleState final {
   IREE_VMLA_NONARY_OP(IotaF32, kernels::Iota, float_t);
 
 #define IREE_VMLA_TILE_OP(name, type)                                     \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,           \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {         \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,    \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape) {  \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                         \
     return kernels::Tile::Execute<type>(src->As<type>(), dst->As<type>(), \
                                         src_shape, dst_shape);            \
@@ -545,12 +556,18 @@ class VMLAModuleState final {
   IREE_VMLA_BINARY_OP(AndX8, kernels::And, uint8_t);
   IREE_VMLA_BINARY_OP(AndX16, kernels::And, uint16_t);
   IREE_VMLA_BINARY_OP(AndX32, kernels::And, uint32_t);
+  IREE_VMLA_BINARY_BROADCAST_OP(AndBroadcastX8, kernels::And, uint8_t);
+  IREE_VMLA_BINARY_BROADCAST_OP(AndBroadcastX16, kernels::And, uint16_t);
+  IREE_VMLA_BINARY_BROADCAST_OP(AndBroadcastX32, kernels::And, uint32_t);
   IREE_VMLA_BINARY_OP(OrX8, kernels::Or, uint8_t);
   IREE_VMLA_BINARY_OP(OrX16, kernels::Or, uint16_t);
   IREE_VMLA_BINARY_OP(OrX32, kernels::Or, uint32_t);
   IREE_VMLA_BINARY_OP(XorX8, kernels::Xor, uint8_t);
   IREE_VMLA_BINARY_OP(XorX16, kernels::Xor, uint16_t);
   IREE_VMLA_BINARY_OP(XorX32, kernels::Xor, uint32_t);
+  IREE_VMLA_BINARY_BROADCAST_OP(XorBroadcastX8, kernels::Xor, uint8_t);
+  IREE_VMLA_BINARY_BROADCAST_OP(XorBroadcastX16, kernels::Xor, uint16_t);
+  IREE_VMLA_BINARY_BROADCAST_OP(XorBroadcastX32, kernels::Xor, uint32_t);
   IREE_VMLA_BINARY_OP(ShlX8, kernels::ShiftLeft, uint8_t);
   IREE_VMLA_BINARY_OP(ShlX16, kernels::ShiftLeft, uint16_t);
   IREE_VMLA_BINARY_OP(ShlX32, kernels::ShiftLeft, uint32_t);
@@ -629,7 +646,7 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_CONVERSION_OP(name, src_type, dst_type)                      \
-  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {                      \
+  Status name(const vm::ref<Buffer>& src, const vm::ref<Buffer>& dst) {        \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Convert::Execute<src_type, dst_type>(src->As<src_type>(),  \
                                                          dst->As<dst_type>()); \
@@ -651,15 +668,14 @@ class VMLAModuleState final {
   // VMLA Ops: Convolution
   //===--------------------------------------------------------------------===//
 
-  Status ConvF32F32F32(vm::ref<Buffer> input, iree_vmla_shape_t input_shape,
-                       vm::ref<Buffer> filter, iree_vmla_shape_t filter_shape,
-                       vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,
-                       absl::Span<const int32_t> window_strides,
-                       absl::Span<const int32_t> padding,
-                       absl::Span<const int32_t> lhs_dilation,
-                       absl::Span<const int32_t> rhs_dilation,
-                       const int32_t feature_group_count,
-                       const int32_t batch_group_count) {
+  Status ConvF32F32F32(
+      const vm::ref<Buffer>& input, iree_vmla_shape_t input_shape,
+      const vm::ref<Buffer>& filter, iree_vmla_shape_t filter_shape,
+      const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape,
+      absl::Span<const int32_t> window_strides,
+      absl::Span<const int32_t> padding, absl::Span<const int32_t> lhs_dilation,
+      absl::Span<const int32_t> rhs_dilation, const int32_t feature_group_count,
+      const int32_t batch_group_count) {
     IREE_TRACE_SCOPE0("VMLAModuleState::ConvF32F32F32");
     if (input_shape.size() != 4 || filter_shape.size() != 4 ||
         dst_shape.size() != 4) {
@@ -702,9 +718,11 @@ class VMLAModuleState final {
   // VMLA Ops: GEMM/GEMV
   //===--------------------------------------------------------------------===//
 
-  Status BatchMatMulF32F32F32(vm::ref<Buffer> lhs, iree_vmla_shape_t lhs_shape,
-                              vm::ref<Buffer> rhs, iree_vmla_shape_t rhs_shape,
-                              vm::ref<Buffer> dst,
+  Status BatchMatMulF32F32F32(const vm::ref<Buffer>& lhs,
+                              iree_vmla_shape_t lhs_shape,
+                              const vm::ref<Buffer>& rhs,
+                              iree_vmla_shape_t rhs_shape,
+                              const vm::ref<Buffer>& dst,
                               iree_vmla_shape_t dst_shape) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BatchMatMulF32F32F32");
     // Compiler guarantees. Here for documentation purposes.
@@ -747,15 +765,15 @@ class VMLAModuleState final {
   // VMLA Ops: reduction
   //===--------------------------------------------------------------------===//
 
-#define IREE_VMLA_REDUCTION_OP(name, kernel, type)                      \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,         \
-              vm::ref<Buffer> init, iree_vmla_shape_t init_shape,       \
-              int32_t dimension, vm::ref<Buffer> dst,                   \
-              iree_vmla_shape_t dst_shape) {                            \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                       \
-    return kernel::Execute<type>(src->As<type>(), init->As<type>(),     \
-                                 dst->As<type>(), dimension, src_shape, \
-                                 dst_shape);                            \
+#define IREE_VMLA_REDUCTION_OP(name, kernel, type)                       \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,   \
+              const vm::ref<Buffer>& init, iree_vmla_shape_t init_shape, \
+              int32_t dimension, const vm::ref<Buffer>& dst,             \
+              iree_vmla_shape_t dst_shape) {                             \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                        \
+    return kernel::Execute<type>(src->As<type>(), init->As<type>(),      \
+                                 dst->As<type>(), dimension, src_shape,  \
+                                 dst_shape);                             \
   }
   IREE_VMLA_REDUCTION_OP(ReduceSumI8, kernels::ReduceSum, int8_t);
   IREE_VMLA_REDUCTION_OP(ReduceSumI16, kernels::ReduceSum, int16_t);
@@ -771,9 +789,9 @@ class VMLAModuleState final {
   IREE_VMLA_REDUCTION_OP(ReduceMaxF32, kernels::ReduceMax, float);
 
 #define IREE_VMLA_POOLING_OP(name, kernel, type)                              \
-  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,               \
-              vm::ref<Buffer> init, iree_vmla_shape_t init_shape,             \
-              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,               \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,        \
+              const vm::ref<Buffer>& init, iree_vmla_shape_t init_shape,      \
+              const vm::ref<Buffer>& dst, iree_vmla_shape_t dst_shape,        \
               iree_vmla_shape_t window_dimensions, iree_vmla_shape_t strides, \
               iree_vmla_shape_t pad_low) {                                    \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
@@ -864,12 +882,24 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("and.x8", &VMLAModuleState::AndX8),
     vm::MakeNativeFunction("and.x16", &VMLAModuleState::AndX16),
     vm::MakeNativeFunction("and.x32", &VMLAModuleState::AndX32),
+    vm::MakeNativeFunction("and.broadcast.x8",
+                           &VMLAModuleState::AndBroadcastX8),
+    vm::MakeNativeFunction("and.broadcast.x16",
+                           &VMLAModuleState::AndBroadcastX16),
+    vm::MakeNativeFunction("and.broadcast.x32",
+                           &VMLAModuleState::AndBroadcastX32),
     vm::MakeNativeFunction("or.x8", &VMLAModuleState::OrX8),
     vm::MakeNativeFunction("or.x16", &VMLAModuleState::OrX16),
     vm::MakeNativeFunction("or.x32", &VMLAModuleState::OrX32),
     vm::MakeNativeFunction("xor.x8", &VMLAModuleState::XorX8),
     vm::MakeNativeFunction("xor.x16", &VMLAModuleState::XorX16),
     vm::MakeNativeFunction("xor.x32", &VMLAModuleState::XorX32),
+    vm::MakeNativeFunction("xor.broadcast.x8",
+                           &VMLAModuleState::XorBroadcastX8),
+    vm::MakeNativeFunction("xor.broadcast.x16",
+                           &VMLAModuleState::XorBroadcastX16),
+    vm::MakeNativeFunction("xor.broadcast.x32",
+                           &VMLAModuleState::XorBroadcastX32),
     vm::MakeNativeFunction("shl.x8", &VMLAModuleState::ShlX8),
     vm::MakeNativeFunction("shl.x16", &VMLAModuleState::ShlX16),
     vm::MakeNativeFunction("shl.x32", &VMLAModuleState::ShlX32),

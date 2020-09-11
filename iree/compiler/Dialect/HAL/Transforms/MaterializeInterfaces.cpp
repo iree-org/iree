@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -180,16 +181,26 @@ static Optional<FuncOp> createDispatchEntryThunk(
   SmallVector<Value, 4> operands;
   int pushConstantOffset = 0;
   for (auto inputType : sourceFuncType.getInputs()) {
-    if (inputType.isa<TensorType>()) {
+    if (auto sourceType = inputType.dyn_cast<TensorType>()) {
       positionForNonConst();
       auto bindingOp = bindingOps[binding++];
+      auto targetType = convertTensorTypeToABIType(sourceType);
       auto loadOp = thunkEntryBuilder.create<IREE::HAL::InterfaceLoadTensorOp>(
-          thunkFuncOp.getLoc(), inputType,
+          thunkFuncOp.getLoc(), targetType,
           thunkEntryBuilder.getSymbolRefAttr(
               interfaceOp.sym_name(),
               {thunkEntryBuilder.getSymbolRefAttr(bindingOp)}),
           zeroOffset);
-      operands.push_back(loadOp.getResult());
+      Value abiValue =
+          convertABITensorType(thunkFuncOp.getLoc(), loadOp.getResult(),
+                               sourceType, thunkEntryBuilder);
+      if (!abiValue) {
+        clonedFuncOp.emitError()
+            << "function argument type " << inputType
+            << " cannot be converted to a HAL ABI type " << targetType;
+        return llvm::None;
+      }
+      operands.push_back(abiValue);
       firstNonConstOp = loadOp;
     } else if (inputType.isa<IndexType>() || inputType.isa<IntegerType>()) {
       positionForConst();
@@ -211,10 +222,22 @@ static Optional<FuncOp> createDispatchEntryThunk(
                                                        clonedFuncOp, operands);
 
   // Push all results to the bindings.
-  for (auto result : callOp.getResults()) {
+  for (auto resultTypeValue :
+       llvm::zip(sourceFuncType.getResults(), callOp.getResults())) {
+    auto sourceType = std::get<0>(resultTypeValue).cast<TensorType>();
+    auto targetType = convertTensorTypeToABIType(sourceType);
+    Value resultValue = std::get<1>(resultTypeValue);
+    Value abiValue = convertABITensorType(thunkFuncOp.getLoc(), resultValue,
+                                          targetType, thunkEntryBuilder);
+    if (!abiValue) {
+      clonedFuncOp.emitError()
+          << "function result type " << resultValue.getType()
+          << " cannot be converted from HAL ABI type " << targetType;
+      return llvm::None;
+    }
     auto bindingOp = bindingOps[binding++];
     thunkEntryBuilder.create<IREE::HAL::InterfaceStoreTensorOp>(
-        thunkFuncOp.getLoc(), result,
+        thunkFuncOp.getLoc(), abiValue,
         thunkEntryBuilder.getSymbolRefAttr(
             interfaceOp.sym_name(),
             {thunkEntryBuilder.getSymbolRefAttr(bindingOp)}),
