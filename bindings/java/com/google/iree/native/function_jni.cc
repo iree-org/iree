@@ -63,7 +63,9 @@ JNI_FUNC jobject JNI_PREFIX(nativeGetSignature)(JNIEnv* env, jobject thiz) {
   // TODO(jennik): Look into caching the results of these lookups.
   iree_vm_function_signature_t function_signature = function->signature();
   jclass cls = env->FindClass("com/google/iree/Function$Signature");
-  jmethodID constructor = env->GetMethodID(cls, "<init>", "(II)V");
-  return env->NewObject(cls, constructor, function_signature.argument_count,
-                        function_signature.result_count);
+  jmethodID constructor =
+      env->GetMethodID(cls, "<init>", "(Ljava/lang/String;)V");
+  return env->NewObject(
+      cls, constructor,
+      env->NewStringUTF(function_signature.calling_convention.data));
 }
