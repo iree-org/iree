@@ -65,6 +65,18 @@ TEST_P(AllocatorTest, Allocate) {
   EXPECT_GE(buffer->allocation_size(), allocation_size);  // Larger is okay.
 }
 
+TEST_P(AllocatorTest, CanUseBufferLike) {
+  MemoryType memory_type = MemoryType::kHostLocal | MemoryType::kDeviceVisible;
+  BufferUsage usage = BufferUsage::kMapping;
+  size_t allocation_size = 1024;
+
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto buffer, allocator_->Allocate(memory_type, usage, allocation_size));
+  // Using the buffer for its original requested purpose should be fine.
+  EXPECT_TRUE(
+      allocator_->CanUseBufferLike(allocator_, memory_type, usage, usage));
+}
+
 INSTANTIATE_TEST_SUITE_P(AllDrivers, AllocatorTest,
                          ::testing::ValuesIn(DriverRegistry::shared_registry()
                                                  ->EnumerateAvailableDrivers()),

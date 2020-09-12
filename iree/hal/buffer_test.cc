@@ -43,7 +43,7 @@ TEST(BufferTest, Allocate) {
 
   // We don't currently do any padding on the host.
   // Other implementations may differ.
-  EXPECT_GE(14, buffer->allocation_size());
+  EXPECT_LE(14, buffer->allocation_size());
   EXPECT_EQ(0, buffer->byte_offset());
   EXPECT_EQ(14, buffer->byte_length());
 
@@ -69,7 +69,7 @@ TEST(BufferTest, AllocateCopy) {
       HeapBuffer::AllocateCopy(BufferUsage::kTransfer | BufferUsage::kMapping,
                                src_data.data(), src_data.size());
   EXPECT_NE(nullptr, buffer->allocator());
-  EXPECT_GE(src_data.size(), buffer->allocation_size());
+  EXPECT_LE(src_data.size(), buffer->allocation_size());
 
   // Data should have been copied.
   std::vector<uint8_t> actual_data(src_data.size());
@@ -99,7 +99,7 @@ TEST(BufferTest, AllocateCopyTyped) {
   EXPECT_NE(nullptr, buffer->allocator());
   EXPECT_EQ(MemoryType::kHostLocal, buffer->memory_type());
   EXPECT_EQ(BufferUsage::kTransfer | BufferUsage::kMapping, buffer->usage());
-  EXPECT_GE(src_data.size() * sizeof(int32_t), buffer->allocation_size());
+  EXPECT_LE(src_data.size() * sizeof(int32_t), buffer->allocation_size());
 
   // Data should have been copied.
   std::vector<int32_t> actual_data(src_data.size());
