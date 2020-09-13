@@ -150,7 +150,7 @@ def stream_command(command, dry_run=False):
                              bufsize=1,
                              stderr=subprocess.STDOUT,
                              stdout=subprocess.PIPE,
-                             text=True)
+                             universal_newlines=True)
   for line in process.stdout:
     print(line, end='')
 
@@ -176,8 +176,9 @@ def get_repo_digest(image):
       '{{index .RepoDigests 0}}',
   ]
   inspect_process = subprocess.run(inspect_command,
-                                   text=True,
-                                   capture_output=True,
+                                   universal_newlines=True,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
                                    timeout=10)
   if inspect_process.returncode != 0:
     print(f'Computing the repository digest for {image} failed.'
@@ -208,9 +209,10 @@ def update_references(image_name, digest, dry_run=False):
 
   grep_command = ['git', 'grep', '-l', f'{image_name}@sha256']
   grep_process = subprocess.run(grep_command,
-                                capture_output=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
                                 timeout=5,
-                                text=True)
+                                universal_newlines=True)
   if grep_process.returncode > 1:
     print(f'{" ".join(grep_command)} '
           f'failed with exit code {grep_process.returncode}')
