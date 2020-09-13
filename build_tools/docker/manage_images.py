@@ -37,6 +37,7 @@ Rebuild and push all images and update references to them in the repository:
 import argparse
 import fileinput
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -237,13 +238,12 @@ if __name__ == '__main__':
     check_stream_command(['gcloud', 'auth', 'configure-docker'],
                          dry_run=args.dry_run)
 
-
   images_to_process = get_ordered_images_to_process(args.images)
   print(f'Also processing dependent images. Will process: {images_to_process}')
 
   for image in images_to_process:
     print(f'Processing image {image}')
-    image_name = os.path.join(IREE_GCR_URL, image)
+    image_name = posixpath.join(IREE_GCR_URL, image)
     image_tag = f'{image_name}:{args.tag}'
     image_path = os.path.join(DOCKER_DIR, image.replace('-', '_'))
 
