@@ -220,7 +220,8 @@ def update_references(image_name, digest, dry_run=False):
   files = grep_process.stdout.split()
   print(f'Updating references in {len(files)} files: {files}')
   for line in fileinput.input(files=files, inplace=(not dry_run)):
-    print(re.sub(f'{image_name}@sha256:[a-zA-Z0-9]+', f'{image_name}@{digest}', line),
+    print(re.sub(f'{image_name}@sha256:[a-zA-Z0-9]+', f'{image_name}@{digest}',
+                 line),
           end='')
 
 
