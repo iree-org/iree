@@ -40,7 +40,6 @@ import os
 import re
 import subprocess
 import sys
-import textwrap
 
 IREE_GCR_URL = 'gcr.io/iree-oss/'
 DOCKER_DIR = 'build_tools/docker/'
