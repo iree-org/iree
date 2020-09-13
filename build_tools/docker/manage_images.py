@@ -13,10 +13,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Builds the specified Docker images and optionally pushes them to GCR.
+"""Manages IREE Docker image definitions.
+
+Includes information on their dependency graph and GCR URL.
 
 Example usage:
-  python3 build_tools/docker/build_and_update_gcr.py --image cmake
+
+Rebuild the cmake image and all images that transitiviely on depend on it,
+tagging them with `latest`:
+  python3 build_tools/docker/manage_images.py --build --image cmake
+
+Print out output for rebuilding the cmake image and all images that
+transitiviely on depend on it, but don't take side-effecting actions:
+  python3 build_tools/docker/manage_images.py --build --image cmake --dry-run
+
+Push all `prod` images to GCR:
+  python3 build_tools/docker/manage_images.py --push --tag prod --images all
+
+Rebuild and push all images and update references to them in the repository:
+  python3 build_tools/docker/manage_images.py --push --images all --update-references
 """
 
 import argparse
@@ -83,10 +98,12 @@ def parse_arguments():
       help='Push the built images to GCR. Requires gcloud authorization.')
   parser.add_argument(
       '--update_references',
+      '--update-references',
       action='store_true',
       help='Update all references to the specified images to point at the new'
       ' digest.')
   parser.add_argument(
+      '--dry_run',
       '--dry-run',
       '-n',
       action='store_true',
