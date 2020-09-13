@@ -203,10 +203,6 @@ def update_rbe_reference(digest, dry_run=False):
 def update_references(image_name, digest, dry_run=False):
   print(f'Updating references to {image_name}')
 
-  # Just hardcode this oddity
-  if image_name.rsplit('/', maxsplit=1)[-1] == 'rbe-toolchain':
-    update_rbe_reference(digest, dry_run=dry_run)
-
   grep_command = ['git', 'grep', '-l', f'{image_name}@sha256']
   grep_process = subprocess.run(grep_command,
                                 stdout=subprocess.PIPE,
