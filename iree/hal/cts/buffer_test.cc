@@ -58,9 +58,6 @@ TEST_P(BufferTest, AllocateZeroLength) {
 }
 
 TEST_P(BufferTest, Fill8) {
-  // TODO: fix this.
-  if (driver_->name() == "vulkan") GTEST_SKIP();
-
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer, device_->allocator()->Allocate(
                        MemoryType::kHostLocal | MemoryType::kDeviceVisible,
@@ -95,9 +92,6 @@ TEST_P(BufferTest, Fill8) {
 }
 
 TEST_P(BufferTest, Fill16) {
-  // TODO: fix this.
-  if (driver_->name() == "vulkan") GTEST_SKIP();
-
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer, device_->allocator()->Allocate(
                        MemoryType::kHostLocal | MemoryType::kDeviceVisible,
@@ -137,9 +131,6 @@ TEST_P(BufferTest, Fill16) {
 }
 
 TEST_P(BufferTest, Fill32) {
-  // TODO: fix this.
-  if (driver_->name() == "vulkan") GTEST_SKIP();
-
   IREE_ASSERT_OK_AND_ASSIGN(
       auto buffer, device_->allocator()->Allocate(
                        MemoryType::kHostLocal | MemoryType::kDeviceVisible,
@@ -209,9 +200,6 @@ TEST_P(BufferTest, ReadWriteData) {
 }
 
 TEST_P(BufferTest, CopyData) {
-  // TODO: fix this.
-  if (driver_->name() == "vulkan") GTEST_SKIP();
-
   std::vector<uint8_t> src_data = {0, 1, 2, 3};
   IREE_ASSERT_OK_AND_ASSIGN(
       auto src_buffer,
