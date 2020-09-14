@@ -949,6 +949,31 @@ Returns a command buffer from the device pool ready to begin recording.
 | :----: | ----------- |
 `result` | command_buffer
 
+### `hal.command_buffer.device` (IREE::HAL::CommandBufferDeviceOp)
+
+command buffer device query operation
+
+Syntax:
+
+```
+operation ::= `hal.command_buffer.device` $command_buffer attr-dict `:` type($device)
+```
+
+
+Used during conversion to access the device used to create a command buffer.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`command_buffer` | command_buffer
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`device` | device
+
 ### `hal.command_buffer.dispatch.indirect` (IREE::HAL::CommandBufferDispatchIndirectOp)
 
 command buffer indirect dispatch recording operation
@@ -982,6 +1007,40 @@ hal.command_buffer.dispatch.indirect %cmd, %executable,
 | :-----: | ----------- |
 `command_buffer` | command_buffer
 `executable` | executable
+`workgroups_buffer` | buffer
+`workgroups_offset` | index
+
+### `hal.command_buffer.dispatch.indirect.symbol` (IREE::HAL::CommandBufferDispatchIndirectSymbolOp)
+
+command buffer indirect dispatch recording operation, using symbolref
+
+Syntax:
+
+```
+operation ::= `hal.command_buffer.dispatch.indirect.symbol` $command_buffer `,` $entry_point `,`
+              `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
+```
+
+
+Dispatches an execution request with the dispatch parameters loaded from the
+given buffer, using using a nested symbol reference to the entry point.
+
+```mlir
+hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
+                                            workgroups = %buffer[%offset]
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`entry_point` | ::mlir::SymbolRefAttr | symbol reference attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`command_buffer` | command_buffer
 `workgroups_buffer` | buffer
 `workgroups_offset` | index
 
@@ -1021,6 +1080,44 @@ hal.command_buffer.dispatch %cmd, %executable,
 | :-----: | ----------- |
 `command_buffer` | command_buffer
 `executable` | executable
+`workgroup_x` | index
+`workgroup_y` | index
+`workgroup_z` | index
+
+### `hal.command_buffer.dispatch.symbol` (IREE::HAL::CommandBufferDispatchSymbolOp)
+
+command buffer dispatch recording operation, using symbolref
+
+Syntax:
+
+```
+operation ::= `hal.command_buffer.dispatch.symbol` $command_buffer `,` $entry_point `,`
+              `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
+              attr-dict
+```
+
+
+Dispatches an execution request, using a nested symbol reference to the entry point.
+
+```mlir
+%x = constant 128 : index
+%y = constant 32 : index
+%z = constant 1 : index
+hal.command_buffer.dispatch.symbol %cmd, @executable::@target::@entry,
+                                   workgroup_xyz = [%x, %y, %z]
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`entry_point` | ::mlir::SymbolRefAttr | symbol reference attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`command_buffer` | command_buffer
 `workgroup_x` | index
 `workgroup_y` | index
 `workgroup_z` | index
@@ -1816,7 +1913,8 @@ is usually removed during transformation.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`target_backend` | ::mlir::StringAttr | string attribute
+`sym_name` | ::mlir::StringAttr | string attribute
+`target_backend_filter` | ::mlir::StringAttr | string attribute
 
 ### `hal.interface.binding` (IREE::HAL::InterfaceBindingOp)
 

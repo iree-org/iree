@@ -417,7 +417,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target "llvm-ir*" {
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         func @dot_ex_dispatch_0() {
@@ -3043,7 +3043,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target "llvm-ir*" {
+  hal.executable.target @llvm_ir, filter="llvm-ir*" {
     hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
     module {
       llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
@@ -3478,7 +3478,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target "llvm-ir*" {
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
@@ -3922,7 +3922,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target "llvm-ir*" {
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
@@ -4373,9 +4373,9 @@ module {
     %sz_10 = hal.allocator.compute_size %allocator_9, shape = [%c32_7, %c64_8], element_type = 50331680
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_2), 1 = (%arg1, %c0, %sz_6), 2 = (%buffer, %c0, %sz_10)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %exe : !hal.executable) {
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch %arg3, %arg4, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -4417,9 +4417,9 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   %sz_10 = hal.allocator.compute_size %allocator_9, shape = [%c32_7, %c64_8], element_type = 50331680
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_2), 1 = (%arg1, %c0, %sz_6), 2 = (%buffer, %c0, %sz_10)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %exe : !hal.executable) {
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch %arg3, %arg4, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -4445,7 +4445,6 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   hal.ex.defer_release %buffer : !hal.buffer
   %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
-  %exe = hal.executable.lookup %dev, @dot_ex_dispatch_0 : !hal.executable
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
   %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
@@ -4454,9 +4453,9 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   %sz_4 = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = 50331680
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz_4)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %exe : !hal.executable) {
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch %arg3, %arg4, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -4482,7 +4481,6 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   hal.ex.defer_release %buffer : !hal.buffer
   %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
-  %exe = hal.executable.lookup %dev, @dot_ex_dispatch_0 : !hal.executable
   %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
   %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
   %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
@@ -4490,9 +4488,9 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
   hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
   hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %exe : !hal.executable) {
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch %arg3, %arg4, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -4513,7 +4511,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target "llvm-ir*" {
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
@@ -4949,7 +4947,6 @@ module {
     hal.ex.defer_release %buffer : !hal.buffer
     %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
-    %exe = hal.executable.lookup %dev, @dot_ex_dispatch_0 : !hal.executable
     %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
     %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
     %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
@@ -4957,9 +4954,9 @@ module {
     %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
     hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %exe : !hal.executable) {
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch %arg3, %arg4, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -4968,22 +4965,653 @@ module {
     hal.ex.submit_and_wait %dev, %cmd
     return %buffer : !hal.buffer
   }
-  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-    %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-    %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %c32 = constant 32 : index
-    %c64 = constant 64 : index
-    %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
-    return %view : !hal.buffer_view
-  }
   func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
-    %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+    %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+    %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+    %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     hal.semaphore.signal %arg4, value = %arg5
-    return %1 : !hal.buffer_view
+    return %view : !hal.buffer_view
   }
+  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    hal.check_success %1, "semaphore wait failed"
+    return %0 : !hal.buffer_view
+  }
+}
+
+```
+### IR Dump After mlir::iree_compiler::IREE::HAL::ResolveEntryPointOrdinalsPass
+```
+
+module {
+  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io {
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    }
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      module {
+        llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
+          %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
+          %1 = llvm.load %0 : !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
+          %2 = llvm.extractvalue %1[0] : !llvm.struct<(ptr<float>, ptr<float>, ptr<float>)>
+          %3 = llvm.mlir.undef : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %4 = llvm.insertvalue %2, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %5 = llvm.insertvalue %2, %4[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %6 = llvm.mlir.constant(0 : index) : !llvm.i64
+          %7 = llvm.insertvalue %6, %5[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %8 = llvm.mlir.constant(32 : index) : !llvm.i64
+          %9 = llvm.insertvalue %8, %7[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %10 = llvm.mlir.constant(1024 : index) : !llvm.i64
+          %11 = llvm.insertvalue %10, %9[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %12 = llvm.insertvalue %10, %11[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %13 = llvm.mlir.constant(1 : index) : !llvm.i64
+          %14 = llvm.insertvalue %13, %12[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %15 = llvm.extractvalue %1[1] : !llvm.struct<(ptr<float>, ptr<float>, ptr<float>)>
+          %16 = llvm.insertvalue %15, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %17 = llvm.insertvalue %15, %16[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %18 = llvm.insertvalue %6, %17[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %19 = llvm.insertvalue %10, %18[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %20 = llvm.mlir.constant(64 : index) : !llvm.i64
+          %21 = llvm.insertvalue %20, %19[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %22 = llvm.insertvalue %20, %21[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %23 = llvm.insertvalue %13, %22[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %24 = llvm.extractvalue %1[2] : !llvm.struct<(ptr<float>, ptr<float>, ptr<float>)>
+          %25 = llvm.insertvalue %24, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %26 = llvm.insertvalue %24, %25[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %27 = llvm.insertvalue %6, %26[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %28 = llvm.insertvalue %8, %27[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %29 = llvm.insertvalue %20, %28[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %30 = llvm.insertvalue %20, %29[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %31 = llvm.insertvalue %13, %30[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %32 = llvm.mlir.constant(4 : index) : !llvm.i64
+          %33 = llvm.mlir.constant(0.000000e+00 : f32) : !llvm.float
+          %34 = llvm.mlir.constant(opaque<"", "0xDEADBEEF"> : vector<4x4xf32>) : !llvm.array<4 x vec<4 x float>>
+          %35 = llvm.mlir.constant(2 : index) : !llvm.i64
+          %36 = llvm.mlir.constant(3 : index) : !llvm.i64
+          llvm.br ^bb1(%6 : !llvm.i64)
+        ^bb1(%37: !llvm.i64):  // 2 preds: ^bb0, ^bb4
+          %38 = llvm.icmp "slt" %37, %8 : !llvm.i64
+          llvm.cond_br %38, ^bb2(%6 : !llvm.i64), ^bb5(%6 : !llvm.i64)
+        ^bb2(%39: !llvm.i64):  // 2 preds: ^bb1, ^bb3
+          %40 = llvm.icmp "slt" %39, %20 : !llvm.i64
+          llvm.cond_br %40, ^bb3, ^bb4
+        ^bb3:  // pred: ^bb2
+          %41 = llvm.extractvalue %31[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %42 = llvm.mul %37, %20 : !llvm.i64
+          %43 = llvm.add %6, %42 : !llvm.i64
+          %44 = llvm.mul %39, %13 : !llvm.i64
+          %45 = llvm.add %43, %44 : !llvm.i64
+          %46 = llvm.getelementptr %41[%45] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          llvm.store %33, %46 : !llvm.ptr<float>
+          %47 = llvm.add %39, %13 : !llvm.i64
+          llvm.br ^bb2(%47 : !llvm.i64)
+        ^bb4:  // pred: ^bb2
+          %48 = llvm.add %37, %13 : !llvm.i64
+          llvm.br ^bb1(%48 : !llvm.i64)
+        ^bb5(%49: !llvm.i64):  // 2 preds: ^bb1, ^bb18
+          %50 = llvm.icmp "slt" %49, %10 : !llvm.i64
+          llvm.cond_br %50, ^bb6, ^bb19
+        ^bb6:  // pred: ^bb5
+          %51 = llvm.extractvalue %14[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %52 = llvm.bitcast %51 : !llvm.ptr<float> to !llvm.ptr<float>
+          %53 = llvm.insertvalue %52, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %54 = llvm.extractvalue %14[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %55 = llvm.bitcast %54 : !llvm.ptr<float> to !llvm.ptr<float>
+          %56 = llvm.insertvalue %55, %53[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %57 = llvm.extractvalue %14[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %58 = llvm.extractvalue %14[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %59 = llvm.extractvalue %14[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %60 = llvm.mlir.constant(0 : i64) : !llvm.i64
+          %61 = llvm.mul %60, %57 : !llvm.i64
+          %62 = llvm.add %59, %61 : !llvm.i64
+          %63 = llvm.mul %49, %58 : !llvm.i64
+          %64 = llvm.add %62, %63 : !llvm.i64
+          %65 = llvm.insertvalue %64, %56[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %66 = llvm.mlir.constant(64 : i64) : !llvm.i64
+          %67 = llvm.insertvalue %66, %65[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %68 = llvm.mlir.constant(1 : i64) : !llvm.i64
+          %69 = llvm.insertvalue %68, %67[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %70 = llvm.mlir.constant(32 : i64) : !llvm.i64
+          %71 = llvm.insertvalue %70, %69[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %72 = llvm.mlir.constant(1024 : i64) : !llvm.i64
+          %73 = llvm.insertvalue %72, %71[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %74 = llvm.extractvalue %23[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %75 = llvm.bitcast %74 : !llvm.ptr<float> to !llvm.ptr<float>
+          %76 = llvm.insertvalue %75, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %77 = llvm.extractvalue %23[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %78 = llvm.bitcast %77 : !llvm.ptr<float> to !llvm.ptr<float>
+          %79 = llvm.insertvalue %78, %76[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %80 = llvm.extractvalue %23[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %81 = llvm.extractvalue %23[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %82 = llvm.extractvalue %23[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %83 = llvm.mul %49, %80 : !llvm.i64
+          %84 = llvm.add %82, %83 : !llvm.i64
+          %85 = llvm.mul %60, %81 : !llvm.i64
+          %86 = llvm.add %84, %85 : !llvm.i64
+          %87 = llvm.insertvalue %86, %79[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %88 = llvm.insertvalue %66, %87[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %89 = llvm.insertvalue %68, %88[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %90 = llvm.insertvalue %66, %89[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %91 = llvm.insertvalue %66, %90[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %92 = llvm.extractvalue %31[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %93 = llvm.bitcast %92 : !llvm.ptr<float> to !llvm.ptr<float>
+          %94 = llvm.insertvalue %93, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %95 = llvm.extractvalue %31[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %96 = llvm.bitcast %95 : !llvm.ptr<float> to !llvm.ptr<float>
+          %97 = llvm.insertvalue %96, %94[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %98 = llvm.insertvalue %6, %97[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %99 = llvm.insertvalue %66, %98[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %100 = llvm.insertvalue %68, %99[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %101 = llvm.insertvalue %70, %100[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %102 = llvm.insertvalue %66, %101[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          llvm.br ^bb7(%6 : !llvm.i64)
+        ^bb7(%103: !llvm.i64):  // 2 preds: ^bb6, ^bb17
+          %104 = llvm.icmp "slt" %103, %20 : !llvm.i64
+          llvm.cond_br %104, ^bb8(%6 : !llvm.i64), ^bb18
+        ^bb8(%105: !llvm.i64):  // 2 preds: ^bb7, ^bb16
+          %106 = llvm.icmp "slt" %105, %20 : !llvm.i64
+          llvm.cond_br %106, ^bb9, ^bb17
+        ^bb9:  // pred: ^bb8
+          %107 = llvm.extractvalue %73[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %108 = llvm.bitcast %107 : !llvm.ptr<float> to !llvm.ptr<float>
+          %109 = llvm.insertvalue %108, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %110 = llvm.extractvalue %73[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %111 = llvm.bitcast %110 : !llvm.ptr<float> to !llvm.ptr<float>
+          %112 = llvm.insertvalue %111, %109[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %113 = llvm.extractvalue %73[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %114 = llvm.extractvalue %73[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %115 = llvm.extractvalue %73[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %116 = llvm.mul %60, %113 : !llvm.i64
+          %117 = llvm.add %115, %116 : !llvm.i64
+          %118 = llvm.mul %105, %114 : !llvm.i64
+          %119 = llvm.add %117, %118 : !llvm.i64
+          %120 = llvm.insertvalue %119, %112[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %121 = llvm.insertvalue %70, %120[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %122 = llvm.insertvalue %68, %121[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %123 = llvm.insertvalue %70, %122[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %124 = llvm.insertvalue %72, %123[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %125 = llvm.extractvalue %91[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %126 = llvm.bitcast %125 : !llvm.ptr<float> to !llvm.ptr<float>
+          %127 = llvm.insertvalue %126, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %128 = llvm.extractvalue %91[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %129 = llvm.bitcast %128 : !llvm.ptr<float> to !llvm.ptr<float>
+          %130 = llvm.insertvalue %129, %127[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %131 = llvm.extractvalue %91[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %132 = llvm.extractvalue %91[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %133 = llvm.extractvalue %91[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %134 = llvm.mul %105, %131 : !llvm.i64
+          %135 = llvm.add %133, %134 : !llvm.i64
+          %136 = llvm.mul %103, %132 : !llvm.i64
+          %137 = llvm.add %135, %136 : !llvm.i64
+          %138 = llvm.insertvalue %137, %130[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %139 = llvm.insertvalue %70, %138[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %140 = llvm.insertvalue %68, %139[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %141 = llvm.insertvalue %70, %140[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %142 = llvm.insertvalue %66, %141[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %143 = llvm.extractvalue %102[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %144 = llvm.bitcast %143 : !llvm.ptr<float> to !llvm.ptr<float>
+          %145 = llvm.insertvalue %144, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %146 = llvm.extractvalue %102[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %147 = llvm.bitcast %146 : !llvm.ptr<float> to !llvm.ptr<float>
+          %148 = llvm.insertvalue %147, %145[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %149 = llvm.extractvalue %102[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %150 = llvm.extractvalue %102[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %151 = llvm.extractvalue %102[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %152 = llvm.mul %60, %149 : !llvm.i64
+          %153 = llvm.add %151, %152 : !llvm.i64
+          %154 = llvm.mul %103, %150 : !llvm.i64
+          %155 = llvm.add %153, %154 : !llvm.i64
+          %156 = llvm.insertvalue %155, %148[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %157 = llvm.insertvalue %70, %156[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %158 = llvm.insertvalue %68, %157[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %159 = llvm.insertvalue %70, %158[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %160 = llvm.insertvalue %66, %159[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          llvm.br ^bb10(%6 : !llvm.i64)
+        ^bb10(%161: !llvm.i64):  // 2 preds: ^bb9, ^bb15
+          %162 = llvm.icmp "slt" %161, %8 : !llvm.i64
+          llvm.cond_br %162, ^bb11(%6 : !llvm.i64), ^bb16
+        ^bb11(%163: !llvm.i64):  // 2 preds: ^bb10, ^bb14
+          %164 = llvm.icmp "slt" %163, %8 : !llvm.i64
+          llvm.cond_br %164, ^bb12(%6 : !llvm.i64), ^bb15
+        ^bb12(%165: !llvm.i64):  // 2 preds: ^bb11, ^bb13
+          %166 = llvm.icmp "slt" %165, %8 : !llvm.i64
+          llvm.cond_br %166, ^bb13, ^bb14
+        ^bb13:  // pred: ^bb12
+          %167 = llvm.extractvalue %124[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %168 = llvm.bitcast %167 : !llvm.ptr<float> to !llvm.ptr<float>
+          %169 = llvm.insertvalue %168, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %170 = llvm.extractvalue %124[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %171 = llvm.bitcast %170 : !llvm.ptr<float> to !llvm.ptr<float>
+          %172 = llvm.insertvalue %171, %169[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %173 = llvm.extractvalue %124[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %174 = llvm.extractvalue %124[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %175 = llvm.extractvalue %124[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %176 = llvm.mul %161, %173 : !llvm.i64
+          %177 = llvm.add %175, %176 : !llvm.i64
+          %178 = llvm.mul %165, %174 : !llvm.i64
+          %179 = llvm.add %177, %178 : !llvm.i64
+          %180 = llvm.insertvalue %179, %172[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %181 = llvm.mlir.constant(4 : i64) : !llvm.i64
+          %182 = llvm.insertvalue %181, %180[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %183 = llvm.insertvalue %68, %182[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %184 = llvm.insertvalue %181, %183[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %185 = llvm.insertvalue %72, %184[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %186 = llvm.extractvalue %142[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %187 = llvm.bitcast %186 : !llvm.ptr<float> to !llvm.ptr<float>
+          %188 = llvm.insertvalue %187, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %189 = llvm.extractvalue %142[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %190 = llvm.bitcast %189 : !llvm.ptr<float> to !llvm.ptr<float>
+          %191 = llvm.insertvalue %190, %188[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %192 = llvm.extractvalue %142[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %193 = llvm.extractvalue %142[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %194 = llvm.extractvalue %142[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %195 = llvm.mul %165, %192 : !llvm.i64
+          %196 = llvm.add %194, %195 : !llvm.i64
+          %197 = llvm.mul %163, %193 : !llvm.i64
+          %198 = llvm.add %196, %197 : !llvm.i64
+          %199 = llvm.insertvalue %198, %191[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %200 = llvm.insertvalue %181, %199[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %201 = llvm.insertvalue %68, %200[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %202 = llvm.insertvalue %181, %201[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %203 = llvm.insertvalue %66, %202[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %204 = llvm.extractvalue %160[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %205 = llvm.bitcast %204 : !llvm.ptr<float> to !llvm.ptr<float>
+          %206 = llvm.insertvalue %205, %3[0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %207 = llvm.extractvalue %160[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %208 = llvm.bitcast %207 : !llvm.ptr<float> to !llvm.ptr<float>
+          %209 = llvm.insertvalue %208, %206[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %210 = llvm.extractvalue %160[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %211 = llvm.extractvalue %160[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %212 = llvm.extractvalue %160[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %213 = llvm.mul %161, %210 : !llvm.i64
+          %214 = llvm.add %212, %213 : !llvm.i64
+          %215 = llvm.mul %163, %211 : !llvm.i64
+          %216 = llvm.add %214, %215 : !llvm.i64
+          %217 = llvm.insertvalue %216, %209[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %218 = llvm.insertvalue %181, %217[3, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %219 = llvm.insertvalue %68, %218[4, 1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %220 = llvm.insertvalue %181, %219[3, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %221 = llvm.insertvalue %66, %220[4, 0] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %222 = llvm.extractvalue %185[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %223 = llvm.extractvalue %185[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %224 = llvm.mul %6, %10 : !llvm.i64
+          %225 = llvm.add %223, %224 : !llvm.i64
+          %226 = llvm.mul %6, %13 : !llvm.i64
+          %227 = llvm.add %225, %226 : !llvm.i64
+          %228 = llvm.getelementptr %222[%227] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %229 = llvm.bitcast %228 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %230 = llvm.load %229 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %231 = llvm.insertvalue %230, %34[0] : !llvm.array<4 x vec<4 x float>>
+          %232 = llvm.mul %13, %10 : !llvm.i64
+          %233 = llvm.add %223, %232 : !llvm.i64
+          %234 = llvm.add %233, %226 : !llvm.i64
+          %235 = llvm.getelementptr %222[%234] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %236 = llvm.bitcast %235 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %237 = llvm.load %236 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %238 = llvm.insertvalue %237, %231[1] : !llvm.array<4 x vec<4 x float>>
+          %239 = llvm.mul %35, %10 : !llvm.i64
+          %240 = llvm.add %223, %239 : !llvm.i64
+          %241 = llvm.add %240, %226 : !llvm.i64
+          %242 = llvm.getelementptr %222[%241] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %243 = llvm.bitcast %242 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %244 = llvm.load %243 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %245 = llvm.insertvalue %244, %238[2] : !llvm.array<4 x vec<4 x float>>
+          %246 = llvm.mul %36, %10 : !llvm.i64
+          %247 = llvm.add %223, %246 : !llvm.i64
+          %248 = llvm.add %247, %226 : !llvm.i64
+          %249 = llvm.getelementptr %222[%248] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %250 = llvm.bitcast %249 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %251 = llvm.load %250 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %252 = llvm.insertvalue %251, %245[3] : !llvm.array<4 x vec<4 x float>>
+          %253 = llvm.extractvalue %203[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %254 = llvm.extractvalue %203[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %255 = llvm.mul %6, %20 : !llvm.i64
+          %256 = llvm.add %254, %255 : !llvm.i64
+          %257 = llvm.add %256, %226 : !llvm.i64
+          %258 = llvm.getelementptr %253[%257] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %259 = llvm.bitcast %258 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %260 = llvm.load %259 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %261 = llvm.mul %13, %20 : !llvm.i64
+          %262 = llvm.add %254, %261 : !llvm.i64
+          %263 = llvm.add %262, %226 : !llvm.i64
+          %264 = llvm.getelementptr %253[%263] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %265 = llvm.bitcast %264 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %266 = llvm.load %265 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %267 = llvm.mul %35, %20 : !llvm.i64
+          %268 = llvm.add %254, %267 : !llvm.i64
+          %269 = llvm.add %268, %226 : !llvm.i64
+          %270 = llvm.getelementptr %253[%269] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %271 = llvm.bitcast %270 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %272 = llvm.load %271 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %273 = llvm.mul %36, %20 : !llvm.i64
+          %274 = llvm.add %254, %273 : !llvm.i64
+          %275 = llvm.add %274, %226 : !llvm.i64
+          %276 = llvm.getelementptr %253[%275] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %277 = llvm.bitcast %276 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %278 = llvm.load %277 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %279 = llvm.extractvalue %221[1] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %280 = llvm.extractvalue %221[2] : !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
+          %281 = llvm.add %280, %255 : !llvm.i64
+          %282 = llvm.add %281, %226 : !llvm.i64
+          %283 = llvm.getelementptr %279[%282] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %284 = llvm.bitcast %283 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %285 = llvm.load %284 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %286 = llvm.add %280, %261 : !llvm.i64
+          %287 = llvm.add %286, %226 : !llvm.i64
+          %288 = llvm.getelementptr %279[%287] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %289 = llvm.bitcast %288 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %290 = llvm.load %289 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %291 = llvm.add %280, %267 : !llvm.i64
+          %292 = llvm.add %291, %226 : !llvm.i64
+          %293 = llvm.getelementptr %279[%292] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %294 = llvm.bitcast %293 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %295 = llvm.load %294 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %296 = llvm.add %280, %273 : !llvm.i64
+          %297 = llvm.add %296, %226 : !llvm.i64
+          %298 = llvm.getelementptr %279[%297] : (!llvm.ptr<float>, !llvm.i64) -> !llvm.ptr<float>
+          %299 = llvm.bitcast %298 : !llvm.ptr<float> to !llvm.ptr<vec<4 x float>>
+          %300 = llvm.load %299 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %301 = llvm.extractvalue %252[0] : !llvm.array<4 x vec<4 x float>>
+          %302 = llvm.extractelement %301[%60 : !llvm.i64] : !llvm.vec<4 x float>
+          %303 = llvm.extractvalue %252[1] : !llvm.array<4 x vec<4 x float>>
+          %304 = llvm.extractelement %303[%60 : !llvm.i64] : !llvm.vec<4 x float>
+          %305 = llvm.extractvalue %252[2] : !llvm.array<4 x vec<4 x float>>
+          %306 = llvm.extractelement %305[%60 : !llvm.i64] : !llvm.vec<4 x float>
+          %307 = llvm.extractvalue %252[3] : !llvm.array<4 x vec<4 x float>>
+          %308 = llvm.extractelement %307[%60 : !llvm.i64] : !llvm.vec<4 x float>
+          %309 = llvm.extractelement %301[%68 : !llvm.i64] : !llvm.vec<4 x float>
+          %310 = llvm.extractelement %303[%68 : !llvm.i64] : !llvm.vec<4 x float>
+          %311 = llvm.extractelement %305[%68 : !llvm.i64] : !llvm.vec<4 x float>
+          %312 = llvm.extractelement %307[%68 : !llvm.i64] : !llvm.vec<4 x float>
+          %313 = llvm.mlir.constant(2 : i64) : !llvm.i64
+          %314 = llvm.extractelement %301[%313 : !llvm.i64] : !llvm.vec<4 x float>
+          %315 = llvm.extractelement %303[%313 : !llvm.i64] : !llvm.vec<4 x float>
+          %316 = llvm.extractelement %305[%313 : !llvm.i64] : !llvm.vec<4 x float>
+          %317 = llvm.extractelement %307[%313 : !llvm.i64] : !llvm.vec<4 x float>
+          %318 = llvm.mlir.constant(3 : i64) : !llvm.i64
+          %319 = llvm.extractelement %301[%318 : !llvm.i64] : !llvm.vec<4 x float>
+          %320 = llvm.extractelement %303[%318 : !llvm.i64] : !llvm.vec<4 x float>
+          %321 = llvm.extractelement %305[%318 : !llvm.i64] : !llvm.vec<4 x float>
+          %322 = llvm.extractelement %307[%318 : !llvm.i64] : !llvm.vec<4 x float>
+          %323 = llvm.mlir.undef : !llvm.vec<4 x float>
+          %324 = llvm.mlir.constant(0 : i32) : !llvm.i32
+          %325 = llvm.insertelement %302, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %326 = llvm.shufflevector %325, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %327 = "llvm.intr.fmuladd"(%326, %260, %285) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %328 = llvm.insertelement %304, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %329 = llvm.shufflevector %328, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %330 = "llvm.intr.fmuladd"(%329, %260, %290) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %331 = llvm.insertelement %306, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %332 = llvm.shufflevector %331, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %333 = "llvm.intr.fmuladd"(%332, %260, %295) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %334 = llvm.insertelement %308, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %335 = llvm.shufflevector %334, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %336 = "llvm.intr.fmuladd"(%335, %260, %300) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %337 = llvm.insertelement %309, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %338 = llvm.shufflevector %337, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %339 = "llvm.intr.fmuladd"(%338, %266, %327) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %340 = llvm.insertelement %310, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %341 = llvm.shufflevector %340, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %342 = "llvm.intr.fmuladd"(%341, %266, %330) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %343 = llvm.insertelement %311, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %344 = llvm.shufflevector %343, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %345 = "llvm.intr.fmuladd"(%344, %266, %333) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %346 = llvm.insertelement %312, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %347 = llvm.shufflevector %346, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %348 = "llvm.intr.fmuladd"(%347, %266, %336) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %349 = llvm.insertelement %314, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %350 = llvm.shufflevector %349, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %351 = "llvm.intr.fmuladd"(%350, %272, %339) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %352 = llvm.insertelement %315, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %353 = llvm.shufflevector %352, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %354 = "llvm.intr.fmuladd"(%353, %272, %342) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %355 = llvm.insertelement %316, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %356 = llvm.shufflevector %355, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %357 = "llvm.intr.fmuladd"(%356, %272, %345) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %358 = llvm.insertelement %317, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %359 = llvm.shufflevector %358, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %360 = "llvm.intr.fmuladd"(%359, %272, %348) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %361 = llvm.insertelement %319, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %362 = llvm.shufflevector %361, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %363 = "llvm.intr.fmuladd"(%362, %278, %351) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %364 = llvm.insertelement %320, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %365 = llvm.shufflevector %364, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %366 = "llvm.intr.fmuladd"(%365, %278, %354) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %367 = llvm.insertelement %321, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %368 = llvm.shufflevector %367, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %369 = "llvm.intr.fmuladd"(%368, %278, %357) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          %370 = llvm.insertelement %322, %323[%324 : !llvm.i32] : !llvm.vec<4 x float>
+          %371 = llvm.shufflevector %370, %323 [0 : i32, 0 : i32, 0 : i32, 0 : i32] : !llvm.vec<4 x float>, !llvm.vec<4 x float>
+          %372 = "llvm.intr.fmuladd"(%371, %278, %360) : (!llvm.vec<4 x float>, !llvm.vec<4 x float>, !llvm.vec<4 x float>) -> !llvm.vec<4 x float>
+          llvm.store %363, %284 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          llvm.store %366, %289 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          llvm.store %369, %294 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          llvm.store %372, %299 {alignment = 4 : i64} : !llvm.ptr<vec<4 x float>>
+          %373 = llvm.add %165, %32 : !llvm.i64
+          llvm.br ^bb12(%373 : !llvm.i64)
+        ^bb14:  // pred: ^bb12
+          %374 = llvm.add %163, %32 : !llvm.i64
+          llvm.br ^bb11(%374 : !llvm.i64)
+        ^bb15:  // pred: ^bb11
+          %375 = llvm.add %161, %32 : !llvm.i64
+          llvm.br ^bb10(%375 : !llvm.i64)
+        ^bb16:  // pred: ^bb10
+          %376 = llvm.add %105, %8 : !llvm.i64
+          llvm.br ^bb8(%376 : !llvm.i64)
+        ^bb17:  // pred: ^bb8
+          %377 = llvm.add %103, %8 : !llvm.i64
+          llvm.br ^bb7(%377 : !llvm.i64)
+        ^bb18:  // pred: ^bb7
+          %378 = llvm.add %49, %20 : !llvm.i64
+          llvm.br ^bb5(%378 : !llvm.i64)
+        ^bb19:  // pred: ^bb5
+          llvm.return
+        }
+      }
+    }
+  }
+  func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
+    %c2048 = constant 2048 : index
+    %c0 = constant 0 : index
+    %c1024 = constant 1024 : index
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %allocator = hal.device.allocator %dev : !hal.allocator
+    %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = 50331680
+    %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
+    hal.ex.defer_release %buffer : !hal.buffer
+    %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+    hal.command_buffer.begin %cmd
+    %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
+    %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
+    %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
+    %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
+    %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
+    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+    hal.device.switch(%dev : !hal.device)
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+      %c1 = constant 1 : index
+      %0 = hal.command_buffer.device %arg3 : !hal.device
+      %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
+      hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.return
+    }
+    %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+    hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
+    hal.command_buffer.end %cmd
+    hal.ex.submit_and_wait %dev, %cmd
+    return %buffer : !hal.buffer
+  }
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
+    %c32 = constant 32 : index
+    %c64 = constant 64 : index
+    %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+    hal.check_success %0, "semaphore wait failed"
+    %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+    %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+    %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+    %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+    hal.semaphore.signal %arg4, value = %arg5
+    return %view : !hal.buffer_view
+  }
+  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    hal.check_success %1, "semaphore wait failed"
+    return %0 : !hal.buffer_view
+  }
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
+  %c2048 = constant 2048 : index
+  %c0 = constant 0 : index
+  %c1024 = constant 1024 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator %dev : !hal.allocator
+  %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = 50331680
+  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
+  hal.ex.defer_release %buffer : !hal.buffer
+  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  hal.command_buffer.begin %cmd
+  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
+  %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
+  %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
+  %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
+  %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
+  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+  hal.device.switch(%dev : !hal.device)
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    %c1 = constant 1 : index
+    %0 = hal.command_buffer.device %arg3 : !hal.device
+    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.return
+  }
+  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
+  hal.command_buffer.end %cmd
+  hal.ex.submit_and_wait %dev, %cmd
+  return %buffer : !hal.buffer
+}
+
+```
+### IR Dump After CSE
+```
+func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
+  %c2048 = constant 2048 : index
+  %c0 = constant 0 : index
+  %c1024 = constant 1024 : index
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator %dev : !hal.allocator
+  %sz = hal.allocator.compute_size %allocator, shape = [%c32, %c64], element_type = 50331680
+  %buffer = hal.allocator.allocate %allocator, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", %sz : !hal.buffer
+  hal.ex.defer_release %buffer : !hal.buffer
+  %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
+  hal.command_buffer.begin %cmd
+  %executable_layout = hal.executable_layout.lookup %dev, set_layouts = [[#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<2, "StorageBuffer", "Write|Discard">]] : !hal.executable_layout
+  %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
+  %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
+  %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
+  %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
+  hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+  hal.device.switch(%dev : !hal.device)
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
+    %c1 = constant 1 : index
+    %0 = hal.command_buffer.device %arg3 : !hal.device
+    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    hal.return
+  }
+  %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
+  hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
+  hal.command_buffer.end %cmd
+  hal.ex.submit_and_wait %dev, %cmd
+  return %buffer : !hal.buffer
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
+  return %view : !hal.buffer_view
+}
+
+```
+### IR Dump After CSE
+```
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
+  %c32 = constant 32 : index
+  %c64 = constant 64 : index
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
+  return %view : !hal.buffer_view
+}
+
+```
+### IR Dump After Canonicalizer
+```
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
+}
+
+```
+### IR Dump After CSE
+```
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
 }
 
 ```
@@ -5020,7 +5648,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target "llvm-ir*" {
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
@@ -5456,17 +6084,18 @@ module {
     hal.ex.defer_release %buffer : !hal.buffer
     %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
-    %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+    %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
     %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
     %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
     %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-    hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+    hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
     hal.device.switch(%dev : !hal.device)
-    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer, %arg4 = %0 : !hal.executable) {
+    #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch %arg3, %arg4, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+      %1 = hal.command_buffer.device %arg3 : !hal.device
+      %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+      hal.command_buffer.dispatch %arg3, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -5475,21 +6104,27 @@ module {
     hal.ex.submit_and_wait %dev, %cmd
     return %buffer : !hal.buffer
   }
-  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-    %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-    %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
-    %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
-    return %view : !hal.buffer_view
-  }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
-    %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+    %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+    %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+    %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+    %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     hal.semaphore.signal %arg4, value = %arg5
-    return %1 : !hal.buffer_view
+    return %view : !hal.buffer_view
+  }
+  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    hal.check_success %1, "semaphore wait failed"
+    return %0 : !hal.buffer_view
   }
 }
 
@@ -5540,18 +6175,19 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   hal.ex.defer_release %buffer : !hal.buffer
   %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
-  %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
   %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
   %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
   %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
   %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-  hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
-  %2 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
-  cond_br %2, ^bb1, ^bb2
+  hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+  %1 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
+  cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %c1 = constant 1 : index
-  hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+  %2 = hal.command_buffer.device %cmd : !hal.device
+  %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   br ^bb3
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -5566,25 +6202,31 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-  %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-  %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-  %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c32 = constant 32 : index
   %c64 = constant 64 : index
-  %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
   return %view : !hal.buffer_view
 }
 
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::InlineDeviceSwitchesPass
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
-  hal.check_success %0, "semaphore wait failed"
-  %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
-  return %1 : !hal.buffer_view
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
 }
 
 ```
@@ -5627,7 +6269,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.target "llvm-ir*" {
+    hal.executable.target @llvm_ir, filter="llvm-ir*" {
       hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
@@ -6063,18 +6705,19 @@ module {
     hal.ex.defer_release %buffer : !hal.buffer
     %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
-    %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+    %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
     %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
     %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
     %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-    hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
-    %2 = hal.variable.load @_device_match_id_0 : i1
-    cond_br %2, ^bb1, ^bb2
+    hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+    %1 = hal.variable.load @_device_match_id_0 : i1
+    cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %c1 = constant 1 : index
-    hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    %2 = hal.command_buffer.device %cmd : !hal.device
+    %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     br ^bb3
   ^bb2:  // pred: ^bb0
     iree.unreachable
@@ -6085,21 +6728,27 @@ module {
     hal.ex.submit_and_wait %dev, %cmd
     return %buffer : !hal.buffer
   }
-  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-    %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-    %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-    %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
-    %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
-    return %view : !hal.buffer_view
-  }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
-    %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+    %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+    %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+    %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+    %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     hal.semaphore.signal %arg4, value = %arg5
-    return %1 : !hal.buffer_view
+    return %view : !hal.buffer_view
+  }
+  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    hal.check_success %1, "semaphore wait failed"
+    return %0 : !hal.buffer_view
   }
 }
 
@@ -6212,17 +6861,17 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   hal.ex.defer_release %buffer : !hal.buffer
   %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
-  %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
   %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
   %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
   %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
   %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-  hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
-  %2 = hal.variable.load @_device_match_id_0 : i1
-  cond_br %2, ^bb1, ^bb2
+  hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+  %1 = hal.variable.load @_device_match_id_0 : i1
+  cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
@@ -6248,17 +6897,17 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   hal.ex.defer_release %buffer : !hal.buffer
   %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
   hal.command_buffer.begin %cmd
-  %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-  %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+  %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
   %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
   %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
   %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
   %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-  hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
-  %2 = hal.variable.load @_device_match_id_0 : i1
-  cond_br %2, ^bb1, ^bb2
+  hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+  %1 = hal.variable.load @_device_match_id_0 : i1
+  cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
   hal.command_buffer.end %cmd
@@ -6271,49 +6920,61 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c32 = constant 32 : index
   %c64 = constant 64 : index
-  %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-  %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-  %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
   return %view : !hal.buffer_view
 }
 
 ```
 ### IR Dump After CSE
 ```
-func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
   %c32 = constant 32 : index
   %c64 = constant 64 : index
-  %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-  %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-  %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-  %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
+  hal.check_success %0, "semaphore wait failed"
+  %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+  %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+  %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+  %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
+  hal.semaphore.signal %arg4, value = %arg5
   return %view : !hal.buffer_view
 }
 
 ```
 ### IR Dump After Canonicalizer
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
-  hal.check_success %0, "semaphore wait failed"
-  %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
-  return %1 : !hal.buffer_view
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
 }
 
 ```
 ### IR Dump After CSE
 ```
-func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
-  %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
-  hal.check_success %0, "semaphore wait failed"
-  %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
-  hal.semaphore.signal %arg4, value = %arg5
-  return %1 : !hal.buffer_view
+func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %dev = hal.ex.shared_device : !hal.device
+  %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+  %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+  %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+  hal.check_success %1, "semaphore wait failed"
+  return %0 : !hal.buffer_view
 }
 
 ```
@@ -6372,17 +7033,17 @@ module {
     hal.ex.defer_release %buffer : !hal.buffer
     %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
-    %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+    %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
     %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
     %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
     %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-    hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
-    %2 = hal.variable.load @_device_match_id_0 : i1
-    cond_br %2, ^bb1, ^bb2
+    hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+    %1 = hal.variable.load @_device_match_id_0 : i1
+    cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
@@ -6391,21 +7052,27 @@ module {
   ^bb2:  // pred: ^bb0
     iree.unreachable
   }
-  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
-    %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-    %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-    %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
-    return %view : !hal.buffer_view
-  }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
-    %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+    %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+    %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+    %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+    %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     hal.semaphore.signal %arg4, value = %arg5
-    return %1 : !hal.buffer_view
+    return %view : !hal.buffer_view
+  }
+  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    hal.check_success %1, "semaphore wait failed"
+    return %0 : !hal.buffer_view
   }
 }
 
@@ -6465,17 +7132,17 @@ module {
     hal.ex.defer_release %buffer : !hal.buffer
     %cmd = hal.command_buffer.create %dev, "OneShot", "Transfer|Dispatch" : !hal.command_buffer
     hal.command_buffer.begin %cmd
-    %0 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
-    %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+    %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
     %allocator_0 = hal.buffer.allocator %arg0 : !hal.allocator
     %sz_1 = hal.allocator.compute_size %allocator_0, shape = [%c32, %c1024], element_type = 50331680
     %allocator_2 = hal.buffer.allocator %arg1 : !hal.allocator
     %sz_3 = hal.allocator.compute_size %allocator_2, shape = [%c1024, %c64], element_type = 50331680
-    hal.command_buffer.push_descriptor_set %cmd, %1, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
-    %2 = hal.variable.load @_device_match_id_0 : i1
-    cond_br %2, ^bb1, ^bb2
+    hal.command_buffer.push_descriptor_set %cmd, %0, set=0, bindings=[0 = (%arg0, %c0, %sz_1), 1 = (%arg1, %c0, %sz_3), 2 = (%buffer, %c0, %sz)]
+    %1 = hal.variable.load @_device_match_id_0 : i1
+    cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    hal.command_buffer.dispatch %cmd, %0, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
+    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
     hal.command_buffer.end %cmd
@@ -6484,21 +7151,27 @@ module {
   ^bb2:  // pred: ^bb0
     iree.unreachable
   }
-  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %c32 = constant 32 : index
     %c64 = constant 64 : index
-    %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer
-    %buffer_0 = hal.buffer_view.buffer %arg1 : !hal.buffer
-    %0 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
-    %view = hal.buffer_view.create %0, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
-    return %view : !hal.buffer_view
-  }
-  func @dot$async(%arg0: !hal.semaphore, %arg1: index, %arg2: !hal.buffer_view, %arg3: !hal.buffer_view, %arg4: !hal.semaphore, %arg5: index) -> !hal.buffer_view attributes {iree.module.export = "dot$async"} {
     %0 = hal.semaphore.await %arg0, min_value = %arg1 : i32
     hal.check_success %0, "semaphore wait failed"
-    %1 = call @dot$sync(%arg2, %arg3) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view
+    %buffer = hal.buffer_view.buffer %arg2 : !hal.buffer
+    %buffer_0 = hal.buffer_view.buffer %arg3 : !hal.buffer
+    %1 = call @dot(%buffer, %buffer_0) : (!hal.buffer, !hal.buffer) -> !hal.buffer
+    %view = hal.buffer_view.create %1, shape = [%c32, %c64], element_type = 50331680 : !hal.buffer_view
     hal.semaphore.signal %arg4, value = %arg5
-    return %1 : !hal.buffer_view
+    return %view : !hal.buffer_view
+  }
+  func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export = "dot", iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %c0 = constant 0 : index
+    %c1 = constant 1 : index
+    %dev = hal.ex.shared_device : !hal.device
+    %semaphore = hal.semaphore.create %dev, initial_value = %c0 : !hal.semaphore
+    %0 = call @dot$async(%semaphore, %c0, %arg0, %arg1, %semaphore, %c1) : (!hal.semaphore, index, !hal.buffer_view, !hal.buffer_view, !hal.semaphore, index) -> !hal.buffer_view
+    %1 = hal.semaphore.await %semaphore, min_value = %c1 : i32
+    hal.check_success %1, "semaphore wait failed"
+    return %0 : !hal.buffer_view
   }
 }
 
@@ -6577,7 +7250,6 @@ module {
       %c3 = vm.const.i32 3 : i32
       %ref_3 = vm.call @hal.command_buffer.create(%ref, %c1_2, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_3) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_4 = vm.call @hal.buffer.allocator(%arg0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %c50331680_5 = vm.const.i32 50331680 : i32
@@ -6593,6 +7265,7 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %zero_11 = vm.const.i32.zero : i32
       vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_11, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       %c20 = vm.const.i32 20 : i32
@@ -6608,25 +7281,31 @@ module {
       vm.fail %c2_12, "unreachable location reached"
     }
     vm.export @dot as("dot$raw")
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c32 = vm.const.i32 32 : i32
       %c64 = vm.const.i32 64 : i32
-      %ref = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_0 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_fail %0, "semaphore wait failed"
+      %ref = vm.call @hal.buffer_view.buffer(%arg2) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_0 = vm.call @hal.buffer_view.buffer(%arg3) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
       %ref_1 = vm.call @dot(%ref, %ref_0) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
       %c50331680 = vm.const.i32 50331680 : i32
       %ref_2 = vm.call.variadic @hal.buffer_view.create(%ref_1, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
       vm.return %ref_2 : !vm.ref<!hal.buffer_view>
     }
-    vm.export @dot$sync as("dot")
-    vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
-      %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-      vm.cond_fail %0, "semaphore wait failed"
-      %ref = vm.call @dot$sync(%arg2, %arg3) : (!vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view>
-      vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
-      vm.return %ref : !vm.ref<!hal.buffer_view>
-    }
     vm.export @dot$async
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %zero = vm.const.i32.zero : i32
+      %c1 = vm.const.i32 1 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_fail %0, "semaphore wait failed"
+      vm.return %ref_1 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -6756,7 +7435,6 @@ vm.module @module {
     %c3 = vm.const.i32 3 : i32
     %ref_3 = vm.call @hal.command_buffer.create(%ref, %c1_2, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
     vm.call @hal.command_buffer.begin(%ref_3) : (!vm.ref<!hal.command_buffer>) -> ()
-    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %ref_4 = vm.call @hal.buffer.allocator(%arg0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
     %c50331680_5 = vm.const.i32 50331680 : i32
@@ -6772,6 +7450,7 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
+    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
     %zero_11 = vm.const.i32.zero : i32
     vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_11, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
@@ -6787,25 +7466,31 @@ vm.module @module {
     vm.fail %c2_12, "unreachable location reached"
   }
   vm.export @dot as("dot$raw")
-  vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+  vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
     %c32 = vm.const.i32 32 : i32
     %c64 = vm.const.i32 64 : i32
-    %ref = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-    %ref_0 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+    %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+    vm.cond_fail %0, "semaphore wait failed"
+    %ref = vm.call @hal.buffer_view.buffer(%arg2) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+    %ref_0 = vm.call @hal.buffer_view.buffer(%arg3) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
     %ref_1 = vm.call @dot(%ref, %ref_0) : (!vm.ref<!hal.buffer>, !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer>
     %c50331680 = vm.const.i32 50331680 : i32
     %ref_2 = vm.call.variadic @hal.buffer_view.create(%ref_1, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+    vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
     vm.return %ref_2 : !vm.ref<!hal.buffer_view>
   }
-  vm.export @dot$sync as("dot")
-  vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
-    %0 = vm.call @hal.semaphore.await(%arg0, %arg1) : (!vm.ref<!hal.semaphore>, i32) -> i32
-    vm.cond_fail %0, "semaphore wait failed"
-    %ref = vm.call @dot$sync(%arg2, %arg3) : (!vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view>
-    vm.call @hal.semaphore.signal(%arg4, %arg5) : (!vm.ref<!hal.semaphore>, i32) -> ()
-    vm.return %ref : !vm.ref<!hal.buffer_view>
-  }
   vm.export @dot$async
+  vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+    %zero = vm.const.i32.zero : i32
+    %c1 = vm.const.i32 1 : i32
+    %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+    %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+    %ref_1 = vm.call @dot$async(%ref_0, %zero, %arg0, %arg1, %ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.buffer_view>, !vm.ref<!hal.semaphore>, i32) -> !vm.ref<!hal.buffer_view>
+    %0 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+    vm.cond_fail %0, "semaphore wait failed"
+    vm.return %ref_1 : !vm.ref<!hal.buffer_view>
+  }
+  vm.export @dot$sync as("dot")
   vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
   vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -6909,7 +7594,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_1) : (!vm.ref<!hal.buffer>) -> ()
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_3 = vm.call @hal.buffer.allocator(%arg0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %1 = vm.call.variadic @hal.allocator.compute_size(%ref_3, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -6919,6 +7603,7 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -6928,50 +7613,6 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot as("dot$raw")
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %c1024 = vm.const.i32 1024 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
-      %c3 = vm.const.i32 3 : i32
-      %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c20 = vm.const.i32 20 : i32
-      %c5 = vm.const.i32 5 : i32
-      %c8 = vm.const.i32 8 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c50331680 = vm.const.i32 50331680 : i32
-      %ref = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_0 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_1 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_2 = vm.call @hal.device.allocator(%ref_1) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %0 = vm.call.variadic @hal.allocator.compute_size(%ref_2, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_3 = vm.call @hal.allocator.allocate(%ref_2, %c50, %c15, %0) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
-      vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
-      %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
-      vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_6 = vm.call @hal.buffer.allocator(%ref_0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_6, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_4, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref, %ref_0, %ref_3], [%zero, %zero, %zero], [%1, %2, %0]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
-      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
-      vm.cond_br %_device_match_id_0, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
-      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
-      vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      vm.call @hal.ex.submit_and_wait(%ref_1, %ref_4) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
-      %ref_7 = vm.call.variadic @hal.buffer_view.create(%ref_3, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
-      vm.return %ref_7 : !vm.ref<!hal.buffer_view>
-    ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
-    }
-    vm.export @dot$sync as("dot")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -6999,7 +7640,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
       %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %2 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7011,6 +7651,7 @@ module {
     ^bb2(%4: i32):  // pred: ^bb0
       vm.fail %4, "semaphore wait failed"
     ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7022,6 +7663,61 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot$async
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %c1024 = vm.const.i32 1024 : i32
+      %c32 = vm.const.i32 32 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c50 = vm.const.i32 50 : i32
+      %c15 = vm.const.i32 15 : i32
+      %c3 = vm.const.i32 3 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c20 = vm.const.i32 20 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c8 = vm.const.i32 8 : i32
+      %c4 = vm.const.i32 4 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+    ^bb1:  // pred: ^bb0
+      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_3 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_4 = vm.call @hal.device.allocator(%ref_3) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
+      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_4, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_5 = vm.call @hal.allocator.allocate(%ref_4, %c50, %c15, %1) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      vm.call @hal.ex.defer_release(%ref_5) : (!vm.ref<!hal.buffer>) -> ()
+      %ref_6 = vm.call @hal.command_buffer.create(%ref_3, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
+      vm.call @hal.command_buffer.begin(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+      %ref_7 = vm.call @hal.buffer.allocator(%ref_1) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_7, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_8 = vm.call @hal.buffer.allocator(%ref_2) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %3 = vm.call.variadic @hal.allocator.compute_size(%ref_8, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_6, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref_1, %ref_2, %ref_5], [%zero, %zero, %zero], [%2, %3, %1]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
+      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+      vm.cond_br %_device_match_id_0, ^bb3, ^bb4
+    ^bb2(%4: i32):  // 2 preds: ^bb0, ^bb3
+      vm.fail %4, "semaphore wait failed"
+    ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_6, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_6, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
+      vm.call @hal.command_buffer.end(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      vm.call @hal.ex.submit_and_wait(%ref_3, %ref_6) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
+      %ref_9 = vm.call.variadic @hal.buffer_view.create(%ref_5, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+      %5 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %5, ^bb2(%5 : i32), ^bb5
+    ^bb4:  // pred: ^bb1
+      vm.fail %c2, "unreachable location reached"
+    ^bb5:  // pred: ^bb3
+      vm.return %ref_9 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -7146,7 +7842,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_1) : (!vm.ref<!hal.buffer>) -> ()
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_3 = vm.call @hal.buffer.allocator(%arg0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %1 = vm.call.variadic @hal.allocator.compute_size(%ref_3, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7156,6 +7851,7 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7165,50 +7861,6 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot as("dot$raw")
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %c1024 = vm.const.i32 1024 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
-      %c3 = vm.const.i32 3 : i32
-      %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c20 = vm.const.i32 20 : i32
-      %c5 = vm.const.i32 5 : i32
-      %c8 = vm.const.i32 8 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c50331680 = vm.const.i32 50331680 : i32
-      %ref = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_0 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_1 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_2 = vm.call @hal.device.allocator(%ref_1) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %0 = vm.call.variadic @hal.allocator.compute_size(%ref_2, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_3 = vm.call @hal.allocator.allocate(%ref_2, %c50, %c15, %0) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
-      vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
-      %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
-      vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_6 = vm.call @hal.buffer.allocator(%ref_0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_6, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_4, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref, %ref_0, %ref_3], [%zero, %zero, %zero], [%1, %2, %0]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
-      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
-      vm.cond_br %_device_match_id_0, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
-      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
-      vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      vm.call @hal.ex.submit_and_wait(%ref_1, %ref_4) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
-      %ref_7 = vm.call.variadic @hal.buffer_view.create(%ref_3, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
-      vm.return %ref_7 : !vm.ref<!hal.buffer_view>
-    ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
-    }
-    vm.export @dot$sync as("dot")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -7236,7 +7888,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
       %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %2 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7248,6 +7899,7 @@ module {
     ^bb2(%4: i32):  // pred: ^bb0
       vm.fail %4, "semaphore wait failed"
     ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7259,6 +7911,61 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot$async
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %c1024 = vm.const.i32 1024 : i32
+      %c32 = vm.const.i32 32 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c50 = vm.const.i32 50 : i32
+      %c15 = vm.const.i32 15 : i32
+      %c3 = vm.const.i32 3 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c20 = vm.const.i32 20 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c8 = vm.const.i32 8 : i32
+      %c4 = vm.const.i32 4 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+    ^bb1:  // pred: ^bb0
+      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_3 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_4 = vm.call @hal.device.allocator(%ref_3) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
+      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_4, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_5 = vm.call @hal.allocator.allocate(%ref_4, %c50, %c15, %1) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      vm.call @hal.ex.defer_release(%ref_5) : (!vm.ref<!hal.buffer>) -> ()
+      %ref_6 = vm.call @hal.command_buffer.create(%ref_3, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
+      vm.call @hal.command_buffer.begin(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+      %ref_7 = vm.call @hal.buffer.allocator(%ref_1) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_7, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_8 = vm.call @hal.buffer.allocator(%ref_2) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %3 = vm.call.variadic @hal.allocator.compute_size(%ref_8, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_6, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref_1, %ref_2, %ref_5], [%zero, %zero, %zero], [%2, %3, %1]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
+      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+      vm.cond_br %_device_match_id_0, ^bb3, ^bb4
+    ^bb2(%4: i32):  // 2 preds: ^bb0, ^bb3
+      vm.fail %4, "semaphore wait failed"
+    ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_6, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_6, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
+      vm.call @hal.command_buffer.end(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      vm.call @hal.ex.submit_and_wait(%ref_3, %ref_6) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
+      %ref_9 = vm.call.variadic @hal.buffer_view.create(%ref_5, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+      %5 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %5, ^bb2(%5 : i32), ^bb5
+    ^bb4:  // pred: ^bb1
+      vm.fail %c2, "unreachable location reached"
+    ^bb5:  // pred: ^bb3
+      vm.return %ref_9 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -7383,7 +8090,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_1) : (!vm.ref<!hal.buffer>) -> ()
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_3 = vm.call @hal.buffer.allocator(%arg0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %1 = vm.call.variadic @hal.allocator.compute_size(%ref_3, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7393,6 +8099,7 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7402,50 +8109,6 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot as("dot$raw")
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %c1024 = vm.const.i32 1024 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
-      %c3 = vm.const.i32 3 : i32
-      %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c20 = vm.const.i32 20 : i32
-      %c5 = vm.const.i32 5 : i32
-      %c8 = vm.const.i32 8 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c50331680 = vm.const.i32 50331680 : i32
-      %ref = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_0 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_1 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_2 = vm.call @hal.device.allocator(%ref_1) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %0 = vm.call.variadic @hal.allocator.compute_size(%ref_2, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_3 = vm.call @hal.allocator.allocate(%ref_2, %c50, %c15, %0) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
-      vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
-      %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
-      vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_6 = vm.call @hal.buffer.allocator(%ref_0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_6, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_4, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref, %ref_0, %ref_3], [%zero, %zero, %zero], [%1, %2, %0]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
-      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
-      vm.cond_br %_device_match_id_0, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
-      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
-      vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      vm.call @hal.ex.submit_and_wait(%ref_1, %ref_4) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
-      %ref_7 = vm.call.variadic @hal.buffer_view.create(%ref_3, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
-      vm.return %ref_7 : !vm.ref<!hal.buffer_view>
-    ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
-    }
-    vm.export @dot$sync as("dot")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -7473,7 +8136,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
       %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %2 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7485,6 +8147,7 @@ module {
     ^bb2(%4: i32):  // pred: ^bb0
       vm.fail %4, "semaphore wait failed"
     ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7496,6 +8159,61 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot$async
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %c1024 = vm.const.i32 1024 : i32
+      %c32 = vm.const.i32 32 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c50 = vm.const.i32 50 : i32
+      %c15 = vm.const.i32 15 : i32
+      %c3 = vm.const.i32 3 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c20 = vm.const.i32 20 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c8 = vm.const.i32 8 : i32
+      %c4 = vm.const.i32 4 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+    ^bb1:  // pred: ^bb0
+      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_3 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_4 = vm.call @hal.device.allocator(%ref_3) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
+      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_4, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_5 = vm.call @hal.allocator.allocate(%ref_4, %c50, %c15, %1) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      vm.call @hal.ex.defer_release(%ref_5) : (!vm.ref<!hal.buffer>) -> ()
+      %ref_6 = vm.call @hal.command_buffer.create(%ref_3, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
+      vm.call @hal.command_buffer.begin(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+      %ref_7 = vm.call @hal.buffer.allocator(%ref_1) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_7, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_8 = vm.call @hal.buffer.allocator(%ref_2) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %3 = vm.call.variadic @hal.allocator.compute_size(%ref_8, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_6, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref_1, %ref_2, %ref_5], [%zero, %zero, %zero], [%2, %3, %1]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
+      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+      vm.cond_br %_device_match_id_0, ^bb3, ^bb4
+    ^bb2(%4: i32):  // 2 preds: ^bb0, ^bb3
+      vm.fail %4, "semaphore wait failed"
+    ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_6, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_6, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
+      vm.call @hal.command_buffer.end(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      vm.call @hal.ex.submit_and_wait(%ref_3, %ref_6) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
+      %ref_9 = vm.call.variadic @hal.buffer_view.create(%ref_5, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+      %5 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %5, ^bb2(%5 : i32), ^bb5
+    ^bb4:  // pred: ^bb1
+      vm.fail %c2, "unreachable location reached"
+    ^bb5:  // pred: ^bb3
+      vm.return %ref_9 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -7517,6 +8235,7 @@ module {
     vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
@@ -7590,7 +8309,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_1) : (!vm.ref<!hal.buffer>) -> ()
       %ref_2 = vm.call @hal.command_buffer.create(%ref, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_3 = vm.call @hal.buffer.allocator(%arg0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %1 = vm.call.variadic @hal.allocator.compute_size(%ref_3, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7600,6 +8318,7 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7609,50 +8328,6 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot as("dot$raw")
-    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
-      %c1024 = vm.const.i32 1024 : i32
-      %c32 = vm.const.i32 32 : i32
-      %c64 = vm.const.i32 64 : i32
-      %c50 = vm.const.i32 50 : i32
-      %c15 = vm.const.i32 15 : i32
-      %c3 = vm.const.i32 3 : i32
-      %c1 = vm.const.i32 1 : i32
-      %zero = vm.const.i32.zero : i32
-      %c20 = vm.const.i32 20 : i32
-      %c5 = vm.const.i32 5 : i32
-      %c8 = vm.const.i32 8 : i32
-      %c4 = vm.const.i32 4 : i32
-      %c2 = vm.const.i32 2 : i32
-      %c50331680 = vm.const.i32 50331680 : i32
-      %ref = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_0 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
-      %ref_1 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
-      %ref_2 = vm.call @hal.device.allocator(%ref_1) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
-      %0 = vm.call.variadic @hal.allocator.compute_size(%ref_2, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_3 = vm.call @hal.allocator.allocate(%ref_2, %c50, %c15, %0) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
-      vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
-      %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
-      vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
-      %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      %ref_6 = vm.call @hal.buffer.allocator(%ref_0) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
-      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_6, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
-      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_4, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref, %ref_0, %ref_3], [%zero, %zero, %zero], [%1, %2, %0]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
-      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
-      vm.cond_br %_device_match_id_0, ^bb1, ^bb2
-    ^bb1:  // pred: ^bb0
-      vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
-      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
-      vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      vm.call @hal.ex.submit_and_wait(%ref_1, %ref_4) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
-      %ref_7 = vm.call.variadic @hal.buffer_view.create(%ref_3, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
-      vm.return %ref_7 : !vm.ref<!hal.buffer_view>
-    ^bb2:  // pred: ^bb0
-      vm.fail %c2, "unreachable location reached"
-    }
-    vm.export @dot$sync as("dot")
     vm.func @dot$async(%arg0: !vm.ref<!hal.semaphore>, %arg1: i32, %arg2: !vm.ref<!hal.buffer_view>, %arg3: !vm.ref<!hal.buffer_view>, %arg4: !vm.ref<!hal.semaphore>, %arg5: i32) -> !vm.ref<!hal.buffer_view> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -7680,7 +8355,6 @@ module {
       vm.call @hal.ex.defer_release(%ref_3) : (!vm.ref<!hal.buffer>) -> ()
       %ref_4 = vm.call @hal.command_buffer.create(%ref_1, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
       vm.call @hal.command_buffer.begin(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %ref_5 = vm.call @hal.buffer.allocator(%ref) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
       %2 = vm.call.variadic @hal.allocator.compute_size(%ref_5, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
@@ -7692,6 +8366,7 @@ module {
     ^bb2(%4: i32):  // pred: ^bb0
       vm.fail %4, "semaphore wait failed"
     ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
       vm.call @hal.command_buffer.dispatch(%ref_4, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_4, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_4) : (!vm.ref<!hal.command_buffer>) -> ()
@@ -7703,6 +8378,61 @@ module {
       vm.fail %c2, "unreachable location reached"
     }
     vm.export @dot$async
+    vm.func @dot$sync(%arg0: !vm.ref<!hal.buffer_view>, %arg1: !vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer_view> attributes {iree.reflection = {f = "I23!B9!d32d1024B9!d1024d64R10!B7!d32d64", fv = "1"}} {
+      %c1024 = vm.const.i32 1024 : i32
+      %c32 = vm.const.i32 32 : i32
+      %c64 = vm.const.i32 64 : i32
+      %c50 = vm.const.i32 50 : i32
+      %c15 = vm.const.i32 15 : i32
+      %c3 = vm.const.i32 3 : i32
+      %c1 = vm.const.i32 1 : i32
+      %zero = vm.const.i32.zero : i32
+      %c20 = vm.const.i32 20 : i32
+      %c5 = vm.const.i32 5 : i32
+      %c8 = vm.const.i32 8 : i32
+      %c4 = vm.const.i32 4 : i32
+      %c2 = vm.const.i32 2 : i32
+      %c50331680 = vm.const.i32 50331680 : i32
+      %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_0 = vm.call @hal.semaphore.create(%ref, %zero) : (!vm.ref<!hal.device>, i32) -> !vm.ref<!hal.semaphore>
+      %0 = vm.call @hal.semaphore.await(%ref_0, %zero) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %0, ^bb2(%0 : i32), ^bb1
+    ^bb1:  // pred: ^bb0
+      %ref_1 = vm.call @hal.buffer_view.buffer(%arg0) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_2 = vm.call @hal.buffer_view.buffer(%arg1) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+      %ref_3 = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
+      %ref_4 = vm.call @hal.device.allocator(%ref_3) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
+      %1 = vm.call.variadic @hal.allocator.compute_size(%ref_4, [%c32, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_5 = vm.call @hal.allocator.allocate(%ref_4, %c50, %c15, %1) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+      vm.call @hal.ex.defer_release(%ref_5) : (!vm.ref<!hal.buffer>) -> ()
+      %ref_6 = vm.call @hal.command_buffer.create(%ref_3, %c1, %c3) : (!vm.ref<!hal.device>, i32, i32) -> !vm.ref<!hal.command_buffer>
+      vm.call @hal.command_buffer.begin(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
+      %ref_7 = vm.call @hal.buffer.allocator(%ref_1) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %2 = vm.call.variadic @hal.allocator.compute_size(%ref_7, [%c32, %c1024], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      %ref_8 = vm.call @hal.buffer.allocator(%ref_2) : (!vm.ref<!hal.buffer>) -> !vm.ref<!hal.allocator>
+      %3 = vm.call.variadic @hal.allocator.compute_size(%ref_8, [%c1024, %c64], %c50331680) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
+      vm.call.variadic @hal.command_buffer.push_descriptor_set(%ref_6, %_executable_layout_0, %zero, [%zero, %c1, %c2], [%ref_1, %ref_2, %ref_5], [%zero, %zero, %zero], [%2, %3, %1]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, i32 ..., !vm.ref<!hal.buffer> ..., i32 ..., i32 ...)
+      %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
+      vm.cond_br %_device_match_id_0, ^bb3, ^bb4
+    ^bb2(%4: i32):  // 2 preds: ^bb0, ^bb3
+      vm.fail %4, "semaphore wait failed"
+    ^bb3:  // pred: ^bb1
+      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_6, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call.variadic @hal.command_buffer.execution_barrier(%ref_6, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
+      vm.call @hal.command_buffer.end(%ref_6) : (!vm.ref<!hal.command_buffer>) -> ()
+      vm.call @hal.ex.submit_and_wait(%ref_3, %ref_6) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
+      %ref_9 = vm.call.variadic @hal.buffer_view.create(%ref_5, [%c32, %c64], %c50331680) : (!vm.ref<!hal.buffer>, i32 ..., i32) -> !vm.ref<!hal.buffer_view>
+      vm.call @hal.semaphore.signal(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> ()
+      %5 = vm.call @hal.semaphore.await(%ref_0, %c1) : (!vm.ref<!hal.semaphore>, i32) -> i32
+      vm.cond_br %5, ^bb2(%5 : i32), ^bb5
+    ^bb4:  // pred: ^bb1
+      vm.fail %c2, "unreachable location reached"
+    ^bb5:  // pred: ^bb3
+      vm.return %ref_9 : !vm.ref<!hal.buffer_view>
+    }
+    vm.export @dot$sync as("dot")
     vm.import @hal.ex.shared_device() -> !vm.ref<!hal.device> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.ex.defer_release(%operand : !vm.ref<?>) attributes {sym_visibility = "private"}
     vm.import @hal.ex.submit_and_wait(%device : !vm.ref<!hal.device>, %command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -7724,6 +8454,7 @@ module {
     vm.import @hal.executable_cache.select_format(%executable_cache : !vm.ref<!hal.executable_cache>, %available_formats : i32 ...) -> i32 attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_cache.prepare(%executable_cache : !vm.ref<!hal.executable_cache>, %executable_layout : !vm.ref<!hal.executable_layout>, %caching_mode : i32, %executable_data : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.executable_layout.create(%device : !vm.ref<!hal.device>, %set_layouts : !vm.ref<!hal.descriptor_set_layout> ..., %push_constants : i32) -> !vm.ref<!hal.executable_layout> attributes {nosideeffects, sym_visibility = "private"}
+    vm.import @hal.semaphore.create(%device : !vm.ref<!hal.device>, %initial_value : i32) -> !vm.ref<!hal.semaphore> attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.semaphore.signal(%semaphore : !vm.ref<!hal.semaphore>, %new_value : i32) attributes {sym_visibility = "private"}
     vm.import @hal.semaphore.await(%semaphore : !vm.ref<!hal.semaphore>, %min_value : i32) -> i32 attributes {sym_visibility = "private"}
     vm.func @__init() {
