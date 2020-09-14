@@ -973,7 +973,7 @@ void DeviceAllocatorOp::getAsmResultNames(
 void DeviceSwitchOp::build(OpBuilder &builder, OperationState &state,
                            TypeRange resultTypes, Value device,
                            ArrayRef<Attribute> conditions,
-                           ArrayRef<ValueRange> conditionArgs,
+                           ArrayRef<SmallVector<Value, 4>> conditionArgs,
                            ArrayRef<NamedAttribute> attributes) {
   state.addOperands({device});
   state.addAttribute("conditions", builder.getArrayAttr(conditions));

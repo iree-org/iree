@@ -1517,7 +1517,7 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, TypeRange resultTypes,
       Value device, ArrayRef<Attribute> conditions,
-      ArrayRef<ValueRange> conditionArgs,
+      ArrayRef<SmallVector<Value, 4>> conditionArgs,
       ArrayRef<NamedAttribute> attributes = {}
     }]>,
   ];
