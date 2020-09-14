@@ -44,7 +44,7 @@ To build the website yourself, mimic the `Publish Documentation` action:
 
 1.  On the `main` branch, run `bash ./build_tools/cmake/build_docs.sh`
 2.  On the `main` branch, run `python3 ./scripts/prepare_doc_publication.py ./build-docs/doc`
-3.  Switch to the `gh-pages` branch (or clone the repo again to make concurrent changes)
+3.  Switch to the `gh-pages` branch (or clone the repo again to make concurrent changes. See "Cloning into another directory")
 4.  Copy the contents of `build-docs/doc/` to the `gh-pages` branch: `cp -rf build-docs/doc/* ./docs/`
 5.  Move `index.md` to the root: `mv -f ./docs/index.md .`
 6.  Push to a fork, or serve the website locally
@@ -65,3 +65,28 @@ on a local webserver. See GitHub's
 help page for instructions on setting up Jekyll on your machine, then run
 `bundle exec jekyll serve` and load the server address that it outputs in your
 web browser.
+
+#### Cloning into another directory
+
+The `main` and `gh-pages` branches have separate `.gitignore` files. If you
+develop IREE, this makes making changes to the `gh-pages` branch within
+the same `git` directory difficult.
+
+You can avoid this by cloning IREE again to a different directory, and using
+that directory to modify this branch:
+
+```shell
+# Set up the new git directory.
+git clone git@github.com:${GITHUB_USERNAME?}/iree.git gh_pages
+cd gh_pages
+git remote add upstream https://github.com/google/iree.git
+
+# Checkout the `gh-pages` branch.
+# Note: if you already have `gh-pages` in your fork it can be helpful to run
+# `git branch -D gh-pages` to avoid unnecessary merge commits.
+git checkout -b gh-pages upstream/gh-pages
+
+# Assuming `iree/` and `gh_pages/` are in the same directory, `build-docs` can
+# be copied over from `iree/` like so:
+cp -rf ../iree/build-docs/doc/* docs/
+```
