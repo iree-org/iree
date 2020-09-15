@@ -65,15 +65,18 @@ RUN cp -rf build-swiftshader/Linux /swiftshader
 # Keep track of the commit we are using.
 RUN echo "${SWIFTSHADER_COMMIT?}" > /swiftshader/git-commit
 
+
+
+######################## Final Image ###########################################
 FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61 AS final
 
 ######################## Python 3 ##############################################
 RUN apt-get update \
-    && apt-get install -y \
-        python3 \
-        python3-pip \
-    && python3 -m pip install --upgrade pip \
-    && python3 -m pip install numpy
+  && apt-get install -y \
+    python3 \
+    python3-pip \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install numpy
 
 ######################## Vulkan SDK ############################################
 ARG VULKAN_SDK_VERSION=1.2.141
@@ -110,10 +113,10 @@ RUN apt-get update && apt-get install -y software-properties-common
 #   3. resymlink python3 to /opt/python3.6/bin/python3.6
 # See https://github.com/google/iree/issues/1966 for more information.
 RUN rm /usr/bin/python3 \
-    && ln -s /usr/bin/python3.5 /usr/bin/python3 \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && rm /usr/bin/python3 \
-    && ln -s /opt/python3.6/bin/python3.6 /usr/bin/python3
+  && ln -s /usr/bin/python3.5 /usr/bin/python3 \
+  && add-apt-repository ppa:deadsnakes/ppa \
+  && rm /usr/bin/python3 \
+  && ln -s /opt/python3.6/bin/python3.6 /usr/bin/python3
 
 # Install python3.6-dev
 RUN apt-get update \
