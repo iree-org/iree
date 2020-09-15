@@ -99,8 +99,8 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<?x?xf32>
     %2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<?x?xf32>
-    linalg.matmul %0, %1, %2 :
-      (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>)
+    linalg.matmul ins(%0, %1 : memref<?x?xf32>, memref<?x?xf32>)
+                 outs(%2 : memref<?x?xf32>)
     return
   }
   func @matmul__num_workgroups__
@@ -135,7 +135,8 @@ module attributes {
 //       CHECK:   %[[VIEW2:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
 //       CHECK:   linalg.matmul
 //  CHECK-SAME:     "workgroup_numprocs_ge_numiters"
-//  CHECK-SAME:     %[[VIEW0]], %[[VIEW1]], %[[VIEW2]]
+//  CHECK-SAME:     ins(%[[VIEW0]], %[[VIEW1]]
+//  CHECK-SAME:    outs(%[[VIEW2]]
 //       CHECK: func @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C8:.+]] = constant 8 : index
 //   CHECK-DAG:   %[[C7:.+]] = constant 7 : index
