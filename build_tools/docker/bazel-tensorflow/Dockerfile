@@ -14,7 +14,7 @@
 
 # An image for building IREE with TensorFlow integrations using Bazel.
 
-FROM gcr.io/iree-oss/bazel-python
+FROM gcr.io/iree-oss/bazel-python AS final
 
 # Install tensorflow.
 RUN python3 -m pip install tf-nightly

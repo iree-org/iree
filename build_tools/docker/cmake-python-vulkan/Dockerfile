@@ -15,7 +15,7 @@
 # A base image for building IREE using CMake and running Vulkan tests. Requires
 # a child image to provide a Vulkan ICD.
 
-FROM gcr.io/iree-oss/cmake-python
+FROM gcr.io/iree-oss/cmake-python AS final
 
 # It would be nice to have a separate install vulkan image and copy from that,
 # but I don't know all the files that installing the vulkan-sdk adds.
