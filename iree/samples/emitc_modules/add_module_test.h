@@ -81,10 +81,10 @@ static iree_status_t call_shim_i32_i32_i32(
 }
 
 static iree_status_t add_module_add(iree_vm_stack_t* stack,
-                                      add_module_t* module,
-                                      add_module_state_t* module_state,
-                                      int32_t arg0, int32_t arg1,
-                                      int32_t* out_ret0) {
+                                    add_module_t* module,
+                                    add_module_state_t* module_state,
+                                    int32_t arg0, int32_t arg1,
+                                    int32_t* out_ret0) {
   //*out_ret0 = arg0 + arg1;
   add_module_add_impl(arg0, arg1, out_ret0);
   return iree_ok_status();
