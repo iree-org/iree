@@ -60,10 +60,11 @@ IMAGES_TO_DEPENDENCIES = {
     'cmake-python': ['cmake'],
     'cmake-python-nvidia': ['cmake-python-vulkan'],
     'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
-    'cmake-python-vulkan': ['cmake-python'],
+    'cmake-python-vulkan': ['cmake-python', 'vulkan'],
     'rbe-toolchain': [],
     'swiftshader': ['cmake'],
     'util': [],
+    'vulkan': ['util'],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
