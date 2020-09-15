@@ -21,6 +21,7 @@
 # for. There are also Ubuntu 18.04 images, but we'd have to construct all our
 # own toolchains.
 
+######################## Install Swiftshader ###################################
 FROM ubuntu:16.04 AS install-swiftshader
 WORKDIR /install-swiftshader
 
@@ -67,7 +68,6 @@ RUN echo "${SWIFTSHADER_COMMIT?}" > /swiftshader/git-commit
 FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61 AS final
 
 ######################## Python 3 ##############################################
-
 RUN apt-get update \
     && apt-get install -y \
         python3 \
@@ -75,7 +75,7 @@ RUN apt-get update \
     && python3 -m pip install --upgrade pip \
     && python3 -m pip install numpy
 
-##########################Vulkan SDK############################################
+######################## Vulkan SDK ############################################
 ARG VULKAN_SDK_VERSION=1.2.141
 
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
@@ -86,7 +86,7 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 RUN apt-get update \
   && apt-get install apt-transport-https
 
-# Note that this image is based on Ubuntu 16.04 (xenial) as opposed to 
+# Note that this image is based on Ubuntu 16.04 (xenial) as opposed to
 # Ubuntu 18.04 (bionic), which we use for our other images.
 RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
     | apt-key add - \
@@ -96,10 +96,7 @@ RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
   && apt-get update \
   && apt-get install -y vulkan-sdk
 
-################################################################################
-
-###########################Swiftshader##########################################
-
+######################## Swiftshader ###########################################
 COPY --from=install-swiftshader /swiftshader /swiftshader
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
@@ -121,5 +118,3 @@ RUN rm /usr/bin/python3 \
 # Install python3.6-dev
 RUN apt-get update \
   && apt-get install -y python3.6 python3.6-dev
-
-################################################################################
