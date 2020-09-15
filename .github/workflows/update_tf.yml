@@ -51,7 +51,7 @@ jobs:
             Updates TF to
             [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
             matching
-            [${{ env.TF_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.TF_SHA }})
+            [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }})
             and copies over the LLVM BUILD files.
 
             `./scripts/git/update_to_llvm_syncpoint.py`
