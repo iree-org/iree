@@ -33,30 +33,28 @@ set -e
 set -o pipefail
 
 export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
-TENSORFLOW_COMMIT="${1:-REMOTE}"
+TENSORFLOW_COMMIT="${1:-LATEST_MATCH}"
 PR_BRANCH="tf-submodule-update"
-BASE_BRANCH="${1:-google}"
+BASE_BRANCH="${BASE_BRANCH:-google}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
-TF_COMMIT_NICKNAME=""
 
 ./scripts/git/git_update.sh "${BASE_BRANCH?}"
 git checkout -B "${PR_BRANCH?}"
 
-CMD="./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true --tensorflow_commit=${TENSORFLOW_COMMIT?}"
+CMD="./scripts/git/update_to_llvm_syncpoint.py --tensorflow_commit=${TENSORFLOW_COMMIT?}"
 
 bash -c "${CMD?}"
 
 TF_SHA="$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
 
-if [[ -z "${TF_COMMIT_NICKNAME?}" && "${TENSORFLOW_COMMIT?}" == "REMOTE" ]]; then
-  TF_COMMIT_NICKNAME="current HEAD"
-fi
-TF_COMMIT_NICKNAME="${TF_COMMIT_NICKNAME:-${TF_SHA?}}"
+LLVM_SHA="$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)"
 
 TITLE="Integrate TF at tensorflow/tensorflow@${TF_SHA?}"
 BODY="$(cat <<-EOF
 Updates TF to
-[${TF_COMMIT_NICKNAME?}](https://github.com/tensorflow/tensorflow/commit/${TF_SHA?})
+[${TF_SHA?}](https://github.com/tensorflow/tensorflow/commit/${TF_SHA?})
+matching
+[${LLVM_SHA?}](https://github.com/llvm/llvm-project/commit/${LLVM_SHA?})
 and copies over the LLVM BUILD files.
 
 \`${CMD?}\`

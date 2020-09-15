@@ -15,20 +15,22 @@
 # limitations under the License.
 
 # pylint: disable=missing-docstring
-"""update_tf_llvm_submodules.
+"""Updates LLVM-dependent submodules based on the current LLVM commit.
 
-Updates the third_party/tensorflow and third_party/llvm-project submodules
-to new commits. We have special conditions around these submodules since
-upstream will only accept an llvm-project version that is sync'd with the
-corresponding version that tensorflow depends on. In addition, some BUILD
-files must be sync'd for the new version.
+Updates the third_party/tensorflow submodule to a new commit based on the commit
+in the third_party/llvm-project submodule. We have special conditions around
+these submodules since they are synced as part of the integration of LLVM into
+Google's source repository. See
+https://google.github.io/iree/developing-iree/repository-management#the-special-relationship-with-llvm-and-tensorflow.
+
+In addition we currently copy LLVM Bazel BUILD files from TensorFlow.
 
 Typical usage:
-  Syntax: ./scripts/git/update_tf_llvm_submodules.py
+  Syntax: ./scripts/git/update_to_llvm_syncpoint.py
 
-  By default, this will update the tensorflow submodule to remote HEAD and
-  update the llvm-project submodule to the corresponding version. It will
-  also sync BUILD file changes as needed and export the version metadata.
+  By default, this will update the TensorFlow submodule to the most recent
+  commit with an LLVM version that matches IREE's and over copy the LLVM
+  BUILD file changes as needed.
 """
 
 import argparse
@@ -39,35 +41,46 @@ import sys
 import submodule_versions
 import utils
 
+REMOTE_HEAD_COMMIT = "REMOTE"
+KEEP_COMMIT = "KEEP"
+INTEGRATE_COMMIT = "INTEGRATE"
+LATEST_MATCHING_COMMIT = "LATEST_MATCH"
+
+COMMIT_OPTIONS = [
+    REMOTE_HEAD_COMMIT, KEEP_COMMIT, INTEGRATE_COMMIT, LATEST_MATCHING_COMMIT
+]
+
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
-  parser.add_argument(
-      "--tensorflow",
-      help="Path to the tensorflow sources "
-      "(default to third_party/tensorflow)",
-      default=None)
-  parser.add_argument(
-      "--llvm",
-      help="Path to the LLVM sources "
-      "(defaults to third_party/llvm-project)",
-      default=None)
+  parser.add_argument("--tensorflow",
+                      help="Path to the tensorflow sources "
+                      "(default to third_party/tensorflow)",
+                      default=None)
+  parser.add_argument("--llvm",
+                      help="Path to the LLVM sources "
+                      "(defaults to third_party/llvm-project)",
+                      default=None)
   parser.add_argument(
       "--tensorflow_commit",
-      help="Update TensorFlow to this commit (or 'KEEP', 'REMOTE')",
-      default="REMOTE")
+      "--tf_commit",
+      help=
+      f"Update TensorFlow to this commit, or a named option: {COMMIT_OPTIONS}",
+      default=INTEGRATE_COMMIT)
   parser.add_argument(
-      "--llvm_commit",
-      help="Update LLVM to this commit (or 'KEEP', 'REMOTE', 'TENSORFLOW')",
-      default="TENSORFLOW")
-  parser.add_argument(
-      "--update_build_files",
-      help=("Updates the IREE LLVM build files from TensorFlow."
-            "Defaults to True iff llvm_commit==TENSORFLOW"),
+      "--validate",
+      help="Validate that the selected commits all match the LLVM commit",
       type=utils.str2bool,
       nargs="?",
-      default=None)
+      default=True,
+  )
+
+  parser.add_argument("--update_build_files",
+                      help="Updates the IREE LLVM build files from TensorFlow.",
+                      type=utils.str2bool,
+                      nargs="?",
+                      default=True)
   args = parser.parse_args()
 
   # Default repo path.
@@ -79,6 +92,7 @@ def parse_arguments():
     args.tensorflow = os.path.join(args.repo, "third_party", "tensorflow")
   if not args.llvm:
     args.llvm = os.path.join(args.repo, "third_party", "llvm-project")
+
   return args
 
 
@@ -95,32 +109,16 @@ def main(args):
         current_tensorflow_commit)
 
   # Update TensorFlow
-  if args.tensorflow_commit == "KEEP":
-    print("Not updating TensorFlow (--tensorflow_commit == 'KEEP')")
-  else:
-    print("\n*** Updating TensorFlow to", args.tensorflow_commit, "***")
-    update_submodule(args.tensorflow, args.tensorflow_commit)
-    stage_path(args.repo, "third_party/tensorflow")
+  new_tf_commit = find_new_tf_commit(args.tensorflow, current_llvm_commit,
+                                     args.tensorflow_commit)
+  print("\n*** Updating TensorFlow to", new_tf_commit, "***")
+  utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow)
 
-  # Update LLVM.
-  if args.llvm_commit == "TENSORFLOW":
-    args.llvm_commit = find_tensorflow_llvm_commit(args.tensorflow)
-    print("Found TensorFlow's LLVM commit:", args.llvm_commit)
-    if args.update_build_files is None:
-      print("Will update build files from TensorFlow",
-            "because --update_build_files not specified")
-      args.update_build_files = True
-  if args.llvm_commit == "KEEP":
-    print("Not updating LLVM (--llvm_commit == 'KEEP')")
-  else:
-    print("\n*** Updating LLVM to", args.llvm_commit, "***")
-    update_submodule(args.llvm, args.llvm_commit)
-    stage_path(args.repo, "third_party/llvm-project")
+  validate_tf_commit(current_llvm_commit,
+                     args.tensorflow,
+                     exit_on_failure=args.validate)
 
-  # Update build files.
-  if not args.update_build_files:
-    print("Not updating build files (--update_build_files not specified)")
-  else:
+  if args.update_build_files:
     print("\n*** Updating BUILD.bazel files ***")
     update_build_files_from_tensorflow(args.repo, args.tensorflow)
 
@@ -133,19 +131,59 @@ def get_commit(path, rev="HEAD"):
   return utils.execute(["git", "rev-parse", rev],
                        cwd=path,
                        silent=True,
-                       capture_output=True).decode("ISO-8859-1").strip()
+                       capture_output=True,
+                       universal_newlines=True).strip()
 
 
-def update_submodule(path, commit, tracking="origin/master"):
-  # Fetch.
-  utils.execute(["git", "fetch"], cwd=path)
-  # Determine commit.
-  if commit == "REMOTE":
-    commit = get_commit(path, rev=tracking)
-    print("Resolved remote commit:", commit)
+def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
+  utils.execute(["git", "fetch"], cwd=tensorflow_path)
 
-  # Rebase to commit (will fail if not fast-forward).
-  utils.execute(["git", "checkout", commit], cwd=path)
+  if tf_commit not in COMMIT_OPTIONS:
+    return get_commit(tensorflow_path, rev=tf_commit)
+
+  if tf_commit == KEEP_COMMIT:
+    return get_commit(tensorflow_path)
+
+  if tf_commit == REMOTE_HEAD_COMMIT:
+    return get_commit(tensorflow_path, "origin/master")
+
+  tf_integrate_commits = utils.execute([
+      "git", "log", "--first-parent", "--format=%H", "-S", llvm_commit,
+      "origin/master", "--", "tensorflow/workspace.bzl"
+  ],
+                                       capture_output=True,
+                                       universal_newlines=True,
+                                       cwd=tensorflow_path).split()
+  if len(tf_integrate_commits) > 2:
+    raise RuntimeError(
+        f"Expected one or two TF commits to involve LLVM commit {llvm_commit},"
+        f" but got {len(tf_integrate_commits)}")
+
+  if not tf_integrate_commits:
+    raise RuntimeError(
+        f"TF does not have any references to LLVM commit {llvm_commit}."
+        " Maybe TF export is behind?")
+
+  if tf_commit == INTEGRATE_COMMIT:
+    return tf_integrate_commits[-1]
+
+  assert tf_commit == LATEST_MATCHING_COMMIT
+  if len(tf_integrate_commits) == 1:
+    # There hasn't been a subsequent integrate, use remote head.
+    return get_commit(tensorflow_path, "origin/master")
+
+  return get_commit(tensorflow_path, rev=f"{tf_integrate_commits[0]}^")
+
+
+def validate_tf_commit(llvm_commit, tensorflow_path, exit_on_failure=True):
+  tf_llvm_commit = find_tensorflow_llvm_commit(tensorflow_path)
+
+  matches = tf_llvm_commit == llvm_commit
+  if not matches:
+    print("WARNING: LLVM commit in TF  does not match that in IREE"
+          f" ({tf_llvm_commit} vs {llvm_commit})")
+    if exit_on_failure:
+      sys.exit(1)
 
 
 def find_tensorflow_llvm_commit(tensorflow_path):
@@ -161,7 +199,7 @@ def find_tensorflow_llvm_commit(tensorflow_path):
       return m.group(1)
 
   print("ERROR: Could not find LLVM commit in %s." % workspace_path)
-  print("Request an explicit commit via --llvm_commit (and file a bug)")
+  print("Please file a bug)")
   print("Expected pattern match for:", pattern_text)
   sys.exit(1)
 
