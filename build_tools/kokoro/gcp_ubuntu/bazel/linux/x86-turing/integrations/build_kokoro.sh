@@ -26,6 +26,8 @@ export PS4='[$(date -u "+%T %Z")] '
 # Kokoro checks out the repository here.
 WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
 
+source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
+
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
