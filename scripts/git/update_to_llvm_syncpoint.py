@@ -206,7 +206,7 @@ def find_tensorflow_llvm_commit(tensorflow_path):
     if m:
       return m.group(1)
 
-  print("ERROR: Could not find LLVM commit in %s." % workspace_path)
+  print(f"ERROR: Could not find LLVM commit in {workspace_path}.")
   print("Please file a bug)")
   print("Expected pattern match for:", pattern_text)
   sys.exit(1)
@@ -230,7 +230,7 @@ def update_build_files_from_tensorflow(repo_path, tensorflow_path):
 
 
 def copy_text_file(repo_path, src_file, dst_file):
-  print("+ cp %s %s" % (src_file, dst_file))
+  print(f"+ cp {src_file} {dst_file}")
   with open(src_file, "r", encoding="UTF-8") as f:
     src_contents = f.read()
 
