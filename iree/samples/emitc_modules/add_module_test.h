@@ -19,93 +19,146 @@
 #include "iree/vm/stack.h"
 
 // This would be generated together with the functions in the header
-#include "iree/samples/emitc_modules/add_module.module"
+//#include "iree/samples/emitc_modules/add_module.module"
+
+// TODO(marbre/simon-camp): The implementations belong to the auto-generated
+// add_module.module. This should be removed as soon as the CModuleTarget is
+// fixed.
+#include "iree/compiler/Dialect/VM/Target/C/vm_c_funcs.h"
+iree_status_t add_module_add_1_impl(int32_t v1, int32_t v2, int32_t* out0) {
+  int32_t v3 = vm_add_i32(v1, v2);
+  int32_t v4 = vm_add_i32(v3, v3);
+  *out0 = v4;
+  return iree_ok_status();
+}
+iree_status_t add_module_add_call_impl(int32_t v1, int32_t* out0) {
+  int32_t v2 = vm_add_i32(v1, v1);
+  *out0 = v2;
+  return iree_ok_status();
+}
 
 struct add_module_s;
 struct add_module_state_s;
 typedef struct add_module_s add_module_t;
 typedef struct add_module_state_s add_module_state_t;
 
-static iree_status_t add_module_add_1(add_module_t* module,
-                                      add_module_state_t* state,
-                                      iree_vm_stack_t* stack,
-                                      const iree_vm_function_call_t* call,
-                                      iree_vm_execution_result_t* out_result) {
-  // TODO(benvanik): iree_vm_stack native frame enter/leave.
-  // By not enter/leaving a frame here we won't be able to set breakpoints or
-  // tracing on the function. Fine for now.
-  iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
-  const iree_vm_register_list_t* arg_list = call->argument_registers;
-  const iree_vm_register_list_t* ret_list = call->result_registers;
-  auto& regs = caller_frame->registers;
+typedef iree_status_t (*call_i32_i32_t)(iree_vm_stack_t* stack,
+                                        void* module_ptr, void* module_state,
+                                        int32_t arg0, int32_t* out_ret0);
 
-  // Load the input argument.
-  // This should really be generated code (like module_abi_cc.h).
-  int32_t arg0 = regs.i32[arg_list->registers[0] & regs.i32_mask];
-  int32_t arg1 = regs.i32[arg_list->registers[1] & regs.i32_mask];
+static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
+                                       const iree_vm_function_call_t* call,
+                                       call_i32_i32_t target_fn, void* module,
+                                       void* module_state,
+                                       iree_vm_execution_result_t* out_result) {
+  // We can use structs to allow compiler-controlled indexing optimizations,
+  // though this won't work for variadic cases.
+  // TODO(benvanik): packed attributes.
+  typedef struct {
+    int32_t arg0;
+  } args_t;
+  typedef struct {
+    int32_t ret0;
+  } results_t;
 
-  int32_t out;
+  const args_t* args = (const args_t*)call->arguments.data;
+  results_t* results = (results_t*)call->results.data;
 
-  add_module_add_1_impl(arg0, arg1, &out);
-
-  // Store the result.
-  regs.i32[ret_list->registers[0] & regs.i32_mask] = out;
-
-  return iree_ok_status();
+  // For simple cases like this (zero or 1 result) we can tail-call.
+  return target_fn(stack, module, module_state, args->arg0, &results->ret0);
 }
 
-static iree_status_t add_module_call_function(
-    add_module_t* module, add_module_state_t* state, iree_vm_stack_t* stack,
-    const iree_vm_function_call_t* call,
+typedef iree_status_t (*call_i32_i32_i32_t)(iree_vm_stack_t* stack,
+                                            void* module_ptr,
+                                            void* module_state, int32_t arg0,
+                                            int32_t arg1, int32_t* out_ret0);
+
+static iree_status_t call_shim_i32_i32_i32(
+    iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
+    call_i32_i32_i32_t target_fn, void* module, void* module_state,
     iree_vm_execution_result_t* out_result) {
-  // TODO(benvanik): iree_vm_stack native frame enter/leave.
-  // By not enter/leaving a frame here we won't be able to set breakpoints or
-  // tracing on the function. Fine for now.
-  iree_vm_stack_frame_t* caller_frame = iree_vm_stack_current_frame(stack);
-  const iree_vm_register_list_t* arg_list = call->argument_registers;
-  const iree_vm_register_list_t* ret_list = call->result_registers;
-  auto& regs = caller_frame->registers;
+  // We can use structs to allow compiler-controlled indexing optimizations,
+  // though this won't work for variadic cases.
+  // TODO(benvanik): packed attributes.
+  typedef struct {
+    int32_t arg0;
+    int32_t arg1;
+  } args_t;
+  typedef struct {
+    int32_t ret0;
+  } results_t;
 
-  // Load the input argument.
-  // This should really be generated code (like module_abi_cc.h).
-  int32_t arg0 = regs.i32[arg_list->registers[0] & regs.i32_mask];
+  const args_t* args = (const args_t*)call->arguments.data;
+  results_t* results = (results_t*)call->results.data;
 
-  int32_t out0;
+  // For simple cases like this (zero or 1 result) we can tail-call.
+  return target_fn(stack, module, module_state, args->arg0, args->arg1,
+                   &results->ret0);
+}
 
-  add_module_add_call_impl(arg0, &out0);
-
-  // Store the result.
-  regs.i32[ret_list->registers[0] & regs.i32_mask] = out0;
-
+static iree_status_t add_module_add_1(iree_vm_stack_t* stack,
+                                      add_module_t* module,
+                                      add_module_state_t* module_state,
+                                      int32_t arg0, int32_t arg1,
+                                      int32_t* out_ret0) {
+  //*out_ret0 = arg0 + arg1;
+  add_module_add_1_impl(arg0, arg1, out_ret0);
   return iree_ok_status();
 }
 
-typedef iree_status_t (*add_module_func_t)(
-    add_module_t* module, add_module_state_t* state, iree_vm_stack_t* stack,
-    const iree_vm_function_call_t* call,
-    iree_vm_execution_result_t* out_result);
-static const add_module_func_t add_module_funcs_[] = {
-    add_module_add_1,
-    add_module_call_function,
+static iree_status_t add_module_add_call(iree_vm_stack_t* stack,
+                                         add_module_t* module,
+                                         add_module_state_t* module_state,
+                                         int32_t arg0, int32_t* out_ret0) {
+  add_module_add_call_impl(arg0, out_ret0);
+  return iree_ok_status();
+}
+
+// TODO(marbre/simon-camp): Remove, this should be autogenerated.
+static const iree_vm_native_export_descriptor_t add_module_exports_[] = {
+    // At the moment the following failing code is auto-generated`:
+    //{iree_make_cstring_view("add_1"), 0, 0, 0, NULL},
+    //{iree_make_cstring_view("add_call"), 0, 0, 0, NULL},
+    // TODO(marbre/simon-camp): Fix CModuleTarget to generate this code:
+    {iree_make_cstring_view("add_1"), iree_make_cstring_view("0ii.i"), 0, NULL},
+    {iree_make_cstring_view("add_call"), iree_make_cstring_view("0i.i"), 0,
+     NULL},
+};
+
+static const iree_vm_native_function_ptr_t add_module_funcs_[] = {
+    {(iree_vm_native_function_shim_t)call_shim_i32_i32_i32,
+     (iree_vm_native_function_target_t)add_module_add_1},
+    {(iree_vm_native_function_shim_t)call_shim_i32_i32,
+     (iree_vm_native_function_target_t)add_module_add_call},
 };
 static_assert(IREE_ARRAYSIZE(add_module_funcs_) ==
                   IREE_ARRAYSIZE(add_module_exports_),
               "function pointer table must be 1:1 with exports");
 
-static iree_status_t IREE_API_PTR add_module_begin_call(
-    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
-    iree_vm_execution_result_t* out_result) {
-  // NOTE: we aren't using module state in this module.
-  return add_module_funcs_[call->function.ordinal](
-      /*module=*/NULL, /*module_state=*/NULL, stack, call, out_result);
-}
+// TODO(marbre/simon-camp): Remove. This is (already) autogenerated.
+static const iree_vm_native_import_descriptor_t add_module_imports_[] = {};
+
+// This code should be auto-generated. At the moment, function shims and target
+// function pointers are not generated, resulting in `add_module_funcs_
+// missing. Hence, the default begin_call cannot be used.
+// TODO(marbre/simon-camp): Fix the CModuleTarget to auto-generate and remove.
+static const iree_vm_native_module_descriptor_t add_module_descriptor_ = {
+    iree_make_cstring_view("add_module"),
+    IREE_ARRAYSIZE(add_module_imports_),
+    add_module_imports_,
+    IREE_ARRAYSIZE(add_module_exports_),
+    add_module_exports_,
+    IREE_ARRAYSIZE(add_module_funcs_),
+    add_module_funcs_,
+    0,
+    NULL,
+};
 
 static iree_status_t add_module_create(iree_allocator_t allocator,
                                        iree_vm_module_t** out_module) {
   // NOTE: this module has neither shared or per-context module state.
   iree_vm_module_t interface;
   IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
-  interface.begin_call = add_module_begin_call;
   return iree_vm_native_module_create(&interface, &add_module_descriptor_,
                                       allocator, out_module);
 }
