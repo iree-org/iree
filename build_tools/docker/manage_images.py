@@ -31,7 +31,8 @@ Push all `prod` images to GCR:
   python3 build_tools/docker/manage_images.py --push --tag prod --images all
 
 Rebuild and push all images and update references to them in the repository:
-  python3 build_tools/docker/manage_images.py --push --images all --update-references
+  python3 build_tools/docker/manage_images.py --push --images all
+  --update-references
 """
 
 import argparse
@@ -73,12 +74,13 @@ def parse_arguments():
   """Parses command-line options."""
   parser = argparse.ArgumentParser(
       description="Build IREE's Docker images and optionally push them to GCR.")
-  parser.add_argument('--images',
-                      '--image',
-                      type=str,
-                      required=True,
-                      action='append',
-                      help=f'Name of the image to build: {IMAGES_HELP}.')
+  parser.add_argument(
+      '--images',
+      '--image',
+      type=str,
+      required=True,
+      action='append',
+      help=f'Name of the image to build: {IMAGES_HELP}.')
   parser.add_argument(
       '--tag',
       type=str,
@@ -86,12 +88,14 @@ def parse_arguments():
       help='Tag for the images to build. Defaults to `latest` (which is good '
       'for testing changes in a PR). Use `prod` to update the images that the '
       'CI caches.')
-  parser.add_argument('--pull',
-                      action='store_true',
-                      help='Pull the specified image before building.')
-  parser.add_argument('--build',
-                      action='store_true',
-                      help='Build new images from the current Dockerfiles.')
+  parser.add_argument(
+      '--pull',
+      action='store_true',
+      help='Pull the specified image before building.')
+  parser.add_argument(
+      '--build',
+      action='store_true',
+      help='Build new images from the current Dockerfiles.')
   parser.add_argument(
       '--push',
       action='store_true',
@@ -146,11 +150,12 @@ def stream_command(command, dry_run=False):
   print(f'Running: `{" ".join(command)}`')
   if dry_run:
     return 0
-  process = subprocess.Popen(command,
-                             bufsize=1,
-                             stderr=subprocess.STDOUT,
-                             stdout=subprocess.PIPE,
-                             universal_newlines=True)
+  process = subprocess.Popen(
+      command,
+      bufsize=1,
+      stderr=subprocess.STDOUT,
+      stdout=subprocess.PIPE,
+      universal_newlines=True)
   for line in process.stdout:
     print(line, end='')
 
@@ -175,11 +180,12 @@ def get_repo_digest(image):
       '-f',
       '{{index .RepoDigests 0}}',
   ]
-  inspect_process = subprocess.run(inspect_command,
-                                   universal_newlines=True,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   timeout=10)
+  inspect_process = subprocess.run(
+      inspect_command,
+      universal_newlines=True,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      timeout=10)
   if inspect_process.returncode != 0:
     print(f'Computing the repository digest for {image} failed.'
           ' Has it been pushed to GCR?')
@@ -204,11 +210,12 @@ def update_references(image_name, digest, dry_run=False):
   print(f'Updating references to {image_name}')
 
   grep_command = ['git', 'grep', '-l', f'{image_name}@sha256']
-  grep_process = subprocess.run(grep_command,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                timeout=5,
-                                universal_newlines=True)
+  grep_process = subprocess.run(
+      grep_command,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      timeout=5,
+      universal_newlines=True)
   if grep_process.returncode > 1:
     print(f'{" ".join(grep_command)} '
           f'failed with exit code {grep_process.returncode}')
@@ -220,9 +227,10 @@ def update_references(image_name, digest, dry_run=False):
   files = grep_process.stdout.split()
   print(f'Updating references in {len(files)} files: {files}')
   for line in fileinput.input(files=files, inplace=(not dry_run)):
-    print(re.sub(f'{image_name}@sha256:[a-zA-Z0-9]+', f'{image_name}@{digest}',
-                 line),
-          end='')
+    print(
+        re.sub(f'{image_name}@sha256:[a-zA-Z0-9]+', f'{image_name}@{digest}',
+               line),
+        end='')
 
 
 if __name__ == '__main__':

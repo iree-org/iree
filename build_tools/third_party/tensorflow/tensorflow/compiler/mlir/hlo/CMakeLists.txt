@@ -85,6 +85,7 @@ external_cc_library(
     MLIRTransformUtils
     MLIRViewLikeInterface
     tensorflow_mlir_hlo_chlo_ops_gen
+    tensorflow_mlir_hlo_chlo_legalize_to_hlo_inc_gen
     tensorflow_mlir_hlo_hlo_ops_base_gen
     tensorflow_mlir_hlo_hlo_ops_gen
     tensorflow_mlir_hlo_hlo_ops_pattern_gen
@@ -238,4 +239,19 @@ external_tablegen_library(
     "lib/Dialect/mhlo/transforms/lower_complex_patterns.td"
   OUTS
     -gen-rewriters lib/Dialect/mhlo/transforms/generated_lower_complex.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_hlo_chlo_legalize_to_hlo_inc_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_HLO_SRC_ROOT}
+  SRCS
+    "lib/Dialect/mhlo/transforms/chlo_legalize_to_hlo_patterns.td"
+  OUTS
+    -gen-rewriters lib/Dialect/mhlo/transforms/generated_chlo_legalize_to_hlo.inc
 )
