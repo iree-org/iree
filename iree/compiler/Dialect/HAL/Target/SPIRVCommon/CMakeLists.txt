@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,29 +20,22 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    VulkanSPIRV
+    SPIRVCommon
   HDRS
-    "VulkanSPIRVTarget.h"
+    "SPIRVTarget.h"
   SRCS
-    "VulkanSPIRVTarget.cpp"
+    "SPIRVTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
-    MLIRGPU
     MLIRIR
-    MLIRLinalgOps
-    MLIRParser
     MLIRSPIRV
     MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
     MLIRSupport
-    MLIRVector
-    flatbuffers
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Target::SPIRVCommon
-    iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::Dialect::Vulkan::Utils
-    iree::schemas::spirv_executable_def_cc_fbs
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )
