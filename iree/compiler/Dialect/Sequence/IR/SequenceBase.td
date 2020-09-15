@@ -25,7 +25,7 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 def SEQUENCE_Dialect : Dialect {
   let name = "sequence";
-  let cppNamespace = "IREE::Sequence";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Sequence";
 
   let summary = [{
     A dialect designed to model iterable sequences.

@@ -1508,14 +1508,14 @@ void SemaphoreCreateOp::getAsmResultNames(
   setNameFn(result(), "semaphore");
 }
 
+}  // namespace HAL
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/HAL/IR/HALOps.cpp.inc"
-
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

@@ -21,7 +21,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def CUSTOM_Dialect : Dialect {
   let name = "custom";
-  let cppNamespace = "IREE::Custom";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Custom";
 
   let summary = [{
     A custom dialect demonstrating custom ops and implementations.

@@ -1087,15 +1087,15 @@ Optional<MutableOperandRange> CondBreakOp::getMutableSuccessorOperands(
   return destOperandsMutable();
 }
 
-//===----------------------------------------------------------------------===//
-// TableGen definitions (intentionally last)
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
-
 }  // namespace VM
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+//===----------------------------------------------------------------------===//
+// TableGen definitions (intentionally last)
+//===----------------------------------------------------------------------===//
+
+#include "iree/compiler/Dialect/VM/IR/VMOpEncoder.cpp.inc"
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"

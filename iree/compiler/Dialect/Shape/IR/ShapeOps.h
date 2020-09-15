@@ -35,11 +35,11 @@ namespace Shape {
 void populateFoldConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns);
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h.inc"
-
 }  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h.inc"
 
 #endif  // IREE_COMPILER_DIALECT_SHAPE_IR_SHAPEOPS_H_
