@@ -33,6 +33,7 @@
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser.h"
 

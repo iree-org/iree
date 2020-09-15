@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "Attributes.h"
     "CooperativeMatrixAnalysis.h"
+    "KernelDispatchUtils.h"
     "MarkerUtils.h"
     "MemorySpace.h"
     "Passes.h"
@@ -28,6 +29,9 @@ iree_cc_library(
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "CooperativeMatrixAnalysis.cpp"
+    "DeclareNumWorkgroupsFnPass.cpp"
+    "KernelDispatchUtils.cpp"
+    "LegalizeNumWorkgroupsFnPass.cpp"
     "LinalgTileAndFusePass.cpp"
     "MarkerUtils.cpp"
     "MatMulVectorizationTest.cpp"

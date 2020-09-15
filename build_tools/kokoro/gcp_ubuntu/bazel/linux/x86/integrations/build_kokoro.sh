@@ -32,7 +32,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/bazel-tensorflow:prod \
+  gcr.io/iree-oss/bazel-tensorflow@sha256:97045a41e101c7870112e59e39a94e0e3a6dbe376a5bb189cc85b9474bff75a0 \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

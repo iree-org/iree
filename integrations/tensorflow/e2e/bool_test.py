@@ -39,6 +39,7 @@ class MathModule(tf.Module):
 
 @tf_test_utils.compile_module(MathModule)
 class BooleanTest(tf_test_utils.TracedModuleTestCase):
+
   def test_constant(self):
 
     def constant(module):

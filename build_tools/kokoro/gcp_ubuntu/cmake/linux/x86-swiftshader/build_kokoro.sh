@@ -33,7 +33,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --env IREE_VULKAN_DISABLE=0 \
-  gcr.io/iree-oss/cmake-swiftshader:prod \
+  gcr.io/iree-oss/cmake-swiftshader@sha256:1912ed3a5f85c8d9abd0729834711905ef4ef03b381eb7f99d9fdb7867932d30 \
   build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

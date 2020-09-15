@@ -41,8 +41,8 @@ struct FuseWithHALInterfaceLoadTensor
         reshapeOp.src().getDefiningOp<IREE::HAL::InterfaceLoadTensorOp>();
     if (!loadOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceLoadTensorOp>(
-        reshapeOp, reshapeOp.getResultType(), loadOp.binding(),
-        loadOp.offset());
+        reshapeOp, reshapeOp.getResultType(), loadOp.offset(),
+        loadOp.getAttrs());
     return success();
   }
 };
@@ -55,8 +55,9 @@ struct FuseWithHALInterfaceStoreTensor
                                 PatternRewriter &rewriter) const override {
     auto reshapeOp = storeOp.operand().getDefiningOp<linalg::TensorReshapeOp>();
     if (!reshapeOp) return failure();
+    SmallVector<Value, 2> operands = {reshapeOp.src(), storeOp.offset()};
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceStoreTensorOp>(
-        storeOp, reshapeOp.src(), storeOp.binding(), storeOp.offset());
+        storeOp, ArrayRef<Type>(), operands, storeOp.getAttrs());
     return success();
   }
 };
