@@ -203,7 +203,6 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   //   * function wrappers
   //   * function table
   //   * interface functions
-  //      * begin_call
   //      * create
   //      * destroy
   //      * alloc_state
