@@ -14,9 +14,9 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
+#include "emitc/Target/Cpp.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "mlir/Pass/PassManager.h"
-#include "third_party/mlir-emitc/include/emitc/Target/Cpp.h"
 
 namespace mlir {
 namespace iree_compiler {
