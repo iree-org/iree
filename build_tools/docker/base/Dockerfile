@@ -23,7 +23,7 @@ RUN apt-get update \
   && apt-get install -y \
     # For updating IREE's submodules.
     git \
-    # core IREE dependencies.
+    # Core IREE dependencies.
     clang \
     libsdl2-dev \
     libssl-dev

@@ -66,7 +66,7 @@ RUN echo "${SWIFTSHADER_COMMIT?}" > /swiftshader/git-commit
 
 FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61 AS final
 
-#########################Python 3###############################################
+######################## Python 3 ##############################################
 
 RUN apt-get update \
     && apt-get install -y \
@@ -86,8 +86,8 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 RUN apt-get update \
   && apt-get install apt-transport-https
 
-# Note that this image is based on Ubuntu 16.04 as opposed to Ubuntu 18.04 for
-# our other images (xenial here instead of bionic).
+# Note that this image is based on Ubuntu 16.04 (xenial) as opposed to 
+# Ubuntu 18.04 (bionic), which we use for our other images.
 RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
     | apt-key add - \
   && wget -qO \
