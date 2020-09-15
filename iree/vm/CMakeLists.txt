@@ -440,3 +440,11 @@ iree_cc_library(
     iree::base::api
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    vm_c_funcs
+  HDRS
+    "vm_c_funcs.h"
+  PUBLIC
+)
