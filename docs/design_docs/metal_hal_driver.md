@@ -138,10 +138,10 @@ thread, which is put into sleep by waiting on the semaphore.
 
 At the moment the Metal HAL driver just has a very simple
 [`hal::Allocator`][hal-allocator] implementation. It just wraps a `MTLDevice`
-and redirects all allocation requests to the `MTLDevice`. No page/pool/slab
-or whatever. This is only meant to get started. In the future we should have
-a better memory allocation library, probably by layering the [Vulkan
-Memory Allocator][vma] on top of [`MTLHeap`][mtl-heap].
+and redirects all allocation requests to the `MTLDevice`. No page/pool/slab or
+whatever. This is only meant to get started. In the future we should have a
+better memory allocation library, probably by layering the
+[Vulkan Memory Allocator][vma] on top of [`MTLHeap`][mtl-heap].
 
 ### Buffer
 
@@ -154,32 +154,31 @@ IREE [`hal::Buffer`][hal-buffer] maps Metal `MTLBuffer`. See
 
 Metal provides four [`MTLStorageMode`][mtl-storage-mode] options:
 
-* `MTLStorageModeShared`: The resource is stored in system memory and is
-  accessible to both the CPU and the GPU.
-* `MTLStorageModeManaged`: The CPU and GPU may maintain separate copies of the
-  resource, and any changes must be explicitly synchronized.
-* `MTLStorageModePrivate`: The resource can be accessed only by the GPU.
-* `MTLStorageMemoryless`: The resource’s contents can be accessed only by the
-  GPU and only exist temporarily during a render pass.
+*   `MTLStorageModeShared`: The resource is stored in system memory and is
+    accessible to both the CPU and the GPU.
+*   `MTLStorageModeManaged`: The CPU and GPU may maintain separate copies of the
+    resource, and any changes must be explicitly synchronized.
+*   `MTLStorageModePrivate`: The resource can be accessed only by the GPU.
+*   `MTLStorageMemoryless`: The resource’s contents can be accessed only by the
+    GPU and only exist temporarily during a render pass.
 
 Among them, `MTLStorageModeManaged` is only available on macOS.
 
 IREE HAL defines serveral [`MemoryType`][hal-buffer]. They need to map to the
 above storage modes:
 
-* If `kDeviceLocal` but not `kHostVisible`, `MTLStorageModePrivate` is chosen.
-* If `kDeviceLocal` and `kHostVisible`:
-  * If macOS, `MTLStorageModeManaged` can be chosen.
-  * Otherwise, `MTLStorageModeShared` is chosen.
-* If not `DeviceLocal` but `kDeviceVisible`, `MTLStorageModeShared` is chosen.
-* If not `kDeviceLocal` and not `kDeviceVisible`, `MTLStorageModeShared` is
-  chosen. (TODO: We should probably use host buffer here.)
+*   If `kDeviceLocal` but not `kHostVisible`, `MTLStorageModePrivate` is chosen.
+*   If `kDeviceLocal` and `kHostVisible`:
+    *   If macOS, `MTLStorageModeManaged` can be chosen.
+    *   Otherwise, `MTLStorageModeShared` is chosen.
+*   If not `DeviceLocal` but `kDeviceVisible`, `MTLStorageModeShared` is chosen.
+*   If not `kDeviceLocal` and not `kDeviceVisible`, `MTLStorageModeShared` is
+    chosen. (TODO: We should probably use host buffer here.)
 
 IREE HAL also allows to create buffers with `kHostCoherent` bit. This may still
 be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 `kHostCoherent` protocol, the Metal HAL driver will perform necessary
 `InValidate`/`Flush` operations automatically under the hood.
-
 
 [macos-version-share]: https://gs.statcounter.com/macos-version-market-share/desktop/worldwide
 [ios-version-share]: https://developer.apple.com/support/app-store/
