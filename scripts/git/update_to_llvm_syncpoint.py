@@ -73,7 +73,7 @@ def parse_arguments():
       "--tf_commit",
       help=
       f"Update TensorFlow to this commit, or a named option: {COMMIT_OPTIONS}",
-      default=INTEGRATE_COMMIT)
+      default=LATEST_MATCHING_COMMIT)
   parser.add_argument(
       "--validate",
       help="Validate that the selected commits all match the LLVM commit",
