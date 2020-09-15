@@ -275,7 +275,7 @@ module attributes {
       %16 = dim %arg2, %c1 : memref<?x?xf32>
       %17 = affine.min #map1()[%1, %16]
       %18 = subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-      linalg.matmul {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"}
+      linalg.matmul {__internal_linalg_transform__ = "workgroup"}
         ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
        outs(%18 : memref<?x?xf32, #map3>)
     }
@@ -398,19 +398,19 @@ module attributes {
 //       CHECK:         %[[SV1:.+]] = subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
 //       CHECK:         %[[SV2:.+]] = subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
 //   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:         %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:         %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //   CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//   CHECK-DAG:         %[[NTHREADSZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//       CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.+}} step %[[NTHREADSZ]]
-//       CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
-//       CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
+//       CHECK:         %[[C1:.+]] = cmpi "slt", %[[TIDZ]], %{{.*}}
+//       CHECK:         %[[C2:.+]] = cmpi "slt", %[[TIDY]], %{{.*}}
+//       CHECK:         %[[C3:.+]] = and %[[C1]], %[[C2]]
+//       CHECK:         %[[C4:.+]] = cmpi "slt", %[[TIDX]], %{{.*}}
+//       CHECK:         %[[COND:.+]] = and %[[C3]], %[[C4]]
+//       CHECK:         scf.if %[[COND]]
+//       CHECK:           scf.for
+//       CHECK:             scf.for
 //       CHECK:               scf.for
 //       CHECK:                 scf.for
-//       CHECK:                   scf.for
-//       CHECK:                     scf.for
-//   CHECK-NOT:                       linalg.conv
+//   CHECK-NOT:                   linalg.conv
 
 // -----
 
@@ -492,11 +492,11 @@ module attributes {
 //       CHECK:       %[[SV1:.+]] = subview %[[ARG0]][%[[IV3]], %[[IV4]]]
 //       CHECK:       %[[SV2:.+]] = subview %[[RET0]][%[[IV3]], %[[IV4]]]
 //   CHECK-DAG:       %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:       %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:       %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:       %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//       CHECK:       scf.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
-//       CHECK:         scf.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
+//       CHECK:       %[[C1:.+]] = cmpi "slt", %[[TIDY]], %{{.*}}
+//       CHECK:       %[[C2:.+]] = cmpi "slt", %[[TIDX]], %{{.*}}
+//       CHECK:       %[[COND:.+]] = and %[[C1]], %[[C2]]
+//       CHECK:       scf.if %[[COND]]
+//       CHECK:         scf.for
 //       CHECK:           scf.for
-//       CHECK:             scf.for
-//   CHECK-NOT:               linalg.pooling_max
+//   CHECK-NOT:             linalg.pooling_max

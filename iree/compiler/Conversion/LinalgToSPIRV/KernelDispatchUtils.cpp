@@ -136,8 +136,10 @@ LogicalResult createNumWorkgroupsFromResultShape(PatternRewriter &rewriter,
   SmallVector<Value, 3> returnValues(3, one);
   for (size_t i = 0, e = std::min<size_t>(parallelLoopRange->size(), 3); i != e;
        ++i) {
-    returnValues[i] = buildCeilDivConstDenominator(
-        rewriter, loc, (*parallelLoopRange)[e - i - 1], tileSizes[e - i - 1]);
+    if (tileSizes[e - i - 1] != 0) {
+      returnValues[i] = buildCeilDivConstDenominator(
+          rewriter, loc, (*parallelLoopRange)[e - i - 1], tileSizes[e - i - 1]);
+    }
   }
   rewriter.create<mlir::ReturnOp>(loc, returnValues);
   return success();
@@ -345,16 +347,24 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
   return success();
 }
 
+template <typename PoolingOpTy>
 static LogicalResult getPoolingOpLaunchConfig(
-    const SPIRVCodegenOptions &options,
+    PoolingOpTy op, const SPIRVCodegenOptions &options,
     spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
     std::array<int64_t, 3> &workgroupSize,
     std::array<int64_t, 3> &numSubgroups) {
   unsigned maxWorkgroupSize =
       resourceLimits.max_compute_workgroup_invocations().getInt();
+  // Pooling op seems to be rank polymorphic but is not well specified enough to
+  // be able to figure out which dimensions of the output correspond to the
+  // pooled dimension and which are not. Need to fix that, but for now just use
+  // a working heuristic.
+  SmallVector<int64_t, 4> ts(std::min<int64_t>(
+      op.output().getType().template cast<ShapedType>().getRank(), 3));
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
-  SmallVector<int64_t, 4> ts = {tileSizeY, tileSizeX};
+  ts[ts.size() - 2] = tileSizeY;
+  ts[ts.size() - 1] = tileSizeX;
   tileSizes.emplace_back(std::move(ts));
   workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
@@ -367,7 +377,7 @@ static LogicalResult getPoolingOpLaunchConfig(
       spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes, \
       std::array<int64_t, 3> &workgroupSize,                                  \
       std::array<int64_t, 3> &numSubgroups) {                                 \
-    return getPoolingOpLaunchConfig(options, resourceLimits, tileSizes,       \
+    return getPoolingOpLaunchConfig(op, options, resourceLimits, tileSizes,   \
                                     workgroupSize, numSubgroups);             \
   }
 

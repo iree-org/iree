@@ -30,17 +30,12 @@ namespace mlir {
 class Operation;
 namespace iree_compiler {
 
-/// Marker to denote that a linalg operation is to be partitioned to
-/// workitems. No assumption can be made about the number of woritems in the
-/// workgroup and number of iterations, i.e. a cyclic distribution is required.
+/// Marker to denote that a linalg operation has been partitioned to workgroups.
 StringRef getWorkgroupMarker();
-StringRef getWorkgroupMemoryMarker();
 
-/// Marker to denote that a linalg operation is to be partitioned to workitems
-/// with the assumption that the number of workitems in the workgroup is greater
-/// than equal to the number of iterations.
-StringRef getWorkgroupNumItemsGENumItersMarker();
-StringRef getWorkgroupMemoryNumItemsGENumItersMarker();
+/// Marker to denote that a linalg operation has been partitioned to workgroups
+/// and operands promoted to scratchspace memory.
+StringRef getWorkgroupMemoryMarker();
 
 /// Marker for copy operations that are moving data from StorageClass to
 /// Workgroup memory.
