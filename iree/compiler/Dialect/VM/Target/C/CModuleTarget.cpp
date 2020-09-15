@@ -152,6 +152,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 
   // exports
   std::string exportName = moduleName + "_exports_";
+  // TODO(marbre/simon-camp): Fix generating the calling_convention.
+  /*
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
   for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
@@ -161,6 +163,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   }
   output << "};\n";
   output << "\n";
+  */
 
   // imports
   std::string importName = moduleName + "_imports_";
@@ -176,7 +179,9 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string functionName = moduleName + "_funcs_";
 
   // module descriptor
-  // TODO(simon-camp) support module-level reflection attributes
+  // TODO(simon-camp): support module-level reflection attributes
+  // TODO(marbre/simon-camp): Renable after fix generating the export descriptor
+  /*
   std::string descriptorName = moduleName + "_descriptor_";
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
@@ -190,6 +195,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "0,\n"
          << "NULL,\n"
          << "};\n";
+  */
 
   // TODO(simon-camp) generate boilerplate code
   //   * module struct
