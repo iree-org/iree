@@ -31,6 +31,7 @@
 
 set -e
 set -o pipefail
+set -x
 
 export UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 TENSORFLOW_COMMIT="${1:-LATEST_MATCH}"
