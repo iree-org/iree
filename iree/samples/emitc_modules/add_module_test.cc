@@ -124,7 +124,7 @@ class VMAddModuleTest : public ::testing::Test {
 TEST_F(VMAddModuleTest, AddTest) {
   IREE_ASSERT_OK_AND_ASSIGN(
       int32_t v,
-      RunFunction(iree_make_cstring_view("add_module.add_1"), 17, 42));
+      RunFunction(iree_make_cstring_view("add_module.add"), 17, 42));
   ASSERT_EQ(v, 118);
 }
 
