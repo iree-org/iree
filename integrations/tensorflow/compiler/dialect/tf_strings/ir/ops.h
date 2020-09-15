@@ -29,16 +29,8 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace tf_strings {
-
 #define GET_OP_CLASSES
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.h.inc"
 #undef GET_OP_CLASSES
-
-}  // namespace tf_strings
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_OPS_H_

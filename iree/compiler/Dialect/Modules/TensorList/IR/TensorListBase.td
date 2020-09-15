@@ -19,7 +19,7 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 def TensorList_Dialect : Dialect {
   let name = "tensorlist";
-  let cppNamespace = "IREE::TensorList";
+  let cppNamespace = "::mlir::iree_compiler::IREE::TensorList";
 
   let summary = [{
     A dialect for implementing TensorFlow's TensorList data structure.

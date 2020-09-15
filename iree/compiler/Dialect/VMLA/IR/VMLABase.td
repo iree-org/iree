@@ -24,7 +24,7 @@ include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 
 def VMLA_Dialect : Dialect {
   let name = "vmla";
-  let cppNamespace = "IREE::VMLA";
+  let cppNamespace = "::mlir::iree_compiler::IREE::VMLA";
 
   let summary = [{
     A dialect representing operations against the IREE VM-based backend.

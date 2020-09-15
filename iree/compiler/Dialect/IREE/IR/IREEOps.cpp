@@ -150,9 +150,9 @@ void UnfoldableConstantOp::getCanonicalizationPatterns(
   results.insert<ExpandUnfoldableConstantOp>(context);
 }
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
-
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"

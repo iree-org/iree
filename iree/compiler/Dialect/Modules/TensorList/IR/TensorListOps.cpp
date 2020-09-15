@@ -16,15 +16,5 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace TensorList {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.cpp.inc"
-
-}  // namespace TensorList
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

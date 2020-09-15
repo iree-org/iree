@@ -49,10 +49,10 @@ void ExpectAlmostEqConstOp::getCanonicalizationPatterns(
           context);
 }
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.cpp.inc"
-
 }  // namespace Check
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.cpp.inc"

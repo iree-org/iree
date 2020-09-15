@@ -721,14 +721,14 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
                           /*elidedAttrs=*/{});
 }
 
+}  // namespace Flow
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"
-
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

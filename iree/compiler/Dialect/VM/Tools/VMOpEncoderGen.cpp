@@ -48,12 +48,13 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
     if (encodingExprs.empty()) continue;
 
     Operator op(def);
+    Operator::NamespaceEmitter emitter(os, op);
     os << formatv(
         "LogicalResult {0}::encode(SymbolTable &syms, VMFuncEncoder &e) {{\n",
-        op.getQualCppClassName());
+        op.getCppClassName());
 
     for (auto &pair : prefixOpcodes) {
-      std::string traitName = (StringRef("OpTrait::IREE::VM::") +
+      std::string traitName = (StringRef("::mlir::OpTrait::IREE::VM::") +
                                pair.first.substr(strlen("Prefix")))
                                   .str();
       if (op.getTrait(traitName)) {

@@ -20,7 +20,7 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 
 def CHECK_Dialect : Dialect {
   let name = "check";
-  let cppNamespace = "IREE::Check";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Check";
   let summary = [{
     A dialect implementing test assertions for IREE modules.
   }];
