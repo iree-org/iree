@@ -103,8 +103,8 @@ template <typename T, int N>
 typename std::enable_if<(N == 0), StridedMemRefType<T, 0> *>::type
 makeStridedMemRefDescriptor(void *ptr, void *alignedPtr,
                             const std::array<int64_t, N> &shape = {},
-                            AllocFunType allocFun = &::malloc,
-                            const std::array<int64_t, N> &shapeAlloc = {}) {
+                            const std::array<int64_t, N> &shapeAlloc = {},
+                            AllocFunType allocFun = &::malloc) {
   StridedMemRefType<T, 0> *descriptor = static_cast<StridedMemRefType<T, 0> *>(
       allocFun(sizeof(StridedMemRefType<T, 0>)));
   descriptor->basePtr = static_cast<T *>(ptr);
@@ -149,8 +149,8 @@ template <typename T, int N>
   ::UnrankedMemRefType<T> *res = static_cast<::UnrankedMemRefType<T> *>(
       allocFun(sizeof(::UnrankedMemRefType<T>)));
   res->rank = N;
-  res->descriptor =
-      makeStridedMemRefDescriptor<T, N>(data, alignedData, shape, allocFun);
+  res->descriptor = makeStridedMemRefDescriptor<T, N>(data, alignedData, shape,
+                                                      shape, allocFun);
   return res;
 }
 
