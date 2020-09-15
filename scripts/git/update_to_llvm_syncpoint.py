@@ -113,6 +113,7 @@ def main(args):
                                      args.tensorflow_commit)
   print("\n*** Updating TensorFlow to", new_tf_commit, "***")
   utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow)
+  stage_path(args.repo, args.tensorflow)
 
   validate_tf_commit(current_llvm_commit,
                      args.tensorflow,
