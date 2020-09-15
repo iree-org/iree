@@ -154,13 +154,33 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
   if tf_commit == REMOTE_HEAD_COMMIT:
     return get_commit(tensorflow_path, "origin/master")
 
-  tf_integrate_commits = utils.execute([
-      "git", "log", "--first-parent", "--format=%H", "-S", llvm_commit,
-      "origin/master", "--", "tensorflow/workspace.bzl"
-  ],
-                                       capture_output=True,
-                                       universal_newlines=True,
-                                       cwd=tensorflow_path).split()
+  # Find commits where the number of occurences of the given LLVM commit hash
+  # changes. In normal cases, there should be at most two commits that match
+  # this:
+  # 1. The commit that first introduced the new hash in the TF workspace file.
+  # 2. The commit that changed it to a new hash afterwards.
+  tf_integrate_commits = utils.execute(
+      [
+          "git",
+          "log",
+          # Only follow the first parent of a merge commit. We don't want to go off
+          # to some random PR.
+          "--first-parent",
+          # Just print the commit hash
+          "--format=%H",
+          # Look for commits where the number of occurences of llvm_commit changed.
+          # https://git-scm.com/docs/git-log#Documentation/git-log.txt--Sltstringgt
+          "-S",
+          llvm_commit,
+          # Search along the master branch
+          "origin/master",
+          # Only look in the TF workspace file where the llvm_commit is recorded
+          "--",
+          "tensorflow/workspace.bzl"
+      ],
+      capture_output=True,
+      universal_newlines=True,
+      cwd=tensorflow_path).split()
   if len(tf_integrate_commits) > 2:
     raise RuntimeError(
         f"Expected one or two TF commits to involve LLVM commit {llvm_commit},"
@@ -179,6 +199,7 @@ def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
     # There hasn't been a subsequent integrate, use remote head.
     return get_commit(tensorflow_path, "origin/master")
 
+  # Use the commit one before the one that changed away from this LLVM version.
   return get_commit(tensorflow_path, rev=f"{tf_integrate_commits[0]}^")
 
 
@@ -243,6 +264,7 @@ def copy_text_file(repo_path, src_file, dst_file):
 def stage_path(repo_path, to_stage):
   # TODO(laurenzo): Move to utils.py.
   utils.execute(["git", "add", to_stage], cwd=repo_path)
+
 
 if __name__ == "__main__":
   main(parse_arguments())
