@@ -39,7 +39,7 @@ PR_BRANCH="tf-submodule-update"
 BASE_BRANCH="${BASE_BRANCH:-google}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 
-./scripts/git/git_update.sh "${BASE_BRANCH?}"
+# ./scripts/git/git_update.sh "${BASE_BRANCH?}"
 git checkout -B "${PR_BRANCH?}"
 
 CMD="./scripts/git/update_to_llvm_syncpoint.py --tensorflow_commit=${TENSORFLOW_COMMIT?}"
