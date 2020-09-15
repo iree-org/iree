@@ -39,8 +39,8 @@ if(${IREE_ENABLE_EMITC})
       iree::vm::native_module
       iree::vm::ref
       iree::vm::stack
+      iree::vm::vm_c_funcs
       iree::base::api
-      iree::compiler::Dialect::VM::Target::C::VMCFuncs
       ::add_module_cc
   PUBLIC
   )
