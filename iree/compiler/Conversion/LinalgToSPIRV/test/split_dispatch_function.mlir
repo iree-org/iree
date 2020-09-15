@@ -23,7 +23,7 @@ module {
   // CHECK:   linalg.fill(%[[TS]], %[[ZERO]])
   // CHECK:   return
 
-  func @kernel() {
+  func @kernel() attributes {vkspv.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %dim = hal.interface.load.constant offset = 0 : index
     %shape1 = shapex.make_ranked_shape %dim : (index) -> !shapex.ranked_shape<[?,2,2,512]>
@@ -37,6 +37,11 @@ module {
     linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
     return
   }
+  func @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
+                                 !shapex.ranked_shape<[3,3,512,1]>,
+                                 !shapex.ranked_shape<[?,1,1,512]>)
+                                 -> (index, index, index)
+  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -48,35 +53,44 @@ module {
 
 // CHECK: module attributes {vkspv.entry_point_schedule = ["kernel_dispatch_0", "kernel_dispatch_1", "kernel_dispatch_2"]}
 module {
-  // CHECK: func @kernel_dispatch_2()
-  // CHECK:   %[[DIM:.+]] = hal.interface.load.constant
-  // CHECK:   %[[SHAPE1:.+]] = shapex.make_ranked_shape %[[DIM]]
-  // CHECK:   %[[SHAPE2:.+]] = shapex.make_ranked_shape %[[DIM]]
-  // CHECK:   %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
-  // CHECK:   %[[TS1:.+]] = shapex.tie_shape %[[IN1]], %[[SHAPE1]]
-  // CHECK:   %[[IN2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
-  // CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
-  // CHECK:   %[[TS2:.+]] = shapex.tie_shape %[[OUT]], %[[SHAPE2]]
-  // CHECK:   linalg.conv(%[[IN2]], %[[TS1]], %[[TS2]])
-  // CHECK:   return
+//      CHECK: func @kernel_dispatch_2()
+// CHECK-SAME: {vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN2:.+]]}
+//      CHECK:   %[[DIM:.+]] = hal.interface.load.constant
+//      CHECK:   %[[SHAPE1:.+]] = shapex.make_ranked_shape %[[DIM]]
+//      CHECK:   %[[SHAPE2:.+]] = shapex.make_ranked_shape %[[DIM]]
+//      CHECK:   %[[IN1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<?x2x2x512xf32>
+//      CHECK:   %[[TS1:.+]] = shapex.tie_shape %[[IN1]], %[[SHAPE1]]
+//      CHECK:   %[[IN2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
+//      CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
+//      CHECK:   %[[TS2:.+]] = shapex.tie_shape %[[OUT]], %[[SHAPE2]]
+//      CHECK:   linalg.conv(%[[IN2]], %[[TS1]], %[[TS2]])
+//      CHECK:   return
 
-  // CHECK: func @kernel_dispatch_1() {
-  // CHECK:   %[[C0:.+]] = constant 0 : index
-  // CHECK:   %[[C1:.+]] = constant 1 : index
-  // CHECK:   scf.parallel (%{{.*}}) = (%[[C0]]) to (%[[C1]]) step (%[[C1]])
-  // CHECK:     scf.yield
-  // CHECK:   return
+//      CHECK: func @[[NUM_WORKGROUPS_FN2]]
 
-  // CHECK: func @kernel_dispatch_0()
-  // CHECK:   %[[ZERO:.+]] = constant
-  // CHECK:   %[[DIM:.+]] = hal.interface.load.constant
-  // CHECK:   %[[SHAPE:.+]] = shapex.make_ranked_shape %[[DIM]]
-  // CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
-  // CHECK:   %[[TS:.+]] = shapex.tie_shape %[[OUT]], %[[SHAPE]]
-  // CHECK:   linalg.fill(%[[TS]], %[[ZERO]])
-  // CHECK:   return
+//      CHECK: func @kernel_dispatch_1()
+// CHECK-SAME: {vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN1:.+]]}
+//      CHECK:   %[[C0:.+]] = constant 0 : index
+//      CHECK:   %[[C1:.+]] = constant 1 : index
+//      CHECK:   scf.parallel (%{{.*}}) = (%[[C0]]) to (%[[C1]]) step (%[[C1]])
+//      CHECK:     scf.yield
+//      CHECK:   return
 
-  func @kernel() {
+//      CHECK: func @[[NUM_WORKGROUPS_FN1]]
+
+//      CHECK: func @kernel_dispatch_0()
+// CHECK-SAME: {vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN0:.+]]}
+//      CHECK:   %[[ZERO:.+]] = constant
+//      CHECK:   %[[DIM:.+]] = hal.interface.load.constant
+//      CHECK:   %[[SHAPE:.+]] = shapex.make_ranked_shape %[[DIM]]
+//      CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<?x1x1x512xf32>
+//      CHECK:   %[[TS:.+]] = shapex.tie_shape %[[OUT]], %[[SHAPE]]
+//      CHECK:   linalg.fill(%[[TS]], %[[ZERO]])
+//      CHECK:   return
+
+//      CHECK: func @[[NUM_WORKGROUPS_FN0]]
+
+  func @kernel() attributes {vkspv.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -95,6 +109,11 @@ module {
     linalg.conv(%1, %ts1, %ts2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<?x2x2x512xf32>, memref<?x1x1x512xf32>
     return
   }
+  func @kernel__num_workgroups__(!shapex.ranked_shape<[?,2,2,512]>,
+                                 !shapex.ranked_shape<[3,3,512,1]>,
+                                 !shapex.ranked_shape<[?,1,1,512]>)
+                                 -> (index, index, index)
+  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -110,7 +129,7 @@ module {
 // CHECK-NOT: vkspv.entry_point_schedule
 module {
   // CHECK-LABEL: @kernel()
-  func @kernel() {
+  func @kernel() attributes {vkspv.num_workgroups_fn = @kernel__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x2x2x512xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<3x3x512x1xf32>
@@ -118,6 +137,8 @@ module {
     linalg.conv(%1, %0, %2) {dilations = [1, 1], padding = dense<[[0, 1], [0, 1]]> : tensor<2x2xi64>, strides = [2, 2]} : memref<3x3x512x1xf32>, memref<1x2x2x512xf32>, memref<1x1x1x512xf32>
     return
   }
+  // CHECK-LABEL: @kernel__num_workgroups__
+  func @kernel__num_workgroups__(!shapex.ranked_shape<[1,2,2,512]>, !shapex.ranked_shape<[3,3,1,512]>, !shapex.ranked_shape<[1,1,1,512]>) -> (index, index, index) attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -153,7 +174,8 @@ module {
 #map0 = affine_map<(d0, d1) -> (d0 * 12 + d1 + 53)>
 
 module {
-  func @subview_interleaved() {
+  func @subview_interleaved()
+  attributes {vkspv.num_workgroups_fn = @subview_interleaved__num_workgroups__} {
     %cst = constant 0.000000e+00 : f32
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
@@ -162,6 +184,10 @@ module {
     linalg.copy(%1, %2) : memref<12x4xf32>, memref<18x12xf32, #map0>
     return
   }
+  func @subview_interleaved__num_workgroups__(!shapex.ranked_shape<[12,4]>,
+                                              !shapex.ranked_shape<[18,12]>)
+                                              -> (index, index, index)
+  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
@@ -191,7 +217,8 @@ module {
 #map2 = affine_map<(d0, d1, d2) -> (d2)>
 
 module {
-  func @reshape_interleaved() {
+  func @reshape_interleaved()
+  attributes {vkspv.num_workgroups_fn = @reshape_interleaved__num_workgroups__} {
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<1x2x4xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
@@ -206,6 +233,11 @@ module {
     linalg.copy(%3, %1) : memref<1x2x4xf32>, memref<1x2x4xf32>
     return
   }
+  func @reshape_interleaved__num_workgroups__(!shapex.ranked_shape<[2,4]>,
+                                              !shapex.ranked_shape<[2,4]>,
+                                              !shapex.ranked_shape<[1,2,4]>)
+                                              -> (index, index, index)
+  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -233,7 +265,8 @@ module {
 // -----
 
 module {
-  func @predict_ex_dispatch_0() {
+  func @predict_ex_dispatch_0()
+  attributes {vkspv.num_workgroups_fn = @predict_ex_dispatch_0__num_workgroups__} {
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1x512x1xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<4x8x16xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x512x1xf32>
@@ -248,6 +281,12 @@ module {
     }: memref<4x8x16xf32>, memref<4x8x16xf32>
     return
   }
+  func @predict_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[1,512,1]>,
+                                                !shapex.ranked_shape<[4,8,16]>,
+                                                !shapex.ranked_shape<[1,512,1]>,
+                                                !shapex.ranked_shape<[4,8,16]>)
+                                                -> (index, index, index)
+  attributes {sym_visibility = "private"}
   hal.interface @legacy_io attributes {push_constants = 1 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"

@@ -41,6 +41,7 @@ cc_library(
         "//iree/compiler/Conversion/LinalgToSPIRV",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
+        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Dialect/Vulkan/Utils",
         "//iree/schemas:spirv_executable_def_cc_fbs",

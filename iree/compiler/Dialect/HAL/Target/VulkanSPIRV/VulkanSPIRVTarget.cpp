@@ -21,6 +21,7 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
@@ -37,6 +38,7 @@
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Matchers.h"
@@ -127,105 +129,61 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
       ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
 }
 
-/// Generates IR to compute the ceil(`numerator`, `denominator`).
-static Value computeCeilDiv(Location loc, Value one, Value numerator,
-                            Value denominator, OpBuilder &builder) {
-  Value dm1 = builder.create<SubIOp>(loc, denominator, one);
-  return builder.create<SignedDivIOp>(
-      loc, builder.create<AddIOp>(loc, numerator, dm1), denominator);
-}
-
-/// Calculates the number of workgroups to use based on the shape of the result
-/// of the dispatch region.  If the `resultShape` is {s0, s1, s2, s3, ....} and
-/// `workgroupSize` is {wx, wy, wz}, the number of workgroups is {ceil(s0/wz),
-/// ceil(s1/wy), ceil(s2/wx)}
-static std::array<Value, 3> calculateDispatchWorkgroupCountFromResultShape(
-    Location loc, ArrayRef<Value> resultShape,
-    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
-  if (resultShape.size() > 3) resultShape = resultShape.take_front(3);
-  SmallVector<Value, 4> reverseResultSize(reverse(resultShape));
-  Value one = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
-  reverseResultSize.resize(3, one);
-  return {
-      computeCeilDiv(loc, one, reverseResultSize[0], workgroupSize[0], builder),
-      computeCeilDiv(loc, one, reverseResultSize[1], workgroupSize[1], builder),
-      computeCeilDiv(loc, one, reverseResultSize[2], workgroupSize[2],
-                     builder)};
-}
-
-/// Calculates the number of workgroups to use based on the linearized shape of
-/// the result of the dispatch region. The `workgroupSize` is assumed to be of
-/// the form {wx, 1, 1}.  If the `resultShape` is {s0, s1, s2, ... sn}, then the
-/// number of workgroups is {ceil(s0*s1*s2*...*sn, wx)}
-static std::array<Value, 3>
-calculateDispatchWorkgroupCountFromLinearizedResultShape(
-    Location loc, ArrayRef<Value> resultShape,
-    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
-  if (!mlir::matchPattern(workgroupSize[1], m_One()) ||
-      !mlir::matchPattern(workgroupSize[2], m_One())) {
-    emitError(loc,
-              "invalid workgroup size when computing workgroup count "
-              "based linearized result shape");
-    return {nullptr, nullptr, nullptr};
+/// The codegeneration emits a function `numWorkgroupsFn` for each entry point
+/// function. This function has arguments the !shapex.ranked_shape for all the
+/// input and output shaped types. Using this the function returns the number of
+/// workgroups to use. To use this function on the host side, generate the
+/// !shapex.ranked_shape values that describe the shape of the inputs and
+/// outputs of the dispatch region and "inline" the function body.
+static std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
+    Location loc, FuncOp numWorkgroupsFn, IREE::HAL::InterfaceOp interface,
+    ArrayRef<Optional<TensorRewriteAdaptor>> operands,
+    ArrayRef<Optional<TensorRewriteAdaptor>> results, OpBuilder &builder) {
+  std::array<Value, 3> returnValue = {nullptr, nullptr, nullptr};
+  // TODO: This is really just inlining a function. For now assume that the
+  // `numWorkgroupsFn` has a single block to make inlining easier.
+  if (!numWorkgroupsFn || !llvm::hasSingleElement(numWorkgroupsFn))
+    return returnValue;
+  SmallVector<SmallVector<Value, 4>, 4> shapeValues;
+  shapeValues.reserve(operands.size() + results.size());
+  auto getShapeValuesFn =
+      [&](ArrayRef<Optional<TensorRewriteAdaptor>> values) -> LogicalResult {
+    for (auto val : values) {
+      if (!val) continue;
+      Optional<SmallVector<Value, 4>> shape = val->getShapeDims(builder);
+      if (!shape) return emitError(loc, "shape computation for operand failed");
+      shapeValues.push_back(shape.getValue());
+    }
+    return success();
+  };
+  if (failed(getShapeValuesFn(operands)) || failed(getShapeValuesFn(results)))
+    return returnValue;
+  BlockAndValueMapping mapper;
+  for (Operation &op : numWorkgroupsFn.front()) {
+    if (isa<mlir::ReturnOp>(op)) {
+      for (unsigned i = 0, e = std::min<unsigned>(3, op.getNumOperands());
+           i != e; ++i) {
+        returnValue[i] = mapper.lookupOrNull(op.getOperand(i));
+      }
+      break;
+    }
+    if (auto shapeOp = dyn_cast<Shape::RankedDimOp>(op)) {
+      if (BlockArgument arg = shapeOp.shape().dyn_cast<BlockArgument>()) {
+        auto &dimValues = shapeValues[arg.getArgNumber()];
+        mapper.map(arg, dimValues[shapeOp.getIndex()]);
+        continue;
+      }
+      return returnValue;
+    }
+    // If all its operands are mapped, clone it.
+    if (llvm::all_of(op.getOperands(), [&mapper](Value operand) {
+          return mapper.contains(operand);
+        })) {
+      builder.clone(op, mapper);
+      continue;
+    }
   }
-  Value one = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
-  Value linearizedSize = one;
-  for (Value dim : resultShape)
-    linearizedSize = builder.create<MulIOp>(loc, linearizedSize, dim);
-  return {computeCeilDiv(loc, one, linearizedSize, workgroupSize[0], builder),
-          one, one};
-}
-
-/// Calculates the number of workgroups to use for a dispatch region based on
-/// the value of `workgroupCountMethodAttr`. This is obtained from an attribute
-/// specified on the entry point functions that is added while lowering to
-/// SPIR-V.
-// TODO(ravishankarm): This method of using enums to specify methodology to
-// compute workgroup count is very hard to maintain. The best approach would be
-// that the lowering generates a function that is "inlined" here. Need to figure
-// out the signature of that function so that it covers all use cases.
-static std::array<Value, 3> calculateSPIRVDispatchWorkgroupCount(
-    Location loc, ArrayRef<Value> resultShape,
-    IntegerAttr workgroupCountMethodAttr,
-    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
-  WorkgroupCountMethodology workgroupCountMethod =
-      static_cast<WorkgroupCountMethodology>(
-          workgroupCountMethodAttr.getValue().getZExtValue());
-  switch (workgroupCountMethod) {
-    case WorkgroupCountMethodology::Default:
-      return {nullptr, nullptr, nullptr};
-    case WorkgroupCountMethodology::LinearizeResultShape:
-      return calculateDispatchWorkgroupCountFromLinearizedResultShape(
-          loc, resultShape, workgroupSize, builder);
-    case WorkgroupCountMethodology::ResultShape:
-      return calculateDispatchWorkgroupCountFromResultShape(
-          loc, resultShape, workgroupSize, builder);
-  }
-  return {nullptr, nullptr, nullptr};
-}
-
-/// Gets the shape of the result from the dispatchState.
-static Optional<SmallVector<Value, 4>> getFirstResultShape(
-    Location loc, TargetBackend::DispatchState dispatchState,
-    OpBuilder &builder) {
-  if (dispatchState.results.empty()) return llvm::None;
-  Optional<TensorRewriteAdaptor> result = dispatchState.results[0];
-  SmallVector<Value, 4> resultShape;
-  // If the output is not a shaped type, assume it is a scalar, and return {1}.
-  if (!result) {
-    resultShape.push_back(
-        builder.create<ConstantOp>(loc, builder.getIndexAttr(1)));
-    return resultShape;
-  }
-
-  // TODO(ravishankarm): Using the result shape to get workgroup count, which
-  // involes using `getShapeDims,` results in the shape values being captured
-  // from outside of the switch statement in dynamic shape cases. This results
-  // in an error since switch statements cannot capture. For now, use the
-  // default path when the shape is dynamic.
-  if (!result->getTensorType().hasStaticShape()) return llvm::None;
-
-  return result->getShapeDims(builder);
+  return returnValue;
 }
 
 class VulkanSPIRVTargetBackend : public TargetBackend {
@@ -346,32 +304,18 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
       auto workgroupSize = calculateDispatchWorkgroupSize(
           loc, spvModuleOp, spvFuncOp.sym_name(), workload, builder);
 
-      StringRef workgroupCountAttrName = getWorkgroupCountAttrName();
-      IntegerAttr workgroupCountAttr =
-          spvFuncOp.getAttrOfType<IntegerAttr>(workgroupCountAttrName);
-      if (!workgroupCountAttr)
-        return spvFuncOp.emitError("missing attribute ")
-               << workgroupCountAttrName;
-
-      // Assuming here that the shape of the first result value of the dispatch
-      // region is enough to calculate the number of workgroups. Either
-      // - All results have the same shape and the `workgroupCountMethod` is set
-      //   to WorkgroupCountMethodology::ResultShape, or
-      // - All the results have the same linearized shape and the
-      //   `workgourpCountMethod` is set to
-      //   WorkgroupCountMethodology::LinearizedResultShape.
-      Optional<SmallVector<Value, 4>> resultShape =
-          getFirstResultShape(loc, dispatchState, builder);
-
-      WorkgroupCountMethodology workgroupCountMethod =
-          static_cast<WorkgroupCountMethodology>(
-              workgroupCountAttr.getValue().getZExtValue());
+      FlatSymbolRefAttr numWorkgroupsFnAttr =
+          spvFuncOp.getAttrOfType<FlatSymbolRefAttr>(
+              getNumWorkgroupsFnAttrName());
 
       std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
-      if (resultShape &&
-          workgroupCountMethod != WorkgroupCountMethodology::Default) {
-        workgroupCount = calculateSPIRVDispatchWorkgroupCount(
-            loc, *resultShape, workgroupCountAttr, workgroupSize, builder);
+      if (numWorkgroupsFnAttr) {
+        FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
+            spvFuncOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
+        if (!numWorkgroupsFn) return failure();
+        workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
+            loc, numWorkgroupsFn, executableOp.getInterfaceOp(),
+            dispatchState.operands, dispatchState.results, builder);
       } else {
         workgroupCount = calculateDispatchWorkgroupCount(
             loc, workload, workgroupSize, builder);
