@@ -118,9 +118,11 @@ class TargetBackend {
 
   virtual ~TargetBackend() = default;
 
-  // Returns the name of the backend as expected to be matched with a call to
-  // matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
+  // Returns a name for the backend used to differentiate between other targets.
   virtual std::string name() const = 0;
+  // Returns a filter pattern for the backend as expected to be matched with a
+  // call to matchPattern. For example, 'vulkan-v1.1' or 'vmla*'.
+  virtual std::string filter_pattern() const = 0;
 
   // Creates an interface representing the bindings and push constants required
   // to dispatch the executable. Interfaces used across backends and executables

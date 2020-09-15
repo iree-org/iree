@@ -187,6 +187,7 @@ module_b_alloc_state(void* self, iree_allocator_t allocator,
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(*state), (void**)&state));
   memset(state, 0, sizeof(*state));
+  state->allocator = allocator;
   *out_module_state = (iree_vm_module_state_t*)state;
   return iree_ok_status();
 }
@@ -281,6 +282,7 @@ static iree_status_t module_b_create(iree_allocator_t allocator,
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(*module), (void**)&module));
   memset(module, 0, sizeof(*module));
+  module->allocator = allocator;
 
   // Resolve types used by the module once so that we can share it across all
   // instances of the module.

@@ -853,10 +853,9 @@ void CommandBufferBindDescriptorSetOp::build(OpBuilder &builder,
 
 void CommandBufferDispatchSymbolOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-    Value workgroupX, Value workgroupY, Value workgroupZ) {
-  state.addOperands(
-      {commandBuffer, executable, workgroupX, workgroupY, workgroupZ});
+    IREE::HAL::ExecutableEntryPointOp entryPoint, Value workgroupX,
+    Value workgroupY, Value workgroupZ) {
+  state.addOperands({commandBuffer, workgroupX, workgroupY, workgroupZ});
   // Construct Executable::Target::EntryPoint nested reference.
   StringRef executableOpSymName =
       entryPoint.getParentOp()

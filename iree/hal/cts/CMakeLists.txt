@@ -47,6 +47,18 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    buffer_test
+  SRCS
+    "buffer_test.cc"
+  DEPS
+    ::cts_test_base
+    iree::base::status
+    iree::hal::driver_registry
+    iree::testing::gtest
+)
+
+iree_cc_test(
+  NAME
     command_buffer_test
   SRCS
     "command_buffer_test.cc"

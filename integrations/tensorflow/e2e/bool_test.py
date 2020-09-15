@@ -21,6 +21,10 @@ import tensorflow.compat.v2 as tf
 
 class MathModule(tf.Module):
 
+  @tf.function(input_signature=[])
+  def constant(self):
+    return np.array([True, False, True], dtype=np.bool)
+
   @tf.function(input_signature=[tf.TensorSpec([4], tf.float32)])
   def greater_than(self, x):
     return x > 1.0
@@ -35,6 +39,13 @@ class MathModule(tf.Module):
 
 @tf_test_utils.compile_module(MathModule)
 class BooleanTest(tf_test_utils.TracedModuleTestCase):
+
+  def test_constant(self):
+
+    def constant(module):
+      module.constant()
+
+    self.compare_backends(constant)
 
   def test_greater_than(self):
 

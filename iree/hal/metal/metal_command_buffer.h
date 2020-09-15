@@ -18,6 +18,7 @@
 #import <Metal/Metal.h>
 
 #include "iree/hal/command_buffer.h"
+#include "iree/hal/metal/metal_buffer.h"
 
 namespace iree {
 namespace hal {
@@ -91,8 +92,23 @@ class MetalCommandBuffer final : public CommandBuffer {
                      CommandCategoryBitfield command_categories,
                      id<MTLCommandBuffer> command_buffer);
 
+  StatusOr<MetalBuffer*> CastBuffer(Buffer* buffer) const;
+
+  // Gets or begins an active MTLBlitCommandEncoder. This also ends all previous
+  // encoded compute commands if any.
+  id<MTLBlitCommandEncoder> GetOrBeginBlitEncoder();
+  void EndBlitEncoder();
+
+  // Gets or begins a new MTLComputeCommandEncoder. This also ends all previous
+  // encoded blit commands if any.
+  id<MTLComputeCommandEncoder> GetOrBeginComputeEncoder();
+  void EndComputeEncoder();
+
   bool is_recording_ = false;
   id<MTLCommandBuffer> metal_handle_;
+
+  id<MTLComputeCommandEncoder> current_compute_encoder_ = nil;
+  id<MTLBlitCommandEncoder> current_blit_encoder_ = nil;
 };
 
 }  // namespace metal

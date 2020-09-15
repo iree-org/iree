@@ -1001,6 +1001,24 @@ def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
   let assemblyFormat = "$command_buffer attr-dict";
 }
 
+def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
+  let summary = [{command buffer device query operation}];
+  let description = [{
+    Used during conversion to access the device used to create a command buffer.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer
+  );
+  let results = (outs
+    HAL_Device:$device
+  );
+
+  let assemblyFormat = "$command_buffer attr-dict `:` type($device)";
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier", [
     AttrSizedOperandSegments,
   ]> {
@@ -1179,15 +1197,13 @@ def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol">
     %x = constant 128 : index
     %y = constant 32 : index
     %z = constant 1 : index
-    hal.command_buffer.dispatch.symbol %cmd, %executable,
-                                       entry_point = @executable::@target::@entry0,
+    hal.command_buffer.dispatch.symbol %cmd, @executable::@target::@entry,
                                        workgroup_xyz = [%x, %y, %z]
     ```
   }];
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
-    HAL_Executable:$executable,  // TODO(scotttodd): remove this and extract from nested ref?
     SymbolRefAttr:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
@@ -1195,7 +1211,7 @@ def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol">
   );
 
   let assemblyFormat = [{
-    $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
+    $command_buffer `,` $entry_point `,`
     `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
     attr-dict
   }];
@@ -1204,7 +1220,7 @@ def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol">
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value commandBuffer,
-      Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
+      IREE::HAL::ExecutableEntryPointOp entryPoint,
       Value workgroupX, Value workgroupY, Value workgroupZ
     }]>,
   ];
@@ -1248,22 +1264,20 @@ def HAL_CommandBufferDispatchIndirectSymbolOp : HAL_Op<"command_buffer.dispatch.
     given buffer, using using a nested symbol reference to the entry point.
 
     ```mlir
-    hal.command_buffer.dispatch.indirect.symbol %cmd, %executable,
-                                                entry_point = @executable::@target::@entry0,
+    hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
                                                 workgroups = %buffer[%offset]
     ```
   }];
 
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
-    HAL_Executable:$executable,  // TODO(scotttodd): remove this and extract from nested ref?
     SymbolRefAttr:$entry_point,
     HAL_Buffer:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset
   );
 
   let assemblyFormat = [{
-    $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
+    $command_buffer `,` $entry_point `,`
     `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
   }];
 }

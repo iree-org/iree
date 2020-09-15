@@ -48,6 +48,7 @@ class VMLATargetBackend final : public TargetBackend {
   VMLATargetBackend(VMLATargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "vmla"; }
+  std::string filter_pattern() const override { return "vmla"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<VM::VMDialect, VMLA::VMLADialect>();
