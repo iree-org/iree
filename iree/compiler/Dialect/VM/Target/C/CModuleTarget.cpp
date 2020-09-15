@@ -172,6 +172,9 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "};\n";
   output << "\n";
 
+  // functions
+  std::string functionName = moduleName + "_funcs_";
+
   // module descriptor
   // TODO(simon-camp) support module-level reflection attributes
   std::string descriptorName = moduleName + "_descriptor_";
@@ -182,6 +185,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << importName << ",\n"
          << "IREE_ARRAYSIZE(" << exportName << "),\n"
          << exportName << ",\n"
+         << "IREE_ARRAYSIZE(" << functionName << "),\n"
+         << functionName << ",\n"
          << "0,\n"
          << "NULL,\n"
          << "};\n";
