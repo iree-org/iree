@@ -48,17 +48,22 @@ DOCKER_DIR = 'build_tools/docker/'
 
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
-    'bazel': [],
-    'bazel-bindings': ['bazel'],
-    'bazel-tensorflow': ['bazel-bindings'],
-    'bazel-nvidia': ['bazel-tensorflow'],
-    'bazel-swiftshader': ['bazel-tensorflow'],
-    'cmake': [],
-    'cmake-android': ['cmake'],
-    'cmake-nvidia': ['cmake'],
-    'cmake-vulkan': ['cmake'],
-    'cmake-swiftshader': ['cmake-vulkan'],
+    'base': [],
+    'bazel': ['base', 'util'],
+    'bazel-python': ['bazel'],
+    'bazel-tensorflow': ['bazel-python'],
+    'bazel-tensorflow-nvidia': ['bazel-tensorflow-vulkan'],
+    'bazel-tensorflow-swiftshader': ['bazel-tensorflow-vulkan', 'swiftshader'],
+    'bazel-tensorflow-vulkan': ['bazel-tensorflow'],
+    'cmake': ['base', 'util'],
+    'cmake-android': ['cmake', 'util'],
+    'cmake-python': ['cmake'],
+    'cmake-python-nvidia': ['cmake-python-vulkan'],
+    'cmake-python-swiftshader': ['cmake-python-vulkan', 'swiftshader'],
+    'cmake-python-vulkan': ['cmake-python'],
     'rbe-toolchain': [],
+    'swiftshader': ['cmake'],
+    'util': [],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
@@ -252,7 +257,7 @@ if __name__ == '__main__':
     print(f'Processing image {image}')
     image_name = posixpath.join(IREE_GCR_URL, image)
     image_tag = f'{image_name}:{args.tag}'
-    image_path = os.path.join(DOCKER_DIR, image.replace('-', '_'))
+    image_path = os.path.join(DOCKER_DIR, image)
 
     if args.pull:
       check_stream_command(['docker', 'pull', image_tag], dry_run=args.dry_run)

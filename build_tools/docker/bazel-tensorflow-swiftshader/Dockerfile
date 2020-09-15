@@ -1,6 +1,4 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common configuration for Kokoro builds that run the core build with bazel on
-# linux.
+# An image for building IREE with TensorFlow integrations using Bazel and
+# running Vulkan tests on SwiftShader.
 
-build_file: "iree/build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh"
+FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
+
+COPY --from=gcr.io/iree-oss/swiftshader swiftshader/ swiftshader/
+
+# Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
+ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json

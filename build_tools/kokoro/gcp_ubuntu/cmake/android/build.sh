@@ -24,16 +24,16 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
-ANDROID_ABI=$1
+ANDROID_ABI="${1?}"
 
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging
 export CMAKE_BIN="$(which cmake)"
-"$CMAKE_BIN" --version
-"$CC" --version
-"$CXX" --version
+"${CMAKE_BIN?}" --version
+"${CC?}" --version
+"${CXX?}" --version
 python3 --version
 echo "Android NDK path: $ANDROID_NDK"
 

@@ -1,6 +1,4 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common configuration for Kokoro builds that run the core build with bazel on
-# linux.
+FROM ubuntu:18.04 AS final
 
-build_file: "iree/build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh"
+# Environment variables for IREE.
+ENV CC /usr/bin/clang
+ENV CXX /usr/bin/clang++
+ENV IREE_LLVMAOT_LINKER_PATH /usr/bin/ld
+
+RUN apt-get update \
+  && apt-get install -y \
+    # For updating IREE's submodules.
+    git \
+    # Core IREE dependencies.
+    clang \
+    libsdl2-dev \
+    libssl-dev

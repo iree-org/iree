@@ -32,9 +32,8 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  --env IREE_VULKAN_DISABLE=0 \
   --gpus all \
-  gcr.io/iree-oss/cmake-nvidia@sha256:26b6fcc4005b4cbb23988b9a8d5484355dd58f5a4a8df10537df8fceb1d7e26a \
+  gcr.io/iree-oss/cmake-python-nvidia@sha256:fb0babff91402d999a2532816d2ee3a9df29ead152e3af7df0215bab9ce85682 \
   build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

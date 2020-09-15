@@ -1,6 +1,4 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common configuration for Kokoro builds that run the core build with bazel on
-# linux.
+# An image for building IREE and its Python bindings using CMake.
 
-build_file: "iree/build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh"
+ARG CMAKE_MAJOR_VERSION=3
+ARG CMAKE_MINOR_VERSION=13
+ARG CMAKE_PATCH_VERSION=5
+
+FROM gcr.io/iree-oss/cmake AS final
+# Dependencies for the python bindings tests.
+RUN apt-get update \
+  && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-setuptools \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install numpy absl-py
+
+ENV PYTHON_BIN /usr/bin/python3

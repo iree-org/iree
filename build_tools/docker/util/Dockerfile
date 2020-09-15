@@ -1,6 +1,4 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common configuration for Kokoro builds that run the core build with bazel on
-# linux.
+# An image containing utilities useful for setting up docker images, but not
+# needed in the final images. Intermediate stages can inherit from this image,
+# but final stages should not.
 
-build_file: "iree/build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build_kokoro.sh"
+FROM ubuntu:18.04 AS final
+
+RUN apt-get update \
+  && apt-get install -y \
+  git \
+  unzip \
+  wget \
+  gnupg2
