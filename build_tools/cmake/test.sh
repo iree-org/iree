@@ -26,7 +26,7 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 # Respect the user setting, but default to turning off the vulkan tests
 # and turning on the llvmjit ones.
-export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
+export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
 export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-0}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried

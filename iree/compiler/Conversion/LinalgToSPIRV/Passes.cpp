@@ -100,11 +100,9 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   afterwards. This gives each Linalg op a second chance to be tiled,
   //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
+  pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(
       options.workgroupSize, options.tileSizes, options.useWorkgroupMemory));
-  pm.addPass(createSplitDispatchFunctionPass());
-  pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
-                                         options.useWorkgroupMemory));
   pm.addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//
@@ -121,6 +119,16 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
+  // Legalize the function that computes the number of workgroups to be runnable
+  // on the host.
+  //
+  // Post-conditions:
+  //   - The shape of the values created from `iree.placeholder` operations are
+  //     tied to the arguments of the function.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createLegalizeNumWorkgroupsFnPass());
+
+  //===--------------------------------------------------------------------===//
   // Resolve shape related ops.
   //
   // Pre-conditions:
@@ -135,6 +143,16 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //     in the IR.
   //===--------------------------------------------------------------------===//
   pm.addPass(createResolveShapeOpsPass());
+
+  //===--------------------------------------------------------------------===//
+  // Legalize the function that computes the number of workgroups to be runnable
+  // on the host.
+  //
+  // Post-conditions:
+  //   - The dead `iree.placeholder` operations are removed after shape
+  //     resolution.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createLegalizeNumWorkgroupsFnPass());
 
   //===--------------------------------------------------------------------===//
   // Prepare stdandard ops for SPIR-V conversion.
@@ -173,6 +191,21 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
 
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
                                      const SPIRVCodegenOptions &options) {
+  //===--------------------------------------------------------------------===//
+  // The entry point functions call an _impl function that captures the ABI that
+  // the host side uses for the dispatch region. This ABI is needed when
+  // generating the function that computes the number of workgroups. Declare the
+  // function that returns the number of workgroups needed for an entry point
+  // function.
+  //
+  // Post-conditions
+
+  //   - An empty, private function is defined for each entry point function
+  //     that returns the number of workgroups.
+  //   - The entry point function gets an attribute `vkspv.num_workgroups_fn` to
+  //     record which function in the module returns the number of workgroups.
+  pm.addPass(createDeclareNumWorkgroupsFnPass());
+
   //===--------------------------------------------------------------------===//
   // Inline the impl dispatch function into the wrapper dispatch function.
   //

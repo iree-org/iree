@@ -7,10 +7,13 @@ module attributes {
     [Shader], [SPV_KHR_storage_buffer_storage_class]>,
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @parallel_4D(%arg0: memref<?x?x?x?xf32>,
-                    %arg1 : memref<?x?x?x?xf32>,
-                    %arg2 : memref<?x?x?x?xf32>)
-  attributes {iree.dispatch_fn_name = "parallel_4D"} {
+  func @parallel_4D() {
+    %arg0 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg0, operand_result_index = 4 : i32} : memref<?x?x?x?xf32>
+    %arg1 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg1, operand_result_index = 9 : i32} : memref<?x?x?x?xf32>
+    %arg2 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@ret0, operand_result_index = 10 : i32} : memref<?x?x?x?xf32>
     linalg.generic
       {args_in = 2 : i64, args_out = 1 : i64,
        indexing_maps = [#map0, #map0, #map0],
@@ -22,10 +25,18 @@ module attributes {
     } : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
     return
   }
+  func @parallel_4D__num_workgroups__
+    (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
+     !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
+    attributes {sym_visibility = "private"}
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+  }
 }
 // CHECK-LABEL: func @parallel_4D
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]>
-//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
@@ -56,6 +67,71 @@ module attributes {
 
 // -----
 
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+module attributes {
+  spv.target_env =
+    #spv.target_env<#spv.vce<v1.3,
+    [Shader], [SPV_KHR_storage_buffer_storage_class]>,
+    {max_compute_workgroup_invocations = 128 : i32,
+     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @parallel_4D_static() attributes {vkspv.num_workgroups_fn = @parallel_4D_static__num_workgroups__} {
+    %arg0 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x5x6xf32>
+    %arg1 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x4x5x6xf32>
+    %arg2 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<3x4x5x6xf32>
+    linalg.generic
+      {args_in = 2 : i64, args_out = 1 : i64,
+       indexing_maps = [#map0, #map0, #map0],
+       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      %arg0, %arg1, %arg2 {
+    ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
+      %0 = addf %arg3, %arg4 : f32
+      linalg.yield %0 : f32
+    } : memref<3x4x5x6xf32>, memref<3x4x5x6xf32>, memref<3x4x5x6xf32>
+    return
+  }
+  func @parallel_4D_static__num_workgroups__
+    (!shapex.ranked_shape<[3,4,5,6]>, !shapex.ranked_shape<[3,4,5,6]>,
+     !shapex.ranked_shape<[3,4,5,6]>) -> (index, index, index)
+    attributes {sym_visibility = "private"}
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+  }
+}
+// CHECK-LABEL: func @parallel_4D_static()
+//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
+//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
+//   CHECK-DAG:     %[[C360:.+]] = constant 360 : index
+//   CHECK-DAG:     %[[C120:.+]] = constant 120 : index
+//   CHECK-DAG:     %[[C30:.+]] = constant 30 : index
+//   CHECK-DAG:     %[[C6:.+]] = constant 6 : index
+//   CHECK-DAG:     %[[BID:.+]] = "gpu.block_id"() {dimension = "x"}
+//   CHECK-DAG:     %[[BDIM:.+]] = "gpu.block_dim"() {dimension = "x"}
+//   CHECK-DAG:     %[[TID:.+]] = "gpu.thread_id"() {dimension = "x"}
+//       CHECK:     %[[BOFFSET:.+]] = muli %[[BID]], %[[BDIM]]
+//       CHECK:     %[[IV:.+]] = addi %[[BOFFSET]], %[[TID]]
+//       CHECK:     %[[COND:.+]] = cmpi "slt", %[[IV]], %[[C360]]
+//       CHECK:     scf.if %[[COND]]
+//       CHECK:       %[[IV0:.+]] = divi_signed %[[IV]], %[[C120]]
+//       CHECK:       %[[T14:.+]] = remi_signed %[[IV]], %[[C120]]
+//       CHECK:       %[[IV1:.+]] = divi_signed %[[T14]], %[[C30]]
+//       CHECK:       %[[T16:.+]] = remi_signed %[[T14]], %[[C30]]
+//       CHECK:       %[[IV2:.+]] = divi_signed %[[T16]], %[[C6]]
+//       CHECK:       %[[IV3:.+]] = remi_signed %[[T16]], %[[C6]]
+//       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+//       CHECK:       load %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+//       CHECK:       store %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
+
+//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C12:.+]] = constant 12 : index
+//       CHECK:   return %[[C12]], %[[C1]], %[[C1]]
+// -----
+
 #map0 = affine_map<() -> ()>
 #accesses = [#map0, #map0, #map0]
 #trait = {
@@ -71,9 +147,13 @@ module attributes {
     [Shader], [SPV_KHR_storage_buffer_storage_class]>,
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @scalar_add(%arg0 : memref<f32>, %arg1 : memref<f32>,
-                   %arg2 : memref<f32>)
-  {
+  func @scalar_add() attributes {vkspv.num_workgroups_fn = @scalar_add__num_workgroups__} {
+    %arg0 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<f32>
+    %arg1 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
+    %arg2 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<f32>
     linalg.generic #trait %arg0, %arg1, %arg2 {
     ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
       %0 = addf %arg3, %arg4 : f32
@@ -81,21 +161,38 @@ module attributes {
      } : memref<f32>, memref<f32>, memref<f32>
      return
   }
+  func @scalar_add__num_workgroups__
+    (!shapex.ranked_shape<[]>, !shapex.ranked_shape<[]>,
+     !shapex.ranked_shape<[]>) -> (index, index, index)
+    attributes {sym_visibility = "private"}
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+  }
 }
-// CHECK-LABEL: func @scalar_add
-//  CHECK-SAME:   local_size = dense<1> : vector<3xi32>
-//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
-//  CHECK-NEXT:     load
+// CHECK-LABEL: func @scalar_add()
+//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
+//       CHECK:     load
 //  CHECK-NEXT:     load
 //  CHECK-NEXT:     addf
 //  CHECK-NEXT:     store
 //  CHECK-NEXT:     return
 
+//       CHECK: func @[[NUM_WORKGROUPS_FN]]
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//       CHECK:   return %[[C1]], %[[C1]], %[[C1]]
+
 // -----
 
 module {
-  func @reduce_sum(%arg0: memref<?x?x?xf32>, %arg1: memref<f32>, %arg2: memref<?xf32>)
-   attributes {iree.dispatch_fn_name = "reduce_sum"} {
+  func @reduce_sum() {
+    %arg0 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?x?xf32>
+    %arg1 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
+    %arg2 = iree.placeholder for "interace buffer"
+      {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<?xf32>
     linalg.indexed_generic
       {args_in = 2 : i64, args_out = 1 : i64,
        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> ()>,
@@ -113,10 +210,14 @@ module {
     }: memref<?x?x?xf32>, memref<f32>, memref<?xf32>
     return
   }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+  }
 }
 // CHECK-LABEL: func @reduce_sum
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]> : vector<3xi32>
-//  CHECK-SAME:   vkspv.workgroup_count_from_result_shape = 1
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
@@ -146,10 +247,11 @@ module attributes {
   spv.target_env =
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
-		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @matmul(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>)
-  attributes {spv.entry_point_abi = {local_size = dense<[8, 8, 1]> : vector<3xi32>},
-              vkspv.workgroup_count_from_result_shape = 2 : i32} {
+                     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @matmul() {
+    %arg0 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
+    %arg1 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1} : memref<?x?xf32>
+    %arg2 = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0} : memref<?x?xf32>
     %c4 = constant 4 : index
     %c0 = constant 0 : index
     %c1 = constant 1 : index
@@ -177,6 +279,11 @@ module attributes {
         : (memref<?x?xf32, #map3>, memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
     }
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
@@ -209,12 +316,11 @@ module attributes {
   spv.target_env =
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
-		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @conv_no_padding(%arg0: memref<?x?x?x?xf32>,
-                        %arg1: memref<?x?x?x?xf32>,
-			%arg2: memref<?x?x?x?xf32>)
-    attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>},
-                vkspv.workgroup_count_from_result_shape = 0 : i32} {
+                     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @conv_no_padding() {
+    %arg0 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0} : memref<?x?x?x?xf32>
+    %arg1 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1} : memref<?x?x?x?xf32>
+    %arg2 = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0} : memref<?x?x?x?xf32>
     %c2 = constant 2 : index
     %c0 = constant 0 : index
     %c3 = constant 3 : index
@@ -252,24 +358,29 @@ module attributes {
               : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
       linalg.conv(%arg0, %21, %27)
         {__internal_linalg_transform__ = "workgroup", dilations = [1, 1], strides = [1, 1]}
-	: memref<?x?x?x?xf32>, memref<?x?x?x?xf32, #map5>, memref<?x?x?x?xf32, #map5>
+        : memref<?x?x?x?xf32>, memref<?x?x?x?xf32, #map5>, memref<?x?x?x?xf32, #map5>
       scf.yield
     }
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @conv_no_padding
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0}
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1}
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0}
 //   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[C1:.+]] = constant 1
 //   CHECK-DAG:   %[[C2:.+]] = constant 2
 //   CHECK-DAG:   %[[N:.+]] = dim %[[ARG1]], %[[C0]]
-//   CHECK-DAG:   %[[P:.+]] = dim %[[ARG2]], %[[C1]]
-//   CHECK-DAG:   %[[Q:.+]] = dim %[[ARG2]], %[[C2]]
+//   CHECK-DAG:   %[[P:.+]] = dim %[[RET0]], %[[C1]]
+//   CHECK-DAG:   %[[Q:.+]] = dim %[[RET0]], %[[C2]]
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
@@ -284,7 +395,7 @@ module attributes {
 //       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
 //       CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
 //       CHECK:         %[[SV1:.+]] = subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//       CHECK:         %[[SV2:.+]] = subview %[[ARG2]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//       CHECK:         %[[SV2:.+]] = subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
 //   CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:         %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
@@ -315,10 +426,11 @@ module attributes {
   spv.target_env =
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
-		     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @pooling_no_padding(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>, %arg2: memref<?x?xf32>)
-    attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>},
-                vkspv.workgroup_count_from_result_shape = 0 : i32} {
+                     max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+  func @pooling_no_padding() {
+    %arg0 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0} : memref<?x?xf32>
+    %arg1 = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1} : memref<?x?xf32>
+    %arg2 = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0} : memref<?x?xf32>
     %c0 = constant 0 : index
     %c1 = constant 1 : index
     %0 = dim %arg1, %c0 : memref<?x?xf32>
@@ -344,23 +456,28 @@ module attributes {
       %19 = subview %arg2[%arg3, %arg4] [%17, %18] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map4>
       linalg.pooling_max(%16, %arg1, %19)
         {__internal_linalg_transform__ = "workgroup", dilations = [1, 1], strides = [1, 1]}
-	: memref<?x?xf32, #map4>, memref<?x?xf32>, memref<?x?xf32, #map4>
+        : memref<?x?xf32, #map4>, memref<?x?xf32>, memref<?x?xf32, #map4>
       scf.yield
     }
     return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
 
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @pooling_no_padding
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
-//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0}
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1}
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0}
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[P:.+]] = dim %[[ARG2]], %[[C0]]
-//   CHECK-DAG:   %[[Q:.+]] = dim %[[ARG2]], %[[C1]]
+//   CHECK-DAG:   %[[P:.+]] = dim %[[RET0]], %[[C0]]
+//   CHECK-DAG:   %[[Q:.+]] = dim %[[RET0]], %[[C1]]
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
@@ -372,7 +489,7 @@ module attributes {
 //       CHECK:   scf.for %[[IV3:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
 //       CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
 //       CHECK:       %[[SV1:.+]] = subview %[[ARG0]][%[[IV3]], %[[IV4]]]
-//       CHECK:       %[[SV2:.+]] = subview %[[ARG2]][%[[IV3]], %[[IV4]]]
+//       CHECK:       %[[SV2:.+]] = subview %[[RET0]][%[[IV3]], %[[IV4]]]
 //   CHECK-DAG:       %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:       %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:       %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}

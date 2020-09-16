@@ -38,7 +38,7 @@ module {
     return
   }
   hal.interface @legacy_io attributes {sym_visiblity = "private"} {
-    hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
   }
 }
 
