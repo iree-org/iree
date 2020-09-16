@@ -36,6 +36,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
@@ -79,13 +80,11 @@ static Attribute getInitValueAsConst(Value init) {
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
-// TODO(hanchung): Use helpers in StructuredOpsUtils.h instead of hardcoded
-// strings once the build system is set up.
 static ArrayAttr getParallelAndReductionIterAttrs(Builder b, unsigned nLoops,
                                                   unsigned nReduction) {
-  SmallVector<Attribute, 3> attrs(nLoops - nReduction,
-                                  b.getStringAttr("parallel"));
-  attrs.append(nReduction, b.getStringAttr("reduction"));
+  SmallVector<Attribute, 3> attrs(
+      nLoops - nReduction, b.getStringAttr(getParallelIteratorTypeName()));
+  attrs.append(nReduction, b.getStringAttr(getReductionIteratorTypeName()));
   return b.getArrayAttr(attrs);
 }
 
