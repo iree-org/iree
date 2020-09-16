@@ -15,7 +15,7 @@
 
 if(${IREE_ENABLE_EMITC})
   iree_add_all_subdirs()
-  
+
   iree_cc_library(
     NAME
       C
