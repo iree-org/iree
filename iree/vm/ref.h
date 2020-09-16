@@ -265,6 +265,8 @@ struct ref_type_descriptor {
   IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value); \
   IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value);   \
   IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref);       \
+  IREE_API_EXPORT iree_status_t IREE_API_CALL name##_check_deref(          \
+      iree_vm_ref_t* ref, T** out_ptr);                                    \
   IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL       \
       name##_get_descriptor();                                             \
   inline bool name##_isa(iree_vm_ref_t* ref) {                             \
@@ -292,6 +294,12 @@ struct ref_type_descriptor {
       return NULL;                                                          \
     }                                                                       \
     return (T*)ref->ptr;                                                    \
+  }                                                                         \
+  IREE_API_EXPORT iree_status_t IREE_API_CALL name##_check_deref(           \
+      iree_vm_ref_t* ref, T** out_ptr) {                                    \
+    IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, name##_descriptor.type));   \
+    *out_ptr = (T*)ref->ptr;                                                \
+    return iree_ok_status();                                                \
   }                                                                         \
   IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL        \
       name##_get_descriptor() {                                             \

@@ -95,16 +95,54 @@ static iree_status_t iree_vm_context_resolve_module_imports(
   iree_vm_module_signature_t module_signature = module->signature(module->self);
   for (int i = 0; i < module_signature.import_function_count; ++i) {
     iree_string_view_t full_name;
+    iree_vm_function_signature_t expected_signature;
     IREE_RETURN_IF_ERROR(
         module->get_function(module->self, IREE_VM_FUNCTION_LINKAGE_IMPORT, i,
                              /*out_function=*/NULL,
                              /*out_name=*/&full_name,
-                             /*out_signature=*/NULL));
+                             /*out_signature=*/&expected_signature));
+
+    // Resolve the function to the module that contains it and return the
+    // information.
     iree_vm_function_t import_function;
     IREE_RETURN_IF_ERROR(
         iree_vm_context_resolve_function(context, full_name, &import_function));
-    IREE_RETURN_IF_ERROR(
-        module->resolve_import(module->self, module_state, i, import_function));
+
+    // Query the function signature from the module that contains it; we don't
+    // use the signature from the module requesting the import as we want a
+    // single source of truth.
+    iree_vm_function_signature_t import_signature =
+        iree_vm_function_signature(&import_function);
+
+    // Simple check to confirm the signatures match. We still can't trust that
+    // the module using the import *actually* calls it with the right convention
+    // (so this is not a safety check!), but this will catch the 99% case of a
+    // signature changing out from under a module or using a module with a newer
+    // signature than that provided by the imported module.
+    //
+    // We allow modules to not define their cconv expectation as in a lot of
+    // cases where modules are all compiled into the same binary there's no
+    // value in performing the verification. Runtime checks during calls will
+    // fail with less awesome logging but that's the tradeoff.
+    if (expected_signature.calling_convention.size &&
+        !iree_string_view_equal(import_signature.calling_convention,
+                                expected_signature.calling_convention)) {
+      return iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "import function signature mismatch between %.*s "
+          "and source %.*s; expected %.*s but got %.*s",
+          (int)iree_vm_module_name(module).size,
+          iree_vm_module_name(module).data,
+          (int)iree_vm_module_name(import_function.module).size,
+          iree_vm_module_name(import_function.module).data,
+          (int)expected_signature.calling_convention.size,
+          expected_signature.calling_convention.data,
+          (int)import_signature.calling_convention.size,
+          import_signature.calling_convention.data);
+    }
+
+    IREE_RETURN_IF_ERROR(module->resolve_import(
+        module->self, module_state, i, &import_function, &import_signature));
   }
   return iree_ok_status();
 }
@@ -164,17 +202,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
-
-  if (!modules && module_count > 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "modules/module_count mismatch");
-  }
-  for (iree_host_size_t i = 0; i < module_count; ++i) {
-    if (!modules[i]) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "module[%zu] is null", i);
-    }
-  }
 
   iree_host_size_t context_size =
       sizeof(iree_vm_context_t) + sizeof(iree_vm_module_t*) * module_count +

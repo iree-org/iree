@@ -26,9 +26,9 @@ export PS4='[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging
 bazel --version
-"$CXX" --version
-"$CC" --version
-"$PYTHON_BIN" -V
+"${CXX?}" --version
+"${CC?}" --version
+"${PYTHON_BIN?}" -V
 # TODO(#1875): Make PYTHON_BIN also control the runtime version
 python3 -V
 

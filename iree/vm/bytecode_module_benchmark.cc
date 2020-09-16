@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
+
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
@@ -19,118 +21,123 @@
 #include "iree/base/logging.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_module_benchmark_module.h"
+#include "iree/vm/context.h"
+#include "iree/vm/instance.h"
 #include "iree/vm/module.h"
+#include "iree/vm/native_module.h"
 #include "iree/vm/stack.h"
 
 namespace {
 
-// Example import function that adds 1 to its value.
-static iree_status_t IREE_API_CALL SimpleAddExecute(
-    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
-    iree_vm_execution_result_t* out_result) {
-  iree_vm_stack_frame_t* callee_frame;
-  IREE_CHECK_OK(iree_vm_stack_function_enter(
-      stack, call->function, call->argument_registers, call->result_registers,
-      &callee_frame));
+struct native_import_module_s;
+struct native_import_module_state_s;
+typedef struct native_import_module_s native_import_module_t;
+typedef struct native_import_module_state_s native_import_module_state_t;
 
-  auto& regs = callee_frame->registers;
-  int32_t value = regs.i32[0];
-  regs.i32[0] = value + 1;
-
-  // TODO(benvanik): replace with macro? helper for none/i32/etc
-  static const union {
-    uint16_t reserved[2];
-    iree_vm_register_list_t list;
-  } result_registers = {{1, 0}};
-  iree_vm_stack_function_leave(stack, &result_registers.list, NULL);
+// vm.import @native_import_module.add_1(%arg0 : i32) -> i32
+static iree_status_t native_import_module_add_1(
+    iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
+    iree_vm_native_function_target_t target_fn, void* module,
+    void* module_state, iree_vm_execution_result_t* out_result) {
+  // Add 1 to arg0 and return.
+  int32_t arg0 = *reinterpret_cast<int32_t*>(call->arguments.data);
+  int32_t ret0 = arg0 + 1;
+  *reinterpret_cast<int32_t*>(call->results.data) = ret0;
   return iree_ok_status();
+}
+
+static const iree_vm_native_export_descriptor_t
+    native_import_module_exports_[] = {
+        {iree_make_cstring_view("add_1"), iree_make_cstring_view("0i.i"), 0,
+         NULL},
+};
+static const iree_vm_native_function_ptr_t native_import_module_funcs_[] = {
+    {(iree_vm_native_function_shim_t)native_import_module_add_1, NULL},
+};
+static_assert(IREE_ARRAYSIZE(native_import_module_funcs_) ==
+                  IREE_ARRAYSIZE(native_import_module_exports_),
+              "function pointer table must be 1:1 with exports");
+static const iree_vm_native_module_descriptor_t
+    native_import_module_descriptor_ = {
+        iree_make_cstring_view("native_import_module"),
+        0,
+        NULL,
+        IREE_ARRAYSIZE(native_import_module_exports_),
+        native_import_module_exports_,
+        IREE_ARRAYSIZE(native_import_module_funcs_),
+        native_import_module_funcs_,
+        0,
+        NULL,
+};
+
+static iree_status_t native_import_module_create(
+    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+  iree_vm_module_t interface;
+  IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
+  return iree_vm_native_module_create(
+      &interface, &native_import_module_descriptor_, allocator, out_module);
 }
 
 // Benchmarks the given exported function, optionally passing in arguments.
 static iree_status_t RunFunction(benchmark::State& state,
                                  absl::string_view function_name,
-                                 absl::InlinedVector<int32_t, 4> i32_args,
-                                 int batch_size = 1) {
+                                 absl::Span<const int32_t> i32_args,
+                                 int result_count, int batch_size = 1) {
+  iree_vm_instance_t* instance = NULL;
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+
+  iree_vm_module_t* import_module = NULL;
+  IREE_CHECK_OK(
+      native_import_module_create(iree_allocator_system(), &import_module));
+
   const auto* module_file_toc =
       iree::vm::bytecode_module_benchmark_module_create();
-  iree_vm_module_t* module = nullptr;
+  iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      iree_allocator_null(), iree_allocator_system(), &module))
-      << "Bytecode module failed to load";
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
-  iree_vm_module_state_t* module_state;
-  module->alloc_state(module->self, iree_allocator_system(), &module_state);
-
-  iree_vm_module_t import_module;
-  memset(&import_module, 0, sizeof(import_module));
-  import_module.begin_call = SimpleAddExecute;
-  iree_vm_function_t imported_func;
-  memset(&imported_func, 0, sizeof(imported_func));
-  imported_func.module = &import_module;
-  imported_func.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-  imported_func.ordinal = 0;
-  module->resolve_import(module->self, module_state, 0, imported_func);
-
-  // Since we only have a single state we pack it in the state_resolver ptr.
-  iree_vm_state_resolver_t state_resolver = {
-      module_state,
-      +[](void* state_resolver, iree_vm_module_t* module,
-          iree_vm_module_state_t** out_module_state) -> iree_status_t {
-        *out_module_state = (iree_vm_module_state_t*)state_resolver;
-        return iree_ok_status();
-      }};
+  std::array<iree_vm_module_t*, 2> modules = {import_module, bytecode_module};
+  iree_vm_context_t* context = NULL;
+  IREE_CHECK_OK(iree_vm_context_create_with_modules(
+      instance, modules.data(), modules.size(), iree_allocator_system(),
+      &context));
 
   iree_vm_function_t function;
-  IREE_CHECK_OK(iree_vm_module_lookup_function_by_name(
-      module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_string_view_t{function_name.data(), function_name.size()},
-      &function))
-      << "Exported function '" << function_name << "' not found";
-  auto signature = iree_vm_function_signature(&function);
+  IREE_CHECK_OK(iree_vm_context_resolve_function(
+      context,
+      iree_make_string_view(function_name.data(), function_name.size()),
+      &function));
 
-  auto* argument_registers = (iree_vm_register_list_t*)iree_alloca(
-      sizeof(iree_vm_register_list_t) +
-      signature.argument_count * sizeof(uint16_t));
-  argument_registers->size = signature.argument_count;
-  for (int i = 0; i < argument_registers->size; ++i) {
-    argument_registers->registers[i] = i;
-  }
-  auto* result_registers = (iree_vm_register_list_t*)iree_alloca(
-      sizeof(iree_vm_register_list_t) +
-      signature.result_count * sizeof(uint16_t));
-  result_registers->size = signature.result_count;
-  for (int i = 0; i < result_registers->size; ++i) {
-    result_registers->registers[i] = i;
-  }
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.function = function;
+  call.arguments =
+      iree_make_byte_span(iree_alloca(i32_args.size() * sizeof(int32_t)),
+                          i32_args.size() * sizeof(int32_t));
+  call.results =
+      iree_make_byte_span(iree_alloca(result_count * sizeof(int32_t)),
+                          result_count * sizeof(int32_t));
 
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, state_resolver,
-                                  iree_allocator_system());
+  IREE_VM_INLINE_STACK_INITIALIZE(
+      stack, iree_vm_context_state_resolver(context), iree_allocator_system());
   while (state.KeepRunningBatch(batch_size)) {
-    iree_vm_stack_frame_t* external_frame = NULL;
-    IREE_CHECK_OK(iree_vm_stack_external_enter(
-        stack, iree_make_cstring_view("invoke"), 8, &external_frame));
-
-    for (int i = 0; i < argument_registers->size; ++i) {
-      external_frame->registers.i32[i] = i32_args[i];
+    for (iree_host_size_t i = 0; i < i32_args.size(); ++i) {
+      reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];
     }
 
-    iree_vm_function_call_t call;
-    memset(&call, 0, sizeof(call));
-    call.function = function;
-    call.argument_registers = argument_registers;
-    call.result_registers = result_registers;
     iree_vm_execution_result_t result;
-    IREE_CHECK_OK(module->begin_call(module->self, stack, &call, &result));
-
-    iree_vm_stack_external_leave(stack);
+    IREE_CHECK_OK(bytecode_module->begin_call(bytecode_module->self, stack,
+                                              &call, &result));
   }
   iree_vm_stack_deinitialize(stack);
 
-  module->free_state(module->self, module_state);
-  module->destroy(module->self);
+  iree_vm_module_release(import_module);
+  iree_vm_module_release(bytecode_module);
+  iree_vm_context_release(context);
+  iree_vm_instance_release(instance);
 
   return iree_ok_status();
 }
@@ -150,7 +157,7 @@ static void BM_ModuleCreate(benchmark::State& state) {
     // Just testing creation and verification here!
     benchmark::DoNotOptimize(module);
 
-    module->destroy(module->self);
+    iree_vm_module_release(module);
   }
 }
 BENCHMARK(BM_ModuleCreate);
@@ -177,7 +184,7 @@ static void BM_ModuleCreateState(benchmark::State& state) {
     module->free_state(module->self, module_state);
   }
 
-  module->destroy(module->self);
+  iree_vm_module_release(module);
 }
 BENCHMARK(BM_ModuleCreateState);
 
@@ -199,17 +206,18 @@ static void BM_FullModuleInit(benchmark::State& state) {
     benchmark::DoNotOptimize(module_state);
 
     module->free_state(module->self, module_state);
-    module->destroy(module->self);
+    iree_vm_module_release(module);
   }
 }
 BENCHMARK(BM_FullModuleInit);
 
+ABSL_ATTRIBUTE_NOINLINE static int empty_fn() {
+  int ret = 1;
+  benchmark::DoNotOptimize(ret);
+  return ret;
+}
+
 static void BM_EmptyFuncReference(benchmark::State& state) {
-  static auto empty_fn = +[]() {
-    int ret = 1;
-    benchmark::DoNotOptimize(ret);
-    return ret;
-  };
   while (state.KeepRunning()) {
     int ret = empty_fn();
     benchmark::DoNotOptimize(ret);
@@ -219,15 +227,17 @@ static void BM_EmptyFuncReference(benchmark::State& state) {
 BENCHMARK(BM_EmptyFuncReference);
 
 static void BM_EmptyFuncBytecode(benchmark::State& state) {
-  IREE_CHECK_OK(RunFunction(state, "empty_func", {}));
+  IREE_CHECK_OK(RunFunction(state, "bytecode_module_benchmark.empty_func", {},
+                            /*result_count=*/0));
 }
 BENCHMARK(BM_EmptyFuncBytecode);
 
+ABSL_ATTRIBUTE_NOINLINE static int add_fn(int value) {
+  benchmark::DoNotOptimize(value += value);
+  return value;
+}
+
 static void BM_CallInternalFuncReference(benchmark::State& state) {
-  static auto add_fn = +[](int value) {
-    benchmark::DoNotOptimize(value += value);
-    return value;
-  };
   while (state.KeepRunningBatch(10)) {
     int value = 1;
     value = add_fn(value);
@@ -256,22 +266,30 @@ static void BM_CallInternalFuncReference(benchmark::State& state) {
 BENCHMARK(BM_CallInternalFuncReference);
 
 static void BM_CallInternalFuncBytecode(benchmark::State& state) {
-  IREE_CHECK_OK(RunFunction(state, "call_internal_func", {100},
-                            /*batch_size=*/20));
+  IREE_CHECK_OK(
+      RunFunction(state, "bytecode_module_benchmark.call_internal_func", {100},
+                  /*result_count=*/1,
+                  /*batch_size=*/20));
 }
 BENCHMARK(BM_CallInternalFuncBytecode);
 
 static void BM_CallImportedFuncBytecode(benchmark::State& state) {
-  IREE_CHECK_OK(RunFunction(state, "call_imported_func", {100},
-                            /*batch_size=*/20));
+  IREE_CHECK_OK(
+      RunFunction(state, "bytecode_module_benchmark.call_imported_func", {100},
+                  /*result_count=*/1,
+                  /*batch_size=*/20));
 }
 BENCHMARK(BM_CallImportedFuncBytecode);
 
 static void BM_LoopSumReference(benchmark::State& state) {
+  static auto work = +[](int x) {
+    benchmark::DoNotOptimize(x);
+    return x;
+  };
   static auto loop = +[](int count) {
     int i = 0;
     for (; i < count; ++i) {
-      benchmark::DoNotOptimize(i);
+      benchmark::DoNotOptimize(i = work(i));
     }
     return i;
   };
@@ -284,8 +302,9 @@ static void BM_LoopSumReference(benchmark::State& state) {
 BENCHMARK(BM_LoopSumReference)->Arg(100000);
 
 static void BM_LoopSumBytecode(benchmark::State& state) {
-  IREE_CHECK_OK(RunFunction(state, "loop_sum",
+  IREE_CHECK_OK(RunFunction(state, "bytecode_module_benchmark.loop_sum",
                             {static_cast<int32_t>(state.range(0))},
+                            /*result_count=*/1,
                             /*batch_size=*/state.range(0)));
 }
 BENCHMARK(BM_LoopSumBytecode)->Arg(100000);

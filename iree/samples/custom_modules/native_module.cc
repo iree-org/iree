@@ -21,7 +21,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm/module_abi_cc.h"
+#include "iree/vm/native_module_cc.h"
 
 //===----------------------------------------------------------------------===//
 // !custom.message type

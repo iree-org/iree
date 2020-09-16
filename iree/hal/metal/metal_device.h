@@ -17,6 +17,8 @@
 
 #import <Metal/Metal.h>
 
+#include <memory>
+
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
 #include "iree/hal/allocator.h"
@@ -40,7 +42,7 @@ class MetalDevice final : public Device {
 
   std::string DebugString() const override;
 
-  Allocator* allocator() const override { return nullptr; }
+  Allocator* allocator() const override { return allocator_.get(); }
 
   absl::Span<CommandQueue*> dispatch_queues() const override {
     return absl::MakeSpan(&common_queue_, 1);
@@ -83,6 +85,8 @@ class MetalDevice final : public Device {
 
   ref_ptr<Driver> driver_;
   id<MTLDevice> metal_handle_;
+
+  std::unique_ptr<Allocator> allocator_;
 
   // Metal does not have clear graphics/dispatch/transfer queue distinction like
   // Vulkan; one just use the same newCommandQueue() API call on MTLDevice to

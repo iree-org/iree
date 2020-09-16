@@ -19,10 +19,12 @@
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/allocator.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/metal/dispatch_time_util.h"
 #include "iree/hal/metal/metal_command_buffer.h"
 #include "iree/hal/metal/metal_command_queue.h"
+#include "iree/hal/metal/metal_direct_allocator.h"
 #include "iree/hal/metal/metal_shared_event.h"
 
 namespace iree {
@@ -44,6 +46,9 @@ MetalDevice::MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info)
   // Grab one queue for dispatch and transfer.
   std::string name = absl::StrCat(device_info.name(), ":queue");
   id<MTLCommandQueue> metal_queue = [metal_handle_ newCommandQueue];  // retained
+
+  allocator_ = MetalDirectAllocator::Create(metal_handle_, metal_queue);
+
   command_queue_ = absl::make_unique<MetalCommandQueue>(
       name, CommandCategory::kDispatch | CommandCategory::kTransfer, metal_queue);
   common_queue_ = command_queue_.get();

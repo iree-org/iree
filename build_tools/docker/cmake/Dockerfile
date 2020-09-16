@@ -14,57 +14,32 @@
 
 # An image for building IREE using CMake.
 
-# Build using:
-# docker build --tag gcr.io/iree-oss/cmake build_tools/docker/cmake/
+# These are separate args because there's no way to strip the patch version off
+# to get the /usr/share path.
+# See https://github.com/moby/moby/issues/41383
+ARG CMAKE_MAJOR_VERSION=3
+ARG CMAKE_MINOR_VERSION=13
+ARG CMAKE_PATCH_VERSION=5
 
-# Run interactively using the following, where IREE_WORKDIR is the path to your
-# local dev environment:
-# docker run -it --rm --entrypoint bash \
-#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
-#   gcr.io/iree-oss/cmake
+FROM gcr.io/iree-oss/util AS install-cmake
+ARG CMAKE_MAJOR_VERSION
+ARG CMAKE_MINOR_VERSION
+ARG CMAKE_PATCH_VERSION
+ENV CMAKE_VERSION="${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}"
+WORKDIR /install-cmake
 
-# Set up the image and working directory.
-FROM ubuntu:18.04
-WORKDIR /usr/src/iree/
+# Install CMake v3.13, which is ahead of apt-get's version (3.10.2).
+RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}-Linux-x86_64.sh"
+RUN chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh"
+RUN "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/
 
-RUN apt-get update \
-  && apt-get install -y \
-    # git for updating IREE's submodules.
-    git \
-    # For later installations
-    wget \
-    # For building with ninja
-    ninja-build \
-    # For bootstrapping the cmake installation
-    cmake \
-    # core IREE dependencies.
-    clang \
-    libsdl2-dev \
-    libssl-dev
+FROM gcr.io/iree-oss/base AS final
+ARG CMAKE_MAJOR_VERSION
+ARG CMAKE_MINOR_VERSION
 
-# Update cmake to v3.13+, which is ahead of apt-get's version (3.10.2).
-# Install dependencies, including an old version of cmake to bootstrap.
-ENV CMAKE_VERSION 3.13.5
-RUN apt-get update \
-  && mkdir ./cmake_install \
-  && cd cmake_install \
-  && wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}.tar.gz" \
-  && tar -xzvf "cmake-${CMAKE_VERSION?}.tar.gz" \
-  && cd "cmake-${CMAKE_VERSION?}/" \
-  && cmake . \
-  && make \
-  && make install
+COPY --from=install-cmake /usr/bin/cmake /usr/bin/ctest /usr/bin/
+COPY --from=install-cmake \
+  "/usr/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" \
+  "/usr/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}"
 
-# Dependencies for the python bindings tests.
-RUN apt-get update \
-  && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-setuptools \
-  && python3 -m pip install --upgrade pip \
-  && python3 -m pip install numpy absl-py
-
-# Environment variables for IREE.
-ENV CC /usr/bin/clang
-ENV CXX /usr/bin/clang++
-ENV IREE_LLVMAOT_LINKER_PATH /usr/bin/ld
+RUN apt-get update && apt-get install -y ninja-build

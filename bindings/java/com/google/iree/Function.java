@@ -23,12 +23,10 @@ final class Function {
   private static final String TAG = Function.class.getCanonicalName();
 
   public static class Signature {
-    int argumentCount;
-    int resultCount;
+    String callingConvention;
 
-    private Signature(int argumentCount, int resultCount) {
-      this.argumentCount = argumentCount;
-      this.resultCount = resultCount;
+    private Signature(String callingConvention) {
+      this.callingConvention = callingConvention;
     }
   }
 
@@ -53,9 +51,8 @@ final class Function {
     Signature signature = getSignature();
     String debugString = String.format("Function debug string\n"
             + "-Name: %s\n"
-            + "-Argument count: %d\n"
-            + "-Result count: %d",
-        name, signature.argumentCount, signature.resultCount);
+            + "-Calling convention: %s\n",
+        name, signature.callingConvention);
     return debugString;
   }
 

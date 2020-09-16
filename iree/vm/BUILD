@@ -74,7 +74,10 @@ cc_test(
     deps = [
         ":bytecode_module",
         ":bytecode_module_benchmark_module_cc",
+        ":context",
+        ":instance",
         ":module",
+        ":native_module",
         ":stack",
         "//iree/base:api",
         "//iree/base:logging",
@@ -207,6 +210,7 @@ cc_library(
     srcs = ["module.c"],
     hdrs = ["module.h"],
     deps = [
+        ":ref",
         "//iree/base:alignment",
         "//iree/base:api",
         "//iree/base:atomics",
@@ -214,10 +218,71 @@ cc_library(
 )
 
 cc_library(
-    name = "module_abi_cc",
+    name = "native_module",
+    srcs = ["native_module.c"],
+    hdrs = ["native_module.h"],
+    deps = [
+        ":module",
+        ":stack",
+        "//iree/base:api",
+    ],
+)
+
+cc_test(
+    name = "native_module_benchmark",
+    srcs = ["native_module_benchmark.cc"],
+    deps = [
+        ":module",
+        ":native_module",
+        ":native_module_test_hdrs",
+        ":stack",
+        "//iree/base:api",
+        "//iree/base:logging",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "native_module_test",
+    srcs = ["native_module_test.cc"],
+    tags = [
+        "noasan",  # TODO(#3122): Enable ASAN test.
+    ],
+    deps = [
+        ":context",
+        ":instance",
+        ":invocation",
+        ":list",
+        ":native_module_test_hdrs",
+        ":ref_cc",
+        "//iree/base:api",
+        "//iree/base:status",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "native_module_test_hdrs",
     hdrs = [
-        "module_abi_cc.h",
+        "native_module_test.h",
+    ],
+    deps = [
+        ":context",
+        ":instance",
+        ":native_module",
+        ":ref",
+        ":stack",
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "native_module_cc",
+    hdrs = [
         "module_abi_packing.h",
+        "native_module_cc.h",
     ],
     deps = [
         ":builtin_types",
@@ -228,7 +293,9 @@ cc_library(
         "//iree/base:api",
         "//iree/base:ref_ptr",
         "//iree/base:status",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -317,10 +384,18 @@ cc_library(
         ":invocation",
         ":list",
         ":module",
+        ":native_module",
         ":ref",
         ":stack",
         ":type_def",
         ":value",
         "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "vm_c_funcs",
+    hdrs = [
+        "vm_c_funcs.h",
     ],
 )

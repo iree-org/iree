@@ -23,5 +23,6 @@ iree_cc_library(
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Conversion::LinalgToSPIRV
+    iree::compiler::Conversion::LinalgToVector
   PUBLIC
 )

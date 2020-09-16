@@ -83,7 +83,10 @@ iree_cc_test(
   DEPS
     ::bytecode_module
     ::bytecode_module_benchmark_module_cc
+    ::context
+    ::instance
     ::module
+    ::native_module
     ::stack
     absl::inlined_vector
     absl::strings
@@ -236,6 +239,7 @@ iree_cc_library(
   SRCS
     "module.c"
   DEPS
+    ::ref
     iree::base::alignment
     iree::base::api
     iree::base::atomics
@@ -244,16 +248,83 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    module_abi_cc
+    native_module
   HDRS
-    "module_abi_cc.h"
+    "native_module.h"
+  SRCS
+    "native_module.c"
+  DEPS
+    ::module
+    ::stack
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    native_module_benchmark
+  SRCS
+    "native_module_benchmark.cc"
+  DEPS
+    ::module
+    ::native_module
+    ::native_module_test_hdrs
+    ::stack
+    benchmark
+    iree::base::api
+    iree::base::logging
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    native_module_test
+  SRCS
+    "native_module_test.cc"
+  DEPS
+    ::context
+    ::instance
+    ::invocation
+    ::list
+    ::native_module_test_hdrs
+    ::ref_cc
+    iree::base::api
+    iree::base::status
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "noasan"
+)
+
+iree_cc_library(
+  NAME
+    native_module_test_hdrs
+  HDRS
+    "native_module_test.h"
+  DEPS
+    ::context
+    ::instance
+    ::native_module
+    ::ref
+    ::stack
+    iree::base::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    native_module_cc
+  HDRS
     "module_abi_packing.h"
+    "native_module_cc.h"
   DEPS
     ::builtin_types
     ::module
     ::ref
     ::ref_cc
     ::stack
+    absl::inlined_vector
+    absl::optional
     absl::span
     absl::strings
     iree::base::api
@@ -361,10 +432,19 @@ iree_cc_library(
     ::invocation
     ::list
     ::module
+    ::native_module
     ::ref
     ::stack
     ::type_def
     ::value
     iree::base::api
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vm_c_funcs
+  HDRS
+    "vm_c_funcs.h"
   PUBLIC
 )

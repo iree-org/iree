@@ -19,6 +19,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Conversion/LinalgToVector/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,6 +32,14 @@ inline void registerHLOToLinalgPasses() {
   createDecomposeHLOClampPass();
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
+}
+
+inline void registerLinalgToVectorPasses() {
+  static bool init_once = []() {
+    createLoadStoreVectorizationPass();
+    return true;
+  }();
+  (void)init_once;
 }
 
 inline void registerLinalgToSPIRVPasses() {

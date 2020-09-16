@@ -24,9 +24,9 @@ export PS4='[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging
 export CMAKE_BIN="$(which cmake)"
-"$CMAKE_BIN" --version
-"$CC" --version
-"$CXX" --version
+"${CMAKE_BIN?}" --version
+"${CC?}" --version
+"${CXX?}" --version
 python3 --version
 
 # Print Vulkan related information: SDK version and GPU ICD version

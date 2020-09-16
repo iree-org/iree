@@ -35,9 +35,11 @@ jobs:
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules
-        run: ./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true
-      - name: Calculating TF SHA
-        run: echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
+        run: ./scripts/git/update_to_llvm_syncpoint.py
+      - name: Calculating SHAs
+        run: |
+          echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
+          echo "::set-env name=LLVM_SHA::$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)"
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
@@ -48,9 +50,11 @@ jobs:
           body: |
             Updates TF to
             [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
+            matching
+            [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }})
             and copies over the LLVM BUILD files.
 
-            `./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP --update_build_files=true`
+            `./scripts/git/update_to_llvm_syncpoint.py`
 
             Automated submodule bump from .github/workflows/update_tf.yml
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"

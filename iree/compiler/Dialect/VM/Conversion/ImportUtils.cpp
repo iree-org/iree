@@ -130,6 +130,14 @@ static Value createStringTableValue(Location loc, StringAttr attrValue,
   return rewriter.create<IREE::VM::ConstRefRodataOp>(loc, rodataOp);
 }
 
+size_t getSegmentSpanSize(Type spanType) {
+  if (auto tupleType = spanType.dyn_cast<TupleType>()) {
+    return tupleType.size();
+  } else {
+    return 1;
+  }
+}
+
 Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter) {

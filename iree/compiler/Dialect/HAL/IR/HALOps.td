@@ -1001,6 +1001,24 @@ def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
   let assemblyFormat = "$command_buffer attr-dict";
 }
 
+def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
+  let summary = [{command buffer device query operation}];
+  let description = [{
+    Used during conversion to access the device used to create a command buffer.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer
+  );
+  let results = (outs
+    HAL_Device:$device
+  );
+
+  let assemblyFormat = "$command_buffer attr-dict `:` type($device)";
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier", [
     AttrSizedOperandSegments,
   ]> {
@@ -1170,6 +1188,44 @@ def HAL_CommandBufferBindDescriptorSetOp :
   ];
 }
 
+def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol"> {
+  let summary = [{command buffer dispatch recording operation, using symbolref}];
+  let description = [{
+    Dispatches an execution request, using a nested symbol reference to the entry point.
+
+    ```mlir
+    %x = constant 128 : index
+    %y = constant 32 : index
+    %z = constant 1 : index
+    hal.command_buffer.dispatch.symbol %cmd, @executable::@target::@entry,
+                                       workgroup_xyz = [%x, %y, %z]
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    SymbolRefAttr:$entry_point,
+    HAL_Dim:$workgroup_x,
+    HAL_Dim:$workgroup_y,
+    HAL_Dim:$workgroup_z
+  );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $entry_point `,`
+    `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
+    attr-dict
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state, Value commandBuffer,
+      IREE::HAL::ExecutableEntryPointOp entryPoint,
+      Value workgroupX, Value workgroupY, Value workgroupZ
+    }]>,
+  ];
+}
+
 def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let summary = [{command buffer dispatch recording operation}];
   let description = [{
@@ -1199,20 +1255,31 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
     attr-dict
   }];
+}
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &state, Value commandBuffer,
-      Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-      Value workgroupX, Value workgroupY, Value workgroupZ
-    }]>,
-    OpBuilder<[{
-      Builder &builder, OperationState &state, Value commandBuffer,
-      Value executable, unsigned entryPointOrdinal,
-      Value workgroupX, Value workgroupY, Value workgroupZ
-    }]>,
-  ];
+def HAL_CommandBufferDispatchIndirectSymbolOp : HAL_Op<"command_buffer.dispatch.indirect.symbol"> {
+  let summary = [{command buffer indirect dispatch recording operation, using symbolref}];
+  let description = [{
+    Dispatches an execution request with the dispatch parameters loaded from the
+    given buffer, using using a nested symbol reference to the entry point.
+
+    ```mlir
+    hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
+                                                workgroups = %buffer[%offset]
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    SymbolRefAttr:$entry_point,
+    HAL_Buffer:$workgroups_buffer,
+    HAL_DeviceSize:$workgroups_offset
+  );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $entry_point `,`
+    `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
+  }];
 }
 
 def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
@@ -1554,7 +1621,10 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
+def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
+    Symbol,
+    HasParent<"IREE::HAL::ExecutableTargetOp">,
+  ]> {
   let summary = [{executable entry point declaration}];
   let description = [{
     An entry point exported by the executable with statically-available
@@ -1573,6 +1643,8 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
     IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableTargetEndOp">,
+    Symbol,
+    SymbolTable,
   ]> {
   let summary = [{target executable IR}];
   let description = [{
@@ -1581,8 +1653,11 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   }];
 
   let arguments = (ins
-    StrAttr:$target_backend
+    StrAttr:$sym_name,
+    StrAttr:$target_backend_filter
     // TODO(benvanik): add compatibility and versioning attributes.
+    // TODO(scotttodd): add linking / preserve_ordinals attribute(s) for targets
+    //                  with special linking requirements
   );
 
   let regions = (region SizedRegion<1>:$body);
@@ -1590,7 +1665,8 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      OpBuilder &builder, OperationState &state, StringRef targetBackend
+      OpBuilder &builder, OperationState &state, StringRef name,
+      StringRef targetBackendFilter
     }]>,
   ];
 

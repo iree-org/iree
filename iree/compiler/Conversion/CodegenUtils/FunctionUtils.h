@@ -23,6 +23,16 @@ namespace iree_compiler {
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(FuncOp func);
 
+/// Returns the attribute name used to record the binding associated with an
+/// iree.placeholder operation.
+inline const char* getBindingAttrName() { return "binding"; }
+
+/// Returns the attribute name used to record argument position in the (operand
+/// + result) list of shaped types of the dispatch region.
+inline const char* getOperandResultNumAttrName() {
+  return "operand_result_index";
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

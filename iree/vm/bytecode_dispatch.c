@@ -17,6 +17,26 @@
 #include "iree/vm/bytecode_dispatch_util.h"
 #include "iree/vm/list.h"
 
+//===----------------------------------------------------------------------===//
+// Math utilities, kept here to limit dependencies
+//===----------------------------------------------------------------------===//
+
+// Rounds up the value to the nearest power of 2 (if not already a power of 2).
+static inline uint32_t iree_math_round_up_to_pow2_u32(uint32_t n) {
+  n--;
+  n |= n >> 1;
+  n |= n >> 2;
+  n |= n >> 4;
+  n |= n >> 8;
+  n |= n >> 16;
+  n++;
+  return n;
+}
+
+//===----------------------------------------------------------------------===//
+// Register remapping utilities
+//===----------------------------------------------------------------------===//
+
 // Remaps registers from a source set to a destination set within the same stack
 // frame. This is a way to perform a conditional multi-mov sequence instead of
 // requiring the additional bytecode representation of the conditional movs.
@@ -26,7 +46,7 @@
 // compiler should ensure this is the case when it can occur.
 static void iree_vm_bytecode_dispatch_remap_branch_registers(
     const iree_vm_registers_t regs,
-    const iree_vm_register_remap_list_t* remap_list) {
+    const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list) {
   for (int i = 0; i < remap_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
@@ -46,7 +66,8 @@ static void iree_vm_bytecode_dispatch_remap_branch_registers(
 // This can be used to eagerly release resources we don't need and reduces
 // memory consumption if used effectively prior to yields/waits.
 static void iree_vm_bytecode_dispatch_discard_registers(
-    const iree_vm_registers_t regs, const iree_vm_register_list_t* reg_list) {
+    const iree_vm_registers_t regs,
+    const iree_vm_register_list_t* IREE_RESTRICT reg_list) {
   for (int i = 0; i < reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     uint16_t reg = reg_list->registers[i];
@@ -57,14 +78,557 @@ static void iree_vm_bytecode_dispatch_discard_registers(
   }
 }
 
-iree_status_t iree_vm_bytecode_dispatch(
-    iree_vm_bytecode_module_t* module,
-    iree_vm_bytecode_module_state_t* module_state, iree_vm_stack_t* stack,
-    iree_vm_stack_frame_t* entry_frame,
+//===----------------------------------------------------------------------===//
+// Stack management
+//===----------------------------------------------------------------------===//
+
+static iree_vm_registers_t iree_vm_bytecode_get_register_storage(
+    iree_vm_stack_frame_t* frame) {
+  const iree_vm_bytecode_frame_storage_t* stack_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(frame);
+
+  // Masks indicate the valid bits of any register value within the range we
+  // have allocated in the storage. So for 4 registers we'd expect a 0b11 mask.
+  iree_vm_registers_t registers;
+  memset(&registers, 0, sizeof(registers));
+  registers.i32_mask = (uint16_t)(stack_storage->i32_register_count
+                                      ? stack_storage->i32_register_count - 1
+                                      : 0);
+  registers.ref_mask = (uint16_t)(stack_storage->ref_register_count
+                                      ? stack_storage->ref_register_count - 1
+                                      : 0);
+
+  // Register storage immediately follows the stack storage header.
+  registers.i32 =
+      (int32_t*)((uintptr_t)stack_storage + stack_storage->i32_register_offset);
+  registers.ref = (iree_vm_ref_t*)((uintptr_t)stack_storage +
+                                   stack_storage->ref_register_offset);
+
+  return registers;
+}
+
+// Releases any remaining refs held in the frame storage.
+static void IREE_API_CALL
+iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
+  iree_vm_registers_t regs = iree_vm_bytecode_get_register_storage(frame);
+  // TODO(benvanik): allow the VM to elide this when it's known that there are
+  // no more live registers.
+  for (uint16_t i = 0; i <= regs.ref_mask; ++i) {
+    iree_vm_ref_t* ref = &regs.ref[i];
+    if (ref->ptr) iree_vm_ref_release(ref);
+  }
+}
+
+static iree_status_t iree_vm_bytecode_function_enter(
+    iree_vm_stack_t* stack, const iree_vm_function_t function,
+    iree_vm_stack_frame_t** out_callee_frame,
+    iree_vm_registers_t* out_callee_registers) {
+  IREE_DISPATCH_LOG_CALL(function);
+
+  iree_vm_bytecode_module_t* module =
+      (iree_vm_bytecode_module_t*)function.module->self;
+  if (IREE_UNLIKELY(function.ordinal >= module->function_descriptor_count)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "import ordinal out of range");
+  }
+  const iree_vm_FunctionDescriptor_t* target_descriptor =
+      &module->function_descriptor_table[function.ordinal];
+
+  // We first compute the frame size of the callee and the masks we'll use to
+  // bounds check register access. This lets us allocate the entire frame
+  // (header, frame, and register storage) as a single pointer bump below.
+
+  // Round up register counts to the nearest power of 2 (if not already).
+  // This let's us use bit masks on register accesses to do bounds checking
+  // instead of more complex logic. The cost of these extra registers is only at
+  // worst 2x the required cost: so not large when thinking about the normal
+  // size of data used in an IREE app for tensors.
+  //
+  // Note that to allow the masking to work as a guard we need to ensure we at
+  // least allocate 1 register; this way an i32[reg & mask] will always point at
+  // valid memory even if mask == 0.
+  uint32_t i32_register_count = iree_math_round_up_to_pow2_u32(
+      VMMAX(1, target_descriptor->i32_register_count));
+  uint32_t ref_register_count = iree_math_round_up_to_pow2_u32(
+      VMMAX(1, target_descriptor->ref_register_count));
+  if (IREE_UNLIKELY(i32_register_count > IREE_I32_REGISTER_MASK) ||
+      IREE_UNLIKELY(ref_register_count > IREE_REF_REGISTER_MASK)) {
+    // Register count overflow. A valid compiler should never produce files that
+    // hit this.
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "register count overflow");
+  }
+
+  // We need to align the ref register start to the natural machine
+  // alignment in case the compiler is expecting that (it makes it easier to
+  // debug too).
+  iree_host_size_t header_size =
+      iree_math_align(sizeof(iree_vm_bytecode_frame_storage_t), 16);
+  iree_host_size_t i32_register_size =
+      iree_math_align(i32_register_count * sizeof(int32_t), 16);
+  iree_host_size_t ref_register_size =
+      iree_math_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
+  iree_host_size_t frame_size =
+      header_size + i32_register_size + ref_register_size;
+
+  // Enter function and allocate stack frame storage.
+  IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(
+      stack, &function, IREE_VM_STACK_FRAME_BYTECODE, frame_size,
+      iree_vm_bytecode_stack_frame_cleanup, out_callee_frame));
+
+  // Stash metadata and compute register pointers.
+  iree_vm_bytecode_frame_storage_t* stack_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          *out_callee_frame);
+  stack_storage->i32_register_count = i32_register_count;
+  stack_storage->ref_register_count = ref_register_count;
+  stack_storage->i32_register_offset = header_size;
+  stack_storage->ref_register_offset = header_size + i32_register_size;
+  *out_callee_registers =
+      iree_vm_bytecode_get_register_storage(*out_callee_frame);
+
+  return iree_ok_status();
+}
+
+// Enters an internal bytecode stack frame from an external caller.
+// A new |out_callee_frame| will be pushed to the stack with storage space for
+// the registers used by the function and |arguments| will be marshaled into the
+// ABI-defined registers.
+//
+// Note that callers are expected to have matched our expectations for
+// |arguments| and we don't validate that here.
+static iree_status_t iree_vm_bytecode_external_enter(
+    iree_vm_stack_t* stack, const iree_vm_function_t function,
+    iree_string_view_t cconv_arguments, iree_byte_span_t arguments,
+    iree_vm_stack_frame_t** out_callee_frame,
+    iree_vm_registers_t* out_callee_registers) {
+  // Enter the bytecode function and allocate registers.
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
+      stack, function, out_callee_frame, out_callee_registers));
+
+  // Marshal arguments from the ABI format to the VM registers.
+  iree_vm_registers_t callee_registers = *out_callee_registers;
+  uint16_t i32_reg = 0;
+  uint16_t ref_reg = 0;
+  const uint8_t* p = arguments.data;
+  for (iree_host_size_t i = 0; i < cconv_arguments.size; ++i) {
+    switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_INT32: {
+        uint16_t dst_reg = i32_reg++;
+        memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
+               sizeof(int32_t));
+        p += sizeof(int32_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_INT64: {
+        uint16_t dst_reg = i32_reg;
+        i32_reg += 2;
+        memcpy(&callee_registers.i32[dst_reg & callee_registers.i32_mask], p,
+               sizeof(int64_t));
+        p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_REF: {
+        uint16_t dst_reg = ref_reg++;
+        iree_vm_ref_move(
+            (iree_vm_ref_t*)p,
+            &callee_registers.ref[dst_reg & callee_registers.ref_mask]);
+        p += sizeof(iree_vm_ref_t);
+      } break;
+    }
+  }
+
+  return iree_ok_status();
+}
+
+// Leaves an internal bytecode stack frame and returns to an external caller.
+// Registers will be marshaled from the |src_reg_list| to the |results| buffer.
+//
+// Note that callers are expected to have matched our expectations for
+// |results| and we don't validate that here.
+static iree_status_t iree_vm_bytecode_external_leave(
+    iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
+    const iree_vm_registers_t* IREE_RESTRICT callee_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    iree_string_view_t cconv_results, iree_byte_span_t results) {
+  // Marshal results from registers to the ABI results buffer.
+  uint8_t* p = results.data;
+  for (iree_host_size_t i = 0; i < cconv_results.size; ++i) {
+    uint16_t src_reg = src_reg_list->registers[i];
+    switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_INT32: {
+        memcpy(p, &callee_registers->i32[src_reg & callee_registers->i32_mask],
+               sizeof(int32_t));
+        p += sizeof(int32_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_INT64: {
+        memcpy(
+            p,
+            &callee_registers->i32[src_reg & (callee_registers->i32_mask & ~1)],
+            sizeof(int64_t));
+        p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_REF: {
+        iree_vm_ref_move(
+            &callee_registers->ref[src_reg & callee_registers->ref_mask],
+            (iree_vm_ref_t*)p);
+        p += sizeof(iree_vm_ref_t);
+      } break;
+    }
+  }
+
+  // Leave and deallocate bytecode stack frame.
+  return iree_vm_stack_function_leave(stack);
+}
+
+// Enters an internal bytecode stack frame from a parent bytecode frame.
+// Registers in |src_reg_list| will be marshaled into the callee frame and the
+// |dst_reg_list| will be stashed for use when leaving the frame.
+static iree_status_t iree_vm_bytecode_internal_enter(
+    iree_vm_stack_t* stack, iree_vm_module_t* module, int32_t function_ordinal,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_stack_frame_t** out_callee_frame,
+    iree_vm_registers_t* out_callee_registers) {
+  // Stash the destination register list for result values on the caller.
+  iree_vm_bytecode_frame_storage_t* caller_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          iree_vm_stack_current_frame(stack));
+  caller_storage->return_registers = dst_reg_list;
+
+  // NOTE: after this call the caller registers may be invalid and need to be
+  // requeried.
+  iree_vm_function_t function;
+  function.module = module;
+  function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
+  function.ordinal = function_ordinal;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
+      stack, function, out_callee_frame, out_callee_registers));
+
+  // Remaps argument/result registers from a source list in the caller/callee
+  // frame to the 0-N ABI registers in the callee/caller frame.
+  // This assumes that the destination stack frame registers are unused and ok
+  // to overwrite directly. Each bank begins left-aligned at 0 and increments
+  // per arg of its type.
+  iree_vm_registers_t src_regs =
+      iree_vm_bytecode_get_register_storage(iree_vm_stack_parent_frame(stack));
+  iree_vm_registers_t* dst_regs = out_callee_registers;
+  int i32_reg_offset = 0;
+  int ref_reg_offset = 0;
+  for (int i = 0; i < src_reg_list->size; ++i) {
+    // TODO(benvanik): change encoding to avoid this branching.
+    // Could write two arrays: one for prims and one for refs.
+    uint16_t src_reg = src_reg_list->registers[i];
+    if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
+      uint16_t dst_reg = ref_reg_offset++;
+      memset(&dst_regs->ref[dst_reg & dst_regs->ref_mask], 0,
+             sizeof(iree_vm_ref_t));
+      iree_vm_ref_retain_or_move(src_reg & IREE_REF_REGISTER_MOVE_BIT,
+                                 &src_regs.ref[src_reg & src_regs.ref_mask],
+                                 &dst_regs->ref[dst_reg & dst_regs->ref_mask]);
+    } else {
+      uint16_t dst_reg = i32_reg_offset++;
+      dst_regs->i32[dst_reg & dst_regs->i32_mask] =
+          src_regs.i32[src_reg & src_regs.i32_mask];
+    }
+  }
+
+  return iree_ok_status();
+}
+
+// Leaves an internal bytecode stack frame and returns to the parent bytecode
+// frame. |src_reg_list| registers will be marshaled into the dst_reg_list
+// provided by the caller frame when entering.
+static iree_status_t iree_vm_bytecode_internal_leave(
+    iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
+    const iree_vm_registers_t callee_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_registers_t* out_caller_registers) {
+  // Remaps registers from source to destination across frames.
+  // Registers from the |src_regs| will be copied/moved to |dst_regs| with the
+  // mappings provided by |src_reg_list| and |dst_reg_list|. It's assumed that
+  // the mappings are matching by type and - in the case that they aren't -
+  // things will get weird (but not crash).
+  *out_caller_frame = iree_vm_stack_parent_frame(stack);
+  iree_vm_bytecode_frame_storage_t* caller_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          *out_caller_frame);
+  const iree_vm_register_list_t* dst_reg_list =
+      caller_storage->return_registers;
+  VMCHECK(src_reg_list->size <= dst_reg_list->size);
+  if (IREE_UNLIKELY(src_reg_list->size > dst_reg_list->size)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "src/dst reg count mismatch on internal return");
+  }
+  iree_vm_registers_t caller_registers =
+      iree_vm_bytecode_get_register_storage(*out_caller_frame);
+  for (int i = 0; i < src_reg_list->size; ++i) {
+    // TODO(benvanik): change encoding to avoid this branching.
+    // Could write two arrays: one for prims and one for refs.
+    uint16_t src_reg = src_reg_list->registers[i];
+    uint16_t dst_reg = dst_reg_list->registers[i];
+    if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
+      iree_vm_ref_retain_or_move(
+          src_reg & IREE_REF_REGISTER_MOVE_BIT,
+          &callee_registers.ref[src_reg & callee_registers.ref_mask],
+          &caller_registers.ref[dst_reg & caller_registers.ref_mask]);
+    } else {
+      caller_registers.i32[dst_reg & caller_registers.i32_mask] =
+          callee_registers.i32[src_reg & callee_registers.i32_mask];
+    }
+  }
+
+  // Leave and deallocate bytecode stack frame.
+  *out_caller_registers = caller_registers;
+  return iree_vm_stack_function_leave(stack);
+}
+
+// Populates an import call arguments
+static void iree_vm_bytecode_populate_import_cconv_arguments(
+    iree_string_view_t cconv_arguments,
+    const iree_vm_registers_t caller_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    iree_byte_span_t storage) {
+  uint8_t* IREE_RESTRICT p = storage.data;
+  for (iree_host_size_t i = 0, seg_i = 0, reg_i = 0; i < cconv_arguments.size;
+       ++i, ++seg_i) {
+    switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_INT32: {
+        memcpy(p,
+               &caller_registers.i32[src_reg_list->registers[reg_i++] &
+                                     caller_registers.i32_mask],
+               sizeof(int32_t));
+        p += sizeof(int32_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_INT64: {
+        memcpy(p,
+               &caller_registers.i32[src_reg_list->registers[reg_i++] &
+                                     (caller_registers.i32_mask & ~1)],
+               sizeof(int64_t));
+        p += sizeof(int64_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_REF: {
+        uint16_t src_reg = src_reg_list->registers[reg_i++];
+        iree_vm_ref_retain_or_move(
+            src_reg & IREE_REF_REGISTER_MOVE_BIT,
+            &caller_registers.ref[src_reg & caller_registers.ref_mask],
+            (iree_vm_ref_t*)p);
+        p += sizeof(iree_vm_ref_t);
+      } break;
+      case IREE_VM_CCONV_TYPE_SPAN_START: {
+        VMCHECK(segment_size_list);
+        int32_t span_count = segment_size_list->registers[seg_i];
+        memcpy(p, &span_count, sizeof(int32_t));
+        p += sizeof(int32_t);
+        if (!span_count) {
+          // No items; skip the span.
+          do {
+            ++i;
+          } while (i < cconv_arguments.size &&
+                   cconv_arguments.data[i] != IREE_VM_CCONV_TYPE_SPAN_END);
+          continue;
+        }
+        iree_host_size_t span_start_i = i + 1;
+        for (int32_t j = 0; j < span_count; ++j) {
+          for (i = span_start_i;
+               i < cconv_arguments.size &&
+               cconv_arguments.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
+               ++i) {
+            // TODO(benvanik): share with switch above.
+            switch (cconv_arguments.data[i]) {
+              case IREE_VM_CCONV_TYPE_INT32: {
+                memcpy(p,
+                       &caller_registers.i32[src_reg_list->registers[reg_i++] &
+                                             caller_registers.i32_mask],
+                       sizeof(int32_t));
+                p += sizeof(int32_t);
+              } break;
+              case IREE_VM_CCONV_TYPE_INT64: {
+                memcpy(p,
+                       &caller_registers.i32[src_reg_list->registers[reg_i++] &
+                                             (caller_registers.i32_mask & ~1)],
+                       sizeof(int64_t));
+                p += sizeof(int64_t);
+              } break;
+              case IREE_VM_CCONV_TYPE_REF: {
+                uint16_t src_reg = src_reg_list->registers[reg_i++];
+                iree_vm_ref_retain_or_move(
+                    src_reg & IREE_REF_REGISTER_MOVE_BIT,
+                    &caller_registers.ref[src_reg & caller_registers.ref_mask],
+                    (iree_vm_ref_t*)p);
+                p += sizeof(iree_vm_ref_t);
+              } break;
+            }
+          }
+        }
+      } break;
+    }
+  }
+}
+
+// Issues a populated import call and marshals the results into |dst_reg_list|.
+static iree_status_t iree_vm_bytecode_issue_import_call(
+    iree_vm_stack_t* stack, const iree_vm_function_call_t call,
+    iree_string_view_t cconv_results,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_registers_t* out_caller_registers,
     iree_vm_execution_result_t* out_result) {
+  // Call external function.
+  iree_status_t call_status = call.function.module->begin_call(
+      call.function.module->self, stack, &call, out_result);
+  if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
+    // TODO(benvanik): set execution result to failure/capture stack.
+    return iree_status_annotate(call_status,
+                                iree_make_cstring_view("while calling import"));
+  }
+
+  // NOTE: we don't support yielding within imported functions right now so it's
+  // safe to assume the stack is still valid here. If the called function can
+  // yield then we'll need to requery all pointers here.
+  *out_caller_frame = iree_vm_stack_current_frame(stack);
+  *out_caller_registers =
+      iree_vm_bytecode_get_register_storage(*out_caller_frame);
+
+  // Marshal outputs from the ABI results buffer to registers.
+  iree_vm_registers_t caller_registers = *out_caller_registers;
+  uint8_t* IREE_RESTRICT p = call.results.data;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+       ++i) {
+    uint16_t dst_reg = dst_reg_list->registers[i];
+    switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_INT32:
+        memcpy(&caller_registers.i32[dst_reg & caller_registers.i32_mask], p,
+               sizeof(int32_t));
+        p += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_INT64:
+        memcpy(
+            &caller_registers.i32[dst_reg & (caller_registers.i32_mask & ~1)],
+            p, sizeof(int64_t));
+        p += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        iree_vm_ref_move(
+            (iree_vm_ref_t*)p,
+            &caller_registers.ref[dst_reg & caller_registers.ref_mask]);
+        p += sizeof(iree_vm_ref_t);
+        break;
+    }
+  }
+
+  return iree_ok_status();
+}
+
+// Calls an imported function from another module.
+// Marshals the |src_reg_list| registers into ABI storage and results into
+// |dst_reg_list|.
+static iree_status_t iree_vm_bytecode_call_import(
+    iree_vm_stack_t* stack, const iree_vm_bytecode_module_state_t* module_state,
+    uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_registers_t* out_caller_registers,
+    iree_vm_execution_result_t* out_result) {
+  // Prepare |call| by looking up the import information.
+  import_ordinal &= 0x7FFFFFFFu;
+  if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "import ordinal out of range");
+  }
+  const iree_vm_bytecode_import_t* import =
+      &module_state->import_table[import_ordinal];
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.function = import->function;
+  IREE_DISPATCH_LOG_CALL(&call.function);
+
+  // Marshal inputs from registers to the ABI arguments buffer.
+  call.arguments.data_length = import->argument_buffer_size;
+  call.arguments.data = iree_alloca(call.arguments.data_length);
+  memset(call.arguments.data, 0, call.arguments.data_length);
+  iree_vm_bytecode_populate_import_cconv_arguments(
+      import->arguments, caller_registers,
+      /*segment_size_list=*/NULL, src_reg_list, call.arguments);
+
+  // Issue the call and handle results.
+  call.results.data_length = import->result_buffer_size;
+  call.results.data = iree_alloca(call.results.data_length);
+  memset(call.results.data, 0, call.results.data_length);
+  return iree_vm_bytecode_issue_import_call(stack, call, import->results,
+                                            dst_reg_list, out_caller_frame,
+                                            out_caller_registers, out_result);
+}
+
+// Calls a variadic imported function from another module.
+// Marshals the |src_reg_list| registers into ABI storage and results into
+// |dst_reg_list|. |segment_size_list| contains the counts within each segment.
+static iree_status_t iree_vm_bytecode_call_import_variadic(
+    iree_vm_stack_t* stack, const iree_vm_bytecode_module_state_t* module_state,
+    uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_stack_frame_t** out_caller_frame,
+    iree_vm_registers_t* out_caller_registers,
+    iree_vm_execution_result_t* out_result) {
+  // Prepare |call| by looking up the import information.
+  import_ordinal &= 0x7FFFFFFFu;
+  if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "import ordinal out of range");
+  }
+  const iree_vm_bytecode_import_t* import =
+      &module_state->import_table[import_ordinal];
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.function = import->function;
+  IREE_DISPATCH_LOG_CALL(&call.function);
+
+  // Allocate ABI argument/result storage taking into account the variadic
+  // segments.
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+      import->arguments, segment_size_list, &call.arguments.data_length));
+  call.arguments.data = iree_alloca(call.arguments.data_length);
+  memset(call.arguments.data, 0, call.arguments.data_length);
+
+  // Marshal inputs from registers to the ABI arguments buffer.
+  iree_vm_bytecode_populate_import_cconv_arguments(
+      import->arguments, caller_registers, segment_size_list, src_reg_list,
+      call.arguments);
+
+  // Issue the call and handle results.
+  call.results.data_length = import->result_buffer_size;
+  call.results.data = iree_alloca(call.results.data_length);
+  memset(call.results.data, 0, call.results.data_length);
+  return iree_vm_bytecode_issue_import_call(stack, call, import->results,
+                                            dst_reg_list, out_caller_frame,
+                                            out_caller_registers, out_result);
+}
+
+//===----------------------------------------------------------------------===//
+// Main interpreter dispatch routine
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_vm_bytecode_dispatch(
+    iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
+    const iree_vm_function_call_t* call, iree_string_view_t cconv_arguments,
+    iree_string_view_t cconv_results, iree_vm_execution_result_t* out_result) {
+  memset(out_result, 0, sizeof(*out_result));
+
   // When required emit the dispatch tables here referencing the labels we are
   // defining below.
   DEFINE_DISPATCH_TABLES();
+
+  // Enter function (as this is the initial call).
+  // The callee's return will take care of storing the output registers when it
+  // actually does return, either immediately or in the future via a resume.
+  iree_vm_stack_frame_t* current_frame = NULL;
+  iree_vm_registers_t regs;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_bytecode_external_enter(stack, call->function, cconv_arguments,
+                                      call->arguments, &current_frame, &regs));
 
   // Primary dispatch state. This is our 'native stack frame' and really
   // just enough to make dereferencing common addresses (like the current
@@ -73,16 +637,14 @@ iree_status_t iree_vm_bytecode_dispatch(
   // The hope is that the compiler decides to keep these in registers (as
   // they are touched for every instruction executed). The frame will change
   // as we call into different functions.
-  iree_vm_stack_frame_t* current_frame = entry_frame;
-  iree_vm_registers_t regs = entry_frame->registers;
-  const uint8_t* bytecode_data =
+  const iree_vm_bytecode_module_state_t* IREE_RESTRICT module_state =
+      (iree_vm_bytecode_module_state_t*)current_frame->module_state;
+  const uint8_t* IREE_RESTRICT bytecode_data =
       module->bytecode_data.data +
       module->function_descriptor_table[current_frame->function.ordinal]
           .bytecode_offset;
   iree_vm_source_offset_t pc = current_frame->pc;
-  const int32_t entry_frame_depth = entry_frame->depth;
-
-  memset(out_result, 0, sizeof(*out_result));
+  const int32_t entry_frame_depth = current_frame->depth;
 
   BEGIN_DISPATCH_CORE() {
     //===------------------------------------------------------------------===//
@@ -90,9 +652,9 @@ iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
     DISPATCH_OP(CORE, GlobalLoadI32, {
-      int32_t byte_offset = VM_DecGlobalAttr("global");
-      if (byte_offset < 0 ||
-          byte_offset >= module_state->rwdata_storage.data_length) {
+      uint32_t byte_offset = VM_DecGlobalAttr("global");
+      if (IREE_UNLIKELY(byte_offset >=
+                        module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -105,9 +667,9 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalStoreI32, {
-      int32_t byte_offset = VM_DecGlobalAttr("global");
-      if (byte_offset < 0 ||
-          byte_offset >= module_state->rwdata_storage.data_length) {
+      uint32_t byte_offset = VM_DecGlobalAttr("global");
+      if (IREE_UNLIKELY(byte_offset >=
+                        module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -120,9 +682,9 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalLoadIndirectI32, {
-      int32_t byte_offset = VM_DecOperandRegI32("global");
-      if (byte_offset < 0 ||
-          byte_offset >= module_state->rwdata_storage.data_length) {
+      uint32_t byte_offset = VM_DecOperandRegI32("global");
+      if (IREE_UNLIKELY(byte_offset >=
+                        module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -135,9 +697,9 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalStoreIndirectI32, {
-      int32_t byte_offset = VM_DecOperandRegI32("global");
-      if (byte_offset < 0 ||
-          byte_offset >= module_state->rwdata_storage.data_length) {
+      uint32_t byte_offset = VM_DecOperandRegI32("global");
+      if (IREE_UNLIKELY(byte_offset >=
+                        module_state->rwdata_storage.data_length)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -150,8 +712,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalLoadRef, {
-      int32_t global = VM_DecGlobalAttr("global");
-      if (global < 0 || global >= module_state->global_ref_count) {
+      uint32_t global = VM_DecGlobalAttr("global");
+      if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global ref ordinal out of range: %d (table=%zu)", global,
@@ -166,8 +728,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalStoreRef, {
-      int32_t global = VM_DecGlobalAttr("global");
-      if (global < 0 || global >= module_state->global_ref_count) {
+      uint32_t global = VM_DecGlobalAttr("global");
+      if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global ref ordinal out of range: %d (table=%zu)", global,
@@ -182,8 +744,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
-      int32_t global = VM_DecGlobalAttr("global");
-      if (global < 0 || global >= module_state->global_ref_count) {
+      uint32_t global = VM_DecGlobalAttr("global");
+      if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global ref ordinal out of range: %d (table=%zu)", global,
@@ -198,8 +760,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
-      int32_t global = VM_DecGlobalAttr("global");
-      if (global < 0 || global >= module_state->global_ref_count) {
+      uint32_t global = VM_DecGlobalAttr("global");
+      if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global ref ordinal out of range: %d (table=%zu)", global,
@@ -235,9 +797,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, ConstRefRodata, {
-      int32_t rodata_ordinal = VM_DecRodataAttr("rodata");
-      if (rodata_ordinal < 0 ||
-          rodata_ordinal >= module_state->rodata_ref_count) {
+      uint32_t rodata_ordinal = VM_DecRodataAttr("rodata");
+      if (IREE_UNLIKELY(rodata_ordinal >= module_state->rodata_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "rodata ref ordinal out of range: %d (table=%zu)", rodata_ordinal,
@@ -256,8 +817,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, ListAlloc, {
       const iree_vm_type_def_t* element_type_def = VM_DecTypeOf("element_type");
-      iree_host_size_t initial_capacity =
-          VM_DecOperandRegI32("initial_capacity");
+      uint32_t initial_capacity = VM_DecOperandRegI32("initial_capacity");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
       iree_vm_list_t* list = NULL;
@@ -271,10 +831,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) {
+      if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      int32_t minimum_capacity = VM_DecOperandRegI32("minimum_capacity");
+      uint32_t minimum_capacity = VM_DecOperandRegI32("minimum_capacity");
       IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, minimum_capacity));
     });
 
@@ -282,7 +842,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) {
+      if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
       int32_t* result = VM_DecResultRegI32("result");
@@ -293,10 +853,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) {
+      if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      int32_t new_size = VM_DecOperandRegI32("new_size");
+      uint32_t new_size = VM_DecOperandRegI32("new_size");
       IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, new_size));
     });
 
@@ -304,10 +864,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       bool list_is_move;
       iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-      if (!list) {
+      if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      int32_t index = VM_DecOperandRegI32("index");
+      uint32_t index = VM_DecOperandRegI32("index");
       int32_t* result = VM_DecResultRegI32("result");
       iree_vm_value_t value;
       IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
@@ -322,7 +882,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (!list) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      int32_t index = VM_DecOperandRegI32("index");
+      uint32_t index = VM_DecOperandRegI32("index");
       int32_t raw_value = VM_DecOperandRegI32("raw_value");
       iree_vm_value_t value = iree_vm_value_make_i32(raw_value);
       IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
@@ -333,7 +893,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
       // if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-      // int32_t index = VM_DecOperandRegI32("index");
+      // uint32_t index = VM_DecOperandRegI32("index");
       // iree_vm_ref_t* result = VM_DecResultRegRef("result");
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "vm.list.get.ref not implemented");
@@ -344,7 +904,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       // iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
       // iree_vm_list_t* list = iree_vm_list_deref(list_ref);
       // if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-      // int32_t index = VM_DecOperandRegI32("index");
+      // uint32_t index = VM_DecOperandRegI32("index");
       // bool operand_is_move = VM_DecOperandRegRefIsMove("value");
       // iree_vm_ref_t* operand = VM_DecOperandRegRef("value");
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -582,46 +1142,19 @@ iree_status_t iree_vm_bytecode_dispatch(
       // TODO(benvanik): something more clever than just a high bit?
       int is_import = (function_ordinal & 0x80000000u) != 0;
       if (is_import) {
-        // Call external function.
-        iree_vm_function_call_t call;
-        memset(&call, 0, sizeof(call));
-        call.function =
-            module_state->import_table[function_ordinal & 0x7FFFFFFFu];
-        call.argument_registers = src_reg_list;
-        call.result_registers = dst_reg_list;
-        IREE_DISPATCH_LOG_CALL(call.function);
-        iree_status_t call_status = call.function.module->begin_call(
-            call.function.module->self, stack, &call, out_result);
-        if (!iree_status_is_ok(call_status)) {
-          // TODO(benvanik): set execution result to failure/capture stack.
-          return iree_status_annotate(
-              call_status, iree_make_cstring_view("while calling import"));
-        }
+        // Call import (and possible yield).
+        IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import(
+            stack, module_state, function_ordinal, regs, src_reg_list,
+            dst_reg_list, &current_frame, &regs, out_result));
       } else {
         // Switch execution to the target function and continue running in the
         // bytecode dispatcher.
-        iree_vm_function_t target_function;
-        target_function.module = &module->interface;
-        target_function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-        target_function.ordinal = function_ordinal;
-        const iree_vm_FunctionDescriptor_t* target_descriptor =
-            &module->function_descriptor_table[function_ordinal];
-        target_function.i32_register_count =
-            target_descriptor->i32_register_count;
-        target_function.ref_register_count =
-            target_descriptor->ref_register_count;
-        IREE_DISPATCH_LOG_CALL(target_function);
-        iree_status_t enter_status = iree_vm_stack_function_enter(
-            stack, target_function, src_reg_list, dst_reg_list, &current_frame);
-        if (!iree_status_is_ok(enter_status)) {
-          // TODO(benvanik): set execution result to stack overflow.
-          return iree_status_annotate(
-              enter_status,
-              iree_make_cstring_view("while calling internal function"));
-        }
-        regs = current_frame->registers;
+        IREE_RETURN_IF_ERROR(iree_vm_bytecode_internal_enter(
+            stack, current_frame->function.module, function_ordinal,
+            src_reg_list, dst_reg_list, &current_frame, &regs));
         bytecode_data =
-            module->bytecode_data.data + target_descriptor->bytecode_offset;
+            module->bytecode_data.data +
+            module->function_descriptor_table[function_ordinal].bytecode_offset;
         pc = current_frame->pc;
       }
     });
@@ -630,7 +1163,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       // TODO(benvanik): dedupe with above or merge and always have the seg size
       // list be present (but empty) for non-variadic calls.
       int32_t function_ordinal = VM_DecFuncAttr("callee");
-      const iree_vm_register_list_t* seg_size_list =
+      const iree_vm_register_list_t* segment_size_list =
           VM_DecVariadicOperands("segment_sizes");
       const iree_vm_register_list_t* src_reg_list =
           VM_DecVariadicOperands("operands");
@@ -641,32 +1174,17 @@ iree_status_t iree_vm_bytecode_dispatch(
       // NOTE: we assume validation has ensured these functions exist.
       // TODO(benvanik): something more clever than just a high bit?
       int is_import = (function_ordinal & 0x80000000u) != 0;
-      if (!is_import) {
+      if (IREE_UNLIKELY(!is_import)) {
         // Variadic calls are currently only supported for import functions.
         return iree_make_status(
             IREE_STATUS_FAILED_PRECONDITION,
             "variadic calls only supported for internal callees");
       }
 
-      // Import that we can fetch from the module state.
-      iree_vm_function_call_t call;
-      memset(&call, 0, sizeof(call));
-      call.function =
-          module_state->import_table[function_ordinal & 0x7FFFFFFFu];
-      call.argument_registers = src_reg_list;
-      call.variadic_segment_size_list = seg_size_list;
-      call.result_registers = dst_reg_list;
-      IREE_DISPATCH_LOG_CALL(call.function);
-
-      // Call external function.
-      iree_status_t call_status = call.function.module->begin_call(
-          call.function.module->self, stack, &call, out_result);
-      if (!iree_status_is_ok(call_status)) {
-        // TODO(benvanik): set execution result to failure/capture stack.
-        return iree_status_annotate(
-            call_status,
-            iree_make_cstring_view("while calling variadic import"));
-      }
+      // Call import (and possible yield).
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import_variadic(
+          stack, module_state, function_ordinal, regs, segment_size_list,
+          src_reg_list, dst_reg_list, &current_frame, &regs, out_result));
     });
 
     DISPATCH_OP(CORE, Return, {
@@ -674,18 +1192,18 @@ iree_status_t iree_vm_bytecode_dispatch(
           VM_DecVariadicOperands("operands");
       current_frame->pc = pc;
 
-      // Leave callee by cleaning up the stack.
-      IREE_RETURN_IF_ERROR(
-          iree_vm_stack_function_leave(stack, src_reg_list, &current_frame));
-
-      if (!current_frame || current_frame->depth < entry_frame_depth) {
+      if (current_frame->depth <= entry_frame_depth) {
         // Return from the top-level entry frame - return back to call().
-        // TODO(benvanik): clear execution results.
-        return iree_ok_status();
+        return iree_vm_bytecode_external_leave(stack, current_frame, &regs,
+                                               src_reg_list, cconv_results,
+                                               call->results);
       }
 
+      // Store results into the caller frame and pop back to the parent.
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_internal_leave(
+          stack, current_frame, regs, src_reg_list, &current_frame, &regs));
+
       // Reset dispatch state so we can continue executing in the caller.
-      regs = current_frame->registers;
       bytecode_data =
           module->bytecode_data.data +
           module->function_descriptor_table[current_frame->function.ordinal]
@@ -766,9 +1284,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       //===----------------------------------------------------------------===//
 
       DISPATCH_OP(EXT_I64, GlobalLoadI64, {
-        int32_t byte_offset = VM_DecGlobalAttr("global");
-        if (byte_offset < 0 ||
-            byte_offset >= module_state->rwdata_storage.data_length) {
+        uint32_t byte_offset = VM_DecGlobalAttr("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -781,9 +1299,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       });
 
       DISPATCH_OP(EXT_I64, GlobalStoreI64, {
-        int32_t byte_offset = VM_DecGlobalAttr("global");
-        if (byte_offset < 0 ||
-            byte_offset >= module_state->rwdata_storage.data_length) {
+        uint32_t byte_offset = VM_DecGlobalAttr("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -796,9 +1314,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       });
 
       DISPATCH_OP(EXT_I64, GlobalLoadIndirectI64, {
-        int32_t byte_offset = VM_DecOperandRegI32("global");
-        if (byte_offset < 0 ||
-            byte_offset >= module_state->rwdata_storage.data_length) {
+        uint32_t byte_offset = VM_DecOperandRegI32("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -811,9 +1329,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       });
 
       DISPATCH_OP(EXT_I64, GlobalStoreIndirectI64, {
-        int32_t byte_offset = VM_DecOperandRegI32("global");
-        if (byte_offset < 0 ||
-            byte_offset >= module_state->rwdata_storage.data_length) {
+        uint32_t byte_offset = VM_DecOperandRegI32("global");
+        if (IREE_UNLIKELY(byte_offset >=
+                          module_state->rwdata_storage.data_length)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "global byte_offset out of range: %d (rwdata=%zu)", byte_offset,
@@ -848,8 +1366,10 @@ iree_status_t iree_vm_bytecode_dispatch(
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
         iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-        if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-        int32_t index = VM_DecOperandRegI32("index");
+        if (IREE_UNLIKELY(!list)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+        }
+        uint32_t index = VM_DecOperandRegI32("index");
         int64_t* result = VM_DecResultRegI64("result");
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
@@ -861,8 +1381,10 @@ iree_status_t iree_vm_bytecode_dispatch(
         bool list_is_move;
         iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
         iree_vm_list_t* list = iree_vm_list_deref(list_ref);
-        if (!list) return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
-        int32_t index = VM_DecOperandRegI32("index");
+        if (IREE_UNLIKELY(!list)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+        }
+        uint32_t index = VM_DecOperandRegI32("index");
         int64_t raw_value = VM_DecOperandRegI64("value");
         iree_vm_value_t value = iree_vm_value_make_i64(raw_value);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));

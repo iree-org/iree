@@ -15,7 +15,7 @@ func @constantTensor() {
 func @constantTensor1() {
   // CHECK-NEXT: %dev = hal.ex.shared_device
   // CHECK-NEXT: %allocator = hal.device.allocator %dev
-  // CHECK-NEXT: %cbuffer = hal.allocator.allocate.const %allocator, {{.+}} = dense<[true, false]> : tensor<2xi1>
+  // CHECK-NEXT: %cbuffer = hal.allocator.allocate.const %allocator, {{.+}} = dense<[1, 0]> : tensor<2xi8>
   %0 = constant dense<[1, 0]> : tensor<2xi1>
   return
 }

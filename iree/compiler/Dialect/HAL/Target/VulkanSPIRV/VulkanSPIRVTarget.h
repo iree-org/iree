@@ -15,11 +15,10 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_VULKANSPIRV_VULKANSPIRVTARGET_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_VULKANSPIRV_VULKANSPIRVTARGET_H_
 
+#include <functional>
 #include <string>
 
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -26,8 +26,7 @@
 #include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm/module_abi_cc.h"
-#include "iree/vm/module_abi_packing.h"
+#include "iree/vm/native_module_cc.h"
 
 namespace iree {
 
