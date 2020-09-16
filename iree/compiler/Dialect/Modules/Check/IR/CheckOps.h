@@ -18,17 +18,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.h.inc"
-
-}  // namespace Check
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_MODULES_CHECK_IR_CHECK_OPS_H_

@@ -24,7 +24,7 @@ include "mlir/IR/OpBase.td"
 // TODO(b/143787186): rename when old dialects are removed.
 def IREE_Dialect : Dialect {
   let name = "iree";
-  let cppNamespace = "IREE";
+  let cppNamespace = "::mlir::iree_compiler::IREE";
 
   let summary = [{
     A dialect used for types common across IREE subdialects.
