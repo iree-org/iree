@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+# Tests for common transforms.
 
-iree_cc_library(
-  NAME
-    init_conversions
-  HDRS
-    "init_conversions.h"
-  DEPS
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::LinalgToSPIRV
-    iree::compiler::Conversion::LinalgToVector
-  PUBLIC
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )

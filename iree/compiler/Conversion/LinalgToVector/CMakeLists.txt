@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,24 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    init_conversions
+    LinalgToVector
   HDRS
-    "init_conversions.h"
+    "Passes.h"
+  SRCS
+    "LoadStoreVectorization.cpp"
   DEPS
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::LinalgToSPIRV
-    iree::compiler::Conversion::LinalgToVector
+    LLVMSupport
+    MLIRIR
+    MLIRLinalgOps
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+    MLIRVector
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
   PUBLIC
 )

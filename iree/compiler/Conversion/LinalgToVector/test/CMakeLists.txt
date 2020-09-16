@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,13 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    init_conversions
-  HDRS
-    "init_conversions.h"
-  DEPS
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::LinalgToSPIRV
-    iree::compiler::Conversion::LinalgToVector
-  PUBLIC
+    lit
+  SRCS
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )
