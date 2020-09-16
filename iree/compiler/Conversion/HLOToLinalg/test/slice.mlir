@@ -4,7 +4,8 @@ module {
   // CHECK_LABEL: @slice_whole_buffer
   //  CHECK-NOT: subview
   //      CHECK: linalg.copy
-  func @slice_whole_buffer() {
+  func @slice_whole_buffer()
+    attributes {signature = (tensor<3x4xi32>) -> (tensor<3x4xi32>)} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<3x4xi32>
     %1 = "mhlo.slice"(%0) {
@@ -38,7 +39,8 @@ module {
   // CHECK-SAME:   [%[[ONE]], %[[ONE]]]
   // CHECK-SAME: : memref<3x4xi32> to memref<?x?xi32, #[[MAP]]>
   //      CHECK: linalg.copy
-  func @slice_whole_stride() {
+  func @slice_whole_stride()
+    attributes {signature = (tensor<3x4xi32>) -> (tensor<1x4xi32>)} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<3x4xi32>
     %1 = "mhlo.slice"(%0) {
@@ -72,7 +74,8 @@ module {
   // CHECK-SAME:   [%[[ONE]], %[[ONE]]]
   // CHECK-SAME: : memref<3x4xi32> to memref<?x?xi32, #map0>
   //       CHECK: linalg.copy
-  func @slice_stride_part() {
+  func @slice_stride_part()
+    attributes {signature = (tensor<3x4xi32>) -> (tensor<1x2xi32>)} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<3x4xi32>
     %1 = "mhlo.slice"(%0) {

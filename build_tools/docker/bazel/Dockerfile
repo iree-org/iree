@@ -14,36 +14,14 @@
 
 # An image for building IREE using bazel.
 
-# Build using:
-# docker build --tag gcr.io/iree-oss/bazel build_tools/docker/bazel/
+ARG BAZEL_VERSION=3.3.1
+# Change to a new version if upgrading Bazel.
+ARG NEW_BAZEL_VERSION=3.3.1
 
-# Run interactively using the following, where IREE_WORKDIR is the path to your
-# local dev environment:
-# docker run -it --rm --entrypoint bash \
-#   --volume "${IREE_WORKDIR?}:/usr/src/iree/" \
-#   gcr.io/iree-oss/bazel
-
-# Set up the image and working directory.
-FROM ubuntu:18.04
-WORKDIR /usr/src/iree
-
-# Set environment variables.
-ENV CXX clang++
-ENV CC clang
-ENV PYTHON_BIN /usr/bin/python3
-ENV IREE_LLVMAOT_LINKER_PATH /usr/bin/ld
-
-RUN apt-get update \
-  && apt-get install -y \
-    # git for updating IREE's submodules.
-    git \
-    # utilities for later installations
-    unzip \
-    zip \
-    wget \
-    # core IREE dependencies.
-    clang \
-    libsdl2-dev
+FROM gcr.io/iree-oss/util AS install-bazel
+WORKDIR /install-bazel
+ARG BAZEL_VERSION
+ARG NEW_BAZEL_VERSION
 
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
 # thing is then feel free. The warning complains about parsing apt-key output,
@@ -52,9 +30,6 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 # Install Bazel.
 # https://docs.bazel.build/versions/master/install-ubuntu.html
-ARG BAZEL_VERSION=3.3.1
-# Change to a new version if upgrading Bazel.
-ARG NEW_BAZEL_VERSION=3.3.1
 RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
   && echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
     | tee /etc/apt/sources.list.d/bazel.list \
@@ -65,7 +40,17 @@ RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
   # your .bazelversion file. When upgrading, we therefore need to have both the
   # old and new version. When the versions are the same this second installation
   # is effectively a noop.
-  && apt-get install "bazel=${BAZEL_VERSION?}" "bazel-${NEW_BAZEL_VERSION?}"
+  && apt-get install -y "bazel=${BAZEL_VERSION?}" "bazel-${NEW_BAZEL_VERSION?}"
+
+FROM gcr.io/iree-oss/base AS final
+ARG BAZEL_VERSION
+ARG NEW_BAZEL_VERSION
+COPY --from=install-bazel \
+  /usr/bin/bazel \
+  "/usr/bin/bazel-${BAZEL_VERSION}" \
+  "/usr/bin/bazel-${NEW_BAZEL_VERSION}" \
+  /usr/bin/bazel-real \
+  /usr/bin/
 
 # TF requires python2 numpy at configure time...
 # TODO(#1737): Remove this

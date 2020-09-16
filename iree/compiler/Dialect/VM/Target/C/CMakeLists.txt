@@ -26,6 +26,7 @@ if(${IREE_ENABLE_EMITC})
       "TranslationRegistration.cpp"
     DEPS
       LLVMSupport
+      MLIRTargetCpp
       MLIRIR
       MLIRPass
       MLIRSupport

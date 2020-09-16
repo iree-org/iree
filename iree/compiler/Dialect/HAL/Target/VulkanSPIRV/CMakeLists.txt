@@ -32,21 +32,17 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgOps
     MLIRParser
-    MLIRPass
     MLIRSPIRV
     MLIRSPIRVSerialization
-    MLIRSPIRVTransforms
     MLIRSupport
-    MLIRTransforms
     MLIRVector
     flatbuffers
-    iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils
     iree::schemas::spirv_executable_def_cc_fbs
-    tensorflow::mlir_hlo
   PUBLIC
 )

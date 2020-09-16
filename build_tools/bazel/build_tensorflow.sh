@@ -37,7 +37,7 @@ if ! [[ -v IREE_LLVMJIT_DISABLE ]]; then
   IREE_LLVMJIT_DISABLE=0
 fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
-  IREE_VULKAN_DISABLE=1
+  IREE_VULKAN_DISABLE=0
 fi
 declare -a test_env_args=(
   --test_env=IREE_LLVMJIT_DISABLE=$IREE_LLVMJIT_DISABLE

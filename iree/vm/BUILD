@@ -392,3 +392,10 @@ cc_library(
         "//iree/base:api",
     ],
 )
+
+cc_library(
+    name = "vm_c_funcs",
+    hdrs = [
+        "vm_c_funcs.h",
+    ],
+)

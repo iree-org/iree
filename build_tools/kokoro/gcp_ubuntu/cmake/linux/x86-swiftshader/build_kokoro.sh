@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build and test the project within the gcr.io/iree-oss/cmake-swiftshader image
-# using Kokoro.
+# Build and test the project within the gcr.io/iree-oss/cmake-python-swiftshader
+# image using Kokoro.
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -32,8 +32,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  --env IREE_VULKAN_DISABLE=0 \
-  gcr.io/iree-oss/cmake-swiftshader@sha256:1912ed3a5f85c8d9abd0729834711905ef4ef03b381eb7f99d9fdb7867932d30 \
+  gcr.io/iree-oss/cmake-python-swiftshader@sha256:e84cac3152543a6f300701bfce98e44b25d4e52dc0ffec715b6998058d91d583 \
   build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
