@@ -32,6 +32,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:Affine": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
+    "@llvm-project//mlir:DialectUtils": [""],
     "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
