@@ -508,9 +508,3 @@ endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
-
-#-------------------------------------------------------------------------------
-# IREE platform applications
-#-------------------------------------------------------------------------------
-
-add_subdirectory(platforms)

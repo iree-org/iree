@@ -154,9 +154,9 @@ JAVAC_BIN=${JAVAC_BIN:-$(which javac)}
 ##################################
 
 # IREE project source root.
-IREE_SOURCE_ROOT=$(dirname $(readlink -f $0))/../../../
+IREE_SOURCE_ROOT=$(git rev-parse --show-toplevel)
 # iree-run-module Android app source root.
-IREE_NATIVE_APP_SOURCE_ROOT=${IREE_SOURCE_ROOT}/platforms/android/run_module_app
+IREE_NATIVE_APP_SOURCE_ROOT=${IREE_SOURCE_ROOT}/iree/tools/android/run_module_app
 
 # Directory for IREE native code intermediate intermediate artifacts.
 IREE_NATIVE_LIB_BUILD_DIR=${IREE_ARTIFACT_ROOT}/iree/${IREE_BUILD_TYPE}
@@ -206,7 +206,7 @@ fi
 
 echo ">>> Building IREE native libraries <<<"
 
-IREE_NATIVE_LIB_NAME=platforms_android_run_module_app_iree_run_module_app
+IREE_NATIVE_LIB_NAME=iree_tools_android_run_module_app_iree_run_module_app
 
 pushd ${IREE_NATIVE_LIB_BUILD_DIR}
 "${CMAKE_BIN}" "${IREE_SOURCE_ROOT}" -G Ninja \

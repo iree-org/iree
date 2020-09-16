@@ -416,3 +416,5 @@ if(${IREE_ENABLE_MLIR})
     )
   endif()
 endif()
+
+add_subdirectory(android)
