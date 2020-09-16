@@ -19,7 +19,6 @@ docker run --interactive --tty --rm cmake
 You can find more information in the
 [official Docker docs](https://docs.docker.com/get-started/overview/).
 
-
 ## Multi-stage Builds
 
 We use
@@ -27,7 +26,6 @@ We use
 to limit duplication in our Dockerfiles and reduce the final image size. There
 is still duplication in cases where it's difficult to determine the correct
 files to copy.
-
 
 ## Dependencies Between Images
 
@@ -38,9 +36,9 @@ IREE images follow a consistent structure. The image defined by
 dependencies based on these image names.
 
 We use a helper python script to manage the Docker image deployment. It lists
-all images and their dependencies and manages their canonical registry
-location. When creating a new image, add it to this mapping. To build an image
-and all images it depends on:
+all images and their dependencies and manages their canonical registry location.
+When creating a new image, add it to this mapping. To build an image and all
+images it depends on:
 
 ```shell
 python3 build_tools/docker/manage_images.py --build --image cmake
@@ -71,37 +69,38 @@ python3 build_tools/docker/manage_images.py --images all --tag latest --update_r
 This requires that the tagged image have a repository digest, which means it was
 pushed to or pulled from GCR.
 
-
 ## Deploying New Images
 
-1. Modify the Dockerfiles as desired.
-2. Update `manage_images.py` to include the new image and its dependencies.
-3. Build and push the new image to GCR and update references to it:
+1.  Modify the Dockerfiles as desired.
+2.  Update `manage_images.py` to include the new image and its dependencies.
+3.  Build and push the new image to GCR and update references to it:
 
-  ```shell
-  python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --build --push --update_references
-  ```
+    ```shell
+    python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --build --push --update_references
+    ```
 
-4. Commit changes and send a PR for review.
-5. Merge your PR after is approved and all builds pass.
-6. Kokoro builds preload images tagged with `prod` on VM creation, so after
-   changing the images used, you should also update the images tagged as `prod`
-   in GCR. Update your local reference to the `prod` tag to point at the new
-   image:
+4.  Commit changes and send a PR for review.
 
-  ```shell
-  python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --build --update_references
-  ```
+5.  Merge your PR after is approved and all builds pass.
 
-  The build steps here should all be cache hits and no references should
-  actually be changed. If they are, that indicates the images you've just built
-  are different from the ones that are being referenced. Stop and fix this
-  before proceeding. This relies on you keeping your local copy of the Docker
-  images. If you didn't, you'll have to manually pull the missing images by
-  their digest.
+6.  Kokoro builds preload images tagged with `prod` on VM creation, so after
+    changing the images used, you should also update the images tagged as `prod`
+    in GCR. Update your local reference to the `prod` tag to point at the new
+    image:
 
-7. Push the new images with the `prod` tag to GCR.
+    ```shell
+    python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --build --update_references
+    ```
 
-   ```shell
-  python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --push
-  ```
+    The build steps here should all be cache hits and no references should
+    actually be changed. If they are, that indicates the images you've just
+    built are different from the ones that are being referenced. Stop and fix
+    this before proceeding. This relies on you keeping your local copy of the
+    Docker images. If you didn't, you'll have to manually pull the missing
+    images by their digest.
+
+7.  Push the new images with the `prod` tag to GCR.
+
+    ```shell
+    python3 build_tools/docker/manage_images.py --image "${IMAGE?}" --tag prod --push
+    ```
