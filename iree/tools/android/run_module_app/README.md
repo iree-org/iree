@@ -2,21 +2,36 @@
 
 This directory contains an Android application packing the `iree-run-module`
 command-line tool together with a specific IREE VM module invocation.
-This is helpful for profiling/debugging using Android tools.
+
+Note that this app is **purely** for benchmarking/profiling IREE itself.
+This is not the expected integration path for a real Android application,
+for which we expect to provide proper Java API and build support.
 
 ## Native Activity
 
-The App uses Android [`NativeActivity`][native-activity] to bridge IREE core
+The app uses Android [`NativeActivity`][native-activity] to bridge IREE core
 libraries together with the Android system. Native activity allows one to
 implement an Android Activity purely in C/C++. There are
 [tutorials][native-activity-tutorial] and [examples][native-activity-example]
 one can follow to learn about Native Activity.
 
+## Android Studio
+
+This app does not contain Gradle configurations. The reason is that we need
+to package both IREE native libraries and a specific VM module invocation
+into the app. The procedure cannot be automated much by Android Studio; rather
+one might need to copy files from different places, rename them, and wire up
+the build. It's inconvenient. For a developer tool we would like to avoid
+such friction and thus improve velocity. So a script,
+[`build_apk.sh`](./build_apk.sh), is provided to automate the process.
+
+But the script itself requires an Android SDK/NDK installation structure that
+matches Android Studio. So it's easier to just install Android Studio to
+manage Android SDK/NDK. The script will use proper tools in Android SDK/NDK
+to build and package the final APK file.
+
 ## Build the APK
 
-We need to package IREE native libraries and a specific VM module invocation.
-IDE is not very convenient to perform such tasks, so a script,
-[`build_apk.sh`](./build_apk.sh), is provided to automate the process.
 
 In general, we need to
 
