@@ -107,8 +107,8 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
   pm.addPass(createSplitDispatchFunctionPass());
-  pm.addPass(createLinalgTileAndFusePass(options.workgroupSize,
-                                         options.useWorkgroupMemory));
+  pm.addPass(createLinalgTileAndFusePass(
+      options.workgroupSize, options.tileSizes, options.useWorkgroupMemory));
   if (options.useVectorPass) {
     pm.addPass(createLoadStoreVectorizationPass());
   }
