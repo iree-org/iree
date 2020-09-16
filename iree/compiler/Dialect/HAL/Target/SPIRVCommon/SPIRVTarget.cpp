@@ -224,8 +224,8 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     int32_t entryPointOrdinal = it.index();
     builder.create<IREE::HAL::CommandBufferDispatchOp>(
         loc, commandBuffer, executable,
-        builder.getI32IntegerAttr(entryPointOrdinal),
-        workgroupCount[0], workgroupCount[1], workgroupCount[2]);
+        builder.getI32IntegerAttr(entryPointOrdinal), workgroupCount[0],
+        workgroupCount[1], workgroupCount[2]);
     if (it.index() + 1 != spvEntryPointFns.size()) {
       recordFullExecutionBarrier(commandBuffer, loc, builder);
     }
