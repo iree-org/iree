@@ -381,7 +381,8 @@ LogicalResult LaunchConfig::init(const SPIRVCodegenOptions &options,
                                  ArrayRef<linalg::LinalgOp> linalgOps) {
   if (!options.workgroupSize.empty()) {
     for (linalg::LinalgOp op : linalgOps)
-      tileSizes[op.getOperation()->getName().getStringRef()] = {};
+      tileSizes[op.getOperation()->getName().getStringRef()].emplace_back(
+          options.tileSizes.begin(), options.tileSizes.end());
     workgroupSize = {1, 1, 1};
     for (unsigned i = 0,
                   e = std::min<unsigned>(3, options.workgroupSize.size());
