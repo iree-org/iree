@@ -56,12 +56,6 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // Utility functions.
 // -----------------------------------------------------------------------------
 
-static std::vector<int64_t> convertDenseIntAttr(
-    mlir::DenseIntElementsAttr attr) {
-  auto values = attr.getValues<int64_t>();
-  return {values.begin(), values.end()};
-}
-
 /// Returns the constant value associated with the init value if the defining
 /// operation is a constant.
 static Attribute getInitValueAsConst(Value init) {
