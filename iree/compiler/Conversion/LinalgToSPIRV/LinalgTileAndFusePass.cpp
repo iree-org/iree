@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
@@ -29,7 +30,6 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Matchers.h"
@@ -37,7 +37,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/FoldUtils.h"
 
-#define DEBUG_TYPE "iree-linalg-tile-and-fuse-buffer"
+#define DEBUG_TYPE "iree-linalg-tile-and-fuse"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,18 +45,6 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
-
-static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
-  if (vector.empty()) return vector;
-  auto numTrailingOnes = 0;
-  for (unsigned i = vector.size() - 1; i > 0; --i) {
-    if (vector[i] != 1) {
-      break;
-    }
-    numTrailingOnes++;
-  }
-  return vector.drop_back(numTrailingOnes);
-}
 
 /// Returns true if the linalg op has padding attribute, and that it has
 /// non-zero entries.
@@ -68,129 +56,6 @@ static bool hasPadding(OpTy op) {
                       [](APInt v) -> bool { return !v.isNullValue(); });
 }
 
-namespace {
-
-/// Computes tile sizes (and workgroup size) to use based on operations within
-/// the function, and resource constraints on the module.
-class TileSizeCalculator {
- public:
-  TileSizeCalculator(FuncOp funcOp)
-      : resourceLimits(spirv::lookupTargetEnv(funcOp).getResourceLimits()) {
-    if (DenseIntElementsAttr attr = spirv::lookupLocalWorkGroupSize(funcOp)) {
-      for (auto val : attr.getValues<APInt>())
-        workgroupSize.push_back(val.getSExtValue());
-    }
-    workgroupSize.resize(3, 1);
-  }
-
-  /// Set tile sizes to use.
-  void setTileSizes(ArrayRef<int64_t> sizes) {
-    tileSizes.assign(sizes.begin(), sizes.end());
-  }
-
-  /// Set workgroup size to use.
-  void setWorkgroupSize(ArrayRef<int64_t> sizes) {
-    workgroupSize.assign(sizes.begin(), sizes.end());
-  }
-
-  /// Compute the tile sizes based on the Linalg Ops within the dispatch region.
-  LogicalResult inferTileAndWorkgroupSize(ArrayRef<linalg::LinalgOp> linalgOps);
-
-  /// Get the current tile size computed.
-  ArrayRef<int64_t> getTileSizes() const { return tileSizes; }
-
-  /// Returns the workgroup size to use based on the tile sizes.
-  ArrayRef<int64_t> getWorkgroupSize() const { return workgroupSize; }
-
- private:
-  /// Current tile size configuration.
-  SmallVector<int64_t, 4> tileSizes;
-
-  /// Workgroup size to use.
-  SmallVector<int64_t, 3> workgroupSize;
-
-  /// Attribute for device constraints.
-  spirv::ResourceLimitsAttr resourceLimits;
-};
-}  // namespace
-
-LogicalResult TileSizeCalculator::inferTileAndWorkgroupSize(
-    ArrayRef<linalg::LinalgOp> linalgOps) {
-  tileSizes.clear();
-  if (linalgOps.empty()) {
-    tileSizes = {1, 1, 1};
-    workgroupSize = {1, 1, 1};
-    return success();
-  }
-  // The tile size will be driven by operations like matmul, conv, etc. within
-  // the list. So see what operation exists in the list to decide the tile size.
-  // If there are two such operations in the list, return error.
-  enum OpInfo : uint32_t {
-    None = 0x0,
-    Convolution = 0x1,
-    Matmul = 0x2,
-    Pooling = 0x4,
-    BatchMatmul = 0x8,
-  };
-  uint32_t opInfo = OpInfo::None;
-  for (linalg::LinalgOp linalgOp : linalgOps) {
-    Operation *op = linalgOp.getOperation();
-    if (isa<linalg::ConvOp>(op))
-      opInfo |= OpInfo::Convolution;
-    else if (isa<linalg::MatmulOp>(op))
-      opInfo |= OpInfo::Matmul;
-    else if (isa<linalg::BatchMatmulOp>(op))
-      opInfo |= OpInfo::BatchMatmul;
-    else if (isa<linalg::PoolingMaxOp>(op))
-      opInfo |= OpInfo::Pooling;
-    else if (isa<linalg::PoolingMinOp>(op))
-      opInfo |= OpInfo::Pooling;
-    else if (isa<linalg::PoolingSumOp>(op))
-      opInfo |= OpInfo::Pooling;
-  }
-  // If there are no tilable ops, there is nothing to do here.
-  if (!opInfo) return success();
-
-  Operation *linalgOp = *(linalgOps.begin());
-  if (llvm::countPopulation(opInfo) != 1)
-    return linalgOp->getParentOfType<FuncOp>().emitError(
-        "unhandled fusion of ops in dispatch function");
-
-  // TODO(ravishanarm, antiagainst): Only the maximum workgroup size is used
-  // here for computing tile sizes. In reality we also need the maximum
-  // workgroup memory size available (per workgroup) to compute the tile sizes
-  // effectively.
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
-  if (opInfo & OpInfo::Convolution) {
-    int64_t tileSizeX = 32;
-    int64_t tileSizeY = maxWorkgroupSize / 32;
-    tileSizes = {1, tileSizeY, tileSizeX};
-    workgroupSize = {tileSizeX, tileSizeY, 1};
-    return success();
-  }
-  if (opInfo & OpInfo::Matmul) {
-    // TODO: For now just hard wire this, but we can do better.
-    tileSizes = {8, 8, 4};
-    workgroupSize = {8, 8, 1};
-    return success();
-  }
-  if (opInfo & OpInfo::BatchMatmul) {
-    tileSizes = {2, 8, 8, 4};
-    workgroupSize = {8, 8, 2};
-    return success();
-  }
-  if (opInfo & OpInfo::Pooling) {
-    int64_t tileSizeX = 32;
-    int64_t tileSizeY = maxWorkgroupSize / 32;
-    tileSizes = {tileSizeY, tileSizeX};
-    workgroupSize = {tileSizeX, tileSizeY, 1};
-    return success();
-  }
-  return linalgOp->getParentOfType<FuncOp>().emitError(
-      "unable to find tile size for ops in this dispatch function");
-}
-
 //===----------------------------------------------------------------------===//
 // Pass and patterns
 //===----------------------------------------------------------------------===//
@@ -199,37 +64,53 @@ namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 struct LinalgTileAndFusePass
     : public PassWrapper<LinalgTileAndFusePass, OperationPass<ModuleOp>> {
-  LinalgTileAndFusePass(ArrayRef<int64_t> workgroupSize = {},
-                        ArrayRef<int64_t> tileSizes = {},
-                        bool useWorkgroupMem = false) {
-    this->workgroupSize = workgroupSize;
-    this->tileSizes = tileSizes;
-    this->useWorkgroupMemory = useWorkgroupMem;
+  LinalgTileAndFusePass() = default;
+  LinalgTileAndFusePass(const SPIRVCodegenOptions &passedOptions) {
+    options = passedOptions;
   }
   LinalgTileAndFusePass(const LinalgTileAndFusePass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, ShapeDialect>();
+                    scf::SCFDialect, ShapeDialect, vector::VectorDialect>();
   }
   void runOnOperation() override;
 
  private:
-  Option<bool> useWorkgroupMemory{
-      *this, "use-workgroup-memory",
-      llvm::cl::desc("Promote subviews to use workgroup memory"),
-      llvm::cl::init(false)};
+  SPIRVCodegenOptions options;
 
-  ListOption<int64_t> workgroupSize{
-      *this, "workgroup-size",
-      llvm::cl::desc("Override the default workgroup size"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
-
+  // TODO: Find a common place to put these options. They are defined three
+  // times, once here, once for the pass pipeline and once for the binary.
   ListOption<int64_t> tileSizes{
       *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+
+  ListOption<int64_t> workgroupSize{
+      *this, "workgroup-size",
+      llvm::cl::desc(
+          "Number of workgroups to dispatch for the SPIR-V module; at most "
+          "three integers standarding for the x, y, and z dimension; "
+          "additional arguments will be ignored (used only for testing)"),
+      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
+
+  Option<bool> useWorkgroupMemory{
+      *this, "use-workgroup-memory",
+      llvm::cl::desc(
+          "Enable use of workgroup memory in SPIR-V code generation pipeline"),
+      llvm::cl::init(false)};
+
+  Option<bool> useVectorization{
+      *this, "use-vectorization",
+      llvm::cl::desc(
+          "Enable use of vectorization in SPIR-V code generation pipeline"),
+      llvm::cl::init(false)};
 };
 
+//===----------------------------------------------------------------------===//
+// Patterns to tile computation to map to workgroups.
+//===----------------------------------------------------------------------===//
+
+/// Distribution options for linalg.matmul when targeting workgroups.
 static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
     [](OpBuilder &builder, Location loc,
        ArrayRef<SubViewOp::Range> parallelLoopRanges) {
@@ -237,6 +118,7 @@ static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
           builder, loc, parallelLoopRanges.size());
     },
     {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+     linalg::DistributionMethod::CyclicNumProcsEqNumIters,
      linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
 /// Pattern for tiling operations. Updates the workgroup size in the surrounding
@@ -245,8 +127,8 @@ template <typename MatmulOp>
 struct TileMatmulPattern : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
   TileMatmulPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
-                    ArrayRef<int64_t> tileSizes,
-                    ArrayRef<int64_t> workgroupSize, PatternBenefit benefit = 1)
+                    const LaunchConfig &launchConfig,
+                    PatternBenefit benefit = 1)
       : Base(MatmulOp::getOperationName(), context,
              options.setDistributionOptions(matmulDistributionOptions),
              linalg::LinalgMarker(
@@ -254,8 +136,7 @@ struct TileMatmulPattern : public linalg::LinalgBaseTilingPattern {
                  Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
                                  context)),
              benefit),
-        tileSizes(tileSizes.begin(), tileSizes.end()),
-        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
+        launchConfig(launchConfig) {}
 
   virtual LogicalResult matchAndRewrite(Operation *op,
                                         PatternRewriter &rewriter) const {
@@ -263,20 +144,37 @@ struct TileMatmulPattern : public linalg::LinalgBaseTilingPattern {
     // erased.
     FuncOp funcOp = op->getParentOfType<FuncOp>();
     if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
-        failed(updateWorkGroupSize(funcOp, workgroupSize)) ||
+        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
-             rewriter, cast<linalg::LinalgOp>(op), funcOp, tileSizes)))) {
+             rewriter, cast<linalg::LinalgOp>(op), funcOp,
+             launchConfig.getTileSizes(op, 0))))) {
       return failure();
     }
     rewriter.eraseOp(op);
     return success();
   }
 
-  SmallVector<int64_t, 3> tileSizes;
-  SmallVector<int64_t, 3> workgroupSize;
+  const LaunchConfig &launchConfig;
 };
 
+/// Pattern to tile linalg.matmul for subgroups.
+struct TileMatmulSubgroupPattern
+    : public linalg::LinalgTilingPattern<linalg::MatmulOp> {
+  using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
+  TileMatmulSubgroupPattern(MLIRContext *context,
+                            linalg::LinalgTilingOptions options,
+                            PatternBenefit benefit = 1)
+      : Base(context, options,
+             linalg::LinalgMarker(
+                 Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
+                                 context),
+                 Identifier::get(getVectorizeMarker(), context)),
+             benefit) {}
+};
+
+/// Distribution options for targeting workgroups for convolution/pooling
+/// operations.
 static linalg::LinalgLoopDistributionOptions convPoolDistributionOptions = {
     [](OpBuilder &builder, Location loc,
        ArrayRef<SubViewOp::Range> parallelLoopRanges) {
@@ -286,14 +184,12 @@ static linalg::LinalgLoopDistributionOptions convPoolDistributionOptions = {
     {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
      linalg::DistributionMethod::Cyclic}};
 
-/// Pattern for tiling convolution and pooling operations. Currently is just a
-/// way to not tile when the operation has padding.
+/// Pattern for tiling convolution and pooling operations.
 template <typename OpTy>
 struct TileConvPoolPattern : public linalg::LinalgTilingPattern<OpTy> {
   using Base = linalg::LinalgTilingPattern<OpTy>;
   TileConvPoolPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
-                      ArrayRef<int64_t> tileSizes,
-                      ArrayRef<int64_t> workgroupSize,
+                      const LaunchConfig &launchConfig,
                       PatternBenefit benefit = 1)
       : Base(context,
              options.setDistributionOptions(convPoolDistributionOptions),
@@ -301,37 +197,57 @@ struct TileConvPoolPattern : public linalg::LinalgTilingPattern<OpTy> {
                  ArrayRef<Identifier>(),
                  Identifier::get(getWorkgroupMarker(), context)),
              benefit),
-        tileSizes(tileSizes.begin(), tileSizes.end()),
-        workgroupSize(workgroupSize.begin(), workgroupSize.end()) {}
+        launchConfig(launchConfig) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     if (hasPadding(cast<OpTy>(op))) return failure();
     FuncOp funcOp = op->getParentOfType<FuncOp>();
     if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
-        failed(updateWorkGroupSize(funcOp, this->workgroupSize)))
+        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())))
       return failure();
     funcOp.removeAttr(getNumWorkgroupsFnAttrName());
     return success();
   }
 
-  SmallVector<int64_t, 3> tileSizes;
-  SmallVector<int64_t, 3> workgroupSize;
+  const LaunchConfig &launchConfig;
 };
+
+/// Populate patterns for first-level tiling.
+static void populateTilingToWorkgroupPatterns(
+    MLIRContext *context, const LaunchConfig &launchConfig,
+    OwningRewritePatternList &patterns) {
+  // Function to compute first level tiling values.
+  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
+      getOuterTileSizeFn =
+          [&launchConfig](OpBuilder &builder,
+                          Operation *operation) -> SmallVector<Value, 4> {
+    ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 0);
+    if (tileSizes.empty()) return {};
+    SmallVector<Value, 4> tileSizesVal;
+    tileSizesVal.reserve(tileSizes.size());
+    for (auto val : tileSizes) {
+      tileSizesVal.push_back(
+          builder.create<ConstantIndexOp>(operation->getLoc(), val));
+    }
+    return tileSizesVal;
+  };
+  patterns.insert<TileConvPoolPattern<linalg::ConvOp>,
+                  TileMatmulPattern<linalg::MatmulOp>,
+                  TileMatmulPattern<linalg::BatchMatmulOp>,
+                  TileConvPoolPattern<linalg::PoolingMaxOp>,
+                  TileConvPoolPattern<linalg::PoolingMinOp>,
+                  TileConvPoolPattern<linalg::PoolingSumOp>>(
+      context,
+      linalg::LinalgTilingOptions()
+          .setTileSizeComputationFunction(getOuterTileSizeFn)
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
+      launchConfig);
+}
 
 //===----------------------------------------------------------------------===//
 // Patterns to promote subviews to workgroup memory
 //===----------------------------------------------------------------------===//
-
-/// Function used as callback for copyin/copyout in promotion pattern used to
-/// promote subviews to workgroup memory when the number of threads is known to
-/// be greater than equal to the number of iteration of loops the copy is
-/// lowered to.
-static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
-  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
-  return success();
-}
 
 /// Pattern to promote matmul operands to workgroup memory.
 struct PromoteMatmulSubviewsPattern
@@ -381,9 +297,113 @@ struct PromoteConvolutionSubviewsPattern
 };
 }  // namespace
 
+static void populatePromotionPatterns(MLIRContext *context,
+                                      OwningRewritePatternList &patterns) {
+  patterns
+      .insert<PromoteMatmulSubviewsPattern, PromoteConvolutionSubviewsPattern>(
+          context,
+          linalg::LinalgPromotionOptions()
+              .setAllocationDeallocationFns(allocateWorkgroupMemory,
+                                            deallocateWorkgroupMemory)
+              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory));
+}
+
+//===----------------------------------------------------------------------===//
+// Patterns and methods for subgroup tiling.
+//===----------------------------------------------------------------------===//
+
+/// Computes the Value for subgroupID along each dimension given number of
+/// subgroups `numSubGroups` along each dimension (x-first, y-second, z-third).
+static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
+    OpBuilder &builder, Location loc, ArrayRef<int64_t> numSubgroups) {
+  Type indexType = builder.getIndexType();
+  Value subgroupId = builder.create<gpu::SubgroupIdOp>(loc, indexType);
+  SmallVector<linalg::ProcInfo, 2> procInfo(numSubgroups.size());
+
+  // subgroupID
+  //   = id.z * nsubgroups.y * nsubgroups.x + id.y * nsubgroups.x + id.x
+  using edsc::op::operator%;
+  for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
+    Value nprocs = builder.create<ConstantIndexOp>(loc, numSubgroups[i]);
+    Value procId = subgroupId % nprocs;
+    procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
+    subgroupId = builder.create<SignedDivIOp>(loc, subgroupId, nprocs);
+  }
+  return procInfo;
+}
+
+/// Patterns for second level tiling to target subgroups.
+static void populateTilingToSubgroupPatterns(
+    MLIRContext *context, const LaunchConfig &launchConfig,
+    OwningRewritePatternList &patterns) {
+  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
+      getInnerTileSizeFn =
+          [&launchConfig](OpBuilder &builder,
+                          Operation *operation) -> SmallVector<Value, 4> {
+    ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 1);
+    if (tileSizes.empty()) return {};
+    SmallVector<Value, 4> tileSizesVal;
+    tileSizesVal.reserve(tileSizes.size());
+    for (auto val : tileSizes) {
+      tileSizesVal.push_back(
+          builder.create<ConstantIndexOp>(operation->getLoc(), val));
+    }
+    return tileSizesVal;
+  };
+
+  auto getSubgroupProcInfoFn =
+      [&launchConfig](OpBuilder &builder, Location loc,
+                      ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+        ArrayRef<int64_t> numSubgroups =
+            launchConfig.getNumSubgroups().take_front(
+                parallelLoopRanges.size());
+        return getSubgroupIdsAndCounts(builder, loc, numSubgroups);
+      };
+  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
+      getSubgroupProcInfoFn,
+      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
+  patterns.insert<TileMatmulSubgroupPattern>(
+      context, linalg::LinalgTilingOptions()
+                   .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+                   .setTileSizeComputationFunction(getInnerTileSizeFn)
+                   .setDistributionOptions(subgroupDistributionOptions));
+}
+
+//====---------------------------------------------------------------------===//
+// Patterns for vectorization
+//====---------------------------------------------------------------------===//
+
+static void populateVectorizationPatterns(MLIRContext *context,
+                                          const LaunchConfig &launchConfig,
+                                          OwningRewritePatternList &patterns) {
+  patterns.insert<linalg::LinalgVectorizationPattern<linalg::MatmulOp>>(
+      context,
+      linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
+}
+
+/// Apply canonicalizations related to tiling to make promotion/vectorization
+/// easier.
+static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
+  OwningRewritePatternList canonicalizationPatterns;
+  canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
+  AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  applyPatternsAndFoldGreedily(op, canonicalizationPatterns);
+}
+
 void LinalgTileAndFusePass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp module = getOperation();
+
+  // Override options with command line values.
+  if (!tileSizes.empty())
+    options.tileSizes.assign(tileSizes.begin(), tileSizes.end());
+  if (!workgroupSize.empty())
+    options.workgroupSize.assign(workgroupSize.begin(), workgroupSize.end());
+  if (useWorkgroupMemory) options.useWorkgroupMemory = true;
+  if (useVectorization) options.useVectorization = true;
 
   LLVM_DEBUG(
       llvm::dbgs() << "--- IREE Linalg tile and fuse configuration ---\n";);
@@ -397,58 +417,62 @@ void LinalgTileAndFusePass::runOnOperation() {
     }
     Block &block = body.front();
     auto linalgOps = block.getOps<linalg::LinalgOp>();
-    if (linalgOps.empty()) return;
+    if (linalgOps.empty()) continue;
 
-    TileSizeCalculator tileSizeCalculator(funcOp);
-    if (tileSizes.empty()) {
-      // Get the tile sizes to use for the lowering.
-      SmallVector<int64_t, 3> tileSizes;
-      SmallVector<linalg::LinalgOp, 1> opsVec(linalgOps.begin(),
-                                              linalgOps.end());
-      if (failed(tileSizeCalculator.inferTileAndWorkgroupSize(opsVec)))
-        return signalPassFailure();
-    } else {
-      tileSizeCalculator.setTileSizes(tileSizes);
-      if (!workgroupSize.empty())
-        tileSizeCalculator.setWorkgroupSize(workgroupSize);
+    LaunchConfig launchConfig;
+    SmallVector<linalg::LinalgOp, 4> linalgOpsVec(linalgOps.begin(),
+                                                  linalgOps.end());
+    if (failed(launchConfig.init(options, linalgOpsVec))) {
+      funcOp.emitError("unable to find launch configuration");
+      return signalPassFailure();
     }
 
     LLVM_DEBUG({
       llvm::dbgs() << "@func " << funcOp.getName() << ": # workgroup sizes: [";
-      interleaveComma(tileSizeCalculator.getWorkgroupSize(), llvm::dbgs());
-      llvm::dbgs() << "]\ntile sizes: [";
-      interleaveComma(tileSizeCalculator.getTileSizes(), llvm::dbgs());
+      interleaveComma(launchConfig.getWorkgroupSize(), llvm::dbgs());
       llvm::dbgs() << "]\n";
+      for (auto op : linalgOps) {
+        llvm::dbgs() << "\t" << op.getOperation()->getName() << " : ";
+        TileSizesListType const &tileSizes = launchConfig.getTileSizes(op);
+        llvm::dbgs() << "{";
+        std::string sep = "";
+        for (auto &level : enumerate(tileSizes)) {
+          llvm::dbgs() << sep << level.index() << " : [";
+          sep = ", ";
+          interleaveComma(level.value(), llvm::dbgs());
+          llvm::dbgs() << "]";
+        }
+        llvm::dbgs() << "}\n";
+      }
     });
 
-    OwningRewritePatternList tilingPatterns;
-    tilingPatterns.insert<TileConvPoolPattern<linalg::ConvOp>,
-                          TileMatmulPattern<linalg::MatmulOp>,
-                          TileMatmulPattern<linalg::BatchMatmulOp>,
-                          TileConvPoolPattern<linalg::PoolingMaxOp>,
-                          TileConvPoolPattern<linalg::PoolingMinOp>,
-                          TileConvPoolPattern<linalg::PoolingSumOp>>(
-        context,
-        linalg::LinalgTilingOptions()
-            .setTileSizes(tileSizeCalculator.getTileSizes())
-            .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-        tileSizeCalculator.getTileSizes(),
-        tileSizeCalculator.getWorkgroupSize());
-    applyPatternsAndFoldGreedily(funcOp, tilingPatterns);
+    OwningRewritePatternList firstLevelTilingPatterns;
+    populateTilingToWorkgroupPatterns(context, launchConfig,
+                                      firstLevelTilingPatterns);
+    applyPatternsAndFoldGreedily(funcOp, firstLevelTilingPatterns);
+    applyCanonicalizationPatterns(context, funcOp);
 
-    if (useWorkgroupMemory) {
+    if (options.useWorkgroupMemory) {
       // The promotion patterns are put separate from the tiling patterns to
       // make sure that the allocated scratchspace memory is constant sizes
       // which requires some folding to trigger.
       OwningRewritePatternList promotionPatterns;
-      promotionPatterns.insert<PromoteMatmulSubviewsPattern,
-                               PromoteConvolutionSubviewsPattern>(
-          context,
-          linalg::LinalgPromotionOptions()
-              .setAllocationDeallocationFns(allocateWorkgroupMemory,
-                                            deallocateWorkgroupMemory)
-              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory));
+      populatePromotionPatterns(context, promotionPatterns);
       applyPatternsAndFoldGreedily(funcOp, promotionPatterns);
+      applyCanonicalizationPatterns(context, funcOp);
+    }
+
+    if (options.useVectorization) {
+      OwningRewritePatternList secondLevelTilingPatterns;
+      populateTilingToSubgroupPatterns(context, launchConfig,
+                                       secondLevelTilingPatterns);
+      applyPatternsAndFoldGreedily(funcOp, secondLevelTilingPatterns);
+      applyCanonicalizationPatterns(context, funcOp);
+
+      OwningRewritePatternList vectorizationPatterns;
+      populateVectorizationPatterns(context, launchConfig,
+                                    vectorizationPatterns);
+      applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns);
     }
   }
 }
@@ -458,10 +482,8 @@ void LinalgTileAndFusePass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
-    ArrayRef<int64_t> workgroupSize, ArrayRef<int64_t> tileSizes,
-    bool useWorkgroupMemory) {
-  return std::make_unique<LinalgTileAndFusePass>(workgroupSize, tileSizes,
-                                                 useWorkgroupMemory);
+    const SPIRVCodegenOptions &options) {
+  return std::make_unique<LinalgTileAndFusePass>(options);
 }
 
 static PassRegistration<LinalgTileAndFusePass> pass(

@@ -27,7 +27,10 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(
         ["*.cpp"],
-        exclude = ["Bench*"],
+        exclude = [
+            "Bench*",
+            "TestMatMulVulkan.cpp",  # b/168746423
+        ],
     ),
     data = [
         # runtime libraries

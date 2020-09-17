@@ -17,6 +17,7 @@
 
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassOptions.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -27,6 +28,8 @@ struct SPIRVCodegenOptions {
   SmallVector<int64_t, 3> workgroupSize = {};
   SmallVector<int64_t, 3> tileSizes = {};
   bool useWorkgroupMemory = false;
+  bool useVectorization = false;
+  bool useVectorPass = false;
 };
 
 /// Pass to initialize the function that computes the number of workgroups for
@@ -40,8 +43,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
 /// it exists) and along "z" for the next loop (if it exists). The workgroup
 /// size is expected to be of size at-most 3.
 std::unique_ptr<OperationPass<ModuleOp>> createLinalgTileAndFusePass(
-    ArrayRef<int64_t> workGroupSize = {}, ArrayRef<int64_t> tileSizes = {},
-    bool useWorkgroupMem = false);
+    const SPIRVCodegenOptions &options);
 
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.

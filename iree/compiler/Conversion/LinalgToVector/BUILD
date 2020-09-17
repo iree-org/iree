@@ -19,36 +19,26 @@ package(
 )
 
 cc_library(
-    name = "HLOToLinalg",
+    name = "LinalgToVector",
     srcs = [
-        "FusionOfTensorOps.cpp",
-        "HLOToLinalgOnBuffers.cpp",
-        "HLOToLinalgOnTensors.cpp",
-        "Passes.cpp",
-        "ResolveShapeOps.cpp",
+        "LoadStoreVectorization.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
-        "//iree/compiler/Conversion/HLOToHLO",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:map_lmhlo_to_scalar_op",
+        "@llvm-project//mlir:VectorOps",
     ],
 )
