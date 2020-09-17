@@ -107,26 +107,6 @@ class PrePartitioningConversionPass
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }
-
-    for (Operation &op : getFunction().getOps()) {
-      if (!FlowDialect::isDialectOp(&op)) continue;
-      bool hasI1Type = false;
-      for (auto type : op.getOperandTypes()) {
-        if (type.isSignlessInteger() && type.getIntOrFloatBitWidth() == 1) {
-          hasI1Type = true;
-          break;
-        }
-        auto shapedType = type.dyn_cast<ShapedType>();
-        if (shapedType && shapedType.getElementTypeBitWidth() == 1) {
-          hasI1Type = true;
-          break;
-        }
-      }
-      if (hasI1Type) {
-        getFunction().emitError() << "expected non-i1 types in FlowDialect";
-        return signalPassFailure();
-      }
-    }
   }
 };
 

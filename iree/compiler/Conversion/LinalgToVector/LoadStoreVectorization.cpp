@@ -29,18 +29,6 @@ namespace iree_compiler {
 
 namespace {
 
-/// Returns the bitwidth of a scalar or vector type.
-static Optional<unsigned> getBitWidth(Type type) {
-  if (type.isIntOrFloat()) {
-    return type.getIntOrFloatBitWidth();
-  } else if (type.isa<VectorType>()) {
-    auto vecType = type.cast<VectorType>();
-    auto elementType = vecType.getElementType();
-    return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
-  }
-  return {};
-}
-
 constexpr int kVectorizationSizeInBits = 128;
 constexpr int kVecSize = kVectorizationSizeInBits / (sizeof(float) * 8);
 

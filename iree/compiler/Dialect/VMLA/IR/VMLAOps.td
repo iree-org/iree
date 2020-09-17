@@ -362,8 +362,10 @@ def VMLA_ScatterOp : VMLA_ElementTypeOp<"scatter", [VMLA_IncludeShapes]> {
 
 def VMLA_NotOp : VMLA_UnaryOp<"not", VMLA_AnyTypeAttr>;
 def VMLA_AndOp : VMLA_BinaryOp<"and", VMLA_AnyTypeAttr>;
+def VMLA_AndBroadcastOp : VMLA_BinaryBroadcastOp<"and.broadcast", VMLA_AnyTypeAttr>;
 def VMLA_OrOp : VMLA_BinaryOp<"or", VMLA_AnyTypeAttr>;
 def VMLA_XorOp : VMLA_BinaryOp<"xor", VMLA_AnyTypeAttr>;
+def VMLA_XorBroadcastOp : VMLA_BinaryBroadcastOp<"xor.broadcast", VMLA_AnyTypeAttr>;
 def VMLA_ShlOp : VMLA_BinaryOp<"shl", VMLA_AnyTypeAttr>;
 def VMLA_ShrOp : VMLA_BinaryOp<"shr", VMLA_AnyTypeAttr>;
 
@@ -393,6 +395,7 @@ def VMLA_MaxOp : VMLA_BinaryOp<"max", VMLA_AnyTypeAttr>;
 def VMLA_ClampOp : VMLA_TernaryOp<"clamp", VMLA_AnyTypeAttr>;
 def VMLA_FloorOp : VMLA_UnaryOp<"floor", VMLA_FloatTypeAttr>;
 def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
+def VMLA_RoundOp : VMLA_UnaryOp<"round", VMLA_FloatTypeAttr>;
 
 //===----------------------------------------------------------------------===//
 // VMLA Ops: conversion

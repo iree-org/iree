@@ -188,6 +188,20 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
   let assemblyFormat = "$lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type";
 }
 
+class VMLA_BinaryBroadcastOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
+    : VMLA_ElementTypeOp<mnemonic, traits> {
+  let arguments = (ins
+    VMLA_Buffer:$lhs,
+    I32:$rhs,
+    VMLA_Buffer:$dst,
+    typeAttr:$element_type,
+    // TODO(benvanik): remove once unsigned types are in MLIR.
+    UnitAttr:$forceUnsigned
+  );
+
+  let assemblyFormat = "$lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type";
+}
+
 class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
     : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins

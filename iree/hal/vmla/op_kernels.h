@@ -197,6 +197,9 @@ struct And {
   static Status Execute(absl::Span<const T> lhs_buffer,
                         absl::Span<const T> rhs_buffer,
                         absl::Span<T> dst_buffer);
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
+                        absl::Span<T> dst_buffer);
 };
 
 struct Or {
@@ -210,6 +213,9 @@ struct Xor {
   template <typename T>
   static Status Execute(absl::Span<const T> lhs_buffer,
                         absl::Span<const T> rhs_buffer,
+                        absl::Span<T> dst_buffer);
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
                         absl::Span<T> dst_buffer);
 };
 
@@ -359,6 +365,12 @@ struct Floor {
 };
 
 struct Ceil {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<T> dst_buffer);
+};
+
+struct Round {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
                         absl::Span<T> dst_buffer);
