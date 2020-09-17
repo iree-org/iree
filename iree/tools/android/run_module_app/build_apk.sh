@@ -189,7 +189,9 @@ if [[ ! -x ${AAPT_BIN} ]] || [[ ! -x ${DX_BIN} ]] || [[ ! -x ${ZIPALIGN_BIN} ]] 
 fi
 
 AAPT_ADD="${AAPT_BIN} add"
-AAPT_PACK="${AAPT_BIN} package -f -I ${ANDROID_SDK_PLATFORMS_DIR}/android.jar"
+# Link in the Android framework classes and disable compression for IREE
+# bytecode modules. This allows us to mmap the file directly.
+AAPT_PACK="${AAPT_BIN} package -f -I ${ANDROID_SDK_PLATFORMS_DIR}/android.jar -0 vmfb"
 DX="${DX_BIN} --dex"
 ZIPALIGN="${ZIPALIGN_BIN} -f -p 4"
 APKSIGN="${APKSIGNER_BIN} sign"
