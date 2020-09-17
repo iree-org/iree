@@ -50,7 +50,8 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
 static std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
     Location loc, FuncOp numWorkgroupsFn, IREE::HAL::InterfaceOp interface,
     ArrayRef<Optional<TensorRewriteAdaptor>> operands,
-    ArrayRef<Optional<TensorRewriteAdaptor>> results, OpBuilder &builder) {
+    ArrayRef<Optional<TensorRewriteAdaptor>> results,
+    ConversionPatternRewriter &rewriter) {
   std::array<Value, 3> returnValue = {nullptr, nullptr, nullptr};
   // TODO: This is really just inlining a function. For now assume that the
   // `numWorkgroupsFn` has a single block to make inlining easier.
@@ -62,7 +63,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
       [&](ArrayRef<Optional<TensorRewriteAdaptor>> values) -> LogicalResult {
     for (auto val : values) {
       if (!val) continue;
-      Optional<SmallVector<Value, 4>> shape = val->getShapeDims(builder);
+      Optional<SmallVector<Value, 4>> shape = val->getShapeDims(rewriter);
       if (!shape) return emitError(loc, "shape computation for operand failed");
       shapeValues.push_back(shape.getValue());
     }
@@ -82,7 +83,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
     if (auto shapeOp = dyn_cast<Shape::RankedDimOp>(op)) {
       if (BlockArgument arg = shapeOp.shape().dyn_cast<BlockArgument>()) {
         auto &dimValues = shapeValues[arg.getArgNumber()];
-        mapper.map(arg, dimValues[shapeOp.getIndex()]);
+        mapper.map(shapeOp.result(), dimValues[shapeOp.getIndex()]);
         continue;
       }
       return returnValue;
@@ -91,7 +92,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
     if (llvm::all_of(op.getOperands(), [&mapper](Value operand) {
           return mapper.contains(operand);
         })) {
-      builder.clone(op, mapper);
+      rewriter.clone(op, mapper);
       continue;
     }
   }
@@ -185,7 +186,9 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       });
 
   auto &entryBlock = region->front();
-  auto builder = OpBuilder::atBlockBegin(&entryBlock);
+  ConversionPatternRewriter &rewriter = switchBuilder.getRewriter();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToEnd(&entryBlock);
   auto workload = entryBlock.getArgument(0);
   auto commandBuffer = entryBlock.getArgument(1);
   auto executable = entryBlock.getArgument(2);
@@ -196,7 +199,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   for (auto it : llvm::enumerate(spvEntryPointFns)) {
     spirv::FuncOp spvFuncOp = it.value();
     auto workgroupSize = calculateDispatchWorkgroupSize(
-        loc, spvModuleOp, spvFuncOp.sym_name(), workload, builder);
+        loc, spvModuleOp, spvFuncOp.sym_name(), workload, rewriter);
 
     FlatSymbolRefAttr numWorkgroupsFnAttr =
         spvFuncOp.getAttrOfType<FlatSymbolRefAttr>(
@@ -209,10 +212,10 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       if (!numWorkgroupsFn) return failure();
       workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
           loc, numWorkgroupsFn, executableOp.getInterfaceOp(),
-          dispatchState.operands, dispatchState.results, builder);
+          dispatchState.operands, dispatchState.results, rewriter);
     } else {
       workgroupCount = calculateDispatchWorkgroupCount(loc, workload,
-                                                       workgroupSize, builder);
+                                                       workgroupSize, rewriter);
     }
 
     if (llvm::any_of(workgroupCount,
@@ -222,16 +225,16 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     // Ordinals are fixed based on the precomputed schedule, so use
     // CommandBufferDispatchOp instead of CommandBufferDispatchSymbolOp.
     int32_t entryPointOrdinal = it.index();
-    builder.create<IREE::HAL::CommandBufferDispatchOp>(
+    rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
         loc, commandBuffer, executable,
-        builder.getI32IntegerAttr(entryPointOrdinal), workgroupCount[0],
+        rewriter.getI32IntegerAttr(entryPointOrdinal), workgroupCount[0],
         workgroupCount[1], workgroupCount[2]);
     if (it.index() + 1 != spvEntryPointFns.size()) {
-      recordFullExecutionBarrier(commandBuffer, loc, builder);
+      recordFullExecutionBarrier(commandBuffer, loc, rewriter);
     }
   }
 
-  builder.create<IREE::HAL::ReturnOp>(loc);
+  rewriter.create<IREE::HAL::ReturnOp>(loc);
   return success();
 }
 

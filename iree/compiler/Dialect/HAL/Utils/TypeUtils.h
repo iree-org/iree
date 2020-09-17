@@ -53,9 +53,8 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
                                          OpBuilder &builder);
 
 // Returns an array of i32 values representing the shape of the |shapedValue|.
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder);
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+    Location loc, Value shapedValue, ConversionPatternRewriter &builder);
 
 // An adaptor used for tensor->buffer rewrites.
 // This abstracts the source and destination types to allow for implicit
@@ -104,7 +103,8 @@ class TensorRewriteAdaptor {
 
   // Returns the I32 shape dimensions of the tensor.
   llvm::Optional<SmallVector<Value, 4>> getShapeDims();
-  llvm::Optional<SmallVector<Value, 4>> getShapeDims(OpBuilder &builder);
+  llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+      ConversionPatternRewriter &builder);
 
   // Performs the equivalent of a hal.buffer_view.byte_length.
   Value getByteLength();
