@@ -29,7 +29,6 @@ iree_lit_test_suite(
         ["*.cpp"],
         exclude = [
             "Bench*",
-            "TestMatMulVulkan.cpp",  # b/168746423
         ],
     ),
     data = [

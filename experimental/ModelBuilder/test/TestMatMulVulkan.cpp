@@ -18,7 +18,7 @@
 // RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so 2>&1 | IreeFileCheck %s
 
 // NOLINTNEXTLINE
-// RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so -use-workgroup-memory -workgroup-size=2,2 2>&1 | IreeFileCheck %s
+// RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so -use-workgroup-memory -workgroup-size=2,2 -tile-sizes=2,2 2>&1 | IreeFileCheck %s
 
 // clang-format on
 #include <string>
@@ -102,6 +102,7 @@ void testMatMul() {
   codegenOptions.workgroupSize.assign(workgroupSize.begin(),
                                       workgroupSize.end());
   codegenOptions.tileSizes.assign(tileSizes.begin(), tileSizes.end());
+  codegenOptions.useWorkgroupMemory = useWorkgroupMemory;
   auto lowering = [&](mlir::PassManager &pm) {
     pm.addPass(
         mlir::iree_compiler::createLinalgTileAndFusePass(codegenOptions));
