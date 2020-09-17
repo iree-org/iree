@@ -395,6 +395,7 @@ def VMLA_MaxOp : VMLA_BinaryOp<"max", VMLA_AnyTypeAttr>;
 def VMLA_ClampOp : VMLA_TernaryOp<"clamp", VMLA_AnyTypeAttr>;
 def VMLA_FloorOp : VMLA_UnaryOp<"floor", VMLA_FloatTypeAttr>;
 def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
+def VMLA_RoundOp : VMLA_UnaryOp<"round", VMLA_FloatTypeAttr>;
 
 //===----------------------------------------------------------------------===//
 // VMLA Ops: conversion

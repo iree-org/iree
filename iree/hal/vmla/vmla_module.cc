@@ -640,6 +640,7 @@ class VMLAModuleState final {
   IREE_VMLA_TERNARY_OP(ClampF32, kernels::Clamp, float);
   IREE_VMLA_UNARY_OP(FloorF32, kernels::Floor, float);
   IREE_VMLA_UNARY_OP(CeilF32, kernels::Ceil, float);
+  IREE_VMLA_UNARY_OP(RoundF32, kernels::Round, float);
 
   //===--------------------------------------------------------------------===//
   // VMLA Ops: conversion
@@ -968,6 +969,7 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("clamp.f32", &VMLAModuleState::ClampF32),
     vm::MakeNativeFunction("floor.f32", &VMLAModuleState::FloorF32),
     vm::MakeNativeFunction("ceil.f32", &VMLAModuleState::CeilF32),
+    vm::MakeNativeFunction("round.f32", &VMLAModuleState::RoundF32),
     vm::MakeNativeFunction("finite.f32", &VMLAModuleState::FiniteF32),
 
     vm::MakeNativeFunction("convert.i8.i16", &VMLAModuleState::ConvertI8I16),
