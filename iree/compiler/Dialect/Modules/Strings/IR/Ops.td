@@ -22,7 +22,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def STRINGS_Dialect : Dialect {
   let name = "strings";
-  let cppNamespace = "IREE::Strings";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Strings";
 
   let summary = [{
     A custom dialect supporting string operations.

@@ -31,7 +31,7 @@ def TfTensorList_Dialect : Dialect {
     This allows representing the TensorList construct with greater fidelity.
   }];
 
-  let cppNamespace = "tf_tensorlist";
+  let cppNamespace = "::mlir::tf_tensorlist";
 }
 
 def TfTensorList_TensorList :

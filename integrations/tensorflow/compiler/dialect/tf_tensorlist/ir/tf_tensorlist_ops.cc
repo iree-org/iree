@@ -16,11 +16,5 @@
 
 #include "mlir/IR/Builders.h"
 
-namespace mlir {
-namespace tf_tensorlist {
-
 #define GET_OP_CLASSES
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.cc.inc"
-
-}  // namespace tf_tensorlist
-}  // namespace mlir

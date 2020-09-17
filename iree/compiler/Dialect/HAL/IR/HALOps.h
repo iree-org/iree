@@ -29,17 +29,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h.inc"
-
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_HAL_IR_HALOPS_H_
