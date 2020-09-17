@@ -816,6 +816,14 @@ Status Ceil::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
   return OkStatus();
 }
 
+template <typename T>
+Status Round::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = std::round(src_buffer[i]);
+  }
+  return OkStatus();
+}
+
 template <typename SRC, typename DST>
 Status Convert::Execute(absl::Span<const SRC> src_buffer,
                         absl::Span<DST> dst_buffer) {

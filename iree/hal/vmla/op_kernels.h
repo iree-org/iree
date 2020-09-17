@@ -370,6 +370,12 @@ struct Ceil {
                         absl::Span<T> dst_buffer);
 };
 
+struct Round {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<T> dst_buffer);
+};
+
 struct Convert {
   template <typename SRC, typename DST>
   static Status Execute(absl::Span<const SRC> src_buffer,
