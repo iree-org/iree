@@ -35,6 +35,48 @@ flow.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
+// CHECK-LABEL: hal.executable @bools_ex_dispatch_0
+//   CHECK-DAG: hal.interface @legacy_io {
+//  CHECK-NEXT:   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: }
+//   CHECK-DAG: hal.executable.target @vmla, filter="vmla" {
+//   CHECK-DAG:   hal.executable.entry_point @bools_rgn_dispatch_0 attributes {
+//  CHECK-SAME:     interface = @legacy_io,
+//  CHECK-SAME:     ordinal = 0 : i32,
+//  CHECK-SAME:     signature = (tensor<4xi1>, tensor<4xi1>) -> tensor<4xi1>
+//  CHECK-SAME:   }
+flow.executable @bools_ex_dispatch_0 {
+  flow.dispatch.entry @bools_rgn_dispatch_0 attributes {
+    workload = 4 : index
+  }
+  // CHECK: module {
+  module {
+    // CHECK-NEXT: func @bools_rgn_dispatch_0()
+    //  CHECK-DAG:   %[[ZERO:.+]] = constant 0 : index
+    //  CHECK-DAG:   %[[ARG0_I8:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %[[ZERO]] : tensor<4xi8>
+    //  CHECK-DAG:   %[[ARG0_I1:.+]] = "mhlo.convert"(%[[ARG0_I8]]) : (tensor<4xi8>) -> tensor<4xi1>
+    //  CHECK-DAG:   %[[ARG1_I8:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %[[ZERO]] : tensor<4xi8>
+    //  CHECK-DAG:   %[[ARG1_I1:.+]] = "mhlo.convert"(%[[ARG1_I8]]) : (tensor<4xi8>) -> tensor<4xi1>
+    // CHECK-NEXT:   %[[RET0_I1:.+]] = call @bools_rgn_dispatch_0_impl(%[[ARG0_I1]], %[[ARG1_I1]]) : (tensor<4xi1>, tensor<4xi1>) -> tensor<4xi1>
+    // CHECK-NEXT:   %[[RET0_I8:.+]] = "mhlo.convert"(%[[RET0_I1]]) : (tensor<4xi1>) -> tensor<4xi8>
+    // CHECK-NEXT:   hal.interface.store.tensor %[[RET0_I8]], @legacy_io::@ret0, offset = %[[ZERO]] : tensor<4xi8>
+    // CHECK-NEXT:   return
+    // CHECK-NEXT: }
+    // CHECK-NEXT: func @bools_rgn_dispatch_0_impl(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1>
+    func @bools_rgn_dispatch_0(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1> {
+      %0 = mhlo.and %arg0, %arg1 : tensor<4xi1>
+      %c = mhlo.constant dense<[false, false, true, false]> : tensor<4xi1>
+      %1 = mhlo.and %0, %c : tensor<4xi1>
+      return %1 : tensor<4xi1>
+    }
+    // CHECK: hal.interface @legacy_io attributes {sym_visibility = "private"}
+  }
+}
+
+// -----
+
 // CHECK-LABEL: hal.executable @shaped_dispatch
 //  CHECK-NEXT: hal.interface @legacy_io attributes {push_constants = 2 : i32} {
 //  CHECK-NEXT:   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

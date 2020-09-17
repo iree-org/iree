@@ -108,9 +108,19 @@ LogicalResult VMLAConversionTarget::applyDefaultBufferRewrite(
   // example, if the op may later need to know the type of the elements in a
   // type-erased buffer it can stash the original tensor type as an attribute.
   if (opInterface) {
-    opInterface->extractTypeAttributes(
-        state, llvm::to_vector<4>(srcOp->getOperandTypes()),
-        llvm::to_vector<4>(srcOp->getResultTypes()));
+    auto convertTensorType = [](Type type) -> Type {
+      if (auto tensorType = type.dyn_cast<TensorType>()) {
+        return VMLATypeConverter::convertTensorTypeToVMLAType(tensorType);
+      }
+      return type;
+    };
+    auto operandTypes = llvm::to_vector<4>(
+        llvm::map_range(srcOp->getOperandTypes(),
+                        [&](Type type) { return convertTensorType(type); }));
+    auto resultTypes = llvm::to_vector<4>(
+        llvm::map_range(srcOp->getResultTypes(),
+                        [&](Type type) { return convertTensorType(type); }));
+    opInterface->extractTypeAttributes(state, operandTypes, resultTypes);
   }
 
   // Until MLIR supports unsigned types we need to sidechannel this to the

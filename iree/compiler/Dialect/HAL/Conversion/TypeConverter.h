@@ -31,7 +31,7 @@ class HALTypeConverter : public TypeConverter {
 
   // TODO(benvanik): signature conversion for output buffers.
 
-  static bool ShouldConvertToHalBuffer(Type type) {
+  static bool shouldConvertToHalBuffer(Type type) {
     if (TensorType tensor_type = type.template dyn_cast<TensorType>()) {
       return tensor_type.getElementType().isIntOrFloat();
     }

@@ -291,8 +291,10 @@ void populateVMLAToVMPatterns(MLIRContext *context,
 
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::NotOp, "vmla.not");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::AndOp, "vmla.and");
+  VMLA_SIZED_IMPORT_OP(IREE::VMLA::AndBroadcastOp, "vmla.and.broadcast");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::OrOp, "vmla.or");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::XorOp, "vmla.xor");
+  VMLA_SIZED_IMPORT_OP(IREE::VMLA::XorBroadcastOp, "vmla.xor.broadcast");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::ShlOp, "vmla.shl");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ShrOp, "vmla.shr");
 
