@@ -17,7 +17,7 @@ A dialect of helper ops for shapifying computations.
 
 ## Operation definition
 
-### `shapex.cast_compatible_shape` (Shape::CastCompatibleShapeOp)
+### `shapex.cast_compatible_shape` (::mlir::iree_compiler::Shape::CastCompatibleShapeOp)
 
 Casts and asserts that one or more shapes are compatible.
 
@@ -53,7 +53,7 @@ Usage:
 | :----: | ----------- |
 `result` | Ranked shape type
 
-### `shapex.const_ranked_shape` (Shape::ConstRankedShapeOp)
+### `shapex.const_ranked_shape` (::mlir::iree_compiler::Shape::ConstRankedShapeOp)
 
 A constant ranked_shape.
 
@@ -77,7 +77,7 @@ Usage:
 | :----: | ----------- |
 `result` | Ranked shape type
 
-### `shapex.from_extent_tensor` (Shape::FromExtentTensorOp)
+### `shapex.from_extent_tensor` (::mlir::iree_compiler::Shape::FromExtentTensorOp)
 
 Convert a tensor of extents to a ranked shape.
 
@@ -100,7 +100,7 @@ Examples:
 | :----: | ----------- |
 `shape` | Ranked shape type
 
-### `shapex.gather_extents` (Shape::GatherExtentsOp)
+### `shapex.gather_extents` (::mlir::iree_compiler::Shape::GatherExtentsOp)
 
 Gather extents across shapes.
 
@@ -175,7 +175,7 @@ Consider a pretty syntax for "concat":
 | :----: | ----------- |
 `result` | Ranked shape type
 
-### `shapex.get_ranked_shape` (Shape::GetRankedShapeOp)
+### `shapex.get_ranked_shape` (::mlir::iree_compiler::Shape::GetRankedShapeOp)
 
 Gets the RankedShape associated with the given Tensor.
 
@@ -221,7 +221,7 @@ with unit value:
 | :----: | ----------- |
 `shape` | Ranked shape type
 
-### `shapex.iota` (Shape::IotaOp)
+### `shapex.iota` (::mlir::iree_compiler::Shape::IotaOp)
 
 Creates an iota of the desired 1-D shape.
 
@@ -242,7 +242,7 @@ Usage:
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `shapex.make_ranked_shape` (Shape::MakeRankedShapeOp)
+### `shapex.make_ranked_shape` (::mlir::iree_compiler::Shape::MakeRankedShapeOp)
 
 Makes a ranked_shape from individual dims.
 
@@ -274,7 +274,7 @@ Note that the type of the dims is is implied by the dim type of the result.
 | :----: | ----------- |
 `shape` | Ranked shape type
 
-### `shapex.ranked_broadcast_in_dim` (Shape::RankedBroadcastInDimOp)
+### `shapex.ranked_broadcast_in_dim` (::mlir::iree_compiler::Shape::RankedBroadcastInDimOp)
 
 Broadcasts dimensions from the input into the result.
 
@@ -304,7 +304,7 @@ Usage:
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `shapex.ranked_broadcast_shape` (Shape::RankedBroadcastShapeOp)
+### `shapex.ranked_broadcast_shape` (::mlir::iree_compiler::Shape::RankedBroadcastShapeOp)
 
 Broadcasts operands to a result shape.
 
@@ -334,7 +334,7 @@ Usage:
 | :----: | ----------- |
 `result` | Ranked shape type
 
-### `shapex.ranked_dim` (Shape::RankedDimOp)
+### `shapex.ranked_dim` (::mlir::iree_compiler::Shape::RankedDimOp)
 
 Gets a dimension value from a ranked_shape.
 
@@ -362,7 +362,7 @@ Usage:
 | :----: | ----------- |
 `result` | index or signless integer
 
-### `shapex.ranked_dims` (Shape::RankedDimsOp)
+### `shapex.ranked_dims` (::mlir::iree_compiler::Shape::RankedDimsOp)
 
 Gets all dimension values from a ranked_shape.
 
@@ -391,7 +391,7 @@ Usage:
 | :----: | ----------- |
 `result` | index or signless integer
 
-### `shapex.tie_shape` (Shape::TieShapeOp)
+### `shapex.tie_shape` (::mlir::iree_compiler::Shape::TieShapeOp)
 
 Ties a tensor and a shape together.
 
@@ -422,7 +422,7 @@ Usage:
 | :----: | ----------- |
 `result` | any type
 
-### `shapex.to_extent_tensor` (Shape::ToExtentTensorOp)
+### `shapex.to_extent_tensor` (::mlir::iree_compiler::Shape::ToExtentTensorOp)
 
 Convert a ranked shape to a tensor of extents.
 

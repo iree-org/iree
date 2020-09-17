@@ -17,7 +17,7 @@ A dialect implementing test assertions for IREE modules.
 
 ## Operation definition
 
-### `check.expect_all_true` (IREE::Check::ExpectAllTrueOp)
+### `check.expect_all_true` (::mlir::iree_compiler::IREE::Check::ExpectAllTrueOp)
 
 Checks that the operand contains only values that are true
 
@@ -44,7 +44,7 @@ check.expect_all_true(%arg1) : tensor<2x2xi32>
 | :-----: | ----------- |
 `operand` | buffer_view or tensor of signless integer values
 
-### `check.expect_almost_eq_const` (IREE::Check::ExpectAlmostEqConstOp)
+### `check.expect_almost_eq_const` (::mlir::iree_compiler::IREE::Check::ExpectAlmostEqConstOp)
 
 Checks that the tensor operand is almost equal to some constant
 
@@ -78,7 +78,7 @@ check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : 
 | :-----: | ----------- |
 `lhs` | tensor of floating-point values
 
-### `check.expect_almost_eq` (IREE::Check::ExpectAlmostEqOp)
+### `check.expect_almost_eq` (::mlir::iree_compiler::IREE::Check::ExpectAlmostEqOp)
 
 Checks that the operands are almost equal
 
@@ -105,7 +105,7 @@ check.expect_almost_eq(%arg0, %arg1) : tensor<5xf32>
 `lhs` | buffer_view or tensor of floating-point values
 `rhs` | buffer_view or tensor of floating-point values
 
-### `check.expect_eq_const` (IREE::Check::ExpectEqConstOp)
+### `check.expect_eq_const` (::mlir::iree_compiler::IREE::Check::ExpectEqConstOp)
 
 Checks that the tensor operand is equal to some constant
 
@@ -138,7 +138,7 @@ check.expect_eq_const(%arg0, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
 | :-----: | ----------- |
 `lhs` | tensor of any type values
 
-### `check.expect_eq` (IREE::Check::ExpectEqOp)
+### `check.expect_eq` (::mlir::iree_compiler::IREE::Check::ExpectEqOp)
 
 Checks that the tensor or buffer view operands are equal
 
@@ -164,7 +164,7 @@ check.expect_eq(%arg0, %arg1) : tensor<5xi32>
 `lhs` | buffer_view or tensor of any type values
 `rhs` | buffer_view or tensor of any type values
 
-### `check.expect_false` (IREE::Check::ExpectFalseOp)
+### `check.expect_false` (::mlir::iree_compiler::IREE::Check::ExpectFalseOp)
 
 Checks that the operand is false
 
@@ -190,7 +190,7 @@ check.expect_false(%arg0) : i32
 | :-----: | ----------- |
 `operand` | signless integer
 
-### `check.expect_true` (IREE::Check::ExpectTrueOp)
+### `check.expect_true` (::mlir::iree_compiler::IREE::Check::ExpectTrueOp)
 
 Checks that the operand is true
 

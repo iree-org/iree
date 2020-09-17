@@ -31,7 +31,7 @@ A buffer of read-write host memory.
 
 ## Operation definition
 
-### `iree.do_not_optimize` (IREE::DoNotOptimizeOp)
+### `iree.do_not_optimize` (::mlir::iree_compiler::IREE::DoNotOptimizeOp)
 
 Prevents compiler optimizations of a value.
 
@@ -52,7 +52,7 @@ the final step in compilation.
 | :----: | ----------- |
 `results` | any type
 
-### `iree.dynamic_shape_constant` (IREE::DynamicShapeConstantOp)
+### `iree.dynamic_shape_constant` (::mlir::iree_compiler::IREE::DynamicShapeConstantOp)
 
 A tensor constant that can have dynamic dimensions
 
@@ -85,7 +85,7 @@ information should be hidden from the compiler and resolved at runtime.
 | :----: | ----------- |
 `result` | tensor of any type values
 
-### `iree.placeholder` (IREE::PlaceholderOp)
+### `iree.placeholder` (::mlir::iree_compiler::IREE::PlaceholderOp)
 
 A placeholder op to feed a value/buffer into computation
 
@@ -114,7 +114,7 @@ argument due to ABI or contract issues.
 | :----: | ----------- |
 `output` | any type
 
-### `iree.unfoldable_constant` (IREE::UnfoldableConstantOp)
+### `iree.unfoldable_constant` (::mlir::iree_compiler::IREE::UnfoldableConstantOp)
 
 A constant that cannot be folded by the compiler.
 
@@ -134,7 +134,7 @@ std.constant wrapped in an iree.do_not_optimize.
 | :----: | ----------- |
 &laquo;unnamed&raquo; | any type
 
-### `iree.unreachable` (IREE::UnreachableOp)
+### `iree.unreachable` (::mlir::iree_compiler::IREE::UnreachableOp)
 
 unreachable assertion op
 

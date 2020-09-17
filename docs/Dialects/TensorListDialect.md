@@ -30,7 +30,7 @@ IREE VM type representing a TensorList.
 
 ## Operation definition
 
-### `tensorlist.Concat` (IREE::TensorList::Concat)
+### `tensorlist.Concat` (::mlir::iree_compiler::IREE::TensorList::Concat)
 
 Creates a tensor by concatenate the tensors in the tensorlist
 
@@ -53,7 +53,7 @@ the non-leading axes.
 | :----: | ----------- |
 `tensor` | buffer_view
 
-### `tensorlist.FromTensor` (IREE::TensorList::FromTensor)
+### `tensorlist.FromTensor` (::mlir::iree_compiler::IREE::TensorList::FromTensor)
 
 Creates a tensorlist by slicing along the first dimension
 
@@ -73,7 +73,7 @@ a tensorlist `list` of length equal to `tensor`'s leading dimension.
 | :----: | ----------- |
 `list` | tensorlist.list
 
-### `tensorlist.GetItem` (IREE::TensorList::GetItem)
+### `tensorlist.GetItem` (::mlir::iree_compiler::IREE::TensorList::GetItem)
 
 Gets an item out of a tensorlist.
 
@@ -93,7 +93,7 @@ Gets an item out of a tensorlist.
 | :----: | ----------- |
 `item` | buffer_view
 
-### `tensorlist.Reserve` (IREE::TensorList::Reserve)
+### `tensorlist.Reserve` (::mlir::iree_compiler::IREE::TensorList::Reserve)
 
 Create a new tensorlist with a given capacity.
 
@@ -112,7 +112,7 @@ Create a new tensorlist with a given capacity.
 | :----: | ----------- |
 `list` | tensorlist.list
 
-### `tensorlist.SetItem` (IREE::TensorList::SetItem)
+### `tensorlist.SetItem` (::mlir::iree_compiler::IREE::TensorList::SetItem)
 
 Sets an item of a tensorlist.
 
@@ -133,7 +133,7 @@ reflecting the updated value. Does not mutate `list`.
 | :----: | ----------- |
 `new_list` | tensorlist.list
 
-### `tensorlist.Stack` (IREE::TensorList::Stack)
+### `tensorlist.Stack` (::mlir::iree_compiler::IREE::TensorList::Stack)
 
 Creates a tensor by stacking the tensors in the tensorlist
 

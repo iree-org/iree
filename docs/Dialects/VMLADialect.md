@@ -34,7 +34,7 @@ Binding and parameter interface (derived from `hal.interface`).
 
 ## Operation definition
 
-### `vmla.conv` (IREE::VMLA::ConvOp)
+### `vmla.conv` (::mlir::iree_compiler::IREE::VMLA::ConvOp)
 
 
 
@@ -73,7 +73,7 @@ operation ::= `vmla.conv` $input`(`$input_shape `:` type($input_shape)`)` `:` $i
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.abs` (IREE::VMLA::AbsOp)
+### `vmla.abs` (::mlir::iree_compiler::IREE::VMLA::AbsOp)
 
 
 
@@ -99,7 +99,7 @@ operation ::= `vmla.abs` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.add` (IREE::VMLA::AddOp)
+### `vmla.add` (::mlir::iree_compiler::IREE::VMLA::AddOp)
 
 
 
@@ -126,7 +126,34 @@ operation ::= `vmla.add` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.and` (IREE::VMLA::AndOp)
+### `vmla.and.broadcast` (::mlir::iree_compiler::IREE::VMLA::AndBroadcastOp)
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.and.broadcast` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
+```
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | buffer
+`rhs` | 32-bit signless integer
+`dst` | buffer
+
+### `vmla.and` (::mlir::iree_compiler::IREE::VMLA::AndOp)
 
 
 
@@ -153,7 +180,7 @@ operation ::= `vmla.and` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.atan2` (IREE::VMLA::Atan2Op)
+### `vmla.atan2` (::mlir::iree_compiler::IREE::VMLA::Atan2Op)
 
 
 
@@ -180,7 +207,7 @@ operation ::= `vmla.atan2` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_typ
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.batch.matmul` (IREE::VMLA::BatchMatMulOp)
+### `vmla.batch.matmul` (::mlir::iree_compiler::IREE::VMLA::BatchMatMulOp)
 
 
 
@@ -213,7 +240,7 @@ operation ::= `vmla.batch.matmul` $lhs`(`$lhs_shape `:` type($lhs_shape)`)` `:` 
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.batch.matmul.pseudo` (IREE::VMLA::BatchMatMulPseudoOp)
+### `vmla.batch.matmul.pseudo` (::mlir::iree_compiler::IREE::VMLA::BatchMatMulPseudoOp)
 
 Tensor-level pseudo-op of VMLA::BatchMatMulOp.
 
@@ -263,7 +290,7 @@ We insert the relevant transposes as needed in the compiler.
 | :----: | ----------- |
 `dst` | tensor of any type values
 
-### `vmla.broadcast` (IREE::VMLA::BroadcastOp)
+### `vmla.broadcast` (::mlir::iree_compiler::IREE::VMLA::BroadcastOp)
 
 
 
@@ -291,7 +318,7 @@ operation ::= `vmla.broadcast` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.buffer.alloc` (IREE::VMLA::BufferAllocOp)
+### `vmla.buffer.alloc` (::mlir::iree_compiler::IREE::VMLA::BufferAllocOp)
 
 
 
@@ -315,7 +342,7 @@ operation ::= `vmla.buffer.alloc` `byte_length` `=` $byte_length attr-dict `:` t
 | :----: | ----------- |
 `result` | buffer
 
-### `vmla.buffer.byte_length` (IREE::VMLA::BufferByteLengthOp)
+### `vmla.buffer.byte_length` (::mlir::iree_compiler::IREE::VMLA::BufferByteLengthOp)
 
 
 
@@ -339,7 +366,7 @@ operation ::= `vmla.buffer.byte_length` $value attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | index
 
-### `vmla.buffer.clone` (IREE::VMLA::BufferCloneOp)
+### `vmla.buffer.clone` (::mlir::iree_compiler::IREE::VMLA::BufferCloneOp)
 
 
 
@@ -363,7 +390,7 @@ operation ::= `vmla.buffer.clone` $src attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | buffer
 
-### `vmla.buffer.const` (IREE::VMLA::BufferConstOp)
+### `vmla.buffer.const` (::mlir::iree_compiler::IREE::VMLA::BufferConstOp)
 
 
 
@@ -387,7 +414,7 @@ operation ::= `vmla.buffer.const` $value attr-dict `:` type($value) `->` type($r
 | :----: | ----------- |
 `result` | buffer
 
-### `vmla.buffer.copy` (IREE::VMLA::BufferCopyOp)
+### `vmla.buffer.copy` (::mlir::iree_compiler::IREE::VMLA::BufferCopyOp)
 
 
 
@@ -411,7 +438,7 @@ operation ::= `vmla.buffer.copy` $src`[`$src_byte_offset`]``,`
 `dst_byte_offset` | index
 `byte_length` | index
 
-### `vmla.buffer.fill` (IREE::VMLA::BufferFillOp)
+### `vmla.buffer.fill` (::mlir::iree_compiler::IREE::VMLA::BufferFillOp)
 
 
 
@@ -430,7 +457,7 @@ operation ::= `vmla.buffer.fill` $value`,` `out` $dst attr-dict
 `value` | buffer
 `dst` | buffer
 
-### `vmla.buffer.load.i32` (IREE::VMLA::BufferLoadI32Op)
+### `vmla.buffer.load.i32` (::mlir::iree_compiler::IREE::VMLA::BufferLoadI32Op)
 
 
 
@@ -455,7 +482,7 @@ operation ::= `vmla.buffer.load.i32` $src`[`$byte_offset`]` attr-dict `:` type($
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vmla.buffer.view` (IREE::VMLA::BufferViewOp)
+### `vmla.buffer.view` (::mlir::iree_compiler::IREE::VMLA::BufferViewOp)
 
 
 
@@ -482,7 +509,7 @@ operation ::= `vmla.buffer.view` $src`[`$byte_offset`]``,` `byte_length` `=` $by
 | :----: | ----------- |
 `result` | buffer
 
-### `vmla.ceil` (IREE::VMLA::CeilOp)
+### `vmla.ceil` (::mlir::iree_compiler::IREE::VMLA::CeilOp)
 
 
 
@@ -508,7 +535,7 @@ operation ::= `vmla.ceil` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.clamp` (IREE::VMLA::ClampOp)
+### `vmla.clamp` (::mlir::iree_compiler::IREE::VMLA::ClampOp)
 
 
 
@@ -536,7 +563,7 @@ operation ::= `vmla.clamp` $a`,` $b`,` $c`,` `out` $dst attr-dict `:` $element_t
 `c` | buffer
 `dst` | buffer
 
-### `vmla.cmp` (IREE::VMLA::CmpOp)
+### `vmla.cmp` (::mlir::iree_compiler::IREE::VMLA::CmpOp)
 
 
 
@@ -563,7 +590,7 @@ operation ::= `vmla.cmp` $predicate`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` 
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.constant` (IREE::VMLA::ConstantOp)
+### `vmla.constant` (::mlir::iree_compiler::IREE::VMLA::ConstantOp)
 
 constant buffer declaration
 
@@ -589,7 +616,7 @@ expanded into VM ops and the vmla.buffer.const op.
 | :----: | ----------- |
 `result` | buffer
 
-### `vmla.convert` (IREE::VMLA::ConvertOp)
+### `vmla.convert` (::mlir::iree_compiler::IREE::VMLA::ConvertOp)
 
 
 
@@ -615,7 +642,7 @@ operation ::= `vmla.convert` $src`,` `out` $dst attr-dict `:` $src_type `->` $ds
 `src` | buffer
 `dst` | buffer
 
-### `vmla.copy` (IREE::VMLA::CopyOp)
+### `vmla.copy` (::mlir::iree_compiler::IREE::VMLA::CopyOp)
 
 
 
@@ -649,7 +676,7 @@ operation ::= `vmla.copy` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst_indices` | index
 `lengths` | index
 
-### `vmla.cos` (IREE::VMLA::CosOp)
+### `vmla.cos` (::mlir::iree_compiler::IREE::VMLA::CosOp)
 
 
 
@@ -675,7 +702,7 @@ operation ::= `vmla.cos` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.div` (IREE::VMLA::DivOp)
+### `vmla.div` (::mlir::iree_compiler::IREE::VMLA::DivOp)
 
 
 
@@ -702,7 +729,7 @@ operation ::= `vmla.div` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.exp` (IREE::VMLA::ExpOp)
+### `vmla.exp` (::mlir::iree_compiler::IREE::VMLA::ExpOp)
 
 
 
@@ -728,7 +755,7 @@ operation ::= `vmla.exp` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.finite` (IREE::VMLA::FiniteOp)
+### `vmla.finite` (::mlir::iree_compiler::IREE::VMLA::FiniteOp)
 
 
 
@@ -753,7 +780,7 @@ operation ::= `vmla.finite` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.floor` (IREE::VMLA::FloorOp)
+### `vmla.floor` (::mlir::iree_compiler::IREE::VMLA::FloorOp)
 
 
 
@@ -779,7 +806,7 @@ operation ::= `vmla.floor` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.gather` (IREE::VMLA::GatherOp)
+### `vmla.gather` (::mlir::iree_compiler::IREE::VMLA::GatherOp)
 
 
 
@@ -812,7 +839,7 @@ operation ::= `vmla.gather` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.interface.binding` (IREE::VMLA::InterfaceBindingOp)
+### `vmla.interface.binding` (::mlir::iree_compiler::IREE::VMLA::InterfaceBindingOp)
 
 
 
@@ -843,7 +870,7 @@ operation ::= `vmla.interface.binding` $interface attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | buffer
 
-### `vmla.interface.const` (IREE::VMLA::InterfaceConstOp)
+### `vmla.interface.const` (::mlir::iree_compiler::IREE::VMLA::InterfaceConstOp)
 
 
 
@@ -873,7 +900,7 @@ operation ::= `vmla.interface.const` $interface attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer or index
 
-### `vmla.iota` (IREE::VMLA::IotaOp)
+### `vmla.iota` (::mlir::iree_compiler::IREE::VMLA::IotaOp)
 
 
 
@@ -897,7 +924,7 @@ operation ::= `vmla.iota` `out` $dst attr-dict `:` $element_type
 | :-----: | ----------- |
 `dst` | buffer
 
-### `vmla.log` (IREE::VMLA::LogOp)
+### `vmla.log` (::mlir::iree_compiler::IREE::VMLA::LogOp)
 
 
 
@@ -923,7 +950,7 @@ operation ::= `vmla.log` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.max` (IREE::VMLA::MaxOp)
+### `vmla.max` (::mlir::iree_compiler::IREE::VMLA::MaxOp)
 
 
 
@@ -950,7 +977,7 @@ operation ::= `vmla.max` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.min` (IREE::VMLA::MinOp)
+### `vmla.min` (::mlir::iree_compiler::IREE::VMLA::MinOp)
 
 
 
@@ -977,7 +1004,7 @@ operation ::= `vmla.min` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.mul` (IREE::VMLA::MulOp)
+### `vmla.mul` (::mlir::iree_compiler::IREE::VMLA::MulOp)
 
 
 
@@ -1004,7 +1031,7 @@ operation ::= `vmla.mul` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.neg` (IREE::VMLA::NegOp)
+### `vmla.neg` (::mlir::iree_compiler::IREE::VMLA::NegOp)
 
 
 
@@ -1030,7 +1057,7 @@ operation ::= `vmla.neg` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.not` (IREE::VMLA::NotOp)
+### `vmla.not` (::mlir::iree_compiler::IREE::VMLA::NotOp)
 
 
 
@@ -1056,7 +1083,7 @@ operation ::= `vmla.not` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.or` (IREE::VMLA::OrOp)
+### `vmla.or` (::mlir::iree_compiler::IREE::VMLA::OrOp)
 
 
 
@@ -1083,7 +1110,7 @@ operation ::= `vmla.or` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.pad` (IREE::VMLA::PadOp)
+### `vmla.pad` (::mlir::iree_compiler::IREE::VMLA::PadOp)
 
 
 
@@ -1117,7 +1144,7 @@ operation ::= `vmla.pad` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.pooling.max` (IREE::VMLA::PoolingMaxOp)
+### `vmla.pooling.max` (::mlir::iree_compiler::IREE::VMLA::PoolingMaxOp)
 
 
 
@@ -1151,7 +1178,7 @@ operation ::= `vmla.pooling.max` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.pooling.min` (IREE::VMLA::PoolingMinOp)
+### `vmla.pooling.min` (::mlir::iree_compiler::IREE::VMLA::PoolingMinOp)
 
 
 
@@ -1185,7 +1212,7 @@ operation ::= `vmla.pooling.min` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.pooling.sum` (IREE::VMLA::PoolingSumOp)
+### `vmla.pooling.sum` (::mlir::iree_compiler::IREE::VMLA::PoolingSumOp)
 
 
 
@@ -1219,7 +1246,7 @@ operation ::= `vmla.pooling.sum` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.pow` (IREE::VMLA::PowOp)
+### `vmla.pow` (::mlir::iree_compiler::IREE::VMLA::PowOp)
 
 
 
@@ -1246,7 +1273,7 @@ operation ::= `vmla.pow` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.reduce.max` (IREE::VMLA::ReduceMaxOp)
+### `vmla.reduce.max` (::mlir::iree_compiler::IREE::VMLA::ReduceMaxOp)
 
 
 
@@ -1278,7 +1305,7 @@ operation ::= `vmla.reduce.max` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.reduce.min` (IREE::VMLA::ReduceMinOp)
+### `vmla.reduce.min` (::mlir::iree_compiler::IREE::VMLA::ReduceMinOp)
 
 
 
@@ -1310,7 +1337,7 @@ operation ::= `vmla.reduce.min` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.reduce.sum` (IREE::VMLA::ReduceSumOp)
+### `vmla.reduce.sum` (::mlir::iree_compiler::IREE::VMLA::ReduceSumOp)
 
 
 
@@ -1342,7 +1369,7 @@ operation ::= `vmla.reduce.sum` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.rem` (IREE::VMLA::RemOp)
+### `vmla.rem` (::mlir::iree_compiler::IREE::VMLA::RemOp)
 
 
 
@@ -1369,7 +1396,7 @@ operation ::= `vmla.rem` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.reverse` (IREE::VMLA::ReverseOp)
+### `vmla.reverse` (::mlir::iree_compiler::IREE::VMLA::ReverseOp)
 
 
 
@@ -1398,7 +1425,7 @@ operation ::= `vmla.reverse` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.rsqrt` (IREE::VMLA::RsqrtOp)
+### `vmla.rsqrt` (::mlir::iree_compiler::IREE::VMLA::RsqrtOp)
 
 
 
@@ -1424,7 +1451,7 @@ operation ::= `vmla.rsqrt` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.scatter` (IREE::VMLA::ScatterOp)
+### `vmla.scatter` (::mlir::iree_compiler::IREE::VMLA::ScatterOp)
 
 
 
@@ -1455,7 +1482,7 @@ operation ::= `vmla.scatter` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.select` (IREE::VMLA::SelectOp)
+### `vmla.select` (::mlir::iree_compiler::IREE::VMLA::SelectOp)
 
 
 
@@ -1482,7 +1509,7 @@ operation ::= `vmla.select` $cond`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $e
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.shl` (IREE::VMLA::ShlOp)
+### `vmla.shl` (::mlir::iree_compiler::IREE::VMLA::ShlOp)
 
 
 
@@ -1509,7 +1536,7 @@ operation ::= `vmla.shl` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.shr` (IREE::VMLA::ShrOp)
+### `vmla.shr` (::mlir::iree_compiler::IREE::VMLA::ShrOp)
 
 
 
@@ -1536,7 +1563,7 @@ operation ::= `vmla.shr` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.sin` (IREE::VMLA::SinOp)
+### `vmla.sin` (::mlir::iree_compiler::IREE::VMLA::SinOp)
 
 
 
@@ -1562,7 +1589,7 @@ operation ::= `vmla.sin` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.sqrt` (IREE::VMLA::SqrtOp)
+### `vmla.sqrt` (::mlir::iree_compiler::IREE::VMLA::SqrtOp)
 
 
 
@@ -1588,7 +1615,7 @@ operation ::= `vmla.sqrt` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.sub` (IREE::VMLA::SubOp)
+### `vmla.sub` (::mlir::iree_compiler::IREE::VMLA::SubOp)
 
 
 
@@ -1615,7 +1642,7 @@ operation ::= `vmla.sub` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
 `rhs` | buffer
 `dst` | buffer
 
-### `vmla.tanh` (IREE::VMLA::TanhOp)
+### `vmla.tanh` (::mlir::iree_compiler::IREE::VMLA::TanhOp)
 
 
 
@@ -1641,7 +1668,7 @@ operation ::= `vmla.tanh` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
-### `vmla.tile` (IREE::VMLA::TileOp)
+### `vmla.tile` (::mlir::iree_compiler::IREE::VMLA::TileOp)
 
 
 
@@ -1669,7 +1696,7 @@ operation ::= `vmla.tile` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.transpose` (IREE::VMLA::TransposeOp)
+### `vmla.transpose` (::mlir::iree_compiler::IREE::VMLA::TransposeOp)
 
 
 
@@ -1698,7 +1725,34 @@ operation ::= `vmla.transpose` $src`(`$src_shape `:` type($src_shape)`)``,`
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
-### `vmla.xor` (IREE::VMLA::XorOp)
+### `vmla.xor.broadcast` (::mlir::iree_compiler::IREE::VMLA::XorBroadcastOp)
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.xor.broadcast` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
+```
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+`forceUnsigned` | ::mlir::UnitAttr | unit attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | buffer
+`rhs` | 32-bit signless integer
+`dst` | buffer
+
+### `vmla.xor` (::mlir::iree_compiler::IREE::VMLA::XorOp)
 
 
 

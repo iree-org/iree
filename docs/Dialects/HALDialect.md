@@ -107,7 +107,7 @@ on for a particular value prior to the signal for that value.
 
 ## Operation definition
 
-### `hal.variable.load.indirect` (IREE::HAL::VariableLoadIndirectOp)
+### `hal.variable.load.indirect` (::mlir::iree_compiler::IREE::HAL::VariableLoadIndirectOp)
 
 loads a value from a global variable
 
@@ -132,7 +132,7 @@ Returns a copy of the variable value.
 | :----: | ----------- |
 `result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 
-### `hal.allocator.allocate.const` (IREE::HAL::AllocatorAllocateConstOp)
+### `hal.allocator.allocate.const` (::mlir::iree_compiler::IREE::HAL::AllocatorAllocateConstOp)
 
 constant buffer allocation operation
 
@@ -169,7 +169,7 @@ repeatedly.
 | :----: | ----------- |
 `result` | buffer
 
-### `hal.allocator.allocate` (IREE::HAL::AllocatorAllocateOp)
+### `hal.allocator.allocate` (::mlir::iree_compiler::IREE::HAL::AllocatorAllocateOp)
 
 empty buffer allocation operation
 
@@ -205,7 +205,7 @@ allocator has specific alignment requirements or minimum allocation sizes.
 | :----: | ----------- |
 `result` | buffer
 
-### `hal.allocator.compute_offset` (IREE::HAL::AllocatorComputeOffsetOp)
+### `hal.allocator.compute_offset` (::mlir::iree_compiler::IREE::HAL::AllocatorComputeOffsetOp)
 
 buffer view indices to byte offset computation operation
 
@@ -240,7 +240,7 @@ This returns the same value as `hal.buffer_view.compute_offset`.
 | :----: | ----------- |
 `offset` | index
 
-### `hal.allocator.compute_range` (IREE::HAL::AllocatorComputeRangeOp)
+### `hal.allocator.compute_range` (::mlir::iree_compiler::IREE::HAL::AllocatorComputeRangeOp)
 
 buffer view byte range computation operation
 
@@ -278,7 +278,7 @@ This returns the same value as `hal.buffer_view.compute_range`.
 `offset` | index
 `length` | index
 
-### `hal.allocator.compute_size` (IREE::HAL::AllocatorComputeSizeOp)
+### `hal.allocator.compute_size` (::mlir::iree_compiler::IREE::HAL::AllocatorComputeSizeOp)
 
 buffer allocation size computation operation
 
@@ -312,7 +312,7 @@ This returns the same value as `hal.buffer_view.byte_length`.
 | :----: | ----------- |
 `result` | index
 
-### `hal.buffer.allocator` (IREE::HAL::BufferAllocatorOp)
+### `hal.buffer.allocator` (::mlir::iree_compiler::IREE::HAL::BufferAllocatorOp)
 
 buffer allocator accessor operation
 
@@ -337,7 +337,7 @@ Returns the allocator this buffer was allocated from.
 | :----: | ----------- |
 `result` | allocator
 
-### `hal.buffer.copy_data` (IREE::HAL::BufferCopyDataOp)
+### `hal.buffer.copy_data` (::mlir::iree_compiler::IREE::HAL::BufferCopyDataOp)
 
 buffer-to-buffer copy operation
 
@@ -360,7 +360,7 @@ Copies data from the provided source_buffer into the buffer.
 `target_offset` | index
 `length` | index
 
-### `hal.buffer.fill` (IREE::HAL::BufferFillOp)
+### `hal.buffer.fill` (::mlir::iree_compiler::IREE::HAL::BufferFillOp)
 
 buffer fill operation
 
@@ -382,7 +382,7 @@ Fills the target buffer with the given repeating value.
 `length` | index
 `pattern` | 32-bit signless integer
 
-### `hal.buffer.load` (IREE::HAL::BufferLoadOp)
+### `hal.buffer.load` (::mlir::iree_compiler::IREE::HAL::BufferLoadOp)
 
 buffer element load operation
 
@@ -408,7 +408,7 @@ Loads a value from a buffer by mapping it.
 | :----: | ----------- |
 `result` | index or signless integer or floating-point or vector of any type values
 
-### `hal.buffer.read_data` (IREE::HAL::BufferReadDataOp)
+### `hal.buffer.read_data` (::mlir::iree_compiler::IREE::HAL::BufferReadDataOp)
 
 buffer-to-heap read operation
 
@@ -431,7 +431,7 @@ Reads a block of byte data from the resource at the given offset.
 `target_offset` | index
 `length` | index
 
-### `hal.buffer.store` (IREE::HAL::BufferStoreOp)
+### `hal.buffer.store` (::mlir::iree_compiler::IREE::HAL::BufferStoreOp)
 
 buffer element store operation
 
@@ -452,7 +452,7 @@ Stores a value into a buffer by mapping it.
 `target_buffer` | buffer
 `target_offset` | index
 
-### `hal.buffer.subspan` (IREE::HAL::BufferSubspanOp)
+### `hal.buffer.subspan` (::mlir::iree_compiler::IREE::HAL::BufferSubspanOp)
 
 buffer subspan operation
 
@@ -479,7 +479,7 @@ Returns a reference to a subspan of the buffer.
 | :----: | ----------- |
 `result` | buffer
 
-### `hal.buffer_view.buffer` (IREE::HAL::BufferViewBufferOp)
+### `hal.buffer_view.buffer` (::mlir::iree_compiler::IREE::HAL::BufferViewBufferOp)
 
 buffer view buffer accessor
 
@@ -504,7 +504,7 @@ Returns the buffer backing this view's contents.
 | :----: | ----------- |
 `result` | buffer
 
-### `hal.buffer_view.byte_length` (IREE::HAL::BufferViewByteLengthOp)
+### `hal.buffer_view.byte_length` (::mlir::iree_compiler::IREE::HAL::BufferViewByteLengthOp)
 
 buffer view buffer byte length accessor
 
@@ -529,7 +529,7 @@ Returns the allocated size of a shaped buffer view in bytes.
 | :----: | ----------- |
 `result` | index
 
-### `hal.buffer_view.compute_offset` (IREE::HAL::BufferViewComputeOffsetOp)
+### `hal.buffer_view.compute_offset` (::mlir::iree_compiler::IREE::HAL::BufferViewComputeOffsetOp)
 
 buffer view indices to byte offset computation operation
 
@@ -555,7 +555,7 @@ Computes an element byte offset within a buffer view.
 | :----: | ----------- |
 `offset` | index
 
-### `hal.buffer_view.compute_range` (IREE::HAL::BufferViewComputeRangeOp)
+### `hal.buffer_view.compute_range` (::mlir::iree_compiler::IREE::HAL::BufferViewComputeRangeOp)
 
 buffer view byte range computation operation
 
@@ -584,7 +584,7 @@ Computes a byte range within a buffer for one or more elements.
 `offset` | index
 `length` | index
 
-### `hal.buffer_view.const` (IREE::HAL::BufferViewConstOp)
+### `hal.buffer_view.const` (::mlir::iree_compiler::IREE::HAL::BufferViewConstOp)
 
 buffer view constant initializer
 
@@ -619,7 +619,7 @@ allocation and a buffer view wrapper.
 | :----: | ----------- |
 `result` | buffer_view
 
-### `hal.buffer_view.create` (IREE::HAL::BufferViewCreateOp)
+### `hal.buffer_view.create` (::mlir::iree_compiler::IREE::HAL::BufferViewCreateOp)
 
 buffer view reference initializer
 
@@ -655,7 +655,7 @@ along with the contents.
 | :----: | ----------- |
 `result` | buffer_view
 
-### `hal.buffer_view.dim` (IREE::HAL::BufferViewDimOp)
+### `hal.buffer_view.dim` (::mlir::iree_compiler::IREE::HAL::BufferViewDimOp)
 
 buffer view dimension value query
 
@@ -686,7 +686,7 @@ Returns the value of the given dimension.
 | :----: | ----------- |
 `result` | index
 
-### `hal.buffer_view.dims` (IREE::HAL::BufferViewDimsOp)
+### `hal.buffer_view.dims` (::mlir::iree_compiler::IREE::HAL::BufferViewDimsOp)
 
 buffer view multi-value dimension query
 
@@ -711,7 +711,7 @@ Returns each dimension value of the buffer view.
 | :----: | ----------- |
 `result` | index
 
-### `hal.buffer_view.rank` (IREE::HAL::BufferViewRankOp)
+### `hal.buffer_view.rank` (::mlir::iree_compiler::IREE::HAL::BufferViewRankOp)
 
 buffer view rank query
 
@@ -736,7 +736,7 @@ Returns the rank of the buffer view.
 | :----: | ----------- |
 `result` | index
 
-### `hal.buffer_view.subview` (IREE::HAL::BufferViewSubviewOp)
+### `hal.buffer_view.subview` (::mlir::iree_compiler::IREE::HAL::BufferViewSubviewOp)
 
 buffer view subview initializer
 
@@ -765,7 +765,7 @@ the original and sliced references must be synchronized.
 | :----: | ----------- |
 `result` | buffer_view
 
-### `hal.buffer_view.trace` (IREE::HAL::BufferViewTraceOp)
+### `hal.buffer_view.trace` (::mlir::iree_compiler::IREE::HAL::BufferViewTraceOp)
 
 trace value(s) operation
 
@@ -784,7 +784,7 @@ Trace point for dispatchable functions.
 | :-----: | ----------- |
 `operands` | buffer_view
 
-### `hal.buffer.write_data` (IREE::HAL::BufferWriteDataOp)
+### `hal.buffer.write_data` (::mlir::iree_compiler::IREE::HAL::BufferWriteDataOp)
 
 heap-to-buffer write operation
 
@@ -807,7 +807,7 @@ Writes a block of byte data into the resource at the given offset.
 `target_offset` | index
 `length` | index
 
-### `hal.check_success` (IREE::HAL::CheckSuccessOp)
+### `hal.check_success` (::mlir::iree_compiler::IREE::HAL::CheckSuccessOp)
 
 raises a global failure if a status is not 'ok'
 
@@ -841,7 +841,7 @@ or pending when the failure occurs will complete.
 | :-----: | ----------- |
 `status` | 32-bit signless integer
 
-### `hal.command_buffer.begin` (IREE::HAL::CommandBufferBeginOp)
+### `hal.command_buffer.begin` (::mlir::iree_compiler::IREE::HAL::CommandBufferBeginOp)
 
 command buffer recording begin operation
 
@@ -861,7 +861,7 @@ recorded contents.
 | :-----: | ----------- |
 `command_buffer` | command_buffer
 
-### `hal.command_buffer.bind_descriptor_set` (IREE::HAL::CommandBufferBindDescriptorSetOp)
+### `hal.command_buffer.bind_descriptor_set` (::mlir::iree_compiler::IREE::HAL::CommandBufferBindDescriptorSetOp)
 
 command buffer descriptor set binding operation
 
@@ -892,7 +892,7 @@ must not be modified once bound to a command buffer.
 `descriptor_set` | descriptor_set
 `dynamic_offsets` | index
 
-### `hal.command_buffer.copy_buffer` (IREE::HAL::CommandBufferCopyBufferOp)
+### `hal.command_buffer.copy_buffer` (::mlir::iree_compiler::IREE::HAL::CommandBufferCopyBufferOp)
 
 command buffer buffer copy recording operation
 
@@ -916,7 +916,7 @@ Copies a range of one buffer to another.
 `target_offset` | index
 `length` | index
 
-### `hal.command_buffer.create` (IREE::HAL::CommandBufferCreateOp)
+### `hal.command_buffer.create` (::mlir::iree_compiler::IREE::HAL::CommandBufferCreateOp)
 
 command buffer allocation operation
 
@@ -949,7 +949,7 @@ Returns a command buffer from the device pool ready to begin recording.
 | :----: | ----------- |
 `result` | command_buffer
 
-### `hal.command_buffer.device` (IREE::HAL::CommandBufferDeviceOp)
+### `hal.command_buffer.device` (::mlir::iree_compiler::IREE::HAL::CommandBufferDeviceOp)
 
 command buffer device query operation
 
@@ -974,7 +974,7 @@ Used during conversion to access the device used to create a command buffer.
 | :----: | ----------- |
 `device` | device
 
-### `hal.command_buffer.dispatch.indirect` (IREE::HAL::CommandBufferDispatchIndirectOp)
+### `hal.command_buffer.dispatch.indirect` (::mlir::iree_compiler::IREE::HAL::CommandBufferDispatchIndirectOp)
 
 command buffer indirect dispatch recording operation
 
@@ -1010,7 +1010,7 @@ hal.command_buffer.dispatch.indirect %cmd, %executable,
 `workgroups_buffer` | buffer
 `workgroups_offset` | index
 
-### `hal.command_buffer.dispatch.indirect.symbol` (IREE::HAL::CommandBufferDispatchIndirectSymbolOp)
+### `hal.command_buffer.dispatch.indirect.symbol` (::mlir::iree_compiler::IREE::HAL::CommandBufferDispatchIndirectSymbolOp)
 
 command buffer indirect dispatch recording operation, using symbolref
 
@@ -1044,7 +1044,7 @@ hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
 `workgroups_buffer` | buffer
 `workgroups_offset` | index
 
-### `hal.command_buffer.dispatch` (IREE::HAL::CommandBufferDispatchOp)
+### `hal.command_buffer.dispatch` (::mlir::iree_compiler::IREE::HAL::CommandBufferDispatchOp)
 
 command buffer dispatch recording operation
 
@@ -1084,7 +1084,7 @@ hal.command_buffer.dispatch %cmd, %executable,
 `workgroup_y` | index
 `workgroup_z` | index
 
-### `hal.command_buffer.dispatch.symbol` (IREE::HAL::CommandBufferDispatchSymbolOp)
+### `hal.command_buffer.dispatch.symbol` (::mlir::iree_compiler::IREE::HAL::CommandBufferDispatchSymbolOp)
 
 command buffer dispatch recording operation, using symbolref
 
@@ -1122,7 +1122,7 @@ hal.command_buffer.dispatch.symbol %cmd, @executable::@target::@entry,
 `workgroup_y` | index
 `workgroup_z` | index
 
-### `hal.command_buffer.end` (IREE::HAL::CommandBufferEndOp)
+### `hal.command_buffer.end` (::mlir::iree_compiler::IREE::HAL::CommandBufferEndOp)
 
 command buffer recording end operation
 
@@ -1141,7 +1141,7 @@ Ends recording into the command buffer.
 | :-----: | ----------- |
 `command_buffer` | command_buffer
 
-### `hal.command_buffer.execution_barrier` (IREE::HAL::CommandBufferExecutionBarrierOp)
+### `hal.command_buffer.execution_barrier` (::mlir::iree_compiler::IREE::HAL::CommandBufferExecutionBarrierOp)
 
 command buffer execution barrier recording operation
 
@@ -1163,7 +1163,7 @@ barrier.
 `memory_barriers` | MemoryBarrier
 `buffer_barriers` | BufferBarrier
 
-### `hal.command_buffer.fill_buffer` (IREE::HAL::CommandBufferFillBufferOp)
+### `hal.command_buffer.fill_buffer` (::mlir::iree_compiler::IREE::HAL::CommandBufferFillBufferOp)
 
 command buffer buffer fill recording operation
 
@@ -1186,7 +1186,7 @@ Fills the target buffer with the given repeating value.
 `length` | index
 `pattern` | 32-bit signless integer
 
-### `hal.command_buffer.push_constants` (IREE::HAL::CommandBufferPushConstantsOp)
+### `hal.command_buffer.push_constants` (::mlir::iree_compiler::IREE::HAL::CommandBufferPushConstantsOp)
 
 command buffer push constants operation
 
@@ -1227,7 +1227,7 @@ hal.command_buffer.push_constants %cmd, %exe_layout,
 `executable_layout` | executable_layout
 `values` | 32-bit signless integer
 
-### `hal.command_buffer.push_descriptor_set` (IREE::HAL::CommandBufferPushDescriptorSetOp)
+### `hal.command_buffer.push_descriptor_set` (::mlir::iree_compiler::IREE::HAL::CommandBufferPushDescriptorSetOp)
 
 command buffer descriptor set push binding operation
 
@@ -1258,7 +1258,7 @@ hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindin
 `binding_offsets` | index
 `binding_lengths` | index
 
-### `hal.descriptor_set.create` (IREE::HAL::DescriptorSetCreateOp)
+### `hal.descriptor_set.create` (::mlir::iree_compiler::IREE::HAL::DescriptorSetCreateOp)
 
 allocates a descriptor set from the device pool
 
@@ -1286,7 +1286,7 @@ Creates a DescriptorSet from the device pool.
 | :----: | ----------- |
 `result` | descriptor_set
 
-### `hal.descriptor_set_layout.create` (IREE::HAL::DescriptorSetLayoutCreateOp)
+### `hal.descriptor_set_layout.create` (::mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutCreateOp)
 
 creates a descriptor set layout
 
@@ -1328,7 +1328,7 @@ executables that use the same set layouts can be reduced.
 | :----: | ----------- |
 `result` | descriptor_set_layout
 
-### `hal.descriptor_set_layout.lookup` (IREE::HAL::DescriptorSetLayoutLookupOp)
+### `hal.descriptor_set_layout.lookup` (::mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutLookupOp)
 
 descriptor set layout cache lookup pseudo-op
 
@@ -1368,7 +1368,7 @@ possibly lazy-initialized descriptor set layout.
 | :----: | ----------- |
 `result` | descriptor_set_layout
 
-### `hal.device.allocator` (IREE::HAL::DeviceAllocatorOp)
+### `hal.device.allocator` (::mlir::iree_compiler::IREE::HAL::DeviceAllocatorOp)
 
 device allocator accessor operation
 
@@ -1394,7 +1394,7 @@ the device.
 | :----: | ----------- |
 `result` | allocator
 
-### `hal.device.match.id` (IREE::HAL::DeviceMatchIDOp)
+### `hal.device.match.id` (::mlir::iree_compiler::IREE::HAL::DeviceMatchIDOp)
 
 returns true if the device ID matches the pattern
 
@@ -1432,7 +1432,7 @@ device is not known at compile-time.
 | :----: | ----------- |
 `result` | 1-bit signless integer
 
-### `hal.device.switch` (IREE::HAL::DeviceSwitchOp)
+### `hal.device.switch` (::mlir::iree_compiler::IREE::HAL::DeviceSwitchOp)
 
 runtime device switch pseudo op
 
@@ -1504,7 +1504,7 @@ return the same types.
 | :----: | ----------- |
 `results` | any type
 
-### `hal.ex.defer_release` (IREE::HAL::ExDeferReleaseOp)
+### `hal.ex.defer_release` (::mlir::iree_compiler::IREE::HAL::ExDeferReleaseOp)
 
 
 
@@ -1522,7 +1522,7 @@ operation ::= `hal.ex.defer_release` $operand `:` type($operand) attr-dict
 | :-----: | ----------- |
 `operand` | allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 
-### `hal.ex.shared_device` (IREE::HAL::ExSharedDeviceOp)
+### `hal.ex.shared_device` (::mlir::iree_compiler::IREE::HAL::ExSharedDeviceOp)
 
 
 
@@ -1540,7 +1540,7 @@ operation ::= `hal.ex.shared_device` attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | device
 
-### `hal.ex.submit_and_wait` (IREE::HAL::ExSubmitAndWaitOp)
+### `hal.ex.submit_and_wait` (::mlir::iree_compiler::IREE::HAL::ExSubmitAndWaitOp)
 
 
 
@@ -1559,7 +1559,7 @@ operation ::= `hal.ex.submit_and_wait` $device `,` $command_buffer attr-dict
 `device` | device
 `command_buffer` | command_buffer
 
-### `hal.executable.binary_end` (IREE::HAL::ExecutableBinaryEndOp)
+### `hal.executable.binary_end` (::mlir::iree_compiler::IREE::HAL::ExecutableBinaryEndOp)
 
 terminator pseudo-op for the executable binary op
 
@@ -1571,7 +1571,7 @@ operation ::= `hal.executable.binary_end` attr-dict
 
 
 
-### `hal.executable.binary` (IREE::HAL::ExecutableBinaryOp)
+### `hal.executable.binary` (::mlir::iree_compiler::IREE::HAL::ExecutableBinaryOp)
 
 compiled executable binary data
 
@@ -1588,7 +1588,7 @@ executable format in `iree/hal/executable_format.h`.
 `format` | ::mlir::IntegerAttr | IREE HAL Executable format
 `data` | ::mlir::DenseIntElementsAttr | 8-bit signless integer elements attribute
 
-### `hal.executable_cache.create` (IREE::HAL::ExecutableCacheCreateOp)
+### `hal.executable_cache.create` (::mlir::iree_compiler::IREE::HAL::ExecutableCacheCreateOp)
 
 creates an executable cache
 
@@ -1638,7 +1638,7 @@ the executables are ready for use.
 | :----: | ----------- |
 `result` | executable_cache
 
-### `hal.executable_cache.prepare` (IREE::HAL::ExecutableCachePrepareOp)
+### `hal.executable_cache.prepare` (::mlir::iree_compiler::IREE::HAL::ExecutableCachePrepareOp)
 
 synchronously prepares an executable for use
 
@@ -1686,7 +1686,7 @@ executables - and calls will block until preparation completes.
 | :----: | ----------- |
 `result` | executable
 
-### `hal.executable_cache.select_format` (IREE::HAL::ExecutableCacheSelectFormatOp)
+### `hal.executable_cache.select_format` (::mlir::iree_compiler::IREE::HAL::ExecutableCacheSelectFormatOp)
 
 selects the preferred format from the given list
 
@@ -1725,7 +1725,7 @@ or features required by the executable are not supported.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `hal.executable_end` (IREE::HAL::ExecutableEndOp)
+### `hal.executable_end` (::mlir::iree_compiler::IREE::HAL::ExecutableEndOp)
 
 terminator pseudo-op for the executable op
 
@@ -1737,7 +1737,7 @@ operation ::= `hal.executable_end` attr-dict
 
 
 
-### `hal.executable.entry_point` (IREE::HAL::ExecutableEntryPointOp)
+### `hal.executable.entry_point` (::mlir::iree_compiler::IREE::HAL::ExecutableEntryPointOp)
 
 executable entry point declaration
 
@@ -1753,7 +1753,7 @@ information describing the IO interface it uses and other dispatch metadata.
 `interface` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 `signature` | ::mlir::TypeAttr | any type attribute
 
-### `hal.executable_layout.create` (IREE::HAL::ExecutableLayoutCreateOp)
+### `hal.executable_layout.create` (::mlir::iree_compiler::IREE::HAL::ExecutableLayoutCreateOp)
 
 creates an executable layout
 
@@ -1801,7 +1801,7 @@ adjacent to it.
 | :----: | ----------- |
 `result` | executable_layout
 
-### `hal.executable_layout.lookup` (IREE::HAL::ExecutableLayoutLookupOp)
+### `hal.executable_layout.lookup` (::mlir::iree_compiler::IREE::HAL::ExecutableLayoutLookupOp)
 
 executable layout cache lookup pseudo-op
 
@@ -1845,7 +1845,7 @@ possibly lazy-initialized executable layout.
 | :----: | ----------- |
 `result` | executable_layout
 
-### `hal.executable.lookup` (IREE::HAL::ExecutableLookupOp)
+### `hal.executable.lookup` (::mlir::iree_compiler::IREE::HAL::ExecutableLookupOp)
 
 executable cache lookup pseudo-op
 
@@ -1877,7 +1877,7 @@ possibly lazy-initialized executable.
 | :----: | ----------- |
 `result` | executable
 
-### `hal.executable` (IREE::HAL::ExecutableOp)
+### `hal.executable` (::mlir::iree_compiler::IREE::HAL::ExecutableOp)
 
 target-specific executable module
 
@@ -1890,7 +1890,7 @@ kernel/shader/etc.
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
 
-### `hal.executable.target_end` (IREE::HAL::ExecutableTargetEndOp)
+### `hal.executable.target_end` (::mlir::iree_compiler::IREE::HAL::ExecutableTargetEndOp)
 
 terminator pseudo-op for the executable target op
 
@@ -1902,7 +1902,7 @@ operation ::= `hal.executable.target_end` attr-dict
 
 
 
-### `hal.executable.target` (IREE::HAL::ExecutableTargetOp)
+### `hal.executable.target` (::mlir::iree_compiler::IREE::HAL::ExecutableTargetOp)
 
 target executable IR
 
@@ -1916,7 +1916,7 @@ is usually removed during transformation.
 `sym_name` | ::mlir::StringAttr | string attribute
 `target_backend_filter` | ::mlir::StringAttr | string attribute
 
-### `hal.interface.binding` (IREE::HAL::InterfaceBindingOp)
+### `hal.interface.binding` (::mlir::iree_compiler::IREE::HAL::InterfaceBindingOp)
 
 executable IO binding description
 
@@ -1944,7 +1944,7 @@ the scheduler.
 `type` | ::mlir::IntegerAttr | IREE HAL DescriptorType
 `access` | ::mlir::IntegerAttr | valid MemoryAccess
 
-### `hal.interface_end` (IREE::HAL::InterfaceEndOp)
+### `hal.interface_end` (::mlir::iree_compiler::IREE::HAL::InterfaceEndOp)
 
 terminator pseudo-op for the executable interface op
 
@@ -1956,7 +1956,7 @@ operation ::= `hal.interface_end` attr-dict
 
 
 
-### `hal.interface.load.constant` (IREE::HAL::InterfaceLoadConstantOp)
+### `hal.interface.load.constant` (::mlir::iree_compiler::IREE::HAL::InterfaceLoadConstantOp)
 
 loads a constant value from the interface constant block
 
@@ -1983,7 +1983,7 @@ bitcast (possibly with truncation or zero-extension) to the result type.
 | :----: | ----------- |
 `result` | index or signless integer or floating-point
 
-### `hal.interface.load.tensor` (IREE::HAL::InterfaceLoadTensorOp)
+### `hal.interface.load.tensor` (::mlir::iree_compiler::IREE::HAL::InterfaceLoadTensorOp)
 
 loads a tensor from an executable IO binding
 
@@ -2027,7 +2027,7 @@ at least a 4 byte boundary.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `hal.interface` (IREE::HAL::InterfaceOp)
+### `hal.interface` (::mlir::iree_compiler::IREE::HAL::InterfaceOp)
 
 executable IO interface description
 
@@ -2057,7 +2057,7 @@ see: https://developer.nvidia.com/vulkan-shader-resource-binding
 `sym_name` | ::mlir::StringAttr | string attribute
 `push_constants` | ::mlir::IntegerAttr | 32-bit signless integer attribute
 
-### `hal.interface.store.tensor` (IREE::HAL::InterfaceStoreTensorOp)
+### `hal.interface.store.tensor` (::mlir::iree_compiler::IREE::HAL::InterfaceStoreTensorOp)
 
 stores a tensor in an executable IO binding
 
@@ -2096,7 +2096,7 @@ at least a 4 byte boundary.
 `operand` | ranked tensor of any type values
 `offset` | index
 
-### `hal.make_buffer_barrier` (IREE::HAL::MakeBufferBarrierOp)
+### `hal.make_buffer_barrier` (::mlir::iree_compiler::IREE::HAL::MakeBufferBarrierOp)
 
 temporary buffer barrier allocation operation
 
@@ -2132,7 +2132,7 @@ command buffer barrier operations.
 | :----: | ----------- |
 `result` | BufferBarrier
 
-### `hal.make_memory_barrier` (IREE::HAL::MakeMemoryBarrierOp)
+### `hal.make_memory_barrier` (::mlir::iree_compiler::IREE::HAL::MakeMemoryBarrierOp)
 
 temporary memory barrier allocation operation
 
@@ -2159,7 +2159,7 @@ command buffer barrier operations.
 | :----: | ----------- |
 `result` | MemoryBarrier
 
-### `hal.return` (IREE::HAL::ReturnOp)
+### `hal.return` (::mlir::iree_compiler::IREE::HAL::ReturnOp)
 
 return from a hal.device.switch region
 
@@ -2178,7 +2178,7 @@ Returns the given values from the region and back to the host code.
 | :-----: | ----------- |
 `operands` | any type
 
-### `hal.semaphore.await` (IREE::HAL::SemaphoreAwaitOp)
+### `hal.semaphore.await` (::mlir::iree_compiler::IREE::HAL::SemaphoreAwaitOp)
 
 asynchronous semaphore wait operation
 
@@ -2206,7 +2206,7 @@ with a non-zero value indicating failure.
 | :----: | ----------- |
 `status` | 32-bit signless integer
 
-### `hal.semaphore.create` (IREE::HAL::SemaphoreCreateOp)
+### `hal.semaphore.create` (::mlir::iree_compiler::IREE::HAL::SemaphoreCreateOp)
 
 semaphore allocation operation
 
@@ -2233,7 +2233,7 @@ Returns a semaphore from the device pool with the given initial value.
 | :----: | ----------- |
 `result` | semaphore
 
-### `hal.semaphore.fail` (IREE::HAL::SemaphoreFailOp)
+### `hal.semaphore.fail` (::mlir::iree_compiler::IREE::HAL::SemaphoreFailOp)
 
 semaphore asynchronous failure operation
 
@@ -2255,7 +2255,7 @@ of the semaphore.
 `semaphore` | semaphore
 `status` | 32-bit signless integer
 
-### `hal.semaphore.query` (IREE::HAL::SemaphoreQueryOp)
+### `hal.semaphore.query` (::mlir::iree_compiler::IREE::HAL::SemaphoreQueryOp)
 
 semaphore payload value query
 
@@ -2285,7 +2285,7 @@ specified value via `hal.semaphore.await`.
 `status` | 32-bit signless integer
 `value` | index
 
-### `hal.semaphore.signal` (IREE::HAL::SemaphoreSignalOp)
+### `hal.semaphore.signal` (::mlir::iree_compiler::IREE::HAL::SemaphoreSignalOp)
 
 semaphore payload value signal operation
 
@@ -2306,7 +2306,7 @@ The call is ignored if the current payload value exceeds `new_value`.
 `semaphore` | semaphore
 `new_value` | index
 
-### `hal.variable.address` (IREE::HAL::VariableAddressOp)
+### `hal.variable.address` (::mlir::iree_compiler::IREE::HAL::VariableAddressOp)
 
 returns an address reference to a variable
 
@@ -2332,7 +2332,7 @@ variable load and store indirect ops.
 | :----: | ----------- |
 `result` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
 
-### `hal.variable.load` (IREE::HAL::VariableLoadOp)
+### `hal.variable.load` (::mlir::iree_compiler::IREE::HAL::VariableLoadOp)
 
 loads a value from a global variable
 
@@ -2357,7 +2357,7 @@ Returns a copy of the variable value.
 | :----: | ----------- |
 `result` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 
-### `hal.variable` (IREE::HAL::VariableOp)
+### `hal.variable` (::mlir::iree_compiler::IREE::HAL::VariableOp)
 
 stateful variable declaration
 
@@ -2375,7 +2375,7 @@ contexts will have different variable storage.
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 `initial_value` | ::mlir::Attribute | any attribute
 
-### `hal.variable.store.indirect` (IREE::HAL::VariableStoreIndirectOp)
+### `hal.variable.store.indirect` (::mlir::iree_compiler::IREE::HAL::VariableStoreIndirectOp)
 
 stores a value into a global variable
 
@@ -2395,7 +2395,7 @@ Stores a copy of the value into a variable.
 `value` | index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
 `variable` | ptr<index or signless integer or floating-point or vector of any type values or allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore>
 
-### `hal.variable.store` (IREE::HAL::VariableStoreOp)
+### `hal.variable.store` (::mlir::iree_compiler::IREE::HAL::VariableStoreOp)
 
 stores a value into a global variable
 

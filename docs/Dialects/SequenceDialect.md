@@ -29,7 +29,7 @@ Any type of sequence.
 
 ## Operation definition
 
-### `sequence.map` (IREE::Sequence::MapOp)
+### `sequence.map` (::mlir::iree_compiler::IREE::Sequence::MapOp)
 
 applies a map function to a sequence element-wise
 

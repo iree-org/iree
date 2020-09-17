@@ -232,13 +232,13 @@ models may have top-k + gather operations, for example. These appear as a
 the loaded value for a `flow.tensor.update` (or other operation):
 
 ```mlir
-  %index_tensor = flow.ex.stream.fragment(...) -> tensor<i32> { ... }
-  %index = flow.tensor.load %index_tensor : tensor<i32>
-  %result = flow.ex.stream.fragment(%arg0 = %index : i32, ...) -> ... {
-    %0 = flow.dispatch ...
-    %1 = flow.tensor.update %0, %arg2[%index] : tensor<10xf32> -> tensor<1x10xf32>
-    ...
-  }
+%index_tensor = flow.ex.stream.fragment(...) -> tensor<i32> { ... }
+%index = flow.tensor.load %index_tensor : tensor<i32>
+%result = flow.ex.stream.fragment(%arg0 = %index : i32, ...) -> ... {
+  %0 = flow.dispatch ...
+  %1 = flow.tensor.update %0, %arg2[%index] : tensor<10xf32> -> tensor<1x10xf32>
+  ...
+}
 ```
 
 Today the `flow.tensor.update` turns into HAL command buffer transfer operations
@@ -260,13 +260,13 @@ they need to be able to move across branches in the CFG. This intuitively
 follows exactly what one would do if recording commands in C:
 
 ```c++
-  vkCmdCopyBuffer(cmd, ...);
-  if (some_flag) {
-    vkCmdBindPipeline(cmd, ..., pipeline_a);
-  } else {
-    vkCmdBindPipeline(cmd, ..., pipeline_b);
-  }
-  vkCmdDispatch(cmd, ...);
+vkCmdCopyBuffer(cmd, ...);
+if (some_flag) {
+  vkCmdBindPipeline(cmd, ..., pipeline_a);
+} else {
+  vkCmdBindPipeline(cmd, ..., pipeline_b);
+}
+vkCmdDispatch(cmd, ...);
 ```
 
 The corresponding `flow` IR:

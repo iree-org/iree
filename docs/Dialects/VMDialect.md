@@ -39,7 +39,7 @@ VM). Lowering targets can insert the reference counting as needed.
 
 ## Operation definition
 
-### `vm.add.i32` (IREE::VM::AddI32Op)
+### `vm.add.i32` (::mlir::iree_compiler::IREE::VM::AddI32Op)
 
 integer add operation
 
@@ -64,7 +64,7 @@ operation ::= `vm.add.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.add.i64` (IREE::VM::AddI64Op)
+### `vm.add.i64` (::mlir::iree_compiler::IREE::VM::AddI64Op)
 
 integer add operation
 
@@ -89,7 +89,7 @@ operation ::= `vm.add.i64` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.and.i32` (IREE::VM::AndI32Op)
+### `vm.and.i32` (::mlir::iree_compiler::IREE::VM::AndI32Op)
 
 integer binary and operation
 
@@ -114,7 +114,7 @@ operation ::= `vm.and.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.and.i64` (IREE::VM::AndI64Op)
+### `vm.and.i64` (::mlir::iree_compiler::IREE::VM::AndI64Op)
 
 integer binary and operation
 
@@ -139,7 +139,7 @@ operation ::= `vm.and.i64` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.br` (IREE::VM::BranchOp)
+### `vm.br` (::mlir::iree_compiler::IREE::VM::BranchOp)
 
 unconditional branch operation
 
@@ -172,7 +172,7 @@ operation ::= `vm.br` $dest (`(` $destOperands^ `:` type($destOperands) `)`)? at
 | :-------: | ----------- |
 `dest` | any successor
 
-### `vm.break` (IREE::VM::BreakOp)
+### `vm.break` (::mlir::iree_compiler::IREE::VM::BreakOp)
 
 unconditional debug break operation
 
@@ -199,7 +199,7 @@ target block.
 | :-------: | ----------- |
 `dest` | any successor
 
-### `vm.call` (IREE::VM::CallOp)
+### `vm.call` (::mlir::iree_compiler::IREE::VM::CallOp)
 
 call operation
 
@@ -230,7 +230,7 @@ Calls an internal VM function with the given arguments.
 | :----: | ----------- |
 `results` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.call.variadic` (IREE::VM::CallVariadicOp)
+### `vm.call.variadic` (::mlir::iree_compiler::IREE::VM::CallVariadicOp)
 
 call operation with variadic arguments
 
@@ -260,7 +260,7 @@ attribute.
 | :----: | ----------- |
 `results` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.check.eq` (IREE::VM::CheckEQOp)
+### `vm.check.eq` (::mlir::iree_compiler::IREE::VM::CheckEQOp)
 
 raises a global failure if the condition is true
 
@@ -298,7 +298,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 `lhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 `rhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.check.ne` (IREE::VM::CheckNEOp)
+### `vm.check.ne` (::mlir::iree_compiler::IREE::VM::CheckNEOp)
 
 raises a global failure if the condition is true
 
@@ -336,7 +336,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 `lhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 `rhs` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.check.nz` (IREE::VM::CheckNZOp)
+### `vm.check.nz` (::mlir::iree_compiler::IREE::VM::CheckNZOp)
 
 raises a global failure if the condition is true
 
@@ -373,7 +373,7 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 | :-----: | ----------- |
 `value` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.cmp.eq.i32` (IREE::VM::CmpEQI32Op)
+### `vm.cmp.eq.i32` (::mlir::iree_compiler::IREE::VM::CmpEQI32Op)
 
 integer equality comparison operation
 
@@ -399,7 +399,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.eq.i64` (IREE::VM::CmpEQI64Op)
+### `vm.cmp.eq.i64` (::mlir::iree_compiler::IREE::VM::CmpEQI64Op)
 
 integer equality comparison operation
 
@@ -425,7 +425,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.eq.ref` (IREE::VM::CmpEQRefOp)
+### `vm.cmp.eq.ref` (::mlir::iree_compiler::IREE::VM::CmpEQRefOp)
 
 ref_ptr equality comparison operation
 
@@ -451,7 +451,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gte.i32.s` (IREE::VM::CmpGTEI32SOp)
+### `vm.cmp.gte.i32.s` (::mlir::iree_compiler::IREE::VM::CmpGTEI32SOp)
 
 signed integer greater-than-or-equal comparison operation
 
@@ -477,7 +477,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gte.i32.u` (IREE::VM::CmpGTEI32UOp)
+### `vm.cmp.gte.i32.u` (::mlir::iree_compiler::IREE::VM::CmpGTEI32UOp)
 
 unsigned integer greater-than-or-equal comparison operation
 
@@ -503,7 +503,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gte.i64.s` (IREE::VM::CmpGTEI64SOp)
+### `vm.cmp.gte.i64.s` (::mlir::iree_compiler::IREE::VM::CmpGTEI64SOp)
 
 signed integer greater-than-or-equal comparison operation
 
@@ -529,7 +529,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gte.i64.u` (IREE::VM::CmpGTEI64UOp)
+### `vm.cmp.gte.i64.u` (::mlir::iree_compiler::IREE::VM::CmpGTEI64UOp)
 
 unsigned integer greater-than-or-equal comparison operation
 
@@ -555,7 +555,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gt.i32.s` (IREE::VM::CmpGTI32SOp)
+### `vm.cmp.gt.i32.s` (::mlir::iree_compiler::IREE::VM::CmpGTI32SOp)
 
 signed integer greater-than comparison operation
 
@@ -581,7 +581,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gt.i32.u` (IREE::VM::CmpGTI32UOp)
+### `vm.cmp.gt.i32.u` (::mlir::iree_compiler::IREE::VM::CmpGTI32UOp)
 
 unsigned integer greater-than comparison operation
 
@@ -607,7 +607,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gt.i64.s` (IREE::VM::CmpGTI64SOp)
+### `vm.cmp.gt.i64.s` (::mlir::iree_compiler::IREE::VM::CmpGTI64SOp)
 
 signed integer greater-than comparison operation
 
@@ -633,7 +633,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.gt.i64.u` (IREE::VM::CmpGTI64UOp)
+### `vm.cmp.gt.i64.u` (::mlir::iree_compiler::IREE::VM::CmpGTI64UOp)
 
 unsigned integer greater-than comparison operation
 
@@ -659,7 +659,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lte.i32.s` (IREE::VM::CmpLTEI32SOp)
+### `vm.cmp.lte.i32.s` (::mlir::iree_compiler::IREE::VM::CmpLTEI32SOp)
 
 signed integer less-than-or-equal comparison operation
 
@@ -685,7 +685,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lte.i32.u` (IREE::VM::CmpLTEI32UOp)
+### `vm.cmp.lte.i32.u` (::mlir::iree_compiler::IREE::VM::CmpLTEI32UOp)
 
 unsigned integer less-than-or-equal comparison operation
 
@@ -711,7 +711,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lte.i64.s` (IREE::VM::CmpLTEI64SOp)
+### `vm.cmp.lte.i64.s` (::mlir::iree_compiler::IREE::VM::CmpLTEI64SOp)
 
 signed integer less-than-or-equal comparison operation
 
@@ -737,7 +737,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lte.i64.u` (IREE::VM::CmpLTEI64UOp)
+### `vm.cmp.lte.i64.u` (::mlir::iree_compiler::IREE::VM::CmpLTEI64UOp)
 
 unsigned integer less-than-or-equal comparison operation
 
@@ -763,7 +763,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lt.i32.s` (IREE::VM::CmpLTI32SOp)
+### `vm.cmp.lt.i32.s` (::mlir::iree_compiler::IREE::VM::CmpLTI32SOp)
 
 signed integer less-than comparison operation
 
@@ -789,7 +789,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lt.i32.u` (IREE::VM::CmpLTI32UOp)
+### `vm.cmp.lt.i32.u` (::mlir::iree_compiler::IREE::VM::CmpLTI32UOp)
 
 unsigned integer less-than comparison operation
 
@@ -815,7 +815,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lt.i64.s` (IREE::VM::CmpLTI64SOp)
+### `vm.cmp.lt.i64.s` (::mlir::iree_compiler::IREE::VM::CmpLTI64SOp)
 
 signed integer less-than comparison operation
 
@@ -841,7 +841,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.lt.i64.u` (IREE::VM::CmpLTI64UOp)
+### `vm.cmp.lt.i64.u` (::mlir::iree_compiler::IREE::VM::CmpLTI64UOp)
 
 unsigned integer less-than comparison operation
 
@@ -867,7 +867,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.ne.i32` (IREE::VM::CmpNEI32Op)
+### `vm.cmp.ne.i32` (::mlir::iree_compiler::IREE::VM::CmpNEI32Op)
 
 integer inequality comparison operation
 
@@ -893,7 +893,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.ne.i64` (IREE::VM::CmpNEI64Op)
+### `vm.cmp.ne.i64` (::mlir::iree_compiler::IREE::VM::CmpNEI64Op)
 
 integer inequality comparison operation
 
@@ -919,7 +919,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.ne.ref` (IREE::VM::CmpNERefOp)
+### `vm.cmp.ne.ref` (::mlir::iree_compiler::IREE::VM::CmpNERefOp)
 
 ref_ptr inequality comparison operation
 
@@ -945,7 +945,7 @@ Compares two operands with the specified predicate.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.nz.i32` (IREE::VM::CmpNZI32Op)
+### `vm.cmp.nz.i32` (::mlir::iree_compiler::IREE::VM::CmpNZI32Op)
 
 integer non-zero comparison operation
 
@@ -970,7 +970,7 @@ Compares the given integer operand for a non-zero value.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.nz.i64` (IREE::VM::CmpNZI64Op)
+### `vm.cmp.nz.i64` (::mlir::iree_compiler::IREE::VM::CmpNZI64Op)
 
 integer non-zero comparison operation
 
@@ -995,7 +995,7 @@ Compares the given integer operand for a non-zero value.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cmp.nz.ref` (IREE::VM::CmpNZRefOp)
+### `vm.cmp.nz.ref` (::mlir::iree_compiler::IREE::VM::CmpNZRefOp)
 
 ref_ptr non-zero comparison operation
 
@@ -1020,7 +1020,7 @@ Compares the given ref_ptr operand for a non-zero/null value.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.cond_br` (IREE::VM::CondBranchOp)
+### `vm.cond_br` (::mlir::iree_compiler::IREE::VM::CondBranchOp)
 
 conditional branch operation
 
@@ -1061,7 +1061,7 @@ operation ::= `vm.cond_br` $condition `,`
 `trueDest` | any successor
 `falseDest` | any successor
 
-### `vm.cond_break` (IREE::VM::CondBreakOp)
+### `vm.cond_break` (::mlir::iree_compiler::IREE::VM::CondBreakOp)
 
 conditional debug break operation
 
@@ -1090,7 +1090,7 @@ attached) execution will continue at the target block.
 | :-------: | ----------- |
 `dest` | any successor
 
-### `vm.cond_fail` (IREE::VM::CondFailOp)
+### `vm.cond_fail` (::mlir::iree_compiler::IREE::VM::CondFailOp)
 
 raises a global failure if the condition is true
 
@@ -1127,7 +1127,7 @@ vm.cond_fail %nz, %statusCode, "expected non-zero"
 `condition` | 32-bit signless integer
 `status` | 32-bit signless integer
 
-### `vm.const.i32` (IREE::VM::ConstI32Op)
+### `vm.const.i32` (::mlir::iree_compiler::IREE::VM::ConstI32Op)
 
 32-bit integer constant operation
 
@@ -1145,7 +1145,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.const.i32.zero` (IREE::VM::ConstI32ZeroOp)
+### `vm.const.i32.zero` (::mlir::iree_compiler::IREE::VM::ConstI32ZeroOp)
 
 32-bit integer constant zero operation
 
@@ -1164,7 +1164,7 @@ Defines a constant zero integer.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.const.i64` (IREE::VM::ConstI64Op)
+### `vm.const.i64` (::mlir::iree_compiler::IREE::VM::ConstI64Op)
 
 64-bit integer constant operation
 
@@ -1182,7 +1182,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.const.i64.zero` (IREE::VM::ConstI64ZeroOp)
+### `vm.const.i64.zero` (::mlir::iree_compiler::IREE::VM::ConstI64ZeroOp)
 
 64-bit integer constant zero operation
 
@@ -1201,7 +1201,7 @@ Defines a constant zero integer.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.const.ref.rodata` (IREE::VM::ConstRefRodataOp)
+### `vm.const.ref.rodata` (::mlir::iree_compiler::IREE::VM::ConstRefRodataOp)
 
 constant rodata access operation
 
@@ -1226,7 +1226,7 @@ Returns a reference to a read-only buffer.
 | :----: | ----------- |
 `value` | ref<byte_buffer>
 
-### `vm.const.ref.zero` (IREE::VM::ConstRefZeroOp)
+### `vm.const.ref.zero` (::mlir::iree_compiler::IREE::VM::ConstRefZeroOp)
 
 null ref_ptr constant operation
 
@@ -1246,7 +1246,7 @@ initialization.
 | :----: | ----------- |
 `result` | ref
 
-### `vm.div.i32.s` (IREE::VM::DivI32SOp)
+### `vm.div.i32.s` (::mlir::iree_compiler::IREE::VM::DivI32SOp)
 
 signed integer division operation
 
@@ -1271,7 +1271,7 @@ operation ::= `vm.div.i32.s` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.div.i32.u` (IREE::VM::DivI32UOp)
+### `vm.div.i32.u` (::mlir::iree_compiler::IREE::VM::DivI32UOp)
 
 unsigned integer division operation
 
@@ -1296,7 +1296,7 @@ operation ::= `vm.div.i32.u` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.div.i64.s` (IREE::VM::DivI64SOp)
+### `vm.div.i64.s` (::mlir::iree_compiler::IREE::VM::DivI64SOp)
 
 signed integer division operation
 
@@ -1321,7 +1321,7 @@ operation ::= `vm.div.i64.s` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.div.i64.u` (IREE::VM::DivI64UOp)
+### `vm.div.i64.u` (::mlir::iree_compiler::IREE::VM::DivI64UOp)
 
 unsigned integer division operation
 
@@ -1346,7 +1346,7 @@ operation ::= `vm.div.i64.u` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.export` (IREE::VM::ExportOp)
+### `vm.export` (::mlir::iree_compiler::IREE::VM::ExportOp)
 
 exports a function from the module
 
@@ -1361,7 +1361,7 @@ exports can reference the same internal functions.
 `export_name` | ::mlir::StringAttr | string attribute
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
-### `vm.ext.i16.i32.s` (IREE::VM::ExtI16I32SOp)
+### `vm.ext.i16.i32.s` (::mlir::iree_compiler::IREE::VM::ExtI16I32SOp)
 
 integer sign extend 16 bits to 32 bits
 
@@ -1385,7 +1385,7 @@ operation ::= `vm.ext.i16.i32.s` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.ext.i16.i32.u` (IREE::VM::ExtI16I32UOp)
+### `vm.ext.i16.i32.u` (::mlir::iree_compiler::IREE::VM::ExtI16I32UOp)
 
 integer zero extend 16 bits to 32 bits
 
@@ -1409,7 +1409,7 @@ operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.ext.i16.i64.s` (IREE::VM::ExtI16I64SOp)
+### `vm.ext.i16.i64.s` (::mlir::iree_compiler::IREE::VM::ExtI16I64SOp)
 
 integer sign extend 16 bits to 64 bits
 
@@ -1433,7 +1433,7 @@ operation ::= `vm.ext.i16.i64.s` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.ext.i16.i64.u` (IREE::VM::ExtI16I64UOp)
+### `vm.ext.i16.i64.u` (::mlir::iree_compiler::IREE::VM::ExtI16I64UOp)
 
 integer zero extend 16 bits to 64 bits
 
@@ -1457,7 +1457,7 @@ operation ::= `vm.ext.i16.i64.u` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.ext.i32.i64.s` (IREE::VM::ExtI32I64SOp)
+### `vm.ext.i32.i64.s` (::mlir::iree_compiler::IREE::VM::ExtI32I64SOp)
 
 integer sign extend 32 bits to 64 bits
 
@@ -1481,7 +1481,7 @@ operation ::= `vm.ext.i32.i64.s` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.ext.i32.i64.u` (IREE::VM::ExtI32I64UOp)
+### `vm.ext.i32.i64.u` (::mlir::iree_compiler::IREE::VM::ExtI32I64UOp)
 
 integer zero extend 32 bits to 64 bits
 
@@ -1505,7 +1505,7 @@ operation ::= `vm.ext.i32.i64.u` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.ext.i8.i32.s` (IREE::VM::ExtI8I32SOp)
+### `vm.ext.i8.i32.s` (::mlir::iree_compiler::IREE::VM::ExtI8I32SOp)
 
 integer sign extend 8 bits to 32 bits
 
@@ -1529,7 +1529,7 @@ operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($operand) `->` type(
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.ext.i8.i32.u` (IREE::VM::ExtI8I32UOp)
+### `vm.ext.i8.i32.u` (::mlir::iree_compiler::IREE::VM::ExtI8I32UOp)
 
 integer zero extend 8 bits to 32 bits
 
@@ -1553,7 +1553,7 @@ operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($operand) `->` type(
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.ext.i8.i64.s` (IREE::VM::ExtI8I64SOp)
+### `vm.ext.i8.i64.s` (::mlir::iree_compiler::IREE::VM::ExtI8I64SOp)
 
 integer sign extend 8 bits to 64 bits
 
@@ -1577,7 +1577,7 @@ operation ::= `vm.ext.i8.i64.s` $operand attr-dict `:` type($operand) `->` type(
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.ext.i8.i64.u` (IREE::VM::ExtI8I64UOp)
+### `vm.ext.i8.i64.u` (::mlir::iree_compiler::IREE::VM::ExtI8I64UOp)
 
 integer zero extend 8 bits to 64 bits
 
@@ -1601,7 +1601,7 @@ operation ::= `vm.ext.i8.i64.u` $operand attr-dict `:` type($operand) `->` type(
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.fail` (IREE::VM::FailOp)
+### `vm.fail` (::mlir::iree_compiler::IREE::VM::FailOp)
 
 raises a global failure
 
@@ -1639,7 +1639,7 @@ vm.fail %statusCode, "oh no!"
 | :-----: | ----------- |
 `status` | 32-bit signless integer
 
-### `vm.func` (IREE::VM::FuncOp)
+### `vm.func` (::mlir::iree_compiler::IREE::VM::FuncOp)
 
 function defined with VM control flow ops
 
@@ -1653,7 +1653,7 @@ All flow control is performed by VM ops.
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 `noinline` | ::mlir::UnitAttr | unit attribute
 
-### `vm.global.address` (IREE::VM::GlobalAddressOp)
+### `vm.global.address` (::mlir::iree_compiler::IREE::VM::GlobalAddressOp)
 
 returns an address reference to a global
 
@@ -1680,7 +1680,7 @@ example, ordinals for refs and byte offsets for primitive types).
 | :----: | ----------- |
 `result` | ptr
 
-### `vm.global.i32` (IREE::VM::GlobalI32Op)
+### `vm.global.i32` (::mlir::iree_compiler::IREE::VM::GlobalI32Op)
 
 32-bit integer global declaration
 
@@ -1698,7 +1698,7 @@ Initialized to zero unless a custom initializer function is specified.
 `initial_value` | Attribute | anonymous_437
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
-### `vm.global.i64` (IREE::VM::GlobalI64Op)
+### `vm.global.i64` (::mlir::iree_compiler::IREE::VM::GlobalI64Op)
 
 64-bit integer global declaration
 
@@ -1716,7 +1716,7 @@ Initialized to zero unless a custom initializer function is specified.
 `initial_value` | Attribute | anonymous_441
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
-### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
+### `vm.global.load.i32` (::mlir::iree_compiler::IREE::VM::GlobalLoadI32Op)
 
 global 32-bit integer load operation
 
@@ -1741,7 +1741,7 @@ Loads the value of a global containing an primitive value.
 | :----: | ----------- |
 `value` | 32-bit signless integer
 
-### `vm.global.load.i64` (IREE::VM::GlobalLoadI64Op)
+### `vm.global.load.i64` (::mlir::iree_compiler::IREE::VM::GlobalLoadI64Op)
 
 global 64-bit integer load operation
 
@@ -1766,7 +1766,7 @@ Loads the value of a global containing an primitive value.
 | :----: | ----------- |
 `value` | 64-bit signless integer
 
-### `vm.global.load.indirect.i32` (IREE::VM::GlobalLoadIndirectI32Op)
+### `vm.global.load.indirect.i32` (::mlir::iree_compiler::IREE::VM::GlobalLoadIndirectI32Op)
 
 global 32-bit integer load operation
 
@@ -1791,7 +1791,7 @@ Loads the value of a global containing a primitive value.
 | :----: | ----------- |
 `value` | 32-bit signless integer
 
-### `vm.global.load.indirect.i64` (IREE::VM::GlobalLoadIndirectI64Op)
+### `vm.global.load.indirect.i64` (::mlir::iree_compiler::IREE::VM::GlobalLoadIndirectI64Op)
 
 global 64-bit integer load operation
 
@@ -1816,7 +1816,7 @@ Loads the value of a global containing a primitive value.
 | :----: | ----------- |
 `value` | 64-bit signless integer
 
-### `vm.global.load.indirect.ref` (IREE::VM::GlobalLoadIndirectRefOp)
+### `vm.global.load.indirect.ref` (::mlir::iree_compiler::IREE::VM::GlobalLoadIndirectRefOp)
 
 global ref_ptr<T> load operation
 
@@ -1841,7 +1841,7 @@ Loads the value of a global containing a ref_ptr of the given type.
 | :----: | ----------- |
 `value` | ref
 
-### `vm.global.load.ref` (IREE::VM::GlobalLoadRefOp)
+### `vm.global.load.ref` (::mlir::iree_compiler::IREE::VM::GlobalLoadRefOp)
 
 global ref_ptr<T> load operation
 
@@ -1866,7 +1866,7 @@ Loads the value of a global containing a ref_ptr of the given type.
 | :----: | ----------- |
 `value` | ref
 
-### `vm.global.ref` (IREE::VM::GlobalRefOp)
+### `vm.global.ref` (::mlir::iree_compiler::IREE::VM::GlobalRefOp)
 
 ref_ptr<T> global declaration
 
@@ -1885,7 +1885,7 @@ replaced with a store or reset.
 `initial_value` | ::mlir::UnitAttr | unit attribute
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
-### `vm.global.store.i32` (IREE::VM::GlobalStoreI32Op)
+### `vm.global.store.i32` (::mlir::iree_compiler::IREE::VM::GlobalStoreI32Op)
 
 global 32-bit integer store operation
 
@@ -1910,7 +1910,7 @@ Stores a primitive value value to a global.
 | :-----: | ----------- |
 `value` | 32-bit signless integer
 
-### `vm.global.store.i64` (IREE::VM::GlobalStoreI64Op)
+### `vm.global.store.i64` (::mlir::iree_compiler::IREE::VM::GlobalStoreI64Op)
 
 global 64-bit integer store operation
 
@@ -1935,7 +1935,7 @@ Stores a primitive value value to a global.
 | :-----: | ----------- |
 `value` | 64-bit signless integer
 
-### `vm.global.store.indirect.i32` (IREE::VM::GlobalStoreIndirectI32Op)
+### `vm.global.store.indirect.i32` (::mlir::iree_compiler::IREE::VM::GlobalStoreIndirectI32Op)
 
 global 32-bit integer store operation
 
@@ -1955,7 +1955,7 @@ Stores a primitive value to a global.
 `value` | 32-bit signless integer
 `global` | 32-bit signless integer or ptr<32-bit signless integer>
 
-### `vm.global.store.indirect.i64` (IREE::VM::GlobalStoreIndirectI64Op)
+### `vm.global.store.indirect.i64` (::mlir::iree_compiler::IREE::VM::GlobalStoreIndirectI64Op)
 
 global 64-bit integer store operation
 
@@ -1975,7 +1975,7 @@ Stores a primitive value to a global.
 `value` | 64-bit signless integer
 `global` | 32-bit signless integer or ptr<64-bit signless integer>
 
-### `vm.global.store.indirect.ref` (IREE::VM::GlobalStoreIndirectRefOp)
+### `vm.global.store.indirect.ref` (::mlir::iree_compiler::IREE::VM::GlobalStoreIndirectRefOp)
 
 global ref_ptr<T> stores operation
 
@@ -1995,7 +1995,7 @@ Stores a ref_ptr<T> to a global, retaining it until the global is reset.
 `value` | ref
 `global` | 32-bit signless integer or ptr<ref>
 
-### `vm.global.store.ref` (IREE::VM::GlobalStoreRefOp)
+### `vm.global.store.ref` (::mlir::iree_compiler::IREE::VM::GlobalStoreRefOp)
 
 global ref_ptr<T> stores operation
 
@@ -2020,7 +2020,7 @@ Stores a ref_ptr<T> to a global, retaining it until the global is reset.
 | :-----: | ----------- |
 `value` | ref
 
-### `vm.import` (IREE::VM::ImportOp)
+### `vm.import` (::mlir::iree_compiler::IREE::VM::ImportOp)
 
 imports a function from an external module
 
@@ -2033,7 +2033,7 @@ an external VM module.
 | :-------: | :-------: | ----------- |
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
-### `vm.list.alloc` (IREE::VM::ListAllocOp)
+### `vm.list.alloc` (::mlir::iree_compiler::IREE::VM::ListAllocOp)
 
 allocates a new empty list
 
@@ -2058,7 +2058,7 @@ Allocates a new typed list with a minimum initial_capacity.
 | :----: | ----------- |
 `result` | list
 
-### `vm.list.get.i32` (IREE::VM::ListGetI32Op)
+### `vm.list.get.i32` (::mlir::iree_compiler::IREE::VM::ListGetI32Op)
 
 primitive type element accessor
 
@@ -2084,7 +2084,7 @@ Returns the value of the element at the given index.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.list.get.i64` (IREE::VM::ListGetI64Op)
+### `vm.list.get.i64` (::mlir::iree_compiler::IREE::VM::ListGetI64Op)
 
 primitive type element accessor
 
@@ -2110,7 +2110,7 @@ Returns the value of the element at the given index.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.list.get.ref` (IREE::VM::ListGetRefOp)
+### `vm.list.get.ref` (::mlir::iree_compiler::IREE::VM::ListGetRefOp)
 
 ref type element accessor
 
@@ -2137,7 +2137,7 @@ may be null if the element is null or the type does not match.
 | :----: | ----------- |
 `result` | ref
 
-### `vm.list.reserve` (IREE::VM::ListReserveOp)
+### `vm.list.reserve` (::mlir::iree_compiler::IREE::VM::ListReserveOp)
 
 reserves capacity for list growth
 
@@ -2158,7 +2158,7 @@ has at least the specified capacity the operation is ignored.
 `list` | list
 `minimum_capacity` | 32-bit signless integer
 
-### `vm.list.resize` (IREE::VM::ListResizeOp)
+### `vm.list.resize` (::mlir::iree_compiler::IREE::VM::ListResizeOp)
 
 resizes the list to a new count in elements
 
@@ -2180,7 +2180,7 @@ with the default list value of 0 if storing primitives and null if refs.
 `list` | list
 `new_size` | 32-bit signless integer
 
-### `vm.list.set.i32` (IREE::VM::ListSetI32Op)
+### `vm.list.set.i32` (::mlir::iree_compiler::IREE::VM::ListSetI32Op)
 
 primitive type element mutator
 
@@ -2201,7 +2201,7 @@ Sets the element at the given index to the new value.
 `index` | 32-bit signless integer
 `value` | 32-bit signless integer
 
-### `vm.list.set.i64` (IREE::VM::ListSetI64Op)
+### `vm.list.set.i64` (::mlir::iree_compiler::IREE::VM::ListSetI64Op)
 
 primitive type element mutator
 
@@ -2222,7 +2222,7 @@ Sets the element at the given index to the new value.
 `index` | 32-bit signless integer
 `value` | 64-bit signless integer
 
-### `vm.list.set.ref` (IREE::VM::ListSetRefOp)
+### `vm.list.set.ref` (::mlir::iree_compiler::IREE::VM::ListSetRefOp)
 
 ref type element mutator
 
@@ -2243,7 +2243,7 @@ Sets the element at the given index to the new ref value (possibly null).
 `index` | 32-bit signless integer
 `value` | ref
 
-### `vm.list.size` (IREE::VM::ListSizeOp)
+### `vm.list.size` (::mlir::iree_compiler::IREE::VM::ListSizeOp)
 
 the size of the list in elements
 
@@ -2268,7 +2268,7 @@ Returns the current size of the list in elements.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.module` (IREE::VM::ModuleOp)
+### `vm.module` (::mlir::iree_compiler::IREE::VM::ModuleOp)
 
 module containing VM functions and variables
 
@@ -2281,7 +2281,7 @@ Top-level container for VM functions.
 `sym_name` | ::mlir::StringAttr | string attribute
 `ordinal_counts` | ::mlir::DictionaryAttr | dictionary of named attribute values
 
-### `vm.module_terminator` (IREE::VM::ModuleTerminatorOp)
+### `vm.module_terminator` (::mlir::iree_compiler::IREE::VM::ModuleTerminatorOp)
 
 terminator pseudo-op for the module op
 
@@ -2293,7 +2293,7 @@ operation ::= `vm.module_terminator` attr-dict
 
 
 
-### `vm.mul.i32` (IREE::VM::MulI32Op)
+### `vm.mul.i32` (::mlir::iree_compiler::IREE::VM::MulI32Op)
 
 integer multiplication operation
 
@@ -2318,7 +2318,7 @@ operation ::= `vm.mul.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.mul.i64` (IREE::VM::MulI64Op)
+### `vm.mul.i64` (::mlir::iree_compiler::IREE::VM::MulI64Op)
 
 integer multiplication operation
 
@@ -2343,7 +2343,7 @@ operation ::= `vm.mul.i64` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.not.i32` (IREE::VM::NotI32Op)
+### `vm.not.i32` (::mlir::iree_compiler::IREE::VM::NotI32Op)
 
 integer binary not operation
 
@@ -2367,7 +2367,7 @@ operation ::= `vm.not.i32` $operand attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.not.i64` (IREE::VM::NotI64Op)
+### `vm.not.i64` (::mlir::iree_compiler::IREE::VM::NotI64Op)
 
 integer binary not operation
 
@@ -2391,7 +2391,7 @@ operation ::= `vm.not.i64` $operand attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.or.i32` (IREE::VM::OrI32Op)
+### `vm.or.i32` (::mlir::iree_compiler::IREE::VM::OrI32Op)
 
 integer binary or operation
 
@@ -2416,7 +2416,7 @@ operation ::= `vm.or.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.or.i64` (IREE::VM::OrI64Op)
+### `vm.or.i64` (::mlir::iree_compiler::IREE::VM::OrI64Op)
 
 integer binary or operation
 
@@ -2441,7 +2441,7 @@ operation ::= `vm.or.i64` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.print` (IREE::VM::PrintOp)
+### `vm.print` (::mlir::iree_compiler::IREE::VM::PrintOp)
 
 message printing operation
 
@@ -2466,7 +2466,7 @@ Prints the given string message and zero or more values.
 | :-----: | ----------- |
 `operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.rem.i32.s` (IREE::VM::RemI32SOp)
+### `vm.rem.i32.s` (::mlir::iree_compiler::IREE::VM::RemI32SOp)
 
 signed integer division remainder operation
 
@@ -2491,7 +2491,7 @@ operation ::= `vm.rem.i32.s` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.rem.i32.u` (IREE::VM::RemI32UOp)
+### `vm.rem.i32.u` (::mlir::iree_compiler::IREE::VM::RemI32UOp)
 
 unsigned integer division remainder operation
 
@@ -2516,7 +2516,7 @@ operation ::= `vm.rem.i32.u` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.rem.i64.s` (IREE::VM::RemI64SOp)
+### `vm.rem.i64.s` (::mlir::iree_compiler::IREE::VM::RemI64SOp)
 
 signed integer division remainder operation
 
@@ -2541,7 +2541,7 @@ operation ::= `vm.rem.i64.s` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.rem.i64.u` (IREE::VM::RemI64UOp)
+### `vm.rem.i64.u` (::mlir::iree_compiler::IREE::VM::RemI64UOp)
 
 unsigned integer division remainder operation
 
@@ -2566,7 +2566,7 @@ operation ::= `vm.rem.i64.u` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.return` (IREE::VM::ReturnOp)
+### `vm.return` (::mlir::iree_compiler::IREE::VM::ReturnOp)
 
 return operation
 
@@ -2591,7 +2591,7 @@ vm.func @foo(%0, %1) : (i32, f8) {
 | :-----: | ----------- |
 `operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.rodata` (IREE::VM::RodataOp)
+### `vm.rodata` (::mlir::iree_compiler::IREE::VM::RodataOp)
 
 read-only data definition operation
 
@@ -2612,7 +2612,7 @@ lifetime.
 `value` | ::mlir::ElementsAttr | constant vector/tensor attribute
 `ordinal` | ::mlir::IntegerAttr | ordinal value
 
-### `vm.select.i32` (IREE::VM::SelectI32Op)
+### `vm.select.i32` (::mlir::iree_compiler::IREE::VM::SelectI32Op)
 
 integer select operation
 
@@ -2648,7 +2648,7 @@ combining "select" with "cmpi" as follows:
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.select.i64` (IREE::VM::SelectI64Op)
+### `vm.select.i64` (::mlir::iree_compiler::IREE::VM::SelectI64Op)
 
 integer select operation
 
@@ -2684,7 +2684,7 @@ combining "select" with "cmpi" as follows:
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.select.ref` (IREE::VM::SelectRefOp)
+### `vm.select.ref` (::mlir::iree_compiler::IREE::VM::SelectRefOp)
 
 ref_ptr select operation
 
@@ -2713,7 +2713,7 @@ otherwise the `false_value` operand is chosen.
 | :----: | ----------- |
 `result` | ref
 
-### `vm.shl.i32` (IREE::VM::ShlI32Op)
+### `vm.shl.i32` (::mlir::iree_compiler::IREE::VM::ShlI32Op)
 
 integer shift left operation
 
@@ -2744,7 +2744,7 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.shl.i64` (IREE::VM::ShlI64Op)
+### `vm.shl.i64` (::mlir::iree_compiler::IREE::VM::ShlI64Op)
 
 integer shift left operation
 
@@ -2775,7 +2775,7 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.shr.i32.s` (IREE::VM::ShrI32SOp)
+### `vm.shr.i32.s` (::mlir::iree_compiler::IREE::VM::ShrI32SOp)
 
 signed integer (arithmetic) shift right operation
 
@@ -2806,7 +2806,7 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.shr.i32.u` (IREE::VM::ShrI32UOp)
+### `vm.shr.i32.u` (::mlir::iree_compiler::IREE::VM::ShrI32UOp)
 
 unsigned integer (logical) shift right operation
 
@@ -2837,7 +2837,7 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.shr.i64.s` (IREE::VM::ShrI64SOp)
+### `vm.shr.i64.s` (::mlir::iree_compiler::IREE::VM::ShrI64SOp)
 
 signed integer (arithmetic) shift right operation
 
@@ -2868,7 +2868,7 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.shr.i64.u` (IREE::VM::ShrI64UOp)
+### `vm.shr.i64.u` (::mlir::iree_compiler::IREE::VM::ShrI64UOp)
 
 unsigned integer (logical) shift right operation
 
@@ -2899,7 +2899,7 @@ Shifts the operand in a direction by the number of bits specified.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.sub.i32` (IREE::VM::SubI32Op)
+### `vm.sub.i32` (::mlir::iree_compiler::IREE::VM::SubI32Op)
 
 integer subtract operation
 
@@ -2924,7 +2924,7 @@ operation ::= `vm.sub.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.sub.i64` (IREE::VM::SubI64Op)
+### `vm.sub.i64` (::mlir::iree_compiler::IREE::VM::SubI64Op)
 
 integer subtract operation
 
@@ -2949,7 +2949,7 @@ operation ::= `vm.sub.i64` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.switch.i32` (IREE::VM::SwitchI32Op)
+### `vm.switch.i32` (::mlir::iree_compiler::IREE::VM::SwitchI32Op)
 
 integer switch operation
 
@@ -2983,7 +2983,7 @@ the index is out of bounds.
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.switch.i64` (IREE::VM::SwitchI64Op)
+### `vm.switch.i64` (::mlir::iree_compiler::IREE::VM::SwitchI64Op)
 
 integer switch operation
 
@@ -3017,7 +3017,7 @@ the index is out of bounds.
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.switch.ref` (IREE::VM::SwitchRefOp)
+### `vm.switch.ref` (::mlir::iree_compiler::IREE::VM::SwitchRefOp)
 
 ref_ptr switch operation
 
@@ -3044,7 +3044,7 @@ the index is out of bounds.
 | :----: | ----------- |
 `result` | ref
 
-### `vm.trace` (IREE::VM::TraceOp)
+### `vm.trace` (::mlir::iree_compiler::IREE::VM::TraceOp)
 
 trace value(s) operation
 
@@ -3071,7 +3071,7 @@ trace verbosity setting.
 | :-----: | ----------- |
 `operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
-### `vm.trunc.i32.i16` (IREE::VM::TruncI32I16Op)
+### `vm.trunc.i32.i16` (::mlir::iree_compiler::IREE::VM::TruncI32I16Op)
 
 integer truncate to 16 bits
 
@@ -3095,7 +3095,7 @@ operation ::= `vm.trunc.i32.i16` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.trunc.i32.i8` (IREE::VM::TruncI32I8Op)
+### `vm.trunc.i32.i8` (::mlir::iree_compiler::IREE::VM::TruncI32I8Op)
 
 integer truncate to 8 bits
 
@@ -3119,7 +3119,7 @@ operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($operand) `->` type(
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.trunc.i64.i16` (IREE::VM::TruncI64I16Op)
+### `vm.trunc.i64.i16` (::mlir::iree_compiler::IREE::VM::TruncI64I16Op)
 
 integer truncate to 16 bits
 
@@ -3143,7 +3143,7 @@ operation ::= `vm.trunc.i64.i16` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.trunc.i64.i32` (IREE::VM::TruncI64I32Op)
+### `vm.trunc.i64.i32` (::mlir::iree_compiler::IREE::VM::TruncI64I32Op)
 
 integer truncate to 32 bits
 
@@ -3167,7 +3167,7 @@ operation ::= `vm.trunc.i64.i32` $operand attr-dict `:` type($operand) `->` type
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.trunc.i64.i8` (IREE::VM::TruncI64I8Op)
+### `vm.trunc.i64.i8` (::mlir::iree_compiler::IREE::VM::TruncI64I8Op)
 
 integer truncate to 8 bits
 
@@ -3191,7 +3191,7 @@ operation ::= `vm.trunc.i64.i8` $operand attr-dict `:` type($operand) `->` type(
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.xor.i32` (IREE::VM::XorI32Op)
+### `vm.xor.i32` (::mlir::iree_compiler::IREE::VM::XorI32Op)
 
 integer binary exclusive-or operation
 
@@ -3216,7 +3216,7 @@ operation ::= `vm.xor.i32` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
-### `vm.xor.i64` (IREE::VM::XorI64Op)
+### `vm.xor.i64` (::mlir::iree_compiler::IREE::VM::XorI64Op)
 
 integer binary exclusive-or operation
 
@@ -3241,7 +3241,7 @@ operation ::= `vm.xor.i64` operands attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 64-bit signless integer
 
-### `vm.yield` (IREE::VM::YieldOp)
+### `vm.yield` (::mlir::iree_compiler::IREE::VM::YieldOp)
 
 unconditional fiber yield operation
 

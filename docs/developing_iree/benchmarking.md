@@ -150,7 +150,6 @@ error:
 
 ```
 Package glfw3 was not found in the pkg-config search path.
-
 ```
 
 and then you could try to install `libglfw3-dev`.

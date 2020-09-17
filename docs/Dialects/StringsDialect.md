@@ -32,7 +32,7 @@ A tensor of string types.
 
 ## Operation definition
 
-### `strings.concat` (IREE::Strings::ConcatOp)
+### `strings.concat` (::mlir::iree_compiler::IREE::Strings::ConcatOp)
 
 
   concatenates the strings in the tensor along the last dimension
@@ -52,7 +52,7 @@ Concatenates the strings in the tensor along the last dimension.
 | :----: | ----------- |
 `result` | string_tensor
 
-### `strings.gather` (IREE::Strings::GatherOp)
+### `strings.gather` (::mlir::iree_compiler::IREE::Strings::GatherOp)
 
 gathers all the strings from a Tensor by id
 
@@ -71,7 +71,7 @@ Gathers all the strings from a Tensor by ID.
 | :----: | ----------- |
 `result` | string_tensor
 
-### `strings.i32_to_string` (IREE::Strings::I32ToStringOp)
+### `strings.i32_to_string` (::mlir::iree_compiler::IREE::Strings::I32ToStringOp)
 
 converts an i32 to a string
 
@@ -89,7 +89,7 @@ Converts an i32 to its string representation.
 | :----: | ----------- |
 `result` | string
 
-### `strings.print` (IREE::Strings::PrintOp)
+### `strings.print` (::mlir::iree_compiler::IREE::Strings::PrintOp)
 
 prints the contents of a string
 
@@ -101,7 +101,7 @@ Prints the contents of a string.
 | :-----: | ----------- |
 `value` | string
 
-### `strings.string_tensor_to_string` (IREE::Strings::StringTensorToStringOp)
+### `strings.string_tensor_to_string` (::mlir::iree_compiler::IREE::Strings::StringTensorToStringOp)
 
 converts a string tensor to a string
 
@@ -119,7 +119,7 @@ Converts a string tensor to a string.
 | :----: | ----------- |
 `result` | string
 
-### `strings.to_string_tensor` (IREE::Strings::ToStringTensorOp)
+### `strings.to_string_tensor` (::mlir::iree_compiler::IREE::Strings::ToStringTensorOp)
 
 converts a hal buffer to a string tensor
 

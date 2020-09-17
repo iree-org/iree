@@ -55,7 +55,7 @@ workload size, shapes of inputs and outputs, etc.
 
 ## Operation definition
 
-### `flow.dispatch.entry` (IREE::Flow::DispatchEntryOp)
+### `flow.dispatch.entry` (::mlir::iree_compiler::IREE::Flow::DispatchEntryOp)
 
 defines an executable entry point for dispatch operations
 
@@ -70,7 +70,7 @@ exports can reference the same internal function.
 `function_ref` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 `workload` | ::mlir::IntegerAttr | size_t
 
-### `flow.dispatch` (IREE::Flow::DispatchOp)
+### `flow.dispatch` (::mlir::iree_compiler::IREE::Flow::DispatchOp)
 
 a dispatch to an outlined dispatch region
 
@@ -96,7 +96,7 @@ Dispatches a workload to the specified executable function.
 | :----: | ----------- |
 `results` | any type
 
-### `flow.dispatch.region` (IREE::Flow::DispatchRegionOp)
+### `flow.dispatch.region` (::mlir::iree_compiler::IREE::Flow::DispatchRegionOp)
 
 partitioned region representing a dispatched workload
 
@@ -126,7 +126,7 @@ side-effects.
 | :----: | ----------- |
 `results` | any type
 
-### `flow.ex.stream.fragment` (IREE::Flow::ExStreamFragmentOp)
+### `flow.ex.stream.fragment` (::mlir::iree_compiler::IREE::Flow::ExStreamFragmentOp)
 
 experimental op for defining formed stream regions
 
@@ -145,7 +145,7 @@ same execution stream. This will be replaced with a segmented verison.
 | :----: | ----------- |
 `results` | any type
 
-### `flow.executable_end` (IREE::Flow::ExecutableEndOp)
+### `flow.executable_end` (::mlir::iree_compiler::IREE::Flow::ExecutableEndOp)
 
 terminator pseudo-op for the executable op
 
@@ -157,7 +157,7 @@ operation ::= `flow.executable_end` attr-dict
 
 
 
-### `flow.executable` (IREE::Flow::ExecutableOp)
+### `flow.executable` (::mlir::iree_compiler::IREE::Flow::ExecutableOp)
 
 generic executable module
 
@@ -171,7 +171,7 @@ target-specific backend IR representations.
 | :-------: | :-------: | ----------- |
 `sym_name` | ::mlir::StringAttr | string attribute
 
-### `flow.return` (IREE::Flow::ReturnOp)
+### `flow.return` (::mlir::iree_compiler::IREE::Flow::ReturnOp)
 
 return from a flow.dispatch_region
 
@@ -190,7 +190,7 @@ Returns the given values from the region and back to the host code.
 | :-----: | ----------- |
 `operands` | any type
 
-### `flow.tensor.clone` (IREE::Flow::TensorCloneOp)
+### `flow.tensor.clone` (::mlir::iree_compiler::IREE::Flow::TensorCloneOp)
 
 performs a full tensor clone operation
 
@@ -215,7 +215,7 @@ Clones the input tensor into an identical output tensor.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.tensor.load` (IREE::Flow::TensorLoadOp)
+### `flow.tensor.load` (::mlir::iree_compiler::IREE::Flow::TensorLoadOp)
 
 loads a value from a tensor element
 
@@ -241,7 +241,7 @@ Returns the element at the given location from within the tensor.
 | :----: | ----------- |
 `result` | index or signless integer or floating-point or vector of any type values
 
-### `flow.tensor.reshape` (IREE::Flow::TensorReshapeOp)
+### `flow.tensor.reshape` (::mlir::iree_compiler::IREE::Flow::TensorReshapeOp)
 
 reshapes a tensor
 
@@ -266,7 +266,7 @@ Reshapes a tensor to a new shape without modifying the contents.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.tensor.slice` (IREE::Flow::TensorSliceOp)
+### `flow.tensor.slice` (::mlir::iree_compiler::IREE::Flow::TensorSliceOp)
 
 slices out a subregion of a tensor
 
@@ -294,7 +294,7 @@ Clones a subregion of a tensor.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.tensor.splat` (IREE::Flow::TensorSplatOp)
+### `flow.tensor.splat` (::mlir::iree_compiler::IREE::Flow::TensorSplatOp)
 
 splats a value into a shaped tensor
 
@@ -319,7 +319,7 @@ Returns a tensor initialized to the given primitive value.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.tensor.store` (IREE::Flow::TensorStoreOp)
+### `flow.tensor.store` (::mlir::iree_compiler::IREE::Flow::TensorStoreOp)
 
 stores a value into a tensor element
 
@@ -347,7 +347,7 @@ Returns a tensor with the element at the given index set to the given value.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.tensor.trace` (IREE::Flow::TensorTraceOp)
+### `flow.tensor.trace` (::mlir::iree_compiler::IREE::Flow::TensorTraceOp)
 
 trace value(s) operation
 
@@ -366,7 +366,7 @@ Trace point for dispatchable functions.
 | :-----: | ----------- |
 `operands` | ranked tensor of any type values
 
-### `flow.tensor.update` (IREE::Flow::TensorUpdateOp)
+### `flow.tensor.update` (::mlir::iree_compiler::IREE::Flow::TensorUpdateOp)
 
 updates a tensor with the contents of another tensor
 
@@ -395,7 +395,7 @@ given offset indices.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.variable.address` (IREE::Flow::VariableAddressOp)
+### `flow.variable.address` (::mlir::iree_compiler::IREE::Flow::VariableAddressOp)
 
 returns an address reference to a variable
 
@@ -421,7 +421,7 @@ variable load and store indirect ops.
 | :----: | ----------- |
 `result` | ranked tensor of any type values or index or signless integer or floating-point
 
-### `flow.variable.load.indirect` (IREE::Flow::VariableLoadIndirectOp)
+### `flow.variable.load.indirect` (::mlir::iree_compiler::IREE::Flow::VariableLoadIndirectOp)
 
 loads a value from a global variable
 
@@ -446,7 +446,7 @@ Returns a copy of the variable value.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.variable.load` (IREE::Flow::VariableLoadOp)
+### `flow.variable.load` (::mlir::iree_compiler::IREE::Flow::VariableLoadOp)
 
 loads a value from a global variable
 
@@ -471,7 +471,7 @@ Returns a copy of the variable value.
 | :----: | ----------- |
 `result` | ranked tensor of any type values
 
-### `flow.variable` (IREE::Flow::VariableOp)
+### `flow.variable` (::mlir::iree_compiler::IREE::Flow::VariableOp)
 
 stateful variable declaration
 
@@ -487,7 +487,7 @@ Declares a persistent variable that maintains its value.
 `initializer` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
 `initial_value` | ::mlir::Attribute | any attribute
 
-### `flow.variable.store.indirect` (IREE::Flow::VariableStoreIndirectOp)
+### `flow.variable.store.indirect` (::mlir::iree_compiler::IREE::Flow::VariableStoreIndirectOp)
 
 stores a value into a global variable
 
@@ -507,7 +507,7 @@ Stores a copy of the value into a variable.
 `value` | ranked tensor of any type values
 `variable` | ranked tensor of any type values or index or signless integer or floating-point
 
-### `flow.variable.store` (IREE::Flow::VariableStoreOp)
+### `flow.variable.store` (::mlir::iree_compiler::IREE::Flow::VariableStoreOp)
 
 stores a value into a global variable
 
