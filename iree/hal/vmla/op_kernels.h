@@ -472,7 +472,10 @@ struct PoolingMax {
 }  // namespace hal
 }  // namespace iree
 
+// Inconsistent automated formatting here. Just disable clang-format (for now?).
+// clang-format off
 #include "iree/hal/vmla/op_kernels_generic.h"  // IWYU pragma: export
 #include "iree/hal/vmla/op_kernels_ruy.h"  // IWYU pragma: export
+// clang-format on
 
 #endif  // IREE_HAL_VMLA_OP_KERNELS_H_
