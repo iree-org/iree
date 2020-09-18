@@ -263,7 +263,7 @@ typedef struct {
 // TODO(benvanik): version this interface.
 typedef struct iree_vm_module {
   void* self;
-  iree_atomic_intptr_t ref_count;
+  iree_atomic_ref_count_t ref_count;
 
   // Destroys |self| when all references to the module have been released.
   void(IREE_API_PTR* destroy)(void* self);

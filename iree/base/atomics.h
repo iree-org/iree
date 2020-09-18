@@ -13,21 +13,20 @@
 // limitations under the License.
 
 // An implementation of the C11 stdatomics.h utilities we use (which is limited
-// to intptr_t for now). We need this for non-C11-compliant platforms (MSVC),
-// but it has the added benefit of not conflicting with <atomic> (these two
-// files cannot be included in the same compilation unit... great design). There
-// shouldn't be any difference between what we do here and what any
-// implementation would do with the platform atomic functions so it's used
-// everywhere.
+// to a subset of types for now). We need this for non-C11-compliant platforms
+// (MSVC), but it has the added benefit of not conflicting with <atomic>
+// (stdatomic.h and atomic cannot be included in the same compilation unit...
+// great design). There shouldn't be any difference between what we do here and
+// what any implementation would do with the platform atomic functions so it's
+// used everywhere.
 //
 // https://en.cppreference.com/w/c/atomic
-//
-// TODO(benvanik): configuration for single-threaded mode to disable atomics.
 
 #ifndef IREE_BASE_ATOMICS_H_
 #define IREE_BASE_ATOMICS_H_
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -37,38 +36,164 @@
 extern "C" {
 #endif
 
-#if defined(IREE_COMPILER_CLANG)
-// Emulate C11 atomics with builtins.
-typedef _Atomic intptr_t iree_atomic_intptr_t;
-#define IREE_ATOMIC_VAR_INIT(value) (value)
-#define iree_atomic_load(object) __c11_atomic_load(object, __ATOMIC_SEQ_CST)
-#define iree_atomic_store(object, desired) \
-  __c11_atomic_store(object, desired, __ATOMIC_SEQ_CST)
-#define iree_atomic_fetch_add(object, operand) \
-  __c11_atomic_fetch_add(object, operand, __ATOMIC_SEQ_CST)
-#define iree_atomic_fetch_sub(object, operand) \
-  __c11_atomic_fetch_sub(object, operand, __ATOMIC_SEQ_CST)
+//==============================================================================
+// Hardware concurrency information
+//==============================================================================
 
-#elif defined(IREE_COMPILER_MSVC)
-// Emulate C11 atomics with Interlocked win32 APIs.
-// NOTE: currently assumes sizeof(intptr_t) == 8.
-typedef struct {
-  intptr_t __val;
-} iree_atomic_intptr_t;
+// https://en.cppreference.com/w/cpp/thread/hardware_destructive_interference_size
+// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0154r1.html
+// https://norrischiu.github.io/2018/09/08/Cpp-jargon-1.html
+
+// TODO(benvanik): test 128 on x64 (to thwart hardware prefetcher).
+
+// Minimum offset between two objects to avoid false sharing.
+// If two members are aligned to this value they will (likely) not share the
+// same L1 cache line.
+#define iree_hardware_destructive_interference_size 64
+
+// Maximum size of contiguous memory to promote true sharing.
+// If two members are within a span of this value they will (likely) share the
+// same L1 cache line.
+#define iree_hardware_constructive_interference_size 64
+
+//==============================================================================
+// Atomics using the Win32 Interlocked* APIs
+//==============================================================================
+#if defined(IREE_COMPILER_MSVC)
+
+typedef enum iree_memory_order_e {
+  iree_memory_order_relaxed,
+  iree_memory_order_consume,
+  iree_memory_order_acquire,
+  iree_memory_order_release,
+  iree_memory_order_acq_rel,
+  iree_memory_order_seq_cst,
+} iree_memory_order_t;
+
 #define IREE_ATOMIC_VAR_INIT(value) \
   { (value) }
-#define iree_atomic_load(object) \
-  InterlockedExchangeAdd64((volatile LONGLONG*)object, 0)
-#define iree_atomic_store(object, desired) \
-  InterlockedExchange64((volatile LONGLONG*)object, desired)
-#define iree_atomic_fetch_add(object, operand) \
-  InterlockedExchangeAdd64((volatile LONGLONG*)object, operand)
-#define iree_atomic_fetch_sub(object, operand) \
-  InterlockedExchangeAdd64((volatile LONGLONG*)object, -(operand))
 
+typedef struct {
+  int32_t __val;
+} iree_atomic_int32_t;
+typedef struct {
+  int64_t __val;
+} iree_atomic_int64_t;
+typedef __declspec(align(16)) struct {
+  uint64_t __val[2];
+} iree_atomic_int128_t;
+
+#define iree_atomic_load_int32(object, order) \
+  InterlockedExchangeAdd((volatile LONG*)object, 0)
+#define iree_atomic_store_int32(object, desired, order) \
+  InterlockedExchange((volatile LONG*)object, desired)
+#define iree_atomic_fetch_add_int32(object, operand, order) \
+  InterlockedExchangeAdd((volatile LONG*)object, operand)
+#define iree_atomic_fetch_sub_int32(object, operand, order) \
+  InterlockedExchangeAdd((volatile LONG*)object, -((int32_t)(operand)))
+#define iree_atomic_exchange_int32(object, desired, order) \
+  InterlockedExchange((volatile LONG*)object, desired)
+static inline bool iree_atomic_compare_exchange_strong_int32(
+    volatile iree_atomic_int32_t* object, int32_t* expected, int32_t desired,
+    iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
+  int32_t expected_value = *expected;
+  int32_t old_value = InterlockedCompareExchange((volatile LONG*)object,
+                                                 desired, expected_value);
+  if (old_value == expected_value) {
+    return true;
+  } else {
+    *expected = old_value;
+    return false;
+  }
+}
+#define iree_atomic_compare_exchange_weak_int32 \
+  iree_atomic_compare_exchange_strong_int32
+
+#define iree_atomic_load_int64(object, order) \
+  InterlockedExchangeAdd64((volatile LONG64*)object, 0)
+#define iree_atomic_store_int64(object, desired, order) \
+  InterlockedExchange64((volatile LONG64*)object, desired)
+#define iree_atomic_fetch_add_int64(object, operand, order) \
+  InterlockedExchangeAdd64((volatile LONG64*)object, operand)
+#define iree_atomic_fetch_sub_int64(object, operand, order) \
+  InterlockedExchangeAdd64((volatile LONG64*)object, -(operand))
+#define iree_atomic_exchange_int64(object, desired, order) \
+  InterlockedExchange64((volatile LONG64*)object, desired)
+static inline bool iree_atomic_compare_exchange_strong_int64(
+    volatile iree_atomic_int64_t* object, int64_t* expected, int64_t desired,
+    iree_memory_order_t order_succ, iree_memory_order_t order_fail) {
+  int64_t expected_value = *expected;
+  int64_t old_value = InterlockedCompareExchange64((volatile LONG64*)object,
+                                                   desired, expected_value);
+  if (old_value == expected_value) {
+    return true;
+  } else {
+    *expected = old_value;
+    return false;
+  }
+}
+#define iree_atomic_compare_exchange_weak_int64 \
+  iree_atomic_compare_exchange_strong_int64
+
+//==============================================================================
+// C11 atomics using Clang builtins
+//==============================================================================
+#elif defined(IREE_COMPILER_CLANG)
+
+typedef enum iree_memory_order_e {
+  iree_memory_order_relaxed = __ATOMIC_RELAXED,
+  iree_memory_order_consume = __ATOMIC_CONSUME,
+  iree_memory_order_acquire = __ATOMIC_ACQUIRE,
+  iree_memory_order_release = __ATOMIC_RELEASE,
+  iree_memory_order_acq_rel = __ATOMIC_ACQ_REL,
+  iree_memory_order_seq_cst = __ATOMIC_SEQ_CST,
+} iree_memory_order_t;
+
+#define IREE_ATOMIC_VAR_INIT(value) (value)
+
+typedef _Atomic int32_t iree_atomic_int32_t;
+typedef _Atomic int64_t iree_atomic_int64_t;
+typedef _Atomic __int128 iree_atomic_int128_t;
+
+#define iree_atomic_load_auto(object, order) \
+  __c11_atomic_load((object), (order))
+#define iree_atomic_store_auto(object, desired, order) \
+  __c11_atomic_store((object), (desired), (order))
+#define iree_atomic_fetch_add_auto(object, operand, order) \
+  __c11_atomic_fetch_add((object), (operand), (order))
+#define iree_atomic_fetch_sub_auto(object, operand, order) \
+  __c11_atomic_fetch_sub((object), (operand), (order))
+#define iree_atomic_exchange_auto(object, operand, order) \
+  __c11_atomic_exchange((object), (operand), (order))
+#define iree_atomic_compare_exchange_strong_auto(object, expected, desired, \
+                                                 order_succ, order_fail)    \
+  __c11_atomic_compare_exchange_strong((object), (expected), (desired),     \
+                                       (order_succ), (order_fail))
+#define iree_atomic_compare_exchange_weak_auto(object, expected, desired, \
+                                               order_succ, order_fail)    \
+  __c11_atomic_compare_exchange_weak((object), (expected), (desired),     \
+                                     (order_succ), (order_fail))
+
+//==============================================================================
+// Atomics for GCC (compatible with both C and C++)
+//==============================================================================
 #elif defined(IREE_COMPILER_GCC)
-// Emulate atomics for GCC in a way that is compatible for inclusion in
-// both C and C++ modes.
+
+typedef enum iree_memory_order_e {
+  iree_memory_order_relaxed = __ATOMIC_RELAXED,
+  iree_memory_order_consume = __ATOMIC_CONSUME,
+  iree_memory_order_acquire = __ATOMIC_ACQUIRE,
+  iree_memory_order_release = __ATOMIC_RELEASE,
+  iree_memory_order_acq_rel = __ATOMIC_ACQ_REL,
+  iree_memory_order_seq_cst = __ATOMIC_SEQ_CST,
+} iree_memory_order_t;
+
+#define IREE_ATOMIC_VAR_INIT(value) (value)
+
+typedef int32_t iree_atomic_int32_t;
+typedef int64_t iree_atomic_int64_t;
+typedef __int128 iree_atomic_int128_t;
+
 #ifdef __cplusplus
 // Equiv to C++ auto keyword in C++ mode.
 #define __iree_auto_type auto
@@ -76,33 +201,82 @@ typedef struct {
 // Only defined in C mode.
 #define __iree_auto_type __auto_type
 #endif
-typedef __INTPTR_TYPE__ iree_atomic_intptr_t;
-#define IREE_ATOMIC_VAR_INIT(value) (value)
-#define iree_atomic_load(object)                                              \
-  __atomic_load_ptr(object, __ATOMIC_SEQ_CST) __extension__({                 \
-    __iree_auto_type __atomic_load_ptr = (object);                            \
-    __typeof__(*__atomic_load_ptr) __atomic_load_tmp;                         \
-    __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (__ATOMIC_SEQ_CST)); \
-    __atomic_load_tmp;                                                        \
-  })
-#define iree_atomic_store(object, desired)                          \
-  __extension__({                                                   \
-    __iree_auto_type __atomic_store_ptr = (object);                 \
-    __typeof__(*__atomic_store_ptr) __atomic_store_tmp = (desired); \
-    __atomic_store(__atomic_store_ptr, &__atomic_store_tmp,         \
-                   (__ATOMIC_SEQ_CST));                             \
-  })
-#define iree_atomic_fetch_add(object, operand) \
-  __atomic_fetch_add((object), (operand), __ATOMIC_SEQ_CST)
-#define iree_atomic_fetch_sub(object, operand) \
-  __atomic_fetch_sub((object), (operand), __ATOMIC_SEQ_CST)
 
+#define iree_atomic_load_auto(object, order)                       \
+  __atomic_load_ptr(object, order) __extension__({                 \
+    __iree_auto_type __atomic_load_ptr = (object);                 \
+    __typeof__(*__atomic_load_ptr) __atomic_load_tmp;              \
+    __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (order)); \
+    __atomic_load_tmp;                                             \
+  })
+#define iree_atomic_store_auto(object, desired, order)                \
+  __extension__({                                                     \
+    __iree_auto_type __atomic_store_ptr = (object);                   \
+    __typeof__(*__atomic_store_ptr) __atomic_store_tmp = (desired);   \
+    __atomic_store(__atomic_store_ptr, &__atomic_store_tmp, (order)); \
+  })
+#define iree_atomic_fetch_add_auto(object, operand, order) \
+  __atomic_fetch_add((object), (operand), (order))
+#define iree_atomic_fetch_sub_auto(object, operand, order) \
+  __atomic_fetch_sub((object), (operand), (order))
+#define iree_atomic_exchange_auto(object, operand, order) \
+  __atomic_exchange_n((object), (operand), (order))
+#define iree_atomic_compare_exchange_strong_auto(object, expected, desired, \
+                                                 order_succ, order_fail)    \
+  __atomic_compare_exchange_n(object, expected, desired, /*weak=*/false,    \
+                              (order_succ), (order_fail))
+#define iree_atomic_compare_exchange_weak_auto(object, expected, desired, \
+                                               order_succ, order_fail)    \
+  __atomic_compare_exchange_n(object, expected, desired, /*weak=*/true,   \
+                              (order_succ), (order_fail))
+
+//==============================================================================
+// Unsupported architecture
+//==============================================================================
 #else
-#error "compiler does not have supported C11-style atomics"
+
+#error Compiler does not have supported C11-style atomics
+
 #endif  // IREE_COMPILER_*
 
-static_assert(sizeof(iree_atomic_intptr_t) == sizeof(intptr_t),
-              "atomic intptr_t must be an intptr_t");
+// If the compiler can automatically determine the types:
+#ifdef iree_atomic_load_auto
+
+#define iree_atomic_load_int32 iree_atomic_load_auto
+#define iree_atomic_store_int32 iree_atomic_store_auto
+#define iree_atomic_fetch_add_int32 iree_atomic_fetch_add_auto
+#define iree_atomic_fetch_sub_int32 iree_atomic_fetch_sub_auto
+#define iree_atomic_exchange_int32 iree_atomic_exchange_auto
+#define iree_atomic_compare_exchange_strong_int32 \
+  iree_atomic_compare_exchange_strong_auto
+#define iree_atomic_compare_exchange_weak_int32 \
+  iree_atomic_compare_exchange_weak_auto
+
+#define iree_atomic_load_int64 iree_atomic_load_auto
+#define iree_atomic_store_int64 iree_atomic_store_auto
+#define iree_atomic_fetch_add_int64 iree_atomic_fetch_add_auto
+#define iree_atomic_fetch_sub_int64 iree_atomic_fetch_sub_auto
+#define iree_atomic_exchange_int64 iree_atomic_exchange_auto
+#define iree_atomic_compare_exchange_strong_int64 \
+  iree_atomic_compare_exchange_strong_auto
+#define iree_atomic_compare_exchange_weak_int64 \
+  iree_atomic_compare_exchange_weak_auto
+
+#endif  // iree_atomic_load_auto
+
+//==============================================================================
+// Reference count atomics
+//==============================================================================
+// These are just aliases that allow use to have nicely readable ref counting
+// operands without caring about the exact bit sizes at each site.
+
+typedef iree_atomic_int32_t iree_atomic_ref_count_t;
+#define iree_atomic_ref_count_init(count_ptr) \
+  iree_atomic_store_int32(count_ptr, 1, iree_memory_order_relaxed)
+#define iree_atomic_ref_count_inc(count_ptr) \
+  iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed)
+#define iree_atomic_ref_count_dec(count_ptr) \
+  iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_release)
 
 #ifdef __cplusplus
 }  // extern "C"
