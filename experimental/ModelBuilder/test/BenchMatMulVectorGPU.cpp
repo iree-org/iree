@@ -282,7 +282,7 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
     auto B = kernelFunc.getArgument(1);
     auto C = kernelFunc.getArgument(2);
 
-    linalg_matmul(TypeRange{}, ValueRange{A, B, C});
+    linalg_matmul(ValueRange{A, B}, ValueRange{C});
     std_ret();
   }
 

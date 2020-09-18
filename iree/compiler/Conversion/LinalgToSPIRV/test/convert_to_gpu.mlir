@@ -275,8 +275,9 @@ module attributes {
       %16 = dim %arg2, %c1 : memref<?x?xf32>
       %17 = affine.min #map1()[%1, %16]
       %18 = subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-      linalg.matmul  %7, %13, %18 {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"}
-        : (memref<?x?xf32, #map3>, memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
+      linalg.matmul {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"}
+        ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
+       outs(%18 : memref<?x?xf32, #map3>)
     }
     return
   }
