@@ -72,16 +72,15 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
   return shape;
 }
 
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder) {
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+    Location loc, Value shapedValue, ConversionPatternRewriter &rewriter) {
   ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
   if (shapedType.hasStaticShape()) {
-    return getStaticShapeDims(loc, shapedType, builder);
+    return getStaticShapeDims(loc, shapedType, rewriter);
   } else {
     // Dynamic shape lookup.
     Value rsValue = Shape::buildOrFindRankedShapeForValue(
-        loc, shapedValue, builder.getIndexType(), builder);
+        loc, shapedValue, rewriter.getIndexType(), rewriter);
     if (!rsValue) {
       return llvm::None;
     }
@@ -89,7 +88,7 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
     // Note that in the following, we require that the dims resolve
     // to discrete SSA values, which in a stream, will be block args.
     if (failed(Shape::getRankedDimsFromRankedShape(
-            loc, rsValue, /*createIntermediateOps=*/true, dims, builder))) {
+            loc, rsValue, /*createIntermediateOps=*/true, dims, rewriter))) {
       return llvm::None;
     }
     return dims;
@@ -188,8 +187,8 @@ llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims() {
   return IREE::HAL::getShapeDims(loc_, oldValue_, rewriter_);
 }
 llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims(
-    OpBuilder &builder) {
-  return IREE::HAL::getShapeDims(loc_, oldValue_, builder);
+    ConversionPatternRewriter &rewriter) {
+  return IREE::HAL::getShapeDims(loc_, oldValue_, rewriter);
 }
 
 Value TensorRewriteAdaptor::getByteLength() {
