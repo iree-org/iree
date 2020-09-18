@@ -120,6 +120,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-fvisibility=hidden"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
+    "/DUSE_MATH_DEFINES"
     "/wd4624"
     # 'inline': used more than once
     "/wd4141"
