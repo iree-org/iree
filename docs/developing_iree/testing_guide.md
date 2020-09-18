@@ -11,7 +11,8 @@ should generally follow the style and best practices of that framework.
 
 ### Running a Test
 
-For the test https://github.com/google/iree/tree/main/iree/base/arena_test.cc
+For
+[iree/base/arena_test.cc](https://github.com/google/iree/tree/main/iree/base/arena_test.cc)
 
 With CMake, run this from the build directory:
 
