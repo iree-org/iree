@@ -25,5 +25,4 @@ rules:
   # We have lots of long strings and command lines.
   line-length: disable
 
-ignore:
-  /third_party/*
+ignore: /third_party/*

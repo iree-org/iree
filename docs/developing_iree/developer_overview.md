@@ -7,49 +7,49 @@ developers.
 
 [iree/](https://github.com/google/iree/blob/main/iree/)
 
-*   Core IREE project
+- Core IREE project
 
 [integrations/](https://github.com/google/iree/blob/main/integrations/)
 
-*   Integrations between IREE and other frameworks, such as TensorFlow
+- Integrations between IREE and other frameworks, such as TensorFlow
 
 [bindings/](https://github.com/google/iree/blob/main/bindings/)
 
-*   Language and platform bindings, such as Python
+- Language and platform bindings, such as Python
 
 [colab/](https://github.com/google/iree/blob/main/colab/)
 
-*   Colab notebooks for interactively using IREE's Python bindings
+- Colab notebooks for interactively using IREE's Python bindings
 
 ## IREE Code Layout
 
 [iree/base/](https://github.com/google/iree/blob/main/iree/base/)
 
-*   Common types and utilities used throughout IREE
+- Common types and utilities used throughout IREE
 
 [iree/compiler/](https://github.com/google/iree/blob/main/iree/compiler/)
 
-*   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
-    Code here should not depend on anything in the runtime
+- IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
+  Code here should not depend on anything in the runtime
 
 [iree/hal/](https://github.com/google/iree/blob/main/iree/hal/)
 
-*   **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
-    implementations for hardware and software backends
+- **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
+  implementations for hardware and software backends
 
 [iree/schemas/](https://github.com/google/iree/blob/main/iree/schemas/)
 
-*   Shared data storage format definitions, primarily using
-    [FlatBuffers](https://google.github.io/flatbuffers/)
+- Shared data storage format definitions, primarily using
+  [FlatBuffers](https://google.github.io/flatbuffers/)
 
 [iree/tools/](https://github.com/google/iree/blob/main/iree/tools/)
 
-*   Assorted tools used to optimize, translate, and evaluate IREE
+- Assorted tools used to optimize, translate, and evaluate IREE
 
 [iree/vm/](https://github.com/google/iree/blob/main/iree/vm/)
 
-*   Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
-    IREE functions
+- Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
+  IREE functions
 
 ## Developer Tools
 

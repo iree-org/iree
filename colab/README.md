@@ -49,9 +49,9 @@ for general information about using Colab with GitHub.
 
 To make changes to a notebook in this repository, one possible workflow is:
 
-*   Open or create the notebook in Colab
-*   Connect to your local runtime
-*   Make your changes, run the notebook, etc.
-*   Download the modified notebook using `File > Download .ipynb`
-*   Move the downloaded notebook file into a clone of this repository and submit
-    a pull request
+- Open or create the notebook in Colab
+- Connect to your local runtime
+- Make your changes, run the notebook, etc.
+- Download the modified notebook using `File > Download .ipynb`
+- Move the downloaded notebook file into a clone of this repository and submit
+  a pull request

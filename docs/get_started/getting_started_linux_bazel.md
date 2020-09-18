@@ -58,8 +58,7 @@ $ git submodule update --init
 $ python3 configure_bazel.py
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
 
 ### Build
@@ -70,8 +69,7 @@ Run all core tests:
 $ bazel test -k iree/...
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;You can add flags like
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;You can add flags like
 > `--test_env=IREE_VULKAN_DISABLE=1` to your test command to change how/which
 > tests run.
 
@@ -122,9 +120,9 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md)
-*   To target GPUs using Vulkan, see
-    [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)
+- For an introduction to IREE's project structure and developer tools, see
+  [Developer Overview](../developing_iree/developer_overview.md)
+- To target GPUs using Vulkan, see
+  [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
+- To use IREE's Python bindings, see
+  [Getting Started with Python](getting_started_python.md)

@@ -60,8 +60,7 @@ $ cd iree
 $ git submodule update --init
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
 
 ### Build
@@ -75,11 +74,9 @@ $ cmake -G Ninja -B build/ .
 Note: this should use `Clang` by default on macOS. `GCC` is not fully supported
 by IREE.
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;The root
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;The root
 > [CMakeLists.txt](https://github.com/google/iree/blob/main/CMakeLists.txt)
-> file has options for configuring which parts of the project to enable.<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
+> file has options for configuring which parts of the project to enable.<br> > &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
 
 Build all targets:
 
@@ -109,10 +106,10 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md).
-*   To understand how IREE implements HAL over Metal, see
-    [Metal HAL Driver](../design_docs/metal_hal_driver.md). <!-- TODO: Link to
-    macOS versions of these guides once they are developed.
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md) -->
+- For an introduction to IREE's project structure and developer tools, see
+  [Developer Overview](../developing_iree/developer_overview.md).
+- To understand how IREE implements HAL over Metal, see
+  [Metal HAL Driver](../design_docs/metal_hal_driver.md). <!-- TODO: Link to
+  macOS versions of these guides once they are developed.
+- To use IREE's Python bindings, see
+  [Getting Started with Python](getting_started_python.md) -->

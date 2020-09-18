@@ -51,15 +51,15 @@ Metal is one of the main modern GPU APIs that provide more explicit control over
 the hardware. The mapping between IREE HAL classes and Metal protocols are
 relatively straightforward:
 
-IREE HAL Class                             | Metal Protocol
-:----------------------------------------: | :------------:
-[`hal::Driver`][hal-driver]                | N/A
-[`hal::Device`][hal-device]                | [`MTLDevice`][mtl-device]
-[`hal::CommandQueue`][hal-command-queue]   | [`MTLCommandQueue`][mtl-command-queue]
-[`hal::CommandBuffer`][hal-command-buffer] | [`MTLCommandBuffer`][mtl-command-buffer]
-[`hal::Semaphore`][hal-semaphore]          | [`MTLSharedEvent`][mtl-shared-event]
-[`hal::Allocator`][hal-allocator]          | N/A
-[`hal::Buffer`][hal-buffer]                | [`MTLBuffer`][mtl-buffer]
+|               IREE HAL Class               |              Metal Protocol              |
+| :----------------------------------------: | :--------------------------------------: |
+|        [`hal::Driver`][hal-driver]         |                   N/A                    |
+|        [`hal::Device`][hal-device]         |        [`MTLDevice`][mtl-device]         |
+|  [`hal::CommandQueue`][hal-command-queue]  |  [`MTLCommandQueue`][mtl-command-queue]  |
+| [`hal::CommandBuffer`][hal-command-buffer] | [`MTLCommandBuffer`][mtl-command-buffer] |
+|     [`hal::Semaphore`][hal-semaphore]      |   [`MTLSharedEvent`][mtl-shared-event]   |
+|     [`hal::Allocator`][hal-allocator]      |                   N/A                    |
+|        [`hal::Buffer`][hal-buffer]         |        [`MTLBuffer`][mtl-buffer]         |
 
 In the following subsections, we go over each pair to provide more details.
 
@@ -146,26 +146,26 @@ IREE [`hal::Buffer`][hal-buffer] maps Metal `MTLBuffer`. See
 
 Metal provides four [`MTLStorageMode`][mtl-storage-mode] options:
 
-*   `MTLStorageModeShared`: The resource is stored in system memory and is
-    accessible to both the CPU and the GPU.
-*   `MTLStorageModeManaged`: The CPU and GPU may maintain separate copies of the
-    resource, and any changes must be explicitly synchronized.
-*   `MTLStorageModePrivate`: The resource can be accessed only by the GPU.
-*   `MTLStorageMemoryless`: The resource’s contents can be accessed only by the
-    GPU and only exist temporarily during a render pass.
+- `MTLStorageModeShared`: The resource is stored in system memory and is
+  accessible to both the CPU and the GPU.
+- `MTLStorageModeManaged`: The CPU and GPU may maintain separate copies of the
+  resource, and any changes must be explicitly synchronized.
+- `MTLStorageModePrivate`: The resource can be accessed only by the GPU.
+- `MTLStorageMemoryless`: The resource’s contents can be accessed only by the
+  GPU and only exist temporarily during a render pass.
 
 Among them, `MTLStorageModeManaged` is only available on macOS.
 
 IREE HAL defines serveral [`MemoryType`][hal-buffer]. They need to map to the
 above storage modes:
 
-*   If `kDeviceLocal` but not `kHostVisible`, `MTLStorageModePrivate` is chosen.
-*   If `kDeviceLocal` and `kHostVisible`:
-    *   If macOS, `MTLStorageModeManaged` can be chosen.
-    *   Otherwise, `MTLStorageModeShared` is chosen.
-*   If not `DeviceLocal` but `kDeviceVisible`, `MTLStorageModeShared` is chosen.
-*   If not `kDeviceLocal` and not `kDeviceVisible`, `MTLStorageModeShared` is
-    chosen. (TODO: We should probably use host buffer here.)
+- If `kDeviceLocal` but not `kHostVisible`, `MTLStorageModePrivate` is chosen.
+- If `kDeviceLocal` and `kHostVisible`:
+  - If macOS, `MTLStorageModeManaged` can be chosen.
+  - Otherwise, `MTLStorageModeShared` is chosen.
+- If not `DeviceLocal` but `kDeviceVisible`, `MTLStorageModeShared` is chosen.
+- If not `kDeviceLocal` and not `kDeviceVisible`, `MTLStorageModeShared` is
+  chosen. (TODO: We should probably use host buffer here.)
 
 IREE HAL also allows to create buffers with `kHostCoherent` bit. This may still
 be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the

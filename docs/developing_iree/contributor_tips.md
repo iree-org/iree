@@ -24,8 +24,7 @@ and create the PR from there.
 1.  Create a fork of the main repository.
 
 2.  Create a local git repository with remotes `upstream` (the main repository)
-    and `origin` (your personal fork). To list your current remotes `git remote
-    -v`.
+    and `origin` (your personal fork). To list your current remotes `git remote -v`.
 
     a. If you already cloned from the main repository (e.g. by following the
     getting started guide):
@@ -50,8 +49,7 @@ and create the PR from there.
     privileges (so can push directly to protected branches). These names are
     just suggestions, but you might find some scripts where the defaults are for
     remotes named like this. For extra safety, you can make it difficult to push
-    directly to upstream by setting the push url to something invalid: `git
-    remote set-url --push upstream DISABLE`, which requires re-enabling the push
+    directly to upstream by setting the push url to something invalid: `git remote set-url --push upstream DISABLE`, which requires re-enabling the push
     URL explicitly before pushing.
 
 3.  Use a script like
@@ -66,14 +64,14 @@ and create the PR from there.
 
 ## Useful Tools
 
-*   GitHub CLI (https://github.com/cli/cli). A CLI for interacting with GitHub.
-    Most importantly, it allows scripting the creation of pull requests.
-*   Refined GitHub Chrome and Firefox Extension:
-    https://github.com/sindresorhus/refined-github. Nice extension that adds a
-    bunch of features to the GitHub UI.
-*   Squashed Merge Messages Chrome and Firefox Extension:
-    https://github.com/zachwhaley/squashed-merge-message. Simple extension that
-    implements the desired pattern for IREE squash-merge and merge-commit
-    messages, copying the PR title and body.
-*   VSCode: https://code.visualstudio.com/. The most commonly used IDE amongst
-    IREE developers.
+- GitHub CLI (https://github.com/cli/cli). A CLI for interacting with GitHub.
+  Most importantly, it allows scripting the creation of pull requests.
+- Refined GitHub Chrome and Firefox Extension:
+  https://github.com/sindresorhus/refined-github. Nice extension that adds a
+  bunch of features to the GitHub UI.
+- Squashed Merge Messages Chrome and Firefox Extension:
+  https://github.com/zachwhaley/squashed-merge-message. Simple extension that
+  implements the desired pattern for IREE squash-merge and merge-commit
+  messages, copying the PR title and body.
+- VSCode: https://code.visualstudio.com/. The most commonly used IDE amongst
+  IREE developers.

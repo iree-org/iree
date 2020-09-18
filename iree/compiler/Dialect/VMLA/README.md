@@ -57,8 +57,7 @@ values (such as `buffer.view`).
 
 If shape information is required (and it's a good idea to make sure it
 absolutely is) then add shapes following the buffer they are related to, for
-example: `vm.import @transpose.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32
-...)`
+example: `vm.import @transpose.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...)`
 
 ### Adding the Op Tablegen Description
 
@@ -116,11 +115,11 @@ straightforward. Many ops can use `VMLA_*_IMPORT_OP` macros to perform the
 conversion automatically. See
 [VMLAToVM](/iree/compiler/Dialect/VMLA/Conversion/VMLAToVM/) for examples.
 
-*   Ops that have no suffix (like `vmla.buffer.fill`) use `VMLA_IMPORT_OP`.
-*   Ops that only require the bit-depth (like `vmla.copy.x8`) use
-    `VMLA_SIZED_IMPORT_OP`.
-*   Ops that require type information (like `vmla.cmp.f32`) use
-    `VMLA_TYPED_IMPORT_OP`.
+- Ops that have no suffix (like `vmla.buffer.fill`) use `VMLA_IMPORT_OP`.
+- Ops that only require the bit-depth (like `vmla.copy.x8`) use
+  `VMLA_SIZED_IMPORT_OP`.
+- Ops that require type information (like `vmla.cmp.f32`) use
+  `VMLA_TYPED_IMPORT_OP`.
 
 Custom conversions can be performed as well but try to avoid that.
 

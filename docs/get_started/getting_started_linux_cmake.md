@@ -32,8 +32,7 @@ package manager installs a version `< 3.13`, then follow the installation
 instructions [here](https://cmake.org/install/) to install a newer version (e.g.
 the latest).
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
 > such as the Visual Studio Code
 > [CMake Tools](https://github.com/microsoft/vscode-cmake-tools) extension.
 
@@ -63,8 +62,7 @@ $ cd iree
 $ git submodule update --init
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
 
 ### Build
@@ -75,11 +73,9 @@ Configure:
 $ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;The root
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;The root
 > [CMakeLists.txt](https://github.com/google/iree/blob/main/CMakeLists.txt)
-> file has options for configuring which parts of the project to enable.<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
+> file has options for configuring which parts of the project to enable.<br> > &nbsp;&nbsp;&nbsp;&nbsp;These are further documented in [CMake Options and Variables](cmake_options_and_variables.md).
 
 Build all targets:
 
@@ -109,9 +105,9 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md)
-*   To target GPUs using Vulkan, see
-    [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)
+- For an introduction to IREE's project structure and developer tools, see
+  [Developer Overview](../developing_iree/developer_overview.md)
+- To target GPUs using Vulkan, see
+  [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
+- To use IREE's Python bindings, see
+  [Getting Started with Python](getting_started_python.md)

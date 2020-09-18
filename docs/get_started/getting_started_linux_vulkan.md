@@ -122,8 +122,7 @@ $ ./build/iree/tools/iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-t
 $ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/tools/test/simple.mlir -o /tmp/module.fb
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;If successful, this may have no output. You can pass
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;If successful, this may have no output. You can pass
 > other flags like `-print-ir-after-all` to control the program.
 
 ### Executing modules with the Vulkan driver

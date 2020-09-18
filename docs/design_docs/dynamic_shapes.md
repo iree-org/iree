@@ -20,7 +20,7 @@ is well established:
     unspecified.
 3.  Unranked Dynamicism: Some tensors have indeterminate ranks.
 
-At this stage, *Dynamic Shapes* in IREE refers to supporting dynamic ranked
+At this stage, _Dynamic Shapes_ in IREE refers to supporting dynamic ranked
 dynamic tensors, where some dimensions are left unspecified at public function
 boundaries. It is expected that once this is solid, some support can be
 considered for unranked dynamicism, and it is further expected that will entail
@@ -54,27 +54,27 @@ level ops on tensors.
 
 #### Types:
 
-*   `ranked_shape`: This value type represents the dynamic dimensions of a
-    partially known, ranked shape. It is used early in the compiler to represent
-    anywhere that dynamic dimensions need to be passed (i.e. function
-    args/results, etc). At lower levels of the compiler, it will generally be
-    dis-aggregated into loose SSA values. This type also carries the datatype
-    used to represent the dimensions. This is currently fixed to i32 but may be
-    leveraged eventually to use smaller integer when such things are known to be
-    legal.
+- `ranked_shape`: This value type represents the dynamic dimensions of a
+  partially known, ranked shape. It is used early in the compiler to represent
+  anywhere that dynamic dimensions need to be passed (i.e. function
+  args/results, etc). At lower levels of the compiler, it will generally be
+  dis-aggregated into loose SSA values. This type also carries the datatype
+  used to represent the dimensions. This is currently fixed to i32 but may be
+  leveraged eventually to use smaller integer when such things are known to be
+  legal.
 
 #### Ops:
 
-*   `get_ranked_shape`: Takes a tensor SSA value and returns a corresponding
-    `ranked_shape`. Early in the compilation flow, anything that needs a ranked
-    shape should add such ops so that the compiler can later determine which
-    shape computations to materialize. Getting the `ranked_shape` of a static
-    tensor should yield a constant.
-*   `tie_shape`: Takes tensor and ranked_shape SSA values and returns the
-    tensor. This is used as a junction point by the shape materialization passes
-    to know at various points precisely what the shape is.
-*   ... TODO: need `get_shape_dim` and conversions to/from 1D tensors and loose
-    SSA values.
+- `get_ranked_shape`: Takes a tensor SSA value and returns a corresponding
+  `ranked_shape`. Early in the compilation flow, anything that needs a ranked
+  shape should add such ops so that the compiler can later determine which
+  shape computations to materialize. Getting the `ranked_shape` of a static
+  tensor should yield a constant.
+- `tie_shape`: Takes tensor and ranked_shape SSA values and returns the
+  tensor. This is used as a junction point by the shape materialization passes
+  to know at various points precisely what the shape is.
+- ... TODO: need `get_shape_dim` and conversions to/from 1D tensors and loose
+  SSA values.
 
 ### Materialization
 

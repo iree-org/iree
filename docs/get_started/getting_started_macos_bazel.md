@@ -59,8 +59,7 @@ $ git submodule update --init
 $ python3 configure_bazel.py
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
 
 ### Build
@@ -74,8 +73,7 @@ $ bazel test -k //iree/... \
     --test_tag_filters="--nokokoro,-driver=vulkan"
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Not all tests are passing on macOS, but the build does
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Not all tests are passing on macOS, but the build does
 > complete successfully at the time of writing.
 
 In general, build artifacts will be under the `bazel-bin` directory at the top
@@ -125,10 +123,10 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md).
-*   To understand how IREE implements HAL over Metal, see
-    [Metal HAL Driver](../design_docs/metal_hal_driver.md). <!-- TODO: Link to
-    macOS versions of these guides once they are developed.
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md) -->
+- For an introduction to IREE's project structure and developer tools, see
+  [Developer Overview](../developing_iree/developer_overview.md).
+- To understand how IREE implements HAL over Metal, see
+  [Metal HAL Driver](../design_docs/metal_hal_driver.md). <!-- TODO: Link to
+  macOS versions of these guides once they are developed.
+- To use IREE's Python bindings, see
+  [Getting Started with Python](getting_started_python.md) -->

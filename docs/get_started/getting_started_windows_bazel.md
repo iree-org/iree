@@ -17,8 +17,7 @@ documented separately, as they require further setup.
 
 ## Prerequisites
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;You can simplify installation by using a package
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;You can simplify installation by using a package
 > manager like [Scoop](https://scoop.sh/) or
 > [Chocolatey](https://chocolatey.org/).
 
@@ -65,8 +64,7 @@ clone the repository, initialize its submodules, and configure:
 > python configure_bazel.py
 ```
 
-> Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
+> Tip:<br> > &nbsp;&nbsp;&nbsp;&nbsp;Editors and other programs can also clone the
 > repository, just make sure that they initialize the submodules.
 
 ### Build
@@ -117,9 +115,9 @@ and execute a function in the compiled module:
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md)
-*   To target GPUs using Vulkan, see
-    [Getting Started on Windows with Vulkan](getting_started_windows_vulkan.md)
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)
+- For an introduction to IREE's project structure and developer tools, see
+  [Developer Overview](../developing_iree/developer_overview.md)
+- To target GPUs using Vulkan, see
+  [Getting Started on Windows with Vulkan](getting_started_windows_vulkan.md)
+- To use IREE's Python bindings, see
+  [Getting Started with Python](getting_started_python.md)

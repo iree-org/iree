@@ -5,10 +5,10 @@ namely FlowToHAL and HALToVM.
 
 For our purposes here, FlowToHAL does the following type conversions:
 
--   converts from `tensor<....>` to `!hal.buffer_view`
+- converts from `tensor<....>` to `!hal.buffer_view`
 
--   converts from the frontend representation of TensorList (e.g.
-    `!tf_tensorlist.list`) to `!tensorlist.list` (this dialect).
+- converts from the frontend representation of TensorList (e.g.
+  `!tf_tensorlist.list`) to `!tensorlist.list` (this dialect).
 
 For our purposes here, HALToVM maps ops to VM-level calls into a custom module.
 

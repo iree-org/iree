@@ -114,9 +114,9 @@ TODO(benvanik): Talk about VM Benchmarks
 
 To use tracing in IREE, you need to build IREE with following requirements:
 
-*   Turn `IREE_ENABLE_RUNTIME_TRACING` on.
-*   Add `-DNDEBUG` to `IREE_DEFAULT_COPTS`.
-*   Use Release/RelWithDebInfo build.
+- Turn `IREE_ENABLE_RUNTIME_TRACING` on.
+- Add `-DNDEBUG` to `IREE_DEFAULT_COPTS`.
+- Use Release/RelWithDebInfo build.
 
 For example:
 

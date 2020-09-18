@@ -11,7 +11,7 @@ This guide walks through cross-compiling IREE core runtime towards the Android
 platform. Cross-compiling IREE compilers towards Android is not supported at the
 moment.
 
-Cross-compilation involves both a *host* platform and a *target* platform. One
+Cross-compilation involves both a _host_ platform and a _target_ platform. One
 invokes compiler toolchains on the host platform to generate libraries and
 executables that can be run on the target platform.
 
@@ -39,8 +39,7 @@ install Android NDK.
 After downloading, it is recommended to set the `ANDROID_NDK` environment
 variable pointing to the directory. For Linux, you can `export` in your shell's
 rc file. For Windows, you can search "environment variable" in the taskbar or
-use `Windows` + `R` to open the "Run" dialog to run `rundll32
-sysdm.cpl,EditEnvironmentVariables`.
+use `Windows` + `R` to open the "Run" dialog to run `rundll32 sysdm.cpl,EditEnvironmentVariables`.
 
 ### Install Android Debug Bridge (ADB)
 
@@ -72,20 +71,20 @@ $ cmake -G Ninja -B build-android  \
     -DIREE_HOST_C_COMPILER=`which clang` -DIREE_HOST_CXX_COMPILER=`which clang++`
 ```
 
-*   The above configures IREE to cross-compile towards 64-bit
-    (`-DANDROID_ABI="arm64-v8a"`) Android 10 (`-DANDROID_PLATFORM=android-29`).
-    This may require the latest Android NDK release. You can choose the suitable
-    [`ANDROID_ABI`](https://developer.android.com/ndk/guides/cmake#android_abi)
-    and
-    [`ANDROID_PLATFORM`](https://en.wikipedia.org/wiki/Android_version_history)
-    for your target device. You can also refer to Android NDK's
-    [CMake documentation](https://developer.android.com/ndk/guides/cmake) for
-    more toolchain arguments.
-*   Building IREE compilers and samples for Android is not supported at the
-    moment; they will be enabled soon.
-*   We need to define `IREE_HOST_{C|CXX}_COMPILER` to Clang here because IREE
-    does [not support](https://github.com/google/iree/issues/1269) GCC well at
-    the moment.
+- The above configures IREE to cross-compile towards 64-bit
+  (`-DANDROID_ABI="arm64-v8a"`) Android 10 (`-DANDROID_PLATFORM=android-29`).
+  This may require the latest Android NDK release. You can choose the suitable
+  [`ANDROID_ABI`](https://developer.android.com/ndk/guides/cmake#android_abi)
+  and
+  [`ANDROID_PLATFORM`](https://en.wikipedia.org/wiki/Android_version_history)
+  for your target device. You can also refer to Android NDK's
+  [CMake documentation](https://developer.android.com/ndk/guides/cmake) for
+  more toolchain arguments.
+- Building IREE compilers and samples for Android is not supported at the
+  moment; they will be enabled soon.
+- We need to define `IREE_HOST_{C|CXX}_COMPILER` to Clang here because IREE
+  does [not support](https://github.com/google/iree/issues/1269) GCC well at
+  the moment.
 
 ### Configure on Windows
 
@@ -105,10 +104,10 @@ REM Assuming in IREE source root
     -DLLVM_HOST_TRIPLE="x86_64-pc-windows-msvc"
 ```
 
-*   See the Linux section in the above for explanations of the used arguments.
-*   We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot
-    properly detect host triple under Android CMake toolchain file. This might
-    be fixed later.
+- See the Linux section in the above for explanations of the used arguments.
+- We need to define `LLVM_HOST_TRIPLE` in the above because LLVM cannot
+  properly detect host triple under Android CMake toolchain file. This might
+  be fixed later.
 
 ### Build all targets
 

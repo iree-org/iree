@@ -20,7 +20,7 @@ name: Update TensorFlow
 on:
   schedule:
     # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
-    - cron: '0 */6 * * *'
+    - cron: "0 */6 * * *"
 
 jobs:
   update_tf:

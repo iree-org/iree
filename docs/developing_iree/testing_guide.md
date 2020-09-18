@@ -176,8 +176,7 @@ to other languages (e.g. Python).
 
 To test these flows we use a custom framework called `check`.
 
-> Note:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;IREE end-to-end tests historically used `iree-run-mlir`.
+> Note:<br> > &nbsp;&nbsp;&nbsp;&nbsp;IREE end-to-end tests historically used `iree-run-mlir`.
 > We are in the process of transitioning them to use the check framework, but
 > that migration is incomplete, so some tests still use `iree-run-mlir`.
 
@@ -261,8 +260,8 @@ Next we use this input constant to exercise the runtime feature under test (in
 this case, just a single floor operation). Finally, we use a check dialect
 operation to make an assertion about the output. There are a few different
 [assertion operations](https://google.github.io/iree/Dialects/CheckDialect).
-Here we use the `expect_almost_eq_const` op: *almost* because we are comparing
-floats and want to allow for floating-point imprecision, and *const* because we
+Here we use the `expect_almost_eq_const` op: _almost_ because we are comparing
+floats and want to allow for floating-point imprecision, and _const_ because we
 want to compare it to a constant value. This last part is just syntactic sugar
 around
 

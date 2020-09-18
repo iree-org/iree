@@ -13,12 +13,12 @@ development envirnoment. The information here is meant to be generic.
 Vulkan adopts a layered architecture, which aims to better support extensiblity.
 There are four components involved in this architecture:
 
-*   The Vulkan Application
-*   [The Vulkan Loader][VulkanLoader]
-*   [Vulkan Layers][VulkanLayer]
-*   [Installable Client Drivers (ICDs)][VulkanICD]
+- The Vulkan Application
+- [The Vulkan Loader][vulkanloader]
+- [Vulkan Layers][vulkanlayer]
+- [Installable Client Drivers (ICDs)][vulkanicd]
 
-![High Level View of Loader][VulkanArchPicture]
+![High Level View of Loader][vulkanarchpicture]
 
 The Vulkan loader sits between the Vulkan application, which calls Vulkan APIs,
 and the ICDs, which implements these Vulkan APIs. Vulkan layers agument the
@@ -28,7 +28,7 @@ application's API calls one by one, and finally redirects the API calls made by
 the Vulkan application to one or more ICDs.
 
 It's highly recommned to read the
-[Architecture of the Vulkan Loader Interfaces Overview][VulkanArchOverview] to
+[Architecture of the Vulkan Loader Interfaces Overview][vulkanarchoverview] to
 get a general understanding of what these components are and how they interact
 with one another.
 
@@ -36,7 +36,7 @@ with one another.
 
 ### Windows
 
-You need to install the [Vulkan SDK][VulkanSDK] from LunarG to get the Vulkan
+You need to install the [Vulkan SDK][vulkansdk] from LunarG to get the Vulkan
 loader.
 
 Typically the Vulkan SDK will be installed at `C:\VulkanSDK\<version>\ ` and
@@ -50,23 +50,23 @@ the graphics card is Vulkan capable or update the driver.
 The following packages should be installed for a proper Vulkan runtime to test
 the runtime functions properly:
 
-*   [libvulkan1][PackageLibVulkan1] for the Vulkan loader `libvulkan.so`.
-*   [AMD] [mesa-vulkan-drivers][PackageMesaVulkan] for Mesa AMD Vulkan ICD.
-*   [NVIDIA] [nvidia-vulkan-icd][PackageNvidiaVulkan] for NVIDIA Vulkan ICD.
+- [libvulkan1][packagelibvulkan1] for the Vulkan loader `libvulkan.so`.
+- [AMD] [mesa-vulkan-drivers][packagemesavulkan] for Mesa AMD Vulkan ICD.
+- [NVIDIA] [nvidia-vulkan-icd][packagenvidiavulkan] for NVIDIA Vulkan ICD.
 
 The above packages provide the Vulkan loader and ICDs. With them an Vulkan
 application should be able to run. You may additionally want to install
 
-*   [vulkan-tools][PackageVulkanTools] for command-line tools like `vulkaninfo`
-    (dumping available ICDs and their capabilities) and GUI application like
-    `vulkancube` (rendering a rotating cube).
+- [vulkan-tools][packagevulkantools] for command-line tools like `vulkaninfo`
+  (dumping available ICDs and their capabilities) and GUI application like
+  `vulkancube` (rendering a rotating cube).
 
 In order to develop Vulkan applications, you additionally need the following
 pacages:
 
-*   [libvulkan-dev][PackageVulkanDev] for various Vulkan header files.
-*   [vulkan-validationlayers][PackageVulkanValidation] for Vulkan validation
-    layers like `VkLayer_standard_validation`.
+- [libvulkan-dev][packagevulkandev] for various Vulkan header files.
+- [vulkan-validationlayers][packagevulkanvalidation] for Vulkan validation
+  layers like `VkLayer_standard_validation`.
 
 ### Linux
 
@@ -74,14 +74,14 @@ For other Linux distros, please consult the corresponding package managment
 tools for the packages needed. (And please feel free to update this doc
 regarding them.)
 
-You can also download and install the [Vulkan SDK][VulkanSDK] from LunarG. It
+You can also download and install the [Vulkan SDK][vulkansdk] from LunarG. It
 packages the loader with many useful layers and other shader tools. The source
 code of the SDK component projects are included, allowing you to recompile the
 artifacts if needed.
 
 You can also build the Vulkan SDK component projects like
-[Vulkan-Loader][VulkanLoaderSource] and
-[Vulkan-ValidationLayers][VulkanValidationLayersSource] from source. But note
+[Vulkan-Loader][vulkanloadersource] and
+[Vulkan-ValidationLayers][vulkanvalidationlayerssource] from source. But note
 that building these components separately you need to make sure they are
 consistent with one another (e.g., using the same version of Vulkan headers) to
 function together.
@@ -104,7 +104,7 @@ downloaded Vulkan SDKs.
 
 RenderDoc is an awesome tool that one can use to capture and introspect Vulkan
 applications. It can be downloaded from RenderDoc's
-[website](https://renderdoc.org/) or compiled from [source][RenderDocSource].
+[website](https://renderdoc.org/) or compiled from [source][renderdocsource].
 
 ## Vulkan development environment troubleshooting
 
@@ -113,20 +113,20 @@ applications. It can be downloaded from RenderDoc's
 There are a few environment variables that can alter the default Vulkan loader
 behavior and print verbose information, notably:
 
-*   `VK_LOADER_DEBUG`: enable loader debug messages. Setting it to `all` will
-    enable the most verbose logging from the loader. This is especially useful
-    when trying to see what layers/ICDs are searched and used.
-*   `VK_ICD_FILENAMES`: force the loader to use a specific ICD. This is
-    especially useful when you have multiple Vulkan capable devices and want to
-    select which one to use manually.
-*   `VK_INSTANCE_LAYERS`: force the loader to enable the given layers. For
-    example, You can force enable `VK_LAYER_LUNARG_api_dump` to have a detailed
-    dump of all Vulkan API calls made by the application. You can force enable
-    `VK_LAYER_LUNARG_core_validation` to validate the API calls made by the
-    application.
-*   `VK_LAYER_PATH`: override the loader's standard layer libary search folders.
+- `VK_LOADER_DEBUG`: enable loader debug messages. Setting it to `all` will
+  enable the most verbose logging from the loader. This is especially useful
+  when trying to see what layers/ICDs are searched and used.
+- `VK_ICD_FILENAMES`: force the loader to use a specific ICD. This is
+  especially useful when you have multiple Vulkan capable devices and want to
+  select which one to use manually.
+- `VK_INSTANCE_LAYERS`: force the loader to enable the given layers. For
+  example, You can force enable `VK_LAYER_LUNARG_api_dump` to have a detailed
+  dump of all Vulkan API calls made by the application. You can force enable
+  `VK_LAYER_LUNARG_core_validation` to validate the API calls made by the
+  application.
+- `VK_LAYER_PATH`: override the loader's standard layer libary search folders.
 
-Please see the [Vulkan loader's documentation][VulkanLoaderEnvVars] for detailed
+Please see the [Vulkan loader's documentation][vulkanloaderenvvars] for detailed
 explanation for these variables.
 
 ### Setting environment variables for Bazel test
@@ -153,19 +153,19 @@ display at the server side, for example:
 export DISPLAY=:0
 ```
 
-[VulkanArchOverview]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#overview
-[VulkanArchPicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/loader/images/high_level_loader.png
-[VulkanICD]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#installable-client-drivers
-[VulkanLayer]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#layers
-[VulkanLoader]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#the-loader
-[VulkanLoaderEnvVars]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#table-of-debug-environment-variables
-[VulkanLoaderSource]: https://github.com/KhronosGroup/Vulkan-Loader
-[VulkanSDK]: https://www.lunarg.com/vulkan-sdk/
-[VulkanValidationLayersSource]: https://github.com/KhronosGroup/Vulkan-ValidationLayers
-[PackageLibVulkan1]: https://packages.ubuntu.com/focal/libvulkan1
-[PackageMesaVulkan]: https://packages.ubuntu.com/focal/mesa-vulkan-drivers
-[PackageNvidiaVulkan]: https://packages.debian.org/buster/nvidia-vulkan-icd
-[PackageVulkanDev]: https://packages.ubuntu.com/focal/libvulkan-dev
-[PackageVulkanTools]: https://packages.ubuntu.com/focal/vulkan-tools
-[PackageVulkanValidation]: https://packages.ubuntu.com/eoan/vulkan-validationlayers
-[RenderDocSource]: https://github.com/baldurk/renderdoc
+[vulkanarchoverview]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#overview
+[vulkanarchpicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/loader/images/high_level_loader.png
+[vulkanicd]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#installable-client-drivers
+[vulkanlayer]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#layers
+[vulkanloader]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#the-loader
+[vulkanloaderenvvars]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#table-of-debug-environment-variables
+[vulkanloadersource]: https://github.com/KhronosGroup/Vulkan-Loader
+[vulkansdk]: https://www.lunarg.com/vulkan-sdk/
+[vulkanvalidationlayerssource]: https://github.com/KhronosGroup/Vulkan-ValidationLayers
+[packagelibvulkan1]: https://packages.ubuntu.com/focal/libvulkan1
+[packagemesavulkan]: https://packages.ubuntu.com/focal/mesa-vulkan-drivers
+[packagenvidiavulkan]: https://packages.debian.org/buster/nvidia-vulkan-icd
+[packagevulkandev]: https://packages.ubuntu.com/focal/libvulkan-dev
+[packagevulkantools]: https://packages.ubuntu.com/focal/vulkan-tools
+[packagevulkanvalidation]: https://packages.ubuntu.com/eoan/vulkan-validationlayers
+[renderdocsource]: https://github.com/baldurk/renderdoc

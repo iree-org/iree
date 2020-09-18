@@ -1,0 +1,63 @@
+# Third party code
+third_party/
+
+# Languages for which we use other formatters
+
+# clang-format
+*.cc
+*.cpp
+*.h
+*.c
+*.hpp
+*.inc
+
+# yapf
+*.py
+
+
+# Duplicates .gitignore:
+
+# Python
+*.pyc
+**/.ipynb_checkpoints/
+
+# Visual Studio files
+.vs/
+.vscode/
+*.sdf
+*.opensdf
+*.VC.opendb
+*.suo
+*.user
+
+# macOS files
+.DS_Store
+
+# CMake artifacts
+build/
+build-*/
+
+# Bazel artifacts
+/bazel-*
+
+# Local-only config options
+configured.bazelrc
+user.bazelrc
+
+# Dear ImGui Ini files
+imgui.ini
+
+# Emacs autosaves
+*~
+\#*\#
+
+# Vim swap files
+[._]*.sw[a-p]
+
+# Source indexing files
+compile_commands.json
+.cache/clangd
+.clangd/
+
+# Pyenv files
+.python-version

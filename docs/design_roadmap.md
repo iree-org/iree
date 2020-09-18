@@ -16,38 +16,38 @@ list.
 
 <!-- TOC -->
 
--   [IREE Design Roadmap](#iree-design-roadmap)
-    -   [Input Dialects](#input-dialects)
-    -   [Future MLIR XLA HLO Replacement](#future-mlir-xla-hlo-replacement)
-    -   [`linalg`: High-level Hierarchical Optimization](#linalg-high-level-hierarchical-optimization)
-    -   [XLA HLO: Canonicalizations](#xla-hlo-canonicalizations)
-    -   [XLA HLO: Tensor to Primitive Conversion](#xla-hlo-tensor-to-primitive-conversion)
-    -   [Quantization](#quantization)
-    -   [`flow`: Data- and Execution-Flow Modeling](#flow-data--and-execution-flow-modeling)
-    -   [Avoiding Readbacks with `flow.stream`](#avoiding-readbacks-with-flowstream)
-    -   [Threading `flow.stream` through the CFG](#threading-flowstream-through-the-cfg)
-    -   [Predication of `flow.dispatch`](#predication-of-flowdispatch)
-    -   [Deduping `flow.executable`s](#deduping-flowexecutables)
-    -   [Rematerializing CSE'd Expressions](#rematerializing-csed-expressions)
-    -   [Device Placement](#device-placement)
-    -   [`hal`: Hardware Abstraction Layer and Multi-Architecture Executables](#hal-hardware-abstraction-layer-and-multi-architecture-executables)
-    -   [Allow Targets to Specify `hal.interface`s](#allow-targets-to-specify-halinterfaces)
-    -   [Target-specific Scheduling Specialization](#target-specific-scheduling-specialization)
-    -   [Buffer Usage Tracking](#buffer-usage-tracking)
-    -   [Batched Executable Caching and Precompilation](#batched-executable-caching-and-precompilation)
-    -   [Target-aware Executable Compression](#target-aware-executable-compression)
-    -   [Target-aware Constant Compression](#target-aware-constant-compression)
-    -   [Command Buffer Stateful Deduplication](#command-buffer-stateful-deduplication)
-    -   [Resource Timeline](#resource-timeline)
-    -   [Transient Tensor Ringbuffer](#transient-tensor-ringbuffer)
-    -   [Timeline Semaphores on the Module ABI](#timeline-semaphores-on-the-module-abi)
-    -   [GPU-like CPU Scheduling](#gpu-like-cpu-scheduling)
-    -   [`vm`: Lightweight Virtual Machine](#vm-lightweight-virtual-machine)
-    -   [Coroutines for Batching and Cooperative Scheduling](#coroutines-for-batching-and-cooperative-scheduling)
-        -   [Cellular Batching](#cellular-batching)
-    -   [Lowering to LLVM IR](#lowering-to-llvm-ir)
-    -   [Improved Type Support](#improved-type-support)
-    -   [Indirect Command Buffer/On-Accelerator Execution](#indirect-command-bufferon-accelerator-execution)
+- [IREE Design Roadmap](#iree-design-roadmap)
+  - [Input Dialects](#input-dialects)
+  - [Future MLIR XLA HLO Replacement](#future-mlir-xla-hlo-replacement)
+  - [`linalg`: High-level Hierarchical Optimization](#linalg-high-level-hierarchical-optimization)
+  - [XLA HLO: Canonicalizations](#xla-hlo-canonicalizations)
+  - [XLA HLO: Tensor to Primitive Conversion](#xla-hlo-tensor-to-primitive-conversion)
+  - [Quantization](#quantization)
+  - [`flow`: Data- and Execution-Flow Modeling](#flow-data--and-execution-flow-modeling)
+  - [Avoiding Readbacks with `flow.stream`](#avoiding-readbacks-with-flowstream)
+  - [Threading `flow.stream` through the CFG](#threading-flowstream-through-the-cfg)
+  - [Predication of `flow.dispatch`](#predication-of-flowdispatch)
+  - [Deduping `flow.executable`s](#deduping-flowexecutables)
+  - [Rematerializing CSE'd Expressions](#rematerializing-csed-expressions)
+  - [Device Placement](#device-placement)
+  - [`hal`: Hardware Abstraction Layer and Multi-Architecture Executables](#hal-hardware-abstraction-layer-and-multi-architecture-executables)
+  - [Allow Targets to Specify `hal.interface`s](#allow-targets-to-specify-halinterfaces)
+  - [Target-specific Scheduling Specialization](#target-specific-scheduling-specialization)
+  - [Buffer Usage Tracking](#buffer-usage-tracking)
+  - [Batched Executable Caching and Precompilation](#batched-executable-caching-and-precompilation)
+  - [Target-aware Executable Compression](#target-aware-executable-compression)
+  - [Target-aware Constant Compression](#target-aware-constant-compression)
+  - [Command Buffer Stateful Deduplication](#command-buffer-stateful-deduplication)
+  - [Resource Timeline](#resource-timeline)
+  - [Transient Tensor Ringbuffer](#transient-tensor-ringbuffer)
+  - [Timeline Semaphores on the Module ABI](#timeline-semaphores-on-the-module-abi)
+  - [GPU-like CPU Scheduling](#gpu-like-cpu-scheduling)
+  - [`vm`: Lightweight Virtual Machine](#vm-lightweight-virtual-machine)
+  - [Coroutines for Batching and Cooperative Scheduling](#coroutines-for-batching-and-cooperative-scheduling)
+    - [Cellular Batching](#cellular-batching)
+  - [Lowering to LLVM IR](#lowering-to-llvm-ir)
+  - [Improved Type Support](#improved-type-support)
+  - [Indirect Command Buffer/On-Accelerator Execution](#indirect-command-bufferon-accelerator-execution)
 
 <!-- /TOC -->
 
@@ -99,12 +99,12 @@ expect more of these missing pieces to be filled in.
 Examples of the optimizations that will greatly benefit IREE (and any other
 backend consuming `mhlo`) include:
 
--   Eliding unneeded transpose, reshape, and broadcast operations.
--   Inserting transpose, reshape, and broadcast operations to allow for more
-    optimal memory access patterns (such as transposing gather input to allow
-    for memcpy-like transfers instead of column-wise cache-unfriendly accesses).
--   Moving operations above broadcasts such that the smallest amount of work is
-    performed.
+- Eliding unneeded transpose, reshape, and broadcast operations.
+- Inserting transpose, reshape, and broadcast operations to allow for more
+  optimal memory access patterns (such as transposing gather input to allow
+  for memcpy-like transfers instead of column-wise cache-unfriendly accesses).
+- Moving operations above broadcasts such that the smallest amount of work is
+  performed.
 
 ### XLA HLO: Tensor to Primitive Conversion
 

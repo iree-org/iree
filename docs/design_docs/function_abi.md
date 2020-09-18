@@ -6,8 +6,8 @@ performed in as similar way as possible in various target languages. In general,
 this requires additional metadata on top of the raw characteristics of a
 function. Where possible, this is done by attaching attributes to a function.
 
-*   `abi` : string indicating the abi/calling convention in use
-*   `abiv` : numeric version of the `abi`
+- `abi` : string indicating the abi/calling convention in use
+- `abiv` : numeric version of the `abi`
 
 Each abi can require additional attributes as needed.
 
@@ -30,11 +30,11 @@ All exported functions implement the raw function ABI, which defines the
 metadata and calling convention for marshalling inputs and results to their
 underlying implementations.
 
-*Attributes:*
+_Attributes:_
 
-*   `fv` = 1 (current version of the raw function ABI)
-*   `f` = encoded raw function signature (see below)
-*   `fbr` = result buffer allocation function name (optional)
+- `fv` = 1 (current version of the raw function ABI)
+- `f` = encoded raw function signature (see below)
+- `fbr` = result buffer allocation function name (optional)
 
 The reflection metadata documented here augments the underlying type system such
 that host language bindings can interop as needed. This additional metadata is
@@ -149,7 +149,7 @@ appropriate results, which allows chains of result-producing invocations to be
 pipelined.
 
 If, however, a `buffer-type` is not fully specified, the compiler may emit a
-special *result allocator* function, which will be referenced in the `fbr`
+special _result allocator_ function, which will be referenced in the `fbr`
 attribute. Such a function would have a signature like this:
 
 ```c++
@@ -188,10 +188,10 @@ functional.
 Functions may support the SIP ABI if their input and result tuples logically map
 onto "structures" (nested sequence/dicts).
 
-*Attributes:*
+_Attributes:_
 
-*   `sipv` = 1 (current SIP ABI version)
-*   `sip` = encoded SIP signature (see below)
+- `sipv` = 1 (current SIP ABI version)
+- `sip` = encoded SIP signature (see below)
 
 This ABI maps a raw, linear sequence of inputs and results onto an input and
 result "structure" -- which in this context refers to a nested assembly of
@@ -247,9 +247,9 @@ interpret the signature.
 
 #### Implementations
 
-*   C++
-    *   `SipSignatureMangler`: Produces a function signature given individual
-        input and result assignment of physical indices to nested index paths in
-        the structure tree.
-    *   `SipSignatureParser`: Parses signatures and dispatches calls to a
-        visitor.
+- C++
+  - `SipSignatureMangler`: Produces a function signature given individual
+    input and result assignment of physical indices to nested index paths in
+    the structure tree.
+  - `SipSignatureParser`: Parses signatures and dispatches calls to a
+    visitor.
