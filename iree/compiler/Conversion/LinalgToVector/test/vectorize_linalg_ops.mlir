@@ -80,6 +80,39 @@ func @cmp_and_select() {
 
 // -----
 
+func @cmp_convert_mul() {
+  %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4xf32>
+  %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<4xi32>
+  %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xi32>
+  %cst = constant 0.000000e+00 : f32
+  linalg.generic {args_in = 2 : i64,
+                  args_out = 1 : i64,
+                  indexing_maps = [affine_map<(d0) -> (d0)>,
+                                   affine_map<(d0) -> (d0)>,
+                                   affine_map<(d0) -> (d0)>],
+                  iterator_types = ["parallel"]} %1, %2, %0 {
+  ^bb0(%arg0: f32, %arg1: i32, %arg2: i32):  // no predecessors
+    %3 = cmpf "oeq", %arg0, %cst : f32
+    %4 = zexti %3 : i1 to i32
+    %5 = muli %4, %arg1 : i32
+    linalg.yield %5 : i32
+  }: memref<4xf32>, memref<4xi32>, memref<4xi32>
+  return
+}
+// CHECK-LABEL: func @cmp_convert_mul
+//   CHECK-DAG: %[[BUF0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1xvector<4xf32>>
+//   CHECK-DAG: %[[BUF1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1xvector<4xi32>>
+//   CHECK-DAG: %[[BUF2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<1xvector<4xi32>>
+//       CHECK: linalg.generic
+//  CHECK-SAME:   %[[BUF0]], %[[BUF1]], %[[BUF2]]
+//       CHECK: ^bb0(%[[ARG0:.+]]: vector<4xf32>, %[[ARG1:.+]]: vector<4xi32>, %[[ARG2:.+]]: vector<4xi32>)
+//       CHECK:   %[[T1:.+]] = cmpf "oeq", %[[ARG0]], %{{.+}} : vector<4xf32>
+//       CHECK:   %[[T2:.+]] = zexti %[[T1]] : vector<4xi1> to vector<4xi32>
+//       CHECK:   %[[T3:.+]] = muli %[[T2]], %[[ARG1]] : vector<4xi32>
+//       CHECK:   linalg.yield %[[T3]] : vector<4xi32>
+
+// -----
+
 func @not_contiguous() {
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
   %c0 = constant 0 : index
