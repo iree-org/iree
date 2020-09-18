@@ -6,11 +6,11 @@ module {
   //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
   //      CHECK: @concatenate
   //      CHECK: linalg.indexed_generic {
-  // CHECK-SAME:   args_in = 2
-  // CHECK-SAME:   args_out = 1
   // CHECK-SAME:   indexing_maps
   // CHECK-SAME:   #[[MAP0]], #[[MAP1]], #[[MAP2]]
   // CHECK-SAME:   iterator_types = ["parallel", "reduction", "reduction", "reduction"]
+  // CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} :
+  // CHECK-SAME:   outs(%{{[a-z0-9]*}} :
   func @concatenate() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2xi32>
@@ -35,11 +35,11 @@ module {
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d0)>
 //      CHECK: @concatenate
 //      CHECK: linalg.indexed_generic {
-// CHECK-SAME:   args_in = 2
-// CHECK-SAME:   args_out = 1
 // CHECK-SAME:   indexing_maps
 // CHECK-SAME:   #[[MAP0]], #[[MAP1]], #[[MAP2]]
 // CHECK-SAME:   iterator_types = ["parallel", "reduction", "reduction", "reduction"]
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} :
+// CHECK-SAME:   outs(%{{[a-z0-9]*}} :
 module {
   func @concatenate() {
     %c0 = constant 0 : index

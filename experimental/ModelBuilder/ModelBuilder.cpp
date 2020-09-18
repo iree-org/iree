@@ -193,12 +193,13 @@ Value mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
 
 Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
                                       std::array<Value, 2> fcArgs,
-                                      Value biasValueArg) {
+                                      Value fcInitTensor, Value biasValueArg) {
   //==========================================================================//
   // Layer 1: FC
   //==========================================================================//
   Value I = fcArgs[0], W = fcArgs[1];
-  Value O2 = linalg_generic_matmul(I, W, outputTensorType)->getResult(0);
+  Value O2 =
+      linalg_generic_matmul(I, W, fcInitTensor, outputTensorType)->getResult(0);
 
   //==========================================================================//
   // Layer 2: BiasAddTanh Block
