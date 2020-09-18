@@ -12,7 +12,8 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<?x?xf32>
     %2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<?x?xf32>
-    linalg.matmul %0, %1, %2 : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>)
+    linalg.matmul ins(%0, %1 : memref<?x?xf32>, memref<?x?xf32>)
+                 outs(%2 : memref<?x?xf32>)
     return
   }
   func @matmul_tile__num_workgroups__
@@ -43,7 +44,8 @@ module attributes {
 //  CHECK-SAME:       "copy_to_workgroup_memory"
 //       CHECK:     linalg.matmul
 //  CHECK-SAME:       "workgroup_memory_numprocs_ge_numiters"
-//  CHECK-SAME:       %[[SUBVIEW1]], %[[SUBVIEW2]], %[[RET0SV]]
+//  CHECK-SAME:       ins(%[[SUBVIEW1]], %[[SUBVIEW2]]
+//  CHECK-SAME:      outs(%[[RET0SV]]
 //   CHECK-DAG:     dealloc %[[ALLOC1]] : memref<8x32xf32, 3>
 //   CHECK-DAG:     dealloc %[[ALLOC2]] : memref<32x16xf32, 3>
 

@@ -89,7 +89,7 @@ void testMatMul() {
     Value A = kernelFunc.getArgument(0);
     Value B = kernelFunc.getArgument(1);
     Value C = kernelFunc.getArgument(2);
-    (linalg_matmul(TypeRange{}, ValueRange{A, B, C}));
+    (linalg_matmul(ValueRange{A, B}, ValueRange{C}));
     std_ret();
   }
   // 2. Compile the function, pass in runtime support library

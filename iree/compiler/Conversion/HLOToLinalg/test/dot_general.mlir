@@ -6,7 +6,7 @@ module {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<2x2x3xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2x3x4xf32>
-    // CHECK: linalg.batch_matmul %{{.+}}, %{{.+}}, %{{.+}} : (memref<2x2x3xf32>, memref<2x3x4xf32>, memref<2x2x4xf32>)
+    // CHECK: linalg.batch_matmul ins(%{{.+}}, %{{.+}} : memref<2x2x3xf32>, memref<2x3x4xf32>) outs(%{{.+}} : memref<2x2x4xf32>)
     %result ="mhlo.dot_general"(%0, %1) {
         dot_dimension_numbers = {
             lhs_batching_dimensions = dense<0> : tensor<1xi64>,

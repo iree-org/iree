@@ -15,8 +15,8 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_num = 1 : i32} : memref<64x256xf16>
     %ret0 = iree.placeholder for "interface buffer"
       {binding = @legacy_io::@ret0, operand_result_num = 2 : i32} : memref<128x256xf16>
-    linalg.matmul %arg0, %arg1, %ret0 :
-      (memref<128x64xf16>, memref<64x256xf16>, memref<128x256xf16>)
+    linalg.matmul ins(%arg0, %arg1 : memref<128x64xf16>, memref<64x256xf16>)
+                 outs(%ret0 : memref<128x256xf16>)
     return
   }
   func @matmul_static_shape__num_workgroups__
