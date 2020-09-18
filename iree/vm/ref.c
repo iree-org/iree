@@ -43,7 +43,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_retain(
   if (!ptr) return;
   volatile iree_atomic_intptr_t* counter =
       iree_vm_get_raw_counter_ptr(ptr, type_descriptor);
-  iree_atomic_fetch_add(counter, 1);
+  iree_atomic_fetch_add_intptr(counter, 1);
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
@@ -51,7 +51,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
   if (!ptr) return;
   volatile iree_atomic_intptr_t* counter =
       iree_vm_get_raw_counter_ptr(ptr, type_descriptor);
-  if (iree_atomic_fetch_sub(counter, 1) == 1) {
+  if (iree_atomic_fetch_sub_intptr(counter, 1) == 1) {
     if (type_descriptor->destroy) {
       // NOTE: this makes us not re-entrant, but I think that's OK.
       type_descriptor->destroy(ptr);
@@ -144,7 +144,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
   if (out_ref->ptr) {
     volatile iree_atomic_intptr_t* counter =
         iree_vm_get_ref_counter_ptr(out_ref);
-    iree_atomic_fetch_add(counter, 1);
+    iree_atomic_fetch_add_intptr(counter, 1);
   }
   return iree_ok_status();
 }
@@ -169,7 +169,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
   if (out_ref->ptr) {
     volatile iree_atomic_intptr_t* counter =
         iree_vm_get_ref_counter_ptr(out_ref);
-    iree_atomic_fetch_add(counter, 1);
+    iree_atomic_fetch_add_intptr(counter, 1);
   }
 }
 
@@ -198,7 +198,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain_or_move(
     // Retain by incrementing counter and preserving the source ref.
     volatile iree_atomic_intptr_t* counter =
         iree_vm_get_ref_counter_ptr(out_ref);
-    iree_atomic_fetch_add(counter, 1);
+    iree_atomic_fetch_add_intptr(counter, 1);
   } else if (ref != out_ref) {
     // Move by not changing counter and clearing the source ref.
     memset(ref, 0, sizeof(*ref));
@@ -221,7 +221,7 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {
   if (ref->type == IREE_VM_REF_TYPE_NULL || ref->ptr == NULL) return;
 
   volatile iree_atomic_intptr_t* counter = iree_vm_get_ref_counter_ptr(ref);
-  if (iree_atomic_fetch_sub(counter, 1) == 1) {
+  if (iree_atomic_fetch_sub_intptr(counter, 1) == 1) {
     const iree_vm_ref_type_descriptor_t* type_descriptor =
         iree_vm_ref_get_type_descriptor(ref->type);
     if (type_descriptor->destroy) {

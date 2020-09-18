@@ -33,7 +33,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_vm_instance_t), (void**)&instance));
   instance->allocator = allocator;
-  iree_atomic_store(&instance->ref_count, 1);
+  iree_atomic_store_intptr(&instance->ref_count, 1);
 
   *out_instance = instance;
   return iree_ok_status();
@@ -47,13 +47,13 @@ static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_instance_retain(iree_vm_instance_t* instance) {
   if (instance) {
-    iree_atomic_fetch_add(&instance->ref_count, 1);
+    iree_atomic_fetch_add_intptr(&instance->ref_count, 1);
   }
 }
 
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_instance_release(iree_vm_instance_t* instance) {
-  if (instance && iree_atomic_fetch_sub(&instance->ref_count, 1) == 1) {
+  if (instance && iree_atomic_fetch_sub_intptr(&instance->ref_count, 1) == 1) {
     iree_vm_instance_destroy(instance);
   }
 }

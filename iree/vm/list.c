@@ -138,7 +138,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_initialize(
   memset(storage.data, 0, required_storage_size);
 
   iree_vm_list_t* list = (iree_vm_list_t*)storage.data;
-  iree_atomic_store(&list->ref_object.counter, 1);
+  iree_atomic_store_intptr(&list->ref_object.counter, 1);
   if (element_type) {
     list->element_type = *element_type;
   }
@@ -164,7 +164,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_list_create(
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(iree_vm_list_t), (void**)&list));
   memset(list, 0, sizeof(*list));
-  iree_atomic_store(&list->ref_object.counter, 1);
+  iree_atomic_store_intptr(&list->ref_object.counter, 1);
   list->allocator = allocator;
   if (element_type) {
     list->element_type = *element_type;

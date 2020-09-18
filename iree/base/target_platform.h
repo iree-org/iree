@@ -18,15 +18,15 @@
 // The Bazel rule defines one of the following top-level platforms and then
 // one platform+architecture pair for that platform.
 //
-// IREE_ARCH_ARM_V7A
-// IREE_ARCH_ARM_V8A
-// IREE_ARCH_ASMJS
+// IREE_ARCH_ARM_32
+// IREE_ARCH_ARM_64
 // IREE_ARCH_WASM_32
 // IREE_ARCH_WASM_64
 // IREE_ARCH_X86_32
 // IREE_ARCH_X86_64
 //
-// TODO(benvanik): endianness
+// IREE_ENDIANNESS_LITTLE
+// IREE_ENDIANNESS_BIG
 //
 // IREE_COMPILER_CLANG
 // IREE_COMPILER_GCC
@@ -64,9 +64,7 @@
 #define IREE_ARCH_WASM_32 1
 #elif defined(__wasm64__)
 #define IREE_ARCH_WASM_64 1
-#elif defined(__asmjs__)
-#define IREE_ARCH_ASMJS 1
-#endif  // wasm/asmjs
+#endif  // WASM
 
 #if defined(__i386__) || defined(__i486__) || defined(__i586__) || \
     defined(__i686__) || defined(__i386) || defined(_M_IX86) || defined(_X86_)
@@ -76,12 +74,28 @@
 #define IREE_ARCH_X86_64 1
 #endif  // X86
 
-#if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&  \
-    !defined(IREE_ARCH_ASMJS) && !defined(IREE_ARCH_WASM_32) &&  \
-    !defined(IREE_ARCH_WASM_64) && !defined(IREE_ARCH_X86_32) && \
-    !defined(IREE_ARCH_X86_64)
+#if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&   \
+    !defined(IREE_ARCH_WASM_32) && !defined(IREE_ARCH_WASM_64) && \
+    !defined(IREE_ARCH_X86_32) && !defined(IREE_ARCH_X86_64)
 #error Unknown architecture.
 #endif  // all archs
+
+//==============================================================================
+// IREE_ENDIANNESS_*
+//==============================================================================
+// https://en.wikipedia.org/wiki/Endianness
+
+#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define IREE_ENDIANNESS_LITTLE 1
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
+    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define IREE_ENDIANNESS_BIG 1
+#elif defined(_WIN32)
+#define IREE_ENDIANNESS_LITTLE 1
+#else
+#error IREE endian detection needs to be set up for your compiler
+#endif  // __BYTE_ORDER__
 
 //==============================================================================
 // IREE_COMPILER_*

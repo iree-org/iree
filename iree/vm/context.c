@@ -209,13 +209,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
 
   iree_vm_context_t* context = NULL;
   iree_allocator_malloc(allocator, context_size, (void**)&context);
-  iree_atomic_store(&context->ref_count, 1);
+  iree_atomic_store_intptr(&context->ref_count, 1);
   context->instance = instance;
   iree_vm_instance_retain(context->instance);
   context->allocator = allocator;
 
   static iree_atomic_intptr_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
-  context->context_id = iree_atomic_fetch_add(&next_context_id, 1);
+  context->context_id = iree_atomic_fetch_add_intptr(&next_context_id, 1);
 
   uint8_t* p = (uint8_t*)context + sizeof(iree_vm_context_t);
   context->list.modules = (iree_vm_module_t**)p;
@@ -266,13 +266,13 @@ static void iree_vm_context_destroy(iree_vm_context_t* context) {
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_retain(iree_vm_context_t* context) {
   if (context) {
-    iree_atomic_fetch_add(&context->ref_count, 1);
+    iree_atomic_fetch_add_intptr(&context->ref_count, 1);
   }
 }
 
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context) {
-  if (context && iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
+  if (context && iree_atomic_fetch_sub_intptr(&context->ref_count, 1) == 1) {
     iree_vm_context_destroy(context);
   }
 }
