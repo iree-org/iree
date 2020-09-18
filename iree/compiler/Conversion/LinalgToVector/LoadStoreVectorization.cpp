@@ -270,7 +270,8 @@ struct LoadStoreVectorizationPass
         VectorizeElementwiseOp<TruncateIOp>,
         VectorizeElementwiseOp<UnsignedDivIOp>,
         VectorizeElementwiseOp<UnsignedRemIOp>,
-        VectorizeElementwiseOp<UnsignedShiftRightOp>>(context);
+        VectorizeElementwiseOp<UnsignedShiftRightOp>,
+        VectorizeElementwiseOp<ZeroExtendIOp>>(context);
     // clang-format on
 
     ConversionTarget target(*context);
