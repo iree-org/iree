@@ -409,6 +409,36 @@ iree_cc_test(
     iree::vm
 )
 
+
+if(${IREE_HAL_DRIVER_VULKAN})
+  # This target statically links against Vulkan.
+  # One way to achieve this is by installing the Vulkan SDK from
+  # https://vulkan.lunarg.com/.
+  # If Vulkan is not found, omit the target.
+  include(FindVulkan)
+  if(NOT Vulkan_FOUND)
+    return()
+  endif()
+
+  iree_cc_library(
+    NAME
+      vulkan_gui_util
+    HDRS
+      "vulkan_gui_util.h"
+    SRCS
+      "vulkan_gui_util.cc"
+    DEPS
+      dear_imgui::dear_imgui
+      dear_imgui::impl_sdl
+      dear_imgui::impl_vulkan
+      iree::base::api
+      iree::base::logging
+      iree::hal::vulkan::api
+      SDL2-static
+      Vulkan::Vulkan
+  )
+endif()
+
 if(${IREE_ENABLE_MLIR})
   add_custom_target(IreeFileCheck ALL
     COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
