@@ -127,7 +127,7 @@ $ ./build/iree/tools/iree-translate \
     -o /tmp/simple-llvm_aot.vmfb
 ```
 
-Then push the IREE runtime executable and module to the device:
+Then run the compiled module using the `dylib` HAL driver:
 
 ```shell
 $ ./build/iree/tools/iree-run-module -driver=dylib \
