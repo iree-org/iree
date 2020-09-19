@@ -107,9 +107,9 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
     -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
-### Dylib LLVM AOT backend
+### LLVM Ahead-of-Time (AOT) backend
 
-To compile IREE LLVM AOT module we need to set the AOT linker path environment variable (eg: for lld-10):
+To compile IREE LLVM AOT (vs JIT) module we need to set the AOT linker path environment variable:
 
 ```shell
 $ export IREE_LLVMAOT_LINKER_PATH=ld.lld-10
