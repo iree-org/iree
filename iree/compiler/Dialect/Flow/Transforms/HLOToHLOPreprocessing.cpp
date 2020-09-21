@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <numeric>
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
@@ -54,6 +56,13 @@ static bool hasPadding(OpTy op) {
   if (!padding) return false;
   return llvm::any_of(padding.getValue(),
                       [](APInt v) -> bool { return !v.isNullValue(); });
+}
+
+static DenseIntElementsAttr make1DElementsAttr(PatternRewriter &rewriter,
+                                               ArrayRef<int64_t> integers) {
+  auto type = RankedTensorType::get({static_cast<int64_t>(integers.size())},
+                                    rewriter.getIntegerType(64));
+  return DenseIntElementsAttr::get(type, integers);
 }
 
 class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
@@ -324,6 +333,240 @@ class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
   }
 };
 
+// Rewrites rank-3 mhlo.dot_general so lhs contraction dimension is
+// inner most (2) and rhs contraction dimension is dim right after batch
+// dimension. The pattern inserts transposes so the dot_general always has the
+// form: {batch_dim, parallel, contraction}.{batch_dim, contraction, parallel}
+class TransposeRank3GenericDotGeneral
+    : public OpRewritePattern<mhlo::DotGeneralOp> {
+ public:
+  using OpRewritePattern<mhlo::DotGeneralOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    auto lhsShapeType = op.lhs().getType().dyn_cast<RankedTensorType>();
+    auto rhsShapeType = op.rhs().getType().dyn_cast<RankedTensorType>();
+    auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
+
+    if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
+    if (resultType.getRank() != 3) return failure();
+
+    if (op.dot_dimension_numbers().lhs_contracting_dimensions().size() != 1 ||
+        op.dot_dimension_numbers().rhs_contracting_dimensions().size() != 1)
+      return failure();
+
+    int64_t lhsBatchDim = (*op.dot_dimension_numbers()
+                                .lhs_batching_dimensions()
+                                .int_value_begin())
+                              .getSExtValue();
+    int64_t rhsBatchDim = (*op.dot_dimension_numbers()
+                                .rhs_batching_dimensions()
+                                .int_value_begin())
+                              .getSExtValue();
+    int64_t lhsContractionDim = (*op.dot_dimension_numbers()
+                                      .lhs_contracting_dimensions()
+                                      .int_value_begin())
+                                    .getSExtValue();
+    int64_t rhsContractionDim = (*op.dot_dimension_numbers()
+                                      .rhs_contracting_dimensions()
+                                      .int_value_begin())
+                                    .getSExtValue();
+    // Only accept rank-3 tensors with dim order when dims are :
+    // lhs : {batch_dim, contraction, parallel}
+    // rhs : {batch_dim, parallel, contraction}
+    if (lhsBatchDim != 0 || rhsBatchDim != 0) return failure();
+    // No transposes are needed.
+    if (lhsContractionDim == 2 && rhsContractionDim == 1) return failure();
+
+    Value lhs = op.lhs(), rhs = op.rhs();
+
+    // transpose {batch_dim, contraction, parallel} case.
+    if (lhsContractionDim == 1) {
+      Type transposedType = RankedTensorType::get(
+          {lhsShapeType.getDimSize(0), lhsShapeType.getDimSize(2),
+           lhsShapeType.getDimSize(1)},
+          resultType.getElementType());
+      lhs = rewriter.create<mhlo::TransposeOp>(
+          op.getLoc(), transposedType, lhs,
+          make1DElementsAttr(rewriter, {0, 2, 1}));
+    }
+
+    // transpose {batch_dim, contraction, parallel} case.
+    if (rhsContractionDim == 2) {
+      Type transposedType = RankedTensorType::get(
+          {rhsShapeType.getDimSize(0), rhsShapeType.getDimSize(2),
+           rhsShapeType.getDimSize(1)},
+          resultType.getElementType());
+      rhs = rewriter.create<mhlo::TransposeOp>(
+          op.getLoc(), transposedType, rhs,
+          make1DElementsAttr(rewriter, {0, 2, 1}));
+    }
+
+    auto dimensionNumbers = mhlo::DotDimensionNumbers::get(
+        /*lhs_batching_dimensions=*/make1DElementsAttr(rewriter, {0}),
+        /*rhs_batching_dimensions=*/make1DElementsAttr(rewriter, {0}),
+        /*lhs_contracting_dimensions=*/make1DElementsAttr(rewriter, {2}),
+        /*rhs_contracting_dimensions=*/
+        make1DElementsAttr(rewriter, {1}), rewriter.getContext());
+
+    Value result = rewriter.create<mhlo::DotGeneralOp>(
+        op.getLoc(), op.getType(), lhs, rhs, dimensionNumbers,
+        op.precision_configAttr());
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+// Rewrite mhlo.dot_general to operate on rank-3 tensors when reduction dims are
+// in consecutive order and not spliting the domain. This pattern inserts
+// reshapes to collapse consecutive reduction and parallel dims to always
+// generate a rank-3 dot_general op.
+class RankReducedDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
+ public:
+  using OpRewritePattern<mhlo::DotGeneralOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    auto lhsShapeType = op.lhs().getType().dyn_cast<ShapedType>();
+    auto rhsShapeType = op.rhs().getType().dyn_cast<ShapedType>();
+    auto resultType = op.getResult().getType().dyn_cast<ShapedType>();
+
+    if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
+    if (!lhsShapeType.hasStaticShape() || !rhsShapeType.hasStaticShape())
+      return failure();
+    if (resultType.getRank() <= 3) return failure();
+
+    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
+    auto lhsBatchingDims = llvm::to_vector<4>(
+        llvm::map_range(dimNumbers.lhs_batching_dimensions(),
+                        [](APInt v) { return v.getSExtValue(); }));
+    auto rhsBatchingDims = llvm::to_vector<4>(
+        llvm::map_range(dimNumbers.rhs_batching_dimensions(),
+                        [](APInt v) { return v.getSExtValue(); }));
+    auto lhsContractingDims = llvm::to_vector<4>(
+        llvm::map_range(dimNumbers.lhs_contracting_dimensions(),
+                        [](APInt v) { return v.getSExtValue(); }));
+    auto rhsContractingDims = llvm::to_vector<4>(
+        llvm::map_range(dimNumbers.rhs_contracting_dimensions(),
+                        [](APInt v) { return v.getSExtValue(); }));
+
+    if (lhsBatchingDims.empty() || rhsBatchingDims.empty()) return failure();
+
+    llvm::sort(lhsBatchingDims);
+    llvm::sort(lhsContractingDims);
+    llvm::sort(rhsBatchingDims);
+    llvm::sort(rhsContractingDims);
+
+    auto isConsecutive = [](ArrayRef<int64_t> array) {
+      for (int i = 1; i < array.size(); ++i) {
+        if (array[i] - array[i - 1] != 1) return false;
+      }
+      return true;
+    };
+
+    auto isDomainSplit = [](ArrayRef<int64_t> shape,
+                            ArrayRef<int64_t> batchingDims,
+                            ArrayRef<int64_t> contractingDims) {
+      // Batching and contracting are contiguous.
+      if ((contractingDims.front() - batchingDims.back()) == 1) return false;
+      // Contracting dims are inner most.
+      if (contractingDims.back() == (shape.size() - 1)) return false;
+      return true;
+    };
+
+    if (!isConsecutive(lhsBatchingDims) || !isConsecutive(lhsContractingDims) ||
+        !isConsecutive(rhsBatchingDims) || !isConsecutive(rhsContractingDims))
+      return failure();
+
+    if (isDomainSplit(lhsShapeType.getShape(), lhsBatchingDims,
+                      lhsContractingDims) ||
+        isDomainSplit(rhsShapeType.getShape(), rhsBatchingDims,
+                      rhsContractingDims))
+      return failure();
+
+    // Collapsing shape into a rank-3 tensor, returns newCollabsedShape
+    // contraction and parallel dim indices.
+    auto computeCollapsedShape = [](ArrayRef<int64_t> shape,
+                                    ArrayRef<int64_t> batchingDims,
+                                    ArrayRef<int64_t> contractingDims) {
+      auto newRank =
+          shape.size() - batchingDims.size() - contractingDims.size() + 2;
+      auto batchingSize = std::accumulate(
+          batchingDims.begin(), batchingDims.end(), 1,
+          [shape](const int64_t accum, const int64_t index) -> int64_t {
+            return accum * shape[index];
+          });
+      auto contractingSize = std::accumulate(
+          contractingDims.begin(), contractingDims.end(), 1,
+          [shape](const int64_t accum, const int64_t index) -> int64_t {
+            return accum * shape[index];
+          });
+
+      int parallelDimIndex, contractingDimIndex, parallelDimSize = 1;
+      if (contractingDims.front() - batchingDims.back() > 1) {
+        parallelDimIndex = 1;
+        contractingDimIndex = 2;
+        for (int i = batchingDims.back() + 1; i < contractingDims.front();
+             ++i) {
+          parallelDimSize *= shape[i];
+        }
+      } else {
+        contractingDimIndex = 1;
+        parallelDimIndex = 2;
+        for (int i = contractingDims.back() + 1; i < shape.size(); ++i) {
+          parallelDimSize *= shape[i];
+        }
+      }
+      llvm::SmallVector<int64_t, 4> newShape(newRank);
+      newShape[0] = batchingSize;
+      newShape[contractingDimIndex] = contractingSize;
+      newShape[parallelDimIndex] = parallelDimSize;
+      return std::make_tuple(newShape, contractingDimIndex, parallelDimIndex);
+    };
+
+    int lhsContractingDimIndex, rhsContractingDimIndex, lhsParallelDimIndex,
+        rhsParallelDimIndex;
+    SmallVector<int64_t, 4> lhsNewShape, rhsNewShape;
+    std::tie(lhsNewShape, lhsContractingDimIndex, lhsParallelDimIndex) =
+        computeCollapsedShape(lhsShapeType.getShape(), lhsBatchingDims,
+                              lhsContractingDims);
+
+    std::tie(rhsNewShape, rhsContractingDimIndex, rhsParallelDimIndex) =
+        computeCollapsedShape(rhsShapeType.getShape(), rhsBatchingDims,
+                              rhsContractingDims);
+    SmallVector<int64_t, 4> resultNewShape = {lhsNewShape[0],
+                                              lhsNewShape[lhsParallelDimIndex],
+                                              rhsNewShape[rhsParallelDimIndex]};
+    Type dotGeneralResultType =
+        RankedTensorType::get(resultNewShape, resultType.getElementType());
+
+    auto loc = op.getLoc();
+    Value reshapedLhs = rewriter.create<mhlo::ReshapeOp>(
+        loc, RankedTensorType::get(lhsNewShape, lhsShapeType.getElementType()),
+        op.lhs());
+    Value reshapedRhs = rewriter.create<mhlo::ReshapeOp>(
+        loc, RankedTensorType::get(rhsNewShape, rhsShapeType.getElementType()),
+        op.rhs());
+    auto dimensionNumbers = mhlo::DotDimensionNumbers::get(
+        /*lhs_batching_dimensions=*/make1DElementsAttr(rewriter, {0}),
+        /*rhs_batching_dimensions=*/make1DElementsAttr(rewriter, {0}),
+        /*lhs_contracting_dimensions=*/
+        make1DElementsAttr(rewriter, {lhsContractingDimIndex}),
+        /*rhs_contracting_dimensions=*/
+        make1DElementsAttr(rewriter, {rhsContractingDimIndex}),
+        rewriter.getContext());
+    Value dotGeneralResult = rewriter.create<mhlo::DotGeneralOp>(
+        loc, dotGeneralResultType, reshapedLhs, reshapedRhs, dimensionNumbers,
+        op.precision_configAttr());
+
+    Value result =
+        rewriter.create<mhlo::ReshapeOp>(loc, resultType, dotGeneralResult);
+    rewriter.replaceOp(op, result);
+
+    return success();
+  }
+};  // namespace
+
 // clang-format off
 //
 // Reorder BroadcastInDimOp and N-ary elementwise op.
@@ -424,6 +667,11 @@ struct HLOToHLOPreprocessing
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape, DecomposeLog1PPattern,
                     DecomposeExpM1Pattern>(context);
+
+    // dot_general canoncalization patterns.
+    mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
+    patterns.insert<RankReducedDotGeneral, TransposeRank3GenericDotGeneral>(
+        context);
 
     // Unary elementwise op.
     patterns.insert<
