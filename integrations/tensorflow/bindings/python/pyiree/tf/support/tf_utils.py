@@ -48,7 +48,7 @@ def ndarange(shape: Sequence[int], dtype: np.dtype = np.float32) -> np.ndarray:
 
 
 def to_mlir_type(dtype: np.dtype) -> str:
-  """Returns a string that denotes the type `dtype` in MLIR style."""
+  """Returns a string that denotes the type 'dtype' in MLIR style."""
   bits = dtype.itemsize * 8
   if np.issubdtype(dtype, np.integer):
     return f"i{bits}"
@@ -72,7 +72,7 @@ def get_shape_and_dtype(array: np.ndarray,
 
 def save_input_values(inputs: Sequence[np.ndarray],
                       artifacts_dir: str = None) -> str:
-  """Saves input values with IREE tools format if `artifacts_dir` is set."""
+  """Saves input values with IREE tools format if 'artifacts_dir' is set."""
   result = []
   for array in inputs:
     shape_dtype = get_shape_and_dtype(array)
@@ -289,6 +289,17 @@ class IreeCompiledModule(CompiledModule):
     return True
 
 
+def _normalize_numpy(result: np.ndarray):
+  """Normalizes TF/Lite's output to match IREE's"""
+  if np.isscalar(result):
+    # convert_to_tensor isn't reversible via .numpy()
+    result = np.array(result)
+  if result.dtype == np.bool:
+    # IREE interprets bools as int8s, so we modify this for comparison.
+    result = result.astype(dtype=np.int8)
+  return result
+
+
 class _TfFunctionWrapper(object):
   """Wraps a TF function, normalizing it to numpy."""
 
@@ -298,14 +309,7 @@ class _TfFunctionWrapper(object):
   def _convert_to_numpy(self, tensor: Any) -> Any:
     if not isinstance(tensor, tf.Tensor):
       return tensor
-    result = tensor.numpy()
-    if np.isscalar(result):
-      # convert_to_tensor isn't reversible via .numpy()
-      result = np.array(result)
-    if result.dtype == np.bool:
-      # IREE interprets bools as int8s, so we modify this for comparison.
-      result = result.astype(dtype=np.int8)
-    return result
+    return _normalize_numpy(tensor.numpy())
 
   def __call__(self, *args, **kwargs):
     # TensorFlow will auto-convert all inbound args.
@@ -378,31 +382,36 @@ def get_added_function_names(cls):
   return list(names)
 
 
-def get_concrete_functions(cls, exported_names=()):
-  """Get the concrete functions from the non-inhereted methods on cls or from exported_names."""
+def get_concrete_functions(module_class: Type[tf.Module],
+                           exported_names: Sequence[str] = ()):
+  """Get concrete functions from non-inherited methods or exported_names."""
   if not len(exported_names):
-    exported_names = get_added_function_names(cls)
-  instance = cls()
+    # Get all method names on 'module_class' that aren't on 'tf.Module'.
+    exported_names = get_added_function_names(module_class)
+  instance = module_class()
   functions = []
   for name in exported_names:
     functions.append(instance.__getattribute__(name).get_concrete_function())
   return functions, exported_names
 
 
-def compile_to_tflite(module_class, exported_names=(), artifacts_dir=None):
-  """Compiles a tf.Module with TFLite and returns a dict of TFLite interpreters."""
+def compile_to_tflite(module_class: Type[tf.Module],
+                      exported_names: Sequence[str] = (),
+                      artifacts_dir: str = None):
+  """Compile a dict of TFLite interpreters for the methods on module_class."""
   functions, names = get_concrete_functions(module_class, exported_names)
   interpreters = dict()
 
-  def _interpret_bytes(tflite_module, base_dir):
-    tflite_dir = os.path.join(base_dir, 'tflite')
+  def _interpret_bytes(tflite_module: bytes, base_dir: str):
+    """Save compiled TFLite module bytes and convert into an interpreter."""
+    tflite_dir = os.path.join(base_dir, "tflite")
     os.makedirs(tflite_dir, exist_ok=True)
-    tflite_path = os.path.join(tflite_dir, f'{name}.tflite')
-    with open(tflite_path, 'wb') as f:
+    tflite_path = os.path.join(tflite_dir, f"{name}.tflite")
+    with open(tflite_path, "wb") as f:
       f.write(tflite_module)
     interpreters[name] = tf.lite.Interpreter(tflite_path)
 
-  for function, name in zip(functions, names):
+  for name, function in zip(names, functions):
     converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
     tflite_module = converter.convert()
 
@@ -416,32 +425,28 @@ def compile_to_tflite(module_class, exported_names=(), artifacts_dir=None):
 
 
 class _TfLiteFunctionWrapper:
-  """Wraps a TFLite interpreter and makes it callable."""
+  """Wraps a TFLite interpreter and makes it behave like a python function."""
 
-  def __init__(self, interpreter):
+  def __init__(self, interpreter: tf.lite.Interpreter):
     self._interpreter = interpreter
 
-  def _normalize(self, result):
-    if np.isscalar(result):
-      # convert_to_tensor isn't reversible via .numpy()
-      result = np.array(result)
-    if result.dtype == np.bool:
-      # IREE interprets bools as int8s, so we modify this for comparison.
-      result = result.astype(dtype=np.int8)
-    return result
+  def __call__(self, *args, **kwargs) -> Tuple[Any]:
+    if len(kwargs):
+      raise ValueError("kwargs are not supported, but the following kwargs "
+                       f"were provided {kwargs}")
 
-  def __call__(self, *args, **kwargs):
-    assert not len(kwargs)
+    # Set up and run the function.
     self._interpreter.allocate_tensors()
-
     for arg, detail in zip(args, self._interpreter.get_input_details()):
-      self._interpreter.set_tensor(detail['index'], arg)
+      self._interpreter.set_tensor(detail["index"], arg)
     self._interpreter.invoke()
+
+    # Retrieve and process outputs.
     outputs = tuple([
-        self._interpreter.get_tensor(detail['index'])
+        self._interpreter.get_tensor(detail["index"])
         for detail in self._interpreter.get_output_details()
     ])
-    outputs = [self._normalize(output) for output in outputs]
+    outputs = [_normalize_numpy(output) for output in outputs]
     if len(outputs) == 1:
       outputs = outputs[0]
     return outputs
@@ -455,22 +460,25 @@ class TfLiteCompiledModule(CompiledModule):
   """Compiles a tf.Module with TFLite and allows it to be called."""
 
   def __init__(self,
-               module_class,
-               backend_info,
-               exported_names = (),
-               artifacts_dir = None):
+               module_class: Type[tf.Module],
+               backend_info: "BackendInfo",
+               exported_names: Sequence[str] = (),
+               artifacts_dir: str = None):
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
     set_random_seed()
-    self._interpreters = compile_to_tflite(module_class, exported_names, artifacts_dir)
+    self._interpreters = compile_to_tflite(module_class, exported_names,
+                                           artifacts_dir)
 
   def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
+    # This is a noop because TFLite (mostly) doesn't support stateful modules.
     pass
 
   def __getattr__(self, attr: str) -> _TfLiteFunctionWrapper:
-    # Try to resolve it as a function.
-    # exported = not self._exported_names or attr in self._exported_names
-    if not attr in self._interpreters:# or not exported:
-      raise AttributeError(f"The TFLite module does not have attr '{attr}'")
+    # Try to resolve it as an interpreter.
+    if not attr in self._interpreters:
+      raise AttributeError(
+          f"The TFLite module does not have an interpreter for '{attr}'")
     return _TfLiteFunctionWrapper(self._interpreters[attr])
 
   @staticmethod
@@ -536,7 +544,7 @@ class BackendInfo:
               module: Type[tf.Module],
               exported_names: Sequence[str] = (),
               artifacts_dir: str = None) -> CompiledModule:
-    """Creates a `CompiledModule` for this backend."""
+    """Creates a 'CompiledModule' for this backend."""
     return self._compiled_module_class(module, self, exported_names,
                                        artifacts_dir)
 
