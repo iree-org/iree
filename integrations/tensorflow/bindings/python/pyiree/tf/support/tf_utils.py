@@ -225,7 +225,14 @@ class CompiledModule(object):
     raise NotImplementedError()
 
 
-class _IreeFunctionWrapper(object):
+class _FunctionWrapper(object):
+
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    """Dummy function to match _IreeFunctionWrapper's API."""
+    return (), ()
+
+
+class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
   def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction):
@@ -236,6 +243,7 @@ class _IreeFunctionWrapper(object):
     return self._f(*args)
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    """Get cxx serialized inputs and outputs for this function."""
     return self._f.get_serialized_values()
 
 
@@ -300,7 +308,7 @@ def _normalize_numpy(result: np.ndarray):
   return result
 
 
-class _TfFunctionWrapper(object):
+class _TfFunctionWrapper(_FunctionWrapper):
   """Wraps a TF function, normalizing it to numpy."""
 
   def __init__(self, f: Callable[..., Any]):
@@ -321,10 +329,6 @@ class _TfFunctionWrapper(object):
       results = (results,)
     return tf.nest.map_structure(
         self._convert_to_numpy, *results, check_types=False)
-
-  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
-    """Dummy function to match _IreeFunctionWrapper's API."""
-    return (), ()
 
 
 class TfCompiledModule(CompiledModule):
@@ -424,7 +428,7 @@ def compile_to_tflite(module_class: Type[tf.Module],
   return interpreters
 
 
-class _TfLiteFunctionWrapper:
+class _TfLiteFunctionWrapper(_FunctionWrapper):
   """Wraps a TFLite interpreter and makes it behave like a python function."""
 
   def __init__(self, interpreter: tf.lite.Interpreter):
@@ -450,10 +454,6 @@ class _TfLiteFunctionWrapper:
     if len(outputs) == 1:
       outputs = outputs[0]
     return outputs
-
-  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
-    """Dummy function to match _IreeFunctionWrapper's API."""
-    return (), ()
 
 
 class TfLiteCompiledModule(CompiledModule):
