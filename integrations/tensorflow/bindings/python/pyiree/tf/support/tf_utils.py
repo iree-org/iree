@@ -378,8 +378,8 @@ class TfCompiledModule(CompiledModule):
     return False
 
 
-def get_added_function_names(cls):
-  """Gets all methods that cls has that its parent doesn't have."""
+def get_non_inhereted_function_names(cls):
+  """Gets all methods that cls has that its parents don't have."""
   names = set(dir(cls))
   for parent in cls.__bases__:
     names -= set(dir(parent))
@@ -391,7 +391,7 @@ def get_concrete_functions(module_class: Type[tf.Module],
   """Get concrete functions from non-inherited methods or exported_names."""
   if not len(exported_names):
     # Get all method names on 'module_class' that aren't on 'tf.Module'.
-    exported_names = get_added_function_names(module_class)
+    exported_names = get_non_inhereted_function_names(module_class)
   instance = module_class()
   functions = []
   for name in exported_names:
