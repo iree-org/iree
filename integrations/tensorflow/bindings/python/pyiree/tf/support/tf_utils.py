@@ -29,8 +29,6 @@ from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
-flags.DEFINE_bool("keep_saved_model", False,
-                  "Keep the SavedModel used by compile_tf_module on disk.")
 FLAGS = flags.FLAGS
 
 
@@ -126,9 +124,6 @@ def compile_tf_module(
   that returns a module that can be called without any further steps.
 
   If artifacts_dir is provided then the following artifacts will be saved:
-    backend_name/saved_model:
-      A TF SavedModel directory containing the files used translate the
-      tf.Module into an IREE module. Only saved if '--keep_saved_model=True'.
     tf_input.mlir:
       MLIR for the module in TF's input dialect.
     iree_input.mlir:
@@ -136,9 +131,8 @@ def compile_tf_module(
     backend_name/compiled.vmfb:
       A VM FlatBuffer compiled to the target backends from the IREE MLIR above.
 
-  If multiple backends are specified, then instead of saving the SavedModel and
-  compiled 'vmfb' under 'backend_name/', they will be saved as follows:
-    - 'saved_model__{backends}'
+  If multiple backends are specified, then instead of saving compiled 'vmfb'
+  under 'backend_name/', it will be saved as follows:
     - 'compiled__{backends}.vmfb'
   where 'backends' is a '__' delimited list (e.g. iree_vmla__iree_llvmjit).
 
@@ -155,14 +149,6 @@ def compile_tf_module(
     artifacts_dir is provided.
   """
 
-  if artifacts_dir is not None and FLAGS.keep_saved_model:
-    # Create a saved model for these target backends to avoid a race condition
-    # when running a test suite.
-    # TODO(meadowlark): Remove this once we have a TfLiteCompiledModule.
-    sm_path = _get_backends_path("saved_model", backend_infos, artifacts_dir)
-  else:
-    sm_path = None
-
   if artifacts_dir is not None:
     # Set up a crash reproducer for debugging.
     backends_string = backends_to_str(backend_infos)
@@ -172,7 +158,7 @@ def compile_tf_module(
   try:
     # Convert the tf_module into raw TF input MLIR.
     compiler_module = compiler.tf_module_to_compiler_module(
-        tf_module, exported_names, sm_path, pass_pipeline=())
+        tf_module, exported_names, pass_pipeline=())
 
     if artifacts_dir is not None:
       tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
