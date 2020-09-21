@@ -624,10 +624,9 @@ class TracedModuleTestCase(tf.test.TestCase):
     super().setUp()
     global _global_ref_module
     global _global_tar_modules
-    _global_ref_module = _global_ref_module.create_reinitialized()
-    _global_tar_modules = [
-        module.create_reinitialized() for module in _global_tar_modules
-    ]
+    _global_ref_module.reinitialize()
+    for module in _global_tar_modules:
+      module.reinitialize()
 
   def compare_backends(self, trace_function: Callable[[TracedModule],
                                                       None]) -> None:
