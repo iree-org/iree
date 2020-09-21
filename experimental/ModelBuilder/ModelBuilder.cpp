@@ -104,7 +104,9 @@ static spirv::TargetEnvAttr getTargetEnv(MLIRContext *context) {
        spirv::Extension::SPV_KHR_8bit_storage,
        spirv::Extension::SPV_KHR_16bit_storage},
       context);
-  return spirv::TargetEnvAttr::get(triple,
+  return spirv::TargetEnvAttr::get(triple, spirv::Vendor::Unknown,
+                                   spirv::DeviceType::Unknown,
+                                   spirv::TargetEnvAttr::kUnknownDeviceID,
                                    spirv::getDefaultResourceLimits(context));
 }
 
