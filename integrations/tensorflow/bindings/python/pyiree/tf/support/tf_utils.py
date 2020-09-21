@@ -286,6 +286,8 @@ class IreeCompiledModule(CompiledModule):
 
   def reinitialize(self):
     """Reinitializes to the initial state of the passed module_class."""
+    # set_random_seed is not needed here because the model_class.__init__ is not
+    # called.
     self._context = rt.SystemContext(
         modules=[self._module], config=self._config)
 
@@ -358,11 +360,11 @@ class TfCompiledModule(CompiledModule):
         effect for this subclass as nothing is compiled.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
-    set_random_seed()
     self.reinitialize()
 
   def reinitialize(self):
     """Reinitializes to the initial state of the passed module_class."""
+    set_random_seed()
     self._tf_module = self._module_class()
 
   def __getattr__(self, attr: str) -> _TfFunctionWrapper:
