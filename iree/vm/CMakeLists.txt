@@ -292,8 +292,6 @@ iree_cc_test(
     iree::base::status
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "noasan"
 )
 
 iree_cc_library(

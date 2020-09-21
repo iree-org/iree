@@ -36,6 +36,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
@@ -55,12 +56,6 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // Utility functions.
 // -----------------------------------------------------------------------------
 
-static std::vector<int64_t> convertDenseIntAttr(
-    mlir::DenseIntElementsAttr attr) {
-  auto values = attr.getValues<int64_t>();
-  return {values.begin(), values.end()};
-}
-
 /// Returns the constant value associated with the init value if the defining
 /// operation is a constant.
 static Attribute getInitValueAsConst(Value init) {
@@ -79,13 +74,11 @@ static Attribute getInitValueAsConst(Value init) {
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
-// TODO(hanchung): Use helpers in StructuredOpsUtils.h instead of hardcoded
-// strings once the build system is set up.
 static ArrayAttr getParallelAndReductionIterAttrs(Builder b, unsigned nLoops,
                                                   unsigned nReduction) {
-  SmallVector<Attribute, 3> attrs(nLoops - nReduction,
-                                  b.getStringAttr("parallel"));
-  attrs.append(nReduction, b.getStringAttr("reduction"));
+  SmallVector<Attribute, 3> attrs(
+      nLoops - nReduction, b.getStringAttr(getParallelIteratorTypeName()));
+  attrs.append(nReduction, b.getStringAttr(getReductionIteratorTypeName()));
   return b.getArrayAttr(attrs);
 }
 
@@ -287,9 +280,7 @@ struct DotOpConversion
         rewriter.notifyMatchFailure(op, "failed to zero fill result buffer");
         return failure();
       }
-      rewriter.create<LinalgOpTy>(
-          op.getLoc(), TypeRange{},
-          ValueRange{inputBuffers[0], inputBuffers[1], resultBuffers[0]});
+      rewriter.create<LinalgOpTy>(op.getLoc(), inputBuffers, resultBuffers);
       return success();
     }
     return failure();
@@ -347,9 +338,8 @@ struct DotGeneralOpConversion
       return rewriter.notifyMatchFailure(op,
                                          "failed to zero fill result buffer");
     }
-    rewriter.create<linalg::BatchMatmulOp>(
-        op.getLoc(), TypeRange{},
-        ValueRange{inputBuffers[0], inputBuffers[1], resultBuffers[0]});
+    rewriter.create<linalg::BatchMatmulOp>(op.getLoc(), inputBuffers,
+                                           resultBuffers);
     return success();
   }
 };

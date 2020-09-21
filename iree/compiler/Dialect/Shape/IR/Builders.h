@@ -19,6 +19,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -67,7 +68,7 @@ Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
 LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
                                            bool createIntermediateOps,
                                            SmallVectorImpl<Value> &outDims,
-                                           OpBuilder &builder);
+                                           ConversionPatternRewriter &rewriter);
 
 }  // namespace Shape
 }  // namespace iree_compiler

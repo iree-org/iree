@@ -149,7 +149,8 @@ template <typename T, int N>
   ::UnrankedMemRefType<T> *res = static_cast<::UnrankedMemRefType<T> *>(
       allocFun(sizeof(::UnrankedMemRefType<T>)));
   res->rank = N;
-  res->descriptor = makeStridedMemRefDescriptor<T, N>(data, alignedData, shape);
+  res->descriptor = makeStridedMemRefDescriptor<T, N>(data, alignedData, shape,
+                                                      shape, allocFun);
   return res;
 }
 
@@ -222,7 +223,8 @@ makeInitializedUnrankedDescriptor(
   auto *alignedData = static_cast<T *>(allocated.second);
   for (unsigned i = 0; i < nElements; ++i) init(i, alignedData);
   return std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>(
-      detail::allocUnrankedDescriptor<T, N>(data, alignedData, shape), freeFun);
+      detail::allocUnrankedDescriptor<T, N>(data, alignedData, shape, alloc),
+      freeFun);
 }
 
 // Entry point to allocate a dense buffer with a given `shape` and initializer

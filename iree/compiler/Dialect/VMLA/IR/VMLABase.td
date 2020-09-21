@@ -24,7 +24,7 @@ include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 
 def VMLA_Dialect : Dialect {
   let name = "vmla";
-  let cppNamespace = "IREE::VMLA";
+  let cppNamespace = "::mlir::iree_compiler::IREE::VMLA";
 
   let summary = [{
     A dialect representing operations against the IREE VM-based backend.
@@ -179,6 +179,20 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
   let arguments = (ins
     VMLA_Buffer:$lhs,
     VMLA_Buffer:$rhs,
+    VMLA_Buffer:$dst,
+    typeAttr:$element_type,
+    // TODO(benvanik): remove once unsigned types are in MLIR.
+    UnitAttr:$forceUnsigned
+  );
+
+  let assemblyFormat = "$lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type";
+}
+
+class VMLA_BinaryBroadcastOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
+    : VMLA_ElementTypeOp<mnemonic, traits> {
+  let arguments = (ins
+    VMLA_Buffer:$lhs,
+    I32:$rhs,
     VMLA_Buffer:$dst,
     typeAttr:$element_type,
     // TODO(benvanik): remove once unsigned types are in MLIR.

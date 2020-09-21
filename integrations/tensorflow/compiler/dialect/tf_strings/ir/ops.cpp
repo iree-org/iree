@@ -24,13 +24,13 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace tf_strings {
-
 #define GET_OP_CLASSES
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.cpp.inc"
 #undef GET_OP_CLASSES
+
+namespace mlir {
+namespace iree_compiler {
+namespace tf_strings {
 
 void ToStringOp::build(OpBuilder& builder, OperationState& tblgen_state,
                        Value value) {

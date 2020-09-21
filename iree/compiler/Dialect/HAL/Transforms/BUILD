@@ -42,6 +42,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
+        "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "@com_google_absl//absl/strings",
@@ -51,6 +52,5 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
     ],
 )

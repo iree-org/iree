@@ -973,7 +973,7 @@ void DeviceAllocatorOp::getAsmResultNames(
 void DeviceSwitchOp::build(OpBuilder &builder, OperationState &state,
                            TypeRange resultTypes, Value device,
                            ArrayRef<Attribute> conditions,
-                           ArrayRef<ValueRange> conditionArgs,
+                           ArrayRef<SmallVector<Value, 4>> conditionArgs,
                            ArrayRef<NamedAttribute> attributes) {
   state.addOperands({device});
   state.addAttribute("conditions", builder.getArrayAttr(conditions));
@@ -1508,14 +1508,14 @@ void SemaphoreCreateOp::getAsmResultNames(
   setNameFn(result(), "semaphore");
 }
 
+}  // namespace HAL
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/HAL/IR/HALOps.cpp.inc"
-
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

@@ -21,15 +21,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h.inc"
-
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_

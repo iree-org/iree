@@ -18,17 +18,7 @@
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListTypes.h"
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace TensorList {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h.inc"
-
-}  // namespace TensorList
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_MODULES_TENSORLIST_IR_TENSORLISTOPS_H_

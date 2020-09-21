@@ -1,6 +1,4 @@
-# Format: //devtools/kokoro/config/proto/build.proto
-
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Deliberately blank as everything necessary is configured in common files, but
-# file must still exist to match corresponding (Google internal) job
-# configurations that trigger the builds.
+iree_add_all_subdirs()
+
+iree_cc_library(
+  NAME
+    LinalgToVector
+  HDRS
+    "Passes.h"
+  SRCS
+    "LoadStoreVectorization.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRLinalgOps
+    MLIRLinalgTransforms
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+    MLIRVector
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
+  PUBLIC
+)

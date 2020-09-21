@@ -23,15 +23,5 @@
 #include "mlir/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Strings {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.cc.inc"
-
-}  // namespace Strings
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

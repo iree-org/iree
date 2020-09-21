@@ -23,7 +23,7 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 def HAL_Dialect : Dialect {
   let name = "hal";
-  let cppNamespace = "IREE::HAL";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 
   let summary = [{
     A dialect representing operations against the IREE HAL.

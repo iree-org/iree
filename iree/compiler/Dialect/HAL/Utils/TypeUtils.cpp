@@ -27,6 +27,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -35,6 +36,29 @@ namespace HAL {
 
 int32_t getRoundedElementByteWidth(Type type) {
   return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+}
+
+TensorType convertTensorTypeToABIType(TensorType sourceType) {
+  assert(sourceType.hasRank() && "only ranked tensors are supported");
+  Type sourceElementType = sourceType.getElementType();
+  Type targetElementType = sourceElementType;
+  if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
+    int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
+    targetElementType =
+        IntegerType::get(targetByteWidth * 8, sourceElementType.getContext());
+  }
+  return RankedTensorType::get(sourceType.getShape(), targetElementType);
+}
+
+Value convertABITensorType(Location loc, Value sourceValue,
+                           TensorType targetType, OpBuilder &builder) {
+  auto sourceType = sourceValue.getType().cast<TensorType>();
+  if (sourceType == targetType) {
+    return sourceValue;
+  }
+  // TODO(benvanik): use a type converter or a dialect interface.
+  return builder.createOrFold<mhlo::ConvertOp>(loc, sourceValue,
+                                               targetType.getElementType());
 }
 
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
@@ -48,16 +72,15 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
   return shape;
 }
 
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder) {
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+    Location loc, Value shapedValue, ConversionPatternRewriter &rewriter) {
   ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
   if (shapedType.hasStaticShape()) {
-    return getStaticShapeDims(loc, shapedType, builder);
+    return getStaticShapeDims(loc, shapedType, rewriter);
   } else {
     // Dynamic shape lookup.
     Value rsValue = Shape::buildOrFindRankedShapeForValue(
-        loc, shapedValue, builder.getIndexType(), builder);
+        loc, shapedValue, rewriter.getIndexType(), rewriter);
     if (!rsValue) {
       return llvm::None;
     }
@@ -65,7 +88,7 @@ llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
     // Note that in the following, we require that the dims resolve
     // to discrete SSA values, which in a stream, will be block args.
     if (failed(Shape::getRankedDimsFromRankedShape(
-            loc, rsValue, /*createIntermediateOps=*/true, dims, builder))) {
+            loc, rsValue, /*createIntermediateOps=*/true, dims, rewriter))) {
       return llvm::None;
     }
     return dims;
@@ -164,8 +187,8 @@ llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims() {
   return IREE::HAL::getShapeDims(loc_, oldValue_, rewriter_);
 }
 llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims(
-    OpBuilder &builder) {
-  return IREE::HAL::getShapeDims(loc_, oldValue_, builder);
+    ConversionPatternRewriter &rewriter) {
+  return IREE::HAL::getShapeDims(loc_, oldValue_, rewriter);
 }
 
 Value TensorRewriteAdaptor::getByteLength() {

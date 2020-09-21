@@ -16,7 +16,10 @@
 #define IREE_COMPILER_DIALECT_HAL_UTILS_DEVICE_SWITCH_BUILDER_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -58,7 +61,7 @@ class DeviceSwitchCaseBuilder {
 
   // Adds a new condition region that must satisfy all parent conditions.
   // The region will have a single entry block with the given |args|.
-  Region *addRegion(ValueRange args) {
+  Region *addRegion(const SmallVector<Value, 4> &args) {
     auto switchOp = builder_.create<IREE::HAL::DeviceSwitchOp>(
         loc_, resultTypes_, device_, ArrayRef<Attribute>{initialCondition_},
         args);
@@ -74,7 +77,8 @@ class DeviceSwitchCaseBuilder {
   // Adds a new condition region that must satisfy |conditionAttr| and all
   // parent conditions. The region will have a single entry block with the
   // given |args|.
-  Region *addConditionRegion(Attribute conditionAttr, ValueRange args) {
+  Region *addConditionRegion(Attribute conditionAttr,
+                             const SmallVector<Value, 4> &args) {
     return nest(conditionAttr).addRegion(args);
   }
 
@@ -107,52 +111,82 @@ class DeviceSwitchCaseBuilder {
 class DeviceSwitchBuilder {
  public:
   DeviceSwitchBuilder(Location loc, TypeRange resultTypes, Value device,
-                      OpBuilder builder)
+                      ConversionPatternRewriter &rewriter)
       : loc_(loc),
         resultTypes_(resultTypes),
         device_(device),
-        builder_(builder) {
+        rewriter_(rewriter) {
     // FIXME: Keep the same listener as the provided builder.
-    builder_.setListener(nullptr);
+    rewriter_.setListener(nullptr);
   }
 
   // Pushes a new condition onto the stack and returns a builder that must have
   // all previously nested conditions met in order to execute any conditions.
   DeviceSwitchCaseBuilder nest(Attribute conditionAttr) {
     return DeviceSwitchCaseBuilder(loc_, resultTypes_, device_, conditionAttr,
-                                   caseOps_, builder_);
+                                   caseOps_, rewriter_);
   }
 
   // Adds a new condition region that must satisfy |conditionAttr| and all
   // parent conditions. The region will have a single entry block with the
   // given |args|.
-  Region *addConditionRegion(Attribute conditionAttr, ValueRange args) {
+  Region *addConditionRegion(Attribute conditionAttr,
+                             const SmallVector<Value, 4> &args) {
     return nest(conditionAttr).addRegion(args);
   }
 
   // Constructs a single hal.device.switch from all added regions.
   IREE::HAL::DeviceSwitchOp build() {
     SmallVector<Attribute, 4> conditionAttrs;
-    SmallVector<ValueRange, 4> conditionArgs;
+    SmallVector<SmallVector<Value, 4>, 4> conditionArgs;
+    llvm::SetVector<Value> capturedFromAbove;
     for (auto caseOp : caseOps_) {
       conditionAttrs.push_back(caseOp.conditions().getValue()[0]);
-      conditionArgs.push_back(caseOp.args());
+
+      // The args list for this case is the args list of `caseOp` and any value
+      // that is captured within the region. The `hal.device.switch` op is
+      // isolated from above. So these captured values are made arguments to the
+      // condition.
+      SmallVector<Value, 4> args(caseOp.args().begin(), caseOp.args().end());
+      capturedFromAbove.clear();
+      getUsedValuesDefinedAbove(caseOp.getOperation()->getRegions(),
+                                capturedFromAbove);
+      args.append(capturedFromAbove.begin(), capturedFromAbove.end());
+      conditionArgs.emplace_back(std::move(args));
     }
-    auto switchOp = builder_.create<IREE::HAL::DeviceSwitchOp>(
+    auto switchOp = rewriter_.create<IREE::HAL::DeviceSwitchOp>(
         loc_, resultTypes_, device_, conditionAttrs, conditionArgs);
     for (int i = 0; i < caseOps_.size(); ++i) {
-      switchOp.getRegion(i).takeBody(caseOps_[i].getRegion(0));
+      Region &targetRegion = switchOp.getRegion(i);
+      Block *entryBlock = new Block;
+      targetRegion.push_back(entryBlock);
+      BlockAndValueMapping mapper;
+      for (auto arg : conditionArgs[i]) {
+        mapper.map(arg, entryBlock->addArgument(arg.getType()));
+      }
+
+      Region &sourceRegion = caseOps_[i].getRegion(0);
+      // When cloning `sourceRegion` into `targetRegion` remap the captured
+      // values to use arguments of the `targetRegion`.
+      rewriter_.cloneRegionBefore(sourceRegion, targetRegion,
+                                  ++(Region::iterator(entryBlock)), mapper);
+      Block *secondBlock = entryBlock->getNextNode();
+      rewriter_.mergeBlocks(secondBlock, entryBlock,
+                            entryBlock->getArguments().take_front(
+                                secondBlock->getNumArguments()));
       caseOps_[i].erase();
     }
     return switchOp;
   }
+
+  ConversionPatternRewriter &getRewriter() const { return rewriter_; }
 
  private:
   Location loc_;
   SmallVector<Type, 4> resultTypes_;
   Value device_;
   SmallVector<IREE::HAL::DeviceSwitchOp, 4> caseOps_;
-  OpBuilder builder_;
+  ConversionPatternRewriter &rewriter_;
 };
 
 }  // namespace HAL

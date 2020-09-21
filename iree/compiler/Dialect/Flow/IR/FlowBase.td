@@ -23,7 +23,7 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 def FLOW_Dialect : Dialect {
   let name = "flow";
-  let cppNamespace = "IREE::Flow";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 
   let summary = [{
     A dialect designed to model execution data flow and partitioning.

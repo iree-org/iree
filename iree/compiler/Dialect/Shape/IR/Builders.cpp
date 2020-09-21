@@ -121,10 +121,9 @@ Value buildDegenerateBroadcastRankedShape(
   }
 }
 
-LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
-                                           bool createIntermediateOps,
-                                           SmallVectorImpl<Value> &outDims,
-                                           OpBuilder &builder) {
+LogicalResult getRankedDimsFromRankedShape(
+    Location loc, Value rsValue, bool createIntermediateOps,
+    SmallVectorImpl<Value> &outDims, ConversionPatternRewriter &rewriter) {
   Operation *op = rsValue.getDefiningOp();
   if (op &&
       (llvm::isa<MakeRankedShapeOp>(op) || llvm::isa<ConstRankedShapeOp>(op))) {
@@ -135,15 +134,21 @@ LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
         if (dynamicDimIndex >= op->getNumOperands()) {
           return emitError(loc, "mismatched dynamic dimensions");
         }
-        outDims.push_back(op->getOperand(dynamicDimIndex++));
+        Value remappedValue =
+            rewriter.getRemappedValue(op->getOperand(dynamicDimIndex++));
+        if (!remappedValue) {
+          return emitError(
+              loc, "unable to find remapped value for ranked dim value");
+        }
+        outDims.push_back(remappedValue);
       } else {
         outDims.push_back(
-            builder.create<ConstantIndexOp>(loc, rsType.getStaticDim(i)));
+            rewriter.create<ConstantIndexOp>(loc, rsType.getStaticDim(i)));
       }
     }
     return success();
   } else if (createIntermediateOps) {
-    auto dimsOp = builder.create<Shape::RankedDimsOp>(loc, rsValue);
+    auto dimsOp = rewriter.create<Shape::RankedDimsOp>(loc, rsValue);
     outDims.resize(dimsOp.result().size());
     std::copy(dimsOp.result().begin(), dimsOp.result().end(), outDims.begin());
     return success();

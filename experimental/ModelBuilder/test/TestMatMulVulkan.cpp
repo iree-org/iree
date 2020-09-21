@@ -18,7 +18,7 @@
 // RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so 2>&1 | IreeFileCheck %s
 
 // NOLINTNEXTLINE
-// RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so -use-workgroup-memory -workgroup-size=2,2 2>&1 | IreeFileCheck %s
+// RUN: test-matmul-vulkan -vulkan-wrapper=$(dirname %s)/../../../../llvm/llvm-project/mlir/tools/libvulkan-runtime-wrappers.so -use-workgroup-memory -workgroup-size=2,2 -tile-sizes=2,2 2>&1 | IreeFileCheck %s
 
 // clang-format on
 #include <string>
@@ -89,7 +89,7 @@ void testMatMul() {
     Value A = kernelFunc.getArgument(0);
     Value B = kernelFunc.getArgument(1);
     Value C = kernelFunc.getArgument(2);
-    (linalg_matmul(TypeRange{}, ValueRange{A, B, C}));
+    (linalg_matmul(ValueRange{A, B}, ValueRange{C}));
     std_ret();
   }
   // 2. Compile the function, pass in runtime support library
@@ -97,13 +97,15 @@ void testMatMul() {
   ModelRunner runner(modelBuilder.getModuleRef(),
                      ModelRunner::Target::GPUTarget);
   CompilationOptions options;
+  mlir::iree_compiler::SPIRVCodegenOptions codegenOptions;
   SmallVector<Type, 3> args = {typeA, typeB, typeC};
-  SmallVector<int64_t, 4> vWorkgroupSizes(workgroupSize.begin(),
-                                          workgroupSize.end());
-  SmallVector<int64_t, 4> vTileSizes(tileSizes.begin(), tileSizes.end());
+  codegenOptions.workgroupSize.assign(workgroupSize.begin(),
+                                      workgroupSize.end());
+  codegenOptions.tileSizes.assign(tileSizes.begin(), tileSizes.end());
+  codegenOptions.useWorkgroupMemory = useWorkgroupMemory;
   auto lowering = [&](mlir::PassManager &pm) {
-    pm.addPass(mlir::iree_compiler::createLinalgTileAndFusePass(
-        vWorkgroupSizes, vTileSizes, useWorkgroupMemory));
+    pm.addPass(
+        mlir::iree_compiler::createLinalgTileAndFusePass(codegenOptions));
     pm.addPass(mlir::iree_compiler::createConvertToGPUPass());
     pm.addPass(mlir::createLowerAffinePass());
     pm.addPass(mlir::createLegalizeStdOpsForSPIRVLoweringPass());
@@ -119,14 +121,14 @@ void testMatMul() {
     spirvModulePM.addPass(
         mlir::spirv::createUpdateVersionCapabilityExtensionPass());
 
-    int numWorkgroupX =
-        vWorkgroupSizes.empty()
-            ? 1
-            : (width + vWorkgroupSizes[0] - 1) / vWorkgroupSizes[0];
-    int numWorkgroupY =
-        vWorkgroupSizes.size() < 2
-            ? 1
-            : (height + vWorkgroupSizes[1] - 1) / vWorkgroupSizes[1];
+    int numWorkgroupX = codegenOptions.tileSizes.empty()
+                            ? 1
+                            : (width + codegenOptions.tileSizes[0] - 1) /
+                                  codegenOptions.tileSizes[0];
+    int numWorkgroupY = codegenOptions.tileSizes.size() < 2
+                            ? 1
+                            : (height + codegenOptions.tileSizes[1] - 1) /
+                                  codegenOptions.tileSizes[1];
     pm.addPass(mlir::createAddVulkanLaunchWrapperPass(
         {numWorkgroupX, numWorkgroupY, 1}, args));
     mlir::LowerToLLVMOptions llvmOptions = {

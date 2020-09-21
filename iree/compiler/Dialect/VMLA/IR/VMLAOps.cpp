@@ -24,19 +24,9 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VMLA {
-
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.cpp.inc"
-
-}  // namespace VMLA
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

@@ -82,7 +82,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
   for (auto srcDstOperand : llvm::zip(srcOp->getOperands(), operands)) {
     auto srcOperand = std::get<0>(srcDstOperand);
     auto dstOperand = std::get<1>(srcDstOperand);
-    if (HALTypeConverter::ShouldConvertToHalBuffer(srcOperand.getType())) {
+    if (HALTypeConverter::shouldConvertToHalBuffer(srcOperand.getType())) {
       // Create the buffer view that we'll pass to the function.
       // Note that we expect this to be CSE'd if there are multiple calls
       // using the same buffer.
@@ -102,7 +102,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     }
   }
   for (auto resultType : srcOp->getResultTypes()) {
-    if (HALTypeConverter::ShouldConvertToHalBuffer(resultType)) {
+    if (HALTypeConverter::shouldConvertToHalBuffer(resultType)) {
       state.addTypes(IREE::HAL::BufferViewType::get(rewriter.getContext()));
     } else {
       // Normal pass-through result.
@@ -121,7 +121,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     Type resultType;
     Value resultValue;
     std::tie(resultType, resultValue) = resultTypeValue;
-    if (HALTypeConverter::ShouldConvertToHalBuffer(resultType)) {
+    if (HALTypeConverter::shouldConvertToHalBuffer(resultType)) {
       results.push_back(rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(
           srcOp->getLoc(), resultValue));
     } else {

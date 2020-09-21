@@ -21,17 +21,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Strings {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h.inc"
-
-}  // namespace Strings
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_OPS_H_

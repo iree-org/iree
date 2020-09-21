@@ -575,6 +575,15 @@ Status And::Execute(absl::Span<const T> lhs_buffer,
 }
 
 template <typename T>
+Status And::Execute(absl::Span<const T> lhs_buffer, T rhs,
+                    absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] & rhs;
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status Or::Execute(absl::Span<const T> lhs_buffer,
                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
@@ -588,6 +597,15 @@ Status Xor::Execute(absl::Span<const T> lhs_buffer,
                     absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] ^ rhs_buffer[i];
+  }
+  return OkStatus();
+}
+
+template <typename T>
+Status Xor::Execute(absl::Span<const T> lhs_buffer, T rhs,
+                    absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] ^ rhs;
   }
   return OkStatus();
 }
@@ -794,6 +812,15 @@ template <typename T>
 Status Ceil::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::ceil(src_buffer[i]);
+  }
+  return OkStatus();
+}
+
+template <typename T>
+Status Round::Execute(absl::Span<const T> src_buffer,
+                      absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = std::round(src_buffer[i]);
   }
   return OkStatus();
 }

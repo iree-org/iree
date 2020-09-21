@@ -74,14 +74,14 @@ static LogicalResult verifyMapOp(MapOp &op) {
   return success();
 }
 
+}  // namespace Sequence
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Sequence/IR/SequenceOps.cpp.inc"
-
-}  // namespace Sequence
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
