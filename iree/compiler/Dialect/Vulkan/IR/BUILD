@@ -47,6 +47,7 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:Support",
     ],
 )
