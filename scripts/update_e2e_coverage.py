@@ -28,7 +28,7 @@ REFERENCE_BACKEND = 'tf'
 # iree_vulkan backends.
 BACKENDS_TO_TITLES = collections.OrderedDict([
     ('tf', 'tensorflow'),
-    ('tflite', 'tf-lite'),
+    ('tflite', 'tflite'),
     ('iree_vmla', 'vmla'),
     ('iree_llvmjit', 'llvm-ir'),
     ('iree_vulkan', 'vulkan-spirv'),
