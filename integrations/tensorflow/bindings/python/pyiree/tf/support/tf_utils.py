@@ -298,9 +298,8 @@ class IreeCompiledModule(CompiledModule):
 
 
 def _normalize_numpy(result: np.ndarray):
-  """Normalizes TF/Lite's output to match IREE's"""
+  """Normalizes TF and TFLite's outputs to match IREE's"""
   if np.isscalar(result):
-    # convert_to_tensor isn't reversible via .numpy()
     result = np.array(result)
   if result.dtype == np.bool:
     # IREE interprets bools as int8s, so we modify this for comparison.
