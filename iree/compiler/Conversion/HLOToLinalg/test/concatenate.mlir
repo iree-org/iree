@@ -57,3 +57,34 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
+
+// -----
+
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d0)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d0)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d0)>
+// CHECK: %1 = alloc() : memref<1x5xf32>
+// CHECK: %cst = constant 0.000000e+00 : f32
+// CHECK: linalg.fill(%1, %cst) : memref<1x5xf32>, f32
+// CHECK: %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x5xf32>
+// CHECK: linalg.indexed_generic {
+// CHECK-SAME:   args_in = 2
+// CHECK-SAME:   args_out = 1
+// CHECK-SAME:   indexing_maps
+// CHECK-SAME:   #[[MAP0]], #[[MAP1]], #[[MAP2]]
+// CHECK-SAME:   iterator_types = ["parallel", "reduction", "reduction", "reduction"]
+module {
+  func @concatenate() {
+    %c0 = constant 0 : index
+    %cst = constant dense<0.000000e+00> : tensor<1x5xf32>
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x5xf32>
+    %1 = "mhlo.concatenate"(%0, %cst) {dimension = 0 : i64} : (tensor<1x5xf32>, tensor<1x5xf32>) -> tensor<2x5xf32>
+    hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<2x5xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  }
+}
+

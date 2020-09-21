@@ -56,6 +56,26 @@ using OutputBufferMap = DenseMap<Operation *, Value>;
 // Utility functions.
 // -----------------------------------------------------------------------------
 
+static mlir::MemRefType ConvertTensorToMemRef(mlir::TensorType type) {
+  assert(type.hasRank() && "expected only ranked shapes");
+  return MemRefType::get(type.getShape(), type.getElementType());
+}
+
+static mlir::Value InsertAllocAndDealloc(
+    mlir::MemRefType type, mlir::Location loc, mlir::PatternRewriter &rewriter,
+    SmallVector<Value, 4> dynamicOperands = {}) {
+  auto alloc = rewriter.create<mlir::AllocOp>(loc, type, dynamicOperands);
+
+  // Make sure to allocate at the beginning of the block.
+  auto *parent_block = alloc.getOperation()->getBlock();
+
+  // Make sure to deallocate this alloc at the end of the block. This is fine
+  // as toy functions have no control flow.
+  auto dealloc = rewriter.create<mlir::DeallocOp>(loc, alloc);
+  dealloc.getOperation()->moveBefore(&parent_block->back());
+  return alloc;
+}
+
 /// Returns the constant value associated with the init value if the defining
 /// operation is a constant.
 static Attribute getInitValueAsConst(Value init) {
@@ -544,6 +564,35 @@ LogicalResult ConvOpConversion::apply(
   }
   return success();
 }
+
+namespace {
+
+struct ConstantOpConversion final
+    : public OpConversionPattern<mlir::ConstantOp> {
+  ConstantOpConversion(MLIRContext *context)
+      : OpConversionPattern<mlir::ConstantOp>(context) {}
+
+  LogicalResult matchAndRewrite(
+      mlir::ConstantOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+
+    auto resultType = op.getType().cast<RankedTensorType>();
+    auto resultMemrefType = ConvertTensorToMemRef(resultType);
+    auto resultBuffer = InsertAllocAndDealloc(resultMemrefType, loc, rewriter);
+
+    auto splatValueAttr =
+        op.valueAttr().cast<DenseElementsAttr>().getSplatValue();
+    Value constVal = rewriter.create<ConstantOp>(loc, splatValueAttr);
+    rewriter.create<linalg::FillOp>(loc, resultBuffer, constVal);
+
+    rewriter.replaceOp(op, resultBuffer);
+
+    return success();
+  }
+};
+
+}  // namespace
 
 //===----------------------------------------------------------------------===//
 // mhlo.concatenate conversion patterns and utility functions.
@@ -1557,10 +1606,18 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   patterns.insert<HALInterfaceLoadTensorOpEraser, ShapeOpPattern>(
       context, resultTensorToBufferMap);
   patterns.insert<HALInterfaceStoreTensorOpEraser>(context, outputBufferMap);
+  patterns.insert<ConstantOpConversion>(context);
 
   ConversionTarget target(*context);
   // Make sure all XLA HLO ops are converted to Linalg ops after this pass.
   target.addIllegalDialect<mhlo::MhloDialect>();
+  // Handle case that a constant as argument of mhlo::ConcatenateOp
+  target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) -> bool {
+    for (auto &user : op.getOperation()->getUses()) {
+      if (isa<mhlo::ConcatenateOp>(user.getOwner())) return false;
+    }
+    return true;
+  });
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
