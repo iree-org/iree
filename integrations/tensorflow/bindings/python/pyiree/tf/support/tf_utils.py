@@ -19,6 +19,7 @@
 import os
 import random
 import re
+import tempfile
 from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
 
 from absl import flags
@@ -383,12 +384,125 @@ class TfCompiledModule(CompiledModule):
     return False
 
 
+def get_added_function_names(cls):
+  """Gets all methods that cls has that its parent doesn't have."""
+  names = set(dir(cls))
+  for parent in cls.__bases__:
+    names -= set(dir(parent))
+  return list(names)
+
+
+def get_concrete_functions(cls, exported_names=()):
+  """Get the concrete functions from the non-inhereted methods on cls or from exported_names."""
+  if not len(exported_names):
+    exported_names = get_added_function_names(cls)
+  instance = cls()
+  functions = []
+  for name in exported_names:
+    functions.append(instance.__getattribute__(name).get_concrete_function())
+  return functions, exported_names
+
+
+def compile_to_tflite(module_class, exported_names=(), artifacts_dir=None):
+  """Compiles a tf.Module with TFLite and returns a dict of TFLite interpreters."""
+  functions, names = get_concrete_functions(module_class, exported_names)
+  interpreters = dict()
+
+  def _interpret_bytes(tflite_module, base_dir):
+    tflite_dir = os.path.join(base_dir, 'tflite')
+    os.makedirs(tflite_dir, exist_ok=True)
+    tflite_path = os.path.join(tflite_dir, f'{name}.tflite')
+    with open(tflite_path, 'wb') as f:
+      f.write(tflite_module)
+    interpreters[name] = tf.lite.Interpreter(tflite_path)
+
+  for function, name in zip(functions, names):
+    converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
+    tflite_module = converter.convert()
+
+    if artifacts_dir is None:
+      with tempfile.TemporaryDirectory() as base_dir:
+        _interpret_bytes(tflite_module, base_dir)
+    else:
+      _interpret_bytes(tflite_module, artifacts_dir)
+
+  return interpreters
+
+
+class _TfLiteFunctionWrapper:
+  """Wraps a TFLite interpreter and makes it callable."""
+
+  def __init__(self, interpreter):
+    self._interpreter = interpreter
+
+  def _normalize(self, result):
+    if np.isscalar(result):
+      # convert_to_tensor isn't reversible via .numpy()
+      result = np.array(result)
+    if result.dtype == np.bool:
+      # IREE interprets bools as int8s, so we modify this for comparison.
+      result = result.astype(dtype=np.int8)
+    return result
+
+  def __call__(self, *args, **kwargs):
+    assert not len(kwargs)
+    self._interpreter.allocate_tensors()
+
+    for arg, detail in zip(args, self._interpreter.get_input_details()):
+      self._interpreter.set_tensor(detail['index'], arg)
+    self._interpreter.invoke()
+    outputs = tuple([
+        self._interpreter.get_tensor(detail['index'])
+        for detail in self._interpreter.get_output_details()
+    ])
+    outputs = [self._normalize(output) for output in outputs]
+    if len(outputs) == 1:
+      outputs = outputs[0]
+    return outputs
+
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    """Dummy function to match _IreeFunctionWrapper's API."""
+    return (), ()
+
+
+class TfLiteCompiledModule(CompiledModule):
+  """Compiles a tf.Module with TFLite and allows it to be called."""
+
+  def __init__(self,
+               module_class,
+               backend_info,
+               exported_names = (),
+               artifacts_dir = None):
+    super().__init__(module_class, backend_info, exported_names, artifacts_dir)
+    set_random_seed()
+    self._interpreters = compile_to_tflite(module_class, exported_names, artifacts_dir)
+
+  def reinitialize(self):
+    pass
+
+  def __getattr__(self, attr: str) -> _TfLiteFunctionWrapper:
+    # Try to resolve it as a function.
+    # exported = not self._exported_names or attr in self._exported_names
+    if not attr in self._interpreters:# or not exported:
+      raise AttributeError(f"The TFLite module does not have attr '{attr}'")
+    return _TfLiteFunctionWrapper(self._interpreters[attr])
+
+  @staticmethod
+  def supports_cxx_serialization() -> bool:
+    return False
+
+
 class BackendInfo:
   """Contains information for compiling the specified backend."""
 
   _name_to_info = {
       "tf": {
           "compiled_module_class": TfCompiledModule,
+          "driver": None,
+          "compiler_targets": None,
+      },
+      "tflite": {
+          "compiled_module_class": TfLiteCompiledModule,
           "driver": None,
           "compiler_targets": None,
       },
