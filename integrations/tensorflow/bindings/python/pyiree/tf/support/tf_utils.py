@@ -230,6 +230,7 @@ class CompiledModule(object):
     self.compiled_path = None
 
   def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
     raise NotImplementedError()
 
   @staticmethod
@@ -284,6 +285,7 @@ class IreeCompiledModule(CompiledModule):
     self.reinitialize()
 
   def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
     self._context = rt.SystemContext(
         modules=[self._module], config=self._config)
 
@@ -360,6 +362,7 @@ class TfCompiledModule(CompiledModule):
     self.reinitialize()
 
   def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
     self._tf_module = self._module_class()
 
   def __getattr__(self, attr: str) -> _TfFunctionWrapper:
