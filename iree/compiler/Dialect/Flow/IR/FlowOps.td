@@ -346,10 +346,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   }];
 
   let arguments = (ins
-    // TODO(benvanik): replace with SymbolRefAttr.
-    // TODO(benvanik): validate target is an executable.
-    FlatSymbolRefAttr:$executable,
-    FlatSymbolRefAttr:$entry_point,
+    SymbolRefAttr:$entry_point,
     FLOW_Workload:$workload,
     Variadic<AnyType>:$operands
   );
@@ -360,19 +357,13 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      OpBuilder &builder, OperationState &result, StringRef executable,
-      StringRef entryPoint, Value workload,
-      ArrayRef<Type> results, ValueRange operands = {}
-    }], [{
-      result.addOperands({workload});
-      result.addOperands(operands);
-      result.addAttribute("executable", builder.getSymbolRefAttr(executable));
-      result.addAttribute("entry_point", builder.getSymbolRefAttr(entryPoint));
-      result.addTypes(results);
+      OpBuilder &builder, OperationState &result, DispatchEntryOp entryPoint,
+      Value workload, ArrayRef<Type> results, ValueRange operands = {}
     }]>,
   ];
 
   let extraClassDeclaration = [{
+    StringRef executable();
     FunctionType getEntryPointType();
 
     // StreamableOpInterface:
