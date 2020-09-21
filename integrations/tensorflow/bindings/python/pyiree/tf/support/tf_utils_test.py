@@ -96,11 +96,9 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     module.increment()
     self.assertEqual([1.], module.get_count())
 
-    reinitialized_module = module.create_reinitialized()
+    module.reinitialize()
     # Test reinitialization.
-    self.assertEqual([0.], reinitialized_module.get_count())
-    # Test independent state.
-    self.assertEqual([1.], module.get_count())
+    self.assertEqual([0.], module.get_count())
 
   def test_to_mlir_type(self):
     self.assertEqual('i8', tf_utils.to_mlir_type(np.dtype('int8')))

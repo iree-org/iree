@@ -229,8 +229,8 @@ class CompiledModule(object):
     self.module_name = self._module_class.__name__
     self.compiled_path = None
 
-  def create_reinitialized(self):
-    """Duplicates this module with its initial state without recompiling."""
+  def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
     raise NotImplementedError()
 
   @staticmethod
@@ -259,8 +259,7 @@ class IreeCompiledModule(CompiledModule):
                module_class: Type[tf.Module],
                backend_info: "BackendInfo",
                exported_names: Sequence[str] = (),
-               artifacts_dir: str = None,
-               _create_reinitialized_dict: Dict[str, Any] = None):
+               artifacts_dir: str = None):
     """Compile a tf.Module to the target backend in backend_info.
 
     Args:
@@ -271,43 +270,24 @@ class IreeCompiledModule(CompiledModule):
         module_class's functions to compile. If exported_names is empty all
         functions will be compiled.
       artifacts_dir: an optional path to save compilation artifacts to.
-      _create_reinitialized_dict: used internally.
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
-    if _create_reinitialized_dict is None:
-      set_random_seed()
-      self._module_blob, self.compiled_path = compile_tf_module(
-          tf_module=module_class(),
-          backend_infos=[backend_info],
-          exported_names=exported_names,
-          artifacts_dir=artifacts_dir)
-      self._module = rt.VmModule.from_flatbuffer(self._module_blob)
-      self._config = rt.Config(driver_name=backend_info.driver)
-    else:
-      # Called from self.create_reinitialized()
-      self._module_blob = _create_reinitialized_dict["_module_blob"]
-      self._module = _create_reinitialized_dict["_module"]
-      self._config = _create_reinitialized_dict["_config"]
-      self.compiled_path = _create_reinitialized_dict["compiled_path"]
+    set_random_seed()
+    self._module_blob, self.compiled_path = compile_tf_module(
+        tf_module=module_class(),
+        backend_infos=[backend_info],
+        exported_names=exported_names,
+        artifacts_dir=artifacts_dir)
+    self._module = rt.VmModule.from_flatbuffer(self._module_blob)
+    self._config = rt.Config(driver_name=backend_info.driver)
 
-    # Holds all of the module's mutable state.
+    self.reinitialize()
+
+  def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
     self._context = rt.SystemContext(
         modules=[self._module], config=self._config)
-
-  def create_reinitialized(self) -> "IreeCompiledModule":
-    """Duplicates this module with its initial state without recompiling."""
-    default_args = [
-        self._module_class, self._backend_info, self._exported_names,
-        self._artifacts_dir
-    ]
-    create_reinitialized_dict = {
-        "_module_blob": self._module_blob,
-        "_module": self._module,
-        "_config": self._config,
-        "compiled_path": self.compiled_path
-    }
-    return IreeCompiledModule(*default_args, create_reinitialized_dict)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.
@@ -379,12 +359,11 @@ class TfCompiledModule(CompiledModule):
     """
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
     set_random_seed()
-    self._tf_module = module_class()
+    self.reinitialize()
 
-  def create_reinitialized(self) -> "TfCompiledModule":
-    """Duplicates this module with the starting state of module_class."""
-    return TfCompiledModule(self._module_class, self._backend_info,
-                            self._exported_names, self._artifacts_dir)
+  def reinitialize(self):
+    """Reinitializes to the initial state of the passed module_class."""
+    self._tf_module = self._module_class()
 
   def __getattr__(self, attr: str) -> _TfFunctionWrapper:
     # Try to resolve it as a function.
