@@ -589,7 +589,7 @@ func @dot_ex_dispatch_0() {
   %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<1024x64xf32>
   %cst = constant 0.000000e+00 : f32
   linalg.fill(%0, %cst) : memref<32x64xf32>, f32
-  linalg.matmul  %1, %2, %0 : (memref<32x1024xf32>, memref<1024x64xf32>, memref<32x64xf32>)
+  linalg.matmul ins(%1, %2 : memref<32x1024xf32>, memref<1024x64xf32>) outs(%0 : memref<32x64xf32>)  
   return
 }
 
