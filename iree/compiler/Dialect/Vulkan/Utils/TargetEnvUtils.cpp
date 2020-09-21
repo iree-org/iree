@@ -100,9 +100,6 @@ spirv::ResourceLimitsAttr convertResourceLimits(
   MLIRContext *context = vkTargetEnv.getContext();
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
   return spirv::ResourceLimitsAttr::get(
-      /*vendor_id=*/nullptr,
-      /*device_id=*/nullptr,
-      /*device_type=*/nullptr,
       /*max_compute_shared_memory_size=*/nullptr,
       vkCapabilities.maxComputeWorkGroupInvocations(),
       vkCapabilities.maxComputeWorkGroupSize(),
@@ -130,7 +127,9 @@ spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
 
   auto triple = spirv::VerCapExtAttr::get(
       spvVersion, spvCapabilities, spvExtensions, vkTargetEnv.getContext());
-  return spirv::TargetEnvAttr::get(triple, spvLimits);
+  return spirv::TargetEnvAttr::get(
+      triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
+      spirv::TargetEnvAttr::kUnknownDeviceID, spvLimits);
 }
 
 }  // namespace Vulkan
