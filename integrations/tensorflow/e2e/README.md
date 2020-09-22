@@ -16,8 +16,9 @@ instructions.
 ## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[the doc](../../../docs/vulkan_and_spirv.md)), then you can run the manual test
-targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
+[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)), 
+then you can run the manual test targets with 
+`--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
@@ -52,23 +53,17 @@ preferred.
 
 ```shell
 # Run math_test on all backends.
-bazel run :math_test_manual
+bazel run integrations/tensorflow/e2e:math_test_manual
 
 # Run math_test comparing TensorFlow to itself (e.g. to debug randomization).
-bazel run :math_test_manual -- target_backends=tf
+bazel run integrations/tensorflow/e2e:math_test_manual -- --target_backends=tf
 
 # Run math_test comparing the VMLA backend and TensorFlow.
-bazel run :math_test_manual -- --target_backends=iree_vmla
+bazel run integrations/tensorflow/e2e:math_test_manual -- --target_backends=iree_vmla
 
 # Run math_test comparing the VMLA backend to itself multiple times.
-bazel run :math_test_manual -- \
+bazel run integrations/tensorflow/e2e:math_test_manual -- \
   --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
-
-# Run math_test and output on failure.
-bazel test :math_test_manual --test_output=errors
-
-# Run an individual test interactively.
-bazel run :math_test_manual -- --test_output=streamed
 ```
 
 For reproducibility of the unit tests `CompiledModule()` sets the random seeds
@@ -98,8 +93,10 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
       # A random seed is automatically set before each call to `simple_mul`.
       a = tf_utils.uniform([4])
       b = np.array([400., 5., 6., 7.], dtype=np.float32)
+
       # The inputs `a` and `b` are recorded along with the output `c`
       c = module.simple_mul(a, b)
+
       # The inputs `a` and `b` are recorded along with the (unnamed) output
       # module.simple_mul returns.
       module.simple_mul(a, c)
@@ -137,14 +134,14 @@ suite. Test targets in these test suites can be run as follows:
 
 ```shell
 # Run all e2e tests that are expected to pass.
-bazel test :e2e_tests
+bazel test integrations/tensorflow/e2e:e2e_tests
 
 # Run all e2e tests that are expected to fail.
-bazel test :e2e_tests_failing
+bazel test integrations/tensorflow/e2e:e2e_tests_failing
 
 # Run a specific failing e2e test target.
 # Note that generated test targets are prefixed with their test suite name.
-bazel test :e2e_tests_failing_broadcasting_test__tf__iree_vulkan
+bazel test integrations/tensorflow/e2e:e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ```
 
 ## Generated Artifacts
