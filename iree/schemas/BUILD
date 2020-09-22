@@ -63,6 +63,12 @@ iree_flatbuffer_cc_library(
 )
 
 iree_flatbuffer_cc_library(
+    name = "metal_executable_def_cc_fbs",
+    srcs = ["metal_executable_def.fbs"],
+    flatc_args = FLATC_ARGS,
+)
+
+iree_flatbuffer_cc_library(
     name = "spirv_executable_def_cc_fbs",
     srcs = ["spirv_executable_def.fbs"],
     flatc_args = FLATC_ARGS,
@@ -80,6 +86,7 @@ iree_build_test(
         ":bytecode_module_def_cc_fbs",
         ":dylib_executable_def_cc_fbs",
         ":llvmir_executable_def_cc_fbs",
+        ":metal_executable_def_cc_fbs",
         ":spirv_executable_def_cc_fbs",
         ":vmla_executable_def_cc_fbs",
     ],
@@ -89,6 +96,7 @@ REFLECTION_SRCS = [] if not FLATBUFFER_SUPPORTS_REFLECTIONS else [
     "bytecode_module_def.bfbs",
     "dylib_executable_def.bfbs",
     "llvmir_executable_def.bfbs",
+    "metal_executable_def.bfbs",
     "spirv_executable_def.bfbs",
     "vmla_executable_def.bfbs",
 ]

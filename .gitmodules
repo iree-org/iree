@@ -53,3 +53,6 @@
 [submodule "third_party/flatcc"]
 	path = third_party/flatcc
 	url = https://github.com/dvidelabs/flatcc.git
+[submodule "third_party/spirv_cross"]
+	path = third_party/spirv_cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
