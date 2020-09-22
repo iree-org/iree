@@ -38,6 +38,7 @@ module {
 //     CHECK: linalg.copy(%[[IN]], %[[SUB0]])
 //     CHECK: %[[SUB1:.+]] = subview %[[OUT]][2, 0] [3, 2] [1, 1]  : memref<5x2xi32> to memref<3x2xi32, #[[MAP1]]>
 //     CHECK: linalg.fill(%[[SUB1]], %[[CST]])
+
 module {
   func @concatenate() {
     %c0 = constant 0 : index

@@ -8,16 +8,17 @@ module {
   //  CHECK-DAG: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<5xf32>
   //  CHECK-DAG: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
   //  CHECK-DAG: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-  //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
+  //      CHECK: linalg.indexed_generic
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
   // CHECK-SAME: iterator_types = ["parallel", "reduction"]}
-  // CHECK-SAME: %[[ARG0]], %[[ARG1]], %[[ARG2]] {
+  // CHECK-SAME:   ins(%[[ARG0]], %[[ARG1]] : memref<5x4xf32>, memref<f32>
+  // CHECK-SAME:   outs(%[[ARG2]] : memref<5xf32>
   // CHECK-NEXT: ^{{.+}}(%{{.+}}, %[[IDX:.+]]: index, %[[SRC:.+]]: f32, %[[INIT:.+]]: f32, %[[DST:.+]]: f32):
   //      CHECK:   %[[OPERAND:.+]] = select %{{.+}}, %[[INIT]], %[[DST]] : f32
   // CHECK-NEXT:   %[[RES:.+]] = addf %[[SRC]], %[[OPERAND]] : f32
   // CHECK-NEXT:   linalg.yield %[[RES]] : f32
-  // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<5xf32>
+  // CHECK-NEXT: }
   func @reduction_entry() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
@@ -119,16 +120,17 @@ module {
   //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4xf32>
   //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-  //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
+  //      CHECK: linalg.indexed_generic {
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
   // CHECK-SAME: iterator_types = ["parallel", "reduction"]}
-  // CHECK-SAME: %[[ARG0]], %[[ARG1]], %[[ARG2]] {
+  // CHECK-SAME: ins(%[[ARG0]], %[[ARG1]] : memref<5x4xf32>, memref<f32>)
+  // CHECK-SAME: outs(%[[ARG2]] : memref<4xf32>)
   // CHECK-NEXT: ^{{.+}}(%{{.+}}, %[[IDX:.+]]: index, %[[SRC:.+]]: f32, %[[INIT:.+]]: f32, %[[DST:.+]]: f32):
   //      CHECK:   %[[OPERAND:.+]] = select %{{.+}}, %[[INIT]], %[[DST]] : f32
   // CHECK-NEXT:   %[[RES:.+]] = addf %[[SRC]], %[[OPERAND]] : f32
   // CHECK-NEXT:   linalg.yield %[[RES]] : f32
-  // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<4xf32>
+  // CHECK-NEXT: }
   func @reduction_entry() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4xf32>
@@ -157,8 +159,6 @@ module {
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<1x10xf32>
     // CHECK: %[[CST:.+]] = constant 0xFF800000 : f32
     // CHECK: linalg.indexed_generic
-    // CHECK-SAME: args_in = 1
-    // CHECK-SAME: args_out = 1
     // CHECK: ^{{.+}}(%{{.+}}: index, %[[DIM:.+]]: index, %{{.+}}: f32, %[[OUTPUT:.+]]: f32):
     // CHECK: select %{{.+}}, %[[CST]], %[[OUTPUT]] : f32
     %cst = constant dense<0xFF800000> : tensor<f32>
@@ -186,11 +186,12 @@ module {
   //      CHECK: %[[ARG2:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4xf32>
   //      CHECK: %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x4x3xf32>
   //      CHECK: %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
-  //      CHECK: linalg.indexed_generic {args_in = 2 : i64, args_out = 1 : i64,
+  //      CHECK: linalg.indexed_generic {
   // CHECK-SAME: indexing_maps
   // CHECK-SAME: #[[MAP0]], #[[MAP1]], #[[MAP2]]
   // CHECK-SAME: iterator_types = ["parallel", "reduction", "reduction"]}
-  // CHECK-SAME: %[[ARG0]], %[[ARG1]], %[[ARG2]] {
+  // CHECK-SAME: ins(%[[ARG0]], %[[ARG1]] : memref<5x4x3xf32>, memref<f32>)
+  // CHECK-SAME: outs(%[[ARG2]] : memref<4xf32>)
   // CHECK-NEXT: ^{{.+}}(%{{.+}}, %[[IDX:.+]]: index, %[[SRC:.+]]: f32, %[[INIT:.+]]: f32, %[[DST:.+]]: f32):
   //      CHECK:   %[[TRUE:.+]] = constant true
   //      CHECK:   %[[CMP1:.+]] = cmpi
@@ -200,7 +201,7 @@ module {
   // CHECK-NEXT:   %[[OPERAND:.+]] = select %[[COND2]], %[[INIT]], %[[DST]] : f32
   // CHECK-NEXT:   %[[RES:.+]] = addf %[[SRC]], %[[OPERAND]] : f32
   // CHECK-NEXT:   linalg.yield %[[RES]] : f32
-  // CHECK-NEXT: }: memref<5x4x3xf32>, memref<f32>, memref<4xf32>
+  // CHECK-NEXT: }
   func @reduction_multi_dimensions() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x4x3xf32>

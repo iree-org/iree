@@ -222,13 +222,14 @@ module {
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret1} : memref<1x2x4xf32>
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
-    linalg.generic {args_in = 1 : i64, args_out = 1 : i64,
-                    indexing_maps = [#map0, #map0],
-                    iterator_types = ["parallel", "parallel"]} %2, %0 {
+    linalg.generic {indexing_maps = [#map0, #map0],
+                    iterator_types = ["parallel", "parallel"]}
+      ins(%2 : memref<2x4xf32>)
+     outs(%0 : memref<2x4xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
       %4 = tanh %arg0 : f32
       linalg.yield %4 : f32
-    }: memref<2x4xf32>, memref<2x4xf32>
+    }
     %3 = linalg.reshape %0 [#map1, #map2] : memref<2x4xf32> into memref<1x2x4xf32>
     linalg.copy(%3, %1) : memref<1x2x4xf32>, memref<1x2x4xf32>
     return
@@ -260,7 +261,9 @@ module {
 //      CHECK: func @reshape_interleaved_dispatch_0()
 //      CHECK:   %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x4xf32>
 //      CHECK:   %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<2x4xf32>
-//      CHECK:   linalg.generic {{.*}} %[[IN]], %[[OUT]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:     ins(%[[IN]] :
+// CHECK-SAME:    outs(%[[OUT]] :
 
 // -----
 
@@ -272,13 +275,14 @@ module {
     %2 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<1x512x1xf32>
     linalg.copy(%2, %0) : memref<1x512x1xf32>, memref<1x512x1xf32>
     %3 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<4x8x16xf32>
-    linalg.generic {args_in = 1 : i64, args_out = 1 : i64,
-                    indexing_maps = [affine_map<(d0, d1, d2) -> (-d0 + 3, d1, d2)>,
+    linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (-d0 + 3, d1, d2)>,
                                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-                    iterator_types = ["parallel", "parallel", "parallel"]} %3, %1 {
+                    iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%3 : memref<4x8x16xf32>)
+     outs(%1 : memref<4x8x16xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
       linalg.yield %arg0 : f32
-    }: memref<4x8x16xf32>, memref<4x8x16xf32>
+    }
     return
   }
   func @predict_ex_dispatch_0__num_workgroups__(!shapex.ranked_shape<[1,512,1]>,
