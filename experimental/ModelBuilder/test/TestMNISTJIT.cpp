@@ -111,35 +111,41 @@ void buildMNISTOnTensors(ModelBuilder &modelBuilder, StringLiteral funcName,
   auto h1WeightsType = modelBuilder.getRankedTensorType({W0, W1}, f32);
   auto h2WeightsType = modelBuilder.getRankedTensorType({W1, W2}, f32);
   auto h3WeightsType = modelBuilder.getRankedTensorType({W2, W3}, f32);
+  auto b1InitType = modelBuilder.getRankedTensorType({B, W1}, f32);
+  auto b2InitType = modelBuilder.getRankedTensorType({B, W2}, f32);
+  auto b3InitType = modelBuilder.getRankedTensorType({B, W3}, f32);
   auto bias1Type = modelBuilder.getRankedTensorType({W1}, f32);
   auto bias2Type = modelBuilder.getRankedTensorType({W2}, f32);
   auto bias3Type = modelBuilder.getRankedTensorType({W3}, f32);
   auto outputType = modelBuilder.getRankedTensorType({B, W3}, f32);
   auto func = modelBuilder.makeFunction(
       funcName, {outputType},
-      {inputType, h1WeightsType, h2WeightsType, h3WeightsType, bias1Type,
-       bias2Type, bias3Type});
+      {inputType, h1WeightsType, h2WeightsType, h3WeightsType, b1InitType,
+       b2InitType, b3InitType, bias1Type, bias2Type, bias3Type});
   Value input = func.getArgument(0);
   Value h1Weights = func.getArgument(1);
   Value h2Weights = func.getArgument(2);
   Value h3Weights = func.getArgument(3);
-  Value bias1 = func.getArgument(4);
-  Value bias2 = func.getArgument(5);
-  Value bias3 = func.getArgument(6);
+  Value b1Init = func.getArgument(4);
+  Value b2Init = func.getArgument(5);
+  Value b3Init = func.getArgument(6);
+  Value bias1 = func.getArgument(7);
+  Value bias2 = func.getArgument(8);
+  Value bias3 = func.getArgument(9);
 
   // 2. Fill the body (3 blocks of FCBiasTanh), alloc everything manually atm.
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());
 
   auto outputBlock1Type = modelBuilder.getRankedTensorType({B, W1}, f32);
-  auto outputBlock1 = modelBuilder.FCBiasTanhTensors(outputBlock1Type,
-                                                     {input, h1Weights}, bias1);
+  auto outputBlock1 = modelBuilder.FCBiasTanhTensors(
+      outputBlock1Type, {input, h1Weights}, b1Init, bias1);
   auto outputBlock2Type = modelBuilder.getRankedTensorType({B, W2}, f32);
   auto outputBlock2 = modelBuilder.FCBiasTanhTensors(
-      outputBlock2Type, {outputBlock1, h2Weights}, bias2);
+      outputBlock2Type, {outputBlock1, h2Weights}, b2Init, bias2);
   auto outputBlock3Type = outputType;
   auto outputBlock3 = modelBuilder.FCBiasTanhTensors(
-      outputBlock3Type, {outputBlock2, h3Weights}, bias3);
+      outputBlock3Type, {outputBlock2, h3Weights}, b3Init, bias3);
   // Vexing parses.
   (std_ret(outputBlock3));
 }
@@ -199,6 +205,7 @@ int main() {
       *static_cast<StridedMemRefType<float, 2> *>(outputBuffer->descriptor));
 }
 
+// clang-format off
 // For now, we can only dump the IR for `test_mnist_jit_tensors`.
 // Once buffer allocation is implemented we will only have an execution test.
 //
@@ -206,39 +213,47 @@ int main() {
 //
 // Matmul
 // CHECK: linalg.generic
-// CHECK:   tensor<?x784xf32>, tensor<784x256xf32> -> tensor<?x256xf32>
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<?x784xf32>, tensor<784x256xf32>)
+// CHECK-SAME:   init(%{{[a-z0-9]*}} : tensor<?x256xf32>)
+// CHECK:   -> tensor<?x256xf32>
 //
 // Pointwise
 // CHECK: linalg.generic
+// CHECK-SAME:  tensor<?x256xf32>, tensor<256xf32>
 // CHECK:   addf
 // CHECK:   mulf
 // CHECK:   tanh
 // CHECK:   mulf
 // CHECK:   addf
 // CHECK:   addf
-// CHECK:   tensor<?x256xf32>, tensor<256xf32> -> tensor<?x256xf32>
+// CHECK:   -> tensor<?x256xf32>
 //
 // Matmul
 // CHECK: linalg.generic
-// CHECK:   tensor<?x256xf32>, tensor<256x256xf32> -> tensor<?x256xf32>
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<?x256xf32>, tensor<256x256xf32>)
+// CHECK-SAME:   init(%{{[a-z0-9]*}} : tensor<?x256xf32>)
+// CHECK:   -> tensor<?x256xf32>
 //
 // Pointwise
 // CHECK: linalg.generic
-// CHECK:   tensor<?x256xf32>, tensor<256xf32> -> tensor<?x256xf32>
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<?x256xf32>, tensor<256xf32>)
+// CHECK:   -> tensor<?x256xf32>
 //
 // Matmul
 // CHECK: linalg.generic
-// CHECK:   tensor<?x256xf32>, tensor<256x10xf32> -> tensor<?x10xf32>
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<?x256xf32>, tensor<256x10xf32>)
+// CHECK-SAME:   init(%{{[a-z0-9]*}} : tensor<?x10xf32>)
+// CHECK:   -> tensor<?x10xf32>
 //
 // Pointwise
 // CHECK: linalg.generic
-// CHECK:   tensor<?x10xf32>, tensor<10xf32> -> tensor<?x10xf32>
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<?x10xf32>, tensor<10xf32>)
+// CHECK:   -> tensor<?x10xf32>
 // CHECK:   return {{.*}} : tensor<?x10xf32>
 
 // Execution test for `test_mnist_jit_buffers`.
 //
 // CHECK: Memref base@ = {{.*}} rank = 2 offset = 0 sizes = [3, 10]
 // CHECK-SAME: strides = [10, 1] data =
-// clang-format off
 // CHECK-COUNT-3: {{.*[[:space:]].*}}[3177.93,   3177.93,   3177.93,   3177.93,   3177.93,   3177.93,   3177.93,   3177.93,   3177.93,   3177.93]
 // clang-format on
