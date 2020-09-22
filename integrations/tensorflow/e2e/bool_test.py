@@ -20,7 +20,7 @@ from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 
-class MathModule(tf.Module):
+class BoolModule(tf.Module):
 
   @tf.function(input_signature=[])
   def constant(self):

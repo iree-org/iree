@@ -23,14 +23,11 @@ import re
 import tempfile
 from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
 
-from absl import flags
 from absl import logging
 import numpy as np
 from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
-
-FLAGS = flags.FLAGS
 
 
 def set_random_seed(seed: int = 0) -> None:
@@ -207,6 +204,7 @@ def _incrementally_compile_tf_module(
   def _compile_module(module, backend_info, exported_names, artifacts_dir):
     compiler_module = compiler.tf_module_to_compiler_module(module,
                                                             exported_names,
+                                                            sm_path=sm_path,
                                                             pass_pipeline=())
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)

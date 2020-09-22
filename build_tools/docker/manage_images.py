@@ -19,12 +19,12 @@ Includes information on their dependency graph and GCR URL.
 
 Example usage:
 
-Rebuild the cmake image and all images that transitiviely on depend on it,
+Rebuild the cmake image and all images that transitively on depend on it,
 tagging them with `latest`:
   python3 build_tools/docker/manage_images.py --build --image cmake
 
 Print out output for rebuilding the cmake image and all images that
-transitiviely on depend on it, but don't take side-effecting actions:
+transitively on depend on it, but don't take side-effecting actions:
   python3 build_tools/docker/manage_images.py --build --image cmake --dry-run
 
 Push all `prod` images to GCR:
