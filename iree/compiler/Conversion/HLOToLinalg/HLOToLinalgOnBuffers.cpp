@@ -74,12 +74,12 @@ static Attribute getInitValueAsConst(Value init) {
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
-static ArrayAttr getParallelAndReductionIterAttrs(Builder b, unsigned nLoops,
-                                                  unsigned nReduction) {
-  SmallVector<Attribute, 3> attrs(
-      nLoops - nReduction, b.getStringAttr(getParallelIteratorTypeName()));
-  attrs.append(nReduction, b.getStringAttr(getReductionIteratorTypeName()));
-  return b.getArrayAttr(attrs);
+static SmallVector<StringRef, 3> getParallelAndReductionIterators(
+    unsigned nLoops, unsigned nReduction) {
+  SmallVector<StringRef, 3> res(nLoops - nReduction,
+                                getParallelIteratorTypeName());
+  res.append(nReduction, getReductionIteratorTypeName());
+  return res;
 }
 
 /// Emits linalg.fill op to fill the given `buffer` with zero value.
@@ -522,16 +522,15 @@ LogicalResult ConvOpConversion::apply(
         nloops, /*symbolCount=*/0, outputExprs, rewriter.getContext()));
 
     Location loc = op.getLoc();
-    SmallVector<Value, 4> linalgOpArgs = {inputBuffers[0], inputBuffers[1],
-                                          resultBuffers[0]};
 
     SmallVector<StringRef, 3> loopAttributeTypes(spatialDims + 3, "parallel");
     loopAttributeTypes.append(spatialDims, "reduction");
     rewriter.create<linalg::GenericOp>(
-        loc, ArrayRef<Type>{}, linalgOpArgs,
-        2,  // args_in
-        1,  // args_out
-        indexingMaps, loopAttributeTypes,
+        loc,
+        /*resultTensorTypes=*/ArrayRef<Type>{},
+        /*inputs=*/inputBuffers,
+        /*outputs=*/resultBuffers, /*intTensors*/ ValueRange{}, indexingMaps,
+        loopAttributeTypes,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           Value mul = nestedBuilder.create<MulFOp>(nestedLoc, args[0], args[1]);
           Value add = nestedBuilder.create<AddFOp>(nestedLoc, mul, args[2]);
@@ -572,7 +571,7 @@ LogicalResult ConcatenateOpConversion::apply(
   int dim = op.dimension();
   int rank = inputBuffers[0].getType().cast<ShapedType>().getRank();
 
-  SmallVector<Attribute, 2> indexingMaps;
+  SmallVector<AffineMap, 2> indexingMaps;
   SmallVector<AffineExpr, 4> exprs;
   exprs.resize(rank);
   for (int i = 0, j = 0, e = rank; i < e; ++i) {
@@ -582,33 +581,31 @@ LogicalResult ConcatenateOpConversion::apply(
   int nloops = rank + inputBuffers.size();
   for (int i = 0, e = inputBuffers.size(); i < e; ++i) {
     exprs[dim] = rewriter.getAffineDimExpr(rank + i);
-    indexingMaps.emplace_back(AffineMapAttr::get(AffineMap::get(
-        nloops, /*symbolCount=*/0, exprs, rewriter.getContext())));
+    indexingMaps.emplace_back(AffineMap::get(nloops, /*symbolCount=*/0, exprs,
+                                             rewriter.getContext()));
   }
   exprs[dim] = rewriter.getAffineDimExpr(rank - 1);
-  indexingMaps.emplace_back(AffineMapAttr::get(
-      AffineMap::get(nloops, /*symbolCount=*/0, exprs, rewriter.getContext())));
+  indexingMaps.emplace_back(
+      AffineMap::get(nloops, /*symbolCount=*/0, exprs, rewriter.getContext()));
 
   SmallVector<Type, 4> bodyArgTypes, opResultTypes;
   // Also make the dimension to be concatenated not a parallel loop.
   int nonParallelLoops = nloops - rank + 1;
-  SmallVector<Value, 2> linalgOpArgs(inputBuffers.begin(), inputBuffers.end());
-  linalgOpArgs.push_back(resultBuffers[0]);
   auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
-      loc, opResultTypes, linalgOpArgs,
-      rewriter.getI64IntegerAttr(inputBuffers.size()),  // args_in
-      rewriter.getI64IntegerAttr(1),                    // args_out
-      rewriter.getArrayAttr(indexingMaps),
-      getParallelAndReductionIterAttrs(rewriter, nloops, nonParallelLoops),
-      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
+      loc, /*resultTensorTypes=*/opResultTypes, /*inputs=*/inputBuffers,
+      /*outputBuffers=*/resultBuffers,
+      /*initTensors=*/ValueRange{}, indexingMaps,
+      getParallelAndReductionIterators(nloops, nonParallelLoops));
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
   auto *block = rewriter.createBlock(region, region->end());
   bodyArgTypes.append(nloops, rewriter.getIndexType());
   auto resultType = op.getResult().getType().dyn_cast<ShapedType>();
-  bodyArgTypes.append(linalgOpArgs.size(), resultType.getElementType());
+  bodyArgTypes.append(linalgOp.getNumInputsAndOutputBuffers(),
+                      resultType.getElementType());
   block->addArguments(bodyArgTypes);
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(block);
 
   Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
@@ -788,29 +785,21 @@ LogicalResult TorchIndexSelectOpConversion::apply(
   Location loc = op.getLoc();
   Value output = op.getResult();
   int rank = output.getType().cast<ShapedType>().getRank();
-  SmallVector<Attribute, 2> indexingMaps;
+  SmallVector<AffineMap, 2> indexingMaps;
   SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < batch; ++i) {
-    exprs.push_back(rewriter.getAffineDimExpr(i));
-  }
-  for (int i = 0, e = nIndices - batch; i < e; ++i) {
+  for (int i = 0; i < batch; ++i) exprs.push_back(rewriter.getAffineDimExpr(i));
+  for (int i = 0, e = nIndices - batch; i < e; ++i)
     exprs.push_back(rewriter.getAffineDimExpr(axis + i));
-  }
-  indexingMaps.emplace_back(AffineMapAttr::get(
-      AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext())));
   indexingMaps.emplace_back(
-      AffineMapAttr::get(rewriter.getMultiDimIdentityMap(rank)));
+      AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
+  indexingMaps.emplace_back(rewriter.getMultiDimIdentityMap(rank));
+  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
+      loc, /*resultTensors=*/ArrayRef<Type>{}, /*inputs=*/adaptor.index(),
+      /*outputBuffers=*/resultBuffers, /*initTensors=*/ValueRange{},
+      indexingMaps, getParallelAndReductionIterators(rank, /*nReduction=*/0));
 
   SmallVector<Type, 4> bodyArgTypes, opResultTypes;
   SmallVector<Value, 2> linalgOpArgs = {adaptor.index(), resultBuffers[0]};
-  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
-      loc, opResultTypes, linalgOpArgs,
-      rewriter.getI64IntegerAttr(1),  // args_in
-      rewriter.getI64IntegerAttr(1),  // args_out
-      rewriter.getArrayAttr(indexingMaps),
-      getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
-      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
-
   // Add a block to the region.
   auto *region = &linalgOp.region();
   auto *block = rewriter.createBlock(region, region->end());
@@ -820,6 +809,7 @@ LogicalResult TorchIndexSelectOpConversion::apply(
         blockArgs.getType().cast<ShapedType>().getElementType());
   }
   block->addArguments(bodyArgTypes);
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(block);
 
   SmallVector<Value, 4> indices;
@@ -835,7 +825,6 @@ LogicalResult TorchIndexSelectOpConversion::apply(
 
   Value res = rewriter.create<LoadOp>(loc, adaptor.input(), indices);
   rewriter.create<linalg::YieldOp>(loc, res);
-
   return success();
 }
 
@@ -1085,12 +1074,12 @@ LogicalResult ReduceOpConversion::apply(
   // initial value and dst, respectively.
   // Transpose `src` to make the reduction loops be the innermost, because it's
   // easier to fully utilize processors.
-  SmallVector<Attribute, 3> indexingMaps;
-  indexingMaps.emplace_back(AffineMapAttr::get(getTransposeMapForReduction(
-      rewriter.getContext(), nInputRank, reductionDims)));
+  SmallVector<AffineMap, 3> indexingMaps;
+  indexingMaps.emplace_back(getTransposeMapForReduction(
+      rewriter.getContext(), nInputRank, reductionDims));
   if (!initConstVal) {
-    indexingMaps.emplace_back(AffineMapAttr::get(
-        AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())));
+    indexingMaps.emplace_back(
+        AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext()));
   }
   // The indexing map of `dst` should drop the reduction loops. Since the
   // reduction loops now are all in the innermost, drops `reductionDims.size()`
@@ -1100,30 +1089,26 @@ LogicalResult ReduceOpConversion::apply(
   for (int i = 0, e = nInputRank - reductionDims.size(); i < e; ++i) {
     exprs.push_back(rewriter.getAffineDimExpr(i));
   }
-  indexingMaps.emplace_back(AffineMapAttr::get(
+  indexingMaps.emplace_back(
       exprs.empty()
           ? AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())
           : AffineMap::get(nInputRank, /*symbolCount=*/0, exprs,
-                           rewriter.getContext())));
+                           rewriter.getContext()));
 
   SmallVector<Type, 2> resultTypes = {};
-  SmallVector<Value, 2> linalgOpArgs = {inputBuffers[0]};
+  SmallVector<Value, 2> inputs = {inputBuffers[0]};
   if (!initConstVal) {
-    linalgOpArgs.push_back(inputBuffers[1]);
+    inputs.push_back(inputBuffers[1]);
   }
-  linalgOpArgs.push_back(resultBuffers[0]);
   if (failed(zeroFillBuffer(loc, resultBuffers[0], rewriter))) {
     rewriter.notifyMatchFailure(reduceOp, "failed to zero fill result buffer");
     return failure();
   }
   auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
-      loc, resultTypes, linalgOpArgs,
-      rewriter.getI64IntegerAttr(linalgOpArgs.size() - 1),  // args_in
-      rewriter.getI64IntegerAttr(1),                        // args_out
-      rewriter.getArrayAttr(indexingMaps),
-      getParallelAndReductionIterAttrs(rewriter, nInputRank,
-                                       reductionDims.size()),
-      /*doc=*/nullptr, /*library_call=*/nullptr, /*symbol_source=*/nullptr);
+      loc, /*resultTensorTypes=*/resultTypes, /*inputs=*/inputs,
+      /*outputBuffers=*/resultBuffers, /*initTensors*/ ValueRange{},
+      indexingMaps,
+      getParallelAndReductionIterators(nInputRank, reductionDims.size()));
 
   linalgOp.region().takeBody(reduceOp.body());
   {
@@ -1196,11 +1181,12 @@ struct LinalgOpOnTensorConversion
     // generic/indexed_generic op, but with memrefs.
     // TODO(ravishankarm): Figure out how to do this inplace.
     auto linalgBufferOp = rewriter.template create<LinalgOpTy>(
-        op.getLoc(), ArrayRef<Type>(), opArgs, op.args_in(), op.args_out(),
-        op.indexing_maps(), op.iterator_types(),
-        /*doc=*/nullptr,
-        /*library_call=*/nullptr,
-        /*symbol_source=*/nullptr);
+        op.getLoc(), inputBuffers, resultBuffers,
+        llvm::to_vector<4>(
+            op.indexing_maps().template getAsValueRange<AffineMapAttr>()),
+        llvm::to_vector<4>(
+            op.iterator_types().template getAsValueRange<StringAttr>()));
+
     // Move the region from the replaced op into the new op.
     unsigned numTensorOperands = op.getNumOperands();
     // indexed_generic op has arguments for each index. In the case of generic

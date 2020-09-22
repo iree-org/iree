@@ -8,16 +8,14 @@ func @addf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xf32>, tensor<{{.+}}xf32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: f32, %[[OPERAND_IN2:.+]]: f32):
 // CHECK-NEXT:   %[[RESULT:.+]] = addf %[[OPERAND_IN1]], %[[OPERAND_IN2]] : f32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : f32
-// CHECK-NEXT: }: tensor<{{.+}}xf32>, tensor<{{.+}}xf32> -> tensor<{{.+}}xf32>
+// CHECK-NEXT: } -> tensor<{{.+}}xf32>
 
 // -----
 
@@ -29,16 +27,14 @@ func @addi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xi32>, tensor<{{.+}}xi32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: i32, %[[OPERAND_IN2:.+]]: i32):
 // CHECK-NEXT:   %[[RESULT:.+]] = addi %[[OPERAND_IN1]], %[[OPERAND_IN2]] : i32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : i32
-// CHECK-NEXT: }: tensor<{{.+}}xi32>, tensor<{{.+}}xi32> -> tensor<{{.+}}xi32>
+// CHECK-NEXT: } -> tensor<{{.+}}xi32>
 
 // -----
 
@@ -51,16 +47,14 @@ attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xf32>, tensor<{{.+}}xf32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: f32, %[[OPERAND_IN2:.+]]: f32):
 // CHECK-NEXT:   %[[RESULT:.+]] = subf %[[OPERAND_IN1]], %[[OPERAND_IN2]] : f32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : f32
-// CHECK-NEXT: }: tensor<{{.+}}xf32>, tensor<{{.+}}xf32> -> tensor<{{.+}}xf32>
+// CHECK-NEXT: } -> tensor<{{.+}}xf32>
 
 // -----
 
@@ -72,16 +66,14 @@ func @subi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xi32>, tensor<{{.+}}xi32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: i32, %[[OPERAND_IN2:.+]]: i32):
 // CHECK-NEXT:   %[[RESULT:.+]] = subi %[[OPERAND_IN1]], %[[OPERAND_IN2]] : i32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : i32
-// CHECK-NEXT: }: tensor<{{.+}}xi32>, tensor<{{.+}}xi32> -> tensor<{{.+}}xi32>
+// CHECK-NEXT: } -> tensor<{{.+}}xi32>
 
 // -----
 
@@ -93,16 +85,14 @@ func @mulf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xf32>, tensor<{{.+}}xf32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: f32, %[[OPERAND_IN2:.+]]: f32):
 // CHECK-NEXT:   %[[RESULT:.+]] = mulf %[[OPERAND_IN1]], %[[OPERAND_IN2]] : f32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : f32
-// CHECK-NEXT: }: tensor<{{.+}}xf32>, tensor<{{.+}}xf32> -> tensor<{{.+}}xf32>
+// CHECK-NEXT: } -> tensor<{{.+}}xf32>
 
 // -----
 
@@ -114,16 +104,14 @@ func @muli(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xi32>, tensor<{{.+}}xi32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: i32, %[[OPERAND_IN2:.+]]: i32):
 // CHECK-NEXT:   %[[RESULT:.+]] = muli %[[OPERAND_IN1]], %[[OPERAND_IN2]] : i32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : i32
-// CHECK-NEXT: }: tensor<{{.+}}xi32>, tensor<{{.+}}xi32> -> tensor<{{.+}}xi32>
+// CHECK-NEXT: } -> tensor<{{.+}}xi32>
 
 // -----
 
@@ -135,16 +123,14 @@ func @divf(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xf32>, tensor<{{.+}}xf32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: f32, %[[OPERAND_IN2:.+]]: f32):
 // CHECK-NEXT:   %[[RESULT:.+]] = divf %[[OPERAND_IN1]], %[[OPERAND_IN2]] : f32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : f32
-// CHECK-NEXT: }: tensor<{{.+}}xf32>, tensor<{{.+}}xf32> -> tensor<{{.+}}xf32>
+// CHECK-NEXT: } -> tensor<{{.+}}xf32>
 
 // -----
 
@@ -156,13 +142,11 @@ func @divi(%operand: tensor<2x2xi32>) attributes {iree.dispatch_fn_name = ""} {
   return
 }
 // CHECK: linalg.generic {
-// CHECK-SAME: args_in = 2
-// CHECK-SAME: args_out = 1
 // CHECK-SAME: indexing_maps
 // CHECK-SAME: #[[MAP0]], #[[MAP0]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel"]}
-// CHECK-SAME: %{{.+}}, %{{.+}} {
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : tensor<{{.+}}xi32>, tensor<{{.+}}xi32>)
 // CHECK-NEXT: ^{{.+}}(%[[OPERAND_IN1:.+]]: i32, %[[OPERAND_IN2:.+]]: i32):
 // CHECK-NEXT:   %[[RESULT:.+]] = divi_signed %[[OPERAND_IN1]], %[[OPERAND_IN2]] : i32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : i32
-// CHECK-NEXT: }: tensor<{{.+}}xi32>, tensor<{{.+}}xi32> -> tensor<{{.+}}xi32>
+// CHECK-NEXT: } -> tensor<{{.+}}xi32>
