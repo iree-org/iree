@@ -74,7 +74,8 @@ module {
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d5, d2 + d6, d4)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d4, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4 * 3 + d3)>
-// CHECK: linalg.generic {args_in = 2 : i64, args_out = 1 : i64, indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]
+// CHECK: linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]
+// CHECK-SAME:   ins(%{{[a-z0-9]*}}, %{{[a-z0-9]*}} : memref<2x4x5x2xf32>, memref<2x2x2x3xf32>)
+// CHECK-SAME:   outs(%{{[a-z0-9]*}} : memref<2x3x4x6xf32>)
 // CHECK: mulf
 // CHECK: addf
-// CHECK: memref<2x4x5x2xf32>, memref<2x2x2x3xf32>, memref<2x3x4x6xf32>
