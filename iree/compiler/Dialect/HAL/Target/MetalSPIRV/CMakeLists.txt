@@ -49,5 +49,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     spirv-cross-msl
+  INCLUDES
+    ${PROJECT_SOURCE_DIR}/third_party
   PUBLIC
 )
