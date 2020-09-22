@@ -53,16 +53,16 @@ preferred.
 
 ```shell
 # Run math_test on all backends.
-bazel run integrations/tensorflow/e2e:math_test_manual
+bazel run //integrations/tensorflow/e2e:math_test_manual
 
 # Run math_test comparing TensorFlow to itself (e.g. to debug randomization).
-bazel run integrations/tensorflow/e2e:math_test_manual -- --target_backends=tf
+bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=tf
 
 # Run math_test comparing the VMLA backend and TensorFlow.
-bazel run integrations/tensorflow/e2e:math_test_manual -- --target_backends=iree_vmla
+bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=iree_vmla
 
 # Run math_test comparing the VMLA backend to itself multiple times.
-bazel run integrations/tensorflow/e2e:math_test_manual -- \
+bazel run //integrations/tensorflow/e2e:math_test_manual -- \
   --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
 ```
 
@@ -134,14 +134,16 @@ suite. Test targets in these test suites can be run as follows:
 
 ```shell
 # Run all e2e tests that are expected to pass.
-bazel test integrations/tensorflow/e2e:e2e_tests
+bazel test //integrations/tensorflow/e2e:e2e_tests
 
 # Run all e2e tests that are expected to fail.
-bazel test integrations/tensorflow/e2e:e2e_tests_failing
+bazel test //integrations/tensorflow/e2e:e2e_tests_failing
 
 # Run a specific failing e2e test target.
 # Note that generated test targets are prefixed with their test suite name.
-bazel test integrations/tensorflow/e2e:e2e_tests_failing_broadcasting_test__tf__iree_vulkan
+# Also, if broadcasting_test starts working on iree_vulkan after the time
+# of writing then this command will fail.
+bazel test //integrations/tensorflow/e2e:e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ```
 
 ## Generated Artifacts
