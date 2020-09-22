@@ -65,7 +65,7 @@ TFLITE_FAILING = [
     "finite_test.py",
     "gather_test.py",
     "mandelbrot_test.py",
-    "matrix_ops_test.py",
+    "matrix_ops_dynamic_test.py",
     "resource_ops_test.py",
     "ring_buffer_test.py",
     "scatter_update_test.py",
@@ -90,7 +90,7 @@ LLVM_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "finite_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "matrix_ops_test.py",
+    "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
@@ -107,7 +107,7 @@ VULKAN_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "finite_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "matrix_ops_test.py",
+    "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
