@@ -83,6 +83,10 @@ SPECIAL_CASES = [
     "vision_model_test.py",
 ]
 
+TFLITE_FAILING = [
+    "lstm_test.py",
+]
+
 VMLA_FAILING = [
     "lstm_test.py",
 ]
@@ -101,6 +105,11 @@ VULKAN_FAILING = [
 TF_PASSING = glob(
     ["*_test.py"],
     exclude = SPECIAL_CASES,
+)
+
+TFLITE_PASSING = glob(
+    ["*_test.py"],
+    exclude = TFLITE_FAILING + SPECIAL_CASES,
 )
 
 VMLA_PASSING = glob(
@@ -122,6 +131,7 @@ iree_e2e_test_suite(
     name = "keras_tests",
     backends_to_srcs = {
         "tf": TF_PASSING,
+        "tflite": TFLITE_PASSING,
         "iree_vmla": VMLA_PASSING,
         "iree_llvmjit": LLVM_PASSING,
         "iree_vulkan": VULKAN_PASSING,
@@ -135,6 +145,7 @@ iree_e2e_test_suite(
 iree_e2e_test_suite(
     name = "keras_tests_failing",
     backends_to_srcs = {
+        "tflite": TFLITE_FAILING,
         "iree_vmla": VMLA_FAILING,
         "iree_llvmjit": LLVM_FAILING,
         "iree_vulkan": VULKAN_FAILING,
@@ -154,6 +165,7 @@ iree_vision_test_suite(
     name = "vision_internal_tests",
     backends = [
         "tf",
+        "tflite",
         "iree_vmla",
         "iree_llvmjit",
         "iree_vulkan",
@@ -171,6 +183,7 @@ iree_vision_test_suite(
     name = "vision_external_tests",
     backends = [
         "tf",
+        "tflite",
         "iree_vmla",
         "iree_llvmjit",
         "iree_vulkan",

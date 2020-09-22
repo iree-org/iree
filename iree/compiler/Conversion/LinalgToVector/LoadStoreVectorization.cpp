@@ -64,15 +64,8 @@ static Value legalizeToVectorType(OpBuilder &builder, Value val) {
   } else if (type.isIntOrFloat()) {
     auto vecType = getVecType(builder, type);
     if (!vecType) return nullptr;
-    // TODO(hanchung): Add a folder on vector::BroadcastOp so we don't need to
-    // create manually.
-    if (auto cst = val.getDefiningOp<ConstantOp>()) {
-      auto cstVecValue = DenseElementsAttr::get(vecType, cst.value());
-      return builder.create<ConstantOp>(val.getLoc(), vecType, cstVecValue)
-          .getResult();
-    }
-    return builder.create<vector::BroadcastOp>(val.getLoc(), vecType, val)
-        .getResult();
+    return builder.createOrFold<vector::BroadcastOp>(val.getLoc(), vecType,
+                                                     val);
   }
   return nullptr;
 }

@@ -140,6 +140,46 @@ better memory allocation library, probably by layering the
 IREE [`hal::Buffer`][hal-buffer] maps Metal `MTLBuffer`. See
 [Memory Management](#memory-management) for more details.
 
+## Compute Pipeline
+
+### Shader/kernel compilation
+
+Metal has [Metal Shading Language (MSL)][msl-spec] for authoring graphics
+shaders and compute kernels. MSL source code can be directly consumed by the
+Metal framework at run-time; it can also be compiled first into an opaque
+library using [command-line tools][msl-cl-library] at build-time.
+
+IREE uses compilers to compile ML models expressed with high-level op semantics
+down to GPU native source format. This is also the case for the Metal HAL
+driver. Metal does not provide an open intermediate language; we reuse the
+[SPIR-V code generation pipeline][spirv-codegen] and then cross compile the
+generated SPIR-V into MSL source with [SPIRV-Cross][spirv-cross]. This is
+actually a fair common practice for targeting multiple GPU APIs in graphics
+programming world. For example, the Vulkan implmenation in macOS/iOs,
+[MoltenVK][moltenvk], is also doing the same for shaders/kernels. The path
+is actually quite robust, as demonstrated by various games on top of MoltenVK.
+
+Therefore, in IREE, we have a [`MetalSPIRVTargetBackend`][metal-spirv-target],
+which pulls in the normal MHLO to Linalg and Linalg to SPIR-V passes to form
+the compilation pipeline. The difference would be to provide a suitable
+SPIR-V target environment to drive the compilation, which one can derive from
+the Metal GPU families to target. (Not implemented yet; TODO for the future.)
+The serialization step differs from
+[`VulkanSPIRVTargetBackend`][vulkan-spirv-target] too: following the normal
+SPIR-V serialization step, we additionally need to invoke SPRIV-Cross to
+cross compile the generated SPIR-V into MSL, and then compile and/or serialize
+the MSL source/library.
+
+IREE uses [FlatBuffer][flatbuffer] to encode the whole workload module,
+including both GPU shader/kernel (called executable in IREE terminology) and
+CPU scheduling logic. The GPU executables are embedded as part of the module's
+FlatBuffer, which are [`mmap`][mmap]ped when IREE runs.
+
+For the Metal HAL driver, it means we need to embed the MSL kernels inside the
+module FlatBuffer. Right now we just encode the MSL source strings and compile
+them at Metal run-time. In the future this should be changed to allow encoding
+the library instead.
+
 ## Memory Management
 
 ### Storage type
@@ -189,6 +229,7 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [metal-device]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_device.h
 [metal-driver]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_driver.h
 [metal-shared-event]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_shared_event.h
+[metal-spirv-target]: https://github.com/google/iree/tree/hal-metal/iree/compiler/Dialect/HAL/Target/MetalSPIRV
 [mtl-buffer]: https://developer.apple.com/documentation/metal/mtlbuffer?language=objc
 [mtl-command-buffer]: https://developer.apple.com/documentation/metal/mtlcommandbuffer?language=objc
 [mtl-command-encoder]: https://developer.apple.com/documentation/metal/mtlcommandencoder?language=objc
@@ -197,6 +238,14 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [mtl-heap]: https://developer.apple.com/documentation/metal/mtlheap?language=objc
 [mtl-shared-event]: https://developer.apple.com/documentation/metal/mtlsharedevent?language=objc
 [mtl-storage-mode]: https://developer.apple.com/documentation/metal/mtlstoragemode?language=objc
+[msl-spec]: https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf
+[msl-cl-library]: https://developer.apple.com/documentation/metal/libraries/building_a_library_with_metal_s_command-line_tools?language=objc
 [objc-arc]: https://en.wikipedia.org/wiki/Automatic_Reference_Counting
 [objcxx]: https://en.wikipedia.org/wiki/Objective-C#Objective-C++
+[flatbuffer]: https://google.github.io/flatbuffers/
+[mmap]: https://en.wikipedia.org/wiki/Mmap
+[moltenvk]: https://github.com/KhronosGroup/MoltenVK
+[spirv-codegen]: https://google.github.io/iree/design-docs/codegen-passes
+[spirv-cross]: https://github.com/KhronosGroup/SPIRV-Cross
 [vma]: https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[vulkan-spirv-target]: https://github.com/google/iree/tree/hal-metal/iree/compiler/Dialect/HAL/Target/VulkanSPIRV
