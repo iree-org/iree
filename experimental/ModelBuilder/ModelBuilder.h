@@ -196,7 +196,7 @@ class ModelBuilder : public OpBuilder {
   // Version with a RankedTensor result.
   static Value FCBiasTanhTensors(RankedTensorType outputTensorType,
                                  std::array<Value, 2> fcArgs,
-                                 Value biasValueArg);
+                                 Value fcInitTensor, Value biasValueArg);
 
   // Build the MLIR representation for:
   //   `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
