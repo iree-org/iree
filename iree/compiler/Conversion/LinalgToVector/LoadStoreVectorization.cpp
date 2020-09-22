@@ -197,12 +197,13 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
       rewriter.replaceOp(placeholder, arg.getResult());
       newArgs.push_back(arg.getResult());
     }
-
+    ArrayRef<Value> newArgsRef(newArgs.begin(), newArgs.end());
     auto newOp = rewriter.create<linalg::GenericOp>(
-        genericOp.getLoc(), genericOp.getResultTypes(), newArgs,
-        rewriter.getI64IntegerAttr(genericOp.getNumInputs()),
-        rewriter.getI64IntegerAttr(genericOp.getNumOutputs()),
-        genericOp.indexing_mapsAttr(), genericOp.iterator_types(),
+        genericOp.getLoc(), genericOp.getResultTypes(),
+        /*inputs=*/newArgsRef.take_front(genericOp.getNumInputs()),
+        /*outputBuffers*/ newArgsRef.take_back(genericOp.getNumOutputs()),
+        /*initTensors*/ ValueRange{}, genericOp.indexing_mapsAttr(),
+        genericOp.iterator_types(),
         /*doc=*/nullptr,
         /*library_call=*/nullptr,
         /*symbol_source=*/nullptr);
