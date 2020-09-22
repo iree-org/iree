@@ -9,8 +9,8 @@ parent: Developing IREE
 # TensorFlow e2e tests
 {: .no_toc }
 
-This is a collection of e2e tests that save a TensorFlow model, compile it with
-IREE, run it on multiple backends and crosscheck the results.
+This is a collection of e2e tests that compile a TensorFlow model with IREE (and
+potentially TFLite), run it on multiple backends, and crosscheck the results.
 
 ## Pre-Requisites
 
@@ -37,9 +37,9 @@ adding `test --test_tag_filters="-driver=vulkan"` to your `user.bazelrc`.
 
 Compatible TensorFlow modules can be compiled to specific IREE backends using
 `IreeCompiledModule`. This also optionally saves compilation artifacts to a
-specified directory. These artifacts include: MLIR across various lowerings, a
-TensorFlow SavedModel, and the compiled VM FlatBuffer. A basic example of
-creating and calling an `IreeCompiledModule` can be found in
+specified directory. These artifacts include MLIR across various lowerings and
+the compiled VM FlatBuffer. A basic example of creating and calling an
+`IreeCompiledModule` can be found in
 [`tf_utils_test.py`](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/pyiree/tf/support/tf_utils_test.py)
 
 When using Keras models or tf.Modules with functions that IREE can't compile,
@@ -53,9 +53,6 @@ vmla_module = tf_utils.IreeCompiledModule(
     exported_names=['predict'])
 vmla_module.predict(...)
 ```
-
-By default the TensorFlow SavedModels will not be kept. This can be overridden
-via the `--keep_saved_model` flag.
 
 ## Running Tests
 
@@ -170,16 +167,21 @@ for each module is as follows:
 /tmp/iree/modules/ModuleName
 ├── tf_input.mlir        # MLIR for ModuleName in TF's input dialect
 ├── iree_input.mlir      # tf_input.mlir translated to IREE MLIR
-├── backend_name_1       # e.g. iree_vmla, tf or tf_ref
+├── iree_backend_name    # e.g. iree_vmla, iree_llvmjit or iree_vulkan
 │   ├── compiled.vmfb    # flatbuffer of ModuleName compiled to this backend
-│   ├── saved_model      # Only created if --keep_saved_model is specified.
 │   └── traces
-│       ├── trace_1      # Directory storing logs and serialization for each trace.
+│       ├── trace_1      # Directory storing logs and serialization for each trace
 │       │   └── log.txt  # A more detailed version of the test logs
 │       └── trace_2
 │           └── log.txt
-└── backend_name_2
-    └── ...
+├── tflite               # If TFLite supports compiling ModuleName
+│   ├── method_1.tflite  # Methods on ModuleName compiled to bytes with TFLite
+│   ├── method_2.tflite
+│   └── traces
+│       └── ...
+└── tf_ref               # Directory storing the tensorflow reference traces
+    └── traces
+        └── ...
 ```
 
 Traces for a particular test can be loaded via the `Trace.load(trace_dir)`
@@ -237,9 +239,3 @@ which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
-
-## Test Harnesses
-
-### Simple function tests
-
-See `simple_arithmetic_test.py` for some basic examples.
