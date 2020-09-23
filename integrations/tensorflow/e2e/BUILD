@@ -186,6 +186,7 @@ iree_e2e_test_suite(
     },
     reference_backend = "tf",
     tags = [
+        "manual",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
