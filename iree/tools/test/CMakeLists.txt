@@ -29,3 +29,16 @@ iree_lit_test_suite(
   LABELS
     "hostonly"
 )
+
+file(GLOB _GLOB_X_TXT LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.txt)
+iree_lit_test_suite(
+  NAME
+    flag_parse
+  SRCS
+    "${_GLOB_X_TXT}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-benchmark-module
+  LABELS
+    "hostonly"
+)

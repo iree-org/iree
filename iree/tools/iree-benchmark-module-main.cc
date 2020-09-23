@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "absl/flags/flag.h"
+#include "absl/flags/internal/parse.h"
+#include "absl/flags/usage.h"
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
 #include "iree/base/file_io.h"
@@ -164,8 +166,12 @@ void BM_RunModule(benchmark::State& state, const std::string& function_name) {
 
 }  // namespace
 
-void RegisterModuleBenchmarks() {
+Status RegisterModuleBenchmarks() {
   auto function_name = absl::GetFlag(FLAGS_entry_function);
+  if (function_name.empty()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Must specify an entry_function";
+  }
   auto benchmark_name = "BM_" + function_name;
   benchmark::RegisterBenchmark(benchmark_name.c_str(),
                                [function_name](benchmark::State& state) {
@@ -184,13 +190,47 @@ void RegisterModuleBenchmarks() {
       // significant digits. If we end up wanting precision beyond microseconds,
       // we can make this setting configurable with a custom command line flag.
       ->Unit(benchmark::kMillisecond);
+  return OkStatus();
 }
 }  // namespace iree
 
 int main(int argc, char** argv) {
+  // We have to contend with two flag parsing libraries here: absl's and
+  // benchmark's. To make matters worse, both define the `--help` flag. To
+  // ensure that each is able to parse its own flags, we use an absl "internal"
+  // function (still with public visibility) to parse while ignoring undefined
+  // flags. If it sees `--help` it will exit here, so we include the benchmark
+  // library usage information in the manually-set help output. Then we let
+  // benchmark parse its flags. Finally we call the normal initialization
+  // function to do other IREE initialization including flag parsing with
+  // normal options. Any remaining flags will be unknown and result in an error.
+  absl::SetProgramUsageMessage(
+      "iree-benchmark-module \n"
+      "    --input_file=module.vmfb\n"
+      "    --entry_function=exported_function_to_benchmark\n"
+      "    [--inputs=2xi32=1 2,1x2xf32=2 1 | --inputs_file=file_with_inputs]\n"
+      "    [--driver=vmla]\n"
+      "\n\n"
+      "  Optional flags from third_party/benchmark/src/benchmark.cc:\n"
+      "    [--benchmark_list_tests={true|false}]\n"
+      "    [--benchmark_filter=<regex>]\n"
+      "    [--benchmark_min_time=<min_time>]\n"
+      "    [--benchmark_repetitions=<num_repetitions>]\n"
+      "    [--benchmark_report_aggregates_only={true|false}]\n"
+      "    [--benchmark_display_aggregates_only={true|false}]\n"
+      "    [--benchmark_format=<console|json|csv>]\n"
+      "    [--benchmark_out=<filename>]\n"
+      "    [--benchmark_out_format=<json|console|csv>]\n"
+      "    [--benchmark_color={auto|true|false}]\n"
+      "    [--benchmark_counters_tabular={true|false}]\n"
+      "    [--v=<verbosity>]\n");
+  absl::flags_internal::ParseCommandLineImpl(
+      argc, argv, absl::flags_internal::ArgvListAction::kRemoveParsedArgs,
+      absl::flags_internal::UsageFlagsAction::kHandleUsage,
+      absl::flags_internal::OnUndefinedFlag::kIgnoreUndefined);
   ::benchmark::Initialize(&argc, argv);
   iree::InitializeEnvironment(&argc, &argv);
-  iree::RegisterModuleBenchmarks();
+  IREE_CHECK_OK(iree::RegisterModuleBenchmarks());
   ::benchmark::RunSpecifiedBenchmarks();
   return 0;
 }

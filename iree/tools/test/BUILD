@@ -34,3 +34,13 @@ iree_lit_test_suite(
     ],
     tags = ["hostonly"],
 )
+
+iree_lit_test_suite(
+    name = "flag_parse",
+    srcs = glob(["*.txt"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-benchmark-module",
+    ],
+    tags = ["hostonly"],
+)
