@@ -350,11 +350,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     BufferSet &bufferSet,
                                     ConversionPatternRewriter &rewriter) {
   // Get the handle to the executable that is compatible with our device.
-  auto executable =
-      rewriter
-          .create<IREE::HAL::ExecutableLookupOp>(dispatchOp.getLoc(), device,
-                                                 dispatchOp.executable())
-          .getResult();
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
@@ -418,7 +413,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   dispatchState.executableOp = executableOp;
   dispatchState.device = device;
   dispatchState.commandBuffer = commandBuffer;
-  dispatchState.executable = executable;
   dispatchState.executableLayout = executableLayout;
   dispatchState.workload = rewriter.getRemappedValue(dispatchOp.workload());
   // TODO(benvanik): support extended push constants.
