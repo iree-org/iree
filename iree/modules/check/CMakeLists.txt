@@ -45,7 +45,7 @@ iree_cc_binary(
   OUT
     iree-check-module
   SRCS
-    "iree-check-module_main.cc"
+    "iree-check-module-main.cc"
   DEPS
     ::native_module
     absl::flags

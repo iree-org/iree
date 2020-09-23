@@ -83,7 +83,7 @@ iree_cc_binary(
   OUT
     custom-opt
   SRCS
-    "custom-opt_main.cc"
+    "custom-opt-main.cc"
   DEPS
     ::init_dialect
     LLVMSupport
@@ -130,7 +130,7 @@ iree_cc_binary(
   OUT
     custom-translate
   SRCS
-    "custom-translate_main.cc"
+    "custom-translate-main.cc"
   DEPS
     ::init_dialect
     LLVMSupport

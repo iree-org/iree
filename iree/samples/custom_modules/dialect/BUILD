@@ -91,7 +91,7 @@ cc_library(
 
 iree_cc_binary(
     name = "custom-opt",
-    srcs = ["custom-opt_main.cc"],
+    srcs = ["custom-opt-main.cc"],
     deps = [
         ":init_dialect",
         "//iree/compiler/Conversion:init_conversions",
@@ -136,7 +136,7 @@ iree_cc_binary(
 
 iree_cc_binary(
     name = "custom-translate",
-    srcs = ["custom-translate_main.cc"],
+    srcs = ["custom-translate-main.cc"],
     deps = [
         ":init_dialect",
         "//iree/compiler/Conversion:init_conversions",

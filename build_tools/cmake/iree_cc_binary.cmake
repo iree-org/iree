@@ -53,7 +53,7 @@ endif()
 #   OUT
 #     awesome-tool
 #   SRCS
-#     "awesome_tool_main.cc"
+#     "awesome-tool-main.cc"
 #   DEPS
 #     iree::awesome
 # )

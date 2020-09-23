@@ -16,7 +16,7 @@ if(CMAKE_CROSSCOMPILING)
   iree_declare_host_excutable(generate_cc_embed_data)
 else()
   add_executable(generate_cc_embed_data)
-  target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data.cc)
+  target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data_main.cc)
   set_target_properties(generate_cc_embed_data PROPERTIES OUTPUT_NAME generate_cc_embed_data)
 
   target_link_libraries(generate_cc_embed_data

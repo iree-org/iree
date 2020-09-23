@@ -12,32 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Main entry function for custom-opt.
-// Based on the iree-opt main entry function (iree-opt_main.cc).
+// Custom translation main entry function.
+// Based on the iree-translate main entry function (iree-translate-main.cc).
 //
 // We need this entry function because we want to register the custom
-// dialect, which is missing in IREE's opt main entry function.
+// dialect, which is missing in IREE's translation main entry function.
 
-#include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/init_conversions.h"
-#include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
+#include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/samples/custom_modules/dialect/init_dialect.h"
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_iree_dialects.h"
-#include "iree/tools/init_iree_passes.h"
 #include "iree/tools/init_mlir_dialects.h"
-#include "iree/tools/init_mlir_passes.h"
 #include "iree/tools/init_targets.h"
+#include "iree/tools/init_translations.h"
 #include "iree/tools/init_xla_dialects.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/AsmState.h"
-#include "mlir/Pass/Pass.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
-#include "mlir/Support/MlirOptMain.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/ToolUtilities.h"
+#include "mlir/Translation.h"
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
@@ -49,46 +50,26 @@ static llvm::cl::opt<std::string> outputFilename(
 
 static llvm::cl::opt<bool> splitInputFile(
     "split-input-file",
-    llvm::cl::desc("Split the input file into pieces and process each "
-                   "chunk independently"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> verifyDiagnostics(
-    "verify-diagnostics",
-    llvm::cl::desc("Check that emitted diagnostics match "
-                   "expected-* lines on the corresponding line"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> verifyPasses(
-    "verify-each",
-    llvm::cl::desc("Run the verifier after each transformation pass"),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> allowUnregisteredDialects(
-    "allow-unregistered-dialect",
-    llvm::cl::desc("Allow operation with no registered dialects"),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> showDialects(
-    "show-dialects", llvm::cl::desc("Print the list of registered dialects"),
+    llvm::cl::desc("Split the input file into pieces and "
+                   "process each chunk independently"),
     llvm::cl::init(false));
 
 int main(int argc, char **argv) {
+  llvm::InitLLVM y(argc, argv);
+
   mlir::DialectRegistry registry;
+
   mlir::registerMlirDialects(registry);
-  mlir::registerMlirPasses();
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeDialects(registry);
-  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   // Register the custom dialect
   mlir::iree_compiler::registerCustomDialect(registry);
-  mlir::iree_compiler::registerAllIreePasses();
-  mlir::iree_compiler::registerHALConversionPasses();
+  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
+  mlir::iree_compiler::registerVMTargets();
+  mlir::registerMlirTranslations();
+  mlir::iree_compiler::registerIreeTranslations();
   mlir::iree_compiler::registerLinalgToSPIRVPasses();
-  mlir::iree_compiler::registerHLOToLinalgPasses();
-  mlir::iree_compiler::registerLinalgToLLVMPasses();
-  llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
@@ -99,24 +80,16 @@ int main(int argc, char **argv) {
   // Register pass manager command-line options like -print-ir-*.
   mlir::registerPassManagerCLOptions();
 
-  mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
+  // Add flags for all the registered translations.
+  llvm::cl::opt<const mlir::TranslateFunction *, false, mlir::TranslationParser>
+      translationRequested("", llvm::cl::desc("Translation to perform"),
+                           llvm::cl::Required);
 
-  // Parse pass names in main to ensure static initialization completed.
-  llvm::cl::ParseCommandLineOptions(argc, argv,
-                                    "IREE modular optimizer driver\n");
+  llvm::cl::ParseCommandLineOptions(argc, argv, "IREE translation driver\n");
 
-  if (showDialects) {
-    llvm::outs() << "Available Dialects:\n";
-    interleave(
-        registry, llvm::outs(),
-        [](auto &registryEntry) { llvm::outs() << registryEntry.first; }, "\n");
-    return 0;
-  }
-
-  // Set up the input file.
   std::string errorMessage;
-  auto file = mlir::openInputFile(inputFilename, &errorMessage);
-  if (!file) {
+  auto input = mlir::openInputFile(inputFilename, &errorMessage);
+  if (!input) {
     llvm::errs() << errorMessage << "\n";
     return 1;
   }
@@ -124,13 +97,28 @@ int main(int argc, char **argv) {
   auto output = mlir::openOutputFile(outputFilename, &errorMessage);
   if (!output) {
     llvm::errs() << errorMessage << "\n";
-    exit(1);
-  }
-
-  if (failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
-                               registry, splitInputFile, verifyDiagnostics,
-                               verifyPasses, allowUnregisteredDialects,
-                               /*preloadDialectsInContext=*/false))) {
     return 1;
   }
+
+  /// Processes the memory buffer with a new MLIRContext.
+  auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
+                           llvm::raw_ostream &os) {
+    mlir::MLIRContext context;
+    registry.appendTo(context.getDialectRegistry());
+    llvm::SourceMgr sourceMgr;
+    sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
+    mlir::SourceMgrDiagnosticHandler diagHandler(sourceMgr, &context);
+    return (*translationRequested)(sourceMgr, os, &context);
+  };
+
+  if (splitInputFile) {
+    if (failed(mlir::splitAndProcessBuffer(std::move(input), processBuffer,
+                                           output->os())))
+      return 1;
+  } else {
+    if (failed(processBuffer(std::move(input), output->os()))) return 1;
+  }
+
+  output->keep();
+  return 0;
 }
