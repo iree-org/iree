@@ -31,8 +31,8 @@ The mechanims in these two domains bear lots of similarity, but they are not
 exactly the same. We need to bridge these two worlds inside IREE.
 
 IREE has its own [Vulkan dialect][iree-vulkan-dialect], which defines the Vulkan
-target environment, including [versions][iree-vulkan-base],
-[extensions][iree-vulkan-base], [features][iree-vulkan-cap-td]. These
+target environment, including [versions][iree-vulkan-base-td],
+[extensions][iree-vulkan-base-td], [features][iree-vulkan-cap-td]. These
 definitions leverage MLIR attribute for storage, parsing/printing, and
 validation. For example, we can have the following Vulkan target environment:
 
@@ -41,8 +41,11 @@ target_env = #vk.target_env<
   v1.1, r(120),
   [VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class],
   {
+    maxComputeSharedMemorySize = 16384 : i32,
     maxComputeWorkGroupInvocations = 1024: i32,
-    maxComputeWorkGroupSize = dense<[128, 8, 4]>: vector<3xi32>
+    maxComputeWorkGroupSize = dense<[128, 8, 4]>: vector<3xi32>,
+    subgroupFeatures = 7: i32,
+    subgroupSize = 64 : i32
   }
 >
 ```
@@ -62,11 +65,14 @@ dump.
 
 When compiling ML models towards Vulkan, one specifies the target environment as
 a `#vk.target_env` attribute assembly via the
-[`iree-vulkan-target-env`][iree-vulkan-target-cl] command line option. At the
+[`iree-vulkan-target-env`][iree-vulkan-target-env] command-line option. At the
 moment only one target environment is supported; in the future this is expected
 to support multiple ones so that one can compile towards different Vulkan
 implementations at once and embed all of them in the final FlatBuffer and select
-at runtime.
+at runtime. Another command-line option, `iree-vulkan-target-triple` is also
+available to allow specifying common triples and avoiding the lengthy target
+environment assembly string. `iree-vulkan-target-triple` will be overridden by
+`iree-vulkan-target-env` if both are given.
 
 Under the hood, this Vulkan target environment is then converted to the SPIR-V
 target environment counterpart to drive code generation. The conversion happens
@@ -86,7 +92,8 @@ the above; it lives in upstream MLIR repo and is documented
 [iree-vulkan-dialect]: https://github.com/google/iree/tree/main/iree/compiler/Dialect/Vulkan
 [iree-vulkan-base-td]: https://github.com/google/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
 [iree-vulkan-cap-td]: https://github.com/google/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.td
-[iree-vulkan-target-cl]: https://github.com/google/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L66-L70
+[iree-vulkan-target-env]: https://github.com/google/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L66-L70
+[iree-vulkan-target-triple]: https://github.com/google/iree/blob/main/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.cpp
 [iree-vulkan-target-conv]: https://github.com/google/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h#L29-L42
 [iree-spirv-target-attach]: https://github.com/google/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L228-L240
 [mlir-spirv-target]: https://mlir.llvm.org/docs/Dialects/SPIR-V/#target-environment

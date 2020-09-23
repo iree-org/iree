@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/SPIRV/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -116,6 +117,37 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
     extensionsAttr = builder.getArrayAttr(extensions);
   }
 
+  // Parse vendor:device-type[:device-id]
+  spirv::Vendor vendorID = spirv::Vendor::Unknown;
+  spirv::DeviceType deviceType = spirv::DeviceType::Unknown;
+  uint32_t deviceID = spirv::TargetEnvAttr::kUnknownDeviceID;
+  {
+    auto loc = parser.getCurrentLocation();
+    StringRef vendorStr;
+    if (parser.parseKeyword(&vendorStr)) return {};
+    if (auto vendorSymbol = spirv::symbolizeVendor(vendorStr)) {
+      vendorID = *vendorSymbol;
+    } else {
+      parser.emitError(loc, "unknown vendor: ") << vendorStr;
+    }
+
+    loc = parser.getCurrentLocation();
+    StringRef deviceTypeStr;
+    if (parser.parseColon() || parser.parseKeyword(&deviceTypeStr)) return {};
+    if (auto deviceTypeSymbol = spirv::symbolizeDeviceType(deviceTypeStr)) {
+      deviceType = *deviceTypeSymbol;
+    } else {
+      parser.emitError(loc, "unknown device type: ") << deviceTypeStr;
+    }
+
+    loc = parser.getCurrentLocation();
+    if (succeeded(parser.parseOptionalColon())) {
+      if (parser.parseInteger(deviceID)) return {};
+    }
+
+    if (parser.parseComma()) return {};
+  }
+
   DictionaryAttr capabilities;
   {
     auto loc = parser.getCurrentLocation();
@@ -131,8 +163,8 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
 
   if (parser.parseGreater()) return {};
 
-  return TargetEnvAttr::get(versionAttr, revisionAttr, extensionsAttr,
-                            capabilities);
+  return TargetEnvAttr::get(versionAttr, revisionAttr, extensionsAttr, vendorID,
+                            deviceType, deviceID, capabilities);
 }
 }  // anonymous namespace
 
@@ -168,7 +200,13 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
   interleaveComma(targetEnv.getExtensionsAttr(), os, [&](Attribute attr) {
     os << attr.cast<StringAttr>().getValue();
   });
-  printer << "], " << targetEnv.getCapabilitiesAttr() << ">";
+  printer << "], " << spirv::stringifyVendor(targetEnv.getVendorID());
+  printer << ":" << spirv::stringifyDeviceType(targetEnv.getDeviceType());
+  auto deviceID = targetEnv.getDeviceID();
+  if (deviceID != spirv::TargetEnvAttr::kUnknownDeviceID) {
+    printer << ":" << targetEnv.getDeviceID();
+  }
+  printer << ", " << targetEnv.getCapabilitiesAttr() << ">";
 }
 }  // anonymous namespace
 
