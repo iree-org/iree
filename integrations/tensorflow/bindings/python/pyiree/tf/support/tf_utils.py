@@ -406,11 +406,11 @@ def compile_to_tflite(module_class: Type[tf.Module],
   """Compile a dict of TFLite interpreters for the methods on module_class."""
   functions, names = get_concrete_functions(module_class, exported_names)
   interpreters = dict()
-  compiled_paths = dict()
+  compiled_paths = None
+  if artifacts_dir is not None:
+    compiled_paths = dict()
 
-  def _interpret_bytes(tflite_module: bytes,
-                       base_dir: str,
-                       update_paths: bool = False):
+  def _interpret_bytes(tflite_module: bytes, base_dir: str):
     """Save compiled TFLite module bytes and convert into an interpreter."""
     tflite_dir = os.path.join(base_dir, "tflite")
     os.makedirs(tflite_dir, exist_ok=True)
@@ -419,7 +419,7 @@ def compile_to_tflite(module_class: Type[tf.Module],
       f.write(tflite_module)
 
     interpreters[name] = tf.lite.Interpreter(tflite_path)
-    if update_paths:
+    if artifacts_dir is not None:
       compiled_paths[name] = tflite_path
 
   for name, function in zip(names, functions):
@@ -430,7 +430,7 @@ def compile_to_tflite(module_class: Type[tf.Module],
       with tempfile.TemporaryDirectory() as base_dir:
         _interpret_bytes(tflite_module, base_dir)
     else:
-      _interpret_bytes(tflite_module, artifacts_dir, update_paths=True)
+      _interpret_bytes(tflite_module, artifacts_dir)
 
   return interpreters, compiled_paths
 
