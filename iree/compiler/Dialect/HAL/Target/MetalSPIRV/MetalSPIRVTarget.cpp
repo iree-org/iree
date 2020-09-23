@@ -44,7 +44,9 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
   auto triple = spirv::VerCapExtAttr::get(
       spirv::Version::V_1_0, {spirv::Capability::Shader},
       {spirv::Extension::SPV_KHR_storage_buffer_storage_class}, context);
-  return spirv::TargetEnvAttr::get(triple,
+  return spirv::TargetEnvAttr::get(triple, spirv::Vendor::Unknown,
+                                   spirv::DeviceType::Unknown,
+                                   spirv::TargetEnvAttr::kUnknownDeviceID,
                                    spirv::getDefaultResourceLimits(context));
 }
 

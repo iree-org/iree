@@ -184,9 +184,6 @@ class TargetBackend {
     // Note that many entry points may exist within a single executable.
     IREE::HAL::ExecutableEntryPointOp entryPointOp;
 
-    // SSA value of the loaded hal.executable reference.
-    Value executable;
-
     // SSA value of the loaded hal.executable_layout reference.
     Value executableLayout;
 
