@@ -233,7 +233,7 @@ iree_cc_binary(
 
 iree_cc_binary(
     name = "iree-run-mlir",
-    srcs = ["run_mlir_main.cc"],
+    srcs = ["iree-run-mlir_main.cc"],
     tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
@@ -270,7 +270,7 @@ iree_cc_binary(
 
 iree_cc_binary(
     name = "iree-run-module",
-    srcs = ["iree-translate_main.cc"],
+    srcs = ["iree-run-module_main.cc"],
     deps = [
         ":vm_util",
         "@com_google_absl//absl/flags:flag",

@@ -316,7 +316,7 @@ if(${IREE_BUILD_COMPILER})
     OUT
       iree-run-mlir
     SRCS
-      "run_mlir_main.cc"
+      "iree-run-mlir_main.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
