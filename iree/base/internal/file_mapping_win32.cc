@@ -35,7 +35,7 @@ class Win32FileMapping : public FileMapping {
   ~Win32FileMapping() override {
     if (!data_.empty()) {
       if (::UnmapViewOfFile(data_.data()) == FALSE) {
-        LOG(WARNING) << "Unable to unmap file: " << GetLastError();
+        IREE_LOG(WARNING) << "Unable to unmap file: " << GetLastError();
       }
       data_ = {};
     }

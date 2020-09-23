@@ -254,9 +254,9 @@ class RefObject {
       auto ref_obj = static_cast<RefObject<V>*>(p);
       int previous_count = ref_obj->counter_.fetch_sub(1);
 #ifdef IREE_VERBOSE_REF_PTR
-      LOG(INFO) << "ro-- " << typeid(V).name() << " " << p << " now "
-                << previous_count - 1
-                << (previous_count == 1 ? " DEAD (CUSTOM)" : "");
+      IREE_LOG(INFO) << "ro-- " << typeid(V).name() << " " << p << " now "
+                     << previous_count - 1
+                     << (previous_count == 1 ? " DEAD (CUSTOM)" : "");
 #endif  // IREE_VERBOSE_REF_PTR
       if (previous_count == 1) {
         // We delete type T pointer here to avoid the need for a virtual dtor.
@@ -272,8 +272,9 @@ class RefObject {
       auto ref_obj = static_cast<RefObject<V>*>(p);
       int previous_count = ref_obj->counter_.fetch_sub(1);
 #ifdef IREE_VERBOSE_REF_PTR
-      LOG(INFO) << "ro-- " << typeid(V).name() << " " << p << " now "
-                << previous_count - 1 << (previous_count == 1 ? " DEAD" : "");
+      IREE_LOG(INFO) << "ro-- " << typeid(V).name() << " " << p << " now "
+                     << previous_count - 1
+                     << (previous_count == 1 ? " DEAD" : "");
 #endif  // IREE_VERBOSE_REF_PTR
       if (previous_count == 1) {
         // We delete type T pointer here to avoid the need for a virtual dtor.
@@ -290,8 +291,8 @@ class RefObject {
     ++ref_obj->counter_;
 
 #ifdef IREE_VERBOSE_REF_PTR
-    LOG(INFO) << "ro++ " << typeid(T).name() << " " << p << " now "
-              << ref_obj->counter_;
+    IREE_LOG(INFO) << "ro++ " << typeid(T).name() << " " << p << " now "
+                   << ref_obj->counter_;
 #endif  // IREE_VERBOSE_REF_PTR
   }
 

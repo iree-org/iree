@@ -389,16 +389,16 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT,
   while (link) {
     ++actual_count;
     if (!link->prev) {
-      DCHECK_EQ(link, head_);
+      IREE_DCHECK_EQ(link, head_);
     }
     if (!link->next) {
-      DCHECK_EQ(link, tail_);
+      IREE_DCHECK_EQ(link, tail_);
     }
-    DCHECK_EQ(link->prev, previous);
+    IREE_DCHECK_EQ(link->prev, previous);
     previous = link;
     link = link->next;
   }
-  DCHECK_EQ(actual_count, count_);
+  IREE_DCHECK_EQ(actual_count, count_);
 #endif  // IREE_PARANOID_INTRUSIVE_LIST
 }
 
@@ -488,10 +488,10 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_front(
     T* value) {
-  DCHECK(value);
+  IREE_DCHECK(value);
   auto* link = impl::TToLink<T, kOffset>(value);
-  DCHECK(!link->next);
-  DCHECK(!link->prev);
+  IREE_DCHECK(!link->next);
+  IREE_DCHECK(!link->prev);
   link->next = head_;
   link->prev = nullptr;
   head_ = link;
@@ -509,7 +509,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_front(
 template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::pop_front() {
-  DCHECK(head_);
+  IREE_DCHECK(head_);
   auto* link = head_;
   if (link) {
     head_ = head_->next;
@@ -537,10 +537,10 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_back(
     T* value) {
-  DCHECK(value);
+  IREE_DCHECK(value);
   auto* link = impl::TToLink<T, kOffset>(value);
-  DCHECK(!link->next);
-  DCHECK(!link->prev);
+  IREE_DCHECK(!link->next);
+  IREE_DCHECK(!link->prev);
   link->prev = tail_;
   link->next = nullptr;
   tail_ = link;
@@ -558,7 +558,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_back(
 template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::pop_back() {
-  DCHECK(tail_);
+  IREE_DCHECK(tail_);
   auto* link = tail_;
   if (link) {
     tail_ = tail_->prev;
@@ -579,11 +579,11 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::insert(
     T* position, T* value) {
-  DCHECK(value);
+  IREE_DCHECK(value);
   auto* link = impl::TToLink<T, kOffset>(value);
   auto* position_link = impl::TToLink<T, kOffset>(position);
-  DCHECK(!link->next);
-  DCHECK(!link->prev);
+  IREE_DCHECK(!link->next);
+  IREE_DCHECK(!link->prev);
 
   if (position_link == head_) {
     push_front(value);
@@ -608,17 +608,17 @@ T* IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::erase(T* value) {
   }
   auto* link = impl::TToLink<T, kOffset>(value);
   if (link->prev) {
-    DCHECK_NE(link, head_);
+    IREE_DCHECK_NE(link, head_);
     link->prev->next = link->next;
   } else {
-    DCHECK_EQ(link, head_);
+    IREE_DCHECK_EQ(link, head_);
     head_ = link->next;
   }
   if (link->next) {
-    DCHECK_NE(link, tail_);
+    IREE_DCHECK_NE(link, tail_);
     link->next->prev = link->prev;
   } else {
-    DCHECK_EQ(link, tail_);
+    IREE_DCHECK_EQ(link, tail_);
     tail_ = link->prev;
   }
   auto* next = link->next;
@@ -647,9 +647,9 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::replace(
     T* old_value, T* new_value) {
-  DCHECK(old_value);
-  DCHECK(new_value);
-  DCHECK_NE(old_value, new_value);
+  IREE_DCHECK(old_value);
+  IREE_DCHECK(new_value);
+  IREE_DCHECK_NE(old_value, new_value);
   auto* old_link = impl::TToLink<T, kOffset>(old_value);
   auto* new_link = impl::TToLink<T, kOffset>(new_value);
   new_link->next = old_link->next;

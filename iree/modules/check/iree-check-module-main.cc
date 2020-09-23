@@ -178,7 +178,7 @@ extern "C" int main(int argc, char** argv) {
   IREE_FORCE_BINARY_STDIN();
 
   if (argc < 2) {
-    LOG(ERROR)
+    IREE_LOG(ERROR)
         << "A binary module file path to run (or - for stdin) must be passed";
     return -1;
   }

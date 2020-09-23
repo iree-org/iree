@@ -15,6 +15,8 @@
 #ifndef IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
 #define IREE_BINDINGS_JAVA_COM_GOOGLE_IREE_NATIVE_CONTEXT_WRAPPER_H_
 
+#include <vector>
+
 #include "bindings/java/com/google/iree/native/function_wrapper.h"
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
 #include "bindings/java/com/google/iree/native/module_wrapper.h"

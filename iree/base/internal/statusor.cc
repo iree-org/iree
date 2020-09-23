@@ -21,14 +21,14 @@ namespace internal_statusor {
 void Helper::HandleInvalidStatusCtorArg(Status* status) {
   const char* kMessage =
       "An OK status is not a valid constructor argument to StatusOr<T>";
-  LOG(ERROR) << kMessage;
+  IREE_LOG(ERROR) << kMessage;
   *status = Status(StatusCode::kInternal, kMessage);
   abort();
 }
 
 void Helper::Crash(const Status& status) {
-  LOG(FATAL) << "Attempting to fetch value instead of handling error "
-             << status;
+  IREE_LOG(FATAL) << "Attempting to fetch value instead of handling error "
+                  << status;
   abort();
 }
 

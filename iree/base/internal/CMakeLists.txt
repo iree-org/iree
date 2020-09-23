@@ -65,34 +65,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    init_internal
-  HDRS
-    "init_internal.h"
-  SRCS
-    "init_internal.cc"
-  DEPS
-    absl::flags_parse
-    iree::base::initializer
-    iree::base::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    logging_internal
-  HDRS
-    "logging.h"
-  SRCS
-    "logging.cc"
-  DEPS
-    absl::core_headers
-    absl::flags
-    iree::base::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     ostringstream
   HDRS
     "ostringstream.h"

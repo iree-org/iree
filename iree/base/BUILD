@@ -15,7 +15,6 @@
 # Common types and utilities used in the IREE codebase.
 
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
-load("//iree:build_defs.oss.bzl", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -246,8 +245,12 @@ cc_library(
 
 cc_library(
     name = "init",
+    srcs = ["init.cc"],
     hdrs = ["init.h"],
-    deps = platform_trampoline_deps("init"),
+    deps = [
+        ":initializer",
+        "@com_google_absl//absl/flags:parse",
+    ],
 )
 
 cc_library(
@@ -289,8 +292,12 @@ cc_test(
 
 cc_library(
     name = "logging",
+    srcs = ["logging.cc"],
     hdrs = ["logging.h"],
-    deps = platform_trampoline_deps("logging"),
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/flags:flag",
+    ],
 )
 
 cc_library(

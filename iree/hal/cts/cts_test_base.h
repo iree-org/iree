@@ -57,15 +57,15 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
     auto driver_or = GetDriver(driver_name);
     if (IsUnavailable(driver_or.status())) {
-      LOG(WARNING) << "Skipping test as driver is unavailable: "
-                   << driver_or.status();
+      IREE_LOG(WARNING) << "Skipping test as driver is unavailable: "
+                        << driver_or.status();
       GTEST_SKIP();
       return;
     }
     IREE_ASSERT_OK_AND_ASSIGN(driver_, std::move(driver_or));
-    LOG(INFO) << "Creating default device...";
+    IREE_LOG(INFO) << "Creating default device...";
     IREE_ASSERT_OK_AND_ASSIGN(device_, driver_->CreateDefaultDevice());
-    LOG(INFO) << "Created device '" << device_->info().name() << "'";
+    IREE_LOG(INFO) << "Created device '" << device_->info().name() << "'";
   }
 
   ref_ptr<Driver> driver_;
@@ -85,12 +85,12 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     // Reuse an existing driver if possible.
     auto found_it = shared_drivers_.find(driver_name);
     if (found_it != shared_drivers_.end()) {
-      LOG(INFO) << "Reusing existing driver '" << driver_name << "'...";
+      IREE_LOG(INFO) << "Reusing existing driver '" << driver_name << "'...";
       return add_ref(found_it->second);
     }
 
     // No existing driver, attempt to create.
-    LOG(INFO) << "Creating driver '" << driver_name << "'...";
+    IREE_LOG(INFO) << "Creating driver '" << driver_name << "'...";
     auto driver_or = DriverRegistry::shared_registry()->Create(driver_name);
     if (IsUnavailable(driver_or.status())) {
       unavailable_driver_names.insert(driver_name);

@@ -70,7 +70,7 @@ static int g_SwapChainResizeHeight = 0;
 
 static void check_vk_result(VkResult err) {
   if (err == 0) return;
-  LOG(FATAL) << "VkResult: " << err;
+  IREE_LOG(FATAL) << "VkResult: " << err;
 }
 
 static std::vector<const char*> GetIreeLayers(
@@ -113,7 +113,7 @@ static std::vector<const char*> GetInstanceLayers(
       }
     }
     if (!found) {
-      LOG(FATAL) << "Required layer " << layer_name << " not available";
+      IREE_LOG(FATAL) << "Required layer " << layer_name << " not available";
     }
   }
   for (const char* layer_name : optional_layers) {
@@ -433,7 +433,7 @@ int iree::IreeMain(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Create a window.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
-    LOG(FATAL) << "Failed to initialize SDL";
+    IREE_LOG(FATAL) << "Failed to initialize SDL";
     return 1;
   }
 
@@ -540,9 +540,9 @@ int iree::IreeMain(int argc, char** argv) {
   iree_status_t status =
       iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version);
   if (iree_status_is_ok(status)) {
-    LOG(INFO) << "IREE runtime API version " << actual_version;
+    IREE_LOG(INFO) << "IREE runtime API version " << actual_version;
   } else {
-    LOG(FATAL) << "Unsupported runtime API version " << actual_version;
+    IREE_LOG(FATAL) << "Unsupported runtime API version " << actual_version;
   }
 
   // Register HAL module types.
@@ -554,7 +554,7 @@ int iree::IreeMain(int argc, char** argv) {
       iree_vm_instance_create(iree_allocator_system(), &iree_instance));
 
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
-  LOG(INFO) << "Creating Vulkan driver/device";
+  IREE_LOG(INFO) << "Creating Vulkan driver/device";
   // Load symbols from our static `vkGetInstanceProcAddr` for IREE to use.
   iree_hal_vulkan_syms_t* iree_vk_syms = nullptr;
   IREE_CHECK_OK(iree_hal_vulkan_syms_create(
@@ -586,7 +586,7 @@ int iree::IreeMain(int argc, char** argv) {
                                        &hal_module));
 
   // Load bytecode module from embedded data.
-  LOG(INFO) << "Loading simple_mul.mlir...";
+  IREE_LOG(INFO) << "Loading simple_mul.mlir...";
   const auto* module_file_toc =
       iree::samples::vulkan::simple_mul_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
@@ -598,21 +598,21 @@ int iree::IreeMain(int argc, char** argv) {
   // Query for details about what is in the loaded module.
   iree_vm_module_signature_t bytecode_module_signature =
       iree_vm_module_signature(bytecode_module);
-  LOG(INFO) << "Module loaded, have <"
-            << bytecode_module_signature.export_function_count
-            << "> exported functions:";
+  IREE_LOG(INFO) << "Module loaded, have <"
+                 << bytecode_module_signature.export_function_count
+                 << "> exported functions:";
   for (int i = 0; i < bytecode_module_signature.export_function_count; ++i) {
     iree_string_view_t function_name;
     iree_vm_function_signature_t function_signature;
     IREE_CHECK_OK(bytecode_module->get_function(
         bytecode_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
         /*out_function=*/nullptr, &function_name, &function_signature));
-    LOG(INFO) << "  " << i << ": '"
-              << std::string(function_name.data, function_name.size)
-              << "' with calling convention '"
-              << std::string(function_signature.calling_convention.data,
-                             function_signature.calling_convention.size)
-              << "'";
+    IREE_LOG(INFO) << "  " << i << ": '"
+                   << std::string(function_name.data, function_name.size)
+                   << "' with calling convention '"
+                   << std::string(function_signature.calling_convention.data,
+                                  function_signature.calling_convention.size)
+                   << "'";
   }
 
   // Allocate a context that will hold the module state across invocations.
@@ -621,7 +621,7 @@ int iree::IreeMain(int argc, char** argv) {
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
       iree_instance, modules.data(), modules.size(), iree_allocator_system(),
       &iree_context));
-  LOG(INFO) << "Context with modules is ready for use";
+  IREE_LOG(INFO) << "Context with modules is ready for use";
 
   // Lookup the async entry point function.
   iree_vm_function_t main_function;
@@ -631,9 +631,10 @@ int iree::IreeMain(int argc, char** argv) {
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
       &main_function));
   iree_string_view_t main_function_name = iree_vm_function_name(&main_function);
-  LOG(INFO) << "Resolved main function named '"
-            << std::string(main_function_name.data, main_function_name.size)
-            << "'";
+  IREE_LOG(INFO) << "Resolved main function named '"
+                 << std::string(main_function_name.data,
+                                main_function_name.size)
+                 << "'";
 
   // Create wait and signal semaphores for async execution.
   vm::ref<iree_hal_semaphore_t> wait_semaphore;
@@ -719,7 +720,7 @@ int iree::IreeMain(int argc, char** argv) {
         // This is synchronous and doesn't reuse buffers for now.
 
         // Write inputs into mappable buffers.
-        DLOG(INFO) << "Creating I/O buffers...";
+        IREE_DLOG(INFO) << "Creating I/O buffers...";
         constexpr int32_t kElementCount = 4;
         iree_hal_allocator_t* allocator =
             iree_hal_device_allocator(iree_vk_device);
@@ -800,7 +801,7 @@ int iree::IreeMain(int argc, char** argv) {
             signal_semaphore.get(), 1, IREE_TIME_INFINITE_FUTURE));
 
         // Read back the results.
-        DLOG(INFO) << "Reading back results...";
+        IREE_DLOG(INFO) << "Reading back results...";
         auto* output_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(
             iree_vm_list_get_ref_deref(outputs.get(), 0,
                                        iree_hal_buffer_view_get_descriptor()));
