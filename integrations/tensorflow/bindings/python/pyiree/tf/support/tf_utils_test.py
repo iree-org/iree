@@ -44,6 +44,15 @@ class StatefulCountingModule(tf.Module):
   def get_count(self):
     return self.count
 
+class RandomInitModule(tf.Module):
+
+  def __init__(self):
+    self.value = tf.Variable(tf.random.uniform([1]))
+
+  @tf.function(input_signature=[])
+  def get(self):
+    return self.value
+
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
@@ -96,11 +105,9 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     module.increment()
     self.assertEqual([1.], module.get_count())
 
-    reinitialized_module = module.create_reinitialized()
+    module.reinitialize()
     # Test reinitialization.
-    self.assertEqual([0.], reinitialized_module.get_count())
-    # Test independent state.
-    self.assertEqual([1.], module.get_count())
+    self.assertEqual([0.], module.get_count())
 
   def test_to_mlir_type(self):
     self.assertEqual('i8', tf_utils.to_mlir_type(np.dtype('int8')))
@@ -113,6 +120,30 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual('2xi32=1 2', tf_utils.save_input_values(inputs))
     inputs = [np.array([1, 2], dtype=np.float32)]
     self.assertEqual('2xf32=1.0 2.0', tf_utils.save_input_values(inputs))
+
+
+  @parameterized.named_parameters([
+      {
+          'testcase_name': 'tensorflow',
+          'backend_name': 'tf',
+      },
+      {
+          'testcase_name': 'vmla',
+          'backend_name': 'iree_vmla',
+      },
+  ])
+  def test_random_initialization(self, backend_name):
+    backend_info = tf_utils.BackendInfo(backend_name)
+
+    # Test compilation is the same.
+    module_1 = backend_info.compile(RandomInitModule)
+    module_2 = backend_info.compile(RandomInitModule)
+    self.assertAllEqual(module_1.get(), module_2.get())
+
+    # Test reinitialization is the same.
+    old_value = module_1.get()
+    module_1.reinitialize()
+    self.assertAllEqual(old_value, module_1.get())
 
 
 if __name__ == '__main__':

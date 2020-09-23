@@ -61,6 +61,12 @@ constexpr ExecutableFormat kExecutableFormatVMLA =
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
 
+// Metal executable in FlatBuffer format using the
+// https://github.com/google/iree/tree/main/iree/schemas/metal_executable_def.fbs
+// schema.
+constexpr ExecutableFormat kExecutableFormatMetal =
+    MakeExecutableFormatID("MTLE");
+
 // LLVMIR executable in FlatBuffer format using the
 // https://github.com/google/iree/tree/main/iree/schemas/llvmir_executable_def.fbs
 // schema.

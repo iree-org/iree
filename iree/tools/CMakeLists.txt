@@ -26,6 +26,10 @@ if(${IREE_TARGET_BACKEND_LLVM-IR})
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM::IR::LLVMIR)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMIR_TARGET")
 endif()
+if(${IREE_TARGET_BACKEND_METAL-SPIRV})
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::MetalSPIRV)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_METALSPIRV_TARGET")
+endif()
 if(${IREE_TARGET_BACKEND_VMLA})
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMLA)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMLA_TARGET")
@@ -51,7 +55,7 @@ iree_cc_binary(
   OUT
     iree-benchmark-module
   SRCS
-    "benchmark_module_main.cc"
+    "iree-benchmark-module-main.cc"
   DEPS
     ::vm_util
     absl::flags
@@ -74,7 +78,7 @@ iree_cc_binary(
   OUT
     iree-dump-module
   SRCS
-    "dump_module_main.cc"
+    "iree-dump-module-main.cc"
   DEPS
     flatbuffers
     iree::base::file_io
@@ -89,7 +93,7 @@ iree_cc_binary(
   OUT
     iree-run-module
   SRCS
-    "run_module_main.cc"
+    "iree-run-module-main.cc"
   DEPS
     ::vm_util
     absl::flags
@@ -232,7 +236,7 @@ if(${IREE_BUILD_COMPILER})
     NAME
       iree_opt_main
     SRCS
-      "opt_main.cc"
+      "iree-opt-main.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
@@ -278,7 +282,7 @@ if(${IREE_BUILD_COMPILER})
     NAME
       iree_translate_main
     SRCS
-      "translate_main.cc"
+      "iree-translate-main.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
@@ -316,7 +320,7 @@ if(${IREE_BUILD_COMPILER})
     OUT
       iree-run-mlir
     SRCS
-      "run_mlir_main.cc"
+      "iree-run-mlir-main.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects

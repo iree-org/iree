@@ -56,7 +56,7 @@ cc_library(
 
 cc_binary(
     name = "iree-tf-opt",
-    srcs = ["tf_opt_main.cc"],
+    srcs = ["iree-tf-opt-main.cc"],
     deps = [
         ":tensorflow",
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir:dialect",

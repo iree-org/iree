@@ -64,15 +64,8 @@ static Value legalizeToVectorType(OpBuilder &builder, Value val) {
   } else if (type.isIntOrFloat()) {
     auto vecType = getVecType(builder, type);
     if (!vecType) return nullptr;
-    // TODO(hanchung): Add a folder on vector::BroadcastOp so we don't need to
-    // create manually.
-    if (auto cst = val.getDefiningOp<ConstantOp>()) {
-      auto cstVecValue = DenseElementsAttr::get(vecType, cst.value());
-      return builder.create<ConstantOp>(val.getLoc(), vecType, cstVecValue)
-          .getResult();
-    }
-    return builder.create<vector::BroadcastOp>(val.getLoc(), vecType, val)
-        .getResult();
+    return builder.createOrFold<vector::BroadcastOp>(val.getLoc(), vecType,
+                                                     val);
   }
   return nullptr;
 }
@@ -197,12 +190,13 @@ struct VectorizeGenericOp : public OpConversionPattern<linalg::GenericOp> {
       rewriter.replaceOp(placeholder, arg.getResult());
       newArgs.push_back(arg.getResult());
     }
-
+    ArrayRef<Value> newArgsRef(newArgs.begin(), newArgs.end());
     auto newOp = rewriter.create<linalg::GenericOp>(
-        genericOp.getLoc(), genericOp.getResultTypes(), newArgs,
-        rewriter.getI64IntegerAttr(genericOp.getNumInputs()),
-        rewriter.getI64IntegerAttr(genericOp.getNumOutputs()),
-        genericOp.indexing_mapsAttr(), genericOp.iterator_types(),
+        genericOp.getLoc(), genericOp.getResultTypes(),
+        /*inputs=*/newArgsRef.take_front(genericOp.getNumInputs()),
+        /*outputBuffers*/ newArgsRef.take_back(genericOp.getNumOutputs()),
+        /*initTensors*/ ValueRange{}, genericOp.indexing_mapsAttr(),
+        genericOp.iterator_types(),
         /*doc=*/nullptr,
         /*library_call=*/nullptr,
         /*symbol_source=*/nullptr);

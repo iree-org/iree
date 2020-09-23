@@ -79,7 +79,7 @@ class ConvertVMToEmitCPass
     registry.insert<mlir::emitc::EmitCDialect>();
   }
 
-  void runOnOperation() {
+  void runOnOperation() override {
     ConversionTarget target(getContext());
 
     OwningRewritePatternList patterns;
