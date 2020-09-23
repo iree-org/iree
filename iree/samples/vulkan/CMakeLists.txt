@@ -34,7 +34,7 @@ iree_bytecode_module(
 # One way to achieve this is by installing the Vulkan SDK from
 # https://vulkan.lunarg.com/.
 # If Vulkan is not found, omit the target.
-if(NOT TARGET iree::tools::vulkan_gui_util)
+if(NOT TARGET iree::testing::vulkan::vulkan_gui_util)
   message(NOTICE "Vulkan was not found, skipping vulkan_inference_gui sample")
   return()
 endif()
@@ -55,7 +55,7 @@ iree_cc_binary(
     iree::base::main
     iree::modules::hal
     iree::samples::vulkan::simple_mul_bytecode_module_cc
-    iree::tools::vulkan_gui_util
+    iree::testing::vulkan::vulkan_gui_util
     iree::vm
     iree::vm::bytecode_module
     iree::vm::ref_cc

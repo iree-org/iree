@@ -17,7 +17,7 @@
 // Vulkan GUI utility functions
 // Other matters here: we need to pull in this first to make sure Vulkan API
 // prototypes are defined so that we can statically link against them.
-#include "iree/tools/vulkan_gui_util.h"
+#include "iree/testing/vulkan/vulkan_gui_util.h"
 
 // IREE's C API:
 #include "iree/base/api.h"

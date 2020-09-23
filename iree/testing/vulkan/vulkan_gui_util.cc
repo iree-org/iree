@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/tools/vulkan_gui_util.h"
+#include "iree/testing/vulkan/vulkan_gui_util.h"
 
 #include <cstring>
 #include <set>
