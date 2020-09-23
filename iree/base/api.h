@@ -612,7 +612,7 @@ typedef void* iree_status_t;
 
 // TODO(#2843): better logging of status checks.
 #define IREE_CHECK_OK(expr) \
-  CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
+  IREE_CHECK_EQ(IREE_STATUS_OK, iree_status_consume_code(expr))
 #define IREE_ASSERT_ARGUMENT(name) assert(name)
 
 // Returns a NUL-terminated string constant for the given status code, such as

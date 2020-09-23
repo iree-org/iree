@@ -30,7 +30,7 @@ using ::iree::testing::status::StatusIs;
 
 std::string GetUniquePath(absl::string_view unique_name) {
   char* test_tmpdir = getenv("TEST_TMPDIR");
-  CHECK(test_tmpdir) << "TEST_TMPDIR not defined";
+  IREE_CHECK(test_tmpdir) << "TEST_TMPDIR not defined";
   return file_path::JoinPaths(test_tmpdir,
                               absl::StrCat(unique_name, "_test.txt"));
 }

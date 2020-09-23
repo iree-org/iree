@@ -86,7 +86,7 @@ uint8_t* Arena::AllocateBytes(size_t length) {
     // This allocation is larger than an entire block. That's bad.
     // We could allocate this with malloc (and then keep track of those to free
     // things), but for now let's just die.
-    CHECK(false);
+    IREE_CHECK(false);
     return nullptr;
   }
 

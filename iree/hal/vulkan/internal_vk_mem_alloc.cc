@@ -37,11 +37,11 @@
   absl::flat_hash_map<KeyT, ValueT, std::hash<KeyT>, std::equal_to<KeyT>, \
                       VmaStlAllocator<std::pair<KeyT, ValueT> > >
 
-// Use CHECK for assertions.
-#define VMA_ASSERT CHECK
-#define VMA_HEAVY_ASSERT DCHECK
+// Use IREE_CHECK for assertions.
+#define VMA_ASSERT IREE_CHECK
+#define VMA_HEAVY_ASSERT IREE_DCHECK
 
-// Use LOG for logging.
+// Use IREE_LOG for logging.
 #ifndef NDEBUG
 #define VMA_DEBUG_LOG(...) ABSL_RAW_LOG(INFO, __VA_ARGS__)
 #else
