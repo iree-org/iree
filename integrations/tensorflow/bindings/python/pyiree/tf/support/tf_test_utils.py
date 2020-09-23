@@ -259,9 +259,10 @@ class Trace:
     if _load_dict is None:
       # Extract metadata from module and function.
       self.module_name = module.module_name
-      self.compiled_path = module.compiled_path
+      self.compiled_paths = module.compiled_paths
       self.backend_name = module.backend
-      self.supports_cxx_serialization = module.supports_cxx_serialization()
+      self.iree_serializable = module.iree_serializable()
+      self.tflite_serializable = module.tflite_serializable()
       self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
@@ -272,9 +273,10 @@ class Trace:
       self.calls = []
     else:
       self.module_name = _load_dict["module_name"]
-      self.compiled_path = _load_dict["compiled_path"]
+      self.compiled_paths = _load_dict["compiled_paths"]
       self.backend_name = _load_dict["backend_name"]
-      self.supports_cxx_serialization = _load_dict["supports_cxx_serialization"]
+      self.iree_serializable = _load_dict["iree_serializable"]
+      self.tflite_serializable = _load_dict["tflite_serializable"]
       self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
@@ -434,9 +436,10 @@ class Trace:
     # Python serialization.
     metadata = {
         "module_name": self.module_name,
-        "compiled_path": self.compiled_path,
+        "compiled_paths": self.compiled_paths,
         "backend_name": self.backend_name,
-        "supports_cxx_serialization": self.supports_cxx_serialization,
+        "iree_serializable": self.iree_serializable,
+        "tflite_serializable": self.tflite_serializable,
         "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
@@ -451,11 +454,11 @@ class Trace:
       call_dir = os.path.join(trace_dir, f"call_{str(i).zfill(width)}")
       call.serialize(call_dir)
 
-    # C++ Serialization.
-    if self.supports_cxx_serialization:
+    # C++ benchmark serialization.
+    if self.iree_serializable:
       flaglines = []
-      if self.compiled_path is not None:
-        flaglines.append(f"--input_file={self.compiled_path}")
+      if self.compiled_paths is not None:
+        flaglines.append(f"--input_file={self.compiled_paths}")
       flaglines.append(f"--driver={self.backend_driver}")
       inputs_str = ", ".join(self.calls[0].serialized_inputs)
       flaglines.append(f"--inputs={inputs_str}")
@@ -463,6 +466,10 @@ class Trace:
 
       with open(os.path.join(trace_dir, "flagfile"), "w") as f:
         f.writelines(line + "\n" for line in flaglines)
+    elif self.tflite_serializable and self.compiled_paths is not None:
+      graph_path = self.compiled_paths[self.calls[0].method]
+      with open(os.path.join(trace_dir, "graph_path"), "w") as f:
+        f.writelines(graph_path + "\n")
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":
