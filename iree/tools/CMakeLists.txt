@@ -51,7 +51,7 @@ iree_cc_binary(
   OUT
     iree-benchmark-module
   SRCS
-    "benchmark_module_main.cc"
+    "iree-benchmark-module_main.cc"
   DEPS
     ::vm_util
     absl::flags
@@ -74,7 +74,7 @@ iree_cc_binary(
   OUT
     iree-dump-module
   SRCS
-    "dump_module_main.cc"
+    "iree-dump-module_main.cc"
   DEPS
     flatbuffers
     iree::base::file_io
@@ -89,7 +89,7 @@ iree_cc_binary(
   OUT
     iree-run-module
   SRCS
-    "run_module_main.cc"
+    "iree-translate_main.cc"
   DEPS
     ::vm_util
     absl::flags
@@ -232,7 +232,7 @@ if(${IREE_BUILD_COMPILER})
     NAME
       iree_opt_main
     SRCS
-      "opt_main.cc"
+      "iree-opt_main.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
@@ -278,7 +278,7 @@ if(${IREE_BUILD_COMPILER})
     NAME
       iree_translate_main
     SRCS
-      "translate_main.cc"
+      "iree-translate_main.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects

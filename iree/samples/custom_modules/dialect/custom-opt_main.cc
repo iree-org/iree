@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Main entry function for custom-opt.
-// Based on the iree-opt main entry function (opt_main.cc).
+// Based on the iree-opt main entry function (iree-opt_main.cc).
 //
 // We need this entry function because we want to register the custom
 // dialect, which is missing in IREE's opt main entry function.
