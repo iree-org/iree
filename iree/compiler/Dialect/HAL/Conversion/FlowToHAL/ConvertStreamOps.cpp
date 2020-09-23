@@ -263,7 +263,7 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
 
 static void recordPushConstants(Value device, Value commandBuffer,
                                 IREE::Flow::DispatchOp &dispatchOp,
-                                IREE::HAL::ExecutableOp &executableOp,
+                                IREE::HAL::InterfaceOp &interfaceOp,
                                 Value executableLayout,
                                 ConversionPatternRewriter &rewriter) {
   SmallVector<Value, 4> pushConstantValues;
@@ -285,7 +285,6 @@ static void recordPushConstants(Value device, Value commandBuffer,
     return;
   }
 
-  auto interfaceOp = executableOp.getInterfaceOp();
   uint64_t maxPushConstants = interfaceOp.push_constants().getValueOr(0);
   (void)maxPushConstants;
   assert(pushConstantValues.size() <= maxPushConstants &&
@@ -298,7 +297,6 @@ static void recordPushConstants(Value device, Value commandBuffer,
 
 static LogicalResult recordPushBindings(Value device, Value commandBuffer,
                                         IREE::Flow::DispatchOp &dispatchOp,
-                                        IREE::HAL::ExecutableOp &executableOp,
                                         Value executableLayout,
                                         BufferSet &bufferSet,
                                         ConversionPatternRewriter &rewriter) {
@@ -352,11 +350,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     BufferSet &bufferSet,
                                     ConversionPatternRewriter &rewriter) {
   // Get the handle to the executable that is compatible with our device.
-  auto executable =
-      rewriter
-          .create<IREE::HAL::ExecutableLookupOp>(dispatchOp.getLoc(), device,
-                                                 dispatchOp.executable())
-          .getResult();
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
@@ -373,12 +366,12 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
 
   // Setup push constants for any dynamic values we need to pass across at
   // runtime.
-  recordPushConstants(device, commandBuffer, dispatchOp, executableOp,
+  recordPushConstants(device, commandBuffer, dispatchOp, interfaceOp,
                       executableLayout, rewriter);
 
   // Setup bindings, right now pushed immediately but soon to be replaced
   // with descriptor sets (or something better, anyway).
-  if (failed(recordPushBindings(device, commandBuffer, dispatchOp, executableOp,
+  if (failed(recordPushBindings(device, commandBuffer, dispatchOp,
                                 executableLayout, bufferSet, rewriter))) {
     return failure();
   }
@@ -420,7 +413,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   dispatchState.executableOp = executableOp;
   dispatchState.device = device;
   dispatchState.commandBuffer = commandBuffer;
-  dispatchState.executable = executable;
   dispatchState.executableLayout = executableLayout;
   dispatchState.workload = rewriter.getRemappedValue(dispatchOp.workload());
   // TODO(benvanik): support extended push constants.
