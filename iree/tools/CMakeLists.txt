@@ -89,7 +89,7 @@ iree_cc_binary(
   OUT
     iree-run-module
   SRCS
-    "iree-translate_main.cc"
+    "iree-run-module_main.cc"
   DEPS
     ::vm_util
     absl::flags
