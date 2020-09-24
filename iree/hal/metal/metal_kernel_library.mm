@@ -60,6 +60,10 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
     [msl_compile_options release];
   });
 
+  // TODO(antiagainst): We are performing synchronous compilation at runtime here. This is good for
+  // debugging purposes but bad for performance. Enable offline compilation and make that as the
+  // default.
+
   for (int i = 0; i < msl_sources.size(); ++i) {
     @autoreleasepool {
       NSError* error = nil;
@@ -71,7 +75,9 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
                                                       error:&error];
       if (!library) {
         NSLog(@"Failed to create MTLLibrary: %@", error);
+#ifndef NDEBUG
         NSLog(@"Original MSL source: %@", shader_source);
+#endif
         return InvalidArgumentErrorBuilder(IREE_LOC) << "Invalid MSL source";
       }
       libraries.push_back(library);
@@ -81,10 +87,12 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
       id<MTLFunction> function = [library newFunctionWithName:entry_point];
       if (!function) {
         NSLog(@"Failed to create MTLFunction");
+#ifndef NDEBUG
         NSLog(@"Original MSL source: %@", shader_source);
+#endif
         return InvalidArgumentErrorBuilder(IREE_LOC)
-               << "Cannot find entry point '" << entry_points[i] << "' in the " << i
-               << "th shader source";
+               << "Cannot find entry point '" << entry_points[i] << "' in shader source index "
+               << i;
       }
       functions.push_back(function);
 
@@ -92,7 +100,9 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
                                                                               error:&error];
       if (!pso) {
         NSLog(@"Failed to create MTLComputePipelineState: %@", error);
+#ifndef NDEBUG
         NSLog(@"Original MSL source: %@", shader_source);
+#endif
         return InvalidArgumentErrorBuilder(IREE_LOC) << "Invalid MSL source";
       }
       states.push_back(pso);

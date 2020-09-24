@@ -32,9 +32,9 @@ namespace metal {
 
 // An executable implementation for Metal that wraps MTLLibrary and MTLFunction.
 //
-// Metal represents compute kernels as MTLFunctions. MTLLibrary is just a
-// alloction of MTLFunctions. One create a MTLComputePipelineState from a
-// MTLFunction and use the pipeline state for creating compute pipelines.
+// Metal represents compute kernels as MTLFunctions. MTLLibrary is just an
+// allocation of MTLFunctions. One creates a MTLComputePipelineState from a
+// MTLFunction and uses the pipeline state for creating compute pipelines.
 // This class bundles all the necesary Metal objects for getting pipeline state
 // objects for a compute kernel.
 class MetalKernelLibrary final : public Executable {
