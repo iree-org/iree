@@ -112,8 +112,7 @@ struct LinalgTileAndFusePass
 
 /// Distribution options for linalg.matmul when targeting workgroups.
 static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
-    [](OpBuilder &builder, Location loc,
-       ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+    [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
       return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
           builder, loc, parallelLoopRanges.size());
     },
@@ -176,8 +175,7 @@ struct TileMatmulSubgroupPattern
 /// Distribution options for targeting workgroups for convolution/pooling
 /// operations.
 static linalg::LinalgLoopDistributionOptions convPoolDistributionOptions = {
-    [](OpBuilder &builder, Location loc,
-       ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+    [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
       return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
           builder, loc, parallelLoopRanges.size());
     },
@@ -353,7 +351,7 @@ static void populateTilingToSubgroupPatterns(
 
   auto getSubgroupProcInfoFn =
       [&launchConfig](OpBuilder &builder, Location loc,
-                      ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+                      ArrayRef<Range> parallelLoopRanges) {
         ArrayRef<int64_t> numSubgroups =
             launchConfig.getNumSubgroups().take_front(
                 parallelLoopRanges.size());
