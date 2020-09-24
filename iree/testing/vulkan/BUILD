@@ -22,6 +22,10 @@ cc_library(
     name = "vulkan_gui_util",
     hdrs = ["vulkan_gui_util.h"],
     srcs = ["vulkan_gui_util.cc"],
+    tags = [
+        "manual",
+        "nokokoro",
+    ],
     deps = [
         "//iree/base:api",
         "//iree/base:logging",
