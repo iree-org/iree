@@ -42,6 +42,42 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+// Convert mhlo.is_finite to linalg.generic for float32 values ranked inputs.
+class LowerHLOIsFiniteF32OpToLinalg
+    : public OpRewritePattern<mhlo::IsFiniteOp> {
+ public:
+  using OpRewritePattern<mhlo::IsFiniteOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::IsFiniteOp op,
+                                PatternRewriter &rewriter) const override {
+    auto inputType = op.x().getType().dyn_cast_or_null<RankedTensorType>();
+    if (!inputType || inputType.getElementType() != rewriter.getF32Type()) {
+      return failure();
+    }
+    auto loc = op.getLoc();
+    auto rank = inputType.getRank();
+    auto identityMap =
+        AffineMap::getMultiDimIdentityMap(rank, rewriter.getContext());
+
+    SmallVector<StringRef, 3> loopAttributeTypes(rank, "parallel");
+
+    auto result = rewriter.create<linalg::GenericOp>(
+        loc, op.y().getType(), /*inputs*/ op.x(),
+        /*outputs*/ ValueRange{},
+        /*intTensors*/ ValueRange{},
+        ArrayRef<AffineMap>{identityMap, identityMap}, loopAttributeTypes,
+        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+          auto constOp = nestedBuilder.create<ConstantOp>(
+              nestedLoc,
+              rewriter.getF32FloatAttr(std::numeric_limits<float>::infinity()));
+          Value cmp = nestedBuilder.create<CmpFOp>(
+              nestedLoc, CmpFPredicate::ONE, args[0], constOp);
+          nestedBuilder.create<linalg::YieldOp>(nestedLoc, cmp);
+        });
+    rewriter.replaceOp(op, result.getResults()[0]);
+    return success();
+  }
+};
+
 struct ConvertHLOToLinalgOnTensorsPass
     : public PassWrapper<ConvertHLOToLinalgOnTensorsPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -49,8 +85,10 @@ struct ConvertHLOToLinalgOnTensorsPass
   }
 
   void runOnFunction() override {
+    MLIRContext *context = &getContext();
+
     OwningRewritePatternList patterns;
-    populateHLOToLinalgOnTensorsConversionPatterns(&getContext(), patterns);
+    populateHLOToLinalgOnTensorsConversionPatterns(context, patterns);
 
     ConversionTarget target(getContext());
     // Allow constant to appear in Linalg op regions.
@@ -78,6 +116,7 @@ struct ConvertHLOToLinalgOnTensorsPass
 
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
+  patterns.insert<LowerHLOIsFiniteF32OpToLinalg>(context);
   mhlo::populateHLOToLinalgConversionPattern(context, &patterns);
 }
 
