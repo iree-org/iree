@@ -95,8 +95,6 @@ class ConvImg2ColMatmulConversion : public OpRewritePattern<linalg::ConvOp> {
 
     Value result = rewriter.create<AllocaOp>(loc, ColBufferMemrefType);
 
-    llvm::SmallVector<Value, 4> linalgOpArgs = {op.input(), result};
-
     // (n, d1, d2, d3, ..., dn, k1, k2, k3, ...kn, ci) ->
     // (n, d_1 * stride_1 + k_1, d_2 * stride_2 + k_2, ...d_n * stride_n + k_n,
     // ci)
@@ -123,10 +121,9 @@ class ConvImg2ColMatmulConversion : public OpRewritePattern<linalg::ConvOp> {
         ColBufferMemrefType.getRank(), rewriter.getContext()));
 
     rewriter.create<linalg::GenericOp>(
-        loc, ArrayRef<Type>{}, linalgOpArgs,
-        1,  // args_in
-        1,  // args_out
-        indexingMaps, loopAttributeTypes,
+        loc, /*resultTensorTypes=*/ArrayRef<Type>{},
+        /*inputs=*/op.input(), /*outputs=*/result,
+        /*intTensors*/ ValueRange{}, indexingMaps, loopAttributeTypes,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });
