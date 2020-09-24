@@ -44,10 +44,11 @@ std::vector<const char*> GetInstanceExtensions(
     SDL_Window* window, iree_hal_vulkan_features_t vulkan_features);
 
 // Initializes the Vulkan environment with the given |vulkan_features| and
-// layers/extensions, and writes various Vulkan handles.
+// layers/extensions, and writes various Vulkan handles. If errors occur, this
+// function asserts and aborts.
 //
 // This function creates Vulkan |instance|, selects a GPU and
-// |lqueue_family_index| with both graphics and compute bits, gets the
+// |queue_family_index| with both graphics and compute bits, gets the
 // |physical_device|, creates a logical |device| from it, and creates a
 // |descriptor_pool|.
 void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
