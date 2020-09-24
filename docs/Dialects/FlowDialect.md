@@ -80,8 +80,7 @@ Dispatches a workload to the specified executable function.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`executable` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
-`entry_point` | ::mlir::FlatSymbolRefAttr | flat symbol reference attribute
+`entry_point` | ::mlir::SymbolRefAttr | symbol reference attribute
 
 #### Operands:
 
