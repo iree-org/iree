@@ -455,21 +455,23 @@ class Trace:
       call.serialize(call_dir)
 
     # C++ benchmark serialization.
-    if self.iree_serializable:
-      flaglines = []
-      if self.compiled_paths is not None:
-        flaglines.append(f"--input_file={self.compiled_paths}")
-      flaglines.append(f"--driver={self.backend_driver}")
-      inputs_str = ", ".join(self.calls[0].serialized_inputs)
-      flaglines.append(f"--inputs={inputs_str}")
-      flaglines.append(f"--entry_function={self.calls[0].method}")
+    if self.iree_serializable or self.tflite_serializable:
+      entry_function = self.calls[0].method
+      compiled_path = self.compiled_paths[entry_function]
 
-      with open(os.path.join(trace_dir, "flagfile"), "w") as f:
-        f.writelines(line + "\n" for line in flaglines)
-    elif self.tflite_serializable and self.compiled_paths is not None:
-      graph_path = self.compiled_paths[self.calls[0].method]
-      with open(os.path.join(trace_dir, "graph_path"), "w") as f:
-        f.writelines(graph_path + "\n")
+      if self.iree_serializable:
+        serialized_inputs = ", ".join(self.calls[0].serialized_inputs)
+        flagfile = [
+            f"--input_file={compiled_path}",
+            f"--driver={self.backend_driver}",
+            f"--inputs={serialized_inputs}",
+            f"--entry_function={entry_function}"
+        ]
+        with open(os.path.join(trace_dir, "flagfile"), "w") as f:
+          f.writelines(line + "\n" for line in flagfile)
+      else:
+        with open(os.path.join(trace_dir, "graph_path"), "w") as f:
+          f.writelines(compiled_path + "\n")
 
   @staticmethod
   def load(trace_dir: str) -> "Trace":

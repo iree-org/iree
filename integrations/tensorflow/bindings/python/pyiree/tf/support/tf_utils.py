@@ -221,13 +221,19 @@ class CompiledModule(object):
     """Reinitializes to the initial state of the passed module_class."""
     raise NotImplementedError()
 
-  @staticmethod
-  def iree_serializable():
+  def iree_serializable(self):
     return False
 
-  @staticmethod
-  def tflite_serializable():
+  def tflite_serializable(self):
     return False
+
+
+def _get_non_inhereted_function_names(cls):
+  """Gets all methods that cls has that its parents don't have."""
+  names = set(dir(cls))
+  for parent in cls.__bases__:
+    names -= set(dir(parent))
+  return list(names)
 
 
 class _FunctionWrapper(object):
@@ -274,13 +280,22 @@ class IreeCompiledModule(CompiledModule):
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
     set_random_seed()
-    self._module_blob, self.compiled_paths = compile_tf_module(
+    self._module_blob, compiled_path = compile_tf_module(
         tf_module=module_class(),
         backend_infos=[backend_info],
         exported_names=exported_names,
         artifacts_dir=artifacts_dir)
     self._module = rt.VmModule.from_flatbuffer(self._module_blob)
     self._config = rt.Config(driver_name=backend_info.driver)
+
+    self.compiled_paths = None
+    if compiled_path is not None:
+      if not len(exported_names):
+        # Get all method names on 'module_class' that aren't on 'tf.Module'.
+        exported_names = _get_non_inhereted_function_names(module_class)
+      self.compiled_paths = dict([
+          (method, compiled_path) for method in exported_names
+      ])
 
     self.reinitialize()
 
@@ -297,9 +312,8 @@ class IreeCompiledModule(CompiledModule):
     f = m[attr]
     return _IreeFunctionWrapper(self._context, f)
 
-  @staticmethod
-  def iree_serializable() -> bool:
-    return True
+  def iree_serializable(self) -> bool:
+    return self.compiled_paths is not None
 
 
 def _normalize_numpy(result: np.ndarray):
@@ -379,20 +393,12 @@ class TfCompiledModule(CompiledModule):
     return _TfFunctionWrapper(f)
 
 
-def get_non_inhereted_function_names(cls):
-  """Gets all methods that cls has that its parents don't have."""
-  names = set(dir(cls))
-  for parent in cls.__bases__:
-    names -= set(dir(parent))
-  return list(names)
-
-
-def get_concrete_functions(module_class: Type[tf.Module],
-                           exported_names: Sequence[str] = ()):
+def _get_concrete_functions(module_class: Type[tf.Module],
+                            exported_names: Sequence[str] = ()):
   """Get concrete functions from non-inherited methods or exported_names."""
   if not len(exported_names):
     # Get all method names on 'module_class' that aren't on 'tf.Module'.
-    exported_names = get_non_inhereted_function_names(module_class)
+    exported_names = _get_non_inhereted_function_names(module_class)
   instance = module_class()
   functions = []
   for name in exported_names:
@@ -404,7 +410,7 @@ def compile_to_tflite(module_class: Type[tf.Module],
                       exported_names: Sequence[str] = (),
                       artifacts_dir: str = None):
   """Compile a dict of TFLite interpreters for the methods on module_class."""
-  functions, names = get_concrete_functions(module_class, exported_names)
+  functions, names = _get_concrete_functions(module_class, exported_names)
   interpreters = dict()
   compiled_paths = None
   if artifacts_dir is not None:
@@ -488,9 +494,8 @@ class TfLiteCompiledModule(CompiledModule):
           f"The TFLite module does not have an interpreter for '{attr}'")
     return _TfLiteFunctionWrapper(self._interpreters[attr])
 
-  @staticmethod
-  def tflite_serializable() -> bool:
-    return True
+  def tflite_serializable(self) -> bool:
+    return self.compiled_paths is not None
 
 
 class BackendInfo:
