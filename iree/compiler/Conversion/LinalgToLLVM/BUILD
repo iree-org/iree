@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "LinalgToLLVM",
     srcs = [
+        "ConvImg2ColMatmulConversion.cpp",
         "ConvertToLLVM.cpp",
         "MatMulVectorization.cpp",
         "Passes.cpp",

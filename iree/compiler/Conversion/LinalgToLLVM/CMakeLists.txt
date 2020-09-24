@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
     "MatMulVectorization.cpp"
     "Passes.cpp"
