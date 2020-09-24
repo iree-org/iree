@@ -104,7 +104,6 @@ def load_cifar10_weights(model):
 
 def initialize_model():
   tf_utils.set_random_seed()
-  tf.keras.backend.set_learning_phase(False)
 
   # Keras applications models receive input shapes without a batch dimension, as
   # the batch size is dynamic by default. This selects just the image size.
@@ -127,12 +126,13 @@ class VisionModule(tf.Module):
   def __init__(self):
     super(VisionModule, self).__init__()
     self.m = initialize_model()
+    self.m.predict = lambda x: self.m.call(x, training=False)
     # Specify input shape with a static batch size.
     # TODO(b/142948097): Add support for dynamic shapes in SPIR-V lowering.
     # Replace input_shape with m.input_shape to make the batch size dynamic.
     self.predict = tf.function(
         input_signature=[tf.TensorSpec(get_input_shape())])(
-            self.m.call)
+            self.m.predict)
 
 
 @tf_test_utils.compile_module(VisionModule, exported_names=['predict'])
