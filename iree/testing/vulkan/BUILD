@@ -20,8 +20,8 @@ package(
 
 cc_library(
     name = "vulkan_gui_util",
-    hdrs = ["vulkan_gui_util.h"],
     srcs = ["vulkan_gui_util.cc"],
+    hdrs = ["vulkan_gui_util.h"],
     tags = [
         "manual",
         "nokokoro",
@@ -37,4 +37,3 @@ cc_library(
         "@vulkan_sdk//:sdk",
     ],
 )
-
