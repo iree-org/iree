@@ -290,8 +290,11 @@ iree_cc_library(
     init
   HDRS
     "init.h"
+  SRCS
+    "init.cc"
   DEPS
-    iree::base::internal::init_internal
+    absl::flags_parse
+    ::initializer
   PUBLIC
 )
 
@@ -339,8 +342,11 @@ iree_cc_library(
     logging
   HDRS
     "logging.h"
+  SRCS
+    "logging.cc"
   DEPS
-    iree::base::internal::logging_internal
+    absl::core_headers
+    absl::flags
   PUBLIC
 )
 

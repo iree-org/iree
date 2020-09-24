@@ -38,7 +38,7 @@ StatusOr<std::vector<const char*>> MatchAvailableLayers(
     bool found = false;
     for (const auto& layer_properties : properties) {
       if (std::strcmp(layer_name, layer_properties.layerName) == 0) {
-        VLOG(1) << "Enabling required layer: " << layer_name;
+        IREE_VLOG(1) << "Enabling required layer: " << layer_name;
         found = true;
         enabled_layers.push_back(layer_name);
         break;
@@ -54,14 +54,14 @@ StatusOr<std::vector<const char*>> MatchAvailableLayers(
     bool found = false;
     for (const auto& layer_properties : properties) {
       if (std::strcmp(layer_name, layer_properties.layerName) == 0) {
-        VLOG(1) << "Enabling optional layer: " << layer_name;
+        IREE_VLOG(1) << "Enabling optional layer: " << layer_name;
         found = true;
         enabled_layers.push_back(layer_name);
         break;
       }
     }
     if (!found) {
-      VLOG(1) << "Optional layer " << layer_name << " not available";
+      IREE_VLOG(1) << "Optional layer " << layer_name << " not available";
     }
   }
 
@@ -83,7 +83,7 @@ StatusOr<std::vector<const char*>> MatchAvailableExtensions(
     for (const auto& extension_properties : properties) {
       if (std::strcmp(extension_name, extension_properties.extensionName) ==
           0) {
-        VLOG(1) << "Enabling required extension: " << extension_name;
+        IREE_VLOG(1) << "Enabling required extension: " << extension_name;
         found = true;
         enabled_extensions.push_back(extension_name);
         break;
@@ -100,14 +100,15 @@ StatusOr<std::vector<const char*>> MatchAvailableExtensions(
     for (const auto& extension_properties : properties) {
       if (std::strcmp(extension_name, extension_properties.extensionName) ==
           0) {
-        VLOG(1) << "Enabling optional extension: " << extension_name;
+        IREE_VLOG(1) << "Enabling optional extension: " << extension_name;
         found = true;
         enabled_extensions.push_back(extension_name);
         break;
       }
     }
     if (!found) {
-      VLOG(1) << "Optional extension " << extension_name << " not available";
+      IREE_VLOG(1) << "Optional extension " << extension_name
+                   << " not available";
     }
   }
 

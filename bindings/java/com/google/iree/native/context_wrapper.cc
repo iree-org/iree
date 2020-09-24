@@ -14,6 +14,8 @@
 
 #include "bindings/java/com/google/iree/native/context_wrapper.h"
 
+#include <vector>
+
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
 #include "iree/vm/ref_cc.h"

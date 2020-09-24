@@ -23,6 +23,15 @@ namespace iree_compiler {
 /// Converts linalg::MatmulOp into LLVM dialect
 std::unique_ptr<FunctionPass> createMatMulTileAndVectorizePass();
 
+/// Converts linalg::ConvOp into packed img2col operation followed by
+/// linalg::MatmulOp.
+std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass();
+
+/// Populates patterns to rewrite linalg::ConvOp into packed img2col operation
+/// followed by linalg::MatmulOp.
+void populateConvImg2ColMatmulConversionPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns);
+
 /// Pass to perform final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 

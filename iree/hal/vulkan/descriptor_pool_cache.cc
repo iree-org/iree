@@ -32,7 +32,7 @@ static constexpr int kMaxDescriptorSets = 4096;
 }  // namespace
 
 DescriptorSetGroup::~DescriptorSetGroup() {
-  CHECK(descriptor_pools_.empty())
+  IREE_CHECK(descriptor_pools_.empty())
       << "DescriptorSetGroup must be reset explicitly";
 }
 

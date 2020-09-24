@@ -412,7 +412,8 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   StatusOr(const T& value);
 
   // Constructs a new StatusOr with the given non-ok status. After calling this
-  // constructor, this->ok() will be false and calls to value() will CHECK-fail.
+  // constructor, this->ok() will be false and calls to value() will
+  // IREE_CHECK-fail.
   StatusOr(const Status& status);
   StatusOr& operator=(const Status& status);
   StatusOr(const StatusBuilder& builder) = delete;
@@ -475,7 +476,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   const Status& status() const&;
   Status status() &&;
 
-  // Returns a reference to the held value if `this->ok()`, or CHECK-fails.
+  // Returns a reference to the held value if `this->ok()`, or IREE_CHECK-fails.
   // If you have already checked the status using `this->ok()` or
   // `operator bool()`, you probably want to use `operator*()` or `operator->()`
   // to access the value instead of `value`.

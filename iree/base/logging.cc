@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/base/internal/logging.h"
+#include "iree/base/logging.h"
 
 #include <string>
 
@@ -21,7 +21,7 @@
 ABSL_FLAG(int, iree_minloglevel, 0,
           "Minimum logging level. 0 = INFO and above.");
 ABSL_FLAG(int, iree_v, 0,
-          "Verbosity level maximum. 1 = VLOG(0-1), 2 = VLOG(0-2).");
+          "Verbosity level maximum. 1 = IREE_VLOG(0-1), 2 = IREE_VLOG(0-2).");
 
 namespace iree {
 namespace internal {
@@ -128,7 +128,7 @@ void MakeCheckOpValueString(std::ostream* os, const uint8_t& v) {
 }
 
 template <>
-void MakeCheckOpValueString(std::ostream* os, const std::nullptr_t& p) {
+void MakeCheckOpValueString(std::ostream* os, const std::nullptr_t& v) {
   (*os) << "nullptr";
 }
 

@@ -93,7 +93,7 @@ VmContext VmContext::Create(VmInstance* instance,
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
-  CHECK(context);
+  IREE_CHECK(context);
   return VmContext::CreateRetained(context);
 }
 

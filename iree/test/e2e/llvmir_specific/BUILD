@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Main IREE build file.
+# Tests for end-to-end IREE support specific to the vulkan-spirv lowering.
+# TODO(ravishankarm): Reorganize these tests.
+
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,27 +23,12 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# Enables the debug service and other profiling features.
-# $ bazel build --define=IREE_DEBUG=1 :some_target
-config_setting(
-    name = "debug",
-    define_values = {"IREE_DEBUG": "1"},
-)
-
-config_setting(
-    name = "enable_tensorflow",
-    define_values = {
-        "iree_tensorflow": "true",
-    },
-)
-
-# Note that the "proper" way to do this is via a query on @bazel_tools,
-# but as with so many things bazel, it doesn't work reliably across versions,
-# variants, etc. So we just define our own since we also own the config
-# setting that activates it.
-config_setting(
-    name = "iree_is_msvc",
-    define_values = {
-        "iree_is_msvc": "true",
-    },
+iree_check_single_backend_test_suite(
+    name = "check_llvm-ir-conv_img2col",
+    srcs = [
+        "conv.mlir",
+    ],
+    compiler_flags = ["-iree-codegen-linalg-to-llvm-conv-img2col-conversion"],
+    driver = "llvm",
+    target_backend = "llvm-ir",
 )

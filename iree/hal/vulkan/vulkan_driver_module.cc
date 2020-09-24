@@ -53,8 +53,9 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   // VK_EXT_debug_utils when available.
   if (absl::GetFlag(FLAGS_vulkan_debug_report) &&
       absl::GetFlag(FLAGS_vulkan_validation_layers)) {
-    LOG(WARNING) << "VK_EXT_debug_report has issues with modern validation "
-                    "layers; disabling validation";
+    IREE_LOG(WARNING)
+        << "VK_EXT_debug_report has issues with modern validation "
+           "layers; disabling validation";
     absl::SetFlag(&FLAGS_vulkan_validation_layers, false);
   }
 

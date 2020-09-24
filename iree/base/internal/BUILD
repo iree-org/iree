@@ -14,8 +14,6 @@
 
 # Implementations for iree/base/
 
-load("//iree:build_defs.oss.bzl", "iree_build_test")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -69,28 +67,6 @@ cc_library(
 )
 
 cc_library(
-    name = "init_internal",
-    srcs = ["init_internal.cc"],
-    hdrs = ["init_internal.h"],
-    deps = [
-        "//iree/base:initializer",
-        "//iree/base:target_platform",
-        "@com_google_absl//absl/flags:parse",
-    ],
-)
-
-cc_library(
-    name = "logging_internal",
-    srcs = ["logging.cc"],
-    hdrs = ["logging.h"],
-    deps = [
-        "//iree/base:target_platform",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/flags:flag",
-    ],
-)
-
-cc_library(
     name = "ostringstream",
     srcs = ["ostringstream.cc"],
     hdrs = ["ostringstream.h"],
@@ -116,17 +92,5 @@ cc_library(
         "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
-    ],
-)
-
-iree_build_test(
-    name = "internal_build_test",
-    targets = [
-        ":file_handle_win32",
-        ":file_io_internal",
-        ":file_mapping_internal",
-        ":init_internal",
-        ":logging_internal",
-        ":status_internal",
     ],
 )

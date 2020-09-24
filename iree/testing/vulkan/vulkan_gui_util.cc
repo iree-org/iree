@@ -26,7 +26,7 @@ namespace {
 
 void check_vk_result(VkResult err) {
   if (err == 0) return;
-  LOG(FATAL) << "VkResult: " << err;
+  IREE_LOG(FATAL) << "VkResult: " << err;
 }
 
 // Returns the names of the Vulkan layers used for the given IREE
@@ -107,7 +107,7 @@ std::vector<const char*> GetInstanceLayers(
       }
     }
     if (!found) {
-      LOG(FATAL) << "Required layer " << layer_name << " not available";
+      IREE_LOG(FATAL) << "Required layer " << layer_name << " not available";
     }
   }
   for (const char* layer_name : optional_layers) {

@@ -14,6 +14,8 @@
 
 #include <jni.h>
 
+#include <vector>
+
 #include "bindings/java/com/google/iree/native/context_wrapper.h"
 #include "bindings/java/com/google/iree/native/function_wrapper.h"
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
@@ -34,10 +36,10 @@ namespace {
 // object.
 static ContextWrapper* GetContextWrapper(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  CHECK(clazz);
+  IREE_CHECK(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  CHECK(field);
+  IREE_CHECK(field);
 
   return reinterpret_cast<ContextWrapper*>(env->GetLongField(obj, field));
 }
@@ -66,14 +68,14 @@ JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz, jlong handle) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
   delete context;
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz,
                                        jlong instanceAddress) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
 
   auto instance = (InstanceWrapper*)instanceAddress;
   auto status = context->Create(*instance);
@@ -84,7 +86,7 @@ JNI_FUNC jint JNI_PREFIX(nativeCreateWithModules)(JNIEnv* env, jobject thiz,
                                                   jlong instanceAddress,
                                                   jlongArray moduleAddresses) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
 
   auto instance = (InstanceWrapper*)instanceAddress;
   auto modules = GetModuleWrappersFromAdresses(env, moduleAddresses);
@@ -96,7 +98,7 @@ JNI_FUNC jint JNI_PREFIX(nativeCreateWithModules)(JNIEnv* env, jobject thiz,
 JNI_FUNC jint JNI_PREFIX(nativeRegisterModules)(JNIEnv* env, jobject thiz,
                                                 jlongArray moduleAddresses) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
 
   auto modules = GetModuleWrappersFromAdresses(env, moduleAddresses);
   auto status = context->RegisterModules(modules);
@@ -107,7 +109,7 @@ JNI_FUNC jint JNI_PREFIX(nativeResolveFunction)(JNIEnv* env, jobject thiz,
                                                 jlong functionAddress,
                                                 jstring name) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
 
   auto function = (FunctionWrapper*)functionAddress;
   const char* native_name = env->GetStringUTFChars(name, /*isCopy=*/nullptr);
@@ -124,7 +126,7 @@ JNI_FUNC jint JNI_PREFIX(nativeInvokeFunction)(JNIEnv* env, jobject thiz,
                                                jint inputElementCount,
                                                jobject output) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
 
   const jsize inputs_size = env->GetArrayLength(inputs);
   std::vector<float*> native_inputs(inputs_size);
@@ -144,7 +146,7 @@ JNI_FUNC jint JNI_PREFIX(nativeInvokeFunction)(JNIEnv* env, jobject thiz,
 
 JNI_FUNC jint JNI_PREFIX(nativeGetId)(JNIEnv* env, jobject thiz) {
   ContextWrapper* context = GetContextWrapper(env, thiz);
-  CHECK_NE(context, nullptr);
+  IREE_CHECK_NE(context, nullptr);
 
   int context_id = context->id();
   return (jint)context_id;

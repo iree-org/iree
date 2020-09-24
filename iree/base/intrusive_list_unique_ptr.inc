@@ -93,17 +93,17 @@ class IntrusiveListUniquePtrBase
     }
     auto* link = impl::TToLink<T, kOffset>(value);
     if (link->prev) {
-      DCHECK_NE(link, head_);
+      IREE_DCHECK_NE(link, head_);
       link->prev->next = link->next;
     } else {
-      DCHECK_EQ(link, head_);
+      IREE_DCHECK_EQ(link, head_);
       head_ = link->next;
     }
     if (link->next) {
-      DCHECK_NE(link, tail_);
+      IREE_DCHECK_NE(link, tail_);
       link->next->prev = link->prev;
     } else {
-      DCHECK_EQ(link, tail_);
+      IREE_DCHECK_EQ(link, tail_);
       tail_ = link->prev;
     }
     link->next = link->prev = nullptr;

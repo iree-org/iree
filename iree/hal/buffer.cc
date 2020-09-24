@@ -160,7 +160,7 @@ StatusOr<ref_ptr<Buffer>> Buffer::Subspan(const ref_ptr<Buffer>& buffer,
   // buffers came from) we'd want to avoid this but I'm not sure that's worth
   // the super deep indirection that could arise.
   if (buffer->allocated_buffer() != buffer.get()) {
-    CHECK(buffer->parent_buffer_);
+    IREE_CHECK(buffer->parent_buffer_);
     return Buffer::Subspan(buffer->parent_buffer_, byte_offset, byte_length);
   } else {
     return {make_ref<SubspanBuffer>(add_ref(buffer), byte_offset, byte_length)};
@@ -484,7 +484,7 @@ Status Buffer::CopyData(device_size_t target_offset, Buffer* source_buffer,
     adjusted_data_length = std::min(source_data_length, target_data_length);
   } else {
     // Specific length requested - validate that we have matching lengths.
-    CHECK_EQ(source_data_length, target_data_length);
+    IREE_CHECK_EQ(source_data_length, target_data_length);
     adjusted_data_length = source_data_length;
   }
 

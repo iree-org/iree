@@ -74,9 +74,9 @@ TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
 
   EXPECT_CALL(*mock_target_queue, Submit(_))
       .WillOnce([&](absl::Span<const SubmissionBatch> batches) {
-        CHECK_EQ(1, batches.size());
-        CHECK_EQ(1, batches[0].command_buffers.size());
-        CHECK_EQ(cmd_buffer.get(), batches[0].command_buffers[0]);
+        IREE_CHECK_EQ(1, batches.size());
+        IREE_CHECK_EQ(1, batches[0].command_buffers.size());
+        IREE_CHECK_EQ(cmd_buffer.get(), batches[0].command_buffers[0]);
         return OkStatus();
       });
   CondVarSemaphore semaphore(0ull);

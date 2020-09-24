@@ -97,7 +97,7 @@ Status HostBuffer::CopyDataImpl(device_size_t target_offset,
   IREE_ASSIGN_OR_RETURN(auto source_data,
                         source_buffer->MapMemory<uint8_t>(
                             MemoryAccess::kRead, source_offset, data_length));
-  CHECK_EQ(data_length, source_data.size());
+  IREE_CHECK_EQ(data_length, source_data.size());
   auto data_ptr = static_cast<uint8_t*>(data_);
   std::memcpy(data_ptr + target_offset, source_data.data(), data_length);
   return OkStatus();

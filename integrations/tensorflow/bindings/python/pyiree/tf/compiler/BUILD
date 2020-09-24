@@ -128,6 +128,7 @@ iree_py_test(
     srcs = ["signature_def_saved_model_test.py"],
     python_version = "PY3",
     tags = [
+        "manual",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [

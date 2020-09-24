@@ -76,7 +76,7 @@ class MMapMapping : public FileMapping {
 
   ~MMapMapping() override {
     if (::munmap(const_cast<uint8_t*>(data_.data()), data_.size()) != 0) {
-      LOG(WARNING) << "Unable to unmap file: " << strerror(errno);
+      IREE_LOG(WARNING) << "Unable to unmap file: " << strerror(errno);
     }
   }
 };
