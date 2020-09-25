@@ -113,10 +113,10 @@ Status MetalBuffer::CopyDataImpl(device_size_t target_offset, Buffer* source_buf
   // TODO(benvanik): a way for allocators to indicate transfer compat.
   IREE_ASSIGN_OR_RETURN(auto source_mapping, source_buffer->MapMemory<uint8_t>(
                                                  MemoryAccess::kRead, source_offset, data_length));
-  CHECK_EQ(data_length, source_mapping.size());
+  IREE_CHECK_EQ(data_length, source_mapping.size());
   IREE_ASSIGN_OR_RETURN(auto target_mapping, MapMemory<uint8_t>(MemoryAccess::kDiscardWrite,
                                                                 target_offset, data_length));
-  CHECK_EQ(data_length, target_mapping.size());
+  IREE_CHECK_EQ(data_length, target_mapping.size());
   std::memcpy(target_mapping.mutable_data(), source_mapping.data(), data_length);
   return OkStatus();
 }
