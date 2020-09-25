@@ -14,19 +14,10 @@
 
 // Vulkan Graphics + IREE API Integration Sample.
 
-// IREE's Vulkan HAL is built with VK_NO_PROTOTYPES so Vulkan can be loaded
-// dynamically. This sample links against the Vulkan SDK statically, so we
-// want prototypes to be included.
-#undef VK_NO_PROTOTYPES
-
-#include <SDL.h>
-#include <SDL_vulkan.h>
-#include <vulkan/vulkan.h>
-
-#include <array>
-#include <cstring>
-#include <set>
-#include <vector>
+// Vulkan GUI utility functions
+// Other matters here: we need to pull in this first to make sure Vulkan API
+// prototypes are defined so that we can statically link against them.
+#include "iree/testing/vulkan/vulkan_gui_util.h"
 
 // IREE's C API:
 #include "iree/base/api.h"
@@ -43,12 +34,6 @@
 #include "iree/base/logging.h"
 #include "iree/base/main.h"
 
-// NOTE: order matters here, imgui must come first:
-#include "third_party/dear_imgui/imgui.h"
-// NOTE: must follow imgui.h:
-#include "third_party/dear_imgui/examples/imgui_impl_sdl.h"
-#include "third_party/dear_imgui/examples/imgui_impl_vulkan.h"
-
 // Compiled module embedded here to avoid file IO:
 #include "iree/samples/vulkan/simple_mul_bytecode_module.h"
 
@@ -57,7 +42,6 @@ static VkInstance g_Instance = VK_NULL_HANDLE;
 static VkPhysicalDevice g_PhysicalDevice = VK_NULL_HANDLE;
 static VkDevice g_Device = VK_NULL_HANDLE;
 static uint32_t g_QueueFamily = (uint32_t)-1;
-static VkDeviceQueueCreateInfo g_QueueInfos[1] = {};
 static VkQueue g_Queue = VK_NULL_HANDLE;
 static VkPipelineCache g_PipelineCache = VK_NULL_HANDLE;
 static VkDescriptorPool g_DescriptorPool = VK_NULL_HANDLE;
@@ -73,265 +57,6 @@ static void check_vk_result(VkResult err) {
   IREE_LOG(FATAL) << "VkResult: " << err;
 }
 
-static std::vector<const char*> GetIreeLayers(
-    iree_hal_vulkan_extensibility_set_t extensibility_set,
-    iree_hal_vulkan_features_t features) {
-  iree_host_size_t required_count;
-  iree_hal_vulkan_get_layers(extensibility_set, features, 0, NULL,
-                             &required_count);
-  std::vector<const char*> layers(required_count);
-  iree_hal_vulkan_get_layers(extensibility_set, features, layers.size(),
-                             layers.data(), &required_count);
-  return layers;
-}
-
-static std::vector<const char*> GetInstanceLayers(
-    iree_hal_vulkan_features_t vulkan_features) {
-  // Query the layers that IREE wants / needs.
-  std::vector<const char*> required_layers =
-      GetIreeLayers(IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features);
-  std::vector<const char*> optional_layers =
-      GetIreeLayers(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features);
-
-  // Query the layers that are available on the Vulkan ICD.
-  uint32_t layer_property_count = 0;
-  check_vk_result(
-      vkEnumerateInstanceLayerProperties(&layer_property_count, NULL));
-  std::vector<VkLayerProperties> layer_properties(layer_property_count);
-  check_vk_result(vkEnumerateInstanceLayerProperties(&layer_property_count,
-                                                     layer_properties.data()));
-
-  // Match between optional/required and available layers.
-  std::vector<const char*> layers;
-  for (const char* layer_name : required_layers) {
-    bool found = false;
-    for (const auto& layer_property : layer_properties) {
-      if (std::strcmp(layer_name, layer_property.layerName) == 0) {
-        found = true;
-        layers.push_back(layer_name);
-        break;
-      }
-    }
-    if (!found) {
-      IREE_LOG(FATAL) << "Required layer " << layer_name << " not available";
-    }
-  }
-  for (const char* layer_name : optional_layers) {
-    for (const auto& layer_property : layer_properties) {
-      if (std::strcmp(layer_name, layer_property.layerName) == 0) {
-        layers.push_back(layer_name);
-        break;
-      }
-    }
-  }
-
-  return layers;
-}
-
-std::vector<const char*> GetIreeExtensions(
-    iree_hal_vulkan_extensibility_set_t extensibility_set,
-    iree_hal_vulkan_features_t features) {
-  iree_host_size_t required_count;
-  iree_hal_vulkan_get_extensions(extensibility_set, features, 0, NULL,
-                                 &required_count);
-  std::vector<const char*> extensions(required_count);
-  iree_hal_vulkan_get_extensions(extensibility_set, features, extensions.size(),
-                                 extensions.data(), &required_count);
-  return extensions;
-}
-
-static std::vector<const char*> GetInstanceExtensions(
-    SDL_Window* window, iree_hal_vulkan_features_t vulkan_features) {
-  // Ask SDL for its list of required instance extensions.
-  uint32_t sdl_extensions_count = 0;
-  SDL_Vulkan_GetInstanceExtensions(window, &sdl_extensions_count, NULL);
-  std::vector<const char*> sdl_extensions(sdl_extensions_count);
-  SDL_Vulkan_GetInstanceExtensions(window, &sdl_extensions_count,
-                                   sdl_extensions.data());
-
-  std::vector<const char*> iree_required_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features);
-  std::vector<const char*> iree_optional_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features);
-
-  // Merge extensions lists, including optional and required for simplicity.
-  std::set<const char*> ext_set;
-  ext_set.insert(sdl_extensions.begin(), sdl_extensions.end());
-  ext_set.insert(iree_required_extensions.begin(),
-                 iree_required_extensions.end());
-  ext_set.insert(iree_optional_extensions.begin(),
-                 iree_optional_extensions.end());
-  std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
-  return extensions;
-}
-
-static std::vector<const char*> GetDeviceExtensions(
-    iree_hal_vulkan_features_t vulkan_features) {
-  std::vector<const char*> iree_required_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_DEVICE_REQUIRED, vulkan_features);
-  std::vector<const char*> iree_optional_extensions =
-      GetIreeExtensions(IREE_HAL_VULKAN_DEVICE_OPTIONAL, vulkan_features);
-
-  // Merge extensions lists, including optional and required for simplicity.
-  std::set<const char*> ext_set;
-  ext_set.insert("VK_KHR_swapchain");
-  ext_set.insert(iree_required_extensions.begin(),
-                 iree_required_extensions.end());
-  ext_set.insert(iree_optional_extensions.begin(),
-                 iree_optional_extensions.end());
-  std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
-  return extensions;
-}
-
-static void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
-                        const char** instance_layers,
-                        uint32_t instance_layers_count,
-                        const char** instance_extensions,
-                        uint32_t instance_extensions_count) {
-  VkResult err;
-
-  // Create Vulkan Instance
-  {
-    VkInstanceCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info.enabledLayerCount = instance_layers_count;
-    create_info.ppEnabledLayerNames = instance_layers;
-    create_info.enabledExtensionCount = instance_extensions_count;
-    create_info.ppEnabledExtensionNames = instance_extensions;
-    err = vkCreateInstance(&create_info, g_Allocator, &g_Instance);
-    check_vk_result(err);
-  }
-
-  // Select GPU
-  {
-    uint32_t gpu_count;
-    err = vkEnumeratePhysicalDevices(g_Instance, &gpu_count, NULL);
-    check_vk_result(err);
-    IM_ASSERT(gpu_count > 0);
-
-    VkPhysicalDevice* gpus =
-        (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * gpu_count);
-    err = vkEnumeratePhysicalDevices(g_Instance, &gpu_count, gpus);
-    check_vk_result(err);
-
-    // Use the first reported GPU for simplicity.
-    g_PhysicalDevice = gpus[0];
-    free(gpus);
-  }
-
-  // Select queue family. We want a single queue with graphics and compute for
-  // simplicity, but we could also discover and use separate queues for each.
-  {
-    uint32_t count;
-    vkGetPhysicalDeviceQueueFamilyProperties(g_PhysicalDevice, &count, NULL);
-    VkQueueFamilyProperties* queues = (VkQueueFamilyProperties*)malloc(
-        sizeof(VkQueueFamilyProperties) * count);
-    vkGetPhysicalDeviceQueueFamilyProperties(g_PhysicalDevice, &count, queues);
-    for (uint32_t i = 0; i < count; i++)
-      if (queues[i].queueFlags &
-          (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
-        g_QueueFamily = i;
-        break;
-      }
-    free(queues);
-    IM_ASSERT(g_QueueFamily != (uint32_t)-1);
-  }
-
-  // Create Logical Device (with 1 queue)
-  {
-    std::vector<const char*> device_extensions =
-        GetDeviceExtensions(vulkan_features);
-    const float queue_priority[] = {1.0f};
-    g_QueueInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    g_QueueInfos[0].queueFamilyIndex = g_QueueFamily;
-    g_QueueInfos[0].queueCount = 1;
-    g_QueueInfos[0].pQueuePriorities = queue_priority;
-    VkDeviceCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info.queueCreateInfoCount =
-        sizeof(g_QueueInfos) / sizeof(g_QueueInfos[0]);
-    create_info.pQueueCreateInfos = g_QueueInfos;
-    create_info.enabledExtensionCount = device_extensions.size();
-    create_info.ppEnabledExtensionNames = device_extensions.data();
-    err =
-        vkCreateDevice(g_PhysicalDevice, &create_info, g_Allocator, &g_Device);
-    check_vk_result(err);
-    vkGetDeviceQueue(g_Device, g_QueueFamily, 0, &g_Queue);
-  }
-
-  // Create Descriptor Pool
-  {
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-        {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000 * IREE_ARRAYSIZE(pool_sizes);
-    pool_info.poolSizeCount = (uint32_t)IREE_ARRAYSIZE(pool_sizes);
-    pool_info.pPoolSizes = pool_sizes;
-    err = vkCreateDescriptorPool(g_Device, &pool_info, g_Allocator,
-                                 &g_DescriptorPool);
-    check_vk_result(err);
-  }
-}
-
-static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd,
-                              VkSurfaceKHR surface, int width, int height) {
-  wd->Surface = surface;
-
-  // Check for WSI support
-  VkBool32 res;
-  vkGetPhysicalDeviceSurfaceSupportKHR(g_PhysicalDevice, g_QueueFamily,
-                                       wd->Surface, &res);
-  if (res != VK_TRUE) {
-    fprintf(stderr, "Error no WSI support on physical device 0\n");
-    exit(-1);
-  }
-
-  // Select Surface Format
-  const VkFormat requestSurfaceImageFormat[] = {
-      VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM,
-      VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM};
-  const VkColorSpaceKHR requestSurfaceColorSpace =
-      VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-  wd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
-      g_PhysicalDevice, wd->Surface, requestSurfaceImageFormat,
-      (size_t)IREE_ARRAYSIZE(requestSurfaceImageFormat),
-      requestSurfaceColorSpace);
-
-  // Select Present Mode
-#ifdef IMGUI_UNLIMITED_FRAME_RATE
-  VkPresentModeKHR present_modes[] = {VK_PRESENT_MODE_MAILBOX_KHR,
-                                      VK_PRESENT_MODE_IMMEDIATE_KHR,
-                                      VK_PRESENT_MODE_FIFO_KHR};
-#else
-  VkPresentModeKHR present_modes[] = {VK_PRESENT_MODE_FIFO_KHR};
-#endif
-  wd->PresentMode = ImGui_ImplVulkanH_SelectPresentMode(
-      g_PhysicalDevice, wd->Surface, &present_modes[0],
-      IREE_ARRAYSIZE(present_modes));
-
-  // Create SwapChain, RenderPass, Framebuffer, etc.
-  IM_ASSERT(g_MinImageCount >= 2);
-  ImGui_ImplVulkanH_CreateWindow(g_Instance, g_PhysicalDevice, g_Device, wd,
-                                 g_QueueFamily, g_Allocator, width, height,
-                                 g_MinImageCount);
-
-  // Set clear color.
-  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-  memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
-}
-
 static void CleanupVulkan() {
   vkDestroyDescriptorPool(g_Device, g_DescriptorPool, g_Allocator);
 
@@ -342,91 +67,6 @@ static void CleanupVulkan() {
 static void CleanupVulkanWindow() {
   ImGui_ImplVulkanH_DestroyWindow(g_Instance, g_Device, &g_MainWindowData,
                                   g_Allocator);
-}
-
-static void FrameRender(ImGui_ImplVulkanH_Window* wd) {
-  VkResult err;
-
-  VkSemaphore image_acquired_semaphore =
-      wd->FrameSemaphores[wd->SemaphoreIndex].ImageAcquiredSemaphore;
-  VkSemaphore render_complete_semaphore =
-      wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
-  err = vkAcquireNextImageKHR(g_Device, wd->Swapchain, UINT64_MAX,
-                              image_acquired_semaphore, VK_NULL_HANDLE,
-                              &wd->FrameIndex);
-  check_vk_result(err);
-
-  ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
-  {
-    err = vkWaitForFences(
-        g_Device, 1, &fd->Fence, VK_TRUE,
-        UINT64_MAX);  // wait indefinitely instead of periodically checking
-    check_vk_result(err);
-
-    err = vkResetFences(g_Device, 1, &fd->Fence);
-    check_vk_result(err);
-  }
-  {
-    err = vkResetCommandPool(g_Device, fd->CommandPool, 0);
-    check_vk_result(err);
-    VkCommandBufferBeginInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    err = vkBeginCommandBuffer(fd->CommandBuffer, &info);
-    check_vk_result(err);
-  }
-  {
-    VkRenderPassBeginInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    info.renderPass = wd->RenderPass;
-    info.framebuffer = fd->Framebuffer;
-    info.renderArea.extent.width = wd->Width;
-    info.renderArea.extent.height = wd->Height;
-    info.clearValueCount = 1;
-    info.pClearValues = &wd->ClearValue;
-    vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
-  }
-
-  // Record Imgui Draw Data and draw funcs into command buffer
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), fd->CommandBuffer);
-
-  // Submit command buffer
-  vkCmdEndRenderPass(fd->CommandBuffer);
-  {
-    VkPipelineStageFlags wait_stage =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    info.waitSemaphoreCount = 1;
-    info.pWaitSemaphores = &image_acquired_semaphore;
-    info.pWaitDstStageMask = &wait_stage;
-    info.commandBufferCount = 1;
-    info.pCommandBuffers = &fd->CommandBuffer;
-    info.signalSemaphoreCount = 1;
-    info.pSignalSemaphores = &render_complete_semaphore;
-
-    err = vkEndCommandBuffer(fd->CommandBuffer);
-    check_vk_result(err);
-    err = vkQueueSubmit(g_Queue, 1, &info, fd->Fence);
-    check_vk_result(err);
-  }
-}
-
-static void FramePresent(ImGui_ImplVulkanH_Window* wd) {
-  VkSemaphore render_complete_semaphore =
-      wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
-  VkPresentInfoKHR info = {};
-  info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  info.waitSemaphoreCount = 1;
-  info.pWaitSemaphores = &render_complete_semaphore;
-  info.swapchainCount = 1;
-  info.pSwapchains = &wd->Swapchain;
-  info.pImageIndices = &wd->FrameIndex;
-  VkResult err = vkQueuePresentKHR(g_Queue, &info);
-  check_vk_result(err);
-  wd->SemaphoreIndex =
-      (wd->SemaphoreIndex + 1) %
-      wd->ImageCount;  // Now we can use the next set of semaphores
 }
 
 int iree::IreeMain(int argc, char** argv) {
@@ -454,7 +94,9 @@ int iree::IreeMain(int argc, char** argv) {
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);
   SetupVulkan(iree_vulkan_features, layers.data(), layers.size(),
-              extensions.data(), extensions.size());
+              extensions.data(), extensions.size(), g_Allocator, &g_Instance,
+              &g_QueueFamily, &g_PhysicalDevice, &g_Queue, &g_Device,
+              &g_DescriptorPool);
 
   // Create Window Surface
   VkSurfaceKHR surface;
@@ -468,7 +110,8 @@ int iree::IreeMain(int argc, char** argv) {
   int w, h;
   SDL_GetWindowSize(window, &w, &h);
   ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
-  SetupVulkanWindow(wd, surface, w, h);
+  SetupVulkanWindow(wd, g_Allocator, g_Instance, g_QueueFamily,
+                    g_PhysicalDevice, g_Device, surface, w, h, g_MinImageCount);
 
   // Setup Dear ImGui context
   IMGUI_CHECKVERSION();
@@ -834,9 +477,9 @@ int iree::IreeMain(int argc, char** argv) {
 
     // Rendering
     ImGui::Render();
-    FrameRender(wd);
+    RenderFrame(wd, g_Device, g_Queue);
 
-    FramePresent(wd);
+    PresentFrame(wd, g_Queue);
   }
   // --------------------------------------------------------------------------
 

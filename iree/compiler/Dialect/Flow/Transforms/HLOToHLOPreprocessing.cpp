@@ -73,6 +73,23 @@ class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
   }
 };
 
+class DecomposeExpM1Pattern : public OpRewritePattern<mhlo::Expm1Op> {
+ public:
+  using OpRewritePattern<mhlo::Expm1Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::Expm1Op op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto type = op.operand().getType().cast<TensorType>();
+    DenseElementsAttr attr =
+        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
+    auto one = rewriter.create<ConstantOp>(loc, attr);
+    auto x = rewriter.create<mhlo::ExpOp>(loc, op.operand());
+    rewriter.replaceOpWithNewOp<mhlo::SubOp>(op, x, one);
+    return success();
+  }
+};
+
 class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
@@ -405,7 +422,8 @@ struct HLOToHLOPreprocessing
     // whether it was legalized away at a higher level.
     chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape, DecomposeLog1PPattern>(context);
+                    AdjustDepthwiseFilterShape, DecomposeLog1PPattern,
+                    DecomposeExpM1Pattern>(context);
 
     // Unary elementwise op.
     patterns.insert<

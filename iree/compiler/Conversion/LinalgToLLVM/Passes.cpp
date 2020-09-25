@@ -25,7 +25,18 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::opt<bool> convImg2ColConversion(
+    "iree-codegen-linalg-to-llvm-conv-img2col-conversion",
+    llvm::cl::desc("Enable rewriting linalg.conv linalg.generic that does "
+                   "img2col buffer packing + "
+                   "linag.matmul"),
+    llvm::cl::init(false));
+
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
+  // Linalg.ConvOp -> (Img2Col packing + matmul)
+  if (convImg2ColConversion) {
+    passManager.addPass(createConvImg2ColMatmulConversionPass());
+  }
   // Linalg -> Vectors Ops.
   passManager.addPass(createMatMulTileAndVectorizePass());
   // Linalg -> SCF

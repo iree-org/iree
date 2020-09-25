@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
 
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/IR/Builders.h"
 
@@ -55,6 +56,12 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
 
   for (Extension ext : vkTargetEnv.getExtensions()) {
     switch (ext) {
+      case Extension::VK_KHR_16bit_storage:
+        extensions.push_back(spirv::Extension::SPV_KHR_16bit_storage);
+        break;
+      case Extension::VK_KHR_8bit_storage:
+        extensions.push_back(spirv::Extension::SPV_KHR_8bit_storage);
+        break;
       case Extension::VK_KHR_shader_float16_int8:
         // This extension allows using certain SPIR-V capabilities.
         break;
@@ -64,6 +71,9 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
       case Extension::VK_KHR_storage_buffer_storage_class:
         extensions.push_back(
             spirv::Extension::SPV_KHR_storage_buffer_storage_class);
+        break;
+      case Extension::VK_KHR_variable_pointers:
+        extensions.push_back(spirv::Extension::SPV_KHR_variable_pointers);
         break;
     }
   }
@@ -91,6 +101,47 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
   MAP_PRIMITIVE_TYPE(Int16);
   MAP_PRIMITIVE_TYPE(Int8);
 #undef MAP_PRIMITIVE_TYPE
+
+#define MAP_8_16_BIT_STORAGE(vkFeature, spvCap) \
+  if (vkCapabilities.vkFeature())               \
+  capabilities.push_back(spirv::Capability::spvCap)
+
+  MAP_8_16_BIT_STORAGE(storageBuffer16BitAccess, StorageBuffer16BitAccess);
+  MAP_8_16_BIT_STORAGE(uniformAndStorageBuffer16BitAccess, StorageUniform16);
+  MAP_8_16_BIT_STORAGE(storagePushConstant16, StoragePushConstant16);
+  MAP_8_16_BIT_STORAGE(storageBuffer8BitAccess, StorageBuffer8BitAccess);
+  MAP_8_16_BIT_STORAGE(uniformAndStorageBuffer8BitAccess,
+                       UniformAndStorageBuffer8BitAccess);
+  MAP_8_16_BIT_STORAGE(storagePushConstant8, StoragePushConstant8);
+#undef MAP_8_16_BIT_STORAGE
+
+  auto subgroupFeatures = *symbolizeSubgroupFeature(
+      vkCapabilities.subgroupFeatures().getValue().getZExtValue());
+
+#define MAP_SUBGROUP_FEATURE(featureBit)                  \
+  if ((subgroupFeatures & SubgroupFeature::featureBit) == \
+      SubgroupFeature::featureBit)                        \
+  capabilities.push_back(spirv::Capability::GroupNonUniform##featureBit)
+
+  if ((subgroupFeatures & SubgroupFeature::Basic) == SubgroupFeature::Basic) {
+    capabilities.push_back(spirv::Capability::GroupNonUniform);
+  }
+  MAP_SUBGROUP_FEATURE(Vote);
+  MAP_SUBGROUP_FEATURE(Arithmetic);
+  MAP_SUBGROUP_FEATURE(Ballot);
+  MAP_SUBGROUP_FEATURE(Shuffle);
+  MAP_SUBGROUP_FEATURE(ShuffleRelative);
+  MAP_SUBGROUP_FEATURE(Clustered);
+  MAP_SUBGROUP_FEATURE(Quad);
+  MAP_SUBGROUP_FEATURE(PartitionedNV);
+#undef MAP_SUBGROUP_FEATURE
+
+  if (vkCapabilities.variablePointers()) {
+    capabilities.push_back(spirv::Capability::VariablePointers);
+  }
+  if (vkCapabilities.variablePointersStorageBuffer()) {
+    capabilities.push_back(spirv::Capability::VariablePointersStorageBuffer);
+  }
 }
 
 /// Gets the corresponding SPIR-V resource limits for the given Vulkan target
@@ -100,19 +151,69 @@ spirv::ResourceLimitsAttr convertResourceLimits(
   MLIRContext *context = vkTargetEnv.getContext();
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
   return spirv::ResourceLimitsAttr::get(
-      /*max_compute_shared_memory_size=*/nullptr,
+      vkCapabilities.maxComputeSharedMemorySize(),
       vkCapabilities.maxComputeWorkGroupInvocations(),
-      vkCapabilities.maxComputeWorkGroupSize(),
-      /*subgroup_size=*/nullptr, context);
+      vkCapabilities.maxComputeWorkGroupSize(), vkCapabilities.subgroupSize(),
+      context);
 }
 }  // anonymous namespace
 
-// TODO(antiagainst): register more SwiftShader extensions.
-const char *swiftShaderTargetEnvAssembly =
-    "#vk.target_env<v1.1, r(0), [VK_KHR_storage_buffer_storage_class], {"
-    "maxComputeWorkGroupInvocations = 128: i32, "
-    "maxComputeWorkGroupSize = dense<[128, 128, 64]>: vector<3xi32>"
-    "}>";
+// TODO(antiagainst): The following is good to get us started but it is
+// certainly not a scalable way to describe GPU targets. We need more proper
+// data structures and such.
+const char *getTargetEnvForTriple(llvm::StringRef triple) {
+  if (triple == "qualcomm-adreno640-unknown-android10") {
+    // Example profile: https://vulkan.gpuinfo.org/displayreport.php?id=7175
+    return R"(#vk.target_env<
+      v1.1, r(87), [
+        VK_KHR_storage_buffer_storage_class, VK_KHR_variable_pointers
+      ], Qualcomm:IntegratedGPU, {
+        maxComputeSharedMemorySize = 32768: i32,
+        maxComputeWorkGroupInvocations = 1024: i32,
+        maxComputeWorkGroupSize = dense<[1024, 1024, 64]>: vector<3xi32>,
+        shaderInt16,
+        subgroupFeatures = 3: i32,
+        subgroupSize = 64: i32,
+        variablePointersStorageBuffer, variablePointers
+    }>)";
+  }
+
+  if (triple == "valhall-g77-unknown-android10") {
+    // Example profile: https://vulkan.gpuinfo.org/displayreport.php?id=8046
+    return R"(#vk.target_env<
+      v1.1, r(108), [
+        VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
+        VK_KHR_storage_buffer_storage_class, VK_KHR_variable_pointers
+      ], ARM:IntegratedGPU, {
+        maxComputeSharedMemorySize = 32768: i32,
+        maxComputeWorkGroupInvocations = 512: i32,
+        maxComputeWorkGroupSize = dense<[512, 512, 512]>: vector<3xi32>,
+        shaderInt16,
+        subgroupFeatures = 1: i32,
+        subgroupSize = 16: i32,
+        storageBuffer16BitAccess, storagePushConstant16,
+        uniformAndStorageBuffer16BitAccess,
+        storageBuffer8BitAccess, uniformAndStorageBuffer8BitAccess,
+        storagePushConstant8,
+        shaderFloat16, shaderInt8,
+        variablePointersStorageBuffer, variablePointers
+    }>)";
+  }
+
+  if (triple == "swiftshader-unknown-unknown") {
+    // Example profile: https://vulkan.gpuinfo.org/displayreport.php?id=9095
+    return R"(#vk.target_env<
+      v1.1, r(0), [VK_KHR_storage_buffer_storage_class], SwiftShader:CPU, {
+        maxComputeSharedMemorySize = 16384: i32,
+        maxComputeWorkGroupInvocations = 128: i32,
+        maxComputeWorkGroupSize = dense<[128, 128, 64]>: vector<3xi32>,
+        subgroupFeatures = 63: i32,
+        subgroupSize = 4: i32
+    }>)";
+  }
+
+  return nullptr;
+}
 
 spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
   auto spvVersion = convertVersion(vkTargetEnv);
@@ -127,9 +228,9 @@ spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
 
   auto triple = spirv::VerCapExtAttr::get(
       spvVersion, spvCapabilities, spvExtensions, vkTargetEnv.getContext());
-  return spirv::TargetEnvAttr::get(
-      triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
-      spirv::TargetEnvAttr::kUnknownDeviceID, spvLimits);
+  return spirv::TargetEnvAttr::get(triple, vkTargetEnv.getVendorID(),
+                                   vkTargetEnv.getDeviceType(),
+                                   vkTargetEnv.getDeviceID(), spvLimits);
 }
 
 }  // namespace Vulkan

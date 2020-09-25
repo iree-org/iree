@@ -34,39 +34,31 @@ iree_bytecode_module(
 # One way to achieve this is by installing the Vulkan SDK from
 # https://vulkan.lunarg.com/.
 # If Vulkan is not found, omit the target.
-include(FindVulkan)
-if(NOT Vulkan_FOUND)
+if(NOT TARGET iree::testing::vulkan::vulkan_gui_util)
   message(NOTICE "Vulkan was not found, skipping vulkan_inference_gui sample")
-else()
-  if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-    set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
-  else()
-    set(_GUI_LINKOPTS "")
-  endif()
-
-  iree_cc_binary(
-      NAME
-        vulkan_inference_gui
-      SRCS
-        "vulkan_inference_gui.cc"
-      DEPS
-        absl::base
-        dear_imgui::dear_imgui
-        dear_imgui::impl_sdl
-        dear_imgui::impl_vulkan
-        iree::base::api
-        iree::base::logging
-        iree::base::main
-        iree::hal::api
-        iree::hal::vulkan::api
-        iree::modules::hal
-        iree::samples::vulkan::simple_mul_bytecode_module_cc
-        iree::vm
-        iree::vm::bytecode_module
-        iree::vm::ref_cc
-        SDL2-static
-        Vulkan::Vulkan
-      LINKOPTS
-        "${_GUI_LINKOPTS}"
-  )
+  return()
 endif()
+
+if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
+else()
+  set(_GUI_LINKOPTS "")
+endif()
+
+iree_cc_binary(
+  NAME
+    vulkan_inference_gui
+  SRCS
+    "vulkan_inference_gui.cc"
+  DEPS
+    absl::base
+    iree::base::main
+    iree::modules::hal
+    iree::samples::vulkan::simple_mul_bytecode_module_cc
+    iree::testing::vulkan::vulkan_gui_util
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::ref_cc
+  LINKOPTS
+    "${_GUI_LINKOPTS}"
+)
