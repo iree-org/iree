@@ -409,11 +409,27 @@ def _get_concrete_functions(module_class: Type[tf.Module],
   return functions, exported_names
 
 
-def compile_to_tflite(module_class: Type[tf.Module],
-                      exported_names: Sequence[str] = (),
-                      artifacts_dir: str = None):
-  """Compile a dict of TFLite interpreters for the methods on module_class."""
-  functions, names = _get_concrete_functions(module_class, exported_names)
+def compile_to_tflite(
+    module_class: Type[tf.Module],
+    exported_names: Sequence[str] = (),
+    artifacts_dir: str = None
+) -> Tuple[Dict[str, tf.lite.Interpreter], Union[Dict[str, str]], None]:
+  """Compile a dict of TFLite interpreters for the methods on module_class.
+
+  Args:
+    module_class: A tf.Module subclass to compile with TFLite. If module_class
+      has an attr get_tflite_v1_kwargs then it will be compiled using
+      tf.compat.v1.lite.
+    exported_names: an optional iterable of strings representing which of the
+      module_class's functions should be callable. If exported_names is empty
+      then all functions will be callable.
+    artifacts_dir: an optional path to save compilation artifacts to.
+
+  Returns:
+    A dictionary of function names to TFLite interpreters and a dictionary of
+    function names to compiled tflite graph paths (or None if artifacts_dir)
+    is None.
+  """
   interpreters = dict()
   compiled_paths = None
   if artifacts_dir is not None:
@@ -431,10 +447,23 @@ def compile_to_tflite(module_class: Type[tf.Module],
     if artifacts_dir is not None:
       compiled_paths[name] = tflite_path
 
-  for name, function in zip(names, functions):
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
-    tflite_module = converter.convert()
+  tflite_modules = []
+  names = []
+  if hasattr(module_class, "get_tflite_v1_kwargs"):
+    tflite_v1_kwargs = module_class.get_tflite_v1_kwargs()
+    converter = tf.compat.v1.lite.TFLiteConverter.from_saved_model(
+        tflite_v1_kwargs["model_path"],
+        input_arrays=tflite_v1_kwargs["input_arrays"],
+        output_arrays=tflite_v1_kwargs["output_arrays"])
+    tflite_modules.append(converter.convert())
+    names.append(tflite_v1_kwargs["function_name"])
+  else:
+    functions, names = _get_concrete_functions(module_class, exported_names)
+    for function in functions:
+      converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
+      tflite_modules.append(converter.convert())
 
+  for name, tflite_module in zip(names, tflite_modules):
     if artifacts_dir is None:
       with tempfile.TemporaryDirectory() as base_dir:
         _interpret_bytes(tflite_module, base_dir)
@@ -461,14 +490,31 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
       self._interpreter.set_tensor(detail["index"], arg)
     self._interpreter.invoke()
 
-    # Retrieve and process outputs.
-    outputs = tuple([
-        self._interpreter.get_tensor(detail["index"])
-        for detail in self._interpreter.get_output_details()
-    ])
-    outputs = [_normalize_numpy(output) for output in outputs]
-    if len(outputs) == 1:
-      outputs = outputs[0]
+    # Extract the outputs from the TFLite interpreter.
+    outputs = []
+    is_dict = False
+    for detail in self._interpreter.get_output_details():
+      value = _normalize_numpy(self._interpreter.get_tensor(detail["index"]))
+      name = detail["name"]
+      if name != "Identity":
+        # If the name of any output is "Identity" then we expect the entire
+        # output to be a single array or tuple of arrays.
+        if len(outputs) and not is_dict:
+          raise ValueError(
+              f"Encountered a named output '{name}' after {len(outputs)} "
+              "non-named outputs")
+        is_dict = True
+        outputs.append([name, value])
+      else:
+        outputs.append(value)
+
+    # Process them to match the output of the tf.Module.
+    if not is_dict:
+      outputs = tuple(outputs)
+      if len(outputs) == 1:
+        outputs = outputs[0]
+    else:
+      outputs = dict(outputs)
     return outputs
 
 
