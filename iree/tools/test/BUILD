@@ -36,8 +36,8 @@ iree_lit_test_suite(
 )
 
 iree_lit_test_suite(
-    name = "flag_parse",
-    srcs = glob(["*.txt"]),
+    name = "benchmark_flags",
+    srcs = ["benchmark_flags.txt"],
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",
