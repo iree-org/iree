@@ -23,6 +23,9 @@
 #ifdef IREE_HAVE_VMLA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VMLA/VMLATarget.h"
 #endif
+#ifdef IREE_HAVE_METALSPIRV_TARGET
+#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
+#endif
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 #endif
@@ -48,6 +51,10 @@ void registerHALTargetBackends() {
 #ifdef IREE_HAVE_VMLA_TARGET
     IREE::HAL::registerVMLATargetBackends(
         []() { return IREE::HAL::getVMLATargetOptionsFromFlags(); });
+#endif
+#ifdef IREE_HAVE_METALSPIRV_TARGET
+    IREE::HAL::registerMetalSPIRVTargetBackends(
+        []() { return IREE::HAL::getMetalSPIRVTargetOptionsFromFlags(); });
 #endif
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
     IREE::HAL::registerVulkanSPIRVTargetBackends(

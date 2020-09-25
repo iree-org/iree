@@ -80,7 +80,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unused-local-typedef"
     "-Wno-unused-private-field"
     "-Wno-user-defined-warnings"
-    "-Wno-macro-redefined" # TODO(GH-2556): Re-enable (IREE and TF both define LOG)
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
     # warnings turned off above.
@@ -104,7 +103,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wunused-comparison"
     "-Wunused-variable"
     "-Wvla"
-    # LINT.ThenChange(https://github.com/google/iree/tree/main/.bazelrc:clang_diagnostics)
+    # LINT.ThenChange(https://github.com/google/iree/tree/main/build_tools/bazel/iree.bazelrc:clang_diagnostics)
 
     # Turn off some additional warnings (CMake only)
     "-Wno-strict-prototypes"
@@ -120,6 +119,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-fvisibility=hidden"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
+    "/D_USE_MATH_DEFINES"
     "/wd4624"
     # 'inline': used more than once
     "/wd4141"
@@ -344,4 +344,24 @@ if(IREE_ENABLE_EMITC)
     ${PROJECT_BINARY_DIR}/third_party/mlir-emitc/include
   )
   add_definitions(-DIREE_HAVE_EMITC_DIALECT)
+endif()
+
+#-------------------------------------------------------------------------------
+# Third party: SPIRV-Cross
+#-------------------------------------------------------------------------------
+
+if(${IREE_TARGET_BACKEND_METAL-SPIRV})
+  set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_ENABLE_GLSL ON CACHE BOOL "" FORCE) # Required to enable MSL
+
+  set(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_CLI OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "" FORCE)
+
+  set(SPIRV_CROSS_ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_ENABLE_CPP OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_ENABLE_REFLECT OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "" FORCE)
+  set(SPIRV_CROSS_ENABLE_UTIL OFF CACHE BOOL "" FORCE)
 endif()

@@ -14,15 +14,15 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_index = 9 : i32} : memref<?x?x?x?xf32>
     %arg2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 10 : i32} : memref<?x?x?x?xf32>
-    linalg.generic
-      {args_in = 2 : i64, args_out = 1 : i64,
+    linalg.generic {
        indexing_maps = [#map0, #map0, #map0],
        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-      %arg0, %arg1, %arg2 {
+      ins(%arg0, %arg1 : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
+     outs(%arg2 : memref<?x?x?x?xf32>) {
     ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
       %0 = addf %arg3, %arg4 : f32
       linalg.yield %0 : f32
-    } : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
+    }
     return
   }
   func @parallel_4D__num_workgroups__
@@ -81,15 +81,15 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<3x4x5x6xf32>
     %arg2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<3x4x5x6xf32>
-    linalg.generic
-      {args_in = 2 : i64, args_out = 1 : i64,
+    linalg.generic {
        indexing_maps = [#map0, #map0, #map0],
        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-      %arg0, %arg1, %arg2 {
+      ins(%arg0, %arg1 : memref<3x4x5x6xf32>, memref<3x4x5x6xf32>)
+     outs(%arg2 : memref<3x4x5x6xf32>) {
     ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
       %0 = addf %arg3, %arg4 : f32
       linalg.yield %0 : f32
-    } : memref<3x4x5x6xf32>, memref<3x4x5x6xf32>, memref<3x4x5x6xf32>
+    }
     return
   }
   func @parallel_4D_static__num_workgroups__
@@ -135,8 +135,6 @@ module attributes {
 #map0 = affine_map<() -> ()>
 #accesses = [#map0, #map0, #map0]
 #trait = {
-  args_in = 2 : i64,
-  args_out = 1 : i64,
   indexing_maps = #accesses,
   iterator_types = []
 }
@@ -154,11 +152,13 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
     %arg2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<f32>
-    linalg.generic #trait %arg0, %arg1, %arg2 {
+    linalg.generic #trait
+      ins(%arg0, %arg1 : memref<f32>, memref<f32>)
+     outs(%arg2 : memref<f32>) {
     ^bb0(%arg3 : f32, %arg4 : f32, %arg5 : f32):
       %0 = addf %arg3, %arg4 : f32
       linalg.yield %0 : f32
-     } : memref<f32>, memref<f32>, memref<f32>
+     }
      return
   }
   func @scalar_add__num_workgroups__
@@ -193,11 +193,12 @@ module {
       {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<f32>
     %arg2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<?xf32>
-    linalg.indexed_generic
-      {args_in = 2 : i64, args_out = 1 : i64,
+    linalg.indexed_generic {
        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> ()>,
                         affine_map<(d0, d1, d2) -> (d0)>],
-       iterator_types = ["parallel", "parallel", "reduction"]} %arg0, %arg1, %arg2 {
+       iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1 : memref<?x?x?xf32>, memref<f32>)
+     outs(%arg2 : memref<?xf32>) {
     ^bb0(%arg3: index, %arg4: index, %arg5: index,
          %arg6: f32, %arg7: f32, %arg8: f32):   // no predecessors
       %c0 = constant 0 : index
@@ -207,7 +208,7 @@ module {
       %2 = select %1, %arg7, %arg8 : f32
       %3 = addf %arg6, %2 : f32
       linalg.yield %3 : f32
-    }: memref<?x?x?xf32>, memref<f32>, memref<?xf32>
+    }
     return
   }
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
@@ -242,7 +243,6 @@ module {
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-
 module attributes {
   spv.target_env =
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -275,8 +275,9 @@ module attributes {
       %16 = dim %arg2, %c1 : memref<?x?xf32>
       %17 = affine.min #map1()[%1, %16]
       %18 = subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-      linalg.matmul  %7, %13, %18 {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"}
-        : (memref<?x?xf32, #map3>, memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
+      linalg.matmul {__internal_linalg_transform__ = "workgroup_numprocs_ge_numiters"}
+        ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
+       outs(%18 : memref<?x?xf32, #map3>)
     }
     return
   }

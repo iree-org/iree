@@ -115,11 +115,11 @@ inline void CopyRegion(absl::Span<const uint8_t> src_buffer,
                  lengths.subspan(1));
     }
   } else {
-    DCHECK_EQ(dst_strides.size(), 1);
-    DCHECK_EQ(src_strides.size(), 1);
-    DCHECK_EQ(src_indices.size(), 1);
-    DCHECK_EQ(dst_indices.size(), 1);
-    DCHECK_EQ(lengths.size(), 1);
+    IREE_DCHECK_EQ(dst_strides.size(), 1);
+    IREE_DCHECK_EQ(src_strides.size(), 1);
+    IREE_DCHECK_EQ(src_indices.size(), 1);
+    IREE_DCHECK_EQ(dst_indices.size(), 1);
+    IREE_DCHECK_EQ(lengths.size(), 1);
     auto src_offset = src_indices[0] * src_strides[0];
     auto dst_offset = dst_indices[0] * dst_strides[0];
     auto length = dst_strides[0] * lengths[0];
@@ -137,10 +137,10 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer, ShapeSpan src_shape,
                      absl::Span<uint8_t> dst_buffer, ShapeSpan dst_shape,
                      absl::Span<const int32_t> dst_indices,
                      absl::Span<const int32_t> lengths) {
-  DCHECK_EQ(src_indices.size(), lengths.size());
-  DCHECK_EQ(dst_indices.size(), lengths.size());
-  DCHECK_EQ(src_shape.size(), lengths.size());
-  DCHECK_EQ(dst_shape.size(), lengths.size());
+  IREE_DCHECK_EQ(src_indices.size(), lengths.size());
+  IREE_DCHECK_EQ(dst_indices.size(), lengths.size());
+  IREE_DCHECK_EQ(src_shape.size(), lengths.size());
+  IREE_DCHECK_EQ(dst_shape.size(), lengths.size());
   if (lengths.empty()) {
     std::memcpy(dst_buffer.data(), src_buffer.data(), element_size);
     return OkStatus();
@@ -150,8 +150,8 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer, ShapeSpan src_shape,
   // across multiple rows.
   auto src_strides = impl::ComputeCopyStrides(src_shape, element_size);
   auto dst_strides = impl::ComputeCopyStrides(dst_shape, element_size);
-  DCHECK_EQ(src_strides.size(), lengths.size());
-  DCHECK_EQ(dst_strides.size(), lengths.size());
+  IREE_DCHECK_EQ(src_strides.size(), lengths.size());
+  IREE_DCHECK_EQ(dst_strides.size(), lengths.size());
   impl::CopyRegion(src_buffer, src_strides, src_indices, dst_buffer,
                    dst_strides, dst_indices, lengths);
   return OkStatus();
@@ -317,7 +317,7 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
                         edge_padding_high, interior_padding)) {
       *dst_ptr++ = padding_value;
     } else {
-      DCHECK(src_ptr != src_buffer.end());
+      IREE_DCHECK(src_ptr != src_buffer.end());
       *dst_ptr++ = *src_ptr++;
     }
     impl::IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
@@ -575,6 +575,15 @@ Status And::Execute(absl::Span<const T> lhs_buffer,
 }
 
 template <typename T>
+Status And::Execute(absl::Span<const T> lhs_buffer, T rhs,
+                    absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] & rhs;
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status Or::Execute(absl::Span<const T> lhs_buffer,
                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
@@ -588,6 +597,15 @@ Status Xor::Execute(absl::Span<const T> lhs_buffer,
                     absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = lhs_buffer[i] ^ rhs_buffer[i];
+  }
+  return OkStatus();
+}
+
+template <typename T>
+Status Xor::Execute(absl::Span<const T> lhs_buffer, T rhs,
+                    absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = lhs_buffer[i] ^ rhs;
   }
   return OkStatus();
 }
@@ -798,10 +816,19 @@ Status Ceil::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
   return OkStatus();
 }
 
+template <typename T>
+Status Round::Execute(absl::Span<const T> src_buffer,
+                      absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = std::round(src_buffer[i]);
+  }
+  return OkStatus();
+}
+
 template <typename SRC, typename DST>
 Status Convert::Execute(absl::Span<const SRC> src_buffer,
                         absl::Span<DST> dst_buffer) {
-  DCHECK_EQ(src_buffer.size(), dst_buffer.size());
+  IREE_DCHECK_EQ(src_buffer.size(), dst_buffer.size());
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = static_cast<DST>(src_buffer[i]);
   }

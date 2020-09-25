@@ -345,7 +345,7 @@ TEST_F(SipSignatureTest, NoInputsResults) {
   SipSignatureMangler results;
 
   auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
-  LOG(INFO) << "SIG: " << signature->encoded();
+  IREE_LOG(INFO) << "SIG: " << signature->encoded();
   EXPECT_EQ("I1!R1!", signature->encoded());
 
   auto inputs_string = PrintInputSignature(signature);
@@ -372,7 +372,7 @@ TEST_F(SipSignatureTest, SequentialInputSingleResult) {
   results.SetRawSignatureIndex(0, {});
 
   auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
-  LOG(INFO) << "SIG: " << signature->encoded();
+  IREE_LOG(INFO) << "SIG: " << signature->encoded();
   auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 
@@ -405,7 +405,7 @@ TEST_F(SipSignatureTest, NestedInputMultiResult) {
   results.SetRawSignatureIndex(1, {{1}});
 
   auto signature = SipSignatureMangler::ToFunctionSignature(inputs, results);
-  LOG(INFO) << "SIG: " << signature->encoded();
+  IREE_LOG(INFO) << "SIG: " << signature->encoded();
   auto inputs_string = PrintInputSignature(signature);
   EXPECT_EQ(kExpectedInputs, inputs_string) << inputs_string;
 

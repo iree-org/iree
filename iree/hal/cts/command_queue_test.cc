@@ -34,14 +34,16 @@ TEST_P(CommandQueueTest, EnumerateDeviceQueues) {
   // relevant on some implementations.
 
   absl::Span<CommandQueue*> dispatch_queues = device_->dispatch_queues();
-  LOG(INFO) << "Device has " << dispatch_queues.size() << " dispatch queue(s)";
+  IREE_LOG(INFO) << "Device has " << dispatch_queues.size()
+                 << " dispatch queue(s)";
   EXPECT_GE(dispatch_queues.size(), 1);
   for (auto* dispatch_queue : dispatch_queues) {
     EXPECT_TRUE(dispatch_queue->can_dispatch());
   }
 
   absl::Span<CommandQueue*> transfer_queues = device_->transfer_queues();
-  LOG(INFO) << "Device has " << transfer_queues.size() << " transfer queue(s)";
+  IREE_LOG(INFO) << "Device has " << transfer_queues.size()
+                 << " transfer queue(s)";
   EXPECT_GE(transfer_queues.size(), 1);
   for (auto* transfer_queue : transfer_queues) {
     EXPECT_TRUE(transfer_queue->can_transfer());

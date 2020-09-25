@@ -258,15 +258,16 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 
   auto* handle = reinterpret_cast<VulkanDriver*>(driver);
 
-  LOG(INFO) << "Enumerating available Vulkan devices...";
+  IREE_LOG(INFO) << "Enumerating available Vulkan devices...";
   IREE_ASSIGN_OR_RETURN(auto available_devices,
                         handle->EnumerateAvailableDevices());
   for (const auto& device_info : available_devices) {
-    LOG(INFO) << "  Device: " << device_info.name();
+    IREE_LOG(INFO) << "  Device: " << device_info.name();
   }
-  LOG(INFO) << "Creating default device...";
+  IREE_LOG(INFO) << "Creating default device...";
   IREE_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
-  LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
+  IREE_LOG(INFO) << "Successfully created device '" << device->info().name()
+                 << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
   return iree_ok_status();
@@ -286,7 +287,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
 
   auto* handle = reinterpret_cast<VulkanDriver*>(driver);
 
-  LOG(INFO) << "Creating VulkanDevice...";
+  IREE_LOG(INFO) << "Creating VulkanDevice...";
   QueueSet compute_qs;
   compute_qs.queue_family_index = compute_queue_set.queue_family_index;
   compute_qs.queue_indices = compute_queue_set.queue_indices;
@@ -296,7 +297,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
   IREE_ASSIGN_OR_RETURN(auto device,
                         handle->WrapDevice(physical_device, logical_device,
                                            compute_qs, transfer_qs));
-  LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
+  IREE_LOG(INFO) << "Successfully created device '" << device->info().name()
+                 << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
 

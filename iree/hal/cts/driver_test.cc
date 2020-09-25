@@ -24,7 +24,7 @@ namespace cts {
 class DriverTest : public CtsTestBase {};
 
 TEST_P(DriverTest, CreateDefaultDevice) {
-  LOG(INFO) << "Device details:\n" << device_->DebugString();
+  IREE_LOG(INFO) << "Device details:\n" << device_->DebugString();
 }
 
 TEST_P(DriverTest, EnumerateAndCreateAvailableDevices) {
@@ -32,7 +32,7 @@ TEST_P(DriverTest, EnumerateAndCreateAvailableDevices) {
 
   for (int i = 0; i < devices.size(); ++i) {
     IREE_ASSERT_OK_AND_ASSIGN(auto device, driver_->CreateDevice(devices[i]));
-    LOG(INFO) << "Device #" << i << " details:\n" << device->DebugString();
+    IREE_LOG(INFO) << "Device #" << i << " details:\n" << device->DebugString();
   }
 }
 

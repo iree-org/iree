@@ -33,6 +33,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRSPIRV
     MLIRSupport
     iree::compiler::Dialect::IREE::IR
   PUBLIC

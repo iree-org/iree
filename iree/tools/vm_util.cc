@@ -169,7 +169,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
     const auto& desc = descs[i];
     std::string desc_str;
     desc.ToString(desc_str);
-    LOG(INFO) << "result[" << i << "]: " << desc_str;
+    IREE_LOG(INFO) << "result[" << i << "]: " << desc_str;
 
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {
@@ -224,7 +224,7 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
 
 Status CreateDevice(absl::string_view driver_name,
                     iree_hal_device_t** out_device) {
-  LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
+  IREE_LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_driver_registry_create_driver(
       iree_string_view_t{driver_name.data(), driver_name.size()},

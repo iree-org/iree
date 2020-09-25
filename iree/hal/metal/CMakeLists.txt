@@ -62,6 +62,7 @@ iree_cc_library(
     ::metal_command_buffer
     ::metal_command_queue
     ::metal_direct_allocator
+    ::metal_pipeline_cache
     ::metal_shared_event
     absl::strings
     absl::span
@@ -127,6 +128,48 @@ iree_cc_library(
     iree::base::status
     iree::hal::driver_registry
   ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    metal_kernel_library
+  HDRS
+    "metal_kernel_library.h"
+  SRCS
+    "metal_kernel_library.mm"
+  DEPS
+    absl::inlined_vector
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::executable
+    iree::hal::executable_spec
+    iree::schemas::metal_executable_def_cc_fbs
+  LINKOPTS
+    "-framework Foundation"
+    "-framework Metal"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    metal_pipeline_cache
+  HDRS
+    "metal_pipeline_cache.h"
+  SRCS
+    "metal_pipeline_cache.mm"
+  DEPS
+    ::metal_kernel_library
+    flatbuffers
+    iree::base::status
+    iree::base::tracing
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
+    iree::schemas::metal_executable_def_cc_fbs
+  LINKOPTS
+    "-framework Metal"
   PUBLIC
 )
 

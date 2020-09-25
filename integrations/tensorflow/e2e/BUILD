@@ -56,9 +56,26 @@ SPECIAL_CASES = [
     "linspace_test.py",
 ]
 
+TFLITE_FAILING = [
+    "broadcasting_test.py",
+    "complex_test.py",
+    "concat_test.py",
+    "dynamic_mlp_relu_test.py",
+    "dynamic_mlp_test.py",
+    "finite_test.py",
+    "gather_test.py",
+    "mandelbrot_test.py",
+    "matrix_ops_dynamic_test.py",
+    "resource_ops_test.py",
+    "ring_buffer_test.py",
+    "scatter_update_test.py",
+    "simple_stateful_test.py",
+    "sliding_window_test.py",
+    "strings_test.py",
+]
+
 # keep sorted
 VMLA_FAILING = [
-    "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
@@ -73,7 +90,7 @@ LLVM_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "finite_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "matrix_ops_test.py",
+    "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
@@ -90,7 +107,7 @@ VULKAN_FAILING = [
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "finite_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
-    "matrix_ops_test.py",
+    "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
@@ -100,6 +117,11 @@ VULKAN_FAILING = [
 TF_PASSING = glob(
     ["*_test.py"],
     exclude = SPECIAL_CASES,
+)
+
+TFLITE_PASSING = glob(
+    ["*_test.py"],
+    exclude = TFLITE_FAILING + SPECIAL_CASES,
 )
 
 VMLA_PASSING = glob(
@@ -121,6 +143,7 @@ iree_e2e_test_suite(
     name = "e2e_tests",
     backends_to_srcs = {
         "tf": TF_PASSING,
+        "tflite": TFLITE_PASSING,
         "iree_vmla": VMLA_PASSING,
         "iree_llvmjit": LLVM_PASSING,
         "iree_vulkan": VULKAN_PASSING,
@@ -134,6 +157,7 @@ iree_e2e_test_suite(
 iree_e2e_test_suite(
     name = "e2e_tests_failing",
     backends_to_srcs = {
+        "tflite": TFLITE_FAILING,
         "iree_vmla": VMLA_FAILING,
         "iree_llvmjit": LLVM_FAILING,
         "iree_vulkan": VULKAN_FAILING,
@@ -162,6 +186,7 @@ iree_e2e_test_suite(
     },
     reference_backend = "tf",
     tags = [
+        "manual",
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [

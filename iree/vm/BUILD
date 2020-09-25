@@ -246,9 +246,6 @@ cc_test(
 cc_test(
     name = "native_module_test",
     srcs = ["native_module_test.cc"],
-    tags = [
-        "noasan",  # TODO(#3122): Enable ASAN test.
-    ],
     deps = [
         ":context",
         ":instance",

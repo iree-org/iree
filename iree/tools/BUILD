@@ -36,10 +36,12 @@ exports_files([
 iree_cc_binary(
     name = "iree-benchmark-module",
     testonly = True,
-    srcs = ["benchmark_module_main.cc"],
+    srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
         "//iree/base:init",
@@ -54,7 +56,7 @@ iree_cc_binary(
 
 iree_cc_binary(
     name = "iree-dump-module",
-    srcs = ["dump_module_main.cc"],
+    srcs = ["iree-dump-module-main.cc"],
     deps = [
         "//iree/base:file_io",  # build-cleaner: keep
         "//iree/base:flatbuffer_util",
@@ -180,7 +182,7 @@ cc_library(
 
 cc_library(
     name = "iree_opt_main",
-    srcs = ["opt_main.cc"],
+    srcs = ["iree-opt-main.cc"],
     deps = [
         ":init_compiler_modules",
         ":init_iree_passes_and_dialects",
@@ -233,7 +235,7 @@ iree_cc_binary(
 
 iree_cc_binary(
     name = "iree-run-mlir",
-    srcs = ["run_mlir_main.cc"],
+    srcs = ["iree-run-mlir-main.cc"],
     tags = ["hostonly"],
     deps = [
         ":init_compiler_modules",
@@ -270,7 +272,7 @@ iree_cc_binary(
 
 iree_cc_binary(
     name = "iree-run-module",
-    srcs = ["run_module_main.cc"],
+    srcs = ["iree-run-module-main.cc"],
     deps = [
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
@@ -299,7 +301,7 @@ iree_cc_binary(
 
 cc_library(
     name = "iree_translate_main",
-    srcs = ["translate_main.cc"],
+    srcs = ["iree-translate-main.cc"],
     deps = [
         ":init_compiler_modules",
         ":init_iree_passes_and_dialects",

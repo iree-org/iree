@@ -31,17 +31,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/VM/IR/VMOps.h.inc"
-
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_VM_IR_VMOPS_H_

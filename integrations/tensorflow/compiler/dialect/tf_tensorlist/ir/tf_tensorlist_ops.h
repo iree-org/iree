@@ -21,14 +21,8 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
-namespace mlir {
-namespace tf_tensorlist {
-
 // Declares the operations for this dialect using the generated header.
 #define GET_OP_CLASSES
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.h.inc"
-
-}  // namespace tf_tensorlist
-}  // namespace mlir
 
 #endif  // IREE_INTEGRATIONS_TENSORFLOW_COMPILER_TF_TENSORLIST_OPS_H_

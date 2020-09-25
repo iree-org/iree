@@ -570,22 +570,11 @@ static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
 
 static ParseResult parseDispatchOp(OpAsmParser &parser,
                                    OperationState *result) {
-  auto executableLoc = parser.getNameLoc();
-
-  // TODO(benvanik): replace with SymbolRefAttr.
-  StringAttr executableAttr;
-  StringAttr entryPointAttr;
-  if (failed(parser.parseSymbolName(executableAttr, "executable",
-                                    result->attributes)) ||
-      failed(parser.parseColon()) || failed(parser.parseColon()) ||
-      failed(parser.parseSymbolName(entryPointAttr, "entry_point",
-                                    result->attributes))) {
+  SymbolRefAttr entryPointAttr;
+  if (failed(parser.parseAttribute(entryPointAttr, "entry_point",
+                                   result->attributes))) {
     return failure();
   }
-  result->attributes.set("entry_point", parser.getBuilder().getSymbolRefAttr(
-                                            entryPointAttr.getValue()));
-  result->attributes.set("executable", parser.getBuilder().getSymbolRefAttr(
-                                           executableAttr.getValue()));
 
   OpAsmParser::OperandType workloadArg;
   Type workloadArgType;
@@ -607,7 +596,7 @@ static ParseResult parseDispatchOp(OpAsmParser &parser,
       failed(
           parser.addTypesToList(entryPointType.getResults(), result->types)) ||
       failed(parser.resolveOperands(operands, entryPointType.getInputs(),
-                                    executableLoc, result->operands))) {
+                                    parser.getNameLoc(), result->operands))) {
     return failure();
   }
   return success();
@@ -615,10 +604,7 @@ static ParseResult parseDispatchOp(OpAsmParser &parser,
 
 static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
   p << op.getOperationName() << ' ';
-  // TODO(benvanik): replace with SymbolRefAttr.
-  p.printSymbolName(op.executable());
-  p << "::";
-  p.printSymbolName(op.entry_point());
+  p.printAttributeWithoutType(op.entry_point());
   p << "[";
   p.printOperand(op.workload());
   p << " : ";
@@ -626,13 +612,29 @@ static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
   p << "](";
   p.printOperands(op.operands());
   p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                              "executable",
-                              "entry_point",
-                          });
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"entry_point"});
   p << " : ";
   p.printType(op.getEntryPointType());
 }
+
+void DispatchOp::build(OpBuilder &builder, OperationState &state,
+                       DispatchEntryOp entryPoint, Value workload,
+                       ArrayRef<Type> results, ValueRange operands) {
+  state.addOperands({workload});
+  state.addOperands(operands);
+  // Construct Executable::Entry nested reference.
+  StringRef executableOpSymName =
+      entryPoint.getParentOp()
+          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
+          .getValue();
+  state.addAttribute(
+      "entry_point",
+      builder.getSymbolRefAttr(executableOpSymName,
+                               {builder.getSymbolRefAttr(entryPoint)}));
+  state.addTypes(results);
+}
+
+StringRef DispatchOp::executable() { return entry_point().getRootReference(); }
 
 FunctionType DispatchOp::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{operands()});
@@ -721,14 +723,14 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
                           /*elidedAttrs=*/{});
 }
 
+}  // namespace Flow
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"
-
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir

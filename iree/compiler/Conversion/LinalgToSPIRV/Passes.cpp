@@ -24,6 +24,7 @@
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToVector/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
@@ -51,22 +52,16 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-/// Command line options for use with SPIR-V code-generation pass pipeline.
-struct SPIRVCodegenClOpts : public PassPipelineOptions<SPIRVCodegenClOpts> {
-  ListOption<int64_t> workgroupSize{
-      *this, "workgroup-size",
+
+/// Linalg to SPIR-V pass pipeline options. In theory this is a superset of all
+/// options in all passes in the pipeline. Adding those based on need, and they
+/// should be needed only for testing.
+struct LinalgToSPIRVPassPipelineOptions
+    : public PassPipelineOptions<LinalgToSPIRVPassPipelineOptions> {
+  Option<bool> useVectorization{
+      *this, "use-vectorization",
       llvm::cl::desc(
-          "Number of workgroups to dispatch for the SPIR-V module; at most "
-          "three integers standarding for the x, y, and z dimension; "
-          "additional arguments will be ignored (used only for testing)"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
-  ListOption<int64_t> tileSizes{
-      *this, "tile-sizes", llvm::cl::desc("Set tile sizes to use"),
-      llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated};
-  Option<bool> useWorkgroupMemory{
-      *this, "use-workgroup-memory",
-      llvm::cl::desc(
-          "Enable use of workgroup memory in SPIR-V code generation pipeline"),
+          "Enable use of vectorization in SPIR-V code generation pipeline"),
       llvm::cl::init(false)};
   Option<bool> useVectorPass{
       *this, "use-vector-pass",
@@ -107,8 +102,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   with the second tile and fuse pass.
   //===--------------------------------------------------------------------===//
   pm.addPass(createSplitDispatchFunctionPass());
-  pm.addPass(createLinalgTileAndFusePass(
-      options.workgroupSize, options.tileSizes, options.useWorkgroupMemory));
+  pm.addPass(createLinalgTileAndFusePass(options));
   if (options.useVectorPass) {
     pm.addPass(createLoadStoreVectorizationPass());
   }
@@ -261,30 +255,33 @@ void buildSPIRVTransformPassPipeline(OpPassManager &pm,
   addLinalgToSPIRVPasses(pm, options);
 }
 
-static SPIRVCodegenOptions getSPIRVCodegenOptions(
-    const SPIRVCodegenClOpts &clOpts) {
-  SPIRVCodegenOptions options;
-  options.workgroupSize.assign(clOpts.workgroupSize.begin(),
-                               clOpts.workgroupSize.end());
-  options.tileSizes.assign(clOpts.tileSizes.begin(), clOpts.tileSizes.end());
-  options.useWorkgroupMemory = clOpts.useWorkgroupMemory;
-  return options;
+static SPIRVCodegenOptions initializeCodegenOptions(
+    const LinalgToSPIRVPassPipelineOptions &options) {
+  SPIRVCodegenOptions codegenOptions;
+  codegenOptions.useVectorization = options.useVectorization;
+  return codegenOptions;
 }
 
-static PassPipelineRegistration<SPIRVCodegenClOpts> linalgToSPIRVPipeline(
-    "iree-codegen-linalg-to-spirv-pipeline",
-    "Runs the progressive lowering pipeline from Linalg to SPIR-V",
-    [](OpPassManager &passManager, const SPIRVCodegenClOpts &options) {
-      addLinalgToSPIRVPasses(passManager, getSPIRVCodegenOptions(options));
-    });
+static PassPipelineRegistration<LinalgToSPIRVPassPipelineOptions>
+    linalgToSPIRVPipeline(
+        "iree-codegen-linalg-to-spirv-pipeline",
+        "Runs the progressive lowering pipeline from Linalg to SPIR-V",
+        [](OpPassManager &passManager,
+           const LinalgToSPIRVPassPipelineOptions &options) {
+          addLinalgToSPIRVPasses(passManager,
+                                 initializeCodegenOptions(options));
+        });
 
-static PassPipelineRegistration<SPIRVCodegenClOpts> hloToLinalgSPIRVPipeline(
-    "iree-codegen-hlo-to-spirv-pipeline",
-    "Runs the progressive lowering pipeline from XLA HLO to Linalg to SPIR-V",
-    [](OpPassManager &passManager, const SPIRVCodegenClOpts &options) {
-      buildSPIRVTransformPassPipeline(passManager,
-                                      getSPIRVCodegenOptions(options));
-    });
+static PassPipelineRegistration<LinalgToSPIRVPassPipelineOptions>
+    hloToLinalgSPIRVPipeline(
+        "iree-codegen-hlo-to-spirv-pipeline",
+        "Runs the progressive lowering pipeline from XLA HLO to Linalg to "
+        "SPIR-V",
+        [](OpPassManager &passManager,
+           const LinalgToSPIRVPassPipelineOptions &options) {
+          buildSPIRVTransformPassPipeline(passManager,
+                                          initializeCodegenOptions(options));
+        });
 
 }  // namespace iree_compiler
 }  // namespace mlir

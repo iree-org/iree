@@ -71,11 +71,15 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::desc("Tile size to use for tiling Linalg operations"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
+  static llvm::cl::opt<std::string> clVulkanTargetTriple(
+      "iree-vulkan-target-triple", llvm::cl::desc("Vulkan target triple"),
+      llvm::cl::init("swiftshader-unknown-unknown"));
+
   static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
       llvm::cl::desc(
           "Vulkan target environment as #vk.target_env attribute assembly"),
-      llvm::cl::init(Vulkan::swiftShaderTargetEnvAssembly));
+      llvm::cl::init(""));
 
   VulkanSPIRVTargetOptions targetOptions;
   targetOptions.codegenOptions.workgroupSize.assign(clWorkgroupSize.begin(),
@@ -84,7 +88,12 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
                                                 clTileSizes.end());
   targetOptions.codegenOptions.useWorkgroupMemory = clUseWorkgroupMemory;
   targetOptions.codegenOptions.useVectorPass = clUseVectorPass;
-  targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
+  if (!clVulkanTargetEnv.empty()) {
+    targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
+  } else {
+    targetOptions.vulkanTargetEnv =
+        Vulkan::getTargetEnvForTriple(clVulkanTargetTriple);
+  }
   return targetOptions;
 }
 
@@ -98,7 +107,8 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
   }
 
   emitError(Builder(context).getUnknownLoc())
-      << "cannot parse vulkan target environment as #vk.target_env attribute ";
+      << "cannot parse vulkan target environment as #vk.target_env attribute: '"
+      << vulkanTargetEnv << "'";
   return {};
 }
 

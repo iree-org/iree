@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VMLA_CONVERSION_TYPECONVERTER_H_
 
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -28,6 +29,20 @@ class VMLATypeConverter : public TypeConverter {
   // post-conversion. For example, the size of i1 would be '1 byte'.
   static int32_t getRoundedElementByteWidth(Type type) {
     return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+  }
+
+  // Converts a `tensor` type with an arbitrary element size to one supported by
+  // VMLA. For example, `tensor<4x8xi1>` is converted to `tensor<4x8xi8>`.
+  static TensorType convertTensorTypeToVMLAType(TensorType sourceType) {
+    assert(sourceType.hasRank() && "only ranked tensors are supported");
+    Type sourceElementType = sourceType.getElementType();
+    Type targetElementType = sourceElementType;
+    if (auto sourceIntType = sourceElementType.dyn_cast<IntegerType>()) {
+      int32_t targetByteWidth = getRoundedElementByteWidth(sourceElementType);
+      targetElementType =
+          IntegerType::get(targetByteWidth * 8, sourceElementType.getContext());
+    }
+    return RankedTensorType::get(sourceType.getShape(), targetElementType);
   }
 
   // TODO(benvanik): signature conversion for output buffers.

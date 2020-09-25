@@ -23,7 +23,7 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 def HAL_Dialect : Dialect {
   let name = "hal";
-  let cppNamespace = "IREE::HAL";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 
   let summary = [{
     A dialect representing operations against the IREE HAL.
@@ -235,6 +235,7 @@ def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
 def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
 def HAL_EF_VMLA : I32EnumAttrCase<"VMLA", 1447906369>;
 def HAL_EF_SpirV : I32EnumAttrCase<"SpirV", 1397773893>;
+def HAL_EF_Metal : I32EnumAttrCase<"Metal", 1297370181>;
 def HAL_EF_LLVM : I32EnumAttrCase<"LLVM", 1280071245>;
 def HAL_EF_DyLib : I32EnumAttrCase<"DyLib", 1145850178>;
 def HAL_ExecutableFormatAttr :
@@ -244,6 +245,7 @@ def HAL_ExecutableFormatAttr :
       HAL_EF_IreeBytecode,
       HAL_EF_VMLA,
       HAL_EF_SpirV,
+      HAL_EF_Metal,
       HAL_EF_LLVM,
       HAL_EF_DyLib
     ]> {

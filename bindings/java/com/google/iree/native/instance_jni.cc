@@ -28,10 +28,10 @@ namespace {
 // object.
 static InstanceWrapper* GetInstanceWrapper(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  CHECK(clazz);
+  IREE_CHECK(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  CHECK(field);
+  IREE_CHECK(field);
 
   return reinterpret_cast<InstanceWrapper*>(env->GetLongField(obj, field));
 }
@@ -44,13 +44,13 @@ JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz, jlong handle) {
   InstanceWrapper* instance = GetInstanceWrapper(env, thiz);
-  CHECK_NE(instance, nullptr);
+  IREE_CHECK_NE(instance, nullptr);
   delete instance;
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz) {
   InstanceWrapper* instance = GetInstanceWrapper(env, thiz);
-  CHECK_NE(instance, nullptr);
+  IREE_CHECK_NE(instance, nullptr);
 
   auto status = instance->Create();
   return (jint)status.code();

@@ -30,14 +30,31 @@ namespace HAL {
 // post-conversion. For example, the size of i1 would be '1 byte'.
 int32_t getRoundedElementByteWidth(Type type);
 
+// Converts a `tensor` type with an arbitrary element size to one supported by
+// the HAL ABI. For example, `tensor<4x8xi1>` is converted to `tensor<4x8xi8>`.
+TensorType convertTensorTypeToABIType(TensorType sourceType);
+
+// Converts a value to/from one supported by the ABI from/to an arbitrary tensor
+// type.
+//
+// Ideally we'd use some type-aware conversion to handle signed/unsigned
+// saturation vs. truncation. As an example, we'd want to zero-extend an
+// unsigned i4 to a signed i8. We also don't want to use HLO ops here, but the
+// standard ops (trunci, zexti, etc) are not supported by subsequent lowerings
+// and just cause pain.
+//
+// Example: `tensor<4xi8>` -> `tensor<4xi1>`
+//      or  `tensor<4xi1>` -> `tensor<4xi8>`
+Value convertABITensorType(Location loc, Value sourceValue,
+                           TensorType targetType, OpBuilder &builder);
+
 // Returns an array of i32 values representing the shape of the |shapedType|.
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
                                          OpBuilder &builder);
 
 // Returns an array of i32 values representing the shape of the |shapedValue|.
-llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
-                                                   Value shapedValue,
-                                                   OpBuilder &builder);
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+    Location loc, Value shapedValue, ConversionPatternRewriter &rewriter);
 
 // An adaptor used for tensor->buffer rewrites.
 // This abstracts the source and destination types to allow for implicit
@@ -86,7 +103,8 @@ class TensorRewriteAdaptor {
 
   // Returns the I32 shape dimensions of the tensor.
   llvm::Optional<SmallVector<Value, 4>> getShapeDims();
-  llvm::Optional<SmallVector<Value, 4>> getShapeDims(OpBuilder &builder);
+  llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+      ConversionPatternRewriter &rewriter);
 
   // Performs the equivalent of a hal.buffer_view.byte_length.
   Value getByteLength();

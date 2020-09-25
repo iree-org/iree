@@ -655,27 +655,12 @@ struct MapLinalgOpToGlobalInvocationId
         workgroupSize = {32, 1, 1};
       }
     }
-    if (failed(updateWorkGroupSize(funcOp, workgroupSize))) return failure();
-
-    // TODO(#3145): The use of the generated function to compute the number of
-    // workgroups works for dynamic shapes as well, but there is an issue with
-    // the shape computation + ha.device.switch creation that needs to be
-    // resolved before the generated function can be used on the host side. So
-    // disabling this approach for dynamic shape case.
-    if (llvm::all_of(linalgOp.getOperands(), [](Value v) {
-          Type t = v.getType();
-          return (t.isa<ShapedType>() &&
-                  t.cast<ShapedType>().hasStaticShape()) ||
-                 t.isIntOrIndexOrFloat();
-        })) {
-      if (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
-          failed(createNumWorkgroupsFromLinearizedResultShape(
-              rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()), funcOp,
-              workgroupSize[0]))) {
-        return failure();
-      }
-    } else {
-      funcOp.removeAttr(getNumWorkgroupsFnAttrName());
+    if (failed(updateWorkGroupSize(funcOp, workgroupSize)) ||
+        (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+         failed(createNumWorkgroupsFromLinearizedResultShape(
+             rewriter, cast<linalg::LinalgOp>(linalgOp.getOperation()), funcOp,
+             workgroupSize[0])))) {
+      return failure();
     }
     rewriter.eraseOp(linalgOp);
     return success();

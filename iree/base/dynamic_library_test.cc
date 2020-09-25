@@ -52,8 +52,8 @@ class DynamicLibraryTest : public ::testing::Test {
                                 file_toc->size);
     IREE_ASSERT_OK(file_io::SetFileContents(library_temp_path_, file_data));
 
-    LOG(INFO) << "Embedded test library written to temp path: "
-              << library_temp_path_;
+    IREE_LOG(INFO) << "Embedded test library written to temp path: "
+                   << library_temp_path_;
   }
 
   static std::string library_temp_path_;

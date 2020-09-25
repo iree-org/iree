@@ -29,3 +29,15 @@ iree_lit_test_suite(
   LABELS
     "hostonly"
 )
+
+iree_lit_test_suite(
+  NAME
+    benchmark_flags
+  SRCS
+    "benchmark_flags.txt"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-benchmark-module
+  LABELS
+    "hostonly"
+)

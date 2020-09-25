@@ -342,9 +342,9 @@ bool FromExtentTensorOp::isCompatibleReturnTypes(ArrayRef<Type> lhs,
       verifyCompatibleShape(lhsRs.getAllDims(), rhsRs.getAllDims()));
 }
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"
-
 }  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"

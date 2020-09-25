@@ -197,6 +197,9 @@ struct And {
   static Status Execute(absl::Span<const T> lhs_buffer,
                         absl::Span<const T> rhs_buffer,
                         absl::Span<T> dst_buffer);
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
+                        absl::Span<T> dst_buffer);
 };
 
 struct Or {
@@ -210,6 +213,9 @@ struct Xor {
   template <typename T>
   static Status Execute(absl::Span<const T> lhs_buffer,
                         absl::Span<const T> rhs_buffer,
+                        absl::Span<T> dst_buffer);
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer, T rhs,
                         absl::Span<T> dst_buffer);
 };
 
@@ -364,6 +370,12 @@ struct Ceil {
                         absl::Span<T> dst_buffer);
 };
 
+struct Round {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<T> dst_buffer);
+};
+
 struct Convert {
   template <typename SRC, typename DST>
   static Status Execute(absl::Span<const SRC> src_buffer,
@@ -460,7 +472,10 @@ struct PoolingMax {
 }  // namespace hal
 }  // namespace iree
 
+// Inconsistent automated formatting here. Just disable clang-format (for now?).
+// clang-format off
 #include "iree/hal/vmla/op_kernels_generic.h"  // IWYU pragma: export
 #include "iree/hal/vmla/op_kernels_ruy.h"  // IWYU pragma: export
+// clang-format on
 
 #endif  // IREE_HAL_VMLA_OP_KERNELS_H_

@@ -18,17 +18,7 @@
 #include "iree/compiler/Dialect/Sequence/IR/SequenceDialect.h"
 #include "iree/compiler/Dialect/Sequence/IR/SequenceTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Sequence {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Sequence/IR/SequenceOps.h.inc"
-
-}  // namespace Sequence
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_SEQUENCE_IR_SEQUENCEOPS_H_

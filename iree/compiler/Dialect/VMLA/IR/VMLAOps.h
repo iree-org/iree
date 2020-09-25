@@ -31,17 +31,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VMLA {
-
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h.inc"
-
-}  // namespace VMLA
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
 
 #endif  // IREE_COMPILER_DIALECT_VMLA_IR_VMLAOPS_H_

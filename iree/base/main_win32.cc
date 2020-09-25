@@ -37,7 +37,7 @@ extern "C" int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   int argc = 0;
   wchar_t** argv_w = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
   if (!argc || !argv_w) {
-    LOG(FATAL) << "Unable to parse command line";
+    IREE_LOG(FATAL) << "Unable to parse command line";
     return 1;
   }
 

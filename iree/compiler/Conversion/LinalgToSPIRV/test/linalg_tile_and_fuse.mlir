@@ -64,7 +64,6 @@ module attributes {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
-//   CHECK-DAG:   %[[C0:.+]] = constant 0
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
@@ -78,9 +77,9 @@ module attributes {
 //       CHECK:   scf.parallel (%[[IV0:.+]], %[[IV1:.+]], %[[IV2:.+]]) = (%[[BIDZ]], %[[LBY]], %[[LBX]])
 //  CHECK-SAME:     step (%[[NBLOCKSZ]], %[[STEPY]], %[[STEPX]])
 //       CHECK:     %[[VIEW1:.+]] = subview %[[ARG1]]
-//  CHECK-SAME:       [%[[IV0]], %[[IV1]], %[[IV2]], %[[C0]]]
+//  CHECK-SAME:       [%[[IV0]], %[[IV1]], %[[IV2]], 0]
 //       CHECK:     %[[VIEW2:.+]] = subview %[[RET0]]
-//  CHECK-SAME:       [%[[IV0]], %[[IV1]], %[[IV2]], %[[C0]]]
+//  CHECK-SAME:       [%[[IV0]], %[[IV1]], %[[IV2]], 0]
 //       CHECK:     linalg.conv
 //  CHECK-SAME:       %[[ARG0]], %[[VIEW1]], %[[VIEW2]]
 //  CHECK-SAME:       "workgroup"
@@ -100,8 +99,8 @@ module attributes {
       {binding = @legacy_io::@arg1, operand_result_index = 1 : i32} : memref<?x?xf32>
     %2 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@ret0, operand_result_index = 2 : i32} : memref<?x?xf32>
-    linalg.matmul %0, %1, %2 :
-      (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>)
+    linalg.matmul ins(%0, %1 : memref<?x?xf32>, memref<?x?xf32>)
+                 outs(%2 : memref<?x?xf32>)
     return
   }
   func @matmul__num_workgroups__
@@ -116,37 +115,39 @@ module attributes {
 }
 
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
+//   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 16)>
 //       CHECK: func @matmul()
-//  CHECK-SAME:   local_size = dense<[8, 8, 1]>
+//  CHECK-SAME:   local_size = dense<[16, 8, 1]>
 //  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:.[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
-//   CHECK-DAG:   %[[C0:.+]] = constant 0
-//   CHECK-DAG:   %[[C4:.+]] = constant 4
 //   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
 //   CHECK-NOT:   scf.parallel
-//       CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %{{.+}} step %[[C4]]
-//       CHECK:     %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:     %[[VIEW0:.+]] = subview %[[ARG0]][%[[LBY]], %[[IV]]
-//       CHECK:     %[[LBX:.+]] = affine.apply #[[MAP0]]()[%[[BIDX]]]
-//       CHECK:     %[[VIEW1:.+]] = subview %[[ARG1]][%[[IV]], %[[LBX]]]
-//       CHECK:     %[[LBY_2:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//       CHECK:     %[[LBX_2:.+]] = affine.apply #[[MAP0]]()[%[[BIDX]]]
-//       CHECK:     %[[VIEW2:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
-//       CHECK:     linalg.matmul
-//  CHECK-SAME:       "workgroup_numprocs_ge_numiters"
-//  CHECK-SAME:       %[[VIEW0]], %[[VIEW1]], %[[VIEW2]]
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[LBY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
+//       CHECK:   %[[VIEW0:.+]] = subview %[[ARG0]][%[[LBY]], 0]
+//       CHECK:   %[[LBX:.+]] = affine.apply #[[MAP3]]()[%[[BIDX]]]
+//       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]][0, %[[LBX]]]
+//       CHECK:   %[[LBY_2:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
+//       CHECK:   %[[LBX_2:.+]] = affine.apply #[[MAP3]]()[%[[BIDX]]]
+//       CHECK:   %[[VIEW2:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     "workgroup_numprocs_ge_numiters"
+//  CHECK-SAME:     ins(%[[VIEW0]], %[[VIEW1]]
+//  CHECK-SAME:    outs(%[[VIEW2]]
 //       CHECK: func @[[NUM_WORKGROUPS_FN]]
 //   CHECK-DAG:   %[[C8:.+]] = constant 8 : index
 //   CHECK-DAG:   %[[C7:.+]] = constant 7 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C16:.+]] = constant 16 : index
+//   CHECK-DAG:   %[[C15:.+]] = constant 15 : index
 //       CHECK:   %[[DIM0:.+]] = dim %{{.*}}, %[[C0]]
 //       CHECK:   %[[DIM1:.+]] = dim %{{.*}}, %[[C1]]
-//       CHECK:   %[[T0:.+]] = addi %[[DIM1]], %[[C7]]
-//       CHECK:   %[[T1:.+]] = divi_signed %[[T0]], %[[C8]]
+//       CHECK:   %[[T0:.+]] = addi %[[DIM1]], %[[C15]]
+//       CHECK:   %[[T1:.+]] = divi_signed %[[T0]], %[[C16]]
 //       CHECK:   %[[T2:.+]] = addi %[[DIM0]], %[[C7]]
 //       CHECK:   %[[T3:.+]] = divi_signed %[[T2]], %[[C8]]
 //       CHECK:   return %[[T1]], %[[T3]], %[[C1]]

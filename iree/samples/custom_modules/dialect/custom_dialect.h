@@ -40,12 +40,12 @@ class MessageType : public Type::TypeBase<MessageType, Type, TypeStorage> {
   using Base::Base;
 };
 
-#define GET_OP_CLASSES
-#include "iree/samples/custom_modules/dialect/custom_ops.h.inc"
-
 }  // namespace Custom
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/samples/custom_modules/dialect/custom_ops.h.inc"
 
 #endif  // IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_DIALECT_H_

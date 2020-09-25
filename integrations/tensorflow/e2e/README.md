@@ -1,7 +1,7 @@
 # TensorFlow e2e tests
 
-This is a collection of e2e tests that save a TensorFlow model, compile it with
-IREE, run it on multiple backends and crosscheck the results.
+This is a collection of e2e tests that compile a TensorFlow model with IREE (and
+potentially TFLite), run it on multiple backends, and crosscheck the results.
 
 ## Pre-Requisites
 
@@ -16,8 +16,9 @@ instructions.
 ## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[the doc](../../../docs/vulkan_and_spirv.md)), then you can run the manual test
-targets with `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
+[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)), 
+then you can run the manual test targets with 
+`--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
 The test suites can be run excluding Vulkan by specifying
@@ -28,9 +29,9 @@ adding `test --test_tag_filters="-driver=vulkan"` to your `user.bazelrc`.
 
 Compatible TensorFlow modules can be compiled to specific IREE backends using
 `IreeCompiledModule`. This also optionally saves compilation artifacts to a
-specified directory. These artifacts include: MLIR across various lowerings, a
-TensorFlow SavedModel, and the compiled VM FlatBuffer. A basic example of
-creating and calling an `IreeCompiledModule` can be found in
+specified directory. These artifacts include MLIR across various lowerings and
+the compiled VM FlatBuffer. A basic example of creating and calling an
+`IreeCompiledModule` can be found in
 [`tf_utils_test.py`](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/pyiree/tf/support/tf_utils_test.py)
 
 When using Keras models or tf.Modules with functions that IREE can't compile,
@@ -45,9 +46,6 @@ vmla_module = tf_utils.IreeCompiledModule(
 vmla_module.predict(...)
 ```
 
-By default the TensorFlow SavedModels will not be kept. This can be overridden
-via the `--keep_saved_model` flag.
-
 ## Running Tests
 
 For locally running tests and iterating on backend development, `bazel run` is
@@ -55,23 +53,17 @@ preferred.
 
 ```shell
 # Run math_test on all backends.
-bazel run :math_test_manual
+bazel run //integrations/tensorflow/e2e:math_test_manual
 
 # Run math_test comparing TensorFlow to itself (e.g. to debug randomization).
-bazel run :math_test_manual -- target_backends=tf
+bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=tf
 
 # Run math_test comparing the VMLA backend and TensorFlow.
-bazel run :math_test_manual -- --target_backends=iree_vmla
+bazel run //integrations/tensorflow/e2e:math_test_manual -- --target_backends=iree_vmla
 
 # Run math_test comparing the VMLA backend to itself multiple times.
-bazel run :math_test_manual -- \
+bazel run //integrations/tensorflow/e2e:math_test_manual -- \
   --reference_backend=iree_vmla --target_backends=iree_vmla,iree_vmla
-
-# Run math_test and output on failure.
-bazel test :math_test_manual --test_output=errors
-
-# Run an individual test interactively.
-bazel run :math_test_manual -- --test_output=streamed
 ```
 
 For reproducibility of the unit tests `CompiledModule()` sets the random seeds
@@ -101,8 +93,10 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
       # A random seed is automatically set before each call to `simple_mul`.
       a = tf_utils.uniform([4])
       b = np.array([400., 5., 6., 7.], dtype=np.float32)
+
       # The inputs `a` and `b` are recorded along with the output `c`
       c = module.simple_mul(a, b)
+
       # The inputs `a` and `b` are recorded along with the (unnamed) output
       # module.simple_mul returns.
       module.simple_mul(a, c)
@@ -140,14 +134,16 @@ suite. Test targets in these test suites can be run as follows:
 
 ```shell
 # Run all e2e tests that are expected to pass.
-bazel test :e2e_tests
+bazel test //integrations/tensorflow/e2e:e2e_tests
 
 # Run all e2e tests that are expected to fail.
-bazel test :e2e_tests_failing
+bazel test //integrations/tensorflow/e2e:e2e_tests_failing
 
 # Run a specific failing e2e test target.
 # Note that generated test targets are prefixed with their test suite name.
-bazel test :e2e_tests_failing_broadcasting_test__tf__iree_vulkan
+# Also, if broadcasting_test starts working on iree_vulkan after the time
+# of writing then this command will fail.
+bazel test //integrations/tensorflow/e2e:e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ```
 
 ## Generated Artifacts
@@ -161,16 +157,21 @@ for each module is as follows:
 /tmp/iree/modules/ModuleName
 ├── tf_input.mlir        # MLIR for ModuleName in TF's input dialect
 ├── iree_input.mlir      # tf_input.mlir translated to IREE MLIR
-├── backend_name_1       # e.g. iree_vmla, tf or tf_ref
+├── iree_backend_name    # e.g. iree_vmla, iree_llvmjit or iree_vulkan
 │   ├── compiled.vmfb    # flatbuffer of ModuleName compiled to this backend
-│   ├── saved_model      # Only created if --keep_saved_model is specified.
 │   └── traces
-│       ├── trace_1      # Directory storing logs and serialization for each trace.
+│       ├── trace_1      # Directory storing logs and serialization for each trace
 │       │   └── log.txt  # A more detailed version of the test logs
 │       └── trace_2
 │           └── log.txt
-└── backend_name_2
-    └── ...
+├── tflite               # If TFLite supports compiling ModuleName
+│   ├── method_1.tflite  # Methods on ModuleName compiled to bytes with TFLite
+│   ├── method_2.tflite
+│   └── traces
+│       └── ...
+└── tf_ref               # Directory storing the tensorflow reference traces
+    └── traces
+        └── ...
 ```
 
 Traces for a particular test can be loaded via the `Trace.load(trace_dir)`
@@ -228,9 +229,3 @@ which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
-
-## Test Harnesses
-
-### Simple function tests
-
-See `simple_arithmetic_test.py` for some basic examples.
