@@ -191,7 +191,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       trace_function_dir = tf_test_utils._get_trace_dir(artifacts_dir, trace)
       trace.serialize(trace_function_dir)
       self.assertTrue(
-          os.path.exists(os.path.join(trace_function_dir, 'flagfile')))
+          os.path.exists(os.path.join(trace_function_dir, 'metadata.pkl')))
       loaded_trace = tf_test_utils.Trace.load(trace_function_dir)
 
       # Check all calls match.
