@@ -42,7 +42,7 @@ and create the PR from there.
     ```shell
     # From your existing git repo
     git remote rename origin upstream
-    git add remote origin git@github.com:<github_username>/iree.git
+    git remote add origin git@github.com:<github_username>/iree.git
     ```
 
     b. If you haven't already cloned:
