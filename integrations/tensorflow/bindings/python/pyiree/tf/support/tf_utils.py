@@ -292,6 +292,9 @@ class IreeCompiledModule(CompiledModule):
     if compiled_path is not None:
       if not len(exported_names):
         # Get all method names on 'module_class' that aren't on 'tf.Module'.
+        # This doesn't address all possbile scenarios.
+        # TODO(meadowlark): Figure out how to get a list of all of the functions
+        # that this module has access to via `pyiree.rt.system_api.BoundModule`.
         exported_names = _get_non_inhereted_function_names(module_class)
       self.compiled_paths = dict([
           (method, compiled_path) for method in exported_names
