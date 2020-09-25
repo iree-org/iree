@@ -154,12 +154,14 @@ IREE_NATIVE_APP_SOURCE_ROOT="${IREE_SOURCE_ROOT}/iree/tools/android/run_module_a
 
 # Directory for IREE native code intermediate intermediate artifacts.
 IREE_NATIVE_LIB_BUILD_DIR="${IREE_ARTIFACT_ROOT}/iree/${IREE_BUILD_TYPE}"
+# Directory for holding APK parts.
+IREE_APK_PARTS_DIR="${IREE_ARTIFACT_ROOT}/parts"
 # Directory for IREE native libraries.
-IREE_NATIVE_LIB_DIR="${IREE_ARTIFACT_ROOT}/libs/lib/${IREE_ANDROID_ABI}"
+IREE_NATIVE_LIB_DIR="${IREE_APK_PARTS_DIR}/libs/lib/${IREE_ANDROID_ABI}"
 # Directory for Android app assets.
-IREE_ASSET_DIR="${IREE_ARTIFACT_ROOT}/assets"
+IREE_ASSET_DIR="${IREE_APK_PARTS_DIR}/assets"
 # Directory for Android app R.class.
-IREE_RESOURCE_GEN_DIR="${IREE_ARTIFACT_ROOT}/rclass"
+IREE_RESOURCE_GEN_DIR="${IREE_APK_PARTS_DIR}/rclass"
 
 #########################
 # Android build toolchain
@@ -190,7 +192,7 @@ DX="${DX_BIN} --dex"
 ZIPALIGN="${ZIPALIGN_BIN} -f -p 4"
 APKSIGN="${APKSIGNER_BIN} sign"
 
-JAVAC="${JAVAC_BIN} -classpath ${ANDROID_SDK_PLATFORMS_DIR}/android.jar -sourcepath ${IREE_RESOURCE_GEN_DIR} -d ${IREE_ARTIFACT_ROOT}"
+JAVAC="${JAVAC_BIN} -classpath ${ANDROID_SDK_PLATFORMS_DIR}/android.jar -sourcepath ${IREE_RESOURCE_GEN_DIR} -d ${IREE_APK_PARTS_DIR}"
 
 #############################
 # Build IREE native libraries
@@ -222,21 +224,22 @@ popd
 # Package Android app
 #####################
 
-rm -rf "${IREE_ARTIFACT_ROOT}"/*.apk
+# Clean artifacts from previous runs.
+rm -rf "${IREE_ARTIFACT_ROOT?}/${IREE_APK_NAME?}.apk" "${IREE_APK_PARTS_DIR?}"
 
 echo ">>> Generating AndroidManifest.xml <<<"
 
 # Create an AndroidManifest.xml with proper target SDK version.
-rm -rf "${IREE_ARTIFACT_ROOT}/AndroidManifest.xml"
+mkdir -p "${IREE_APK_PARTS_DIR}"
 IREE_ANDROID_API_LEVEL="${IREE_ANDROID_API_LEVEL}" envsubst \
   < "${IREE_NATIVE_APP_SOURCE_ROOT}/AndroidManifest.xml.template" \
-  > "${IREE_ARTIFACT_ROOT}/AndroidManifest.xml"
+  > "${IREE_APK_PARTS_DIR}/AndroidManifest.xml"
 
 echo ">>> Preparing shared libraries and vm module information <<<"
 
 # Find the compiled iree_run_module_app shared library and symlink it to a
 # known location for packaging.
-rm -rf "${IREE_NATIVE_LIB_DIR}" && mkdir -p "${IREE_NATIVE_LIB_DIR}"
+mkdir -p "${IREE_NATIVE_LIB_DIR}"
 IREE_NATIVE_LIB=$(find ${IREE_NATIVE_LIB_BUILD_DIR} -name "lib${IREE_NATIVE_LIB_NAME}.so")
 # Note: the target link name must match with
 # run_module_app/AndroidManifest.xml.template.
@@ -244,7 +247,7 @@ ln -sf "${IREE_NATIVE_LIB}" "${IREE_NATIVE_LIB_DIR}/libiree_run_module_app.so"
 
 # Copy the VM FlatBuffer and iree-run-module invocation related information
 # over as assets.
-rm -rf "${IREE_ASSET_DIR}" && mkdir -p "${IREE_ASSET_DIR}"
+mkdir -p "${IREE_ASSET_DIR}"
 # Note: the following files must match with run_module_app/src/main.cc.
 cp "${IREE_INPUT_MODULE_FILE}" "${IREE_ASSET_DIR}/module.vmfb"
 cp "${IREE_INPUT_BUFFER_FILE}" "${IREE_ASSET_DIR}/inputs.txt"
@@ -254,30 +257,29 @@ echo -n "${IREE_DRIVER}" > "${IREE_ASSET_DIR}/driver.txt"
 echo ">>> Compiling app resources <<<"
 
 # Generate the R.java for resources.
-rm -rf "${IREE_RESOURCE_GEN_DIR}" && mkdir -p "${IREE_RESOURCE_GEN_DIR}"
+mkdir -p "${IREE_RESOURCE_GEN_DIR}"
 ${AAPT_PACK} --non-constant-id -m \
-  -M "${IREE_ARTIFACT_ROOT}/AndroidManifest.xml" \
+  -M "${IREE_APK_PARTS_DIR}/AndroidManifest.xml" \
   -S "${IREE_NATIVE_APP_SOURCE_ROOT}/res" \
   -J "${IREE_RESOURCE_GEN_DIR}" \
   --generate-dependencies
 
 # Compile the R.java and create classes.dex out of it for Android.
 echo "Using javac: '${JAVAC_BIN}'"
-rm -rf "${IREE_ARTIFACT_ROOT}/classes.dex" "${IREE_ARTIFACT_ROOT}/com/"
 ${JAVAC} "${IREE_RESOURCE_GEN_DIR}"/com/google/iree/run_module/*.java
-${DX} --output="${IREE_ARTIFACT_ROOT}/classes.dex" "${IREE_ARTIFACT_ROOT}"
+${DX} --output="${IREE_APK_PARTS_DIR}/classes.dex" "${IREE_APK_PARTS_DIR}"
 
 echo ">>> Packaging apk file <<<"
 
 # Package assets and shared libraries into an apk file.
 ${AAPT_PACK} -m \
-  -M "${IREE_ARTIFACT_ROOT}/AndroidManifest.xml" \
+  -M "${IREE_APK_PARTS_DIR}/AndroidManifest.xml" \
   -S "${IREE_NATIVE_APP_SOURCE_ROOT}/res" \
-  -A "${IREE_ARTIFACT_ROOT}/assets" \
-  -F "${IREE_ARTIFACT_ROOT}/${IREE_APK_NAME}.unaligned.apk" \
-  --shared-lib "${IREE_ARTIFACT_ROOT}/libs"
+  -A "${IREE_APK_PARTS_DIR}/assets" \
+  -F "${IREE_APK_PARTS_DIR}/${IREE_APK_NAME}.unaligned.apk" \
+  --shared-lib "${IREE_APK_PARTS_DIR}/libs"
 
-pushd "${IREE_ARTIFACT_ROOT}"
+pushd "${IREE_APK_PARTS_DIR}"
 # Also package the resources into the apk file.
 ${AAPT_ADD} "${IREE_APK_NAME}.unaligned.apk" classes.dex
 echo ">>> Aligning apk file <<<"
@@ -285,6 +287,7 @@ ${ZIPALIGN} "${IREE_APK_NAME}.unaligned.apk" "${IREE_APK_NAME}.apk"
 echo ">>> Signing apk file <<<"
 echo "NOTE: if you are using the Android Studio's debug keystore, the password is 'android'."
 ${APKSIGN} --ks "${ANDROID_KEYSTORE}" --min-sdk-version 28 "${IREE_APK_NAME}.apk"
+mv "${IREE_APK_NAME}.apk" "${IREE_ARTIFACT_ROOT}"
 popd
 
 echo ">>> Done: '${IREE_ARTIFACT_ROOT}/${IREE_APK_NAME}.apk' <<<"
