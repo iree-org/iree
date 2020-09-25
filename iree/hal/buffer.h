@@ -495,8 +495,8 @@ class Buffer : public Resource {
 
   // Unmaps previously mapped memory.
   // No-op if the memory is not mapped. As this is often used in destructors
-  // we can't rely on failures here propagating with anything but CHECK/DCHECK.
-  // State and parameters have already been validated.
+  // we can't rely on failures here propagating with anything but
+  // IREE_CHECK/IREE_DCHECK. State and parameters have already been validated.
   virtual Status UnmapMemoryImpl(device_size_t local_byte_offset,
                                  device_size_t local_byte_length,
                                  void* data) = 0;
@@ -547,7 +547,8 @@ class Buffer : public Resource {
 
   // Unmaps previously mapped memory.
   // No-op if the memory is not mapped. As this is often used in destructors
-  // we can't rely on failures here propagating with anything but CHECK/DCHECK.
+  // we can't rely on failures here propagating with anything but
+  // IREE_CHECK/IREE_DCHECK.
   Status UnmapMemory(device_size_t local_byte_offset,
                      device_size_t local_byte_length, void* data);
 

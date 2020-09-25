@@ -22,9 +22,22 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Vulkan {
-/// Returns the target environment for SwiftShader's Vulkan implementation as an
-/// #vk.target_env attribute assembly.
-extern const char *swiftShaderTargetEnvAssembly;
+
+/// Returns the Vulkan target environment assembly for the given GPU triple.
+/// Returns nullptr if the triple is not recognized.
+///
+/// We call it "triple" to match common compiler language: historically one
+/// would describe a CPU compiler target as a string containing exactly three
+/// fields. But here the configuration is for GPU and there can exist a lot of
+/// architectures/vendors/SoCs/OSes. We define it in the form of:
+///   <arch/vendor>-<gpu>-<soc/product>-<os>
+/// For example:
+///   ampere-rtx3080-unknown-windows
+///   rdna-5700xt-unkown-linux
+///   qualcomm-adreno640-pixel4-android10
+///   valhall-g77-galaxys20-android10
+/// "unknown" means the parameter is not important.
+const char* getTargetEnvForTriple(llvm::StringRef triple);
 
 /// Converts the given Vulkan target environment into the corresponding SPIR-V
 /// target environment.

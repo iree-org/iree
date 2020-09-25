@@ -37,9 +37,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessageCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
     void* user_data) {
   if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-    LOG(ERROR) << callback_data->pMessage;
+    IREE_LOG(ERROR) << callback_data->pMessage;
   } else {
-    VLOG(1) << callback_data->pMessage;
+    IREE_VLOG(1) << callback_data->pMessage;
   }
 
   return VK_FALSE;  // VK_TRUE is reserved for future use.
@@ -49,7 +49,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugReportCallback(
     VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT object_type,
     uint64_t object, size_t location, int32_t message_code,
     const char* layer_prefix, const char* message, void* user_data) {
-  VLOG(1) << message;
+  IREE_VLOG(1) << message;
 
   return VK_FALSE;  // VK_TRUE is reserved for future use.
 }

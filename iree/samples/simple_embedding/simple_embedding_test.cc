@@ -73,7 +73,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 
   // Create the driver/device as defined by the test and setup the HAL module.
   const auto& driver_name = GetParam().driver_name;
-  LOG(INFO) << "Creating driver '" << driver_name << "'...";
+  IREE_LOG(INFO) << "Creating driver '" << driver_name << "'...";
   iree_hal_driver_t* driver = nullptr;
   IREE_ASSERT_OK(iree_hal_driver_registry_create_driver(
       iree_string_view_t{driver_name.data(), driver_name.size()},
@@ -87,7 +87,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   iree_hal_driver_release(driver);
 
   // Load bytecode module from the embedded data.
-  LOG(INFO) << "Loading simple_module_test.mlir...";
+  IREE_LOG(INFO) << "Loading simple_module_test.mlir...";
   const auto* module_file_toc = simple_embedding_test_bytecode_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_ASSERT_OK(iree_vm_bytecode_module_create(
@@ -102,7 +102,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   IREE_ASSERT_OK(iree_vm_context_create_with_modules(
       instance, modules.data(), modules.size(), iree_allocator_system(),
       &context));
-  LOG(INFO) << "Module loaded and context is ready for use";
+  IREE_LOG(INFO) << "Module loaded and context is ready for use";
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
 
@@ -117,7 +117,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
 
   // Allocate buffers that can be mapped on the CPU and that can also be used
   // on the device. Not all devices support this, but the ones we have now do.
-  LOG(INFO) << "Creating I/O buffers...";
+  IREE_LOG(INFO) << "Creating I/O buffers...";
   constexpr int kElementCount = 4;
   iree_hal_buffer_t* arg0_buffer = nullptr;
   iree_hal_buffer_t* arg1_buffer = nullptr;
@@ -156,20 +156,20 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
                                      iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  LOG(INFO) << "Calling " << kMainFunctionName << "...";
+  IREE_LOG(INFO) << "Calling " << kMainFunctionName << "...";
   IREE_ASSERT_OK(iree_vm_invoke(context, main_function,
                                 /*policy=*/nullptr, inputs.get(), outputs.get(),
                                 iree_allocator_system()));
 
   // Get the result buffers from the invocation.
-  LOG(INFO) << "Retreiving results...";
+  IREE_LOG(INFO) << "Retrieving results...";
   auto* ret_buffer =
       reinterpret_cast<iree_hal_buffer_t*>(iree_vm_list_get_ref_deref(
           outputs.get(), 0, iree_hal_buffer_get_descriptor()));
   ASSERT_NE(nullptr, ret_buffer);
 
   // Read back the results and ensure we got the right values.
-  LOG(INFO) << "Reading back results...";
+  IREE_LOG(INFO) << "Reading back results...";
   iree_hal_mapped_memory_t mapped_memory;
   IREE_ASSERT_OK(iree_hal_buffer_map(ret_buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
                                      IREE_WHOLE_BUFFER, &mapped_memory));
@@ -178,7 +178,7 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
                   mapped_memory.contents.data_length / sizeof(float)),
               ::testing::ElementsAreArray({8.0f, 8.0f, 8.0f, 8.0f}));
   IREE_ASSERT_OK(iree_hal_buffer_unmap(ret_buffer, &mapped_memory));
-  LOG(INFO) << "Results match!";
+  IREE_LOG(INFO) << "Results match!";
 
   inputs.reset();
   outputs.reset();

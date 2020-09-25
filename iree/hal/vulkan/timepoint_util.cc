@@ -67,7 +67,7 @@ TimePointFencePool::~TimePointFencePool() {
                            logical_device_->allocator());
     ++free_count;
   }
-  DCHECK_EQ(free_count, kMaxInFlightFenceCount);
+  IREE_DCHECK_EQ(free_count, kMaxInFlightFenceCount);
   free_fences_.clear();
 }
 
@@ -157,7 +157,7 @@ TimePointSemaphorePool::~TimePointSemaphorePool() {
 
   absl::MutexLock lock(&mutex_);
 
-  DCHECK_EQ(free_semaphores_.size(), kMaxInFlightSemaphoreCount);
+  IREE_DCHECK_EQ(free_semaphores_.size(), kMaxInFlightSemaphoreCount);
   free_semaphores_.clear();
 
   for (auto& semaphore : storage_) {
@@ -185,7 +185,7 @@ void TimePointSemaphorePool::ReleaseResolved(
   IREE_TRACE_SCOPE0("TimePointSemaphorePool::ReleaseResolved");
 
   for (auto* semaphore : *semaphores) {
-    DCHECK(!semaphore->signal_fence && !semaphore->wait_fence);
+    IREE_DCHECK(!semaphore->signal_fence && !semaphore->wait_fence);
     semaphore->value = UINT64_MAX;
   }
 

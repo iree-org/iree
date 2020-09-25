@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
+#include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/IR/Attributes.h"
 
 namespace mlir {
@@ -41,8 +42,14 @@ class TargetEnvAttr
   /// Gets a TargetEnvAttr instance.
   // TODO(antiagainst): support other physical device core properties, physical
   // device core features and per-extension features.
+  static TargetEnvAttr get(Version version, uint32_t revision,
+                           ArrayRef<Extension> extensions,
+                           spirv::Vendor vendorID, spirv::DeviceType deviceType,
+                           uint32_t deviceID, DictionaryAttr capabilities);
   static TargetEnvAttr get(IntegerAttr version, IntegerAttr revision,
-                           ArrayAttr extensions, DictionaryAttr capabilities);
+                           ArrayAttr extensions, spirv::Vendor vendorID,
+                           spirv::DeviceType deviceType, uint32_t deviceID,
+                           DictionaryAttr capabilities);
 
   /// Returns the attribute kind's name (without the 'vk.' prefix).
   static StringRef getKindName();
@@ -66,13 +73,24 @@ class TargetEnvAttr
   /// array attribute.
   ArrayAttr getExtensionsAttr();
 
+  /// Returns the vendor ID.
+  spirv::Vendor getVendorID();
+
+  /// Returns the device type.
+  spirv::DeviceType getDeviceType();
+
+  /// Returns the device ID.
+  uint32_t getDeviceID();
+
   /// Returns the dictionary attribute containing various Vulkan capabilities
   /// bits.
   CapabilitiesAttr getCapabilitiesAttr();
 
   static LogicalResult verifyConstructionInvariants(
       Location loc, IntegerAttr version, IntegerAttr revision,
-      ArrayAttr extensions, DictionaryAttr capabilities);
+      ArrayAttr extensions, spirv::Vendor vendorID,
+      spirv::DeviceType deviceType, uint32_t deviceID,
+      DictionaryAttr capabilities);
 };
 
 }  // namespace Vulkan

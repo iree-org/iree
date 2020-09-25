@@ -43,7 +43,7 @@ AsyncCommandQueue::~AsyncCommandQueue() {
   // Ensure we shut down OK.
   {
     absl::MutexLock lock(&submission_mutex_);
-    CHECK(submission_queue_.empty())
+    IREE_CHECK(submission_queue_.empty())
         << "Dirty shutdown of async queue (unexpected thread exit?)";
   }
 }

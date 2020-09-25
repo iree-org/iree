@@ -64,7 +64,7 @@ StatusOr<DevicePlacement> DeviceManager::ResolvePlacement(
   }
 
   // TODO(benvanik): multiple devices and placement.
-  QCHECK_EQ(devices_.size(), 1)
+  IREE_QCHECK_EQ(devices_.size(), 1)
       << "Multiple devices not yet supported (need placement)";
   DevicePlacement device_placement;
   device_placement.device = devices_.front().get();

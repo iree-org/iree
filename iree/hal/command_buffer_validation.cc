@@ -121,7 +121,7 @@ bool ValidatingCommandBuffer::is_recording() const {
 }
 
 Status ValidatingCommandBuffer::Begin() {
-  DVLOG(3) << "CommandBuffer::Begin()";
+  IREE_DVLOG(3) << "CommandBuffer::Begin()";
   if (impl_->is_recording()) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Command buffer is already recording";
@@ -130,7 +130,7 @@ Status ValidatingCommandBuffer::Begin() {
 }
 
 Status ValidatingCommandBuffer::End() {
-  DVLOG(3) << "CommandBuffer::End()";
+  IREE_DVLOG(3) << "CommandBuffer::End()";
   if (!impl_->is_recording()) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Command buffer is not recording";
@@ -238,7 +238,7 @@ Status ValidatingCommandBuffer::ExecutionBarrier(
     ExecutionStageBitfield target_stage_mask,
     absl::Span<const MemoryBarrier> memory_barriers,
     absl::Span<const BufferBarrier> buffer_barriers) {
-  DVLOG(3) << "CommandBuffer::ExecutionBarrier(...)";
+  IREE_DVLOG(3) << "CommandBuffer::ExecutionBarrier(...)";
 
   // TODO(benvanik): additional synchronization validation.
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer |
@@ -250,7 +250,7 @@ Status ValidatingCommandBuffer::ExecutionBarrier(
 
 Status ValidatingCommandBuffer::SignalEvent(
     Event* event, ExecutionStageBitfield source_stage_mask) {
-  DVLOG(3) << "CommandBuffer::SignalEvent(...)";
+  IREE_DVLOG(3) << "CommandBuffer::SignalEvent(...)";
 
   // TODO(benvanik): additional synchronization validation.
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
@@ -260,7 +260,7 @@ Status ValidatingCommandBuffer::SignalEvent(
 
 Status ValidatingCommandBuffer::ResetEvent(
     Event* event, ExecutionStageBitfield source_stage_mask) {
-  DVLOG(3) << "CommandBuffer::ResetEvent(...)";
+  IREE_DVLOG(3) << "CommandBuffer::ResetEvent(...)";
 
   // TODO(benvanik): additional synchronization validation.
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
@@ -273,7 +273,7 @@ Status ValidatingCommandBuffer::WaitEvents(
     ExecutionStageBitfield target_stage_mask,
     absl::Span<const MemoryBarrier> memory_barriers,
     absl::Span<const BufferBarrier> buffer_barriers) {
-  DVLOG(3) << "CommandBuffer::WaitEvents(...)";
+  IREE_DVLOG(3) << "CommandBuffer::WaitEvents(...)";
 
   // TODO(benvanik): additional synchronization validation.
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
@@ -287,9 +287,9 @@ Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
                                            device_size_t length,
                                            const void* pattern,
                                            size_t pattern_length) {
-  DVLOG(3) << "CommandBuffer::FillBuffer(" << target_buffer->DebugString()
-           << ", " << target_offset << ", " << length << ", ??, "
-           << pattern_length << ")";
+  IREE_DVLOG(3) << "CommandBuffer::FillBuffer(" << target_buffer->DebugString()
+                << ", " << target_offset << ", " << length << ", ??, "
+                << pattern_length << ")";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
   IREE_RETURN_IF_ERROR(
@@ -320,7 +320,8 @@ Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
 }
 
 Status ValidatingCommandBuffer::DiscardBuffer(Buffer* buffer) {
-  DVLOG(3) << "CommandBuffer::DiscardBuffer(" << buffer->DebugString() << ")";
+  IREE_DVLOG(3) << "CommandBuffer::DiscardBuffer(" << buffer->DebugString()
+                << ")";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
   IREE_RETURN_IF_ERROR(
@@ -335,9 +336,9 @@ Status ValidatingCommandBuffer::UpdateBuffer(const void* source_buffer,
                                              Buffer* target_buffer,
                                              device_size_t target_offset,
                                              device_size_t length) {
-  DVLOG(3) << "CommandBuffer::UpdateBuffer(" << source_buffer << ", "
-           << source_offset << ", " << target_buffer->DebugString() << ", "
-           << target_offset << ", " << length << ")";
+  IREE_DVLOG(3) << "CommandBuffer::UpdateBuffer(" << source_buffer << ", "
+                << source_offset << ", " << target_buffer->DebugString() << ", "
+                << target_offset << ", " << length << ")";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
   IREE_RETURN_IF_ERROR(
@@ -355,9 +356,9 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
                                            Buffer* target_buffer,
                                            device_size_t target_offset,
                                            device_size_t length) {
-  DVLOG(3) << "CommandBuffer::CopyBuffer(" << source_buffer->DebugString()
-           << ", " << source_offset << ", " << target_buffer->DebugString()
-           << ", " << target_offset << ", " << length << ")";
+  IREE_DVLOG(3) << "CommandBuffer::CopyBuffer(" << source_buffer->DebugString()
+                << ", " << source_offset << ", " << target_buffer->DebugString()
+                << ", " << target_offset << ", " << length << ")";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kTransfer));
 
@@ -396,9 +397,9 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
 Status ValidatingCommandBuffer::PushConstants(
     ExecutableLayout* executable_layout, size_t offset,
     absl::Span<const uint32_t> values) {
-  DVLOG(3) << "CommandBuffer::PushConstants("
-           << executable_layout->DebugString() << ", " << offset << ", "
-           << absl::StrJoin(values, ", ") << ")";
+  IREE_DVLOG(3) << "CommandBuffer::PushConstants("
+                << executable_layout->DebugString() << ", " << offset << ", "
+                << absl::StrJoin(values, ", ") << ")";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
@@ -410,10 +411,11 @@ Status ValidatingCommandBuffer::PushConstants(
 Status ValidatingCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     absl::Span<const DescriptorSet::Binding> bindings) {
-  DVLOG(3) << "CommandBuffer::PushDescriptorSet("
-           << executable_layout->DebugString() << ", " << set << ", ["
-           << absl::StrJoin(bindings, ", ", DescriptorSetBindingFormatter())
-           << "])";
+  IREE_DVLOG(3) << "CommandBuffer::PushDescriptorSet("
+                << executable_layout->DebugString() << ", " << set << ", ["
+                << absl::StrJoin(bindings, ", ",
+                                 DescriptorSetBindingFormatter())
+                << "])";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
@@ -427,10 +429,10 @@ Status ValidatingCommandBuffer::BindDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     DescriptorSet* descriptor_set,
     absl::Span<const device_size_t> dynamic_offsets) {
-  DVLOG(3) << "CommandBuffer::BindDescriptorSet("
-           << executable_layout->DebugString() << ", " << set << ", "
-           << descriptor_set->DebugString() << ", ["
-           << absl::StrJoin(dynamic_offsets, ", ") << "])";
+  IREE_DVLOG(3) << "CommandBuffer::BindDescriptorSet("
+                << executable_layout->DebugString() << ", " << set << ", "
+                << descriptor_set->DebugString() << ", ["
+                << absl::StrJoin(dynamic_offsets, ", ") << "])";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
@@ -466,8 +468,9 @@ Status ValidatingCommandBuffer::ValidateDispatchBindings(Executable* executable,
 Status ValidatingCommandBuffer::Dispatch(Executable* executable,
                                          int32_t entry_point,
                                          std::array<uint32_t, 3> workgroups) {
-  DVLOG(3) << "CommandBuffer::Dispatch(" << executable->DebugString() << ", "
-           << entry_point << ", [" << absl::StrJoin(workgroups, ", ") << "])";
+  IREE_DVLOG(3) << "CommandBuffer::Dispatch(" << executable->DebugString()
+                << ", " << entry_point << ", ["
+                << absl::StrJoin(workgroups, ", ") << "])";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
   IREE_RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
@@ -478,9 +481,10 @@ Status ValidatingCommandBuffer::Dispatch(Executable* executable,
 Status ValidatingCommandBuffer::DispatchIndirect(
     Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
     device_size_t workgroups_offset) {
-  DVLOG(3) << "CommandBuffer::DispatchIndirect(" << executable->DebugString()
-           << ", " << entry_point << ", " << workgroups_buffer->DebugString()
-           << ", " << workgroups_offset << ")";
+  IREE_DVLOG(3) << "CommandBuffer::DispatchIndirect("
+                << executable->DebugString() << ", " << entry_point << ", "
+                << workgroups_buffer->DebugString() << ", " << workgroups_offset
+                << ")";
 
   IREE_RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 

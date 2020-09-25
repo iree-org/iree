@@ -27,13 +27,6 @@ config_setting(
     define_values = {"IREE_DEBUG": "1"},
 )
 
-# Marker library which can be extended to provide flags for things that
-# need to know the platform target.
-cc_library(
-    name = "target_config",
-    defines = ["IREE_UNSPECIFIED_TARGET=1"],
-)
-
 config_setting(
     name = "enable_tensorflow",
     define_values = {

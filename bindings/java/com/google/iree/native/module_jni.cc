@@ -27,10 +27,10 @@ namespace {
 // object.
 static ModuleWrapper* GetModuleWrapper(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  CHECK(clazz);
+  IREE_CHECK(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  CHECK(field);
+  IREE_CHECK(field);
 
   return reinterpret_cast<ModuleWrapper*>(env->GetLongField(obj, field));
 }
@@ -43,13 +43,13 @@ JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz) {
   ModuleWrapper* module = GetModuleWrapper(env, thiz);
-  CHECK_NE(module, nullptr);
+  IREE_CHECK_NE(module, nullptr);
   delete module;
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz, jobject buf) {
   ModuleWrapper* module = GetModuleWrapper(env, thiz);
-  CHECK_NE(module, nullptr);
+  IREE_CHECK_NE(module, nullptr);
 
   const uint8_t* data = (uint8_t*)env->GetDirectBufferAddress(buf);
   int length = env->GetDirectBufferCapacity(buf);
@@ -59,7 +59,7 @@ JNI_FUNC jint JNI_PREFIX(nativeCreate)(JNIEnv* env, jobject thiz, jobject buf) {
 
 JNI_FUNC jstring JNI_PREFIX(nativeGetName)(JNIEnv* env, jobject thiz) {
   ModuleWrapper* module = GetModuleWrapper(env, thiz);
-  CHECK_NE(module, nullptr);
+  IREE_CHECK_NE(module, nullptr);
 
   iree_string_view_t module_name = module->name();
   return env->NewStringUTF(module_name.data);
@@ -67,7 +67,7 @@ JNI_FUNC jstring JNI_PREFIX(nativeGetName)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC jobject JNI_PREFIX(nativeGetSignature)(JNIEnv* env, jobject thiz) {
   ModuleWrapper* module = GetModuleWrapper(env, thiz);
-  CHECK_NE(module, nullptr);
+  IREE_CHECK_NE(module, nullptr);
 
   iree_vm_module_signature_t module_signature = module->signature();
   jclass cls = env->FindClass("com/google/iree/Module$Signature");

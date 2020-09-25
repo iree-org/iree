@@ -50,7 +50,7 @@ cc_test(
 iree_cc_binary(
     name = "iree-check-module",
     testonly = True,
-    srcs = ["check_module_main.cc"],
+    srcs = ["iree-check-module-main.cc"],
     deps = [
         ":native_module",
         "@com_google_absl//absl/flags:flag",

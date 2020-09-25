@@ -455,7 +455,7 @@ struct BufferView final
                                           &actual_rank);
       shape.resize(actual_rank);
     } while (iree_status_is_out_of_range(status));
-    DCHECK(iree_status_is_ok(status));
+    IREE_DCHECK(iree_status_is_ok(status));
     return shape;
   }
 

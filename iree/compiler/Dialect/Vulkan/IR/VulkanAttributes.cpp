@@ -14,7 +14,9 @@
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/IR/AttributeSupport.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Location.h"
@@ -30,40 +32,72 @@ namespace Vulkan {
 
 namespace detail {
 struct TargetEnvAttributeStorage : public AttributeStorage {
-  using KeyTy = std::tuple<Attribute, Attribute, Attribute, Attribute>;
+  using KeyTy = std::tuple<Attribute, Attribute, Attribute, spirv::Vendor,
+                           spirv::DeviceType, uint32_t, Attribute>;
 
   TargetEnvAttributeStorage(Attribute version, Attribute revision,
-                            Attribute extensions, Attribute capabilities)
+                            Attribute extensions, spirv::Vendor vendorID,
+                            spirv::DeviceType deviceType, uint32_t deviceID,
+                            Attribute capabilities)
       : version(version),
         revision(revision),
         extensions(extensions),
-        capabilities(capabilities) {}
+        capabilities(capabilities),
+        vendorID(vendorID),
+        deviceType(deviceType),
+        deviceID(deviceID) {}
 
   bool operator==(const KeyTy &key) const {
-    return std::get<0>(key) == version && std::get<1>(key) == revision &&
-           std::get<2>(key) == extensions && std::get<3>(key) == capabilities;
+    return key == std::make_tuple(version, revision, extensions, vendorID,
+                                  deviceType, deviceID, capabilities);
   }
 
   static TargetEnvAttributeStorage *construct(
       AttributeStorageAllocator &allocator, const KeyTy &key) {
     return new (allocator.allocate<TargetEnvAttributeStorage>())
         TargetEnvAttributeStorage(std::get<0>(key), std::get<1>(key),
-                                  std::get<2>(key), std::get<3>(key));
+                                  std::get<2>(key), std::get<3>(key),
+                                  std::get<4>(key), std::get<5>(key),
+                                  std::get<6>(key));
   }
 
   Attribute version;
   Attribute revision;
   Attribute extensions;
   Attribute capabilities;
+  spirv::Vendor vendorID;
+  spirv::DeviceType deviceType;
+  uint32_t deviceID;
 };
 }  // namespace detail
 
+TargetEnvAttr TargetEnvAttr::get(Vulkan::Version version, uint32_t revision,
+                                 ArrayRef<Vulkan::Extension> extensions,
+                                 spirv::Vendor vendorID,
+                                 spirv::DeviceType deviceType,
+                                 uint32_t deviceID,
+                                 DictionaryAttr capabilities) {
+  mlir::Builder builder(capabilities.getContext());
+  llvm::SmallVector<Attribute, 0> extAttrs;
+  extAttrs.reserve(extensions.size());
+  for (auto ext : extensions) {
+    extAttrs.push_back(builder.getStringAttr(Vulkan::stringifyExtension(ext)));
+  }
+  return get(builder.getI32IntegerAttr(static_cast<uint32_t>(version)),
+             builder.getI32IntegerAttr(revision),
+             builder.getArrayAttr(extAttrs), vendorID, deviceType, deviceID,
+             capabilities);
+}
+
 TargetEnvAttr TargetEnvAttr::get(IntegerAttr version, IntegerAttr revision,
-                                 ArrayAttr extensions,
+                                 ArrayAttr extensions, spirv::Vendor vendorID,
+                                 spirv::DeviceType deviceType,
+                                 uint32_t deviceID,
                                  DictionaryAttr capabilities) {
   assert(version && revision && extensions && capabilities);
   MLIRContext *context = version.getContext();
-  return Base::get(context, version, revision, extensions, capabilities);
+  return Base::get(context, version, revision, extensions, vendorID, deviceType,
+                   deviceID, capabilities);
 }
 
 StringRef TargetEnvAttr::getKindName() { return "target_env"; }
@@ -92,13 +126,23 @@ ArrayAttr TargetEnvAttr::getExtensionsAttr() {
   return getImpl()->extensions.cast<ArrayAttr>();
 }
 
+spirv::Vendor TargetEnvAttr::getVendorID() { return getImpl()->vendorID; }
+
+spirv::DeviceType TargetEnvAttr::getDeviceType() {
+  return getImpl()->deviceType;
+}
+
+uint32_t TargetEnvAttr::getDeviceID() { return getImpl()->deviceID; }
+
 CapabilitiesAttr TargetEnvAttr::getCapabilitiesAttr() {
   return getImpl()->capabilities.cast<CapabilitiesAttr>();
 }
 
 LogicalResult TargetEnvAttr::verifyConstructionInvariants(
     Location loc, IntegerAttr version, IntegerAttr revision,
-    ArrayAttr extensions, DictionaryAttr capabilities) {
+    ArrayAttr extensions, spirv::Vendor /*vendorID*/,
+    spirv::DeviceType /*deviceType*/, uint32_t /*deviceID*/,
+    DictionaryAttr capabilities) {
   if (!version.getType().isInteger(32))
     return emitError(loc) << "expected 32-bit integer for version";
 
@@ -112,9 +156,10 @@ LogicalResult TargetEnvAttr::verifyConstructionInvariants(
       }))
     return emitError(loc) << "unknown extension in extension list";
 
-  if (!capabilities.isa<CapabilitiesAttr>())
+  if (!capabilities.isa<CapabilitiesAttr>()) {
     return emitError(loc)
            << "expected vulkan::CapabilitiesAttr for capabilities";
+  }
 
   return success();
 }

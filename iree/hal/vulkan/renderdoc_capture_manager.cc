@@ -69,8 +69,8 @@ Status RenderDocCaptureManager::Connect() {
            << "Failed to get RenderDoc API object";
   }
 
-  LOG(INFO) << "Connected to RenderDoc's API; writing captures to "
-            << renderdoc_api_->GetCaptureFilePathTemplate();
+  IREE_LOG(INFO) << "Connected to RenderDoc's API; writing captures to "
+                 << renderdoc_api_->GetCaptureFilePathTemplate();
 
   return OkStatus();
 }
@@ -93,19 +93,19 @@ void RenderDocCaptureManager::Disconnect() {
 void RenderDocCaptureManager::StartCapture() {
   IREE_TRACE_SCOPE0("RenderDocCaptureManager::StartCapture");
 
-  CHECK(is_connected()) << "Can't start capture when not connected";
-  CHECK(!is_capturing()) << "Capture is already started";
+  IREE_CHECK(is_connected()) << "Can't start capture when not connected";
+  IREE_CHECK(!is_capturing()) << "Capture is already started";
 
-  LOG(INFO) << "Starting RenderDoc capture";
+  IREE_LOG(INFO) << "Starting RenderDoc capture";
   renderdoc_api_->StartFrameCapture(NULL, NULL);
 }
 
 void RenderDocCaptureManager::StopCapture() {
   IREE_TRACE_SCOPE0("RenderDocCaptureManager::StopCapture");
 
-  CHECK(is_capturing()) << "Can't stop capture when not capturing";
+  IREE_CHECK(is_capturing()) << "Can't stop capture when not capturing";
 
-  LOG(INFO) << "Ending RenderDoc capture";
+  IREE_LOG(INFO) << "Ending RenderDoc capture";
   renderdoc_api_->EndFrameCapture(NULL, NULL);
 }
 

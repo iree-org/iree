@@ -28,10 +28,10 @@ namespace {
 // object.
 static FunctionWrapper* GetFunctionWrapper(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  CHECK(clazz);
+  IREE_CHECK(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  CHECK(field);
+  IREE_CHECK(field);
 
   return reinterpret_cast<FunctionWrapper*>(env->GetLongField(obj, field));
 }
@@ -44,13 +44,13 @@ JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz) {
   FunctionWrapper* function = GetFunctionWrapper(env, thiz);
-  CHECK_NE(function, nullptr);
+  IREE_CHECK_NE(function, nullptr);
   delete function;
 }
 
 JNI_FUNC jstring JNI_PREFIX(nativeGetName)(JNIEnv* env, jobject thiz) {
   FunctionWrapper* function = GetFunctionWrapper(env, thiz);
-  CHECK_NE(function, nullptr);
+  IREE_CHECK_NE(function, nullptr);
 
   iree_string_view_t function_name = function->name();
   return env->NewStringUTF(function_name.data);
@@ -58,7 +58,7 @@ JNI_FUNC jstring JNI_PREFIX(nativeGetName)(JNIEnv* env, jobject thiz) {
 
 JNI_FUNC jobject JNI_PREFIX(nativeGetSignature)(JNIEnv* env, jobject thiz) {
   FunctionWrapper* function = GetFunctionWrapper(env, thiz);
-  CHECK_NE(function, nullptr);
+  IREE_CHECK_NE(function, nullptr);
 
   // TODO(jennik): Look into caching the results of these lookups.
   iree_vm_function_signature_t function_signature = function->signature();

@@ -199,7 +199,8 @@ StatusOr<std::string> PrepareModule(
   }
 
   // Translate from MLIR to IREE bytecode.
-  LOG(INFO) << "Compiling for target backend '" << target_backend << "'...";
+  IREE_LOG(INFO) << "Compiling for target backend '" << target_backend
+                 << "'...";
   auto hal_target_options =
       mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
   hal_target_options.targets = {std::move(target_backend)};
@@ -317,8 +318,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                          const std::string& flatbuffer_data) {
   IREE_TRACE_SCOPE0("EvaluateFunctions");
 
-  LOG(INFO) << "Evaluating all functions in module for driver '" << driver_name
-            << "'...";
+  IREE_LOG(INFO) << "Evaluating all functions in module for driver '"
+                 << driver_name << "'...";
 
   // Load the bytecode module from the flatbuffer data.
   // We do this first so that if we fail validation we know prior to dealing
@@ -464,8 +465,8 @@ Status RunFile(const std::string& mlir_filename,
                                llvm::Twine(split_line));
     auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
     if (!sub_failure.ok()) {
-      LOG(ERROR) << "Failure for split at line #" << split_line << ": "
-                 << sub_failure;
+      IREE_LOG(ERROR) << "Failure for split at line #" << split_line << ": "
+                      << sub_failure;
       if (any_failure.ok()) {
         any_failure = std::move(sub_failure);
       }

@@ -182,7 +182,6 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       {
           dispatchState.workload,
           dispatchState.commandBuffer,
-          dispatchState.executable,
       });
 
   auto &entryBlock = region->front();
@@ -191,7 +190,6 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   rewriter.setInsertionPointToEnd(&entryBlock);
   auto workload = entryBlock.getArgument(0);
   auto commandBuffer = entryBlock.getArgument(1);
-  auto executable = entryBlock.getArgument(2);
 
   // We have multiple entry points to dispatch. Record in the order
   // specified by entry point schedule and insert barrier between sequential
@@ -211,7 +209,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
           spvFuncOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
       if (!numWorkgroupsFn) return failure();
       workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
-          loc, numWorkgroupsFn, executableOp.getInterfaceOp(),
+          loc, numWorkgroupsFn, dispatchState.executableOp.getInterfaceOp(),
           dispatchState.operands, dispatchState.results, rewriter);
     } else {
       workgroupCount = calculateDispatchWorkgroupCount(loc, workload,
@@ -224,6 +222,11 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
 
     // Ordinals are fixed based on the precomputed schedule, so use
     // CommandBufferDispatchOp instead of CommandBufferDispatchSymbolOp.
+    auto executable = rewriter
+                          .create<IREE::HAL::ExecutableLookupOp>(
+                              loc, dispatchState.device,
+                              dispatchState.dispatchOp.executable())
+                          .getResult();
     int32_t entryPointOrdinal = it.index();
     rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
         loc, commandBuffer, executable,

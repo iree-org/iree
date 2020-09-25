@@ -50,7 +50,8 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
     // fence. This ensures that even if we are running synchronously we still
     // get consistent failure behavior with drivers that are purely async.
     for (auto& batch : batches) {
-      DCHECK(batch.wait_semaphores.empty() && batch.signal_semaphores.empty())
+      IREE_DCHECK(batch.wait_semaphores.empty() &&
+                  batch.signal_semaphores.empty())
           << "Semaphores must be handled by the wrapping queue";
       IREE_RETURN_IF_ERROR(ProcessCommandBuffers(batch.command_buffers));
     }

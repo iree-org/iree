@@ -265,9 +265,9 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   // are of the same queue family as the dispatch queues: Vulkan requires that
   // all queues created from the same family are done in the same
   // VkDeviceQueueCreateInfo struct.
-  DVLOG(1) << "Creating " << queue_family_info.dispatch_queue_count
-           << " dispatch queue(s) in queue family "
-           << queue_family_info.dispatch_index;
+  IREE_DVLOG(1) << "Creating " << queue_family_info.dispatch_queue_count
+                << " dispatch queue(s) in queue family "
+                << queue_family_info.dispatch_index;
   absl::InlinedVector<VkDeviceQueueCreateInfo, 2> queue_create_info;
   absl::InlinedVector<float, 4> dispatch_queue_priorities;
   absl::InlinedVector<float, 4> transfer_queue_priorities;
@@ -280,14 +280,15 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   dispatch_queue_info.queueCount = queue_family_info.dispatch_queue_count;
   if (has_dedicated_transfer_queues) {
     if (queue_family_info.dispatch_index == queue_family_info.transfer_index) {
-      DVLOG(1) << "Creating " << queue_family_info.transfer_queue_count
-               << " dedicated transfer queue(s) in shared queue family "
-               << queue_family_info.transfer_index;
+      IREE_DVLOG(1) << "Creating " << queue_family_info.transfer_queue_count
+                    << " dedicated transfer queue(s) in shared queue family "
+                    << queue_family_info.transfer_index;
       dispatch_queue_info.queueCount += queue_family_info.transfer_queue_count;
     } else {
-      DVLOG(1) << "Creating " << queue_family_info.transfer_queue_count
-               << " dedicated transfer queue(s) in independent queue family "
-               << queue_family_info.transfer_index;
+      IREE_DVLOG(1)
+          << "Creating " << queue_family_info.transfer_queue_count
+          << " dedicated transfer queue(s) in independent queue family "
+          << queue_family_info.transfer_index;
       queue_create_info.push_back({});
       auto& transfer_queue_info = queue_create_info.back();
       transfer_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

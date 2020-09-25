@@ -241,9 +241,10 @@ Status InProcCommandBuffer::Process(CommandBuffer* command_processor) const {
        cmd_header = cmd_header->next) {
     auto command_status = ProcessCmd(cmd_header, command_processor);
     if (!command_status.ok()) {
-      LOG(ERROR) << "DeviceQueue failure while executing command; permanently "
-                    "failing all future commands: "
-                 << command_status;
+      IREE_LOG(ERROR)
+          << "DeviceQueue failure while executing command; permanently "
+             "failing all future commands: "
+          << command_status;
       return command_status;
     }
   }
