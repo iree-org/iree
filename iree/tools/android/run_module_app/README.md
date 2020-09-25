@@ -32,7 +32,6 @@ to build and package the final APK file.
 
 ## Build the APK
 
-
 In general, we need to
 
 1. Build the `iree_run_module_app` shared library following normal C++ build

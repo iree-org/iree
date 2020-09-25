@@ -57,25 +57,25 @@ class ModuleLoader {
   explicit ModuleLoader(android_app* app) : app_context_(app) {}
   ~ModuleLoader() = default;
 
-  IreeModuleInvocation LoadModuleInvocation() {
+  StatusOr<IreeModuleInvocation> LoadModuleInvocation() {
     IreeModuleInvocation invocation = {};
-    invocation.module = ReadFileAsset(kModuleFileName);
-    invocation.entry_function = ReadFileAsset(kEntryFunctionFileName);
-    invocation.inputs = ReadFileAsset(kInputsFileName);
-    invocation.driver = ReadFileAsset(kDriverFileName);
+    IREE_ASSIGN_OR_RETURN(invocation.module, ReadFileAsset(kModuleFileName));
+    IREE_ASSIGN_OR_RETURN(invocation.entry_function,
+                          ReadFileAsset(kEntryFunctionFileName));
+    IREE_ASSIGN_OR_RETURN(invocation.inputs, ReadFileAsset(kInputsFileName));
+    IREE_ASSIGN_OR_RETURN(invocation.driver, ReadFileAsset(kDriverFileName));
     return invocation;
   }
 
  private:
-  // Reads the given asset file and returns its contents. Returns an empty
-  // string on error.
-  std::string ReadFileAsset(const char* file_name) {
+  // Reads the given asset file and returns its contents.
+  StatusOr<std::string> ReadFileAsset(const char* file_name) {
     AAssetManager* asset_manager = app_context_->activity->assetManager;
     AAsset* asset =
         AAssetManager_open(asset_manager, file_name, AASSET_MODE_BUFFER);
     if (!asset) {
-      LOGE("failed to open file '%s' in assets", kModuleFileName);
-      return {};
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "failed to open file '" << kModuleFileName << "' in assets";
     }
 
     size_t size_in_bytes = AAsset_getLength(asset);
@@ -165,12 +165,12 @@ void RunModuleAppMain(android_app* app) {
   IREE_RUN_MODULE_INITIALIZERS();
 
   ModuleLoader loader(app);
-  IreeModuleInvocation invocation = loader.LoadModuleInvocation();
-  LOGI("entry function: '%s'", invocation.entry_function.c_str());
-  LOGI("inputs:\n%s", invocation.inputs.c_str());
-  LOGI("driver: '%s'", invocation.driver.c_str());
-  if (invocation) {
-    auto status = RunModule(invocation);
+  StatusOr<IreeModuleInvocation> invocation = loader.LoadModuleInvocation();
+  if (invocation.ok()) {
+    LOGI("entry function: '%s'", invocation->entry_function.c_str());
+    LOGI("inputs:\n%s", invocation->inputs.c_str());
+    LOGI("driver: '%s'", invocation->driver.c_str());
+    auto status = RunModule(invocation.value());
     if (!status.ok()) LOGE("%s", status.ToString().c_str());
   }
 }
