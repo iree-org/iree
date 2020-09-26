@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_TOOLS_VM_UTIL_H_
-#define IREE_TOOLS_VM_UTIL_H_
+#ifndef IREE_TOOLS_UTILS_VM_UTIL_H_
+#define IREE_TOOLS_UTILS_VM_UTIL_H_
 
 #include <iostream>
 #include <ostream>
@@ -96,4 +96,4 @@ Status LoadBytecodeModule(absl::string_view module_data,
 
 }  // namespace iree
 
-#endif  // IREE_TOOLS_VM_UTIL_H_
+#endif  // IREE_TOOLS_UTILS_VM_UTIL_H_

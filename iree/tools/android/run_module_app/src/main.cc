@@ -20,7 +20,7 @@
 #include "iree/base/initializer.h"
 #include "iree/base/status.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/tools/vm_util.h"
+#include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 
 namespace iree {

@@ -27,7 +27,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/tools/vm_util.h"
+#include "iree/tools/utils/vm_util.h"
 #include "iree/vm/bytecode_module.h"
 
 // On Windows stdin defaults to text mode and will get weird line ending

@@ -38,7 +38,6 @@ iree_cc_binary(
     testonly = True,
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
-        ":vm_util",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/flags:usage",
@@ -49,6 +48,7 @@ iree_cc_binary(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/modules/hal",
+        "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
@@ -243,7 +243,6 @@ iree_cc_binary(
         ":init_mlir_passes_and_dialects",
         ":init_targets",
         ":init_xla_dialects",
-        ":vm_util",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
@@ -257,6 +256,7 @@ iree_cc_binary(
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/hal:api",
         "//iree/modules/hal",
+        "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "@llvm-project//llvm:Support",
@@ -274,7 +274,6 @@ iree_cc_binary(
     name = "iree-run-module",
     srcs = ["iree-run-module-main.cc"],
     deps = [
-        ":vm_util",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
         "//iree/base:file_io",
@@ -282,6 +281,7 @@ iree_cc_binary(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/modules/hal",
+        "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
@@ -336,39 +336,4 @@ sh_binary(
     srcs = ["IreeFileCheck.sh"],
     data = ["@llvm-project//llvm:FileCheck"],
     tags = ["hostonly"],
-)
-
-# TODO(b/146898896): Refactor these into more coherent packages.
-cc_library(
-    name = "vm_util",
-    srcs = ["vm_util.cc"],
-    hdrs = ["vm_util.h"],
-    deps = [
-        "//iree/base:file_io",
-        "//iree/base:signature_mangle",
-        "//iree/base:status",
-        "//iree/hal:api",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-        "//iree/vm:ref_cc",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_test(
-    name = "vm_util_test",
-    srcs = ["vm_util_test.cc"],
-    deps = [
-        ":vm_util",
-        "//iree/base:api",
-        "//iree/hal:api",
-        "//iree/hal/vmla:vmla_driver_module",
-        "//iree/modules/hal",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "//iree/vm",
-        "@com_google_absl//absl/strings",
-    ],
 )

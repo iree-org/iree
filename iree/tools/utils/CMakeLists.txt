@@ -12,43 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if (NOT ANDROID)
-  return()
-endif()
-
-set(NATIVE_APP_GLUE_DIR "${ANDROID_NDK}/sources/android/native_app_glue")
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    android_native_app_glue
+    vm_util
+  HDRS
+    "vm_util.h"
   SRCS
-    "${NATIVE_APP_GLUE_DIR}/android_native_app_glue.c"
+    "vm_util.cc"
+  DEPS
+    absl::span
+    absl::strings
+    iree::base::file_io
+    iree::base::signature_mangle
+    iree::base::status
+    iree::hal::api
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::ref_cc
+  PUBLIC
 )
 
-# Export ANativeActivity_onCreate().
-# See https://github.com/android-ndk/ndk/issues/381.
-set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
-
-iree_cc_library(
+iree_cc_test(
   NAME
-    iree_run_module_app
+    vm_util_test
   SRCS
-    src/main.cc
-  INCLUDES
-    ${NATIVE_APP_GLUE_DIR}
+    "vm_util_test.cc"
   DEPS
-    ::android_native_app_glue
+    ::vm_util
     absl::strings
-    iree::base::initializer
-    iree::base::status
+    iree::base::api
+    iree::hal::api
+    iree::hal::vmla::vmla_driver_module
     iree::modules::hal
-    iree::tools::utils::vm_util
+    iree::testing::gtest
+    iree::testing::gtest_main
     iree::vm
-    ${IREE_HAL_DRIVER_MODULES}
-  LINKOPTS
-    android
-    log
-  SHARED
-  WHOLEARCHIVE
 )
