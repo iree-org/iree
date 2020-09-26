@@ -15,6 +15,9 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
+#include <chrono>
+#include <thread>
+
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/initializer.h"
@@ -43,11 +46,6 @@ struct IreeModuleInvocation {
   std::string entry_function;
   std::string inputs;
   std::string driver;
-
-  operator bool() const {
-    return !module.empty() && !entry_function.empty() && !inputs.empty() &&
-           !driver.empty();
-  }
 };
 
 // A class for loading IREE module invocation information from Android apk asset
@@ -162,6 +160,12 @@ Status RunModule(const IreeModuleInvocation& invocation) {
 }
 
 void RunModuleAppMain(android_app* app) {
+  // Sleep for 2 seconds to allow tools like AGI to perform the necessary
+  // initialization.
+  // TODO(antiagainst): This can be improved by rendering some UI button to
+  // trigger the workload.
+  std::this_thread::sleep_for(std::chrono::seconds(2));
+
   IREE_RUN_MODULE_INITIALIZERS();
 
   ModuleLoader loader(app);
@@ -172,6 +176,9 @@ void RunModuleAppMain(android_app* app) {
     LOGI("driver: '%s'", invocation->driver.c_str());
     auto status = RunModule(invocation.value());
     if (!status.ok()) LOGE("%s", status.ToString().c_str());
+  } else {
+    LOGE("failed to load module invocation: %s",
+         invocation.status().ToString().c_str());
   }
 }
 
