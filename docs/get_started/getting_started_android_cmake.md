@@ -66,7 +66,7 @@ You may also want to add the folder to the `PATH` environment variable.
 ```shell
 # Assuming in IREE source root
 $ cmake -G Ninja -B build-android  \
-    -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+    -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="arm64-v8a" -DANDROID_PLATFORM=android-29 \
     -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_SAMPLES=OFF \
     -DIREE_HOST_C_COMPILER=`which clang` -DIREE_HOST_CXX_COMPILER=`which clang++`
@@ -268,9 +268,9 @@ path environment variable:
 
 ```shell
 $ export ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain
-$ $ANDROID_NDK/build/tools/make-standalone-toolchain.sh --arch=arm64 --platform=android-29 \
-    --install-dir=$ANDROID_ARM64_TOOLCHAIN
-$ export IREE_LLVMAOT_LINKER_PATH=$ANDROID_ARM64_TOOLCHAIN/aarch64-linux-android/bin/ld
+$ "${ANDROID_NDK?}/build/tools/make-standalone-toolchain.sh" --arch=arm64 --platform=android-29 \
+    --install-dir="${ANDROID_ARM64_TOOLCHAIN?}"
+$ export IREE_LLVMAOT_LINKER_PATH="${ANDROID_ARM64_TOOLCHAIN?}/aarch64-linux-android/bin/ld"
 ```
 
 Translate a source MLIR into an IREE module:
