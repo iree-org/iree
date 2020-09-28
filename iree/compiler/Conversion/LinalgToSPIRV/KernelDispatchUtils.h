@@ -26,6 +26,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
@@ -39,7 +40,7 @@ class Value;
 
 namespace linalg {
 class LinalgOp;
-}
+}  // namespace linalg
 namespace iree_compiler {
 struct SPIRVCodegenOptions;
 }
@@ -94,17 +95,26 @@ class LaunchConfig {
   /// - tile sizes for each level,
   /// - the workgroup size, and
   /// - number of subgroups to use.
-  LogicalResult init(const SPIRVCodegenOptions &options,
-                     ArrayRef<linalg::LinalgOp> linalgOps);
+  LogicalResult init(MLIRContext *context, const SPIRVCodegenOptions &options,
+                     ArrayRef<Operation *> linalgOps);
+
+  /// Remove attributed added to operations for retrieving tile size
+  /// information.
+  void finalize(FuncOp funcOp);
 
   /// Gets the tile size computed for an operation at all levels.
   TileSizesListType getTileSizes(Operation *op) const {
-    return tileSizes.lookup(op->getName().getStringRef());
+    auto key = getKey(op);
+    if (!key) return {};
+    auto it = tileSizes.find(*key);
+    return it->second;
   }
 
   /// Gets the tile size computed for an operation for an level.
   ArrayRef<int64_t> getTileSizes(Operation *op, size_t level) const {
-    auto it = tileSizes.find(op->getName().getStringRef());
+    auto key = getKey(op);
+    if (!key) return {};
+    auto it = tileSizes.find(*key);
     if (it == tileSizes.end() || level >= it->second.size()) return {};
     return it->second[level];
   }
@@ -115,14 +125,19 @@ class LaunchConfig {
   /// Returns the number of subgroups to use.
   ArrayRef<int64_t> getNumSubgroups() const { return numSubgroups; }
 
- protected:
-  /// Current tile size configuration per operation.
+  /// Returns true if tile sizes have been computed for the operation. If tile
+  /// sizes arent set, it implies operation is not to be tiled.
+  bool hasTileSizes(Operation *op, size_t level = 0) const {
+    return !getTileSizes(op, level).empty();
+  }
 
-  // TODO: For now just use the operation name for the mapping. The tile sizes
-  // will be selected only for operations like matmul, conv, pool, etc. and
-  // assume that there is only one such operation per dispatch
-  // region. Eventually this might need to be relaxed, and some name-marker
-  // based mechanism might be needed.
+ protected:
+  /// Current tile size configuration per operation. They key used here to
+  /// retrieve the tile size information per operation is the value of a StrAttr
+  /// added to operations during `init`. When tiled this attribute is copied
+  /// over to the tiled operation, thereby the same key can be used to retrieve
+  /// the tile sizes for the next level of tiling. The `finalize` method removes
+  /// these attributes.
   llvm::StringMap<TileSizesListType> tileSizes;
 
   /// Workgroup size to use.
@@ -130,6 +145,11 @@ class LaunchConfig {
 
   /// Number of subgroups that are logically distributed along x, y & z.
   std::array<int64_t, 3> numSubgroups;
+
+ private:
+  /// Retrieves the key to use to get the `tileSizes` for a given
+  /// `operation`. Returns llvm::None on failure.
+  Optional<StringRef> getKey(Operation *op) const;
 };
 
 }  // namespace iree_compiler

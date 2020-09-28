@@ -27,6 +27,8 @@ struct VectorTransforms {
 const StringLiteral VectorTransforms::kVectorTransformMarker =
     "__internal_vector_transform__";
 
+StringRef getFusedMarker() { return "fused_numprocs_ge_numiters"; }
+
 StringRef getWorkgroupMarker() { return "workgroup"; }
 
 StringRef getWorkgroupMemoryMarker() { return "workgroup_memory"; }
@@ -44,6 +46,8 @@ StringRef getCopyToWorkgroupMemoryMarker() {
 }
 
 StringRef getVectorizeMarker() { return "vectorize"; }
+
+StringRef getDeleteMarker() { return "delete"; }
 
 bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
