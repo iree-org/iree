@@ -35,6 +35,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -57,35 +58,67 @@ namespace iree_compiler {
 
 namespace {
 
-/// Returns true if the Linalg ops can be separated to multiple kernels.
-bool canSeparateOps(ArrayRef<Operation *> ops) {
-  if (llvm::any_of(ops, [](Operation *op) {
-        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op))
-          return !linalgOp.hasBufferSemantics();
-        return false;
-      }))
-    return false;
-
-  // Require no other non-metadata ops interleave with Linalg structured ops for
-  // now. This is the common case and it simplifies further analysis.
+/// For the list of operations in `ops` returns a list of lists where each list
+/// contains the operations that need to be put in a separate dispatch function.
+LogicalResult separateOps(
+    ArrayRef<Operation *> ops,
+    const linalg::LinalgDependenceGraph &dependenceGraph,
+    SmallVectorImpl<SmallVector<Operation *, 1>> &fusedOpList) {
+  assert(!ops.empty() &&
+         "expected at least one separable op for splitting dispatch function");
+  SmallVector<Operation *, 1> currList;
   for (auto currOp = ops.begin(), nextOp = std::next(ops.begin());
        nextOp != ops.end(); ++currOp, ++nextOp) {
+    // Check that the operation has buffer semantics.
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*currOp)) {
+      if (!linalgOp.hasBufferSemantics()) return failure();
+    }
+
+    // Require no other non-metadata ops interleave with Linalg structured ops
+    // for now. This is the common case and it simplifies further analysis.
     Operation *iter = (*currOp)->getNextNode();
     while (iter != *nextOp && (MemoryEffectOpInterface::hasNoEffect(iter) ||
                                isa<IREE::PlaceholderOp>(iter)))
       iter = iter->getNextNode();
-    if (iter != *nextOp) return false;
-  }
+    if (iter != *nextOp) return failure();
 
-  return true;
+    currList.push_back(*currOp);
+
+    // If the nextOp is not fusible with the currOp, then record the list of ops
+    // so far, and start a new list.
+    if (isa<linalg::LinalgOp>(*currOp) && isa<linalg::LinalgOp>(*nextOp) &&
+        dependenceGraph.hasDependenceFrom(
+            *currOp, *nextOp,
+            linalg::LinalgDependenceGraph::DependenceType::WAW)) {
+#define ADD_FUSABLE_PAIR(SrcOpTy, DstOpTy) \
+  if (isa<SrcOpTy>(*currOp) && isa<DstOpTy>(*nextOp)) continue;
+
+      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp)
+      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp)
+      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp)
+      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMinOp)
+      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingSumOp)
+
+#undef ADD_FUSABLE_PAIR
+    }
+
+    // Push the current list of ops into the list of lists `currList` and
+    // start a new list.
+    SmallVector<Operation *, 2> newList;
+    std::swap(newList, currList);
+    fusedOpList.emplace_back(std::move(newList));
+  }
+  currList.push_back(ops.back());
+  fusedOpList.emplace_back(std::move(currList));
+  return success();
 }
 
 /// Recursively collects all the operations that are referenced by given
 /// `rootOp` into `closure`.
-void collectAllReferencedOps(Operation *rootOp,
+void collectAllReferencedOps(ArrayRef<Operation *> rootOps,
                              llvm::SmallPtrSetImpl<Operation *> &closure) {
   llvm::SmallVector<Operation *, 8> workList;
-  workList.push_back(rootOp);
+  workList.assign(rootOps.begin(), rootOps.end());
 
   while (!workList.empty()) {
     Operation *curOp = workList.pop_back_val();
@@ -161,10 +194,16 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
       separableOps.push_back(&op);
 
   if (separableOps.size() <= 1) return success();
-  if (!canSeparateOps(separableOps)) {
+
+  linalg::Aliases aliases;
+  linalg::LinalgDependenceGraph dependenceGraph =
+      linalg::LinalgDependenceGraph::buildDependenceGraph(aliases, oldFn);
+  SmallVector<SmallVector<Operation *, 1>, 1> fusedOpsList;
+  if (failed(separateOps(separableOps, dependenceGraph, fusedOpsList))) {
     return oldFn.emitError(
         "cannot separate Linalg/Parallel ops into multiple kernels");
   }
+  if (fusedOpsList.size() <= 1) return success();
 
   ModuleOp moduleOp = cast<ModuleOp>(oldFn.getParentOp());
   Block &oldFnBlock = oldFn.getBlocks().front();
@@ -174,10 +213,11 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   splitKernels.reserve(separableOps.size());
   llvm::SmallPtrSet<Operation *, 16> closure;
 
-  for (const auto &separableOp : llvm::enumerate(separableOps)) {
+  for (const auto &fusedOps : llvm::enumerate(fusedOpsList)) {
+    if (fusedOps.value().empty()) continue;
     // Create a new function for hosting this op.
-    splitKernels.emplace_back(llvm::formatv("{0}_dispatch_{1}", oldFn.getName(),
-                                            separableOp.index()));
+    splitKernels.emplace_back(
+        llvm::formatv("{0}_dispatch_{1}", oldFn.getName(), fusedOps.index()));
     StringRef newFnName = splitKernels.back();
     builder.setInsertionPointToStart(moduleOp.getBody());
     auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType());
@@ -210,7 +250,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
 
     // Collect the closure for the current Linalg op.
     closure.clear();
-    collectAllReferencedOps(separableOp.value(), closure);
+    collectAllReferencedOps(fusedOps.value(), closure);
 
     // Clone all ops in the closure to the new function.
     Block *newFnBlock = newFn.addEntryBlock();
@@ -219,7 +259,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     for (Operation &op : oldFnBlock) {
       if (closure.count(&op) == 0) continue;
       builder.insert(op.clone(remapper));
-      if (&op == separableOp.value()) break;
+      if (&op == fusedOps.value().back()) break;
     }
     builder.insert(oldFnBlock.getTerminator()->clone(remapper));
   }
