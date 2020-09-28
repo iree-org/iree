@@ -26,67 +26,67 @@ include those relevant for benchmarking):
 ```shell
 # Example for a generic module `ModuleName`:
 /tmp/iree/modules/ModuleName
-    ├── iree_vmla  # Or any other IREE backend.
-    │   ├── compiled.vmfb
-    │   │   # A flatbuffer containing IREE's compiled code.
-    │   └── traces
-    │       # Directory with a trace for each unittest in vision_model_test.py.
-    │       ├── traced_function_1
-    │       │   # A specific trace.
-    │       │   └── flagfile
-    │       │       # An Abseil flagfile containing arguments
-    │       │       # iree-benchmark-module needs to benchmark this trace.
-    │       ├── traced_function_2
-    │       └── ...
-    └── tflite
-        ├── module_method_1.tflite
-        │   # A method on ModuleName compiled to bytes with TFLite, which can
-        │   # be ingested by TFLite's benchmark_model binary.
-        ├── module_method_2.tflite
-        ├── ...
-        └── traces
-            ├── traced_function_1
-            │   └── graph_path
-            │       # In general, a trace's name does not have to match the name
-            │       # of the method(s) on the tf.Module that it calls. This file
-            │       # points to the correct module_method_*.tflite graph file
-            │       # for TFLite's benchmark_model to use.
-            ├── traced_function_2
-            └── ...
+  ├── iree_vmla  # Or any other IREE backend.
+  │   ├── compiled.vmfb
+  │   │   # A flatbuffer containing IREE's compiled code.
+  │   └── traces
+  │       # Directory with a trace for each unittest in vision_model_test.py.
+  │       ├── traced_function_1
+  │       │   # Directory storing logs and serialization for a specific trace.
+  │       │   └── flagfile
+  │       │       # An Abseil flagfile containing arguments
+  │       │       # iree-benchmark-module needs to benchmark this trace.
+  │       ├── traced_function_2
+  │       └── ...
+  └── tflite
+      ├── module_method_1.tflite
+      │   # A method on ModuleName compiled to bytes with TFLite, which can
+      │   # be ingested by TFLite's benchmark_model binary.
+      ├── module_method_2.tflite
+      ├── ...
+      └── traces
+          ├── traced_function_1
+          │   └── graph_path
+          │       # In general, a trace's name does not have to match the name
+          │       # of the method(s) on the tf.Module that it calls. This file
+          │       # points to the correct module_method_*.tflite graph file
+          │       # for TFLite's benchmark_model to use.
+          ├── traced_function_2
+          └── ...
 
 # Example for MatrixOpsStaticModule:
 /tmp/iree/modules/MatrixOpsStaticModule
-├── iree_llvmjit
-│   ├── compiled.vmfb
-│   └── traces
-│       ├── basic_matmul
-│       │   └── flagfile
-│       ├── matmul_broadcast_singleton_dimension
-│       │   └── flagfile
-│       ├── matmul_lhs_batch
-│       │   └── flagfile
-│       └── matmul_rhs_batch
-│           └── flagfile
-├── iree_vmla
-│   ├── compiled.vmfb
-│   └── traces  # ...same as iree_llvmjit/traces above.
-├── iree_vulkan
-│   ├── compiled.vmfb
-│   └── traces  # ...same as iree_llvmjit/traces above.
-└── tflite
-    ├── basic_matmul.tflite
-    ├── matmul_broadcast_singleton_dimension.tflite
-    ├── matmul_lhs_batch.tflite
-    ├── matmul_rhs_batch.tflite
-    └── traces
-        ├── basic_matmul
-        │   └── graph_path
-        ├── matmul_broadcast_singleton_dimension
-        │   └── graph_path
-        ├── matmul_lhs_batch
-        │   └── graph_path
-        └── matmul_rhs_batch
-            └── graph_path
+  ├── iree_llvmjit
+  │   ├── compiled.vmfb
+  │   └── traces
+  │       ├── basic_matmul
+  │       │   └── flagfile
+  │       ├── matmul_broadcast_singleton_dimension
+  │       │   └── flagfile
+  │       ├── matmul_lhs_batch
+  │       │   └── flagfile
+  │       └── matmul_rhs_batch
+  │           └── flagfile
+  ├── iree_vmla
+  │   ├── compiled.vmfb
+  │   └── traces  # ...same as iree_llvmjit/traces above.
+  ├── iree_vulkan
+  │   ├── compiled.vmfb
+  │   └── traces  # ...same as iree_llvmjit/traces above.
+  └── tflite
+      ├── basic_matmul.tflite
+      ├── matmul_broadcast_singleton_dimension.tflite
+      ├── matmul_lhs_batch.tflite
+      ├── matmul_rhs_batch.tflite
+      └── traces
+          ├── basic_matmul
+          │   └── graph_path
+          ├── matmul_broadcast_singleton_dimension
+          │   └── graph_path
+          ├── matmul_lhs_batch
+          │   └── graph_path
+          └── matmul_rhs_batch
+              └── graph_path
 ```
 
 ### Optional: Compile the Keras Applications Vision tests.
