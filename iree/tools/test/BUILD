@@ -34,3 +34,13 @@ iree_lit_test_suite(
     ],
     tags = ["hostonly"],
 )
+
+iree_lit_test_suite(
+    name = "benchmark_flags",
+    srcs = ["benchmark_flags.txt"],
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-benchmark-module",
+    ],
+    tags = ["hostonly"],
+)

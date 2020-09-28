@@ -40,6 +40,8 @@ iree_cc_binary(
     deps = [
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/flags:usage",
         "@com_google_absl//absl/strings",
         "@com_google_benchmark//:benchmark",
         "//iree/base:init",
