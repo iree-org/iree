@@ -115,7 +115,7 @@ def extract_artifacts(test_path: str, test_name: str, artifacts_dir: str):
     # Check for collisions.
     collision_check(filename, test_name)
 
-    # Unarchive and update flagfile path.
+    # Extract and update flagfile path.
     if not FLAGS.dry_run:
       archive.extract(filename, artifacts_dir)
       if filename.endswith('flagfile'):
