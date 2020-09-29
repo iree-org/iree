@@ -24,7 +24,7 @@ import os
 import re
 import subprocess
 import tempfile
-from zipfile import ZipFile
+import zipfile
 
 import utils
 
@@ -107,7 +107,7 @@ def update_path(archive_path: str, artifacts_dir: str):
 def extract_artifacts(test_path: str, test_name: str, artifacts_dir: str):
   """Unzips all of the benchmarking artifacts for a given test and backend."""
   outputs = os.path.join(test_path, 'test.outputs', 'outputs.zip')
-  archive = ZipFile(outputs)
+  archive = zipfile.ZipFile(outputs)
   # Filter out directory names.
   filenames = [name for name in archive.namelist() if name[-1] != os.sep]
 
