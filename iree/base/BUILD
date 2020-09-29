@@ -392,6 +392,39 @@ cc_test(
 )
 
 cc_library(
+    name = "synchronization",
+    srcs = ["synchronization.c"],
+    hdrs = ["synchronization.h"],
+    linkopts = ["-lpthread"],
+    deps = [
+        ":api",
+        ":atomics",
+        ":target_platform",
+        ":tracing",
+    ],
+)
+
+cc_test(
+    name = "synchronization_benchmark",
+    srcs = ["synchronization_benchmark.cc"],
+    deps = [
+        ":synchronization",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "synchronization_test",
+    srcs = ["synchronization_test.cc"],
+    deps = [
+        ":synchronization",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "target_platform",
     hdrs = ["target_platform.h"],
 )
