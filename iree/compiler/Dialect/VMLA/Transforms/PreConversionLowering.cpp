@@ -277,6 +277,95 @@ class LowerBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
   }
 };
 
+
+// Lower mhlo::SortOp to an pseudo SortOp in the VMLA dialect. This
+// pseudo op generates a set of ordered indices for that array along the last
+// dimension. Then using a torch_index_select the values can be reordered to
+// support arbitrary inputs.
+//
+// Note: At this point only organizes ascending values for a single input.
+// TODO(suderman): support descending support.
+class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::SortOp op,
+                                PatternRewriter &rewriter) const override {
+    auto operand_ty = op.getOperand(0).getType().cast<RankedTensorType>();
+    bool last_dimension = (op.dimension() == -1)
+        || (op.dimension() == (operand_ty.getRank() - 1));
+
+    // TODO(suderman): Add transpose to sort along the last dimension.
+    if (!last_dimension) return failure();
+
+
+    auto& comparator = op.comparator();
+    auto& block = comparator.getBlocks().front();
+    auto& operations = block.getOperations();
+    auto comparison = dyn_cast_or_null<mhlo::CompareOp>(&operations.front());
+
+    // First verify that the block is purely a return of a comparison. This
+    // handles the regular sorting behavior.
+    if (!comparison) return failure();
+
+    auto second = &(*(++operations.begin()));
+    auto return_op = dyn_cast_or_null<mhlo::ReturnOp>(second);
+    if (!return_op) return failure();
+
+    if (return_op.getOperand(0) != comparison.getResult()) return failure();
+
+    // Determine which operands being compared.
+    auto lhs = comparison.getOperand(0);
+    auto rhs = comparison.getOperand(1);
+    auto lhs_index = -1;
+    auto rhs_index = -1;
+    for (auto arg : llvm::enumerate(block.getArguments())) {
+      if (arg.value() == lhs) lhs_index = arg.index();
+      if (arg.value() == rhs) rhs_index = arg.index();
+    }
+
+    // This should never happen but best to check.
+    if (lhs_index == -1) return failure();
+    if (rhs_index == -1) return failure();
+
+    // They should not be the same.
+    if (lhs_index == rhs_index) return failure();
+
+    // Comparisons need to pull from same Sort operand..
+    auto lhs_operand = lhs_index / 2;
+    auto rhs_operand = rhs_index / 2;
+    if (lhs_operand != rhs_operand) return failure();
+
+    // Must be GT, GE, LT, or LE.
+    auto is_gt = comparison.comparison_direction() == "GT" || comparison.comparison_direction() == "GE" ;
+    auto is_lt = comparison.comparison_direction() == "LT" || comparison.comparison_direction() == "LE" ;
+    if (!is_gt && !is_lt) return failure();
+
+    bool operand_parity = lhs_index > rhs_index;
+    auto is_ascending = operand_parity ^ is_gt;   
+
+    auto operand = op.getOperand(lhs_operand);
+    if (!is_ascending) return failure();
+
+    auto sorted_indices = rewriter.create<VMLA::SortPseudoOp>(
+      op.getLoc(), RankedTensorType::get(
+        operand_ty.getShape(), rewriter.getI32Type()), operand);
+
+
+    llvm::SmallVector<Value, 6> sorted;
+    for (auto operand : op.getOperands()) {
+      auto tensor_type = operand.getType().cast<RankedTensorType>();
+      auto gathered = rewriter.create<mhlo::TorchIndexSelectOp>(
+        op.getLoc(), tensor_type, operand, sorted_indices,
+        /**dim=*/operand_ty.getRank() - 1,
+        /**batch_dims=*/operand_ty.getRank() - 1);
+      sorted.push_back(gathered);
+    }
+
+    rewriter.replaceOp(op, sorted);
+    return success();
+  }
+};
+
 class PreConversionLoweringPass
     : public PassWrapper<PreConversionLoweringPass, OperationPass<FuncOp>> {
  public:
@@ -310,6 +399,8 @@ class PreConversionLoweringPass
     patterns.insert<LowerBroadcastInDimOp>(context);
     target.addIllegalOp<mhlo::BroadcastOp>();
     patterns.insert<LowerBroadcastOp>(context);
+    target.addIllegalOp<mhlo::SortOp>();
+    patterns.insert<LowerSortOp>(context);
 
     if (failed(applyPartialConversion(getOperation(), target, patterns))) {
       return signalPassFailure();

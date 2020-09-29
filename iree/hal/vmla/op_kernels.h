@@ -168,6 +168,13 @@ struct Reverse {
                         absl::Span<const int32_t> dimensions);
 };
 
+struct Sort {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<int32_t> dst_buffer,
+                        ShapeSpan src_shape);
+};
+
 struct Broadcast {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
