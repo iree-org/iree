@@ -77,7 +77,7 @@ def get_test_paths_and_names(test_suite_path: str):
   return test_paths, test_names
 
 
-def collision_check(filename: str, test_name: str):
+def check_collision(filename: str, test_name: str):
   """Check that we aren't overwriting files unless we expect to."""
   # Note: We can't use a check that the files have identical contents because
   # tf_input.mlir can have random numbers appended to its function names.
@@ -113,7 +113,7 @@ def extract_artifacts(test_path: str, test_name: str, artifacts_dir: str):
 
   for filename in filenames:
     # Check for collisions.
-    collision_check(filename, test_name)
+    check_collision(filename, test_name)
 
     # Extract and update flagfile path.
     if not FLAGS.dry_run:
