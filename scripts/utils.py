@@ -70,5 +70,5 @@ def get_test_targets(test_suite_path: str):
 
   query = ['bazel', 'query', f'tests({test_suite_path})']
   tests, _ = check_and_get_output(query, stderr_filters=BAZEL_FILTERS)
-  tests = list(filter(lambda s: s.startswith(f'{test_suite_path}_'), tests))
+  tests = [test for test in tests if test.startswith(f'{test_suite_path}_')]
   return tests
