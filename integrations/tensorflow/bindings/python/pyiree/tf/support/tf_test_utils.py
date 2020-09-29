@@ -62,7 +62,7 @@ def _setup_artifacts_dir(module_name: str) -> str:
       os.path.join(tempfile.gettempdir(), "iree", "modules"),
   ]
   # Use the most preferred path in parent_dirs that isn't None.
-  parent_dir = [parent for parent in parent_dirs if parent is not None][0]
+  parent_dir = next(parent for parent in parent_dirs if parent is not None)
 
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
