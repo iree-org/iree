@@ -6839,7 +6839,7 @@ hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18836xi8>, format = 1280071245 : i32} {
+  hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18504xi8>, format = 1280071245 : i32} {
   }
 }
 
@@ -7015,7 +7015,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18836xi8>, format = 1280071245 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18504xi8>, format = 1280071245 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
@@ -7114,7 +7114,7 @@ module {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18836xi8>, format = 1280071245 : i32} {
+    hal.executable.binary attributes {data = opaque<"", "0xDEADBEEF"> : vector<18504xi8>, format = 1280071245 : i32} {
     }
   }
   func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.reflection = {}}) -> (!hal.buffer {iree.reflection = {}}) attributes {iree.module.export = "dot$raw"} {
@@ -7214,7 +7214,7 @@ module {
     }
     vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18836xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -7399,7 +7399,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18836xi8>
+  vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
   vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -7569,7 +7569,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18836xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -7817,7 +7817,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18836xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -8065,7 +8065,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18836xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
@@ -8284,7 +8284,7 @@ module {
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18836xi8>
+    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> {
       %c1024 = vm.const.i32 1024 : i32
       %c32 = vm.const.i32 32 : i32
