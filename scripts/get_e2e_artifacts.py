@@ -44,7 +44,7 @@ flags.DEFINE_string(
 flags.DEFINE_bool('run_test_suites', True, 'Run any specified test suites.')
 flags.DEFINE_list(
     'test_suites', ['e2e_tests', 'keras_tests', 'vision_external_tests'],
-    'Any of `e2e_tests`, `keras_tests`, and `vision_external_tests`')
+    'Any combination of `e2e_tests`, `keras_tests`, and `vision_external_tests`')
 
 SUITE_NAME_TO_TARGET = {
     'e2e_tests':
