@@ -232,7 +232,6 @@ class VMLATargetBackend final : public TargetBackend {
         }
 
         // Clone vm.module ops, including their contents.
-        // As we do this, we de-dup some symbols.
         auto vmModuleOps =
             targetOp.getInnerModule().getOps<IREE::VM::ModuleOp>();
         if (vmModuleOps.empty()) {
@@ -241,25 +240,19 @@ class VMLATargetBackend final : public TargetBackend {
         }
         auto vmModuleOp = *vmModuleOps.begin();
         builder.setInsertionPoint(&linkedVmModuleOp.getBlock().back());
+        // Use a SymbolTable to guard against inserting duplicate symbols.
         SymbolTable symbolTable(linkedVmModuleOp.getOperation());
 
-        for (auto funcOp : vmModuleOp.getOps<IREE::VM::FuncOp>()) {
-          builder.clone(*funcOp);
+        for (auto &op : vmModuleOp.getBody()->getOperations()) {
+          if (auto terminatorOp = dyn_cast<IREE::VM::ModuleTerminatorOp>(op)) {
+            continue;
+          }
+          if (op.hasTrait<SymbolOpInterface::Trait>() &&
+              symbolTable.lookup(dyn_cast<SymbolOpInterface>(op).getName())) {
+            continue;
+          }
+          builder.clone(op);
         }
-        for (auto exportOp : vmModuleOp.getOps<IREE::VM::ExportOp>()) {
-          builder.clone(*exportOp);
-        }
-
-#define IREE_CLONE_OP_WITHOUT_DUPLICATES(opType)          \
-  for (auto op : vmModuleOp.getOps<IREE::VM::opType>()) { \
-    if (symbolTable.lookup(op.getName())) continue;       \
-    builder.clone(*op);                                   \
-  }
-        IREE_CLONE_OP_WITHOUT_DUPLICATES(ImportOp);
-        IREE_CLONE_OP_WITHOUT_DUPLICATES(RodataOp);
-        IREE_CLONE_OP_WITHOUT_DUPLICATES(GlobalI32Op);
-        IREE_CLONE_OP_WITHOUT_DUPLICATES(GlobalI64Op);
-        IREE_CLONE_OP_WITHOUT_DUPLICATES(GlobalRefOp);
 
         // Now that we're done cloning its ops, delete the original target op.
         targetOp.erase();
