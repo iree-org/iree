@@ -15,7 +15,8 @@
 # limitations under the License.
 """Runs all E2E TensorFlow tests and extracts their benchmarking artifacts.
 
-Example usage: python3 get_e2e_artifacts.py
+Example usage:
+  python3 get_e2e_artifacts.py
 """
 
 import fileinput
