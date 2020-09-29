@@ -68,9 +68,9 @@ if [[ $# == 1 ]]; then
   IREE_ARTIFACT_ROOT=$(readlink -f $1)
 fi
 
-if [[ -z "${IREE_ARTIFACT_ROOT+x}" ]] || [[ -z "${IREE_INPUT_MODULE_FILE+x}" ]] || \
-   [[ -z "${IREE_ENTRY_FUNCTION+x}" ]] || [[ -z "${IREE_INPUT_BUFFER_FILE+x}" ]] || \
-   [[ -z "${IREE_DRIVER+x}" ]]; then
+if [[ -z "${IREE_ARTIFACT_ROOT}" ]] || [[ -z "${IREE_INPUT_MODULE_FILE}" ]] || \
+   [[ -z "${IREE_ENTRY_FUNCTION}" ]] || [[ -z "${IREE_INPUT_BUFFER_FILE}" ]] || \
+   [[ -z "${IREE_DRIVER}" ]]; then
   echo "Error: missing necessary parameters" >&2
   print_usage_and_exit
 fi
@@ -114,7 +114,6 @@ CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 NINJA_BIN="${NINJA_BIN:-$(which ninja)}"
 CC_BIN="${CC_BIN:-$(which clang)}"
 CXX_BIN="${CXX_BIN:-$(which clang++)}"
-
 JAVAC_BIN="${JAVAC_BIN:-$(which javac)}"
 
 ##################################
@@ -149,15 +148,6 @@ DX_BIN="${ANDROID_SDK_BUILD_TOOLS_DIR?}/dx"
 ZIPALIGN_BIN="${ANDROID_SDK_BUILD_TOOLS_DIR?}/zipalign"
 APKSIGNER_BIN="${ANDROID_SDK_BUILD_TOOLS_DIR?}/apksigner"
 
-if [[ ! -x "${AAPT_BIN?}" ]] || [[ ! -x "${DX_BIN?}" ]] || [[ ! -x "${ZIPALIGN_BIN?}" ]] || [[ ! -x "${APKSIGNER_BIN?}" ]]; then
-  if [[ -z "${ANDROID_SDK_BUILD_TOOLS_VERSION?}" ]]; then
-    echo "Error: 'ANDROID_SDK_BUILD_TOOLS_VERSION' environment variable not set" &>2
-  else
-    echo "Error: '${ANDROID_SDK_BUILD_TOOLS_DIR}' does not point to a valid Android SDK build tools directory containing aapt/apksigner/dx/zipalign" &>2
-  fi
-  exit 1
-fi
-
 AAPT_ADD="${AAPT_BIN?} add"
 # Link in the Android framework classes and disable compression for IREE
 # bytecode modules. This allows us to mmap the file directly.
@@ -165,16 +155,13 @@ AAPT_PACK="${AAPT_BIN?} package -f -I ${ANDROID_SDK_PLATFORMS_DIR?}/android.jar 
 DX="${DX_BIN?} --dex"
 ZIPALIGN="${ZIPALIGN_BIN?} -f -p 4"
 APKSIGN="${APKSIGNER_BIN?} sign"
-
 JAVAC="${JAVAC_BIN?} -classpath ${ANDROID_SDK_PLATFORMS_DIR?}/android.jar -sourcepath ${IREE_RESOURCE_GEN_DIR?} -d ${IREE_APK_PARTS_DIR?}"
 
 #############################
 # Build IREE native libraries
 #############################
 
-if [[ ! -d "${IREE_NATIVE_LIB_BUILD_DIR?}" ]]; then
-  mkdir -p "${IREE_NATIVE_LIB_BUILD_DIR?}"
-fi
+mkdir -p "${IREE_NATIVE_LIB_BUILD_DIR?}"
 
 echo ">>> Building IREE native libraries <<<"
 
@@ -239,7 +226,7 @@ ${AAPT_PACK?} --non-constant-id -m \
   --generate-dependencies
 
 # Compile the R.java and create classes.dex out of it for Android.
-echo "Using javac: '${JAVAC_BIN}'"
+echo "Using javac: '${JAVAC_BIN?}'"
 ${JAVAC?} "${IREE_RESOURCE_GEN_DIR?}"/com/google/iree/run_module/*.java
 ${DX?} --output="${IREE_APK_PARTS_DIR?}/classes.dex" "${IREE_APK_PARTS_DIR?}"
 

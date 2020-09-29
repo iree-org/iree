@@ -1,7 +1,7 @@
-# iree-run-module Android App
+# Android App to Run an IREE Bytecode Module
 
-This directory contains an Android application packing the `iree-run-module`
-command-line tool together with a specific IREE VM module invocation.
+This directory contains configuration to create an Android application that
+executes a single IREE module as a native activity.
 
 Note that this app is **purely** for benchmarking/profiling IREE itself.
 This is not the expected integration path for a real Android application,
@@ -39,7 +39,7 @@ In general, we need to
 1. Package the shared library together with an IREE VM FlatBuffer, its entry
    function, input buffers, and the HAL driver into an Android app, following
    a certain directory hierarchy. Specifically,
-   1. Generating `AndroidManifest.xml` from the
+   1. Generate `AndroidManifest.xml` from the
       [template](./AndroidManifest.xml.template) by providing the proper target
       Android API level.
    1. Copy the VM FlatBuffer as `assets/module.vmfb`, write the entry function
