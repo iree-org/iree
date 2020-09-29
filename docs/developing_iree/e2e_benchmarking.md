@@ -1,11 +1,11 @@
 # Benchmark IREE and TFLite
 
-We use our end-to-end TensorFlow integrations tests to generate tested
-compilation and benchmarking artifacts. This allows us to validate that our
-benchmarks are behaving as we expect them to, and to run them using valid inputs
-for each model.
+We use our end-to-end TensorFlow integration tests to test compilation and
+numerical accuracy, and to generate compilation and benchmarking artifacts.
+This allows us to validate that our benchmarks are behaving as we expect them
+to, and to run them using valid inputs for each model.
 
-This guide assumes that you can run the tensorflow integrations tests. See
+This guide assumes that you can run the tensorflow integration tests. See
 [this doc](https://google.github.io/iree/developing-iree/tensorflow-integrations)
 for more information. That doc also covers writing new tests, which you'll need
 to do if you'd like to benchmark a new TensorFlow model.
@@ -41,7 +41,7 @@ include those relevant for benchmarking):
   └── tflite
       ├── module_method_1.tflite
       │   # A method on ModuleName compiled to bytes with TFLite, which can
-      │   # be ingested by TFLite's benchmark_model binary.
+      │   # be used by the TFLite's benchmark_model binary.
       ├── module_method_2.tflite
       ├── ...
       └── traces
@@ -89,7 +89,7 @@ include those relevant for benchmarking):
               └── graph_path
 ```
 
-### Optional: Compile the Keras Applications Vision tests.
+### Optional: Compile the Keras Applications Vision tests
 
 The vision tests take a while to run, so we exclude them from the CI and
 wildcard expansion. They can be run by invoking the following test suite:
@@ -106,7 +106,7 @@ organized by `/tmp/iree/modules/ModelName/Dataset/backends` instead of just by
 
 ## 2. Benchmarking IREE on desktop
 
-### 2.1 Build the `iree-benchmark-module`
+### 2.1 Optional: Build the `iree-benchmark-module`
 
 This step is optional, but allows running the benchmarks without running `bazel`
 at the same time.
@@ -127,7 +127,7 @@ providing the following flags:
 
 | Flag              | Description                                      |
 |-------------------|--------------------------------------------------|
-| --input_file      | Path to the IREE compiled VM flatbuffer          |
+| --input_file      | Absolute path to the IREE compiled VM flatbuffer |
 | --inputs          | A comma delimited string of input tensors        |
 | --driver          | The backend driver to use for the benchmark      |
 | --entry_function  | The method on the TensorFlow module to benchmark |
@@ -216,7 +216,7 @@ adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
 adb shell chmod +x /data/local/tmp/iree-benchmark-module
 ```
 
-### 4.2 Push the IREE's compilation / benchmarking artifacts to the device.
+### 4.2 Push the IREE's compilation / benchmarking artifacts to the device
 
 In this example we'll only copy over the files we need to benchmark a single
 module on a single backend, but you can easily copy all of the modules over
@@ -242,16 +242,17 @@ adb shell /data/local/tmp/iree-benchmark-module \
   --input_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
 ```
 
-Note: The `--input_file` flag must be specified manually if the location of the
-compiled flatbuffer (`compiled.vmfb`) changes. The flagfile can still take care
-of specifying the input data, driver and entry function however.
+Note: Because the flagfile uses absolute paths, the `--input_file` flag must be
+specified manually if the location of the compiled flatbuffer (`compiled.vmfb`)
+changes. The flagfile can still take care of specifying the input data, driver
+and entry function however.
 
-## 5. Benchmark the model on android with TFLite
+## 5. Benchmark the model on Android with TFLite
 
 ### 5.1 Prepare the benchmarking tools
 
 There are three options for getting TFLite's `benchmark_model` binary for
-android.
+Android.
 
 The first two are to build it directly, either in a
 [`docker` container](https://www.tensorflow.org/lite/guide/build_android#set_up_build_environment_using_docker)
