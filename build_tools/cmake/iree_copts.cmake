@@ -238,6 +238,16 @@ set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
+# Third party: cpuinfo
+#-------------------------------------------------------------------------------
+
+set(CPUINFO_BUILD_TOOLS ON CACHE BOOL "" FORCE)
+
+set(CPUINFO_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(CPUINFO_BUILD_MOCK_TESTS OFF CACHE BOOL "" FORCE)
+
+#-------------------------------------------------------------------------------
 # Third party: flatbuffers
 #-------------------------------------------------------------------------------
 
