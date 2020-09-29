@@ -718,8 +718,8 @@ struct SortOpConversion : public OpConversionPattern<IREE::VMLA::SortPseudoOp> {
         srcOp.getLoc(), srcOp.value(), typeConverter, rewriter);
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
-    rewriter.createOrFold<IREE::VMLA::SortOp>(
-      srcOp.getLoc(), src, src_shape, dst, TypeAttr::get(inputType));
+    rewriter.createOrFold<IREE::VMLA::SortOp>(srcOp.getLoc(), src, src_shape,
+                                              dst, TypeAttr::get(inputType));
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }

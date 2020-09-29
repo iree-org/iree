@@ -642,13 +642,12 @@ class VMLAModuleState final {
   IREE_VMLA_UNARY_OP(CeilF32, kernels::Ceil, float);
   IREE_VMLA_UNARY_OP(RoundF32, kernels::Round, float);
 
-
-#define IREE_VMLA_SORT_OP(name, type)                                     \
+#define IREE_VMLA_SORT_OP(name, type)                                        \
   Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,       \
-              const vm::ref<Buffer>& dst) {  \
+              const vm::ref<Buffer>& dst) {                                  \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
-    return kernels::Sort::Execute<type>( \
-    src->As<type>(), dst->As<int32_t>(), src_shape);                 \
+    return kernels::Sort::Execute<type>(src->As<type>(), dst->As<int32_t>(), \
+                                        src_shape);                          \
   }
 
   IREE_VMLA_SORT_OP(SortI8, int8_t);

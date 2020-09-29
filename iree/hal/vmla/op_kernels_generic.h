@@ -17,8 +17,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numeric>
 #include <iostream>
+#include <numeric>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
@@ -523,8 +523,7 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
 
 template <typename T>
 Status Sort::Execute(absl::Span<const T> src_buffer,
-                     absl::Span<int32_t> dst_buffer,
-                     ShapeSpan src_shape) {
+                     absl::Span<int32_t> dst_buffer, ShapeSpan src_shape) {
   int elements = 1;
   for (auto dim : src_shape) {
     elements *= dim;
@@ -537,7 +536,9 @@ Status Sort::Execute(absl::Span<const T> src_buffer,
     auto dst_subspan = dst_buffer.subspan(i, sort_size);
     std::iota(dst_subspan.begin(), dst_subspan.end(), 0);
     std::stable_sort(dst_subspan.begin(), dst_subspan.end(),
-         [&src_subspan](int32_t i1, int32_t i2) {return src_subspan[i1] < src_subspan[i2];});
+                     [&src_subspan](int32_t i1, int32_t i2) {
+                       return src_subspan[i1] < src_subspan[i2];
+                     });
   }
 
   return OkStatus();

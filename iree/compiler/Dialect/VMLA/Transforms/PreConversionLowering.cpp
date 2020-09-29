@@ -277,7 +277,6 @@ class LowerBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
   }
 };
 
-
 // Lower mhlo::SortOp to an pseudo SortOp in the VMLA dialect. This
 // pseudo op generates a set of ordered indices for that array along the last
 // dimension. Then using a torch_index_select the values can be reordered to
@@ -291,16 +290,15 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
   LogicalResult matchAndRewrite(mhlo::SortOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand_ty = op.getOperand(0).getType().cast<RankedTensorType>();
-    bool last_dimension = (op.dimension() == -1)
-        || (op.dimension() == (operand_ty.getRank() - 1));
+    bool last_dimension = (op.dimension() == -1) ||
+                          (op.dimension() == (operand_ty.getRank() - 1));
 
     // TODO(suderman): Add transpose to sort along the last dimension.
     if (!last_dimension) return failure();
 
-
-    auto& comparator = op.comparator();
-    auto& block = comparator.getBlocks().front();
-    auto& operations = block.getOperations();
+    auto &comparator = op.comparator();
+    auto &block = comparator.getBlocks().front();
+    auto &operations = block.getOperations();
     auto comparison = dyn_cast_or_null<mhlo::CompareOp>(&operations.front());
 
     // First verify that the block is purely a return of a comparison. This
@@ -336,28 +334,30 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
     if (lhs_operand != rhs_operand) return failure();
 
     // Must be GT, GE, LT, or LE.
-    auto is_gt = comparison.comparison_direction() == "GT" || comparison.comparison_direction() == "GE" ;
-    auto is_lt = comparison.comparison_direction() == "LT" || comparison.comparison_direction() == "LE" ;
+    auto is_gt = comparison.comparison_direction() == "GT" ||
+                 comparison.comparison_direction() == "GE";
+    auto is_lt = comparison.comparison_direction() == "LT" ||
+                 comparison.comparison_direction() == "LE";
     if (!is_gt && !is_lt) return failure();
 
     bool operand_parity = lhs_index > rhs_index;
-    auto is_ascending = operand_parity ^ is_gt;   
+    auto is_ascending = operand_parity ^ is_gt;
 
     auto operand = op.getOperand(lhs_operand);
     if (!is_ascending) return failure();
 
     auto sorted_indices = rewriter.create<VMLA::SortPseudoOp>(
-      op.getLoc(), RankedTensorType::get(
-        operand_ty.getShape(), rewriter.getI32Type()), operand);
-
+        op.getLoc(),
+        RankedTensorType::get(operand_ty.getShape(), rewriter.getI32Type()),
+        operand);
 
     llvm::SmallVector<Value, 6> sorted;
     for (auto operand : op.getOperands()) {
       auto tensor_type = operand.getType().cast<RankedTensorType>();
       auto gathered = rewriter.create<mhlo::TorchIndexSelectOp>(
-        op.getLoc(), tensor_type, operand, sorted_indices,
-        /**dim=*/operand_ty.getRank() - 1,
-        /**batch_dims=*/operand_ty.getRank() - 1);
+          op.getLoc(), tensor_type, operand, sorted_indices,
+          /**dim=*/operand_ty.getRank() - 1,
+          /**batch_dims=*/operand_ty.getRank() - 1);
       sorted.push_back(gathered);
     }
 

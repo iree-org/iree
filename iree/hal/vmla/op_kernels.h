@@ -171,8 +171,7 @@ struct Reverse {
 struct Sort {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<int32_t> dst_buffer,
-                        ShapeSpan src_shape);
+                        absl::Span<int32_t> dst_buffer, ShapeSpan src_shape);
 };
 
 struct Broadcast {
