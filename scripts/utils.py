@@ -60,7 +60,7 @@ def check_and_get_output(command: Sequence[str],
 
 
 def get_test_targets(test_suite_path: str):
-  """Returns a list of test targets stripped of paths and suite names."""
+  """Returns a list of test targets for the given test suite."""
   # Check if the suite exists (which may not be true for failing suites)
   target_dir = test_suite_path.split(':')[0]
   query = ['bazel', 'query', f'{target_dir}/...']
@@ -70,5 +70,4 @@ def get_test_targets(test_suite_path: str):
 
   query = ['bazel', 'query', f'tests({test_suite_path})']
   tests, _ = check_and_get_output(query, stderr_filters=BAZEL_FILTERS)
-  tests = [test for test in tests if test.startswith(f'{test_suite_path}_')]
   return tests

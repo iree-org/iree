@@ -59,10 +59,11 @@ def _setup_artifacts_dir(module_name: str) -> str:
   parent_dirs = [
       FLAGS.artifacts_dir,
       os.environ['TEST_UNDECLARED_OUTPUTS_DIR'],
+      os.environ['TEST_TMPDIR'],
       os.path.join(tempfile.gettempdir(), "iree", "modules"),
   ]
   # Use the most preferred path in parent_dirs that isn't None.
-  parent_dir = next(parent for parent in parent_dirs if parent is not None)
+  parent_dir = [parent for parent in parent_dirs if parent is not None][0]
 
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
