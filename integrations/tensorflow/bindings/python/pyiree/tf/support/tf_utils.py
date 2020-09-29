@@ -418,8 +418,8 @@ def compile_to_tflite(
 
   Args:
     module_class: A tf.Module subclass to compile with TFLite. If module_class
-      has an attr get_tflite_v1_kwargs then it will be compiled using
-      tf.compat.v1.lite.
+      has an attr get_legacy_tflite_saved_model_converter_kwargs then it will
+      be compiled using tf.compat.v1.lite. It's best not to use this, however.
     exported_names: an optional iterable of strings representing which of the
       module_class's functions should be callable. If exported_names is empty
       then all functions will be callable.
@@ -449,14 +449,14 @@ def compile_to_tflite(
 
   tflite_modules = []
   names = []
-  if hasattr(module_class, "get_tflite_v1_kwargs"):
-    tflite_v1_kwargs = module_class.get_tflite_v1_kwargs()
+  if hasattr(module_class, "get_legacy_tflite_saved_model_converter_kwargs"):
+    kwargs = module_class.get_legacy_tflite_saved_model_converter_kwargs()
     converter = tf.compat.v1.lite.TFLiteConverter.from_saved_model(
-        tflite_v1_kwargs["model_path"],
-        input_arrays=tflite_v1_kwargs["input_arrays"],
-        output_arrays=tflite_v1_kwargs["output_arrays"])
+        kwargs["model_path"],
+        input_arrays=kwargs["input_arrays"],
+        output_arrays=kwargs["output_arrays"])
     tflite_modules.append(converter.convert())
-    names.append(tflite_v1_kwargs["function_name"])
+    names.append(kwargs["exported_name"])
   else:
     functions, names = _get_concrete_functions(module_class, exported_names)
     for function in functions:

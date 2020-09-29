@@ -16,8 +16,8 @@ instructions.
 ## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)), 
-then you can run the manual test targets with 
+[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
+then you can run the manual test targets with
 `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
@@ -229,3 +229,15 @@ which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
+
+## Legacy TFLite Compilation
+
+_Please don't use this unless you are forced to._
+
+We support using `tf.compat.v1.lite.TFLiteConverter.from_saved_model` to compile
+older `tf.Module`s with TFLite. This will be used if the `tf.Module` being
+tested has a method named `get_legacy_tflite_saved_model_converter_kwargs`. This
+method must return a dict with the following kwargs: `model_path`,
+`input_arrays`, `output_arrays`, and `exported_name`. The module must use only
+one exported name, and `exported_name` should be equal to that name. See
+`mobile_bert_squad_test.py` for a concrete example.

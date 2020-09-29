@@ -48,10 +48,10 @@ class MobileBertSquad(tf.Module):
     return model_path
 
   @staticmethod
-  def get_tflite_v1_kwargs():
+  def get_legacy_tflite_saved_model_converter_kwargs():
     return dict([("input_arrays", ["input_ids", "input_mask", "segment_ids"]),
                  ("output_arrays", ["start_logits", "end_logits"]),
-                 ("function_name", "predict"),
+                 ("exported_name", "predict"),
                  ("model_path", MobileBertSquad.get_model_path())])
 
   @tf.function(input_signature=[
