@@ -448,6 +448,56 @@ cc_test(
 )
 
 cc_library(
+    name = "threading",
+    srcs = [
+        "threading.c",
+        "threading_darwin.c",
+        "threading_impl.h",
+        "threading_pthreads.c",
+        "threading_win32.c",
+    ],
+    hdrs = ["threading.h"],
+    copts = [
+        "-D_GNU_SOURCE=1",
+    ],
+    linkopts = [
+        "-ldl",
+        "-lpthread",
+    ],
+    deps = [
+        ":api",
+        ":atomics",
+        ":synchronization",
+        ":target_platform",
+        ":tracing",
+    ],
+)
+
+cc_test(
+    name = "threading_benchmark",
+    srcs = ["threading_benchmark.cc"],
+    deps = [
+        ":threading",
+        "//iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_test(
+    name = "threading_test",
+    srcs = [
+        "threading_impl.h",
+        "threading_test.cc",
+    ],
+    deps = [
+        ":synchronization",
+        ":threading",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [

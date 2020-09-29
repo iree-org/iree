@@ -229,6 +229,9 @@ static inline iree_host_size_t iree_math_align(iree_host_size_t value,
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
+#define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
+#define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
+
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities
 //===----------------------------------------------------------------------===//
