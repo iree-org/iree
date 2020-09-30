@@ -71,8 +71,9 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
     return res;
   };
   if (traceDispatchTensors) {
-    builder.create<TensorTraceOp>(regionOp.getLoc(),
-                                  getTensorTypeArgs(newArgs));
+    std::string str = "Input for " + std::string(outlinedFuncOp.getName());
+    builder.create<TensorTraceOp>(regionOp.getLoc(), getTensorTypeArgs(newArgs),
+                                  builder.getStringAttr(str));
   }
 
   // Create the dispatch op to the executable function.
@@ -81,8 +82,10 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
       outlinedFuncOp.getType().getResults(), newArgs);
 
   if (traceDispatchTensors) {
+    std::string str = "Output for " + std::string(outlinedFuncOp.getName());
     builder.create<TensorTraceOp>(regionOp.getLoc(),
-                                  getTensorTypeArgs(dispatchOp.getResults()));
+                                  getTensorTypeArgs(dispatchOp.getResults()),
+                                  builder.getStringAttr(str));
   }
 
   // Replace uses of the existing results with the new results.
