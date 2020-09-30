@@ -26,7 +26,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR

@@ -26,7 +26,7 @@ iree_cc_library(
     "CheckOps.cpp.inc"
   DEPS
     MLIRIR
-    MLIRStandardOps
+    MLIRStandard
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
