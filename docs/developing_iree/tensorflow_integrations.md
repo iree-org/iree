@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: developing-iree/tensorflow-integrations
-title: TensorFlow Integrations and Benchmarking
+title: TensorFlow Integrations
 nav_order: 5
 parent: Developing IREE
 ---
@@ -25,8 +25,8 @@ instructions.
 ## Vulkan Setup
 
 If you do not have your environment setup to use IREE with Vulkan (see
-[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)), 
-then you can run the manual test targets with 
+[this doc](https://google.github.io/iree/get-started/generic-vulkan-env-setup)),
+then you can run the manual test targets with
 `--target_backends=tf,iree_vmla,iree_llvmjit` (that is, by omitting
 `iree_vulkan` from the list of backends to run the tests on).
 
@@ -162,25 +162,37 @@ benchmarking artifacts in `/tmp/iree/modules/`. The location of these artifacts
 can be changed via the `--artifacts_dir` flag. The generated directory structure
 for each module is as follows:
 
-```
+```shell
 /tmp/iree/modules/ModuleName
-├── tf_input.mlir        # MLIR for ModuleName in TF's input dialect
-├── iree_input.mlir      # tf_input.mlir translated to IREE MLIR
-├── iree_backend_name    # e.g. iree_vmla, iree_llvmjit or iree_vulkan
-│   ├── compiled.vmfb    # flatbuffer of ModuleName compiled to this backend
-│   └── traces
-│       ├── trace_1      # Directory storing logs and serialization for each trace
-│       │   └── log.txt  # A more detailed version of the test logs
-│       └── trace_2
-│           └── log.txt
-├── tflite               # If TFLite supports compiling ModuleName
-│   ├── method_1.tflite  # Methods on ModuleName compiled to bytes with TFLite
-│   ├── method_2.tflite
-│   └── traces
-│       └── ...
-└── tf_ref               # Directory storing the tensorflow reference traces
-    └── traces
-        └── ...
+  ├── tf_input.mlir
+  │   # MLIR for ModuleName in TF's input dialect.
+  ├── iree_input.mlir
+  │   # tf_input.mlir translated to IREE MLIR.
+  ├── iree_vmla
+  │   # Or any other IREE backend.
+  │   ├── compiled.vmfb
+  │   │   # A flatbuffer containing IREE's compiled code.
+  │   └── traces
+  │       # Directory with a trace for each unittest in vision_model_test.py.
+  │       ├── trace_function_1
+  │       │   # Directory storing logs and serialization for a specific trace.
+  │       │   │── flagfile
+  │       │   │   # An Abseil flagfile containing arguments
+  │       │   │   # iree-benchmark-module needs to benchmark this trace.
+  │       │   └── log.txt
+  │       │       # A more detailed version of the test logs.
+  │       │── trace_function_2
+  │       └── ...
+  ├── tflite  # If TFLite supports compiling ModuleName.
+  │   ├── method_1.tflite  # Methods on ModuleName compiled to bytes with TFLite
+  │   │   # A method on ModuleName compiled to bytes with TFLite, which can
+  │   │   # be ingested by TFLite's benchmark_model binary.
+  │   ├── method_2.tflite
+  │   └── traces
+  │       └── ...
+  └── tf_ref  # Directory storing the tensorflow reference traces.
+      └── traces
+          └── ...
 ```
 
 Traces for a particular test can be loaded via the `Trace.load(trace_dir)`
@@ -199,36 +211,11 @@ Traces are named after the trace functions defined in their unittests. So in the
 
 ## Benchmarking E2E Modules
 
-Abseil flagfiles containing all of the data that `iree-benchmark-module` needs
-to run are generated for each `Trace` in our E2E tests. This allows for any
-module we test to be easily benchmarked on valid inputs. The process for
-benchmarking a vision model can thus be reduced to the following:
-
-```shell
-# Generate benchmarking artifacts for all vision models:
-bazel test integrations/tensorflow/e2e/keras:vision_external_tests
-
-# Benchmark ResNet50 with cifar10 weights on vmla:
-bazel run iree/tools:iree-benchmark-module -- \
-  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_vmla/traces/predict/flagfile
-
-# Benchmark ResNet50 with cifar10 weights on llvmjit:
-bazel run iree/tools:iree-benchmark-module -- \
-  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_llvmjit/traces/predict/flagfile
-```
-
-Duplicate flags provided after the flagfile will take precedence. For example:
-
-```shell
-bazel run iree/tools:iree-benchmark-module -- \
-  --flagfile=/tmp/iree/modules/ResNet50/cifar10/iree_llvmjit/traces/predict/flagfile  \
-  --input_file=/path/to/custom/compiled.vmfb
-```
-
-Currently, this only supports benchmarking the first module call in a trace. We
-plan to extend this to support benchmarking all of the calls in the trace, and
-also plan to support verifying outputs during the warm-up phase of the
-benchmark.
+We use our end-to-end TensorFlow integrations tests to generate tested
+compilation and benchmarking artifacts. This allows us to validate that our
+benchmarks are behaving as we expect them to, and to run them using valid inputs
+for each model. An overview of how to run benchmarks on IREE and TFLite can be
+found in [this doc](TODO(meadowlark)).
 
 ## Debugging Tests
 
@@ -238,3 +225,15 @@ which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
+
+## Legacy TFLite Compilation
+
+_Please don't use this unless you are forced to._
+
+We support using `tf.compat.v1.lite.TFLiteConverter.from_saved_model` to compile
+older `tf.Module`s with TFLite. This will be used if the `tf.Module` being
+tested has a method named `get_legacy_tflite_saved_model_converter_kwargs`. This
+method must return a dict with the following kwargs: `model_path`,
+`input_arrays`, `output_arrays`, and `exported_name`. The module must use only
+one exported name, and `exported_name` should be equal to that name. See
+`mobile_bert_squad_test.py` for a concrete example.
