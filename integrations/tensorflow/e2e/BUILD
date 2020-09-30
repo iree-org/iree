@@ -65,7 +65,6 @@ TFLITE_FAILING = [
     "dynamic_mlp_test.py",
     "finite_test.py",
     "gather_test.py",
-    "logical_ops_test.py",
     "mandelbrot_test.py",
     "matrix_ops_dynamic_test.py",
     "resource_ops_test.py",
@@ -90,7 +89,6 @@ LLVM_FAILING = [
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "finite_test.py",
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
@@ -108,7 +106,6 @@ VULKAN_FAILING = [
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "finite_test.py",
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
