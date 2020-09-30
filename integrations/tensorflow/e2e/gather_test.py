@@ -49,6 +49,22 @@ class GatherModule(tf.Module):
     return tf.gather(params, indices, axis=2, batch_dims=1)
 
 
+  @tf.function(input_signature=[
+      tf.TensorSpec([4, 7, 8, 2], tf.float32),
+      tf.TensorSpec([4, 1], tf.int32)
+  ])
+  def gather_axis1_batch1(self, params, indices):
+    return tf.gather(params, indices, axis=1, batch_dims=1)
+
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([2, 4], tf.int32),
+      tf.TensorSpec([2, 4], tf.int32)
+  ])
+  def gather_axis2_batch2(self, params, indices):
+    return tf.gather(params, indices, axis=1, batch_dims=1)
+
+
 @tf_test_utils.compile_module(GatherModule)
 class GatherTest(tf_test_utils.TracedModuleTestCase):
 
@@ -87,6 +103,25 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       module.gather_axis2_batch1(params, indices)
 
     self.compare_backends(gather_axis2_batch1)
+
+  def test_gather_axis1_batch1(self):
+
+    def gather_axis1_batch1(module):
+      indices = np.array([[2], [3], [0], [1]], dtype=np.int32)
+      params = tf_utils.ndarange([4, 7, 8, 2])
+      module.gather_axis1_batch1(params, indices)
+
+    self.compare_backends(gather_axis1_batch1)
+
+  def test_gather_axis2_batch2(self):
+
+    def gather_axis2_batch2(module):
+      indices = np.array([[0, 1, 2, 3], [3, 2, 1, 0]], dtype=np.int32)
+      values = np.array([[0, 1, 2, 3], [9, 8, 7, 0]], dtype=np.int32)
+      module.gather_axis2_batch2(values, indices)
+
+    self.compare_backends(gather_axis2_batch2)
+
 
 
 if __name__ == "__main__":
