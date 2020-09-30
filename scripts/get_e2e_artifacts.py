@@ -31,6 +31,19 @@ import utils
 from absl import app
 from absl import flags
 
+SUITE_NAME_TO_TARGET = {
+    'e2e_tests':
+        '//integrations/tensorflow/e2e:e2e_tests',
+    'mobile_bert_squad_tests':
+        '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
+    'keras_tests':
+        '//integrations/tensorflow/e2e/keras:keras_tests',
+    'vision_external_tests':
+        '//integrations/tensorflow/e2e/keras:vision_external_tests',
+}
+SUITES_HELP = [f'`{name}`' for name in SUITE_NAME_TO_TARGET]
+SUITES_HELP = f'{", ".join(SUITES_HELP[:-1])} and {SUITES_HELP[-1]}'
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_bool(
@@ -42,18 +55,8 @@ flags.DEFINE_string(
     'Directory to transfer the benchmarking artifacts to. Defaults to '
     '/tmp/iree/modules/')
 flags.DEFINE_bool('run_test_suites', True, 'Run any specified test suites.')
-flags.DEFINE_list(
-    'test_suites', ['e2e_tests', 'keras_tests', 'vision_external_tests'],
-    'Any combination of `e2e_tests`, `keras_tests`, and `vision_external_tests`')
-
-SUITE_NAME_TO_TARGET = {
-    'e2e_tests':
-        '//integrations/tensorflow/e2e:e2e_tests',
-    'keras_tests':
-        '//integrations/tensorflow/e2e/keras:keras_tests',
-    'vision_external_tests':
-        '//integrations/tensorflow/e2e/keras:vision_external_tests',
-}
+flags.DEFINE_list('test_suites', list(SUITE_NAME_TO_TARGET.keys()),
+                  f'Any combination of {SUITES_HELP}.')
 
 EXPECTED_COLLISIONS = [
     '/tf_ref/', 'tf_input.mlir', 'iree_input.mlir', '/saved_model/'
@@ -135,7 +138,10 @@ def main(argv):
 
   for test_suite in test_suites:
     if FLAGS.run_test_suites and not FLAGS.dry_run:
-      subprocess.check_output(['bazel', 'test', test_suite, '--color=yes'])
+      subprocess.check_output([
+          'bazel', 'test', test_suite, '--color=yes',
+          '--test_arg=--get_saved_model'
+      ])
       print()
 
     # Extract all of the artifacts for this test suite.

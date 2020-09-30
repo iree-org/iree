@@ -204,7 +204,6 @@ def _incrementally_compile_tf_module(
   def _compile_module(module, backend_info, exported_names, artifacts_dir):
     compiler_module = compiler.tf_module_to_compiler_module(module,
                                                             exported_names,
-                                                            sm_path=sm_path,
                                                             pass_pipeline=())
     return _incrementally_lower_compiler_module(compiler_module, backend_info,
                                                 artifacts_dir)
