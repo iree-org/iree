@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -63,7 +64,6 @@ class DepthConv2dModule(tf.Module):
         img, kernel, [1, 1, 1, 1], "SAME", name="result")
 
 
-@tf_test_utils.compile_module(DepthConv2dModule)
 class ConvTest(tf_test_utils.TracedModuleTestCase):
 
   def test_batched_feature_unpadded(self):
@@ -112,7 +112,13 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(batched_feature_padded_same_stride_1_output_1)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(DepthConv2dModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

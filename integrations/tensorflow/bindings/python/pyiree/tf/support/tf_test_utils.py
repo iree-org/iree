@@ -551,7 +551,13 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-def compile_module(
+# Will be initialized by `compile_module`.
+_global_artifacts_dir = None
+_global_ref_module = None
+_global_tar_modules = None
+
+
+def compile_tf_module(
     module_class: Type[tf.Module], exported_names: Sequence[str] = ()
 ) -> Callable[[Any], Any]:
   """CompiledModuleTestCase decorator that compiles a tf.Module.
@@ -565,68 +571,40 @@ def compile_module(
     exported_names: optional iterable of strings representing which of
       module_class's functions to compile. If exported_names is empty all
       functions will be compiled.
-
-  Returns:
-    Class decorator function.
   """
 
-  def decorator(cls):
-    """Decorator Function."""
-    if not issubclass(cls, TracedModuleTestCase):
-      logging.exception(
-          "The 'compile_module' decorator must be applied to a "
-          "TracedModuleTestCase derived class, which %s is not.", cls)
-    cls._module_class = module_class
-    cls._exported_names = exported_names
-    return cls
+  # Setup the directory for saving compilation artifacts and traces.
+  global _global_artifacts_dir
+  _global_artifacts_dir = _setup_artifacts_dir(module_class.__name__)
 
-  return decorator
+  # Get the backend information for this test.
+  ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
+                                          f"{FLAGS.reference_backend}_ref")
+  tar_backend_infos = get_target_backends()
 
+  compile_backend = lambda backend_info: backend_info.compile(
+      module_class, exported_names, _global_artifacts_dir)
 
-# Will be initialized by TracedModuleTestCase.setUpClass
-# Global variables are used because storing the compiler context on the cls
-# causes cleaning up refcounts to fail, and tf.test.TestCase wipes the variables
-# on the class instance (self.*) before each unittest.
-# TODO(#2900): Move these back to class variables when we figure out issues with
-# refcounting.
-_global_ref_module = None
-_global_tar_modules = None
+  global _global_ref_module
+  global _global_tar_modules
+  _global_ref_module = compile_backend(ref_backend_info)
+  _global_tar_modules = [
+      compile_backend(backend_info) for backend_info in tar_backend_infos
+  ]
 
 
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
-  # Will be initialized by the @compile_module decorator.
-  _module_class = None
-  _exported_names = ()
-
-  @classmethod
-  def _compile(cls, backend_info: tf_utils.BackendInfo):
-    return backend_info.compile(cls._module_class, cls._exported_names,
-                                cls._artifacts_dir)
 
   @classmethod
   def setUpClass(cls) -> None:
     # Ran before any of the unit tests.
     super().setUpClass()
-    if cls._module_class is None:
+    if _global_ref_module is None or _global_tar_modules is None:
       raise AttributeError(
-          "setUpClass was called but no module was specified. Specify a module "
-          "to compile via the @tf_test_utils.compile_module decorator.")
-
-    # Setup the directory for saving compilation artifacts and traces.
-    cls._artifacts_dir = _setup_artifacts_dir(cls._module_class.__name__)
-
-    # Get the backend information for this test.
-    ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
-                                            f"{FLAGS.reference_backend}_ref")
-    tar_backend_infos = get_target_backends()
-
-    global _global_ref_module
-    global _global_tar_modules
-    _global_ref_module = cls._compile(ref_backend_info)
-    _global_tar_modules = [
-        cls._compile(backend_info) for backend_info in tar_backend_infos
-    ]
+          "tf.test.main was called before any modules were compiled. Use"
+          "`tf_test_utils.compile_tf_module` in the main function before "
+          "calling tf.test.main")
 
   def setUp(self) -> None:
     # Runs before each unit test.
@@ -674,11 +652,11 @@ class TracedModuleTestCase(tf.test.TestCase):
         failed_backend_indices.append(i)
 
     # Save the results to disk before validating.
-    ref_trace_dir = _get_trace_dir(self._artifacts_dir, ref_trace)
+    ref_trace_dir = _get_trace_dir(_global_artifacts_dir, ref_trace)
     ref_trace.save_plaintext(ref_trace_dir, FLAGS.summarize)
     ref_trace.serialize(ref_trace_dir)
     for tar_trace in tar_traces:
-      tar_trace_dir = _get_trace_dir(self._artifacts_dir, tar_trace)
+      tar_trace_dir = _get_trace_dir(_global_artifacts_dir, tar_trace)
       tar_trace.save_plaintext(tar_trace_dir, FLAGS.summarize)
       tar_trace.serialize(tar_trace_dir)
 

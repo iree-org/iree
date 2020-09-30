@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for ops in the tf.math module that specifically handle logical ops."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -46,7 +47,6 @@ class LogicalOpsModule(tf.Module):
     return tf.math.logical_not(x)
 
 
-@tf_test_utils.compile_module(LogicalOpsModule)
 class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_logical_and(self):
@@ -84,7 +84,13 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(logical_not)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(LogicalOpsModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

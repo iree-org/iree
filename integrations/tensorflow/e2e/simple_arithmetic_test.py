@@ -14,6 +14,7 @@
 # limitations under the License.
 """Several baseline e2e simple arithmetic tests."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -37,7 +38,6 @@ class SimpleArithmeticModule(tf.Module):
     return tf.matmul(a, b)
 
 
-@tf_test_utils.compile_module(SimpleArithmeticModule)
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
   def test_simple_mul(self):
@@ -61,7 +61,13 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(simple_matmul)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(SimpleArithmeticModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test matrix ops."""
 
+from absl import app
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
@@ -55,7 +56,6 @@ class MatrixOpsStaticModule(tf.Module):
     return tf.matmul(lhs, rhs)
 
 
-@tf_test_utils.compile_module(MatrixOpsStaticModule)
 class MatrixOpsStaticTest(tf_test_utils.TracedModuleTestCase):
 
   def test_basic_matmul(self):
@@ -94,7 +94,13 @@ class MatrixOpsStaticTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(matmul_broadcast_singleton_dimension)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(MatrixOpsStaticModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

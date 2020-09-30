@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Test scatter update behavior for tensorflow."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-"""Test scatter update behavior for tensorflow."""
 
 
 class ScatterUpdateModule(tf.Module):
@@ -48,7 +49,6 @@ class ScatterUpdateModule(tf.Module):
     return tf.tensor_scatter_nd_update(tensor, indices, updates)
 
 
-@tf_test_utils.compile_module(ScatterUpdateModule)
 class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
 
   def test_scatter_update_1D(self):
@@ -82,7 +82,13 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(scatter_update_2D_slice)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(ScatterUpdateModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test broadcasting support."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -30,7 +31,6 @@ class BroadcastingModule(tf.Module):
     return lhs + rhs
 
 
-@tf_test_utils.compile_module(BroadcastingModule)
 class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
 
   def test_add_same_shape(self):
@@ -61,7 +61,13 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(add_broadcast_rhs)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(BroadcastingModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

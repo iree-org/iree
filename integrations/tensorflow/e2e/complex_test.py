@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -32,7 +33,6 @@ class ComplexModule(tf.Module):
     return tf.math.real(exp)
 
 
-@tf_test_utils.compile_module(ComplexModule)
 class ComplexTest(tf_test_utils.TracedModuleTestCase):
 
   def test_complex(self):
@@ -45,7 +45,13 @@ class ComplexTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(complex_exp)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(ComplexModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

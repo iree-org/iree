@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -75,7 +76,6 @@ class SlidingWindowModule(tf.Module):
     return self.sw(x)
 
 
-@tf_test_utils.compile_module(SlidingWindowModule, exported_names=["predict"])
 class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
 
   def test_sliding_window(self):
@@ -92,7 +92,13 @@ class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(sliding_window)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(SlidingWindowModule, exported_names=["predict"])
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

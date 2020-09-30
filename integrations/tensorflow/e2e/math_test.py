@@ -14,6 +14,7 @@
 # limitations under the License.
 """Tests for ops in the tf.math module."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -42,7 +43,6 @@ class MathModule(tf.Module):
     return tf.math.mod(x, 2.0)
 
 
-@tf_test_utils.compile_module(MathModule)
 class MathTest(tf_test_utils.TracedModuleTestCase):
 
   def test_abs(self):
@@ -81,7 +81,13 @@ class MathTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(mod)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(MathModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

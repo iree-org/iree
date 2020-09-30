@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test matrix ops."""
 
+from absl import app
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
@@ -43,7 +44,6 @@ class MatrixOpsDynamicModule(tf.Module):
     return tf.matmul(lhs, rhs)
 
 
-@tf_test_utils.compile_module(MatrixOpsDynamicModule)
 class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
 
   def test_matmul_high_rank_batch(self):
@@ -87,7 +87,13 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(matmul_dynamic_rank_broadcasting)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(MatrixOpsDynamicModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

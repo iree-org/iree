@@ -81,7 +81,6 @@ class MobileBertSquad(tf.Module):
     return self.inference_func(**inputs)
 
 
-@tf_test_utils.compile_module(MobileBertSquad, exported_names=["predict"])
 class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):
   """Tests of MobileBertSquad."""
 
@@ -97,8 +96,13 @@ class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(predict)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-
+  tf_test_utils.compile_tf_module(MobileBertSquad, exported_names=["predict"])
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

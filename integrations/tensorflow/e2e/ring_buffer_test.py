@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -31,16 +32,20 @@ class RingBuffer(tf.Module):
 
     # buffer has size [buffer_size, dims]
     # only the first dimension is used for updating buffer in a ring manner
-    self._buffer = tf.Variable(
-        tf.zeros((self._buffer_size,) + dims, dtype=dtype),
-        trainable=False,
-        name="RingBuffer")
+    self._buffer = tf.Variable(tf.zeros((self._buffer_size,) + dims,
+                                        dtype=dtype),
+                               trainable=False,
+                               name="RingBuffer")
     # Size of the data available for reading
-    self._data_size = tf.Variable(
-        0, trainable=False, dtype=tf.int32, name="FramerBuffer/Size")
+    self._data_size = tf.Variable(0,
+                                  trainable=False,
+                                  dtype=tf.int32,
+                                  name="FramerBuffer/Size")
     # The index pointing to the head of the data available for reading
-    self._read_head = tf.Variable(
-        0, trainable=False, dtype=tf.int32, name="FramerBuffer/Head")
+    self._read_head = tf.Variable(0,
+                                  trainable=False,
+                                  dtype=tf.int32,
+                                  name="FramerBuffer/Head")
 
   @property
   def dtype(self):
@@ -82,8 +87,8 @@ class RingBuffer(tf.Module):
     start = tf.math.floormod(
         self._read_head.read_value() + self._data_size.read_value(),
         self._buffer_size)
-    indices = tf.math.floormod(
-        tf.range(start, limit=start + elements_size), self._buffer_size)
+    indices = tf.math.floormod(tf.range(start, limit=start + elements_size),
+                               self._buffer_size)
 
     tf.compat.v1.scatter_update(self._buffer, indices, elements)
 
@@ -118,8 +123,8 @@ class RingBuffer(tf.Module):
       Tensor of elements with shape [length, dims...].
     """
     start = self._read_head + offset
-    indices = tf.math.floormod(
-        tf.range(start, limit=start + length), self._buffer_size)
+    indices = tf.math.floormod(tf.range(start, limit=start + length),
+                               self._buffer_size)
     result = tf.gather(self._buffer, indices)
     if consume:
       self.consume(length, offset)
@@ -148,8 +153,9 @@ class StatefulRingBuffer(tf.keras.layers.Layer):
   def build(self, input_shape):
     super(StatefulRingBuffer, self).build(input_shape)
     buffer_size = self.state_shape[1]
-    self.rb = RingBuffer(
-        buffer_size=buffer_size, dims=(self.state_shape[2],), dtype=tf.float32)
+    self.rb = RingBuffer(buffer_size=buffer_size,
+                         dims=(self.state_shape[2],),
+                         dtype=tf.float32)
 
   def call(self, inputs):
     self.rb.write(inputs)
@@ -177,8 +183,6 @@ class StatefulRingBufferModule(tf.Module):
     return self.rb(x)
 
 
-@tf_test_utils.compile_module(
-    StatefulRingBufferModule, exported_names=["predict"])
 class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
 
   def test_stateful_ringbuffer(self):
@@ -201,7 +205,14 @@ class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(stateful_ringbuffer)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(StatefulRingBufferModule,
+                               exported_names=["predict"])
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

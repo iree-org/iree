@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -65,7 +66,6 @@ class GatherModule(tf.Module):
     return tf.gather(params, indices, axis=1, batch_dims=1)
 
 
-@tf_test_utils.compile_module(GatherModule)
 class GatherTest(tf_test_utils.TracedModuleTestCase):
 
   def test_gather_axis0_scalar(self):
@@ -124,7 +124,13 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
 
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(GatherModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

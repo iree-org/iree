@@ -16,6 +16,7 @@
 # This test is the same as keras_lstm_test, but all shapes are static.
 # This stresses the TensorList lowering more specifically.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -42,7 +43,6 @@ class LstmStaticModule(tf.Module):
             self.m.call)
 
 
-@tf_test_utils.compile_module(LstmStaticModule, exported_names=["predict"])
 class LstmStaticTest(tf_test_utils.TracedModuleTestCase):
 
   def test_lstm(self):
@@ -54,7 +54,13 @@ class LstmStaticTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(predict)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(LstmStaticModule, exported_names=["predict"])
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -28,7 +29,6 @@ class ResourcesOpsModule(tf.Module):
     return self.counter.assign_add(value)
 
 
-@tf_test_utils.compile_module(ResourcesOpsModule)
 class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_add_assign(self):
@@ -39,7 +39,13 @@ class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(add_assign)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(ResourcesOpsModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

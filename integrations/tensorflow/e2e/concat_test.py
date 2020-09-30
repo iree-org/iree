@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test concat op."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -51,7 +52,6 @@ class ConcatOpsModule(tf.Module):
     return tf.concat([a, b], axis=2)
 
 
-@tf_test_utils.compile_module(ConcatOpsModule)
 class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def test_concat_zero_dim(self):
@@ -91,7 +91,13 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(concat2axis)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+  tf_test_utils.compile_tf_module(ConcatOpsModule)
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

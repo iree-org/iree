@@ -135,7 +135,6 @@ class VisionModule(tf.Module):
             self.m.predict)
 
 
-@tf_test_utils.compile_module(VisionModule, exported_names=['predict'])
 class AppTest(tf_test_utils.TracedModuleTestCase):
 
   def test_application(self):
@@ -156,6 +155,7 @@ def main(argv):
   # Override VisionModule's __name__ to be more specific.
   VisionModule.__name__ = os.path.join(FLAGS.model, FLAGS.data)
 
+  tf_test_utils.compile_tf_module(VisionModule, exported_names=['predict'])
   tf.test.main()
 
 

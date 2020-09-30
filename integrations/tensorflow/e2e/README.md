@@ -81,7 +81,10 @@ backend as a source of truth. For example:
 
 ```python
 # Compile a `tf.Module` named `SimpleArithmeticModule` into a `CompiledModule`.
-@tf_test_utils.compile_module(SimpleArithmeticModule)
+# This line goes in the main function before calling `tf.test.main()`, and is
+# here to provide context.
+tf_test_utils.compile_tf_module(SimpleArithmeticModule)
+
 # Inherit from `TracedModuleTestCase`.
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
