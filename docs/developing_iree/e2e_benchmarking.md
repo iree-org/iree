@@ -349,7 +349,7 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
 ```
 
 ```shell
-# Benchmark with TFLite running on GPU
+# Benchmark with TFLite running on GPU.
 adb shell taskset f0 /data/local/tmp/benchmark_model \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
