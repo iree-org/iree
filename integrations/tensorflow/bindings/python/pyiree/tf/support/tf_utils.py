@@ -21,7 +21,7 @@ import os
 import random
 import re
 import tempfile
-from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -183,7 +183,7 @@ def _incrementally_compile_tf_module(
     exported_names: Sequence[str] = (),
     artifacts_dir: str = None,
 ) -> Tuple[compiler.binding.OpaqueBlob, Union[str, None]]:
-  """Compiles a TensorFlow tf.Module and optionally saves compilation artifacts.
+  """Compile a TensorFlow tf.Module and optionally save compilation artifacts.
 
   The module blob this creates is not callable. See IreeCompiledModule for an
   API that returns a module that can be called without any further steps.
@@ -193,7 +193,7 @@ def _incrementally_compile_tf_module(
 
   Args:
     module: A tf.Module.
-    backend_info: BackendInfo with the details for compiling module to IREE.
+    backend_info: BackendInfo with the details for compiling this module.
     exported_names: Optional sequence representing the exported names to keep.
     artifacts_dir: An optional string pointing to where compilation artifacts
       should be saved. No compilation artifacts will be saved if this is not
@@ -204,7 +204,7 @@ def _incrementally_compile_tf_module(
     artifacts_dir is provided.
   """
 
-  def _compile_module(module, exported_names, backend_info, artifacts_dir):
+  def _compile_module(module, backend_info, exported_names, artifacts_dir):
     compiler_module = compiler.tf_module_to_compiler_module(module,
                                                             exported_names,
                                                             pass_pipeline=())
@@ -213,7 +213,45 @@ def _incrementally_compile_tf_module(
 
   _compile_module = _setup_mlir_crash_reproducer(_compile_module, artifacts_dir,
                                                  backend_info.backend_id)
-  return _compile_module(module, exported_names, backend_info, artifacts_dir)
+  return _compile_module(module, backend_info, exported_names, artifacts_dir)
+
+
+def _incrementally_compile_tf_signature_def_saved_model(
+    saved_model_dir: str, saved_model_tags: Set[str],
+    backend_info: "BackendInfo", exported_name: str, artifacts_dir: str):
+  """Compile a SignatureDef SavedModel and optionally save compilation artifacts.
+
+  The module blob this creates is not callable. See IreeCompiledModule for an
+  API that returns a module that can be called without any further steps.
+
+  See _incrementally_lower_compiler_module's docstring for details about which
+  artifacts will be saved.
+
+  Args:
+    module: A tf.Module.
+    backend_info: BackendInfo with the details for compiling the saved model.
+    exported_names: Optional sequence representing the exported names to keep.
+    artifacts_dir: An optional string pointing to where compilation artifacts
+      should be saved. No compilation artifacts will be saved if this is not
+      provided.
+
+  Returns:
+    A compiled IREE module blob and the path to the compiled VM FlatBuffer if
+    artifacts_dir is provided.
+  """
+
+  def _compile_module(saved_model_dir, saved_model_tags, backend_info,
+                      exported_name, artifacts_dir):
+    # Convert the tf_module into raw TF input MLIR.
+    compiler_module = compiler.tf_signature_def_saved_model_to_compiler_module(
+        saved_model_dir, saved_model_tags, [exported_name], pass_pipeline=())
+    return _incrementally_lower_compiler_module(compiler_module, backend_info,
+                                                artifacts_dir)
+
+  _compile_module = _setup_mlir_crash_reproducer(_compile_module, artifacts_dir,
+                                                 backend_info.backend_id)
+  return _compile_module(saved_model_dir, saved_model_tags, backend_info,
+                         exported_name, artifacts_dir)
 
 
 class CompiledModule(object):
@@ -252,7 +290,7 @@ class CompiledModule(object):
 
     Args:
       module_class: The tf.Module subclass to compile.
-      backend_info: BackendInfo with the details for compiling module to IREE.
+      backend_info: BackendInfo with the details for compiling this module.
       exported_names: Optional sequence representing the exported names to keep.
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
@@ -274,6 +312,33 @@ class CompiledModule(object):
       module_instance: The tf.Module instance to compile.
       backend_info: BackendInfo with the details for compiling module to IREE.
       exported_names: Optional sequence representing the exported names to keep.
+      artifacts_dir: An optional string pointing to where compilation artifacts
+        should be saved. No compilation artifacts will be saved if this is not
+        provided.
+    """
+    raise NotImplementedError()
+
+  @classmethod
+  def create_from_signature_def_saved_model(cls,
+                                            saved_model_dir: str,
+                                            saved_model_tags: Set[str],
+                                            module_name: str,
+                                            backend_info: "BackendInfo",
+                                            exported_name: str,
+                                            input_names: Sequence[str],
+                                            output_names: Sequence[str],
+                                            artifacts_dir: str = None):
+    """Compile a SignatureDef SavedModel to the target backend in backend_info.
+
+    Args:
+      saved_model_dir: Directory of the saved model.
+      saved_model_tags: Optional set of tags to use when loading the model.
+      module_name: A name for this compiled module.
+      backend_info: BackendInfo with the details for compiling the saved model.
+      exported_name: A str representing the signature on the saved model to
+        compile.
+      input_names: A sequence of kwargs to feed to the saved model.
+      output_names: A sequence of named outputs to extract from the saved model.
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
@@ -390,6 +455,51 @@ class IreeCompiledModule(CompiledModule):
 
     return cls(module_name, backend_info, compiled_paths, vm_module, config)
 
+  @classmethod
+  def create_from_signature_def_saved_model(cls,
+                                            saved_model_dir: str,
+                                            saved_model_tags: Set[str],
+                                            module_name: str,
+                                            backend_info: "BackendInfo",
+                                            exported_name: str,
+                                            input_names: Sequence[str],
+                                            output_names: Sequence[str],
+                                            artifacts_dir: str = None):
+    """Compile a SignatureDef SavedModel to the target backend in backend_info.
+
+    Args:
+      saved_model_dir: Directory of the saved model.
+      saved_model_tags: Optional set of tags to use when loading the model.
+      module_name: A name for this compiled module.
+      backend_info: BackendInfo with the details for compiling the saved model.
+      exported_name: A str representing the signature on the saved model to
+        compile.
+      input_names: A sequence of kwargs to feed to the saved model.
+      output_names: A sequence of named outputs to extract from the saved model.
+      artifacts_dir: An optional string pointing to where compilation artifacts
+        should be saved. No compilation artifacts will be saved if this is not
+        provided.
+    """
+    del input_names  # Unused.
+    del output_names  # Unused.
+    module_blob, compiled_path = _incrementally_compile_tf_signature_def_saved_model(
+        saved_model_dir, saved_model_tags, backend_info, exported_name,
+        artifacts_dir)
+    vm_module = rt.VmModule.from_flatbuffer(module_blob)
+    config = rt.Config(driver_name=backend_info.driver)
+
+    compiled_path = None
+
+    compiled_paths = None
+    if compiled_path is not None:
+      # IREE bundles every compiled method into the same compiled module :)
+      compiled_paths = collections.defaultdict(lambda: compiled_path)
+
+    if module_name is None:
+      module_name = type(module_instance).__name__
+
+    return cls(module_name, backend_info, compiled_paths, vm_module, config)
+
   def reinitialize(self):
     """Reinitializes all stateful variables."""
     # set_random_seed is not needed here because the model_class.__init__ is not
@@ -441,6 +551,28 @@ class _TfFunctionWrapper(_FunctionWrapper):
                                  check_types=False)
 
 
+def _convert_numpy_args_to_tf_tensor_kwargs(function, input_array_names):
+
+  def decorator(*args):
+    args = [tf.convert_to_tensor(arg) for arg in args]
+    kwargs = dict(zip(input_array_names, args))
+    return function(**kwargs)
+
+  return decorator
+
+
+class SignatureDefSavedModelWrapper(object):
+
+  def __init__(self, saved_model_dir: str, saved_model_tags: Set[str],
+               input_names: Sequence[str], exported_name: str):
+    self.saved_model = tf.saved_model.load(saved_model_dir,
+                                           tags=saved_model_tags)
+    inference_func = self.saved_model.signatures[exported_name]
+    inference_func = _convert_numpy_args_to_tf_tensor_kwargs(
+        inference_func, input_names)
+    self.__setattr__(exported_name, inference_func)
+
+
 class TfCompiledModule(CompiledModule):
   """TensorFlow 'compiled' module.
 
@@ -482,7 +614,7 @@ class TfCompiledModule(CompiledModule):
 
     Args:
       module_class: The tf.Module subclass to compile.
-      backend_info: BackendInfo with the details for compiling module to IREE.
+      backend_info: BackendInfo with the details for compiling this module.
       exported_names: Optional sequence representing the exported names to keep.
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
@@ -491,6 +623,35 @@ class TfCompiledModule(CompiledModule):
     module_name = module_class.__name__
     constructor = module_class
     return cls(module_name, backend_info, constructor, exported_names)
+
+  @classmethod
+  def create_from_signature_def_saved_model(cls,
+                                            saved_model_dir: str,
+                                            saved_model_tags: Set[str],
+                                            module_name: str,
+                                            backend_info: "BackendInfo",
+                                            exported_name: str,
+                                            input_names: Sequence[str],
+                                            output_names: Sequence[str],
+                                            artifacts_dir: str = None):
+    """Compile a SignatureDef SavedModel to the target backend in backend_info.
+
+    Args:
+      saved_model_dir: Directory of the saved model.
+      saved_model_tags: Optional set of tags to use when loading the model.
+      module_name: A name for this compiled module.
+      backend_info: BackendInfo with the details for compiling the saved model.
+      exported_name: A str representing the signature on the saved model to
+        compile.
+      input_names: A sequence of kwargs to feed to the saved model.
+      output_names: A sequence of named outputs to extract from the saved model.
+      artifacts_dir: An optional string pointing to where compilation artifacts
+        should be saved. No compilation artifacts will be saved if this is not
+        provided.
+    """
+    constructor = lambda: SignatureDefSavedModelWrapper(
+        saved_model_dir, saved_model_tags, input_names, exported_name)
+    return cls(module_name, backend_info, constructor, [exported_name])
 
   def reinitialize(self):
     """Reinitializes all stateful variables."""
@@ -530,26 +691,73 @@ def _get_concrete_functions(module_class: Type[tf.Module],
   return functions, exported_names
 
 
-def tf_module_to_tflite_interpreters(
-    module_class: Type[tf.Module],
-    exported_names: Sequence[str] = (),
-    artifacts_dir: str = None
-) -> Tuple[Dict[str, tf.lite.Interpreter], Union[Dict[str, str]], None]:
-  """Compile a tf.Module to TFLite interpreters for each of its methods.
+def tf_module_to_tflite_module_bytes(
+    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
+) -> Dict[str, bytes]:
+  """Compiles a tf.Module's methods with TFLite.
 
   Args:
-    module_class: A tf.Module subclass to compile with TFLite. If module_class
-      has an attr get_legacy_tflite_saved_model_converter_kwargs then it will
-      be compiled using tf.compat.v1.lite. It's best not to use this, however.
+    module_class: A tf.Module subclass to compile with TFLite.
     exported_names: an optional iterable of strings representing which of the
-      module_class's functions should be callable. If exported_names is empty
-      then all functions will be callable.
+      module_class's functions should be compiled. If exported_names is empty
+      then all functions will be compiled.
+
+  Returns:
+    A dict mapping method names to compiled TFLite module bytes.
+  """
+  tflite_modules = []
+  methods, method_names = _get_concrete_functions(module_class, exported_names)
+  for method in methods:
+    converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
+    tflite_modules.append(converter.convert())
+  return dict(method_names, tflite_modules)
+
+
+def tf_signature_def_saved_model_to_tflite_module_bytes(
+    saved_model_dir: str,
+    saved_model_tags: Set[str],
+    exported_name: str,
+    input_names: Sequence[str],
+    output_names: Sequence[str],
+) -> Dict[str, bytes]:
+  """Compiles a SignatureDef SavedModel signature with TFLite.
+
+  Args:
+    saved_model_dir: Directory of the saved model.
+    saved_model_tags: Optional set of tags to use when loading the model.
+    exported_name: A str representing the signature on the saved model to
+      compile.
+    input_names: A sequence of kwargs to feed to the saved model.
+    output_names: A sequence of named outputs to extract from the saved model.
+
+  Returns:
+    A dict mapping the signature name to the compiled TFLite module bytes.
+  """
+  converter = tf.compat.v1.lite.TFLiteConverter.from_saved_model(
+      saved_model_dir,
+      tag_set=saved_model_tags,
+      signature_key=exported_name,
+      input_arrays=input_names,
+      output_arrays=output_names)
+  tflite_module = converter.convert()
+  return dict([[exported_name, tflite_module]])
+
+
+def tflite_module_bytes_to_tflite_interpreters(
+    tflite_module_bytes: Dict[str, bytes],
+    artifacts_dir: str = None
+) -> Tuple[Dict[str, tf.lite.Interpreter], Union[Dict[str, str], None]]:
+  """Compile a dict of TFLite compiled bytes to  TFLite interpreters.
+
+  Args:
+    tflite_module_bytes: A dict mapping method names to compiled TFLite byte
+      strings.
     artifacts_dir: an optional path to save compilation artifacts to.
 
   Returns:
-    A dictionary of function names to TFLite interpreters and a dictionary of
-    function names to compiled tflite graph paths (or None if artifacts_dir)
-    is None.
+    A dictionary mapping method names to TFLite interpreters and a dictionary
+    mapping method names to compiled tflite graph paths (or None if
+    artifacts_dir is None).
   """
   interpreters = dict()
   compiled_paths = None
@@ -560,23 +768,16 @@ def tf_module_to_tflite_interpreters(
     """Save compiled TFLite module bytes and convert into an interpreter."""
     tflite_dir = os.path.join(base_dir, "tflite")
     os.makedirs(tflite_dir, exist_ok=True)
-    tflite_path = os.path.join(tflite_dir, f"{name}.tflite")
+    tflite_path = os.path.join(tflite_dir, f"{method_name}.tflite")
     with open(tflite_path, "wb") as f:
       f.write(tflite_module)
 
-    interpreters[name] = tf.lite.Interpreter(tflite_path)
+    interpreters[method_name] = tf.lite.Interpreter(tflite_path)
     if artifacts_dir is not None:
-      compiled_paths[name] = tflite_path
-
-  # Convert module_class's methods into TFLite module byte-strings.
-  tflite_modules = []
-  functions, names = _get_concrete_functions(module_class, exported_names)
-  for function in functions:
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
-    tflite_modules.append(converter.convert())
+      compiled_paths[method_name] = tflite_path
 
   # Load each of the converted methods above into tf.lite.Interpreters.
-  for name, tflite_module in zip(names, tflite_modules):
+  for method_name, tflite_module in tflite_module_bytes.items():
     if artifacts_dir is None:
       with tempfile.TemporaryDirectory() as base_dir:
         _interpret_bytes(tflite_module, base_dir)
@@ -664,16 +865,50 @@ class TfLiteCompiledModule(CompiledModule):
 
     Args:
       module_class: The tf.Module subclass to compile.
-      backend_info: BackendInfo with the details for compiling module to IREE.
+      backend_info: BackendInfo with the details for compiling this module.
       exported_names: Optional sequence representing the exported names to keep.
       artifacts_dir: An optional string pointing to where compilation artifacts
         should be saved. No compilation artifacts will be saved if this is not
         provided.
     """
     set_random_seed()
-    interpreters, compiled_paths = tf_module_to_tflite_interpreters(
-        module_class, exported_names, artifacts_dir)
+    tflite_module_bytes = tf_module_to_tflite_module_bytes(
+        module_class, exported_names)
+    interpreters, compiled_paths = tflite_module_bytes_to_tflite_interpreters(
+        tflite_module_bytes, artifacts_dir)
     module_name = module_class.__name__
+    return cls(module_name, backend_info, compiled_paths, interpreters)
+
+  @classmethod
+  def create_from_signature_def_saved_model(cls,
+                                            saved_model_dir: str,
+                                            saved_model_tags: Set[str],
+                                            module_name: str,
+                                            backend_info: "BackendInfo",
+                                            exported_name: str,
+                                            input_names: Sequence[str],
+                                            output_names: Sequence[str],
+                                            artifacts_dir: str = None):
+    """Compile a SignatureDef SavedModel to the target backend in backend_info.
+
+    Args:
+      saved_model_dir: Directory of the saved model.
+      saved_model_tags: Optional set of tags to use when loading the model.
+      module_name: A name for this compiled module.
+      backend_info: BackendInfo with the details for compiling the saved model.
+      exported_name: A str representing the signature on the saved model to
+        compile.
+      input_names: A sequence of kwargs to feed to the saved model.
+      output_names: A sequence of named outputs to extract from the saved model.
+      artifacts_dir: An optional string pointing to where compilation artifacts
+        should be saved. No compilation artifacts will be saved if this is not
+        provided.
+    """
+    tflite_module_bytes = tf_signature_def_saved_model_to_tflite_module_bytes(
+        saved_model_dir, saved_model_tags, exported_name, input_names,
+        output_names)
+    interpreters, compiled_paths = tflite_module_bytes_to_tflite_interpreters(
+        tflite_module_bytes, artifacts_dir)
     return cls(module_name, backend_info, compiled_paths, interpreters)
 
   def reinitialize(self):
@@ -760,6 +995,19 @@ class BackendInfo:
     """Creates a 'CompiledModule' for this backend."""
     return self._compiled_module_class.create_from_class(
         module_class, self, exported_names, artifacts_dir)
+
+  def compile_signature_def_saved_model(
+      self,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: str = None) -> CompiledModule:
+    return self._compiled_module_class.create_from_signature_def_saved_model(
+        saved_model_dir, saved_model_tags, module_name, self, exported_name,
+        input_names, output_names, artifacts_dir)
 
   @classmethod
   def get_all_backends(cls) -> Sequence["BackendInfo"]:

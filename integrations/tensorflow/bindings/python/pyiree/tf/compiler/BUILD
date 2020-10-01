@@ -51,6 +51,7 @@ config_setting(
 # See: https://github.com/google/iree/issues/1506
 SAVED_MODEL_TF_RUNTIME_DEPS = [
     "@org_tensorflow//tensorflow/core:ops",
+    "@org_tensorflow//tensorflow/core:tensorflow",
 ] + select({
     ":disable_kernels": [],
     "//conditions:default": [
