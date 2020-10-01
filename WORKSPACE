@@ -271,5 +271,12 @@ maybe(
     path = "third_party/renderdoc_api",
 )
 
+maybe(
+    new_local_repository,
+    name = "com_github_pytorch_cpuinfo",
+    build_file = "build_tools/third_party/cpuinfo/BUILD.overlay",
+    path = "third_party/cpuinfo",
+)
+
 # Bootstrap TensorFlow deps last so that ours can take precedence.
 tf_repositories()

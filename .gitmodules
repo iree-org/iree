@@ -56,3 +56,6 @@
 [submodule "third_party/spirv_cross"]
 	path = third_party/spirv_cross
 	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "third_party/cpuinfo"]
+	path = third_party/cpuinfo
+	url = https://github.com/pytorch/cpuinfo.git
