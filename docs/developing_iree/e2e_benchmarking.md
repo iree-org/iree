@@ -348,6 +348,26 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
   --enable_op_profiling=true
 ```
 
+```shell
+# Benchmark with TFLite running on GPU
+adb shell taskset f0 /data/local/tmp/benchmark_model \
+  --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
+  --warmup_runs=1 \
+  --num_threads=1 \
+  --num_runs=10 \
+  --enable_op_profiling=true \
+  --use_gpu=true
+```
+
+Running benchmark on GPU won't give op profiling. To detailed profiling
+information for GPU you can run the following script:
+
+```shell
+# Op profiling on GPU using OpenCL backend
+sh //tensorflow/lite//delegates/gpu/cl/testing/run_performance_profiling.sh \
+  -m /data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite
+```
+
 Note: You will have to manually specify the TFLite graph that you want to
 benchmark, as the `graph_path` file assumes that the graph has not moved. The
 name of the `.tflite` graph that you need to benchmark _may_ be different from
