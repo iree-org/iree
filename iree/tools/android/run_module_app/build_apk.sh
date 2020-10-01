@@ -32,41 +32,67 @@ echo "===-------------------------------------------==="
 echo ""
 
 print_usage_and_exit() {
-  echo "Usage: $0"
-  echo "       -d <driver>"
-  echo "       -m <input-module-file> "
-  echo "       -e <entry-function> "
-  echo "       -i <input-buffer-file> "
-  echo "       <artifact-directory>"
+  echo "Usage: $0 <artifact-directory> "
+  echo "       --driver <driver>"
+  echo "       --module_file <input-module-file> "
+  echo "       --entry_function <entry-function> "
+  echo "       --inputs_file <input-buffer-file> "
   exit 1
 }
 
-# Parse module invocation options.
-while getopts ':d:m:e:i:' OPTION; do
-  case "${OPTION}" in
-    d)
-      IREE_DRIVER="${OPTARG}"
+while (( "$#" )); do
+  case "$1" in
+    --driver)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_DRIVER=$2
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
       ;;
-    m)
-      IREE_INPUT_MODULE_FILE=$(readlink -f "${OPTARG}")
+    --module_file)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_INPUT_MODULE_FILE=$(readlink -f $2)
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
       ;;
-    e)
-      IREE_ENTRY_FUNCTION="${OPTARG}"
+    --entry_function)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_ENTRY_FUNCTION=$2
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
       ;;
-    i)
-      IREE_INPUT_BUFFER_FILE=$(readlink -f "${OPTARG}")
+    --inputs_file)
+      if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
+        IREE_INPUT_BUFFER_FILE=$(readlink -f $2)
+        shift 2
+      else
+        echo "Error: missing argument for $1" >&2
+        print_usage_and_exit
+      fi
       ;;
-    ?) # Unsupported flags
-      print_usage_and_exit
+    -*|--*=) # Unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # Positional arguments
+      if [[ -z "${IREE_ARTIFACT_ROOT+x}" ]]; then
+        IREE_ARTIFACT_ROOT=$(readlink -f $1)
+      else
+        echo "Error: <artifact-directory> already set to ${IREE_ARTIFACT_ROOT}" >&2
+        print_usage_and_exit
+      fi
+      shift
       ;;
   esac
 done
-shift $((OPTIND -1))
-
-# Parse artifact directory.
-if [[ $# == 1 ]]; then
-  IREE_ARTIFACT_ROOT=$(readlink -f $1)
-fi
 
 if [[ -z "${IREE_ARTIFACT_ROOT}" ]] || [[ -z "${IREE_INPUT_MODULE_FILE}" ]] || \
    [[ -z "${IREE_ENTRY_FUNCTION}" ]] || [[ -z "${IREE_INPUT_BUFFER_FILE}" ]] || \
