@@ -62,7 +62,7 @@
 #include "iree/tools/init_mlir_dialects.h"
 #include "iree/tools/init_targets.h"
 #include "iree/tools/init_xla_dialects.h"
-#include "iree/tools/vm_util.h"
+#include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "llvm/ADT/StringRef.h"

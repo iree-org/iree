@@ -58,7 +58,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::modules::hal
     iree::testing::gtest
-    iree::tools::vm_util
+    iree::tools::utils::vm_util
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
   TESTONLY

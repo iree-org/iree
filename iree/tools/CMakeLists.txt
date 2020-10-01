@@ -14,6 +14,12 @@
 
 # bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
 
+# This need to come first so targets in the android/ directory can depend on it.
+# TODO(#3317): this seems to indicate an issue somewhere regarding dynamic
+# library dependency management.
+add_subdirectory(utils)
+
+add_subdirectory(android)
 add_subdirectory(test)
 
 # Enable compiler targets based on options.
@@ -57,7 +63,6 @@ iree_cc_binary(
   SRCS
     "iree-benchmark-module-main.cc"
   DEPS
-    ::vm_util
     absl::flags
     absl::flags_parse
     absl::flags_usage
@@ -68,6 +73,7 @@ iree_cc_binary(
     iree::base::status
     iree::base::tracing
     iree::modules::hal
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
@@ -97,7 +103,6 @@ iree_cc_binary(
   SRCS
     "iree-run-module-main.cc"
   DEPS
-    ::vm_util
     absl::flags
     absl::strings
     iree::base::file_io
@@ -105,6 +110,7 @@ iree_cc_binary(
     iree::base::status
     iree::base::tracing
     iree::modules::hal
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
     ${IREE_HAL_DRIVER_MODULES}
@@ -329,7 +335,6 @@ if(${IREE_BUILD_COMPILER})
       ::init_mlir_passes_and_dialects
       ::init_targets
       ::init_xla_dialects
-      ::vm_util
       LLVMSupport
       MLIRIR
       MLIRParser
@@ -352,6 +357,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::hal::api
       iree::modules::hal
+      iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
       ${IREE_HAL_DRIVER_MODULES}
@@ -373,43 +379,6 @@ if(${IREE_BUILD_COMPILER} OR CMAKE_CROSSCOMPILING)
     HOSTONLY
   )
 endif()
-
-iree_cc_library(
-  NAME
-    vm_util
-  HDRS
-    "vm_util.h"
-  SRCS
-    "vm_util.cc"
-  DEPS
-    absl::span
-    absl::strings
-    iree::base::file_io
-    iree::base::signature_mangle
-    iree::base::status
-    iree::hal::api
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::ref_cc
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    vm_util_test
-  SRCS
-    "vm_util_test.cc"
-  DEPS
-    ::vm_util
-    iree::base::api
-    iree::hal::api
-    iree::hal::vmla::vmla_driver_module
-    iree::modules::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
-)
 
 if(${IREE_ENABLE_MLIR})
   add_custom_target(IreeFileCheck ALL
