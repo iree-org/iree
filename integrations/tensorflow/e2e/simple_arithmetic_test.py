@@ -40,6 +40,10 @@ class SimpleArithmeticModule(tf.Module):
 
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(SimpleArithmeticTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(SimpleArithmeticModule)
+
   def test_simple_mul(self):
 
     def simple_mul(module):
@@ -48,7 +52,7 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
       c = module.simple_mul(a, b)
       module.simple_mul(a, c)
 
-    self.compare_backends(simple_mul)
+    self.compare_backends(simple_mul, *self._modules)
 
   def test_simple_matmul(self):
 
@@ -58,14 +62,13 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
       b = tf_utils.uniform((3072, 256)) * 1e-3
       module.simple_matmul(a, b)
 
-    self.compare_backends(simple_matmul)
+    self.compare_backends(simple_matmul, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(SimpleArithmeticModule)
   tf.test.main()
 
 

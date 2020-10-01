@@ -78,6 +78,11 @@ class SlidingWindowModule(tf.Module):
 
 class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(SlidingWindowTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(SlidingWindowModule,
+                                                    exported_names=["predict"])
+
   def test_sliding_window(self):
 
     def sliding_window(module):
@@ -89,14 +94,13 @@ class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
       result2 = module.predict(input2)
       # output2 = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
 
-    self.compare_backends(sliding_window)
+    self.compare_backends(sliding_window, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(SlidingWindowModule, exported_names=["predict"])
   tf.test.main()
 
 

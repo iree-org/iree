@@ -465,7 +465,7 @@ class Trace:
             f"--input_file={compiled_path}",
             f"--driver={self.backend_driver}",
             f"--inputs={serialized_inputs}",
-            f"--entry_function={entry_function}"
+            f"--entry_function={entry_function}",
         ]
         with open(os.path.join(trace_dir, "flagfile"), "w") as f:
           f.writelines(line + "\n" for line in flagfile)
@@ -551,12 +551,6 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-# Will be initialized by `compile_module`.
-_global_artifacts_dir = None
-_global_ref_module = None
-_global_tar_modules = None
-
-
 def compile_tf_module(
     module_class: Type[tf.Module], exported_names: Sequence[str] = ()
 ) -> Callable[[Any], Any]:
@@ -574,8 +568,7 @@ def compile_tf_module(
   """
 
   # Setup the directory for saving compilation artifacts and traces.
-  global _global_artifacts_dir
-  _global_artifacts_dir = _setup_artifacts_dir(module_class.__name__)
+  artifacts_dir = _setup_artifacts_dir(module_class.__name__)
 
   # Get the backend information for this test.
   ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
@@ -583,40 +576,30 @@ def compile_tf_module(
   tar_backend_infos = get_target_backends()
 
   compile_backend = lambda backend_info: backend_info.compile(
-      module_class, exported_names, _global_artifacts_dir)
+      module_class, exported_names, artifacts_dir)
 
-  global _global_ref_module
-  global _global_tar_modules
-  _global_ref_module = compile_backend(ref_backend_info)
-  _global_tar_modules = [
+  ref_module = compile_backend(ref_backend_info)
+  tar_modules = [
       compile_backend(backend_info) for backend_info in tar_backend_infos
   ]
+  return ref_module, tar_modules, artifacts_dir
 
 
 class TracedModuleTestCase(tf.test.TestCase):
   """Compiles a tf.Module to multiple backends to test their correctness."""
 
-  @classmethod
-  def setUpClass(cls) -> None:
-    # Ran before any of the unit tests.
-    super().setUpClass()
-    if _global_ref_module is None or _global_tar_modules is None:
-      raise AttributeError(
-          "tf.test.main was called before any modules were compiled. Use"
-          "`tf_test_utils.compile_tf_module` in the main function before "
-          "calling tf.test.main")
-
   def setUp(self) -> None:
     # Runs before each unit test.
     super().setUp()
-    global _global_ref_module
-    global _global_tar_modules
-    _global_ref_module.reinitialize()
-    for module in _global_tar_modules:
+    # self._modules is a tuple of (ref_module, tar_modules, artifacts_dir).
+    self._modules[0].reinitialize()
+    for module in self._modules[1]:
       module.reinitialize()
 
-  def compare_backends(self, trace_function: Callable[[TracedModule],
-                                                      None]) -> None:
+  def compare_backends(self, trace_function: Callable[[TracedModule], None],
+                       ref_module: tf_utils.CompiledModule,
+                       tar_modules: Sequence[tf_utils.CompiledModule],
+                       artifacts_dir: str) -> None:
     """Run the reference and target backends on trace_function and compare them.
 
     Random seeds for tensorflow, numpy and python are set before each invocation
@@ -626,17 +609,17 @@ class TracedModuleTestCase(tf.test.TestCase):
       trace_function: a function accepting a TracedModule as its argument.
     """
     # Create Traces for each backend.
-    ref_trace = Trace(_global_ref_module, trace_function)
+    ref_trace = Trace(ref_module, trace_function)
     tar_traces = [
-        Trace(module, trace_function) for module in _global_tar_modules
+        Trace(module, trace_function) for module in tar_modules
     ]
 
     # Run the traces through trace_function with their associated modules.
     tf_utils.set_random_seed()
-    trace_function(TracedModule(_global_ref_module, ref_trace))
+    trace_function(TracedModule(ref_module, ref_trace))
     if FLAGS.log_all_traces:
       logging.info(ref_trace)
-    for module, trace in zip(_global_tar_modules, tar_traces):
+    for module, trace in zip(tar_modules, tar_traces):
       tf_utils.set_random_seed()
       trace_function(TracedModule(module, trace))
       if FLAGS.log_all_traces:
@@ -652,11 +635,11 @@ class TracedModuleTestCase(tf.test.TestCase):
         failed_backend_indices.append(i)
 
     # Save the results to disk before validating.
-    ref_trace_dir = _get_trace_dir(_global_artifacts_dir, ref_trace)
+    ref_trace_dir = _get_trace_dir(artifacts_dir, ref_trace)
     ref_trace.save_plaintext(ref_trace_dir, FLAGS.summarize)
     ref_trace.serialize(ref_trace_dir)
     for tar_trace in tar_traces:
-      tar_trace_dir = _get_trace_dir(_global_artifacts_dir, tar_trace)
+      tar_trace_dir = _get_trace_dir(artifacts_dir, tar_trace)
       tar_trace.save_plaintext(tar_trace_dir, FLAGS.summarize)
       tar_trace.serialize(tar_trace_dir)
 

@@ -36,6 +36,10 @@ class LinspaceModule(tf.Module):
 
 class LinspaceTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(LinspaceTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(LinspaceModule)
+
   def test_linspace(self):
 
     def linspace(module):
@@ -43,14 +47,13 @@ class LinspaceTest(tf_test_utils.TracedModuleTestCase):
       stop = np.array(12., dtype=np.float32)
       module.linspace(start, stop)
 
-    self.compare_backends(linspace)
+    self.compare_backends(linspace, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(LinspaceModule)
   tf.test.main()
 
 

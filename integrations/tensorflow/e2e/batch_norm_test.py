@@ -42,6 +42,10 @@ class BatchNormModule(tf.Module):
 
 class BatchNormTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(BatchNormTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(BatchNormModule)
+
   def test_batch_norm_inference(self):
 
     def batch_norm_inference(module):
@@ -53,14 +57,13 @@ class BatchNormTest(tf_test_utils.TracedModuleTestCase):
       scale = tf_utils.uniform((16,)) * 1e-3
       module.batch_norm_inference(x, mean, variance, offset, scale)
 
-    self.compare_backends(batch_norm_inference)
+    self.compare_backends(batch_norm_inference, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(BatchNormModule)
   tf.test.main()
 
 

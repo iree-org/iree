@@ -49,6 +49,10 @@ class LogicalOpsModule(tf.Module):
 
 class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(LogicalOpsTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(LogicalOpsModule)
+
   def test_logical_and(self):
 
     def logical_and(module):
@@ -56,7 +60,7 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_and)
+    self.compare_backends(logical_and, *self._modules)
 
   def test_logical_or(self):
 
@@ -65,7 +69,7 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_or)
+    self.compare_backends(logical_or, *self._modules)
 
   def test_logical_xor(self):
 
@@ -74,21 +78,20 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_xor)
+    self.compare_backends(logical_xor, *self._modules)
 
   def test_logical_not(self):
 
     def logical_not(module):
       module.logical_not(np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_not)
+    self.compare_backends(logical_not, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(LogicalOpsModule)
   tf.test.main()
 
 

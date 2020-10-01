@@ -39,8 +39,8 @@ class DynamicMlpModule(tf.Module):
     self.input_dim = input_dim
     self.classes = classes
     self.h1_weights = tf.Variable(tf.random.normal([input_dim, hidden_1_dim]))
-    self.h2_weights = tf.Variable(
-        tf.random.normal([hidden_1_dim, hidden_2_dim]))
+    self.h2_weights = tf.Variable(tf.random.normal([hidden_1_dim,
+                                                    hidden_2_dim]))
     self.out_weights = tf.Variable(tf.random.normal([hidden_2_dim, classes]))
     self.h1_bias = tf.Variable(tf.random.normal([hidden_1_dim]))
     self.h2_bias = tf.Variable(tf.random.normal([hidden_2_dim]))
@@ -48,8 +48,7 @@ class DynamicMlpModule(tf.Module):
 
     # Compile with dynamic batch dim.
     self.predict = tf.function(
-        input_signature=[tf.TensorSpec([None, self.input_dim])])(
-            self.predict)
+        input_signature=[tf.TensorSpec([None, self.input_dim])])(self.predict)
 
   def mlp(self, x):
     layer_1 = tf.sigmoid(tf.add(tf.matmul(x, self.h1_weights), self.h1_bias))
@@ -64,20 +63,24 @@ class DynamicMlpModule(tf.Module):
 
 class DynamicMlpTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(DynamicMlpTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(DynamicMlpModule,
+                                                    exported_names=["predict"])
+
   def test_dynamic_batch(self):
 
     def dynamic_batch(module):
       x = tf_utils.uniform([3, 28 * 28]) * 1e-3
       module.predict(x)
 
-    self.compare_backends(dynamic_batch)
+    self.compare_backends(dynamic_batch, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(DynamicMlpModule, exported_names=["predict"])
   tf.test.main()
 
 

@@ -51,6 +51,10 @@ class ScatterUpdateModule(tf.Module):
 
 class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(ScatterUpdateTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(ScatterUpdateModule)
+
   def test_scatter_update_1D(self):
 
     def scatter_update_1D(module):
@@ -59,7 +63,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([9, 10, 11], dtype=np.int32)
       module.scatter_update_1D(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_1D)
+    self.compare_backends(scatter_update_1D, *self._modules)
 
   def test_scatter_update_2D(self):
 
@@ -69,7 +73,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([2, 5, 8], dtype=np.int32)
       module.scatter_update_2D(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_2D)
+    self.compare_backends(scatter_update_2D, *self._modules)
 
   def test_scatter_update_2D_slice(self):
 
@@ -79,14 +83,13 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([[2, 3, 4]], dtype=np.int32)
       module.scatter_update_2D_slice(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_2D_slice)
+    self.compare_backends(scatter_update_2D_slice, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(ScatterUpdateModule)
   tf.test.main()
 
 

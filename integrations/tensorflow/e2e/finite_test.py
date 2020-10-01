@@ -27,19 +27,22 @@ class FiniteModule(tf.Module):
 
 class FiniteTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(FiniteTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(FiniteModule)
+
   def test_finite(self):
 
     def finite(module):
       module.finite(np.array([0.0, 1.2, -5.0, np.inf], dtype=np.float32))
 
-    self.compare_backends(finite)
+    self.compare_backends(finite, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(FiniteModule)
   tf.test.main()
 
 

@@ -31,19 +31,22 @@ class ResourcesOpsModule(tf.Module):
 
 class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(ResourcesOpsTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(ResourcesOpsModule)
+
   def test_add_assign(self):
 
     def add_assign(module):
       module.add_assign(np.array(9., dtype=np.float32))
 
-    self.compare_backends(add_assign)
+    self.compare_backends(add_assign, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(ResourcesOpsModule)
   tf.test.main()
 
 

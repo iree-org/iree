@@ -36,20 +36,23 @@ class SimpleStatefulModule(tf.Module):
 
 class StatefulTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(StatefulTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(SimpleStatefulModule)
+
   def test_stateful(self):
 
     def get_state(module):
       module.inc_by(np.array(1., dtype=np.float32))
       module.get_state()
 
-    self.compare_backends(get_state)
+    self.compare_backends(get_state, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(SimpleStatefulModule)
   tf.test.main()
 
 

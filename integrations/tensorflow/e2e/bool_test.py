@@ -40,19 +40,23 @@ class MathModule(tf.Module):
 
 class BooleanTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(BooleanTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(MathModule)
+
   def test_constant(self):
 
     def constant(module):
       module.constant()
 
-    self.compare_backends(constant)
+    self.compare_backends(constant, *self._modules)
 
   def test_greater_than(self):
 
     def greater_than(module):
       module.greater_than(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-    self.compare_backends(greater_than)
+    self.compare_backends(greater_than, *self._modules)
 
   def test_logical_and(self):
 
@@ -61,14 +65,13 @@ class BooleanTest(tf_test_utils.TracedModuleTestCase):
           np.array([True, True, False, False], dtype=np.bool),
           np.array([True, False, False, True], dtype=np.bool))
 
-    self.compare_backends(logical_and)
+    self.compare_backends(logical_and, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(MathModule)
   tf.test.main()
 
 

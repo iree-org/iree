@@ -34,6 +34,10 @@ class RangeModule(tf.Module):
 
 class RangeTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(RangeTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(RangeModule)
+
   def test_range(self):
 
     def range(module):
@@ -42,14 +46,13 @@ class RangeTest(tf_test_utils.TracedModuleTestCase):
       delta = np.array(3, dtype=np.float32)
       result = module.range(start, stop, delta)
 
-    self.compare_backends(range)
+    self.compare_backends(range, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(RangeModule)
   tf.test.main()
 
 

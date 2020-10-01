@@ -185,6 +185,11 @@ class StatefulRingBufferModule(tf.Module):
 
 class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(StatefulRingBufferTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(StatefulRingBufferModule,
+                                                    exported_names=["predict"])
+
   def test_stateful_ringbuffer(self):
 
     def stateful_ringbuffer(module):
@@ -202,15 +207,13 @@ class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
       module.predict(input3)
       # output = np.array([[3.0, 4.0]], dtype=np.float32)
 
-    self.compare_backends(stateful_ringbuffer)
+    self.compare_backends(stateful_ringbuffer, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(StatefulRingBufferModule,
-                               exported_names=["predict"])
   tf.test.main()
 
 

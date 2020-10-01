@@ -37,13 +37,17 @@ class ControlFlowModule(tf.Module):
 
 class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(ControlFlowTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(ControlFlowModule)
+
   def test_short_sequence(self):
 
     def short_sequence(module):
       input_array = np.array(9., dtype=np.float32)
       module.collatz(input_array)
 
-    self.compare_backends(short_sequence)
+    self.compare_backends(short_sequence, *self._modules)
 
   def test_long_sequence(self):
 
@@ -51,14 +55,13 @@ class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
       input_array = np.array(178., dtype=np.float32)
       module.collatz(input_array)
 
-    self.compare_backends(long_sequence)
+    self.compare_backends(long_sequence, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(ControlFlowModule)
   tf.test.main()
 
 

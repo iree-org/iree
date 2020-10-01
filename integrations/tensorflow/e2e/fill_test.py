@@ -33,6 +33,10 @@ class FillModule(tf.Module):
 
 class FillTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(FillTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(FillModule)
+
   def test_fill(self):
 
     def fill(module):
@@ -40,14 +44,13 @@ class FillTest(tf_test_utils.TracedModuleTestCase):
       value = np.array(9., dtype=np.float32)
       module.fill(dims, value)
 
-    self.compare_backends(fill)
+    self.compare_backends(fill, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(FillModule)
   tf.test.main()
 
 

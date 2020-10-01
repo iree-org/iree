@@ -33,6 +33,10 @@ class BroadcastToModule(tf.Module):
 
 class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(BroadcastToTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(BroadcastToModule)
+
   def test_scalar_broadcast_to(self):
 
     def scalar_broadcast_to(module):
@@ -40,14 +44,13 @@ class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
       shape = np.array([3, 3], dtype=np.int32)
       result = module.scalar_broadcast_to(x, shape)
 
-    self.compare_backends(scalar_broadcast_to)
+    self.compare_backends(scalar_broadcast_to, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(BroadcastToModule)
   tf.test.main()
 
 

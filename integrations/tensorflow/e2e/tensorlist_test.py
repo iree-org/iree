@@ -51,8 +51,9 @@ class TensorListModule(tf.Module):
   @tf.function(
       input_signature=[tf.TensorSpec([STATIC_SIZE, STATIC_SIZE], tf.float32)])
   def slice_first_element_with_from_tensor_high_rank(self, t):
-    ta = tf.TensorArray(
-        dtype=tf.float32, size=STATIC_SIZE, element_shape=[STATIC_SIZE])
+    ta = tf.TensorArray(dtype=tf.float32,
+                        size=STATIC_SIZE,
+                        element_shape=[STATIC_SIZE])
     ta = ta.unstack(t)
     return ta.read(0)
 
@@ -69,20 +70,24 @@ class TensorListModule(tf.Module):
 
 class TensorListTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, methodName="runTest"):
+    super(TensorListTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(TensorListModule)
+
   def test_identity_through_tensorlist(self):
 
     def identity_through_tensorlist(module):
       module.identity_through_tensorlist(np.array(42., dtype=np.float32))
 
-    self.compare_backends(identity_through_tensorlist)
+    self.compare_backends(identity_through_tensorlist, *self._modules)
 
   def test_add_through_tensorlist(self):
 
     def add_through_tensorlist(module):
-      module.add_through_tensorlist(
-          np.array(42., dtype=np.float32), np.array(43., dtype=np.float32))
+      module.add_through_tensorlist(np.array(42., dtype=np.float32),
+                                    np.array(43., dtype=np.float32))
 
-    self.compare_backends(add_through_tensorlist)
+    self.compare_backends(add_through_tensorlist, *self._modules)
 
   def test_slice_first_element_with_from_tensor(self):
 
@@ -90,7 +95,7 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
       module.slice_first_element_with_from_tensor(
           np.arange(STATIC_SIZE, dtype=np.float32))
 
-    self.compare_backends(slice_first_element_with_from_tensor)
+    self.compare_backends(slice_first_element_with_from_tensor, *self._modules)
 
   def test_slice_first_element_with_from_tensor_high_rank(self):
 
@@ -98,22 +103,22 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
       module.slice_first_element_with_from_tensor_high_rank(
           tf_utils.ndarange([STATIC_SIZE, STATIC_SIZE]))
 
-    self.compare_backends(slice_first_element_with_from_tensor_high_rank)
+    self.compare_backends(slice_first_element_with_from_tensor_high_rank,
+                          *self._modules)
 
   def test_concat_with_tensorlist_stack(self):
 
     def concat_with_tensorlist_stack(module):
-      module.concat_with_tensorlist_stack(
-          np.array(42., dtype=np.float32), np.array(43., dtype=np.float32))
+      module.concat_with_tensorlist_stack(np.array(42., dtype=np.float32),
+                                          np.array(43., dtype=np.float32))
 
-    self.compare_backends(concat_with_tensorlist_stack)
+    self.compare_backends(concat_with_tensorlist_stack, *self._modules)
 
 
 def main(argv):
   del argv  # Unused
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(TensorListModule)
   tf.test.main()
 
 
