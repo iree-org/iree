@@ -363,7 +363,7 @@ Running benchmark on GPU won't give op profiling. To detailed profiling
 information for GPU you can run the following script:
 
 ```shell
-# Op profiling on GPU using OpenCL backend
+# Op profiling on GPU using OpenCL backend.
 sh //tensorflow/lite//delegates/gpu/cl/testing/run_performance_profiling.sh \
   -m /data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite
 ```
