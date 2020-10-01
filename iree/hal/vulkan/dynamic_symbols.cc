@@ -193,6 +193,19 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
 
   // Setup the lookup methods first. The rest of the syms uses these to
   // resolve function pointers.
+#if defined(IREE_PLATFORM_LINUX)
+  // Try to resolve itself could get different address, e.g.,
+  //   0x7f7d31a83960 -> 0x555cf16d5a00
+  // It seems that sometimes there is a bug if we don't use the resolved
+  // vkGetInstanceProcAddr method, see b/169256917.
+  this->vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+      this->vkGetInstanceProcAddr(instance, "vkGetInstanceProcAddr"));
+  if (!this->vkGetInstanceProcAddr) {
+    return UnavailableErrorBuilder(IREE_LOC)
+           << "Required Vulkan function vkGetInstanceProcAddr not available; "
+              "invalid driver handle?";
+  }
+#endif  // IREE_PLATFORM_LINUX
   this->vkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
       this->vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr"));
   if (!this->vkGetDeviceProcAddr) {
