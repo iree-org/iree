@@ -27,7 +27,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRStandardOps
+    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR

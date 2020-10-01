@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCFToStandard
-    MLIRStandardOps
+    MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIRTransforms

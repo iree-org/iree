@@ -22,16 +22,16 @@ iree_cc_library(
   SRCS
     "ModelBuilder.cpp"
   DEPS
-    MLIRAffineOps
+    MLIRAffine
     MLIREDSC
     MLIRGPU
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgTransforms
     MLIRSCF
     MLIRSCFTransforms
     MLIRSPIRV
-    MLIRStandardOps
+    MLIRStandard
     MLIRVector
   PUBLIC
 )
@@ -51,7 +51,7 @@ iree_cc_library(
     MLIRPass
     MLIRSPIRV
     MLIRSPIRVSerialization
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
   PUBLIC
 )

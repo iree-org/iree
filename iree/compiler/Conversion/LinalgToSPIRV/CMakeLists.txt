@@ -42,13 +42,13 @@ iree_cc_library(
     "VectorizeMemref.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
+    MLIRAffine
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRGPU
     MLIRGPUToSPIRVTransforms
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCF
@@ -57,7 +57,7 @@ iree_cc_library(
     MLIRSPIRV
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
-    MLIRStandardOps
+    MLIRStandard
     MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms

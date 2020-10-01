@@ -170,13 +170,13 @@ if(${IREE_BUILD_COMPILER})
       "init_mlir_dialects.h"
       "init_mlir_passes.h"
     DEPS
-      MLIRAffineOps
+      MLIRAffine
       MLIRAffineTransforms
       MLIRGPU
       MLIRGPUToSPIRVTransforms
       MLIRIR
       MLIRLLVMIR
-      MLIRLinalgOps
+      MLIRLinalg
       MLIRLinalgToLLVM
       MLIRLinalgToSPIRVTransforms
       MLIRLinalgTransforms
@@ -188,7 +188,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRV
       MLIRSPIRVTransforms
       MLIRShape
-      MLIRStandardOps
+      MLIRStandard
       MLIRStandardToSPIRVTransforms
       MLIRTransforms
       MLIRVector
