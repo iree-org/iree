@@ -55,7 +55,7 @@ class RuntimeTest(tf.test.TestCase):
               sess, ["bar"], {"baz": sig}, strip_default_attrs=True)
           builder.save()
 
-      module = compiler.tf_load_signature_def_saved_model(
+      module = compiler.tf_signature_def_saved_model_to_compiler_module(
           sm_dir, tags=set(["bar"]), exported_names=["baz"])
 
       module_asm = module.to_asm(large_element_limit=100)
