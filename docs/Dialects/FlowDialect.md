@@ -359,6 +359,12 @@ operation ::= `flow.tensor.trace` attr-dict ($operands^ `:` type($operands))?
 
 Trace point for dispatchable functions.
 
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`trace_info` | ::mlir::StringAttr | string attribute
+
 #### Operands:
 
 | Operand | Description |

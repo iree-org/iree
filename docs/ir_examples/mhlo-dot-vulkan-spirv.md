@@ -4723,7 +4723,7 @@ module {
     vm.import @hal.buffer_view.dims.2(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32) attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.buffer_view.dims.3(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.buffer_view.dims.4(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ...) attributes {sym_visibility = "private"}
+    vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ..., %trace_info : !vm.ref<!iree.byte_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -4916,7 +4916,7 @@ vm.module @module {
   vm.import @hal.buffer_view.dims.2(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32) attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.buffer_view.dims.3(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
   vm.import @hal.buffer_view.dims.4(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
-  vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ...) attributes {sym_visibility = "private"}
+  vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ..., %trace_info : !vm.ref<!iree.byte_buffer>) attributes {sym_visibility = "private"}
   vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
   vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
   vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -5149,7 +5149,7 @@ module {
     vm.import @hal.buffer_view.dims.2(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32) attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.buffer_view.dims.3(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.buffer_view.dims.4(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ...) attributes {sym_visibility = "private"}
+    vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ..., %trace_info : !vm.ref<!iree.byte_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
@@ -5403,7 +5403,7 @@ module {
     vm.import @hal.buffer_view.dims.2(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32) attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.buffer_view.dims.3(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
     vm.import @hal.buffer_view.dims.4(%buffer_view : !vm.ref<!hal.buffer_view>) -> (i32, i32, i32, i32) attributes {nosideeffects, sym_visibility = "private"}
-    vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ...) attributes {sym_visibility = "private"}
+    vm.import @hal.buffer_view.trace(%operands : !vm.ref<!hal.buffer_view> ..., %trace_info : !vm.ref<!iree.byte_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.create(%device : !vm.ref<!hal.device>, %modes : i32, %command_categories : i32) -> !vm.ref<!hal.command_buffer> attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.begin(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
     vm.import @hal.command_buffer.end(%command_buffer : !vm.ref<!hal.command_buffer>) attributes {sym_visibility = "private"}
