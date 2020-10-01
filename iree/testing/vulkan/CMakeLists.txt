@@ -66,7 +66,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal::vulkan::vulkan_driver_module
     iree::modules::hal
-    iree::tools::vm_util
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
   LINKOPTS

@@ -64,7 +64,7 @@ cc_binary(
         "//iree/base:tracing",
         "//iree/modules/hal",
         "//iree/hal/vulkan:vulkan_driver_module",
-        "//iree/tools:vm_util",
+        "//iree/tools/utils:vm_util",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref_cc",

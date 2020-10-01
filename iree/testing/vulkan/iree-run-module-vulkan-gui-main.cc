@@ -24,7 +24,7 @@
 #include "iree/base/main.h"
 #include "iree/base/status.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/tools/vm_util.h"
+#include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
