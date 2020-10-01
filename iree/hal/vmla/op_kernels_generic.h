@@ -524,11 +524,7 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
 template <typename T>
 Status Sort::Execute(absl::Span<const T> src_buffer,
                      absl::Span<int32_t> dst_buffer, ShapeSpan src_shape) {
-  int elements = 1;
-  for (auto dim : src_shape) {
-    elements *= dim;
-  }
-
+  int elements = src_buffer.size();
   const int sort_size = src_shape.back();
 
   for (int i = 0; i < elements; i += sort_size) {
