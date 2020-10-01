@@ -282,8 +282,9 @@ class LowerBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
 // dimension. Then using a torch_index_select the values can be reordered to
 // support arbitrary inputs.
 //
-// Note: At this point only organizes ascending values for a single input.
-// TODO(suderman): support descending support.
+// TODO(suderman): This lowering only covers the case of ascending values, we
+// should support a separate descending value case by having separate
+// SortAscending and SortDescending operations.
 class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
  public:
   using OpRewritePattern::OpRewritePattern;
