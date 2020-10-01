@@ -70,7 +70,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
-    "@sdl2//:SDL2": ["SDL2-static"]
+    "@sdl2//:SDL2": ["SDL2-static"],
+    "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
 }
 
 

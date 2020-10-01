@@ -216,7 +216,8 @@ attributes {nosideeffects}
 
 // Prints out the content of buffers.
 vm.import @buffer_view.trace(
-  %operands : !vm.ref<!hal.buffer_view> ...
+  %operands : !vm.ref<!hal.buffer_view> ...,
+  %trace_info : !vm.ref<!iree.byte_buffer>
 )
 
 //===----------------------------------------------------------------------===//
