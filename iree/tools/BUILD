@@ -285,35 +285,6 @@ iree_cc_binary(
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 
-cc_binary(
-    name = "iree-run-module-vulkan-gui",
-    srcs = ["iree-run-module-vulkan-gui-main.cc"],
-    linkopts = select({
-        "@bazel_tools//src/conditions:windows": [
-            "-SUBSYSTEM:WINDOWS",
-        ],
-        "//conditions:default": [],
-    }),
-    tags = [
-        "manual",
-        "nokokoro",
-    ],
-    deps = [
-        ":vm_util",
-        "//iree/base:init",
-        "//iree/base:main",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/modules/hal",
-        "//iree/testing/vulkan:vulkan_gui_util",
-        "//iree/hal/vulkan:vulkan_driver_module",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-        "//iree/vm:ref_cc",
-        "@com_google_absl//absl/flags:flag",
-    ] + PLATFORM_VULKAN_DEPS,
-)
-
 iree_cc_binary(
     name = "iree-tblgen",
     tags = ["hostonly"],
