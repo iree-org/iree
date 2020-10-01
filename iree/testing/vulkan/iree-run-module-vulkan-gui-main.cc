@@ -101,35 +101,17 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
 
 // Runs the current IREE bytecode module and renders its result to a window
 // using ImGui.
-Status ImGuiRender(iree_hal_device_t* device, iree_vm_context_t* context,
-                   iree_vm_function_t function) {
-  IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
-
-  IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
-  vm::ref<iree_vm_list_t> inputs;
-  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
-    if (!absl::GetFlag(FLAGS_inputs).empty()) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of inputs and inputs_file to be set";
-    }
-    IREE_ASSIGN_OR_RETURN(
-        inputs, ParseToVariantListFromFile(input_descs,
-                                           iree_hal_device_allocator(device),
-                                           absl::GetFlag(FLAGS_inputs_file)));
-  } else {
-    IREE_ASSIGN_OR_RETURN(
-        inputs,
-        ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                           absl::GetFlag(FLAGS_inputs)));
-  }
-
-  IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
+Status RunModuleAndUpdateImGuiWindow(
+    iree_hal_device_t* device, iree_vm_context_t* context,
+    iree_vm_function_t function, const std::string& function_name,
+    const vm::ref<iree_vm_list_t>& inputs,
+    const std::vector<RawSignatureParser::Description>& output_descs,
+    const std::string& window_title) {
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr,
                                            output_descs.size(),
                                            iree_allocator_system(), &outputs));
 
-  std::string function_name = absl::GetFlag(FLAGS_entry_function);
   IREE_LOG(INFO) << "EXEC @" << function_name;
   IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
                                       inputs.get(), outputs.get(),
@@ -140,10 +122,9 @@ Status ImGuiRender(iree_hal_device_t* device, iree_vm_context_t* context,
   IREE_RETURN_IF_ERROR(PrintVariantList(output_descs, outputs.get(), &oss))
       << "printing results";
 
-  inputs.reset();
   outputs.reset();
 
-  ImGui::Begin(absl::GetFlag(FLAGS_module_file).c_str(), /*p_open=*/nullptr,
+  ImGui::Begin(window_title.c_str(), /*p_open=*/nullptr,
                ImGuiWindowFlags_AlwaysAutoResize);
 
   ImGui::Text("Entry function:");
@@ -355,6 +336,37 @@ int iree::IreeMain(int argc, char** argv) {
                  << std::string(main_function_name.data,
                                 main_function_name.size)
                  << "'";
+
+  IREE_CHECK_OK(ValidateFunctionAbi(main_function));
+
+  auto main_function_input_descs = ParseInputSignature(main_function);
+  if (!main_function_input_descs.ok()) {
+    IREE_LOG(FATAL) << main_function_input_descs.status().ToString();
+  }
+  StatusOr<vm::ref<iree_vm_list_t>> main_function_inputs;
+  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_inputs).empty()) {
+      IREE_LOG(FATAL)
+          << "Expected only one of inputs and inputs_file to be set";
+    }
+    main_function_inputs = ParseToVariantListFromFile(
+        *main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
+        absl::GetFlag(FLAGS_inputs_file));
+  } else {
+    main_function_inputs = ParseToVariantList(
+        *main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
+        absl::GetFlag(FLAGS_inputs));
+  }
+  if (!main_function_inputs.ok()) {
+    IREE_LOG(FATAL) << main_function_inputs.status().ToString();
+  }
+
+  auto main_function_output_descs = ParseOutputSignature(main_function);
+  if (!main_function_output_descs.ok()) {
+    IREE_LOG(FATAL) << main_function_output_descs.status().ToString();
+  }
+
+  const std::string& window_title = absl::GetFlag(FLAGS_module_file);
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -395,7 +407,10 @@ int iree::IreeMain(int argc, char** argv) {
     ImGui::NewFrame();
 
     // Custom window.
-    auto status = ImGuiRender(iree_vk_device, iree_context, main_function);
+    auto status = RunModuleAndUpdateImGuiWindow(
+        iree_vk_device, iree_context, main_function, entry_function,
+        main_function_inputs.value(), main_function_output_descs.value(),
+        window_title);
     if (!status.ok()) {
       IREE_LOG(FATAL) << status;
       done = true;
@@ -412,6 +427,8 @@ int iree::IreeMain(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Cleanup
+  main_function_inputs.value().reset();
+
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
   iree_vm_context_release(iree_context);
