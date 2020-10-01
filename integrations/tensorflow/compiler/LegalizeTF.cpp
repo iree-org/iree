@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/Shape/IR/Shape.h"  // from @llvm-project
+#include "mlir/Dialect/Shape/IR/Shape.h"      // from @llvm-project
 #include "mlir/Dialect/StandardOps/IR/Ops.h"  // from @llvm-project
-#include "mlir/Pass/Pass.h"  // from @llvm-project
-#include "mlir/Support/LLVM.h"  // from @llvm-project
+#include "mlir/Pass/Pass.h"                   // from @llvm-project
+#include "mlir/Support/LLVM.h"                // from @llvm-project
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
@@ -43,29 +43,30 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     OwningRewritePatternList canonicalizePatterns;
     for (auto *op : context->getRegisteredOperations())
       op->getCanonicalizationPatterns(canonicalizePatterns, context);
-    
+
     OwningRewritePatternList patterns;
     // Note that the `OperationConverter` orders patterns lexicographically by:
-    // 1) Ascending legalization depth (i.e., minimum number of patterns necessary
+    // 1) Ascending legalization depth (i.e., minimum number of patterns
+    // necessary
     //    to arrive at conversion target).
     // 2) Descending pattern benefit.
     // 3) Order of patterns in `OwningRewritePatternList`.
-    
+
     // Add TF->HLO legalization patterns.
     PopulateLegalizeTfPatterns(context, &patterns);
-    
+
     // Add TF->TF lowering patterns.
     TF::PopulateLoweringTFPatterns(context, &patterns);
-    
+
     // Populate with CHLO->HLO lowerings to account for TF ops legalized to
     // CHLO first.
     chlo::PopulateLegalizeChloToHloPatterns(context, &patterns);
-    
+
     // ConstantLike op is convenient to create splat constants, but is
     // canonicalized to plain HLO constant if statically shaped. Add the
     // canonicalization pattern to pattern list to enable multi-hop lowering.
     chlo::ConstantLikeOp::getCanonicalizationPatterns(patterns, context);
-    
+
     ConversionTarget target(*context);
     target.addIllegalDialect<chlo::HloClientDialect>();
     target.addLegalDialect<MhloDialect>();
@@ -73,24 +74,22 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     target.addLegalDialect<shape::ShapeDialect>();
     target.addLegalOp<CallOp>();
     target.addLegalOp<TensorCastOp>();
-                      
+
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
 
     while (true) {
-      if (failed(applyPartialConversion(op, target, patterns, &unconvertedOps))) {
+      if (failed(
+              applyPartialConversion(op, target, patterns, &unconvertedOps))) {
         signalPassFailure();
       }
 
       if (prevUnconvertedOps == unconvertedOps) break;
 
       prevUnconvertedOps = std::move(unconvertedOps);
-      op.dump();
-      if (failed(applyPatternsAndFoldGreedily(op, canonicalizePatterns))) {            
+      if (failed(applyPatternsAndFoldGreedily(op, canonicalizePatterns))) {
         signalPassFailure();
       }
-
-      op.dump();
     }
   }
 
@@ -117,11 +116,9 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
       llvm::cl::init("INVALID_DEVICE_TYPE")};
 };
 
-
 static PassRegistration<LegalizeTF> pass(
     "iree-xla-legalize-tf", "Legalize from TensorFlow to the XLA dialect");
 
 }  // namespace
 }  // namespace mhlo
 }  // namespace mlir
-
