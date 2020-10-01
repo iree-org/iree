@@ -103,9 +103,6 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
 // using ImGui.
 Status ImGuiRender(iree_hal_device_t* device, iree_vm_context_t* context,
                    iree_vm_function_t function) {
-  ImGui::Begin(absl::GetFlag(FLAGS_module_file).c_str(), /*p_open=*/nullptr,
-               ImGuiWindowFlags_AlwaysAutoResize);
-
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
   IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
@@ -145,6 +142,9 @@ Status ImGuiRender(iree_hal_device_t* device, iree_vm_context_t* context,
 
   inputs.reset();
   outputs.reset();
+
+  ImGui::Begin(absl::GetFlag(FLAGS_module_file).c_str(), /*p_open=*/nullptr,
+               ImGuiWindowFlags_AlwaysAutoResize);
 
   ImGui::Text("Entry function:");
   ImGui::Text(function_name.c_str());
@@ -263,9 +263,6 @@ int iree::IreeMain(int argc, char** argv) {
     check_vk_result(err);
     ImGui_ImplVulkan_DestroyFontUploadObjects();
   }
-
-  // Demo state.
-  bool show_iree_window = true;
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -307,9 +304,9 @@ int iree::IreeMain(int argc, char** argv) {
       IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
   IREE_CHECK_OK(iree_hal_vulkan_driver_create_using_instance(
       options, iree_vk_syms, g_Instance, &iree_vk_driver));
-  // Create a device sharing our VkDevice and queue.
-  // We could also create a separate (possibly low priority) compute queue for
-  // IREE, and/or provide a dedicated transfer queue.
+  // Create a device sharing our VkDevice and queue. This makes capturing with
+  // vendor tools easier because we will have sync compute residing in the
+  // rendered frame.
   iree_hal_vulkan_queue_set_t compute_queue_set;
   compute_queue_set.queue_family_index = g_QueueFamily;
   compute_queue_set.queue_indices = 1 << 0;
@@ -337,16 +334,6 @@ int iree::IreeMain(int argc, char** argv) {
           reinterpret_cast<const uint8_t*>(module_file_or->data()),
           module_file_or->size()},
       iree_allocator_null(), iree_allocator_system(), &bytecode_module));
-  // Query for details about what is in the loaded module.
-  iree_vm_module_signature_t bytecode_module_signature =
-      iree_vm_module_signature(bytecode_module);
-  for (int i = 0; i < bytecode_module_signature.export_function_count; ++i) {
-    iree_string_view_t function_name;
-    iree_vm_function_signature_t function_signature;
-    IREE_CHECK_OK(bytecode_module->get_function(
-        bytecode_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-        /*out_function=*/nullptr, &function_name, &function_signature));
-  }
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* iree_context = nullptr;
@@ -373,9 +360,7 @@ int iree::IreeMain(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Main loop.
   bool done = false;
-  int frame_number = 0;
   while (!done) {
-    frame_number++;
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
