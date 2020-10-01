@@ -56,7 +56,7 @@ class LstmStaticTest(tf_test_utils.TracedModuleTestCase):
       inputs = tf_utils.ndarange(INPUT_SHAPE)
       module.predict(inputs, rtol=1e-5, atol=1e-5)
 
-    self.compare_backends(predict, *self._modules)
+    self.compare_backends(predict, self._modules)
 
 
 def main(argv):

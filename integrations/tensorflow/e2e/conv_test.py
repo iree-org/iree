@@ -113,7 +113,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = np.ones([1, 1, 1, 1], dtype=np.float32)
       module.conv2d_1451x1111_valid(i, k)
 
-    self.compare_backends(id_batch_size_1, *self._modules)
+    self.compare_backends(id_batch_size_1, self._modules)
 
   def test_id_batch_size_2(self):
 
@@ -122,7 +122,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = np.ones([1, 1, 1, 1], dtype=np.float32)
       module.conv2d_2451x1111_valid(i, k)
 
-    self.compare_backends(id_batch_size_2, *self._modules)
+    self.compare_backends(id_batch_size_2, self._modules)
 
   def test_asymmetric_kernel(self):
 
@@ -132,7 +132,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
                    dtype=np.float32).reshape(2, 3, 1, 1)
       module.conv2d_1451x2311_valid(i, k)
 
-    self.compare_backends(asymmetric_kernel, *self._modules)
+    self.compare_backends(asymmetric_kernel, self._modules)
 
   def test_padding(self):
 
@@ -142,7 +142,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
                    dtype=np.float32).reshape(2, 3, 1, 1)
       module.conv2d_1451x2311_same(i, k)
 
-    self.compare_backends(padding, *self._modules)
+    self.compare_backends(padding, self._modules)
 
   def test_batched_padding(self):
 
@@ -152,7 +152,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
                    dtype=np.float32).reshape(2, 3, 1, 1)
       module.conv2d_2451x2311_same(i, k)
 
-    self.compare_backends(batched_padding, *self._modules)
+    self.compare_backends(batched_padding, self._modules)
 
   def test_feature_reduce(self):
 
@@ -161,7 +161,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = np.ones([3, 2, 2, 1], dtype=np.float32)
       module.conv2d_1452x3221_same(i, k)
 
-    self.compare_backends(feature_reduce, *self._modules)
+    self.compare_backends(feature_reduce, self._modules)
 
   def test_feature_inflate(self):
 
@@ -170,7 +170,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([1, 1, 1, 2])
       module.conv2d_1451x1112_same(i, k)
 
-    self.compare_backends(feature_inflate, *self._modules)
+    self.compare_backends(feature_inflate, self._modules)
 
   def test_feature_mix(self):
 
@@ -179,7 +179,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([1, 1, 2, 2])
       module.conv2d_1452x1122_same(i, k)
 
-    self.compare_backends(feature_mix, *self._modules)
+    self.compare_backends(feature_mix, self._modules)
 
   def test_feature_padded(self):
 
@@ -188,7 +188,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([2, 2, 2, 3])
       module.conv2d_1452x2223_same(i, k)
 
-    self.compare_backends(feature_padded, *self._modules)
+    self.compare_backends(feature_padded, self._modules)
 
   def test_feature_unpadded(self):
 
@@ -197,7 +197,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([2, 2, 2, 3])
       module.conv2d_1452x2223_valid(i, k)
 
-    self.compare_backends(feature_unpadded, *self._modules)
+    self.compare_backends(feature_unpadded, self._modules)
 
   def test_batched_feature_unpadded(self):
 
@@ -206,7 +206,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([2, 2, 2, 3])
       module.conv2d_2452x2223_valid(i, k)
 
-    self.compare_backends(batched_feature_unpadded, *self._modules)
+    self.compare_backends(batched_feature_unpadded, self._modules)
 
 
 def main(argv):

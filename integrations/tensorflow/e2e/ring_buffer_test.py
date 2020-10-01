@@ -207,7 +207,7 @@ class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
       module.predict(input3)
       # output = np.array([[3.0, 4.0]], dtype=np.float32)
 
-    self.compare_backends(stateful_ringbuffer, *self._modules)
+    self.compare_backends(stateful_ringbuffer, self._modules)
 
 
 def main(argv):

@@ -47,7 +47,7 @@ class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
       input_array = np.array(9., dtype=np.float32)
       module.collatz(input_array)
 
-    self.compare_backends(short_sequence, *self._modules)
+    self.compare_backends(short_sequence, self._modules)
 
   def test_long_sequence(self):
 
@@ -55,7 +55,7 @@ class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
       input_array = np.array(178., dtype=np.float32)
       module.collatz(input_array)
 
-    self.compare_backends(long_sequence, *self._modules)
+    self.compare_backends(long_sequence, self._modules)
 
 
 def main(argv):

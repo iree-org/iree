@@ -63,7 +63,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([9, 10, 11], dtype=np.int32)
       module.scatter_update_1D(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_1D, *self._modules)
+    self.compare_backends(scatter_update_1D, self._modules)
 
   def test_scatter_update_2D(self):
 
@@ -73,7 +73,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([2, 5, 8], dtype=np.int32)
       module.scatter_update_2D(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_2D, *self._modules)
+    self.compare_backends(scatter_update_2D, self._modules)
 
   def test_scatter_update_2D_slice(self):
 
@@ -83,7 +83,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([[2, 3, 4]], dtype=np.int32)
       module.scatter_update_2D_slice(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_2D_slice, *self._modules)
+    self.compare_backends(scatter_update_2D_slice, self._modules)
 
 
 def main(argv):

@@ -52,7 +52,7 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
       c = module.simple_mul(a, b)
       module.simple_mul(a, c)
 
-    self.compare_backends(simple_mul, *self._modules)
+    self.compare_backends(simple_mul, self._modules)
 
   def test_simple_matmul(self):
 
@@ -62,7 +62,7 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
       b = tf_utils.uniform((3072, 256)) * 1e-3
       module.simple_matmul(a, b)
 
-    self.compare_backends(simple_matmul, *self._modules)
+    self.compare_backends(simple_matmul, self._modules)
 
 
 def main(argv):

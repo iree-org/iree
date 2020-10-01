@@ -105,7 +105,7 @@ class MandelbrotTest(tf_test_utils.TracedModuleTestCase):
       # This is a much more detailed view, so more iterations are needed.
       module.calculate(-0.7436447860, 0.1318252536, 0.0000029336, 400, 3000)
 
-    self.compare_backends(mandelbrot, *self._modules)
+    self.compare_backends(mandelbrot, self._modules)
 
 
 def main(argv):

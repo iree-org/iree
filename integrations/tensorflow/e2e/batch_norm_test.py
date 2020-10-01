@@ -57,7 +57,7 @@ class BatchNormTest(tf_test_utils.TracedModuleTestCase):
       scale = tf_utils.uniform((16,)) * 1e-3
       module.batch_norm_inference(x, mean, variance, offset, scale)
 
-    self.compare_backends(batch_norm_inference, *self._modules)
+    self.compare_backends(batch_norm_inference, self._modules)
 
 
 def main(argv):

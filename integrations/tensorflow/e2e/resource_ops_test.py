@@ -40,7 +40,7 @@ class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
     def add_assign(module):
       module.add_assign(np.array(9., dtype=np.float32))
 
-    self.compare_backends(add_assign, *self._modules)
+    self.compare_backends(add_assign, self._modules)
 
 
 def main(argv):

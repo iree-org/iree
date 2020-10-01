@@ -52,7 +52,7 @@ class LstmTest(tf_test_utils.TracedModuleTestCase):
       inputs = tf_utils.ndarange(INPUT_SHAPE)
       module.predict(inputs)
 
-    self.compare_backends(predict, *self._modules)
+    self.compare_backends(predict, self._modules)
 
 
 def main(argv):

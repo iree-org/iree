@@ -79,7 +79,7 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
     def identity_through_tensorlist(module):
       module.identity_through_tensorlist(np.array(42., dtype=np.float32))
 
-    self.compare_backends(identity_through_tensorlist, *self._modules)
+    self.compare_backends(identity_through_tensorlist, self._modules)
 
   def test_add_through_tensorlist(self):
 
@@ -87,7 +87,7 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
       module.add_through_tensorlist(np.array(42., dtype=np.float32),
                                     np.array(43., dtype=np.float32))
 
-    self.compare_backends(add_through_tensorlist, *self._modules)
+    self.compare_backends(add_through_tensorlist, self._modules)
 
   def test_slice_first_element_with_from_tensor(self):
 
@@ -95,7 +95,7 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
       module.slice_first_element_with_from_tensor(
           np.arange(STATIC_SIZE, dtype=np.float32))
 
-    self.compare_backends(slice_first_element_with_from_tensor, *self._modules)
+    self.compare_backends(slice_first_element_with_from_tensor, self._modules)
 
   def test_slice_first_element_with_from_tensor_high_rank(self):
 
@@ -104,7 +104,7 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
           tf_utils.ndarange([STATIC_SIZE, STATIC_SIZE]))
 
     self.compare_backends(slice_first_element_with_from_tensor_high_rank,
-                          *self._modules)
+                          self._modules)
 
   def test_concat_with_tensorlist_stack(self):
 
@@ -112,7 +112,7 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
       module.concat_with_tensorlist_stack(np.array(42., dtype=np.float32),
                                           np.array(43., dtype=np.float32))
 
-    self.compare_backends(concat_with_tensorlist_stack, *self._modules)
+    self.compare_backends(concat_with_tensorlist_stack, self._modules)
 
 
 def main(argv):

@@ -47,7 +47,7 @@ class LinspaceTest(tf_test_utils.TracedModuleTestCase):
       stop = np.array(12., dtype=np.float32)
       module.linspace(start, stop)
 
-    self.compare_backends(linspace, *self._modules)
+    self.compare_backends(linspace, self._modules)
 
 
 def main(argv):

@@ -55,7 +55,7 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
            [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
       module.print_ids(input_ids)
 
-    self.compare_backends(print_ids, *self._modules)
+    self.compare_backends(print_ids, self._modules)
 
   def test_strings_to_ids(self):
 
@@ -65,7 +65,7 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
            [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
       module.strings_to_ids(input_ids)
 
-    self.compare_backends(strings_to_ids, *self._modules)
+    self.compare_backends(strings_to_ids, self._modules)
 
 
 def main(argv):

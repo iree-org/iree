@@ -74,7 +74,7 @@ class DynamicMlpTest(tf_test_utils.TracedModuleTestCase):
       x = tf_utils.uniform([3, 28 * 28]) * 1e-3
       module.predict(x)
 
-    self.compare_backends(dynamic_batch, *self._modules)
+    self.compare_backends(dynamic_batch, self._modules)
 
 
 def main(argv):

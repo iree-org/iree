@@ -44,7 +44,7 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
       rhs = tf_utils.uniform([4])
       module.add(lhs, rhs)
 
-    self.compare_backends(add_same_shape, *self._modules)
+    self.compare_backends(add_same_shape, self._modules)
 
   def test_add_broadcast_lhs(self):
 
@@ -53,7 +53,7 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
       rhs = tf_utils.uniform([4])
       module.add(lhs, rhs)
 
-    self.compare_backends(add_broadcast_lhs, *self._modules)
+    self.compare_backends(add_broadcast_lhs, self._modules)
 
   def test_add_broadcast_rhs(self):
 
@@ -62,7 +62,7 @@ class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
       rhs = tf_utils.uniform([1])
       module.add(lhs, rhs)
 
-    self.compare_backends(add_broadcast_rhs, *self._modules)
+    self.compare_backends(add_broadcast_rhs, self._modules)
 
 
 def main(argv):

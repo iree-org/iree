@@ -79,7 +79,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       params = tf_utils.ndarange([4, 8])
       module.gather_axis0_scalar(params, indices)
 
-    self.compare_backends(gather_axis0_scalar, *self._modules)
+    self.compare_backends(gather_axis0_scalar, self._modules)
 
   def test_gather_axis0_batch0(self):
 
@@ -88,7 +88,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       params = tf_utils.ndarange([4, 8])
       module.gather_axis0_batch0(params, indices)
 
-    self.compare_backends(gather_axis0_batch0, *self._modules)
+    self.compare_backends(gather_axis0_batch0, self._modules)
 
   def test_gather_axis1_batch0(self):
 
@@ -97,7 +97,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       params = tf_utils.ndarange([4, 7, 8])
       module.gather_axis1_batch0(params, indices)
 
-    self.compare_backends(gather_axis1_batch0, *self._modules)
+    self.compare_backends(gather_axis1_batch0, self._modules)
 
   def test_gather_axis2_batch1(self):
 
@@ -106,7 +106,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       params = tf_utils.ndarange([4, 7, 8, 2])
       module.gather_axis2_batch1(params, indices)
 
-    self.compare_backends(gather_axis2_batch1, *self._modules)
+    self.compare_backends(gather_axis2_batch1, self._modules)
 
   def test_gather_axis1_batch1(self):
 
@@ -115,7 +115,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       params = tf_utils.ndarange([4, 7, 8, 2])
       module.gather_axis1_batch1(params, indices)
 
-    self.compare_backends(gather_axis1_batch1, *self._modules)
+    self.compare_backends(gather_axis1_batch1, self._modules)
 
   def test_gather_axis2_batch2(self):
 
@@ -124,7 +124,7 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
       values = np.array([[0, 1, 2, 3], [9, 8, 7, 0]], dtype=np.int32)
       module.gather_axis2_batch2(values, indices)
 
-    self.compare_backends(gather_axis2_batch2, *self._modules)
+    self.compare_backends(gather_axis2_batch2, self._modules)
 
 
 

@@ -68,7 +68,7 @@ class MatrixOpsStaticTest(tf_test_utils.TracedModuleTestCase):
       module.basic_matmul(tf_utils.uniform([LEFT_DIM, INNER_DIM]),
                           tf_utils.uniform([INNER_DIM, RIGHT_DIM]))
 
-    self.compare_backends(basic_matmul, *self._modules)
+    self.compare_backends(basic_matmul, self._modules)
 
   def test_matmul_lhs_batch(self):
 
@@ -77,7 +77,7 @@ class MatrixOpsStaticTest(tf_test_utils.TracedModuleTestCase):
           tf_utils.uniform([BATCH_DIM, LEFT_DIM, INNER_DIM]),
           tf_utils.uniform([INNER_DIM, RIGHT_DIM]))
 
-    self.compare_backends(matmul_lhs_batch, *self._modules)
+    self.compare_backends(matmul_lhs_batch, self._modules)
 
   def test_matmul_rhs_batch(self):
 
@@ -86,7 +86,7 @@ class MatrixOpsStaticTest(tf_test_utils.TracedModuleTestCase):
           tf_utils.uniform([LEFT_DIM, INNER_DIM]),
           tf_utils.uniform([BATCH_DIM, INNER_DIM, RIGHT_DIM]))
 
-    self.compare_backends(matmul_rhs_batch, *self._modules)
+    self.compare_backends(matmul_rhs_batch, self._modules)
 
   def test_matmul_broadcast_singleton_dimension(self):
 
@@ -95,7 +95,7 @@ class MatrixOpsStaticTest(tf_test_utils.TracedModuleTestCase):
           tf_utils.uniform([1, LEFT_DIM, INNER_DIM]),
           tf_utils.uniform([BATCH_DIM, INNER_DIM, RIGHT_DIM]))
 
-    self.compare_backends(matmul_broadcast_singleton_dimension, *self._modules)
+    self.compare_backends(matmul_broadcast_singleton_dimension, self._modules)
 
 
 def main(argv):

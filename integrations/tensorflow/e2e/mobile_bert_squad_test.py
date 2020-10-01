@@ -98,7 +98,7 @@ class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):
 
       module.predict(input_ids, input_mask, segment_ids, atol=1e0)
 
-    self.compare_backends(predict, *self._modules)
+    self.compare_backends(predict, self._modules)
 
 
 def main(argv):

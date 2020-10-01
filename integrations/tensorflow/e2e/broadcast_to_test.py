@@ -44,7 +44,7 @@ class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
       shape = np.array([3, 3], dtype=np.int32)
       result = module.scalar_broadcast_to(x, shape)
 
-    self.compare_backends(scalar_broadcast_to, *self._modules)
+    self.compare_backends(scalar_broadcast_to, self._modules)
 
 
 def main(argv):

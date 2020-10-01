@@ -87,7 +87,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([2, 2, 2, 3])
       module.conv2d_2452x2423_valid(i, k)
 
-    self.compare_backends(batched_feature_unpadded, *self._modules)
+    self.compare_backends(batched_feature_unpadded, self._modules)
 
   def test_batched_feature_unpadded_same(self):
 
@@ -96,7 +96,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([2, 4, 2, 3])
       module.conv2d_2452x2423_same(i, k)
 
-    self.compare_backends(batched_feature_unpadded_same, *self._modules)
+    self.compare_backends(batched_feature_unpadded_same, self._modules)
 
   def test_batched_feature_unpadded_same_stride_2(self):
 
@@ -106,7 +106,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       module.conv2d_2452x2423_valid_stride_2(i, k)
 
     self.compare_backends(batched_feature_unpadded_same_stride_2,
-                          *self._modules)
+                          self._modules)
 
   def test_batched_feature_padded_same_stride_2(self):
 
@@ -115,7 +115,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       k = tf_utils.ndarange([2, 4, 2, 3])
       module.conv2d_2452x2423_same_stride_2(i, k)
 
-    self.compare_backends(batched_feature_padded_same_stride_2, *self._modules)
+    self.compare_backends(batched_feature_padded_same_stride_2, self._modules)
 
   def test_batched_feature_padded_same_stride_1_output_1(self):
 
@@ -125,7 +125,7 @@ class ConvTest(tf_test_utils.TracedModuleTestCase):
       module.conv2d_2453x2441_same_stride_1(i, k)
 
     self.compare_backends(batched_feature_padded_same_stride_1_output_1,
-                          *self._modules)
+                          self._modules)
 
 
 def main(argv):

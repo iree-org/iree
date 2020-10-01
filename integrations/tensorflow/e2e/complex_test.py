@@ -46,7 +46,7 @@ class ComplexTest(tf_test_utils.TracedModuleTestCase):
       imag = np.array([-1., 0.4], dtype=np.float32)
       module.complex_exp(real, imag)
 
-    self.compare_backends(complex_exp, *self._modules)
+    self.compare_backends(complex_exp, self._modules)
 
 
 def main(argv):

@@ -102,7 +102,7 @@ class ModelTrainTest(tf_test_utils.TracedModuleTestCase):
       # Run one iteration of training step.
       module.train_step(inputs, targets)
 
-    self.compare_backends(train_step, *self._modules)
+    self.compare_backends(train_step, self._modules)
 
 
 if __name__ == "__main__":

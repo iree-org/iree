@@ -36,7 +36,7 @@ class FiniteTest(tf_test_utils.TracedModuleTestCase):
     def finite(module):
       module.finite(np.array([0.0, 1.2, -5.0, np.inf], dtype=np.float32))
 
-    self.compare_backends(finite, *self._modules)
+    self.compare_backends(finite, self._modules)
 
 
 def main(argv):

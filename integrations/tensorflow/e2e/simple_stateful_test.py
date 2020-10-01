@@ -46,7 +46,7 @@ class StatefulTest(tf_test_utils.TracedModuleTestCase):
       module.inc_by(np.array(1., dtype=np.float32))
       module.get_state()
 
-    self.compare_backends(get_state, *self._modules)
+    self.compare_backends(get_state, self._modules)
 
 
 def main(argv):

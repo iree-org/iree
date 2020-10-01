@@ -44,7 +44,7 @@ class FillTest(tf_test_utils.TracedModuleTestCase):
       value = np.array(9., dtype=np.float32)
       module.fill(dims, value)
 
-    self.compare_backends(fill, *self._modules)
+    self.compare_backends(fill, self._modules)
 
 
 def main(argv):

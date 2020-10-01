@@ -94,7 +94,7 @@ class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
       result2 = module.predict(input2)
       # output2 = np.array([[0.0, 0.0], [1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
 
-    self.compare_backends(sliding_window, *self._modules)
+    self.compare_backends(sliding_window, self._modules)
 
 
 def main(argv):

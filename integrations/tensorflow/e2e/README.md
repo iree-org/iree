@@ -107,7 +107,7 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
     # Calls `simple_mul` once for each backend, recording the inputs and outputs
     # to `module` and then comparing them.
-    self.compare_backends(simple_mul, *self._modules)
+    self.compare_backends(simple_mul, self._modules)
 ```
 
 ## Test Suites

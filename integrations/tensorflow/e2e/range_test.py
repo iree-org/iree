@@ -46,7 +46,7 @@ class RangeTest(tf_test_utils.TracedModuleTestCase):
       delta = np.array(3, dtype=np.float32)
       result = module.range(start, stop, delta)
 
-    self.compare_backends(range, *self._modules)
+    self.compare_backends(range, self._modules)
 
 
 def main(argv):
