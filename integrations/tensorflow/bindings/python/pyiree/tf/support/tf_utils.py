@@ -157,8 +157,9 @@ def compile_tf_module(
 
   try:
     # Convert the tf_module into raw TF input MLIR.
-    compiler_module = compiler.tf_module_to_compiler_module(
-        tf_module, exported_names, pass_pipeline=())
+    compiler_module = compiler.tf_module_to_compiler_module(tf_module,
+                                                            exported_names,
+                                                            pass_pipeline=())
 
     if artifacts_dir is not None:
       tf_mlir_path = os.path.join(artifacts_dir, "tf_input.mlir")
@@ -214,15 +215,25 @@ class CompiledModule(object):
     self.backend = self._backend_info.name
     self.backend_driver = self._backend_info.driver
     self.module_name = self._module_class.__name__
-    self.compiled_path = None
+    self.compiled_paths = None
 
   def reinitialize(self):
     """Reinitializes to the initial state of the passed module_class."""
     raise NotImplementedError()
 
-  @staticmethod
-  def supports_cxx_serialization():
-    raise NotImplementedError()
+  def iree_serializable(self):
+    return False
+
+  def tflite_serializable(self):
+    return False
+
+
+def _get_non_inhereted_function_names(cls):
+  """Gets all methods that cls has that its parents don't have."""
+  names = set(dir(cls))
+  for parent in cls.__bases__:
+    names -= set(dir(parent))
+  return list(names)
 
 
 class _FunctionWrapper(object):
@@ -269,7 +280,7 @@ class IreeCompiledModule(CompiledModule):
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
 
     set_random_seed()
-    self._module_blob, self.compiled_path = compile_tf_module(
+    self._module_blob, compiled_path = compile_tf_module(
         tf_module=module_class(),
         backend_infos=[backend_info],
         exported_names=exported_names,
@@ -277,14 +288,26 @@ class IreeCompiledModule(CompiledModule):
     self._module = rt.VmModule.from_flatbuffer(self._module_blob)
     self._config = rt.Config(driver_name=backend_info.driver)
 
+    self.compiled_paths = None
+    if compiled_path is not None:
+      if not len(exported_names):
+        # Get all method names on 'module_class' that aren't on 'tf.Module'.
+        # This doesn't address all possbile scenarios.
+        # TODO(meadowlark): Figure out how to get a list of all of the functions
+        # that this module has access to via `pyiree.rt.system_api.BoundModule`.
+        exported_names = _get_non_inhereted_function_names(module_class)
+      self.compiled_paths = dict([
+          (method, compiled_path) for method in exported_names
+      ])
+
     self.reinitialize()
 
   def reinitialize(self):
     """Reinitializes to the initial state of the passed module_class."""
     # set_random_seed is not needed here because the model_class.__init__ is not
     # called.
-    self._context = rt.SystemContext(
-        modules=[self._module], config=self._config)
+    self._context = rt.SystemContext(modules=[self._module],
+                                     config=self._config)
 
   def __getattr__(self, attr: str) -> _IreeFunctionWrapper:
     # Try to resolve it as a function.
@@ -292,9 +315,8 @@ class IreeCompiledModule(CompiledModule):
     f = m[attr]
     return _IreeFunctionWrapper(self._context, f)
 
-  @staticmethod
-  def supports_cxx_serialization() -> bool:
-    return True
+  def iree_serializable(self) -> bool:
+    return self.compiled_paths is not None
 
 
 def _normalize_numpy(result: np.ndarray):
@@ -326,8 +348,9 @@ class _TfFunctionWrapper(_FunctionWrapper):
     # which is sad).
     if not isinstance(results, tuple):
       results = (results,)
-    return tf.nest.map_structure(
-        self._convert_to_numpy, *results, check_types=False)
+    return tf.nest.map_structure(self._convert_to_numpy,
+                                 *results,
+                                 check_types=False)
 
 
 class TfCompiledModule(CompiledModule):
@@ -372,25 +395,13 @@ class TfCompiledModule(CompiledModule):
           f"The TensorFlow module does not have a callable attr '{attr}'")
     return _TfFunctionWrapper(f)
 
-  @staticmethod
-  def supports_cxx_serialization() -> bool:
-    return False
 
-
-def get_non_inhereted_function_names(cls):
-  """Gets all methods that cls has that its parents don't have."""
-  names = set(dir(cls))
-  for parent in cls.__bases__:
-    names -= set(dir(parent))
-  return list(names)
-
-
-def get_concrete_functions(module_class: Type[tf.Module],
-                           exported_names: Sequence[str] = ()):
+def _get_concrete_functions(module_class: Type[tf.Module],
+                            exported_names: Sequence[str] = ()):
   """Get concrete functions from non-inherited methods or exported_names."""
   if not len(exported_names):
     # Get all method names on 'module_class' that aren't on 'tf.Module'.
-    exported_names = get_non_inhereted_function_names(module_class)
+    exported_names = _get_non_inhereted_function_names(module_class)
   instance = module_class()
   functions = []
   for name in exported_names:
@@ -398,12 +409,31 @@ def get_concrete_functions(module_class: Type[tf.Module],
   return functions, exported_names
 
 
-def compile_to_tflite(module_class: Type[tf.Module],
-                      exported_names: Sequence[str] = (),
-                      artifacts_dir: str = None):
-  """Compile a dict of TFLite interpreters for the methods on module_class."""
-  functions, names = get_concrete_functions(module_class, exported_names)
+def compile_to_tflite(
+    module_class: Type[tf.Module],
+    exported_names: Sequence[str] = (),
+    artifacts_dir: str = None
+) -> Tuple[Dict[str, tf.lite.Interpreter], Union[Dict[str, str]], None]:
+  """Compile a dict of TFLite interpreters for the methods on module_class.
+
+  Args:
+    module_class: A tf.Module subclass to compile with TFLite. If module_class
+      has an attr get_legacy_tflite_saved_model_converter_kwargs then it will
+      be compiled using tf.compat.v1.lite. It's best not to use this, however.
+    exported_names: an optional iterable of strings representing which of the
+      module_class's functions should be callable. If exported_names is empty
+      then all functions will be callable.
+    artifacts_dir: an optional path to save compilation artifacts to.
+
+  Returns:
+    A dictionary of function names to TFLite interpreters and a dictionary of
+    function names to compiled tflite graph paths (or None if artifacts_dir)
+    is None.
+  """
   interpreters = dict()
+  compiled_paths = None
+  if artifacts_dir is not None:
+    compiled_paths = dict()
 
   def _interpret_bytes(tflite_module: bytes, base_dir: str):
     """Save compiled TFLite module bytes and convert into an interpreter."""
@@ -412,19 +442,35 @@ def compile_to_tflite(module_class: Type[tf.Module],
     tflite_path = os.path.join(tflite_dir, f"{name}.tflite")
     with open(tflite_path, "wb") as f:
       f.write(tflite_module)
+
     interpreters[name] = tf.lite.Interpreter(tflite_path)
+    if artifacts_dir is not None:
+      compiled_paths[name] = tflite_path
 
-  for name, function in zip(names, functions):
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
-    tflite_module = converter.convert()
+  tflite_modules = []
+  names = []
+  if hasattr(module_class, "get_legacy_tflite_saved_model_converter_kwargs"):
+    kwargs = module_class.get_legacy_tflite_saved_model_converter_kwargs()
+    converter = tf.compat.v1.lite.TFLiteConverter.from_saved_model(
+        kwargs["model_path"],
+        input_arrays=kwargs["input_arrays"],
+        output_arrays=kwargs["output_arrays"])
+    tflite_modules.append(converter.convert())
+    names.append(kwargs["exported_name"])
+  else:
+    functions, names = _get_concrete_functions(module_class, exported_names)
+    for function in functions:
+      converter = tf.lite.TFLiteConverter.from_concrete_functions([function])
+      tflite_modules.append(converter.convert())
 
+  for name, tflite_module in zip(names, tflite_modules):
     if artifacts_dir is None:
       with tempfile.TemporaryDirectory() as base_dir:
         _interpret_bytes(tflite_module, base_dir)
     else:
       _interpret_bytes(tflite_module, artifacts_dir)
 
-  return interpreters
+  return interpreters, compiled_paths
 
 
 class _TfLiteFunctionWrapper(_FunctionWrapper):
@@ -444,14 +490,31 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
       self._interpreter.set_tensor(detail["index"], arg)
     self._interpreter.invoke()
 
-    # Retrieve and process outputs.
-    outputs = tuple([
-        self._interpreter.get_tensor(detail["index"])
-        for detail in self._interpreter.get_output_details()
-    ])
-    outputs = [_normalize_numpy(output) for output in outputs]
-    if len(outputs) == 1:
-      outputs = outputs[0]
+    # Extract the outputs from the TFLite interpreter.
+    outputs = []
+    is_dict = False
+    for detail in self._interpreter.get_output_details():
+      value = _normalize_numpy(self._interpreter.get_tensor(detail["index"]))
+      name = detail["name"]
+      if name != "Identity":
+        # If the name of any output is "Identity" then we expect the entire
+        # output to be a single array or tuple of arrays.
+        if len(outputs) and not is_dict:
+          raise ValueError(
+              f"Encountered a named output '{name}' after {len(outputs)} "
+              "non-named outputs")
+        is_dict = True
+        outputs.append([name, value])
+      else:
+        outputs.append(value)
+
+    # Process them to match the output of the tf.Module.
+    if not is_dict:
+      outputs = tuple(outputs)
+      if len(outputs) == 1:
+        outputs = outputs[0]
+    else:
+      outputs = dict(outputs)
     return outputs
 
 
@@ -465,8 +528,8 @@ class TfLiteCompiledModule(CompiledModule):
                artifacts_dir: str = None):
     super().__init__(module_class, backend_info, exported_names, artifacts_dir)
     set_random_seed()
-    self._interpreters = compile_to_tflite(module_class, exported_names,
-                                           artifacts_dir)
+    self._interpreters, self.compiled_paths = compile_to_tflite(
+        module_class, exported_names, artifacts_dir)
 
   def reinitialize(self):
     """Reinitializes to the initial state of the passed module_class."""
@@ -480,9 +543,8 @@ class TfLiteCompiledModule(CompiledModule):
           f"The TFLite module does not have an interpreter for '{attr}'")
     return _TfLiteFunctionWrapper(self._interpreters[attr])
 
-  @staticmethod
-  def supports_cxx_serialization() -> bool:
-    return False
+  def tflite_serializable(self) -> bool:
+    return self.compiled_paths is not None
 
 
 class BackendInfo:

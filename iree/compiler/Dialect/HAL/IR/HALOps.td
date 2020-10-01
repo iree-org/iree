@@ -933,7 +933,10 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
     Trace point for dispatchable functions.
   }];
 
-  let arguments = (ins Variadic<HAL_BufferView>:$operands);
+  let arguments = (ins
+    Variadic<HAL_BufferView>:$operands,
+    StrAttr:$trace_info
+  );
 
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }

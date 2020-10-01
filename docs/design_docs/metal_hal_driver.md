@@ -60,6 +60,8 @@ IREE HAL Class                             | Metal Protocol
 [`hal::Semaphore`][hal-semaphore]          | [`MTLSharedEvent`][mtl-shared-event]
 [`hal::Allocator`][hal-allocator]          | N/A
 [`hal::Buffer`][hal-buffer]                | [`MTLBuffer`][mtl-buffer]
+[`hal::Executable`][hal-executable]        | [`MTLLibrary`][mtl-library]
+[`hal::ExecutableCache`][hal-executable-cache] | N/A
 
 In the following subsections, we go over each pair to provide more details.
 
@@ -139,6 +141,22 @@ better memory allocation library, probably by layering the
 
 IREE [`hal::Buffer`][hal-buffer] maps Metal `MTLBuffer`. See
 [Memory Management](#memory-management) for more details.
+
+### Executable
+
+IREE [`hal::Executable`][hal-executable] represents a GPU program archive with
+a driver-defined format. It maps naturally to Metal [`MTLLibrary`][mtl-library].
+An entry point in a `MTLLibrary` is a [`MTLFunction`][mtl-function]. We define
+[`hal::metal::MetalKernelLibrary`][metal-kernel-library] to wrap around a
+`MTLLibrary`, its `MTLFunction`s, and also `MTLComputePipelineState` objects
+constructed from `MTLFunction`s.
+
+### Executable cache
+
+IREE [`hal::ExecutableCache`][hal-executable-cache] is modelling a cache of
+preprared GPU executables for a particular device. At the moment the Metal
+HAL driver does not peforming any cache on GPU programs; it simply reads the
+program from the FlatBuffer and hands it over to Metal driver.
 
 ## Compute Pipeline
 
@@ -223,11 +241,14 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [hal-command-buffer]: https://github.com/google/iree/blob/main/iree/hal/command_buffer.h
 [hal-device]: https://github.com/google/iree/blob/main/iree/hal/device.h
 [hal-driver]: https://github.com/google/iree/blob/main/iree/hal/driver.h
+[hal-executable]: https://github.com/google/iree/blob/main/iree/hal/executable.h
+[hal-executable-cache]: https://github.com/google/iree/blob/main/iree/hal/executable_cache.h
 [hal-semaphore]: https://github.com/google/iree/blob/main/iree/hal/semaphore.h
 [metal-command-queue]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_command_queue.h
 [metal-command-buffer]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_command_buffer.h
 [metal-device]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_device.h
 [metal-driver]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_driver.h
+[metal-kernel-library]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_kernel_library.h
 [metal-shared-event]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_shared_event.h
 [metal-spirv-target]: https://github.com/google/iree/tree/hal-metal/iree/compiler/Dialect/HAL/Target/MetalSPIRV
 [mtl-buffer]: https://developer.apple.com/documentation/metal/mtlbuffer?language=objc
@@ -235,7 +256,9 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [mtl-command-encoder]: https://developer.apple.com/documentation/metal/mtlcommandencoder?language=objc
 [mtl-command-queue]: https://developer.apple.com/documentation/metal/mtlcommandqueue?language=objc
 [mtl-device]: https://developer.apple.com/documentation/metal/mtldevice?language=objc
+[mtl-function]: https://developer.apple.com/documentation/metal/mtlfunction?language=objc
 [mtl-heap]: https://developer.apple.com/documentation/metal/mtlheap?language=objc
+[mtl-library]: https://developer.apple.com/documentation/metal/mtllibrary?language=objc
 [mtl-shared-event]: https://developer.apple.com/documentation/metal/mtlsharedevent?language=objc
 [mtl-storage-mode]: https://developer.apple.com/documentation/metal/mtlstoragemode?language=objc
 [msl-spec]: https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf

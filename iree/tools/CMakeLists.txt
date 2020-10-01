@@ -59,6 +59,8 @@ iree_cc_binary(
   DEPS
     ::vm_util
     absl::flags
+    absl::flags_parse
+    absl::flags_usage
     absl::strings
     benchmark
     iree::base::init
