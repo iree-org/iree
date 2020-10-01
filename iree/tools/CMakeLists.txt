@@ -14,7 +14,9 @@
 
 # bazel_to_cmake: DO NOT EDIT (Special logic is used throughout this file)
 
-# This need to come first so other directories can depend targets in it.
+# This need to come first so targets in the android/ directory can depend on it.
+# TODO(#3317): this seems to indicate an issue somewhere regarding dynamic
+# library dependency management.
 add_subdirectory(utils)
 
 add_subdirectory(android)
