@@ -44,6 +44,7 @@ class StatefulCountingModule(tf.Module):
   def get_count(self):
     return self.count
 
+
 class RandomInitModule(tf.Module):
 
   def __init__(self):
@@ -56,25 +57,15 @@ class RandomInitModule(tf.Module):
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
-  @parameterized.named_parameters([
-      {
-          'testcase_name': 'single_backend',
-          'backend_infos': [tf_utils.BackendInfo('iree_vmla')],
-      },
-      {
-          'testcase_name':
-              'multiple_backends',
-          'backend_infos': [
-              tf_utils.BackendInfo('iree_vmla'),
-              tf_utils.BackendInfo('iree_llvmjit')
-          ],
-      },
-  ])
-  def test_artifact_saving(self, backend_infos):
+  def test_artifact_saving(self):
+    backend_info = tf_utils.BackendInfo('iree_vmla')
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
-      iree_compiled_module, compiled_path = tf_utils.compile_tf_module(
-          tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
+      iree_compiled_module, compiled_path = (
+          tf_utils._incrementally_compile_tf_module(
+              tf_module,
+              backend_info=backend_info,
+              artifacts_dir=artifacts_dir))
 
       artifacts_to_check = [
           'tf_input.mlir',
@@ -120,7 +111,6 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual('2xi32=1 2', tf_utils.save_input_values(inputs))
     inputs = [np.array([1, 2], dtype=np.float32)]
     self.assertEqual('2xf32=1.0 2.0', tf_utils.save_input_values(inputs))
-
 
   @parameterized.named_parameters([
       {
