@@ -36,7 +36,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRSideEffectInterfaces
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     MLIRTranslation
@@ -58,7 +58,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRParser
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     iree::compiler::Dialect::VM::Conversion

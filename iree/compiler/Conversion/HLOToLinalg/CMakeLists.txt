@@ -28,11 +28,11 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass
     MLIRSPIRV
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     iree::compiler::Conversion::CodegenUtils

@@ -35,9 +35,9 @@ iree_cc_library(
     LLVMSupport
     LLVMX86AsmParser
     LLVMX86CodeGen
-    MLIRAffineOps
+    MLIRAffine
     MLIRLLVMIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRSCF
     MLIRTargetLLVMIR
     MLIRVector

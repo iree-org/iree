@@ -27,10 +27,10 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
+    MLIRAffine
     MLIRGPU
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRParser
     MLIRSPIRV
     MLIRSPIRVSerialization

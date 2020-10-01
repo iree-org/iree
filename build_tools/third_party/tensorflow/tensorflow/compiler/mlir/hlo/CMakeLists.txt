@@ -79,7 +79,7 @@ external_cc_library(
     MLIRPass
     MLIRShape
     MLIRSideEffectInterfaces
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     MLIRTransformUtils

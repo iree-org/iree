@@ -21,6 +21,7 @@
 #  "@com_google_absl//absl/"
 #  "@bazel_skylib//"
 #  "@com_google_benchmark//"
+#  "@com_github_pytorch_cpuinfo//"
 #  "@com_github_google_flatbuffers//"
 #  "@com_github_dvidelabs_flatcc//"
 #  "@com_google_googletest//"

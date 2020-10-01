@@ -34,7 +34,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRIR
     MLIRPass
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
