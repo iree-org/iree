@@ -17,6 +17,7 @@
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/TableGenBackend.h"
 #include "mlir/TableGen/Attribute.h"
+#include "mlir/TableGen/CodeGenHelpers.h"
 #include "mlir/TableGen/GenInfo.h"
 #include "mlir/TableGen/Operator.h"
 
@@ -48,7 +49,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
     if (encodingExprs.empty()) continue;
 
     Operator op(def);
-    Operator::NamespaceEmitter emitter(os, op);
+    tblgen::NamespaceEmitter emitter(os, op.getDialect());
     os << formatv(
         "LogicalResult {0}::encode(SymbolTable &syms, VMFuncEncoder &e) {{\n",
         op.getCppClassName());

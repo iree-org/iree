@@ -45,3 +45,16 @@ func @finite(%arg0 : tensor<4xf32>) -> tensor<4xi1> attributes { sym_visibility 
   // CHECK-NEXT: return %[[BUF]]
   return %0 : tensor<4xi1>
 }
+
+// -----
+
+// CHECK-LABEL: @not
+func @not(%arg0 : tensor<4xi8>) -> tensor<4xi8> attributes { sym_visibility = "private" } {
+  // CHECK-NEXT: %[[BUF_SZ:.+]] = constant 4
+  // CHECK-NEXT: %[[BUF:.+]] = vmla.buffer.alloc byte_length = %[[BUF_SZ]] : !vmla.buffer
+  // CHECK-NEXT: vmla.not %arg0, out %[[BUF]] : i8
+  %0 = "mhlo.not"(%arg0) : (tensor<4xi8>) -> tensor<4xi8>
+  // CHECK-NEXT: return %[[BUF]]
+  return %0 : tensor<4xi8>
+}
+

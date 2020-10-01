@@ -426,10 +426,9 @@ class HALModuleState final {
   }
 
   Status BufferViewTrace(
-      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views) {
-    // TODO(hanchung): Have better information for each dump, eg, having StrAttr
-    // for each trace event so we can map the dump to dispatch functions easier.
-    fprintf(stderr, "=== DEBUG DUMP ===\n");
+      absl::Span<const vm::ref<iree_hal_buffer_view_t>> buffer_views,
+      absl::string_view trace_info) {
+    fprintf(stderr, "=== %s ===\n", std::string(trace_info).c_str());
     for (auto& view : buffer_views) {
       std::string result_str(4096, '\0');
       iree_status_t status;
