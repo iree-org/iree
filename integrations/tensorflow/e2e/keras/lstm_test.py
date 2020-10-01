@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -31,17 +32,19 @@ class LstmModule(tf.Module):
     super(LstmModule, self).__init__()
     tf_utils.set_random_seed()
     inputs = tf.keras.layers.Input(batch_size=None, shape=DYNAMIC_SHAPE[1:])
-    outputs = tf.keras.layers.LSTM(
-        units=NUM_UNITS, return_sequences=True)(
-            inputs)
+    outputs = tf.keras.layers.LSTM(units=NUM_UNITS,
+                                   return_sequences=True)(inputs)
     self.m = tf.keras.Model(inputs, outputs)
     self.predict = tf.function(
-        input_signature=[tf.TensorSpec(DYNAMIC_SHAPE, tf.float32)])(
-            self.m.call)
+        input_signature=[tf.TensorSpec(DYNAMIC_SHAPE, tf.float32)])(self.m.call)
 
 
-@tf_test_utils.compile_module(LstmModule, exported_names=["predict"])
 class LstmTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(LstmTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(LstmModule,
+                                                    exported_names=["predict"])
 
   def test_lstm(self):
 
@@ -49,10 +52,16 @@ class LstmTest(tf_test_utils.TracedModuleTestCase):
       inputs = tf_utils.ndarange(INPUT_SHAPE)
       module.predict(inputs)
 
-    self.compare_backends(predict)
+    self.compare_backends(predict, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
+
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

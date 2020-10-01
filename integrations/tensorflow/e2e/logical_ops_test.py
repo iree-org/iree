@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for ops in the tf.math module that specifically handle logical ops."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -46,8 +47,11 @@ class LogicalOpsModule(tf.Module):
     return tf.math.logical_not(x)
 
 
-@tf_test_utils.compile_module(LogicalOpsModule)
 class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(LogicalOpsTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(LogicalOpsModule)
 
   def test_logical_and(self):
 
@@ -56,7 +60,7 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_and)
+    self.compare_backends(logical_and, self._modules)
 
   def test_logical_or(self):
 
@@ -65,7 +69,7 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_or)
+    self.compare_backends(logical_or, self._modules)
 
   def test_logical_xor(self):
 
@@ -74,17 +78,22 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_xor)
+    self.compare_backends(logical_xor, self._modules)
 
   def test_logical_not(self):
 
     def logical_not(module):
       module.logical_not(np.array([0, 1, 1, 0], dtype=np.bool))
 
-    self.compare_backends(logical_not)
+    self.compare_backends(logical_not, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

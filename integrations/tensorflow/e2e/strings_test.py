@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import string
@@ -40,8 +41,11 @@ class StringsModule(tf.Module):
     return tf.strings.reduce_join(wps, 1)
 
 
-@tf_test_utils.compile_module(StringsModule)
 class StringsTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(StringsTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(StringsModule)
 
   def test_print_ids(self):
 
@@ -51,7 +55,7 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
            [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
       module.print_ids(input_ids)
 
-    self.compare_backends(print_ids)
+    self.compare_backends(print_ids, self._modules)
 
   def test_strings_to_ids(self):
 
@@ -61,10 +65,15 @@ class StringsTest(tf_test_utils.TracedModuleTestCase):
            [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
       module.strings_to_ids(input_ids)
 
-    self.compare_backends(strings_to_ids)
+    self.compare_backends(strings_to_ids, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

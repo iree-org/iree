@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test concat op."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -51,8 +52,11 @@ class ConcatOpsModule(tf.Module):
     return tf.concat([a, b], axis=2)
 
 
-@tf_test_utils.compile_module(ConcatOpsModule)
 class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(ConcatOpsTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(ConcatOpsModule)
 
   def test_concat_zero_dim(self):
 
@@ -61,7 +65,7 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
       b = tf_utils.uniform([1, 5, 1])
       module.concat_zero_dim(a, b)
 
-    self.compare_backends(concat_zero_dim)
+    self.compare_backends(concat_zero_dim, self._modules)
 
   def test_concat0axis(self):
 
@@ -70,7 +74,7 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
       b = tf_utils.uniform([1, 5, 1])
       module.concat0axis(a, b)
 
-    self.compare_backends(concat0axis)
+    self.compare_backends(concat0axis, self._modules)
 
   def test_concat1axis(self):
 
@@ -79,7 +83,7 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
       b = tf_utils.uniform([1, 5, 1])
       module.concat1axis(a, b)
 
-    self.compare_backends(concat1axis)
+    self.compare_backends(concat1axis, self._modules)
 
   def test_concat2axis(self):
 
@@ -88,10 +92,15 @@ class ConcatOpsTest(tf_test_utils.TracedModuleTestCase):
       b = tf_utils.uniform([1, 5, 1])
       module.concat2axis(a, b)
 
-    self.compare_backends(concat2axis)
+    self.compare_backends(concat2axis, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)
