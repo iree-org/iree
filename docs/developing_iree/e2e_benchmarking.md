@@ -364,7 +364,7 @@ information for GPU you can run the following script:
 
 ```shell
 # Op profiling on GPU using OpenCL backend.
-sh //tensorflow/lite//delegates/gpu/cl/testing/run_performance_profiling.sh \
+sh tensorflow/lite/delegates/gpu/cl/testing/run_performance_profiling.sh \
   -m /data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite
 ```
 
