@@ -39,7 +39,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRSideEffectInterfaces
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     iree::compiler::Dialect::IREE::IR

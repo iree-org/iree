@@ -23,7 +23,7 @@ iree_cc_library(
     "ConvertToHAL.cpp"
   DEPS
     MLIRIR
-    MLIRStandardOps
+    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR

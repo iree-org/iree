@@ -28,9 +28,9 @@ iree_cc_library(
   DEPS
     LLVMCore
     LLVMSupport
-    MLIRAffineOps
+    MLIRAffine
     MLIRLLVMIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRSCF
     MLIRTargetLLVMIR
     MLIRVector

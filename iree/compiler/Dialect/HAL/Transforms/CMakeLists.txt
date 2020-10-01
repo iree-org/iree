@@ -34,7 +34,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     absl::strings

@@ -141,7 +141,7 @@ iree_cc_binary(
     MLIRGPUToSPIRVTransforms
     MLIRGPUToVulkanTransforms
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRParser
@@ -179,7 +179,7 @@ iree_cc_binary(
     MLIRGPU
     MLIRGPUToVulkanTransforms
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRParser
@@ -216,7 +216,7 @@ iree_cc_binary(
     MLIRGPU
     MLIRGPUToVulkanTransforms
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRParser
