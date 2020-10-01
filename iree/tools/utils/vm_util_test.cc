@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/tools/vm_util.h"
+#include "iree/tools/utils/vm_util.h"
 
 #include <sstream>
 
