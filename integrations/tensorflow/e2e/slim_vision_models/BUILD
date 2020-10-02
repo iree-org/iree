@@ -59,7 +59,8 @@ iree_slim_vision_test_suite(
         "iree_vulkan",
     ],
     failing_configurations = [
-        {   # Failing all but tf and vmla:
+        {
+            # Failing all but tf and vmla:
             "model_tags": [
                 "inception_resnet_v2",
                 # tflite: RuntimeError: tensorflow/lite/kernels/reshape.cc:66 num_input_elements != num_output_elements (38400 != -1571481807)Node number 333 (RESHAPE) failed to prepare.
@@ -80,7 +81,8 @@ iree_slim_vision_test_suite(
                 "iree_vulkan",
             ],
         },
-        {   # Failing llvmjit and vulkan:
+        {
+            # Failing llvmjit and vulkan:
             "model_tags": [
                 "inception_v2",
                 # llvmjit: double free or corruption (!prev); *** Received signal 6 ***
@@ -99,7 +101,7 @@ iree_slim_vision_test_suite(
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
-        }
+        },
     ],
     model_tags = [
         "inception_resnet_v2",  # *** Received signal 6 ***
@@ -161,7 +163,8 @@ iree_slim_vision_test_suite(
         "iree_vulkan",
     ],
     failing_configurations = [
-        {   # Failing on all backends:
+        {
+            # Failing on all backends:
             "model_tags": [
                 "amoebanet_a_n18_f448",
                 "mobilenet_v2_035_128",
