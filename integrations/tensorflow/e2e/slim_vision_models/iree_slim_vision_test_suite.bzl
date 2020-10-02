@@ -23,6 +23,7 @@ def iree_slim_vision_test_suite(
         backends,
         reference_backend,
         failing_configurations = None,
+        tf_hub_url = None,
         tags = None,
         deps = None,
         size = "large",
@@ -49,6 +50,8 @@ def iree_slim_vision_test_suite(
         an iterable of dictionaries with the keys `models` and `backends`. Each
         key points to a string or iterable of strings specifying a set of models
         and backends that are failing.
+      tf_hub_url:
+        a string pointing to the TF Hub base url of the models to test.
       tags:
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
@@ -94,6 +97,7 @@ def iree_slim_vision_test_suite(
 
             args = [
                 "--model={}".format(model),
+                "--tf_hub_url={}".format(tf_hub_url),
                 "--reference_backend={}".format(reference_backend),
                 "--target_backends={}".format(backend),
             ]

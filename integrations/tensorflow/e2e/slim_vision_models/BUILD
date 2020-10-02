@@ -147,6 +147,7 @@ iree_slim_vision_test_suite(
         "nokokoro",
         "notap",
     ],
+    tf_hub_url = "https://tfhub.dev/google/imagenet/",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
@@ -225,6 +226,7 @@ iree_slim_vision_test_suite(
         "nokokoro",
         "notap",
     ],
+    tf_hub_url = "https://tfhub.dev/google/imagenet/",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

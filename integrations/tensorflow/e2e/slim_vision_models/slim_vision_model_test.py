@@ -37,7 +37,7 @@ flags.DEFINE_string(
     'mobilenet_v2_035_224]\nAt least a subset can be viewed here:\n'
     'https://tfhub.dev/s?dataset=imagenet&module-type=image-classification,image-classifier'
 )
-flags.DEFINE_string('hub_url', 'https://tfhub.dev/google/imagenet/',
+flags.DEFINE_string('tf_hub_url', 'https://tfhub.dev/google/imagenet/',
                     'Base URL for the models to test')
 
 # Classification mode; 4 - is a format of the model (SavedModel TF v2).
@@ -50,7 +50,7 @@ class SlimVisionModule(tf.Module):
   def __init__(self):
     super(SlimVisionModule, self).__init__()
     tf_utils.set_random_seed()
-    model_path = posixpath.join(FLAGS.hub_url, FLAGS.model, MODE)
+    model_path = posixpath.join(FLAGS.tf_hub_url, FLAGS.model, MODE)
     hub_layer = hub.KerasLayer(model_path)
     self.m = tf.keras.Sequential([hub_layer])
     self.m.build(INPUT_SHAPE)
