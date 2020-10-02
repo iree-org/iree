@@ -291,11 +291,11 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
   LogicalResult matchAndRewrite(mhlo::SortOp op,
                                 PatternRewriter &rewriter) const override {
     auto operandTy = op.getOperand(0).getType().cast<RankedTensorType>();
-    bool last_dimension =
+    bool lastDimension =
         (op.dimension() == -1) || (op.dimension() == (operandTy.getRank() - 1));
 
     // TODO(suderman): Add transpose to sort along the last dimension.
-    if (!last_dimension) return failure();
+    if (!lastDimension) return failure();
 
     auto &comparator = op.comparator();
     auto &block = comparator.getBlocks().front();
@@ -315,48 +315,48 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
     // Determine which operands being compared.
     auto lhs = comparison.getOperand(0);
     auto rhs = comparison.getOperand(1);
-    auto lhs_index = -1;
-    auto rhs_index = -1;
+    auto lhsIndex = -1;
+    auto rhsIndex = -1;
     for (auto arg : llvm::enumerate(block.getArguments())) {
-      if (arg.value() == lhs) lhs_index = arg.index();
-      if (arg.value() == rhs) rhs_index = arg.index();
+      if (arg.value() == lhs) lhsIndex = arg.index();
+      if (arg.value() == rhs) rhsIndex = arg.index();
     }
 
     // This should never happen but best to check.
-    if (lhs_index == -1) return failure();
-    if (rhs_index == -1) return failure();
+    if (lhsIndex == -1) return failure();
+    if (rhsIndex == -1) return failure();
 
     // They should not be the same.
-    if (lhs_index == rhs_index) return failure();
+    if (lhsIndex == rhsIndex) return failure();
 
     // Comparisons need to pull from same Sort operand..
-    auto lhs_operand = lhs_index / 2;
-    auto rhs_operand = rhs_index / 2;
-    if (lhs_operand != rhs_operand) return failure();
+    auto lhsOperand = lhsIndex / 2;
+    auto rhsOperand = rhsIndex / 2;
+    if (lhsOperand != rhsOperand) return failure();
 
     // Must be GT, GE, LT, or LE.
-    auto is_gt = comparison.comparison_direction() == "GT" ||
+    auto isGt = comparison.comparison_direction() == "GT" ||
                  comparison.comparison_direction() == "GE";
-    auto is_lt = comparison.comparison_direction() == "LT" ||
+    auto isLt = comparison.comparison_direction() == "LT" ||
                  comparison.comparison_direction() == "LE";
-    if (!is_gt && !is_lt) return failure();
+    if (!isGt && !isLt) return failure();
 
-    bool operand_parity = lhs_index > rhs_index;
-    auto is_ascending = operand_parity ^ is_gt;
+    bool operandParity = lhsIndex > rhsIndex;
+    auto isAscending = operandParity ^ isGt;
     // TODO(suderman): Add support for descended sorting.
-    if (!is_ascending) return failure();
+    if (!isAscending) return failure();
 
-    auto operand = op.getOperand(lhs_operand);
-    auto sorted_indices = rewriter.create<VMLA::SortPseudoOp>(
+    auto operand = op.getOperand(lhsOperand);
+    auto sortedIndices = rewriter.create<VMLA::SortPseudoOp>(
         op.getLoc(),
         RankedTensorType::get(operandTy.getShape(), rewriter.getI32Type()),
         operand);
 
     llvm::SmallVector<Value, 6> sortedResults;
     for (auto operand : op.getOperands()) {
-      auto tensor_type = operand.getType().cast<RankedTensorType>();
+      auto tensorTy = operand.getType().cast<RankedTensorType>();
       auto gathered = rewriter.create<mhlo::TorchIndexSelectOp>(
-          op.getLoc(), tensor_type, operand, sorted_indices,
+          op.getLoc(), tensorTy, operand, sortedIndices,
           /**dim=*/operandTy.getRank() - 1,
           /**batch_dims=*/operandTy.getRank() - 1);
       sortedResults.push_back(gathered);
