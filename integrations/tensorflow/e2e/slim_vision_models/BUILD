@@ -61,7 +61,7 @@ iree_slim_vision_test_suite(
     failing_configurations = [
         {
             # Failing all but tf and vmla:
-            "model_tags": [
+            "models": [
                 "inception_resnet_v2",
                 # tflite: RuntimeError: tensorflow/lite/kernels/reshape.cc:66 num_input_elements != num_output_elements (38400 != -1571481807)Node number 333 (RESHAPE) failed to prepare.
                 # llvmjit: *** Received signal 6 *** (mangled stack trace)
@@ -83,7 +83,7 @@ iree_slim_vision_test_suite(
         },
         {
             # Failing llvmjit and vulkan:
-            "model_tags": [
+            "models": [
                 "inception_v2",
                 # llvmjit: double free or corruption (!prev); *** Received signal 6 ***
                 # vulkan: Floating point difference between ref and tar was too large. Max abs diff: 1.0769763, atol: 2e-05, max relative diff: 0.19576924, rtol: 1e-06
@@ -103,10 +103,10 @@ iree_slim_vision_test_suite(
             ],
         },
     ],
-    model_tags = [
-        "inception_resnet_v2",  # *** Received signal 6 ***
+    models = [
+        "inception_resnet_v2",
         "inception_v1",
-        "inception_v2",  # Floating point difference: Max abs diff: 1.0769763, max relative diff: 0.19576924
+        "inception_v2",
         "inception_v3",
         "mobilenet_v1_025_128",
         "mobilenet_v1_025_160",
@@ -165,7 +165,7 @@ iree_slim_vision_test_suite(
     failing_configurations = [
         {
             # Failing on all backends:
-            "model_tags": [
+            "models": [
                 "amoebanet_a_n18_f448",
                 "mobilenet_v2_035_128",
                 "mobilenet_v2_035_160",
@@ -195,7 +195,7 @@ iree_slim_vision_test_suite(
             ],
         },
     ],
-    model_tags = [
+    models = [
         "amoebanet_a_n18_f448",
         "mobilenet_v2_035_128",
         "mobilenet_v2_035_160",

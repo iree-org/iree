@@ -29,20 +29,19 @@ FLAGS = flags.FLAGS
 # Testing vision models from
 # https://github.com/tensorflow/models/tree/master/research/slim
 # slim models were designed with tf v1 and then coverted to SavedModel
-# they are stored at tensorflow_hub. At least a subset can be viewed here:
-# https://tfhub.dev/s?dataset=imagenet&module-type=image-classification,image-classifier
+# they are stored at tensorflow_hub.
 flags.DEFINE_string(
-    'model_tag', 'mobilenet_v1_100_224', 'examples of model tag: '
-    'resnet_v1_50, resnet_v1_101, resnet_v2_50, resnet_v2_101, '
+    'model', 'mobilenet_v1_100_224', 'example model names: '
+    '[resnet_v1_50, resnet_v1_101, resnet_v2_50, resnet_v2_101, '
     'mobilenet_v1_100_224, mobilenet_v1_025_224, mobilenet_v2_100_224, '
-    'mobilenet_v2_035_224')
-
-HUB_URL = 'https://tfhub.dev/google/imagenet/'
+    'mobilenet_v2_035_224]\nAt least a subset can be viewed here:\n'
+    'https://tfhub.dev/s?dataset=imagenet&module-type=image-classification,image-classifier'
+)
+flags.DEFINE_string('hub_url', 'https://tfhub.dev/google/imagenet/',
+                    'Base URL for the models to test')
 
 # Classification mode; 4 - is a format of the model (SavedModel TF v2).
 MODE = 'classification/4'
-
-# Most models have input shape:
 INPUT_SHAPE = (1, 224, 224, 3)
 
 
@@ -51,7 +50,7 @@ class SlimVisionModule(tf.Module):
   def __init__(self):
     super(SlimVisionModule, self).__init__()
     tf_utils.set_random_seed()
-    model_path = posixpath.join(HUB_URL, FLAGS.model_tag, MODE)
+    model_path = posixpath.join(FLAGS.hub_url, FLAGS.model, MODE)
     hub_layer = hub.KerasLayer(model_path)
     self.m = tf.keras.Sequential([hub_layer])
     self.m.build(INPUT_SHAPE)
@@ -80,7 +79,7 @@ def main(argv):
   if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
 
-  SlimVisionModule.__name__ = FLAGS.model_tag
+  SlimVisionModule.__name__ = FLAGS.model
   tf.test.main()
 
 

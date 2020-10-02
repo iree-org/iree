@@ -19,7 +19,7 @@ load("@bazel_skylib//lib:new_sets.bzl", "sets")
 
 def iree_slim_vision_test_suite(
         name,
-        model_tags,
+        models,
         backends,
         reference_backend,
         failing_configurations = None,
@@ -30,7 +30,7 @@ def iree_slim_vision_test_suite(
         **kwargs):
     """Creates a test for each configuration and bundles a succeeding and failing test suite.
 
-    Creates one test per model_tag and backend. Tests indicated in
+    Creates one test per model and backend. Tests indicated in
     `failing_configurations` are bundled into a suite suffixed with "_failing"
     tagged to be excluded from CI and wildcard builds. All other tests are
     bundled into a suite with the same name as the macro.
@@ -39,7 +39,7 @@ def iree_slim_vision_test_suite(
       name:
         name of the generated passing test suite. If failing_configurations is
         not `None` then a test suite named name_failing will also be generated.
-      model_tags:
+      models:
         an iterable of slim vision model tags to generate targets for.
       backends:
         an iterable of targets backends to generate targets for.
@@ -72,28 +72,28 @@ def iree_slim_vision_test_suite(
                 if type(value) == type(""):
                     configuration[key] = [value]
 
-            for model_tag in configuration["model_tags"]:
+            for model in configuration["models"]:
                 for backend in configuration["backends"]:
-                    sets.insert(failing_set, (model_tag, backend))
+                    sets.insert(failing_set, (model, backend))
 
     tests = []
-    for model_tag in model_tags:
+    for model in models:
         for backend in backends:
             # Check if this is a failing configuration.
-            failing = sets.contains(failing_set, (model_tag, backend))
+            failing = sets.contains(failing_set, (model, backend))
 
             # Append "_failing" to name if this is a failing configuration.
             test_name = name if not failing else name + "_failing"
             test_name = "{}_{}__{}__{}".format(
                 test_name,
-                model_tag,
+                model,
                 reference_backend,
                 backend,
             )
             tests.append(test_name)
 
             args = [
-                "--model_tag={}".format(model_tag),
+                "--model={}".format(model),
                 "--reference_backend={}".format(reference_backend),
                 "--target_backends={}".format(backend),
             ]
