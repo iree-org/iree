@@ -138,10 +138,10 @@ IREE's VMLA driver:
 
 ```shell
 $ bazel run iree/tools:iree-run-module -- \
-  --input_file=/tmp/simple.module \
+  --module_file=/tmp/simple.module \
   --driver=vmla \
   --entry_function=abs \
-  --inputs="i32=-2"
+  --function_inputs="i32=-2"
 ```
 
 ### iree-check-module
