@@ -99,7 +99,7 @@ TF_IMPORT_PASS_PIPELINE = (
 
 def tf_saved_model_to_compiler_module(
     saved_model_dir: str,
-    exported_names: Collection[str] = (),
+    exported_names: Sequence[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
     compiler_context: Optional[Context] = None) -> Module:
   """Converts a TensorFlow SavedModel into a MLIR module.
@@ -108,8 +108,7 @@ def tf_saved_model_to_compiler_module(
 
   Args:
     saved_model_dir: Directory of the saved model.
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
+    exported_names: Optional sequence representing the exported names to keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     compiler_context: The pyiree.compiler.Context() backing the module.
@@ -131,18 +130,17 @@ def tf_saved_model_to_compiler_module(
 
 def compile_tf_saved_model(
     saved_model_dir: str,
-    exported_names: Collection[str] = (),
-    target_backends: Collection[str] = (),
+    exported_names: Sequence[str] = (),
+    target_backends: Sequence[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
     compiler_context: Optional[Context] = None) -> binding.OpaqueBlob:
   """Compiles a TensorFlow SavedModel to IREE in one shot.
 
   Args:
     saved_model_dir: Directory of the saved model.
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
-    target_backends: The specific target backends to compile for (defaults to
-      all compiled in targets).
+    exported_names: Optional sequence representing the exported names to keep.
+    target_backends: Optional sequence of specific target backends to compile
+      for (defaults to all compiled in targets).
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     compiler_context: The pyiree.compiler.Context() backing the module.
@@ -160,7 +158,7 @@ def compile_tf_saved_model(
 def tf_signature_def_saved_model_to_compiler_module(
     saved_model_dir: str,
     saved_model_tags: Set[str] = set(),
-    exported_names: Collection[str] = [],
+    exported_names: Sequence[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
     compiler_context: Optional[Context] = None) -> Module:
   """Converts a TensorFlow SignatureDef SavedModel into a MLIR module.
@@ -168,8 +166,7 @@ def tf_signature_def_saved_model_to_compiler_module(
   Args:
     saved_model_dir: Directory of the saved model.
     saved_model_tags: Optional set of tags to use when loading the model.
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
+    exported_names: Optional sequence representing the exported names to keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     compiler_context: The pyiree.compiler.Context() backing the module.
@@ -194,8 +191,8 @@ def tf_signature_def_saved_model_to_compiler_module(
 def compile_tf_signature_def_saved_model(
     saved_model_dir: str,
     saved_model_tags: Set[str] = set(),
-    exported_names: Collection[str] = (),
-    target_backends: Collection[str] = (),
+    exported_names: Sequence[str] = (),
+    target_backends: Sequence[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
     compiler_context: Optional[Context] = None) -> binding.OpaqueBlob:
   """Compiles a TensorFlow SignatureDef SavedModel to IREE in one shot.
@@ -203,10 +200,9 @@ def compile_tf_signature_def_saved_model(
   Args:
     saved_model_dir: Directory of the saved model.
     saved_model_tags: Optional set of tags to use when loading the model.
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
-    target_backends: The specific target backends to compile for (defaults to
-      all compiled in targets).
+    exported_names: Optional sequence representing the exported names to keep.
+    target_backends: Optional sequence of specific target backends to compile
+      for (defaults to all compiled in targets).
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     compiler_context: The pyiree.compiler.Context() backing the module.
@@ -222,7 +218,7 @@ def compile_tf_signature_def_saved_model(
 
 def tf_module_to_compiler_module(
     module: tf.Module,
-    exported_names: Collection[str] = (),
+    exported_names: Sequence[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
     compiler_context: Optional[Context] = None,
     saved_model_dir: str = None) -> Module:
@@ -230,8 +226,7 @@ def tf_module_to_compiler_module(
 
   Args:
     module: The tf.Module instance to convert to MLIR
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
+    exported_names: Optional sequence representing the exported names to keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     compiler_context: The pyiree.compiler.Context() backing the module.
@@ -259,8 +254,8 @@ def tf_module_to_compiler_module(
 
 
 def compile_tf_module(module: tf.Module,
-                      exported_names: Collection[str] = (),
-                      target_backends: Collection[str] = (),
+                      exported_names: Sequence[str] = (),
+                      target_backends: Sequence[str] = (),
                       pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
                       compiler_context: Optional[Context] = None,
                       saved_model_dir: str = None):
@@ -268,10 +263,9 @@ def compile_tf_module(module: tf.Module,
 
   Args:
     module: The tf.Module instance to convert to MLIR
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
-    target_backends: The specific target backends to compile for (defaults to
-      all compiled in targets).
+    exported_names: Optional sequence representing the exported names to keep.
+    target_backends: Optional sequence of specific target backends to compile
+      for (defaults to all compiled in targets).
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to TF_IMPORT_PASS_PIPELINE.
     compiler_context: The pyiree.compiler.Context() backing the module.
