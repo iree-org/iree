@@ -41,6 +41,8 @@ TEST_SUITES_TO_HEADERS = {
         'End to end tests written using tf.keras',
     '//integrations/tensorflow/e2e/keras:vision_external_tests':
         'End to end tests of tf.keras.applications vision models',
+    '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
+        'End to end tests of TensorFlow slim vision models',
 }
 
 # Some test suites are generated from a single source. This allows us to point
@@ -48,6 +50,8 @@ TEST_SUITES_TO_HEADERS = {
 SINGLE_SOURCE_SUITES = {
     '//integrations/tensorflow/e2e/keras:vision_external_tests':
         'vision_model_test',
+    '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
+        'slim_vision_model_test',
 }
 
 # The symbols to show in the table if the operation is supported or not.
