@@ -36,18 +36,16 @@ package(
 )
 
 # Create binaries for all test srcs to allow them to be run manually.
-[
-    iree_py_binary(
-        name = src.replace(".py", "_manual"),
-        srcs = [src],
-        main = src,
-        python_version = "PY3",
-        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-        ],
-    )
-    for src in glob(["*_test.py"])
-]
+iree_py_binary(
+    name = "slim_vision_model_test_manual",
+    srcs = ["slim_vision_model_test.py"],
+    args = ["--tf_hub_url=https://tfhub.dev/google/imagenet/"],
+    main = "slim_vision_model_test.py",
+    python_version = "PY3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
 
 iree_slim_vision_test_suite(
     name = "slim_vision_tests",

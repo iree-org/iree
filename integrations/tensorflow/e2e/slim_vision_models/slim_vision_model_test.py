@@ -37,8 +37,9 @@ flags.DEFINE_string(
     'mobilenet_v2_035_224]\nAt least a subset can be viewed here:\n'
     'https://tfhub.dev/s?dataset=imagenet&module-type=image-classification,image-classifier'
 )
-flags.DEFINE_string('tf_hub_url', 'https://tfhub.dev/google/imagenet/',
-                    'Base URL for the models to test')
+flags.DEFINE_string('tf_hub_url', None,
+                    'Base URL for the models to test. URL at the time of '
+                    'writing:\nhttps://tfhub.dev/google/imagenet/')
 
 # Classification mode; 4 - is a format of the model (SavedModel TF v2).
 MODE = 'classification/4'
