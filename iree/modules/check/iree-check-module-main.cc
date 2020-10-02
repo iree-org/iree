@@ -79,7 +79,7 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_context_t* context_ = nullptr;
 };
 
-StatusOr<int> Run(std::string input_file_path) {
+StatusOr<int> Run(std::string module_file_path) {
   IREE_TRACE_SCOPE0("iree-check-module");
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types())
@@ -90,12 +90,12 @@ StatusOr<int> Run(std::string input_file_path) {
       << "creating instance";
 
   std::string module_data;
-  if (input_file_path == "-") {
+  if (module_file_path == "-") {
     module_data = std::string{std::istreambuf_iterator<char>(std::cin),
                               std::istreambuf_iterator<char>()};
   } else {
     IREE_ASSIGN_OR_RETURN(module_data,
-                          file_io::GetFileContents(input_file_path));
+                          file_io::GetFileContents(module_file_path));
   }
 
   iree_vm_module_t* input_module = nullptr;
@@ -182,9 +182,9 @@ extern "C" int main(int argc, char** argv) {
         << "A binary module file path to run (or - for stdin) must be passed";
     return -1;
   }
-  auto input_file_path = std::string(argv[1]);
+  auto module_file_path = std::string(argv[1]);
 
-  auto ret_or = Run(std::move(input_file_path));
+  auto ret_or = Run(std::move(module_file_path));
   int ret = ret_or.ok() ? ret_or.value() : 1;
   if (absl::GetFlag(FLAGS_expect_failure)) {
     if (ret == 0) {
