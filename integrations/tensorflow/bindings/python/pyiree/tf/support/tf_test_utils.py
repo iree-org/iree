@@ -385,11 +385,17 @@ class Trace:
         return False
       if np.issubdtype(ref.dtype, np.floating):
         same = np.allclose(ref, tar, rtol=rtol, atol=atol)
+        abs_diff = np.max(np.abs(ref - tar))
+        rel_diff = np.max(np.abs(ref - tar) / np.max(np.abs(tar)))
         if not same:
-          abs_diff = np.max(np.abs(ref - tar))
-          rel_diff = np.max(np.abs(ref - tar) / np.max(tar))
           logging.error(
               "Floating point difference between ref and tar was too large. "
+              "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
+              abs_diff, atol, rel_diff, rtol)
+        else:
+          logging.info(
+              "Floating point difference between ref and tar was within "
+              "tolerance. "
               "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
               abs_diff, atol, rel_diff, rtol)
         return same
