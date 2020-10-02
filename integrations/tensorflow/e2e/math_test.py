@@ -14,6 +14,7 @@
 # limitations under the License.
 """Tests for ops in the tf.math module."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -42,46 +43,54 @@ class MathModule(tf.Module):
     return tf.math.mod(x, 2.0)
 
 
-@tf_test_utils.compile_module(MathModule)
 class MathTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(MathTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(MathModule)
 
   def test_abs(self):
 
     def abs(module):
       module.abs(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
 
-    self.compare_backends(abs)
+    self.compare_backends(abs, self._modules)
 
   def test_ceil(self):
 
     def ceil(module):
       module.ceil(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-    self.compare_backends(ceil)
+    self.compare_backends(ceil, self._modules)
 
   def test_cos(self):
 
     def cos(module):
       module.cos(np.array([-0.5, 0.0, 0.5, 1.0], dtype=np.float32))
 
-    self.compare_backends(cos)
+    self.compare_backends(cos, self._modules)
 
   def test_log(self):
 
     def log(module):
       module.log(np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32))
 
-    self.compare_backends(log)
+    self.compare_backends(log, self._modules)
 
   def test_mod(self):
 
     def mod(module):
       module.mod(np.array([0.0, 1.2, 1.5, 3.75], dtype=np.float32))
 
-    self.compare_backends(mod)
+    self.compare_backends(mod, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

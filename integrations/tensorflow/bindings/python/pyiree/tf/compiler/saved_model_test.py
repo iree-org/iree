@@ -62,7 +62,7 @@ class RuntimeTest(tf.test.TestCase):
       tf.saved_model.save(my_module, sm_dir, options=options)
 
       # Load it up.
-      input_module = compiler.tf_load_saved_model(sm_dir)
+      input_module = compiler.tf_saved_model_to_compiler_module(sm_dir)
       xla_asm = input_module.to_asm()
       print("XLA ASM:", xla_asm)
       self.assertRegex(xla_asm, "mhlo.tanh")

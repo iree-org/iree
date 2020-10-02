@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load(
+    "//iree:build_defs.oss.bzl",
+    "PLATFORM_VULKAN_DEPS",
+)
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -36,4 +41,34 @@ cc_library(
         "@sdl2//:SDL2",
         "@vulkan_sdk//:sdk",
     ],
+)
+
+cc_binary(
+    name = "iree-run-module-vulkan-gui",
+    srcs = ["iree-run-module-vulkan-gui-main.cc"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [
+            "-SUBSYSTEM:WINDOWS",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = [
+        "manual",
+        "nokokoro",
+    ],
+    deps = [
+        ":vulkan_gui_util",
+        "//iree/base:init",
+        "//iree/base:main",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/modules/hal",
+        "//iree/hal/vulkan:vulkan_driver_module",
+        "//iree/tools/utils:vm_util",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:ref_cc",
+        "@com_google_absl//absl/flags:flag",
+        "@sdl2//:SDL2",
+    ] + PLATFORM_VULKAN_DEPS,
 )

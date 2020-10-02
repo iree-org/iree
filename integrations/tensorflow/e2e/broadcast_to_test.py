@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -30,8 +31,11 @@ class BroadcastToModule(tf.Module):
     return tf.broadcast_to(x, shape)
 
 
-@tf_test_utils.compile_module(BroadcastToModule)
 class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(BroadcastToTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(BroadcastToModule)
 
   def test_scalar_broadcast_to(self):
 
@@ -40,10 +44,15 @@ class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
       shape = np.array([3, 3], dtype=np.int32)
       result = module.scalar_broadcast_to(x, shape)
 
-    self.compare_backends(scalar_broadcast_to)
+    self.compare_backends(scalar_broadcast_to, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

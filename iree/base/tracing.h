@@ -355,14 +355,14 @@ enum {
 
 #define IREE_TRACE_ALLOC(ptr, size)               \
   ___tracy_emit_memory_alloc_callstack(ptr, size, \
-                                       IREE_TRACING_MAX_CALLSTACK_DEPTH)
+                                       IREE_TRACING_MAX_CALLSTACK_DEPTH, 0)
 #define IREE_TRACE_FREE(ptr) \
-  ___tracy_emit_memory_free_callstack(ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH)
+  ___tracy_emit_memory_free_callstack(ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0)
 
 #else
 
-#define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size)
-#define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr)
+#define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size, 0)
+#define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr, 0)
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 
@@ -371,24 +371,11 @@ enum {
 #define IREE_TRACE_FREE(ptr)
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
-#ifdef __cplusplus
-
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
-
-inline void* operator new(size_t count) {
-  auto ptr = malloc(count);
-  IREE_TRACE_ALLOC(ptr, count);
-  return ptr;
-}
-
-inline void operator delete(void* ptr) noexcept {
-  IREE_TRACE_FREE(ptr);
-  free(ptr);
-}
-
-#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
-
-#endif  // __cplusplus
+#if defined(__cplusplus) && \
+    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
+void* operator new(size_t count) noexcept;
+void operator delete(void* ptr) noexcept;
+#endif  // __cplusplus && IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 //===----------------------------------------------------------------------===//
 // Instrumentation C++ RAII types, wrappers, and macros
