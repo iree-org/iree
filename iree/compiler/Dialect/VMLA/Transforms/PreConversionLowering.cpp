@@ -290,9 +290,9 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mhlo::SortOp op,
                                 PatternRewriter &rewriter) const override {
-    auto operand_ty = op.getOperand(0).getType().cast<RankedTensorType>();
+    auto operandTy = op.getOperand(0).getType().cast<RankedTensorType>();
     bool last_dimension = (op.dimension() == -1) ||
-                          (op.dimension() == (operand_ty.getRank() - 1));
+                          (op.dimension() == (operandTy.getRank() - 1));
 
     // TODO(suderman): Add transpose to sort along the last dimension.
     if (!last_dimension) return failure();
@@ -303,14 +303,13 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
     auto comparison = dyn_cast_or_null<mhlo::CompareOp>(&operations.front());
 
     // First verify that the block is purely a return of a comparison. This
-    // handles the regular sorting behavior.
+    // handles sorting a single tensor of values.
     if (!comparison) return failure();
 
-    auto second = &(*(++operations.begin()));
-    auto return_op = dyn_cast_or_null<mhlo::ReturnOp>(second);
-    if (!return_op) return failure();
+    auto returnOp = dyn_cast_or_null<mhlo::ReturnOp>(&(*(++operations.begin())));
+    if (!returnOp) return failure();
 
-    if (return_op.getOperand(0) != comparison.getResult()) return failure();
+    if (returnOp.getOperand(0) != comparison.getResult()) return failure();
 
     // Determine which operands being compared.
     auto lhs = comparison.getOperand(0);
@@ -343,26 +342,26 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
 
     bool operand_parity = lhs_index > rhs_index;
     auto is_ascending = operand_parity ^ is_gt;
-
-    auto operand = op.getOperand(lhs_operand);
+    // TODO(suderman): Add support for descended sorting.
     if (!is_ascending) return failure();
 
+    auto operand = op.getOperand(lhs_operand);
     auto sorted_indices = rewriter.create<VMLA::SortPseudoOp>(
         op.getLoc(),
-        RankedTensorType::get(operand_ty.getShape(), rewriter.getI32Type()),
+        RankedTensorType::get(operandTy.getShape(), rewriter.getI32Type()),
         operand);
 
-    llvm::SmallVector<Value, 6> sorted;
+    llvm::SmallVector<Value, 6> sortedResults;
     for (auto operand : op.getOperands()) {
       auto tensor_type = operand.getType().cast<RankedTensorType>();
       auto gathered = rewriter.create<mhlo::TorchIndexSelectOp>(
           op.getLoc(), tensor_type, operand, sorted_indices,
-          /**dim=*/operand_ty.getRank() - 1,
-          /**batch_dims=*/operand_ty.getRank() - 1);
-      sorted.push_back(gathered);
+          /**dim=*/operandTy.getRank() - 1,
+          /**batch_dims=*/operandTy.getRank() - 1);
+      sortedResults.push_back(gathered);
     }
 
-    rewriter.replaceOp(op, sorted);
+    rewriter.replaceOp(op, sortedResults);
     return success();
   }
 };
