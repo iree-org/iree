@@ -89,10 +89,14 @@ outputs to these modules are then checked for correctness, using the reference
 backend as a source of truth. For example:
 
 ```python
-# Compile a `tf.Module` named `SimpleArithmeticModule` into a `CompiledModule`.
-@tf_test_utils.compile_module(SimpleArithmeticModule)
 # Inherit from `TracedModuleTestCase`.
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(SimpleArithmeticTest, self).__init__(methodName)
+    # Compile a `tf.Module` named `SimpleArithmeticModule` into
+    # `CompiledModule`s for each reference and target backend.
+    self._modules = tf_test_utils.compile_tf_module(SimpleArithmeticModule)
 
   # Unit test.
   def test_simple_mul(self):
@@ -112,7 +116,7 @@ class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
     # Calls `simple_mul` once for each backend, recording the inputs and outputs
     # to `module` and then comparing them.
-    self.compare_backends(simple_mul)
+    self.compare_backends(simple_mul, self._modules)
 ```
 
 ## Test Suites

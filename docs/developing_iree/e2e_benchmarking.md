@@ -256,7 +256,7 @@ specified manually if the location of the compiled flatbuffer (`compiled.vmfb`)
 changes. The flagfile can still take care of specifying the input data, driver
 and entry function however.
 
-## 5. Benchmark the model on Android with TFLite
+## 5. Benchmarking TFLite on Android
 
 ### 5.1 Prepare the benchmarking tools
 
