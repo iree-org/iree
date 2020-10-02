@@ -321,6 +321,7 @@ void populateVMLAToVMPatterns(MLIRContext *context,
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::FloorOp, "vmla.floor");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::CeilOp, "vmla.ceil");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::RoundOp, "vmla.round");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::SortOp, "vmla.sort");
 
   patterns.insert<VMLAConvertImportOpConversion>(context, importSymbols,
                                                  typeConverter, "vmla.convert");

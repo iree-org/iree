@@ -333,6 +333,20 @@ vm.import @floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 
+
+vm.import @sort.i8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>)
+vm.import @sort.i16(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>)
+vm.import @sort.i32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>)
+vm.import @sort.f32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>)
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: conversion
 //===----------------------------------------------------------------------===//

@@ -277,6 +277,96 @@ class LowerBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
   }
 };
 
+// Lower mhlo::SortOp to an pseudo SortOp in the VMLA dialect. This
+// pseudo op generates a set of ordered indices for that array along the last
+// dimension. Then using a torch_index_select the values can be reordered to
+// support arbitrary inputs.
+//
+// TODO(suderman): This lowering only covers the case of ascending values, we
+// should support a separate descending value case by having separate
+// SortAscending and SortDescending operations.
+class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::SortOp op,
+                                PatternRewriter &rewriter) const override {
+    auto operandTy = op.getOperand(0).getType().cast<RankedTensorType>();
+    bool lastDimension =
+        (op.dimension() == -1) || (op.dimension() == (operandTy.getRank() - 1));
+
+    // TODO(suderman): Add transpose to sort along the last dimension.
+    if (!lastDimension) return failure();
+
+    auto &comparator = op.comparator();
+    auto &block = comparator.getBlocks().front();
+    auto &operations = block.getOperations();
+    auto comparison = dyn_cast_or_null<mhlo::CompareOp>(&operations.front());
+
+    // First verify that the block is purely a return of a comparison. This
+    // handles sorting a single tensor of values.
+    if (!comparison) return failure();
+
+    auto returnOp =
+        dyn_cast_or_null<mhlo::ReturnOp>(&(*(++operations.begin())));
+    if (!returnOp) return failure();
+
+    if (returnOp.getOperand(0) != comparison.getResult()) return failure();
+
+    // Determine which operands being compared.
+    auto lhs = comparison.getOperand(0);
+    auto rhs = comparison.getOperand(1);
+    auto lhsIndex = -1;
+    auto rhsIndex = -1;
+    for (auto arg : llvm::enumerate(block.getArguments())) {
+      if (arg.value() == lhs) lhsIndex = arg.index();
+      if (arg.value() == rhs) rhsIndex = arg.index();
+    }
+
+    // This should never happen but best to check.
+    if (lhsIndex == -1) return failure();
+    if (rhsIndex == -1) return failure();
+
+    // They should not be the same.
+    if (lhsIndex == rhsIndex) return failure();
+
+    // Comparisons need to pull from same Sort operand..
+    auto lhsOperand = lhsIndex / 2;
+    auto rhsOperand = rhsIndex / 2;
+    if (lhsOperand != rhsOperand) return failure();
+
+    // Must be GT, GE, LT, or LE.
+    auto isGt = comparison.comparison_direction() == "GT" ||
+                comparison.comparison_direction() == "GE";
+    auto isLt = comparison.comparison_direction() == "LT" ||
+                comparison.comparison_direction() == "LE";
+    if (!isGt && !isLt) return failure();
+
+    bool operandParity = lhsIndex > rhsIndex;
+    auto isAscending = operandParity ^ isGt;
+    // TODO(suderman): Add support for descended sorting.
+    if (!isAscending) return failure();
+
+    auto operand = op.getOperand(lhsOperand);
+    auto sortedIndices = rewriter.create<VMLA::SortPseudoOp>(
+        op.getLoc(),
+        RankedTensorType::get(operandTy.getShape(), rewriter.getI32Type()),
+        operand);
+
+    llvm::SmallVector<Value, 6> sortedResults;
+    for (auto operand : op.getOperands()) {
+      auto tensorTy = operand.getType().cast<RankedTensorType>();
+      auto gathered = rewriter.create<mhlo::TorchIndexSelectOp>(
+          op.getLoc(), tensorTy, operand, sortedIndices,
+          /**dim=*/operandTy.getRank() - 1,
+          /**batch_dims=*/operandTy.getRank() - 1);
+      sortedResults.push_back(gathered);
+    }
+
+    rewriter.replaceOp(op, sortedResults);
+    return success();
+  }
+};
+
 class PreConversionLoweringPass
     : public PassWrapper<PreConversionLoweringPass, OperationPass<FuncOp>> {
  public:
@@ -310,6 +400,8 @@ class PreConversionLoweringPass
     patterns.insert<LowerBroadcastInDimOp>(context);
     target.addIllegalOp<mhlo::BroadcastOp>();
     patterns.insert<LowerBroadcastOp>(context);
+    target.addIllegalOp<mhlo::SortOp>();
+    patterns.insert<LowerSortOp>(context);
 
     if (failed(applyPartialConversion(getOperation(), target, patterns))) {
       return signalPassFailure();

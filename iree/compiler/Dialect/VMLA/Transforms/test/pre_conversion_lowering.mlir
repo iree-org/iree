@@ -17,6 +17,38 @@ func @f(%arg0: tensor<3x4xf32>, %arg1: tensor<4x5xf32>) -> tensor<3x5xf32> {
 // -----
 
 // CHECK-LABEL: func @f
+func @f(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes { sym_visibility = "private" } {
+  // CHECK-DAG: [[SORT:%.+]] = vmla.sort.pseudo %arg0
+  // CHECK-DAG: [[GATHER:%.+]] = "mhlo.torch_index_select"(%arg0, [[SORT]]) {batch_dims = 0 : i64, dim = 0 : i64}
+  %sort = "mhlo.sort"(%arg0) ( {
+  ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
+    %compare = "mhlo.compare"(%arg1, %arg2) {comparison_direction = "GT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    "mhlo.return"(%compare) : (tensor<i1>) -> ()
+  }) {dimension = 0 : i64, is_stable = false} : (tensor<4xf32>) -> tensor<4xf32>
+
+  // CHECK: return [[GATHER]]
+  return %sort : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @f
+func @f(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> attributes { sym_visibility = "private" } {
+  // CHECK-DAG: [[SORT:%.+]] = vmla.sort.pseudo %arg0
+  // CHECK-DAG: [[GATHER:%.+]] = "mhlo.torch_index_select"(%arg0, [[SORT]]) {batch_dims = 1 : i64, dim = 1 : i64}
+  %sort = "mhlo.sort"(%arg0) ( {
+  ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
+    %compare = "mhlo.compare"(%arg1, %arg2) {comparison_direction = "GT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    "mhlo.return"(%compare) : (tensor<i1>) -> ()
+  }) {dimension = 1 : i64, is_stable = false} : (tensor<4x4xf32>) -> tensor<4x4xf32>
+
+  // CHECK return [[GATHER]]
+  return %sort : tensor<4x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @f
 func @f(%arg0: tensor<3xf32>) -> tensor<4x3xf32> {
   // CHECK: "shapex.ranked_broadcast_in_dim"(%arg0, %rs4_3)
   %0 = "mhlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<3xf32>) -> tensor<4x3xf32>
