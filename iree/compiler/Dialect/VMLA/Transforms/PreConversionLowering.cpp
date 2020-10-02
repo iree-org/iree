@@ -291,8 +291,8 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
   LogicalResult matchAndRewrite(mhlo::SortOp op,
                                 PatternRewriter &rewriter) const override {
     auto operandTy = op.getOperand(0).getType().cast<RankedTensorType>();
-    bool last_dimension = (op.dimension() == -1) ||
-                          (op.dimension() == (operandTy.getRank() - 1));
+    bool last_dimension =
+        (op.dimension() == -1) || (op.dimension() == (operandTy.getRank() - 1));
 
     // TODO(suderman): Add transpose to sort along the last dimension.
     if (!last_dimension) return failure();
@@ -306,7 +306,8 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
     // handles sorting a single tensor of values.
     if (!comparison) return failure();
 
-    auto returnOp = dyn_cast_or_null<mhlo::ReturnOp>(&(*(++operations.begin())));
+    auto returnOp =
+        dyn_cast_or_null<mhlo::ReturnOp>(&(*(++operations.begin())));
     if (!returnOp) return failure();
 
     if (returnOp.getOperand(0) != comparison.getResult()) return failure();
