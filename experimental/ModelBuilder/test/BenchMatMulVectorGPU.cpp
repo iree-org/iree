@@ -112,7 +112,7 @@ static void insertBarrier(OpBuilder &b, Location loc) {
 
 template <typename IdOp, typename NProcsOp>
 static SmallVector<linalg::ProcInfo, 2> getGpuProcIds(
-    OpBuilder &b, Location loc, ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+    OpBuilder &b, Location loc, ArrayRef<Range> parallelLoopRanges) {
   if (parallelLoopRanges.size() != 2)
     llvm_unreachable("expected two parallel loops for matmul operation");
   Type indexType = b.getIndexType();
@@ -128,7 +128,7 @@ constexpr int numSubgroupX = 2;
 constexpr int numSubgroupY = 2;
 
 static SmallVector<linalg::ProcInfo, 2> getSubgroupIds(
-    OpBuilder &b, Location loc, ArrayRef<SubViewOp::Range> parallelLoopRanges) {
+    OpBuilder &b, Location loc, ArrayRef<Range> parallelLoopRanges) {
   if (parallelLoopRanges.size() != 2)
     llvm_unreachable("expected two parallel loops for matmul operation");
   Type indexType = b.getIndexType();
