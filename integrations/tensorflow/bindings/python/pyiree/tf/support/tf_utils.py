@@ -362,12 +362,17 @@ class _FunctionWrapper(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction):
+  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction,
+               output_names: Sequence[str] = None):
     self._context = context
     self._f = f
+    self._output_names = output_names
 
   def __call__(self, *args):
-    return self._f(*args)
+    results = self._f(*args)
+    if self._output_names is not None:
+      results = dict(zip(self._output_names, results))
+    return results
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     """Get cxx serialized inputs and outputs for this function."""
@@ -384,6 +389,7 @@ class IreeCompiledModule(CompiledModule):
       compiled_paths: Dict[str, str],
       vm_module: rt.VmModule,
       config: rt.Config,
+      output_names: Sequence[str] = None,
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -395,10 +401,13 @@ class IreeCompiledModule(CompiledModule):
         corresponding to their serialized representations.
       vm_module: A rt.VmModule containing compilation info to wrap.
       config: A rt.Config containing compilation info to wrap.
+      output_names: Temporary compatibility measure for SignatureDef
+        SavedModels.
     """
     super().__init__(module_name, backend_info, compiled_paths)
     self._vm_module = vm_module
     self._config = config
+    self._output_names = output_names
     self.reinitialize()
 
   @classmethod
@@ -481,7 +490,6 @@ class IreeCompiledModule(CompiledModule):
         provided.
     """
     del input_names  # Unused.
-    del output_names  # Unused.
     module_blob, compiled_path = _incrementally_compile_tf_signature_def_saved_model(
         saved_model_dir, saved_model_tags, backend_info, exported_name,
         artifacts_dir)
@@ -498,7 +506,8 @@ class IreeCompiledModule(CompiledModule):
     if module_name is None:
       module_name = type(module_instance).__name__
 
-    return cls(module_name, backend_info, compiled_paths, vm_module, config)
+    return cls(module_name, backend_info, compiled_paths, vm_module, config,
+               output_names)
 
   def reinitialize(self):
     """Reinitializes all stateful variables."""
@@ -511,7 +520,7 @@ class IreeCompiledModule(CompiledModule):
     # Try to resolve it as a function.
     m = self._context.modules[self._vm_module.name]
     f = m[attr]
-    return _IreeFunctionWrapper(self._context, f)
+    return _IreeFunctionWrapper(self._context, f, self._output_names)
 
   def iree_serializable(self) -> bool:
     return self.compiled_paths is not None
