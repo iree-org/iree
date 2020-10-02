@@ -228,9 +228,11 @@ def _incrementally_compile_tf_signature_def_saved_model(
   artifacts will be saved.
 
   Args:
-    module: A tf.Module.
+    saved_model_dir: Directory of the saved model.
+    saved_model_tags: Optional set of tags to use when loading the model.
     backend_info: BackendInfo with the details for compiling the saved model.
-    exported_names: Optional sequence representing the exported names to keep.
+    exported_name: A str representing the signature on the saved model to
+      compile.
     artifacts_dir: An optional string pointing to where compilation artifacts
       should be saved. No compilation artifacts will be saved if this is not
       provided.
@@ -496,15 +498,10 @@ class IreeCompiledModule(CompiledModule):
     vm_module = rt.VmModule.from_flatbuffer(module_blob)
     config = rt.Config(driver_name=backend_info.driver)
 
-    compiled_path = None
-
     compiled_paths = None
     if compiled_path is not None:
       # IREE bundles every compiled method into the same compiled module :)
       compiled_paths = collections.defaultdict(lambda: compiled_path)
-
-    if module_name is None:
-      module_name = type(module_instance).__name__
 
     return cls(module_name, backend_info, compiled_paths, vm_module, config,
                output_names)
@@ -560,17 +557,18 @@ class _TfFunctionWrapper(_FunctionWrapper):
                                  check_types=False)
 
 
-def _convert_numpy_args_to_tf_tensor_kwargs(function, input_array_names):
+def _convert_numpy_args_to_tf_tensor_kwargs(function, input_names):
 
   def decorator(*args):
     args = [tf.convert_to_tensor(arg) for arg in args]
-    kwargs = dict(zip(input_array_names, args))
+    kwargs = dict(zip(input_names, args))
     return function(**kwargs)
 
   return decorator
 
 
 class SignatureDefSavedModelWrapper(object):
+  """Wraps a SavedModel to imitate a tf.Module with a method 'exported_name'."""
 
   def __init__(self, saved_model_dir: str, saved_model_tags: Set[str],
                input_names: Sequence[str], exported_name: str):
