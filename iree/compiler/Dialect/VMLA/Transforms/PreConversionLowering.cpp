@@ -336,9 +336,9 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
 
     // Must be GT, GE, LT, or LE.
     auto isGt = comparison.comparison_direction() == "GT" ||
-                 comparison.comparison_direction() == "GE";
+                comparison.comparison_direction() == "GE";
     auto isLt = comparison.comparison_direction() == "LT" ||
-                 comparison.comparison_direction() == "LE";
+                comparison.comparison_direction() == "LE";
     if (!isGt && !isLt) return failure();
 
     bool operandParity = lhsIndex > rhsIndex;
