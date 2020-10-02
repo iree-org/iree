@@ -48,7 +48,7 @@
 
 ### P1 O: [Perf burndown] Identify target workload for IREE perf credibility burndown
 
-Note: This is in preparation for a 2020Q1 objective: Establish IREE's credibility at delivering competitive production levels of performance on a realistic use case.  
+Note: This is in preparation for a 2021Q1 objective: Establish IREE's credibility at delivering competitive production levels of performance on a realistic use case.  
 
 +   P1 KR: Defined criteria for evaluating workloads for the burndown.
 +   P1 KR: Evaluated criteria (including performance analysis) for all candidate workloads.
