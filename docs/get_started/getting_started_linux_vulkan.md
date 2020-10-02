@@ -133,10 +133,10 @@ Pass the flag `-driver=vulkan` to `iree-run-module`:
 ```shell
 # -- CMake --
 $ cmake --build build/ --target iree_tools_iree-run-module
-$ ./build/iree/tools/iree-run-module -input_file=/tmp/module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
+$ ./build/iree/tools/iree-run-module -module_file=/tmp/module.fb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
 
 # -- Bazel --
-$ bazel run iree/tools:iree-run-module -- -input_file=/tmp/module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
+$ bazel run iree/tools:iree-run-module -- -module_file=/tmp/module.fb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
 ```
 
 ## Running IREE's Vulkan Samples
