@@ -383,6 +383,9 @@ class Trace:
             "Expected ref and tar to have the same dtype, but got %s  and %s",
             ref.dtype, tar.dtype)
         return False
+      if ref.size == tar.size == 0:
+        return True
+
       if np.issubdtype(ref.dtype, np.floating):
         same = np.allclose(ref, tar, rtol=rtol, atol=atol)
         abs_diff = np.max(np.abs(ref - tar))

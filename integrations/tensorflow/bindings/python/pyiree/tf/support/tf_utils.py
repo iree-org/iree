@@ -717,7 +717,7 @@ def tf_module_to_tflite_module_bytes(
   for method in methods:
     converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
     tflite_modules.append(converter.convert())
-  return dict(method_names, tflite_modules)
+  return dict(zip(method_names, tflite_modules))
 
 
 def tf_signature_def_saved_model_to_tflite_module_bytes(
