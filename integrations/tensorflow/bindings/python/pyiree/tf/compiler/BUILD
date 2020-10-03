@@ -55,7 +55,7 @@ SAVED_MODEL_TF_RUNTIME_DEPS = [
     # Deps for MobileBert
     "@org_tensorflow//tensorflow/core:direct_session",
     "@org_tensorflow//tensorflow/core/kernels:parameterized_truncated_normal_op",  # TruncatedNormal
-    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops", #  VarHandleOp
+    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops",  #  VarHandleOp
     "@org_tensorflow//tensorflow/core/kernels:state",  # Assign.
     "@org_tensorflow//tensorflow/core/kernels:logging_ops",  # Assert
     "@org_tensorflow//tensorflow/core/kernels:bias_op",  # BiasAdd
