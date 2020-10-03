@@ -51,7 +51,20 @@ config_setting(
 # See: https://github.com/google/iree/issues/1506
 SAVED_MODEL_TF_RUNTIME_DEPS = [
     "@org_tensorflow//tensorflow/core:ops",
-    "@org_tensorflow//tensorflow/core:tensorflow",
+
+    # Deps for MobileBert
+    "@org_tensorflow//tensorflow/core:direct_session",
+    "@org_tensorflow//tensorflow/core/kernels:parameterized_truncated_normal_op",  # TruncatedNormal
+    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops", #  VarHandleOp
+    "@org_tensorflow//tensorflow/core/kernels:state",  # Assign.
+    "@org_tensorflow//tensorflow/core/kernels:logging_ops",  # Assert
+    "@org_tensorflow//tensorflow/core/kernels:bias_op",  # BiasAdd
+    "@org_tensorflow//tensorflow/core/kernels:softmax_op",  # Softmax
+    "@org_tensorflow//tensorflow/core/kernels:relu_op",  # Relu
+    "@org_tensorflow//tensorflow/core/kernels:regex_full_match_op",  # StaticRegexFullMatch
+    "@org_tensorflow//tensorflow/core/kernels:string_join_op",  # StringJoin
+    "@org_tensorflow//tensorflow/core/kernels:save_op",  # SharedFilename
+    "@org_tensorflow//tensorflow/core/kernels:save_restore_v2_ops",  # SaveV2
 ] + select({
     ":disable_kernels": [],
     "//conditions:default": [
