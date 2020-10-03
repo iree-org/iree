@@ -771,7 +771,7 @@ def tflite_module_bytes_to_tflite_interpreters(
   if artifacts_dir is not None:
     compiled_paths = dict()
 
-  def _interpret_bytes(tflite_module: bytes, base_dir: str):
+  def _interpret_bytes(method_name: str, tflite_module: bytes, base_dir: str):
     """Save compiled TFLite module bytes and convert into an interpreter."""
     tflite_dir = os.path.join(base_dir, "tflite")
     os.makedirs(tflite_dir, exist_ok=True)
@@ -787,9 +787,9 @@ def tflite_module_bytes_to_tflite_interpreters(
   for method_name, tflite_module in tflite_module_bytes.items():
     if artifacts_dir is None:
       with tempfile.TemporaryDirectory() as base_dir:
-        _interpret_bytes(tflite_module, base_dir)
+        _interpret_bytes(method_name, tflite_module, base_dir)
     else:
-      _interpret_bytes(tflite_module, artifacts_dir)
+      _interpret_bytes(method_name, tflite_module, artifacts_dir)
 
   return interpreters, compiled_paths
 
