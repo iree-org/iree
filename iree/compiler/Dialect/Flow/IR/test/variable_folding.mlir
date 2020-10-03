@@ -32,6 +32,16 @@ func @fold_immutable_const() -> tensor<8xf32> {
 
 // -----
 
+flow.variable @v_const dense<1.0> : tensor<8xf32> attributes {noinline}
+// CHECK-LABEL: @no_fold_noinline_immutable_const
+func @no_fold_noinline_immutable_const() -> tensor<8xf32> {
+  // CHECK-NEXT: = flow.variable.load @v_const : tensor<8xf32>
+  %0 = flow.variable.load @v_const : tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+
+// -----
+
 flow.variable @v_nop mutable : tensor<4xi32>
 // CHECK-LABEL: @nop_load_store
 func @nop_load_store() {
