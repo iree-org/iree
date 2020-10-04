@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt --iree-convert-flow-to-hal %s --split-input-file | IreeFileCheck %s
+// RUN: iree-tf-opt --iree-convert-to-hal %s --split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @i32_to_string
 func @i32_to_string(%arg0 : i32) -> !tf_strings.string {

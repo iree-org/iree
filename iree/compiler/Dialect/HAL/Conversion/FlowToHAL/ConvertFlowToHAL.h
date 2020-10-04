@@ -21,8 +21,16 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Converts flow streams to command buffer recording ops.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertFlowToHALPass();
+// Adds op legality rules to |conversionTarget| to ensure all incoming flow ops
+// are removed during Flow->HAL lowering.
+void setupFlowToHALLegality(MLIRContext *context,
+                            ConversionTarget &conversionTarget,
+                            TypeConverter &typeConverter);
+
+// Populates conversion patterns for Flow->HAL.
+void populateFlowToHALPatterns(MLIRContext *context,
+                               OwningRewritePatternList &patterns,
+                               TypeConverter &typeConverter);
 
 }  // namespace iree_compiler
 }  // namespace mlir

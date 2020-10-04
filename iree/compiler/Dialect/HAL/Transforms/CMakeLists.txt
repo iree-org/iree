@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "ConvertToHAL.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeInterfaces.cpp"
@@ -40,12 +41,17 @@ iree_cc_library(
     absl::strings
     iree::base::signature_mangle
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
+    iree::compiler::Dialect::HAL::Conversion::IREEToHAL
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::IREE::Transforms
+    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
   PUBLIC
 )

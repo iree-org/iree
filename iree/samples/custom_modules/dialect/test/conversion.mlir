@@ -16,7 +16,7 @@
 // Depending on whether any manual conversion is performed this may get complex,
 // such as when versioning imports or performing optimizations.
 
-// RUN: custom-opt %s -iree-convert-flow-to-hal -iree-shape-expand-function-ranked-shape-dims -iree-vm-conversion -split-input-file | IreeFileCheck %s
+// RUN: custom-opt %s -iree-convert-to-hal -iree-shape-expand-function-ranked-shape-dims -iree-vm-conversion -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @tensorToMessage
 func @tensorToMessage(%tensor : tensor<2x4xf32>) {

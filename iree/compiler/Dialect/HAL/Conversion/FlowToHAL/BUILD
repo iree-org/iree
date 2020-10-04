@@ -38,8 +38,6 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/IREE/Conversion:ConvertToHAL",
-        "//iree/compiler/Dialect/IREE/Conversion:PreserveCompilerHints",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",

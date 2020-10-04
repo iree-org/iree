@@ -16,14 +16,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    PreserveCompilerHints
+    IREEToHAL
   HDRS
-    "PreserveCompilerHints.h"
+    "ConvertIREEToHAL.h"
   SRCS
-    "PreserveCompilerHints.cpp"
+    "ConvertIREEToHAL.cpp"
   DEPS
     MLIRIR
+    MLIRStandard
     MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

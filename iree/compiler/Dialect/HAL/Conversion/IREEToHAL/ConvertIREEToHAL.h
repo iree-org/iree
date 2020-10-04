@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_IREE_CONVERSION_CONVERTTOHAL_H_
-#define IREE_COMPILER_DIALECT_IREE_CONVERSION_CONVERTTOHAL_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTIREETOHAL_H_
+#define IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTIREETOHAL_H_
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
@@ -36,4 +36,4 @@ void setupIREEToHALLegality(MLIRContext *context, ConversionTarget &target);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_CONVERSION_CONVERTTOHAL_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTIREETOHAL_H_

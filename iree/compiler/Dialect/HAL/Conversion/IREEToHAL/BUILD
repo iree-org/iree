@@ -12,18 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-iree_cc_library(
-  NAME
-    PreserveCompilerHints
-  HDRS
-    "PreserveCompilerHints.h"
-  SRCS
-    "PreserveCompilerHints.cpp"
-  DEPS
-    MLIRIR
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-  PUBLIC
+cc_library(
+    name = "IREEToHAL",
+    srcs = [
+        "ConvertIREEToHAL.cpp",
+    ],
+    hdrs = [
+        "ConvertIREEToHAL.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/IREE/IR",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Transforms",
+    ],
 )

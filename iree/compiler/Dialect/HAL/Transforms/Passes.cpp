@@ -16,7 +16,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -44,7 +43,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 }  // namespace
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   TargetOptions targetOptions,
+                                   const TargetOptions &targetOptions,
                                    const TransformOptions &transformOptions) {
   passManager.addPass(createCanonicalizerPass());
 
@@ -56,7 +55,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // this pass.
   passManager.addPass(createTranslateExecutablesPass(targetOptions));
 
-  passManager.addPass(createConvertFlowToHALPass());
+  // Convert supported input dialects (std, flow, etc) into the HAL dialect.
+  passManager.addPass(createConvertToHALPass());
 
   // Phase ordering note: Before this pass, functions signatures will be based
   // on explicit shape types (such as ranked_shape). After this pass, these
@@ -113,7 +113,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   TargetOptions targetOptions) {
+                                   const TargetOptions &targetOptions) {
   TransformOptions transformOptions;
   buildHALTransformPassPipeline(passManager, targetOptions, transformOptions);
 }

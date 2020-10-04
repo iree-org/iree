@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
-iree_cc_library(
-  NAME
-    PreserveCompilerHints
-  HDRS
-    "PreserveCompilerHints.h"
-  SRCS
-    "PreserveCompilerHints.cpp"
-  DEPS
-    MLIRIR
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )

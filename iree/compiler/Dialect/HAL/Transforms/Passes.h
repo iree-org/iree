@@ -45,9 +45,16 @@ namespace HAL {
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   TargetOptions targetOptions);
+                                   const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
+
+//===----------------------------------------------------------------------===//
+// Conversion
+//===----------------------------------------------------------------------===//
+
+// Convert input flow/std/etc dialects to the IREE HAL dialect.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 
 //===----------------------------------------------------------------------===//
 // Device management
@@ -109,6 +116,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 inline void registerHALPasses() {
   registerHALTransformPassPipeline();
   auto executableOptions = getTargetOptionsFromFlags();
+  createConvertToHALPass();
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
   createMaterializeInterfacesPass(executableOptions);

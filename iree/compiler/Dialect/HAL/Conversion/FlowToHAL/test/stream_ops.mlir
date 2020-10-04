@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-flow-to-hal -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-to-hal -canonicalize %s | IreeFileCheck %s
 
 hal.executable @ex0 {
   hal.interface @interface {
