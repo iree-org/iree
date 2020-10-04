@@ -24,8 +24,9 @@ def iree_vision_test_suite(
         backends,
         reference_backend,
         failing_configurations = None,
-        external_weights = None,
         tags = None,
+        url = None,
+        use_external_weights = None,
         deps = None,
         size = "large",
         python_version = "PY3",
@@ -55,11 +56,13 @@ def iree_vision_test_suite(
         an iterable of dictionaries with the keys `models`, `datasets` and
         `backends`. Each key points to a string or iterable of strings
         specifying a set of models, datasets and backends that are failing.
-      external_weights:
-        a base url to fetch trained model weights from.
       tags:
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
+      url:
+        a base url to fetch non-keras trained model weights from.
+      use_external_weights:
+        whether or not to load model weights from keras or a supplied url.
       deps:
         test dependencies.
       size:
@@ -94,13 +97,21 @@ def iree_vision_test_suite(
 
                 # Append "_failing" to name if this is a failing configuration.
                 test_name = name if not failing else name + "_failing"
-                test_name = "{}_{}_{}__{}__{}".format(
-                    test_name,
-                    model,
-                    dataset,
-                    reference_backend,
-                    backend,
-                )
+                if len(datasets) > 1:
+                    test_name = "{}_{}_{}__{}__{}".format(
+                        test_name,
+                        model,
+                        dataset,
+                        reference_backend,
+                        backend,
+                    )
+                else:
+                    test_name = "{}_{}__{}__{}".format(
+                        test_name,
+                        model,
+                        reference_backend,
+                        backend,
+                    )
                 tests.append(test_name)
 
                 args = [
@@ -109,8 +120,11 @@ def iree_vision_test_suite(
                     "--reference_backend={}".format(reference_backend),
                     "--target_backends={}".format(backend),
                 ]
-                if external_weights:
-                    args.append("--url={}".format(external_weights))
+                if url:
+                    args.append("--url={}".format(url))
+                if use_external_weights:
+                    args.append(
+                        "--use_external_weights={}".format(use_external_weights))
 
                 # TODO(GH-2175): Simplify this after backend names are
                 # standardized.

@@ -162,7 +162,7 @@ iree_e2e_test_suite(
 )
 
 iree_vision_test_suite(
-    name = "vision_internal_tests",
+    name = "short_cifar10_internal_tests",
     backends = [
         "tf",
         "tflite",
@@ -171,7 +171,14 @@ iree_vision_test_suite(
         "iree_vulkan",
     ],
     datasets = ["cifar10"],
-    models = ["ResNet50"],
+    models = [
+        # All models with runtime shorter than ResNet50.
+        "MobileNet",  # Max: Vulkan 61.0s
+        "MobileNetV2",  # Max: LLVM 96.3s
+        "ResNet50",  # Max: LLVM 145.6s
+        "VGG16",  # Max: LLVM 89.5s
+        "VGG19",  # Max: LLVM 94.7s
+    ],
     reference_backend = "tf",
     tags = ["manual"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
@@ -180,7 +187,8 @@ iree_vision_test_suite(
 )
 
 iree_vision_test_suite(
-    name = "vision_external_tests",
+    name = "long_cifar10_internal_tests",
+    size = "enormous",
     backends = [
         "tf",
         "tflite",
@@ -188,10 +196,59 @@ iree_vision_test_suite(
         "iree_llvmjit",
         "iree_vulkan",
     ],
-    datasets = [
-        "cifar10",
-        "imagenet",
+    datasets = ["cifar10"],
+    failing_configurations = [
+        {
+            # Failing all but tf and vmla:
+            "models": [
+                "NASNetLarge",
+                "NASNetMobile",
+                "ResNet50V2",
+                "ResNet101V2",
+                "ResNet152V2",
+            ],
+            "datasets": ["cifar10"],
+            "backends": [
+                "tflite",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
     ],
+    models = [
+        "DenseNet121",
+        "DenseNet169",
+        "DenseNet201",
+        "NASNetLarge",
+        "NASNetMobile",
+        "ResNet50V2",
+        "ResNet101",
+        "ResNet101V2",
+        "ResNet152",
+        "ResNet152V2",
+    ],
+    reference_backend = "tf",
+    tags = [
+        "guitar",
+        "manual",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_vision_test_suite(
+    name = "cifar10_external_tests",
+    backends = [
+        "tf",
+        "tflite",
+        "iree_vmla",
+        "iree_llvmjit",
+        "iree_vulkan",
+    ],
+    datasets = ["cifar10"],
     models = [
         "MobileNet",
         "MobileNetV2",
@@ -206,6 +263,74 @@ iree_vision_test_suite(
         "nokokoro",
         "notap",
     ],
+    url = "https://storage.googleapis.com/iree_models/",
+    use_external_weights = True,
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_vision_test_suite(
+    name = "imagenet_external_tests",
+    size = "enormous",
+    backends = [
+        "tf",
+        "tflite",
+        "iree_vmla",
+        "iree_llvmjit",
+        "iree_vulkan",
+    ],
+    datasets = ["imagenet"],
+    failing_configurations = [
+        {
+            # Failing all but tf and vmla:
+            "models": [
+                "InceptionResNetV2",
+                "InceptionV3",
+                "NASNetLarge",
+                "NASNetMobile",
+                "ResNet50V2",
+                "ResNet101V2",
+                "ResNet152V2",
+                "Xception",
+            ],
+            "datasets": ["imagenet"],
+            "backends": [
+                "tflite",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+    ],
+    models = [
+        "DenseNet121",
+        "DenseNet169",
+        "DenseNet201",
+        "InceptionResNetV2",
+        "InceptionV3",
+        "MobileNet",
+        "MobileNetV2",
+        "NASNetLarge",
+        "NASNetMobile",
+        "ResNet50",
+        "ResNet50V2",
+        "ResNet101",
+        "ResNet101V2",
+        "ResNet152",
+        "ResNet152V2",
+        "VGG16",
+        "VGG19",
+        "Xception",
+    ],
+    reference_backend = "tf",
+    tags = [
+        "external",
+        "guitar",
+        "manual",
+        "nokokoro",
+        "notap",
+    ],
+    use_external_weights = True,
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
