@@ -489,6 +489,14 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 // HAL structs
 //===----------------------------------------------------------------------===//
 
+def HAL_ByteRangeAttr :
+  IREE_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,
+    IREE_StructFieldAttr<"length", HAL_DeviceSizeAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_MemoryBarrier : NamedTupleOf<[
     NamedTupleElement<0, "source_scope", I32>,
     NamedTupleElement<1, "target_scope", I32>

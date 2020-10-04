@@ -103,6 +103,75 @@ IntegerAttr getElementTypeAttr(Type type) {
 //===----------------------------------------------------------------------===//
 
 // static
+Attribute ByteRangeAttr::parse(DialectAsmParser &p) {
+  auto b = p.getBuilder();
+  if (failed(p.parseLess())) return {};
+
+  // TODO(benvanik): support the range syntax; the dialect asm parser fights
+  // with it though by checking for proper []/() nesting.
+
+  // Try first the range style: byte_range<[start..end)>
+  bool startInclusive;
+  if (succeeded(p.parseOptionalLSquare())) {  // [...
+    startInclusive = true;
+  } else if (succeeded(p.parseOptionalLParen())) {  // (...
+    startInclusive = false;
+  } else {
+    // byte_range<offset, length>
+    IntegerAttr offsetAttr;
+    IntegerAttr lengthAttr;
+    if (failed(p.parseAttribute(offsetAttr, b.getIndexType())) ||
+        failed(p.parseComma()) ||
+        failed(p.parseAttribute(lengthAttr, b.getIndexType())) ||
+        failed(p.parseGreater())) {
+      return {};
+    }
+    return get(offsetAttr, lengthAttr);
+  }
+
+  IntegerAttr startAttr;
+  IntegerAttr endAttr;
+  if (failed(p.parseAttribute(startAttr, b.getIndexType())) ||
+      failed(p.parseKeyword("to")) ||
+      failed(p.parseAttribute(endAttr, b.getIndexType()))) {
+    return {};
+  }
+
+  bool endInclusive;
+  if (succeeded(p.parseOptionalRSquare())) {  // ...]
+    endInclusive = true;
+  } else if (succeeded(p.parseOptionalRParen())) {  // ...)
+    endInclusive = false;
+  } else {
+    p.emitError(p.getCurrentLocation()) << "expected ] or ) to end range";
+    return {};
+  }
+
+  if (failed(p.parseGreater())) return {};
+
+  startAttr = startInclusive
+                  ? startAttr
+                  : b.getIndexAttr((startAttr.getValue() + 1).getSExtValue());
+  endAttr = endInclusive
+                ? endAttr
+                : b.getIndexAttr((endAttr.getValue() - 1).getSExtValue());
+
+  IntegerAttr offsetAttr = startAttr;
+  IntegerAttr lengthAttr = b.getIndexAttr(
+      (endAttr.getValue() - startAttr.getValue()).getSExtValue());
+  return get(offsetAttr, lengthAttr);
+}
+
+void ByteRangeAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  os << offset();
+  os << ", ";
+  os << length();
+  os << ">";
+}
+
+// static
 Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
   auto b = p.getBuilder();
   IntegerAttr bindingAttr;

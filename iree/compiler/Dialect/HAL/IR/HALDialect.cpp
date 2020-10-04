@@ -82,8 +82,8 @@ HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
   addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
 
-  addAttributes<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-                MatchAllAttr, DeviceMatchIDAttr>();
+  addAttributes<ByteRangeAttr, DescriptorSetLayoutBindingAttr, MatchAlwaysAttr,
+                MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr>();
 
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
@@ -104,7 +104,9 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
                                      Type type) const {
   StringRef attrKind;
   if (failed(parser.parseKeyword(&attrKind))) return {};
-  if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
+  if (attrKind == ByteRangeAttr::getKindName()) {
+    return ByteRangeAttr::parse(parser);
+  } else if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
   } else if (attrKind == MatchAlwaysAttr::getKindName()) {
     return MatchAlwaysAttr::parse(parser);
@@ -122,8 +124,8 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-            MatchAllAttr, DeviceMatchIDAttr>(
+      .Case<ByteRangeAttr, DescriptorSetLayoutBindingAttr, MatchAlwaysAttr,
+            MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr>(
           [&](auto typedAttr) { typedAttr.print(p); })
       .Default(
           [](Attribute) { llvm_unreachable("unhandled HAL attribute kind"); });
