@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir %s -iree-hal-target-backends=vmla -input-value="3x2x2xi32=[[1, 2] [3, 4]] [[5, 6] [7, 8]] [[9, 10] [11, 12]]" -input-value="2xi32=[0, 1]" | IreeFileCheck %s
-// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=llvm-ir -input-value="3x2x2xi32=[[1, 2] [3, 4]] [[5, 6] [7, 8]] [[9, 10] [11, 12]]" -input-value="2xi32=[0, 1]" | IreeFileCheck %s)
+// RUN: iree-run-mlir %s -iree-hal-target-backends=vmla -function-value="3x2x2xi32=[[1, 2] [3, 4]] [[5, 6] [7, 8]] [[9, 10] [11, 12]]" -function-value="2xi32=[0, 1]" | IreeFileCheck %s
+// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=llvm-ir -function-value="3x2x2xi32=[[1, 2] [3, 4]] [[5, 6] [7, 8]] [[9, 10] [11, 12]]" -function-value="2xi32=[0, 1]" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @torch_index_select1
 func @torch_index_select1(%arg0: tensor<?x?x?xi32>, %arg1: tensor<?xi32>) -> tensor<?x?x?xi32> attributes {iree.module.export} {

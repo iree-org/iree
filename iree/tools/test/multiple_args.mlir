@@ -3,7 +3,7 @@
 // (only checking exit codes).
 // RUN: iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s -o ${TEST_TMPDIR?}/bc.module && iree-benchmark-module --driver=vmla --entry_function=multi_input --function_inputs='2xi32=[1 2], 2xi32=[3 4]' --module_file=${TEST_TMPDIR?}/bc.module
 
-// RUN: (iree-run-mlir --iree-hal-target-backends=vmla --input-value='2xi32=[1 2]' --input-value='2xi32=[3 4]' %s) | IreeFileCheck %s
+// RUN: (iree-run-mlir --iree-hal-target-backends=vmla --function-value='2xi32=[1 2]' --function-value='2xi32=[3 4]' %s) | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @multi_input
 func @multi_input(%arg0 : tensor<2xi32>, %arg1 : tensor<2xi32>) -> (tensor<2xi32>, tensor<2xi32>) attributes { iree.module.export } {

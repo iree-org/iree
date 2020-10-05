@@ -120,7 +120,7 @@ and execute a function in the compiled module:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
-    -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+    -function-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
