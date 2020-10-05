@@ -1186,6 +1186,10 @@ module {
     vm.import @vmla.floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
@@ -1399,6 +1403,10 @@ vm.module @module {
   vm.import @vmla.floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+  vm.import @vmla.sort.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+  vm.import @vmla.sort.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+  vm.import @vmla.sort.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+  vm.import @vmla.sort.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
   vm.import @vmla.convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
@@ -1612,6 +1620,10 @@ module {
     vm.import @vmla.floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
@@ -1814,6 +1826,10 @@ module {
     vm.import @vmla.floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.round.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i16(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.i32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
+    vm.import @vmla.sort.f32(%src : !vm.ref<!vmla.buffer>, %src_shape : i32 ..., %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}
     vm.import @vmla.convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>) attributes {sym_visibility = "private"}

@@ -1615,6 +1615,62 @@ operation ::= `vmla.sin` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
+### `vmla.sort` (::mlir::iree_compiler::IREE::VMLA::SortOp)
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.sort` $src`(`$src_shape `:` type($src_shape)`)``,`
+              `out` $dst attr-dict `:` $element_type
+```
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`dst` | buffer
+
+### `vmla.sort.pseudo` (::mlir::iree_compiler::IREE::VMLA::SortPseudoOp)
+
+Tensor-level pseudo-op of VMLA::SortOp.
+
+Syntax:
+
+```
+operation ::= `vmla.sort.pseudo` $value attr-dict `:` `(`type($value)`)` `->` type($dst)
+```
+
+
+This is a tensor-level version of VMLA::SortOp, to facilitate
+the lowering process.
+
+This operation generates a sorted index list along the last dimension,
+performing batch-wise along all other dimensions.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`value` | tensor of any type values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`dst` | tensor of 32-bit signless integer values
+
 ### `vmla.sqrt` (::mlir::iree_compiler::IREE::VMLA::SqrtOp)
 
 
