@@ -1,8 +1,8 @@
 // MNIST model with placeholder weights, for testing.
 
-// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s -function-value="1x28x28x1xf32" | IreeFileCheck %s
-// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=llvm-ir %s -function-value="1x28x28x1xf32" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -function-value="1x28x28x1xf32" | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s -function-input="1x28x28x1xf32" | IreeFileCheck %s
+// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=llvm-ir %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -function-input="1x28x28x1xf32" | IreeFileCheck %s)
 
 module attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 175 : i32}} {
   flow.variable @"__iree_flow___sm_node15__model.layer-2.kernel" dense<0.5> : tensor<784x128xf32>

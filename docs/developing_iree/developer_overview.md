@@ -181,7 +181,7 @@ For example, to execute the contents of
 ```shell
 $ bazel run iree/tools:iree-run-mlir -- \
   $PWD/iree/tools/test/simple.mlir \
-  --function-value="i32=-2" \
+  --function-input="i32=-2" \
   --iree-hal-target-backends=vmla
 ```
 
@@ -247,8 +247,8 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/renderdoc/lib/path \
   bazel-bin/iree/tools/iree-run-mlir \
     $PWD/iree/samples/vulkan/simple_mul.mlir \
     -iree-hal-target-backends=vulkan-spirv \
-    -function-value="4xf32=1,2,3,4" \
-    -function-value="4xf32=2,4,6,8" \
+    -function-input="4xf32=1,2,3,4" \
+    -function-input="4xf32=2,4,6,8" \
     -run-arg="--vulkan_renderdoc"
 ```
 
