@@ -146,25 +146,11 @@ spirv::GlobalVariableOp getOrInsertResourceVariable(Location loc, Type type,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Template class for attaching type converter to conversion patterns.
-template <typename SourceOp>
-class InterfaceOpConversion : public OpConversionPattern<SourceOp> {
- public:
-  InterfaceOpConversion(MLIRContext *context, TypeConverter &typeConverter,
-                        PatternBenefit benefit = 1)
-      : OpConversionPattern<SourceOp>(context, benefit),
-        typeConverter(typeConverter) {}
-
- protected:
-  TypeConverter &typeConverter;
-};
-
 /// A pattern to convert hal.interface.load.constant into a sequence of SPIR-V
 /// ops to load from a global variable representing the push constant storage.
 struct HALInterfaceLoadConstantConverter final
-    : public InterfaceOpConversion<IREE::HAL::InterfaceLoadConstantOp> {
-  using InterfaceOpConversion<
-      IREE::HAL::InterfaceLoadConstantOp>::InterfaceOpConversion;
+    : public OpConversionPattern<IREE::HAL::InterfaceLoadConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceLoadConstantOp loadOp, ArrayRef<Value> operands,
@@ -174,8 +160,8 @@ struct HALInterfaceLoadConstantConverter final
 /// A pattern to convert iree.placeholdder into a sequence of SPIR-V ops to get
 /// the address to a global variable representing the resource buffer.
 struct IREEPlaceholderConverter final
-    : public InterfaceOpConversion<IREE::PlaceholderOp> {
-  using InterfaceOpConversion<IREE::PlaceholderOp>::InterfaceOpConversion;
+    : public OpConversionPattern<IREE::PlaceholderOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       IREE::PlaceholderOp phOp, ArrayRef<Value> operands,
@@ -373,7 +359,7 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   auto moduleOp = phOp.getParentOfType<ModuleOp>();
 
-  Type convertedType = typeConverter.convertType(phOp.getType());
+  Type convertedType = getTypeConverter()->convertType(phOp.getType());
   if (!convertedType) {
     return phOp.emitError()
            << "SPIRV type conversion failed: " << phOp.getType();
@@ -421,8 +407,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
   populateVectorToSPIRVPatterns(context, typeConverter, patterns,
                                 cooperativeMatrixAnalysis);
-  patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter,
-                  LinalgReshapeConverter>(context, typeConverter);
+  patterns.insert<HALInterfaceLoadConstantConverter, IREEPlaceholderConverter>(
+      typeConverter, context);
+  patterns.insert<LinalgReshapeConverter>(context, typeConverter);
 
   std::unique_ptr<ConversionTarget> target =
       spirv::SPIRVConversionTarget::get(targetAttr);
