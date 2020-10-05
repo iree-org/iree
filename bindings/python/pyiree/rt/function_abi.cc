@@ -32,6 +32,227 @@ namespace python {
 
 namespace {
 
+class SipLinearizeInputsVisitor {
+ public:
+  SipLinearizeInputsVisitor(SipSignatureParser& parser, py::tuple& py_args,
+                            py::dict& py_kwargs,
+                            absl::InlinedVector<py::handle, 4>& linear_py_args)
+      : parser_(parser),
+        py_args_(py_args),
+        py_kwargs_(py_kwargs),
+        linear_py_args_(linear_py_args) {}
+
+  void IntegerKey(SipSignatureParser& p, int k) {
+    auto current = tos();
+    try {
+      auto current_seq = current.cast<py::sequence>();
+      stack_.push_back(current_seq[k]);
+    } catch (std::exception& e) {
+      auto message =
+          absl::StrCat("Expected sequence index ", k, " not found in ",
+                       py::repr(current).cast<std::string>());
+      SetError(std::move(message));
+    }
+  }
+
+  void StringKey(SipSignatureParser& p, absl::string_view k) {
+    auto current = tos();
+    py::str py_k(k.data(), k.size());
+    try {
+      auto current_dict = tos().cast<py::dict>();
+      stack_.push_back(current_dict[py_k]);
+    } catch (std::exception& e) {
+      auto message = absl::StrCat("Expected key '", k, "' not found in ",
+                                  py::repr(current).cast<std::string>());
+      SetError(std::move(message));
+    }
+  }
+
+  void OpenStruct(SipSignatureParser& p,
+                  SipSignatureParser::StructType struct_type) {
+    // Only structs directly off of the root are opened without a key.
+    if (!stack_.empty()) return;
+
+    py::handle tos;
+    switch (struct_type) {
+      case SipSignatureParser::StructType::kDict:
+        tos = py_kwargs_;
+        break;
+      case SipSignatureParser::StructType::kSequence:
+        tos = py_args_;
+        break;
+    }
+    stack_.push_back(tos);
+  }
+
+  void CloseStruct(SipSignatureParser& p) {
+    if (!stack_.empty()) {
+      stack_.pop_back();
+    }
+  }
+
+  void MapToRawSignatureIndex(SipSignatureParser& p, int index) {
+    if (static_cast<int>(linear_py_args_.size()) <= index) {
+      linear_py_args_.resize(index + 1);
+    }
+    linear_py_args_[index] = tos();
+    if (!stack_.empty()) {
+      stack_.pop_back();
+    }
+  }
+
+ private:
+  py::handle tos() {
+    if (stack_.empty()) {
+      SetError("Mismatched structures during unpacking arguments");
+      return py::handle();
+    }
+    return stack_.back();
+  }
+
+  void SetError(std::string message) { parser_.SetError(message); }
+
+  SipSignatureParser& parser_;
+  py::tuple& py_args_;
+  py::dict& py_kwargs_;
+  absl::InlinedVector<py::handle, 4>& linear_py_args_;
+
+  // The struct stack. Top is the last.
+  // When the stack is empty, opening a struct will push the first entry:
+  // py_args_ if a sequence and py_kwargs_ if a dict. Otherwise, new stack
+  // levels are opened upon key resolution.
+  // Either CloseStruct or MapToRawSignatureIndex terminate each level of
+  // the stack.
+  absl::InlinedVector<py::handle, 4> stack_;
+};
+
+class SipStructureResultsVisitor {
+ public:
+  SipStructureResultsVisitor(
+      SipSignatureParser& parser,
+      absl::InlinedVector<py::object, 4>& linear_py_results)
+      : parser_(parser), linear_py_results_(linear_py_results) {}
+
+  void IntegerKey(SipSignatureParser& p, int k) {
+    pending_assign_key_ = py::int_(k);
+  }
+
+  void StringKey(SipSignatureParser& p, absl::string_view k) {
+    pending_assign_key_ = py::str(k.data(), k.size());
+  }
+
+  void OpenStruct(SipSignatureParser& p,
+                  SipSignatureParser::StructType struct_type) {
+    py::object struct_obj;
+    bool is_dict;
+    switch (struct_type) {
+      case SipSignatureParser::StructType::kDict:
+        struct_obj = py::dict();
+        is_dict = true;
+        break;
+      case SipSignatureParser::StructType::kSequence:
+        struct_obj = py::list();
+        is_dict = false;
+        break;
+      default:
+        SetError("Illegal structure type");
+        return;
+    }
+    // Must assign before pushing so as to assign to the prior level.
+    AssignCurrent(struct_obj);
+    stack_.push_back(std::make_pair(std::move(struct_obj), is_dict));
+  }
+
+  void CloseStruct(SipSignatureParser& p) {
+    if (!stack_.empty()) stack_.pop_back();
+    pending_assign_key_ = py::none();  // Just in case (for error path).
+  }
+
+  void MapToRawSignatureIndex(SipSignatureParser& p, int index) {
+    if (index < 0 || index >= static_cast<int>(linear_py_results_.size())) {
+      SetError("Raw result index out of range in reflection metadata");
+      return;
+    }
+    py::object current_obj = linear_py_results_[index];
+    AssignCurrent(std::move(current_obj));
+  }
+
+  py::object ConsumeResult() {
+    if (result)
+      return std::move(result);
+    else
+      return py::none();
+  }
+
+ private:
+  void AssignCurrent(py::object value) {
+    if (stack_.empty()) {
+      if (result) {
+        SetError("Attempt to unpack multiple roots");
+        return;
+      }
+      result = std::move(value);
+    } else {
+      if (!pending_assign_key_ || pending_assign_key_.is_none()) {
+        SetError("Attempt to assign out of order");
+        return;
+      }
+
+      try {
+        auto stack_entry = stack_.back();
+        bool is_dict = stack_entry.second;
+        if (is_dict) {
+          stack_entry.first.cast<py::dict>()[pending_assign_key_] = value;
+        } else {
+          int index = pending_assign_key_.cast<int>();
+          py::list l = stack_entry.first.cast<py::list>();
+          // Technically, signature keys can come out of order, which is sad.
+          // none-fill the list as needed to fill the gap.
+          // TODO: Further guarantees can be enforced at conversion time,
+          // simplifying this.
+          bool extended = false;
+          int list_size = l.size();
+          if (list_size <= index) {
+            while (l.size() <= index) {
+              l.append(py::none());
+              extended = true;
+            }
+            l.append(std::move(value));
+          } else {
+            l[index] = std::move(value);
+          }
+          pending_assign_key_ = py::none();
+        }
+      } catch (std::exception& e) {
+        SetError("Corrupt sip signature: Signature/data type mismatch");
+        pending_assign_key_ = py::none();
+      }
+    }
+  }
+
+  void SetError(std::string message) { parser_.SetError(message); }
+
+  SipSignatureParser& parser_;
+  absl::InlinedVector<py::object, 4>& linear_py_results_;
+  py::object result;
+
+  // Parse state.
+  // A new level of the stack is opened for each container. Each entry is a
+  // pair of (container, is_dict). If not is_dict, it is assumed to be a list.
+  absl::InlinedVector<std::pair<py::object, bool>, 4> stack_;
+  // If a pending key has been set for a following assignment, it is noted
+  // here. The nested assignments, the call sequence is:
+  //   1. OpenStruct
+  //     For-each key:
+  //       a. IntegerKey or StringKey
+  //       b. MapToRawSignatureIndex
+  //   2. CloseStruct
+  // For single-result situations, it is legal to just have a single, top-level
+  // call to MapToRawSignatureIndex, which causes the entire result to be
+  // equal to the current object.
+  py::object pending_assign_key_;
+};
+
 // Python friendly entry-point for creating an instance from a list
 // of attributes. This is not particularly efficient and is primarily
 // for testing. Typically, this will be created directly from a function
@@ -49,20 +270,6 @@ std::unique_ptr<FunctionAbi> PyCreateAbi(
   return FunctionAbi::Create(device, std::move(host_type_factory), lookup);
 }
 
-VmVariantList PyRawPack(FunctionAbi* self,
-                        absl::Span<const FunctionAbi::Description> descs,
-                        py::sequence py_args, bool writable) {
-  if (py_args.size() != descs.size()) {
-    throw RaiseValueError("Mismatched pack arity");
-  }
-
-  VmVariantList f_args = VmVariantList::Create(py_args.size());
-  absl::InlinedVector<py::handle, 8> local_py_args(py_args.begin(),
-                                                   py_args.end());
-  self->RawPack(descs, absl::MakeSpan(local_py_args), f_args, writable);
-  return f_args;
-}
-
 VmVariantList PyAllocateResults(FunctionAbi* self, VmVariantList& f_args,
                                 bool static_alloc) {
   auto f_results = VmVariantList::Create(self->raw_result_arity());
@@ -73,18 +280,6 @@ VmVariantList PyAllocateResults(FunctionAbi* self, VmVariantList& f_args,
                           f_args, f_results);
   }
   return f_results;
-}
-
-py::object PyRawUnpackResults(FunctionAbi* self, VmVariantList& f_args) {
-  absl::InlinedVector<py::object, 4> py_results;
-  py_results.resize(f_args.size());
-  self->RawUnpack(absl::MakeConstSpan(self->raw_config().results), f_args,
-                  absl::MakeSpan(py_results));
-  py::tuple py_result_tuple(py_results.size());
-  for (size_t i = 0, e = py_results.size(); i < e; ++i) {
-    py_result_tuple[i] = std::move(py_results[i]);
-  }
-  return std::move(py_result_tuple);  // Without move, warns of copy.
 }
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
@@ -225,7 +420,12 @@ std::string FunctionAbi::DebugString() const {
   if (!s) {
     return "<FunctionAbi NO_DEBUG_INFO>";
   }
-  return absl::StrCat("<FunctionAbi ", *s, ">");
+  auto result = absl::StrCat("<FunctionAbi ", *s);
+  if (sip_signature_) {
+    absl::StrAppend(&result, " SIP:'", *sip_signature_, "'");
+  }
+  absl::StrAppend(&result, ">");
+  return result;
 }
 
 std::unique_ptr<FunctionAbi> FunctionAbi::Create(
@@ -264,8 +464,81 @@ std::unique_ptr<FunctionAbi> FunctionAbi::Create(
     throw RaiseValueError(message.c_str());
   }
 
-  // TODO(laurenzo): Detect sip ABI and add a translation layer.
+  auto reported_abi = lookup("abi");
+  auto sip_signature = lookup("sip");
+  if (reported_abi && *reported_abi == "sip" && sip_signature) {
+    abi->sip_signature_ = std::string(*sip_signature);
+  }
   return abi;
+}
+
+void FunctionAbi::Pack(py::tuple& py_args, py::dict& py_kwargs,
+                       absl::Span<const Description> descs, VmVariantList& args,
+                       bool writable) {
+  absl::InlinedVector<py::handle, 4> linear_py_args;
+  if (!sip_signature_) {
+    // There is no python -> linear translation.
+    size_t e = py_args.size();
+    linear_py_args.resize(e);
+    for (size_t i = 0; i < e; ++i) {
+      linear_py_args[i] = py_args[i];
+    }
+  } else {
+    // Linearize based on sip signature.
+    // Note that we use explicit errors here and do not let exceptions escape
+    // since parsing may be happening in a library not compiled for exceptions.
+    SipSignatureParser parser;
+    SipLinearizeInputsVisitor visitor(parser, py_args, py_kwargs,
+                                      linear_py_args);
+    parser.VisitInputs(visitor, *sip_signature_);
+    auto error = parser.GetError();
+    if (error) {
+      auto message =
+          absl::StrCat("Could not unpack python arguments: ", *error);
+      throw RaiseValueError(message.c_str());
+    }
+  }
+  RawPack(descs, absl::MakeSpan(linear_py_args), args, writable);
+}
+
+py::object FunctionAbi::Unpack(absl::Span<const Description> descs,
+                               VmVariantList& f_results) {
+  absl::InlinedVector<py::object, 4> linear_py_results;
+  linear_py_results.resize(f_results.size());
+  RawUnpack(descs, f_results, absl::MakeSpan(linear_py_results));
+
+  if (!sip_signature_) {
+    // Just emulate unpacking to a tuple, which is the standard way of
+    // returning multiple results from a python function.
+    auto linear_size = linear_py_results.size();
+    if (linear_size == 0) {
+      return py::none();
+    } else if (linear_size == 1) {
+      return std::move(linear_py_results.front());
+    }
+    // Fall back to tuple multi-result form.
+    py::tuple py_result_tuple(linear_size);
+    for (size_t i = 0; i < linear_size; ++i) {
+      py_result_tuple[i] = std::move(linear_py_results[i]);
+    }
+    return std::move(py_result_tuple);  // Without move, warns of copy.
+  }
+
+  // Structured unpack with the sip signature.
+  // Note that we use explicit errors here and do not let exceptions escape
+  // since parsing may be happening in a library not compiled for exceptions.
+  SipSignatureParser parser;
+  SipStructureResultsVisitor visitor(parser, linear_py_results);
+  parser.VisitResults(visitor, *sip_signature_);
+  auto error = parser.GetError();
+  if (error) {
+    auto message =
+        absl::StrCat("Could not create python structured results: ", *error);
+    throw RaiseValueError(message.c_str());
+  }
+
+  assert(!PyErr_Occurred());
+  return visitor.ConsumeResult();
 }
 
 void FunctionAbi::RawPack(absl::Span<const Description> descs,
@@ -546,11 +819,13 @@ void SetupFunctionAbiBindings(pybind11::module m) {
       .def("__repr__", &FunctionAbi::DebugString)
       .def_property_readonly("raw_input_arity", &FunctionAbi::raw_input_arity)
       .def_property_readonly("raw_result_arity", &FunctionAbi::raw_result_arity)
-      .def("raw_pack_inputs",
-           [](FunctionAbi* self, py::sequence py_args) {
-             return PyRawPack(self,
-                              absl::MakeConstSpan(self->raw_config().inputs),
-                              py_args, false /* writable */);
+      .def("pack_inputs",
+           [](FunctionAbi* self, py::args py_args, py::kwargs py_kwargs) {
+             VmVariantList f_args = VmVariantList::Create(py_args.size());
+             self->Pack(py_args, py_kwargs,
+                        absl::MakeConstSpan(self->raw_config().inputs), f_args,
+                        false /* writable */);
+             return f_args;
            })
       .def("serialize_vm_list",
            [](FunctionAbi* self, VmVariantList& vm_list) {
@@ -558,7 +833,10 @@ void SetupFunctionAbiBindings(pybind11::module m) {
            })
       .def("allocate_results", &PyAllocateResults, py::arg("f_results"),
            py::arg("static_alloc") = true)
-      .def("raw_unpack_results", &PyRawUnpackResults);
+      .def("unpack_results", [](FunctionAbi* self, VmVariantList& f_results) {
+        return self->Unpack(absl::MakeConstSpan(self->raw_config().results),
+                            f_results);
+      });
 }
 
 }  // namespace python

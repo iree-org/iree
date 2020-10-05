@@ -67,6 +67,17 @@ class FunctionAbi {
   int raw_input_arity() const { return raw_config_.inputs.size(); }
   int raw_result_arity() const { return raw_config_.results.size(); }
 
+  // Structured packing. Linearizes structures according to the ABI and
+  // delegates to RawPack.
+  void Pack(pybind11::tuple& py_args, pybind11::dict& kwargs,
+            absl::Span<const Description> descs, VmVariantList& args,
+            bool writable);
+
+  // Structured unpacking. Delegates to RawUnpack and delinearizes according to
+  // the ABI.
+  pybind11::object Unpack(absl::Span<const Description> descs,
+                          VmVariantList& f_results);
+
   // Raw packing. These always operate on the linear span of raw inputs and
   // results. Some ABIs perform a higher level of mapping on top of this,
   // which can be accessed via the non-prefixed Pack/Unpack methods.
@@ -107,6 +118,11 @@ class FunctionAbi {
   HalDevice device_;
   std::shared_ptr<HostTypeFactory> host_type_factory_;
   RawConfig raw_config_;
+  // If present, the SIP signature maps a "structured signature" to linearized
+  // input and result lists. In layman's terms, this maps the normal python
+  // *args and **kwargs calling convention with nested dicts and sequences.
+  // It is used by TensorFlow, which lacks higher level types for such things.
+  absl::optional<std::string> sip_signature_;
 };
 
 void SetupFunctionAbiBindings(pybind11::module m);
