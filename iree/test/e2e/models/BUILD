@@ -15,6 +15,7 @@
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,12 +23,24 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+CHECK_FRAMEWORK_TESTS = ["bert_encoder_unrolled_fake_weights.mlir"]
+
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = glob(
+        ["*.mlir"],
+        exclude = CHECK_FRAMEWORK_TESTS,
+    ),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
     ],
     tags = ["hostonly"],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmla_vmla",
+    srcs = CHECK_FRAMEWORK_TESTS,
+    driver = "vmla",
+    target_backend = "vmla",
 )

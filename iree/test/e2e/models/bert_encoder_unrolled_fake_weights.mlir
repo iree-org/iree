@@ -1,7 +1,5 @@
 // MobileBert encoder model with placeholder weights, for testing.
 
-// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s --input-value=1x384xi32=0 --input-value=1x384xi32=0 --input-value=1x384xi32=0 | IreeFileCheck %s
-
 module {
   flow.variable @"__iree_flow_bert/embeddings/FakeLayerNorm/beta" dense<1.0> : tensor<512xf32>
   flow.variable @"__iree_flow_bert/embeddings/FakeLayerNorm/gamma" dense<0.4> : tensor<512xf32>
@@ -1116,7 +1114,10 @@ module {
   flow.variable @"__iree_flow_bert/encoder/layer_9/output/dense/kernel" dense<0.0001> : tensor<512x128xf32>
   flow.variable @"__iree_flow_cls/squad/output_bias" dense<0.1> : tensor<2xf32>
   flow.variable @"__iree_flow_cls/squad/output_weights" dense<1.0> : tensor<2x512xf32>
-  func @serving_default(%arg0: tensor<1x384xi32>, %arg1: tensor<1x384xi32>, %arg2: tensor<1x384xi32>) -> (tensor<1x384xf32>, tensor<1x384xf32>) {
+  func @serving_default() {
+    %arg0 = iree.unfoldable_constant dense<0> : tensor<1x384xi32>
+    %arg1 = iree.unfoldable_constant dense<0> : tensor<1x384xi32>
+    %arg2 = iree.unfoldable_constant dense<0> : tensor<1x384xi32>
     %0 = flow.variable.address @"__iree_flow_bert/embeddings/FakeLayerNorm/beta" : !iree.ptr<tensor<512xf32>>
     %1 = flow.variable.address @"__iree_flow_bert/embeddings/FakeLayerNorm/gamma" : !iree.ptr<tensor<512xf32>>
     %2 = flow.variable.address @"__iree_flow_bert/embeddings/embedding_transformation/bias" : !iree.ptr<tensor<512xf32>>
@@ -2230,13 +2231,13 @@ module {
     %1110 = flow.variable.address @"__iree_flow_bert/encoder/layer_9/output/dense/kernel" : !iree.ptr<tensor<512x128xf32>>
     %1111 = flow.variable.address @"__iree_flow_cls/squad/output_bias" : !iree.ptr<tensor<2xf32>>
     %1112 = flow.variable.address @"__iree_flow_cls/squad/output_weights" : !iree.ptr<tensor<2x512xf32>>
-    %1113 = mhlo.constant dense<-1.000000e+04> : tensor<1x1x384x384xf32>
-    %1114 = mhlo.constant dense<0.176776692> : tensor<1x4x384x384xf32>
-    %1115 = mhlo.constant dense<1.000000e+04> : tensor<1x1x384x384xf32>
-    %1116 = mhlo.constant dense<1.000000e+00> : tensor<1x384x384xf32>
-    %1117 = mhlo.constant dense<0xFF800000> : tensor<f32>
-    %1118 = mhlo.constant dense<0.000000e+00> : tensor<f32>
-    %1119 = mhlo.constant dense<0.000000e+00> : tensor<1x384x512xf32>
+    %1113 = iree.unfoldable_constant dense<-1.000000e+04> : tensor<1x1x384x384xf32>
+    %1114 = iree.unfoldable_constant dense<0.176776692> : tensor<1x4x384x384xf32>
+    %1115 = iree.unfoldable_constant dense<1.000000e+04> : tensor<1x1x384x384xf32>
+    %1116 = iree.unfoldable_constant dense<1.000000e+00> : tensor<1x384x384xf32>
+    %1117 = iree.unfoldable_constant dense<0xFF800000> : tensor<f32>
+    %1118 = iree.unfoldable_constant dense<0.000000e+00> : tensor<f32>
+    %1119 = iree.unfoldable_constant dense<0.000000e+00> : tensor<1x384x512xf32>
     %1120 = flow.variable.load.indirect %0 : !iree.ptr<tensor<512xf32>> -> tensor<512xf32>
     %1121 = flow.variable.load.indirect %1 : !iree.ptr<tensor<512xf32>> -> tensor<512xf32>
     %1122 = flow.variable.load.indirect %2 : !iree.ptr<tensor<512xf32>> -> tensor<512xf32>
@@ -6702,8 +6703,8 @@ module {
     %5390 = "mhlo.reshape"(%5389) : (tensor<1x1x384xf32>) -> tensor<1x384xf32>
     %5391 = "mhlo.slice"(%5388) {limit_indices = dense<[2, 1, 384]> : tensor<3xi64>, start_indices = dense<[1, 0, 0]> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} : (tensor<2x1x384xf32>) -> tensor<1x1x384xf32>
     %5392 = "mhlo.reshape"(%5391) : (tensor<1x1x384xf32>) -> tensor<1x384xf32>
-    return %5390, %5392 : tensor<1x384xf32>, tensor<1x384xf32>
+    check.expect_almost_eq_const(%5390, dense<895.256> : tensor<1x384xf32>) : tensor<1x384xf32>
+    check.expect_almost_eq_const(%5392, dense<895.256> : tensor<1x384xf32>) : tensor<1x384xf32>
+    return
   }
 }
-// CHECK: 1x384xf32=[895.{{[0-9]+}}
-// CHECK: 1x384xf32=[895.{{[0-9]+}}
