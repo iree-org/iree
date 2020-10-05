@@ -172,9 +172,9 @@ $ adb shell
 
 android $ cd /data/local/tmp/
 android $ ./iree-run-module -driver=vmla \
-          -input_file=simple-vmla.vmfb \
+          -module_file=simple-vmla.vmfb \
           -entry_function=abs \
-          -inputs="i32=-5"
+          -function_inputs="i32=-5"
 
 EXEC @abs
 i32=5
@@ -211,9 +211,9 @@ $ adb shell
 
 android $ cd /data/local/tmp/
 android $ ./iree-run-module -driver=vulkan \
-          -input_file=simple-vulkan.vmfb \
+          -module_file=simple-vulkan.vmfb \
           -entry_function=abs \
-          -inputs="i32=-5"
+          -function_inputs="i32=-5"
 
 EXEC @abs
 i32=5
@@ -300,9 +300,9 @@ $ adb shell
 
 android $ cd /data/local/tmp/
 android $ ./iree-run-module -driver=dylib \
-          -input_file=simple-llvm_aot.vmfb \
+          -module_file=simple-llvm_aot.vmfb \
           -entry_function=abs \
-          -inputs="i32=-5"
+          -function_inputs="i32=-5"
 
 EXEC @abs
 i32=5

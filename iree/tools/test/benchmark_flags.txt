@@ -1,5 +1,5 @@
 // HELP: iree-benchmark-module
-// HELP: --input_file
+// HELP: --module_file
 // HELP: --benchmark_list_tests
 // RUN: ( iree-benchmark-module --help || [[ $? == 1 ]] )  | IreeFileCheck --check-prefix=HELP %s
 // RUN: ( iree-benchmark-module --helpshort || [[ $? == 1 ]] ) | IreeFileCheck --check-prefix=HELP %s

@@ -471,9 +471,9 @@ class Trace:
       if self.iree_serializable:
         serialized_inputs = ", ".join(self.calls[0].serialized_inputs)
         flagfile = [
-            f"--input_file={compiled_path}",
+            f"--module_file={compiled_path}",
             f"--driver={self.backend_driver}",
-            f"--inputs={serialized_inputs}",
+            f"--function_inputs={serialized_inputs}",
             f"--entry_function={entry_function}",
         ]
         with open(os.path.join(trace_dir, "flagfile"), "w") as f:
@@ -560,8 +560,8 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-Modules = collections.namedtuple('Modules',
-                                 ['ref_module', 'tar_modules', 'artifacts_dir'])
+Modules = collections.namedtuple("Modules",
+                                 ["ref_module", "tar_modules", "artifacts_dir"])
 
 
 def compile_tf_module(

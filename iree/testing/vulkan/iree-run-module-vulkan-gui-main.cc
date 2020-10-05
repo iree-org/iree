@@ -36,7 +36,7 @@ ABSL_FLAG(std::string, entry_function, "",
           "Name of a function contained in the module specified by input_file "
           "to run.");
 
-ABSL_FLAG(std::vector<std::string>, inputs, {},
+ABSL_FLAG(std::vector<std::string>, function_inputs, {},
           "A comma-separated list of of input buffers of the format:"
           "[shape]xtype=[value]\n"
           "2x2xi32=1 2 3 4\n"
@@ -48,7 +48,7 @@ ABSL_FLAG(std::vector<std::string>, inputs, {},
           "values:\n"
           "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
 
-ABSL_FLAG(std::string, inputs_file, "",
+ABSL_FLAG(std::string, function_inputs_file, "",
           "Provides a file for input shapes and optional values (see "
           "ParseToVariantListFromFile in vm_util.h for details)");
 
@@ -104,7 +104,7 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
 Status RunModuleAndUpdateImGuiWindow(
     iree_hal_device_t* device, iree_vm_context_t* context,
     iree_vm_function_t function, const std::string& function_name,
-    const vm::ref<iree_vm_list_t>& inputs,
+    const vm::ref<iree_vm_list_t>& function_inputs,
     const std::vector<RawSignatureParser::Description>& output_descs,
     const std::string& window_title) {
   vm::ref<iree_vm_list_t> outputs;
@@ -114,7 +114,7 @@ Status RunModuleAndUpdateImGuiWindow(
 
   IREE_LOG(INFO) << "EXEC @" << function_name;
   IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                      inputs.get(), outputs.get(),
+                                      function_inputs.get(), outputs.get(),
                                       iree_allocator_system()))
       << "invoking function " << function_name;
 
@@ -344,18 +344,18 @@ int iree::IreeMain(int argc, char** argv) {
     IREE_LOG(FATAL) << main_function_input_descs.status().ToString();
   }
   StatusOr<vm::ref<iree_vm_list_t>> main_function_inputs;
-  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
-    if (!absl::GetFlag(FLAGS_inputs).empty()) {
-      IREE_LOG(FATAL)
-          << "Expected only one of inputs and inputs_file to be set";
+  if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
+      IREE_LOG(FATAL) << "Expected only one of function_inputs and "
+                         "function_inputs_file to be set";
     }
     main_function_inputs = ParseToVariantListFromFile(
         *main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-        absl::GetFlag(FLAGS_inputs_file));
+        absl::GetFlag(FLAGS_function_inputs_file));
   } else {
     main_function_inputs = ParseToVariantList(
         *main_function_input_descs, iree_hal_device_allocator(iree_vk_device),
-        absl::GetFlag(FLAGS_inputs));
+        absl::GetFlag(FLAGS_function_inputs));
   }
   if (!main_function_inputs.ok()) {
     IREE_LOG(FATAL) << main_function_inputs.status().ToString();
