@@ -36,7 +36,7 @@ print_usage_and_exit() {
   echo "       --driver <driver>"
   echo "       --module_file <input-module-file> "
   echo "       --entry_function <entry-function> "
-  echo "       --inputs_file <input-buffer-file> "
+  echo "       --function_inputs_file <input-buffer-file> "
   exit 1
 }
 
@@ -69,7 +69,7 @@ while (( "$#" )); do
         print_usage_and_exit
       fi
       ;;
-    --inputs_file)
+    --function_inputs_file)
       if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
         IREE_INPUT_BUFFER_FILE=$(readlink -f $2)
         shift 2

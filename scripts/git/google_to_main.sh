@@ -56,4 +56,7 @@ if [[ -z "$(which gh)" ]]; then
   echo "${BODY?}"
   exit 1
 fi
-gh pr create --base main --title="${TITLE?}" --body="${BODY?}"
+
+# Workaround https://github.com/cli/cli/issues/1820
+GITHUB_USERNAME="$(gh config get -h github.com user)"
+gh pr create --base main --head="${GITHUB_USERNAME?}:${PR_BRANCH?}" --title="${TITLE?}" --body="${BODY?}"

@@ -117,8 +117,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       # Only outputs
       module.get_count()
 
-    module = tf_utils.TfCompiledModule(StatefulCountingModule,
-                                       tf_utils.BackendInfo('tf'))
+    module = tf_utils.TfCompiledModule.create_from_class(
+        StatefulCountingModule, tf_utils.BackendInfo('tf'))
     trace = tf_test_utils.Trace(module, trace_function)
     trace_function(tf_test_utils.TracedModule(module, trace))
 
@@ -140,13 +140,13 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       module.increment()
       module.decrement()
 
-    tf_module = tf_utils.TfCompiledModule(StatefulCountingModule,
-                                          tf_utils.BackendInfo('tf'))
+    tf_module = tf_utils.TfCompiledModule.create_from_class(
+        StatefulCountingModule, tf_utils.BackendInfo('tf'))
     tf_trace = tf_test_utils.Trace(tf_module, tf_function)
     tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
 
-    vmla_module = tf_utils.IreeCompiledModule(StatefulCountingModule,
-                                              tf_utils.BackendInfo('iree_vmla'))
+    vmla_module = tf_utils.IreeCompiledModule.create_from_class(
+        StatefulCountingModule, tf_utils.BackendInfo('iree_vmla'))
     vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
     vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 
@@ -161,13 +161,13 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     def vmla_function(module):
       module.increment_by(np.array([22.], dtype=np.float32))
 
-    tf_module = tf_utils.TfCompiledModule(StatefulCountingModule,
-                                          tf_utils.BackendInfo('tf'))
+    tf_module = tf_utils.TfCompiledModule.create_from_class(
+        StatefulCountingModule, tf_utils.BackendInfo('tf'))
     tf_trace = tf_test_utils.Trace(tf_module, tf_function)
     tf_function(tf_test_utils.TracedModule(tf_module, tf_trace))
 
-    vmla_module = tf_utils.IreeCompiledModule(StatefulCountingModule,
-                                              tf_utils.BackendInfo('iree_vmla'))
+    vmla_module = tf_utils.IreeCompiledModule.create_from_class(
+        StatefulCountingModule, tf_utils.BackendInfo('iree_vmla'))
     vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
     vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 
@@ -178,12 +178,12 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     def trace_function(module):
       module.increment()
       module.increment_by(np.array([81.], dtype=np.float32))
-      module.increment_by_max(
-          np.array([81], dtype=np.float32), np.array([92], dtype=np.float32))
+      module.increment_by_max(np.array([81], dtype=np.float32),
+                              np.array([92], dtype=np.float32))
       module.get_count()
 
-    module = tf_utils.IreeCompiledModule(StatefulCountingModule,
-                                         tf_utils.BackendInfo('iree_vmla'))
+    module = tf_utils.IreeCompiledModule.create_from_class(
+        StatefulCountingModule, tf_utils.BackendInfo('iree_vmla'))
     trace = tf_test_utils.Trace(module, trace_function)
     trace_function(tf_test_utils.TracedModule(module, trace))
 

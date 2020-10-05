@@ -72,4 +72,7 @@ if [[ -z "$(which gh)" ]]; then
   echo "${BODY?}"
   exit 1
 fi
-gh pr create --title="${TITLE?}" --body="${BODY?}" --base="${BASE_BRANCH?}"
+
+# Workaround https://github.com/cli/cli/issues/1820
+GITHUB_USERNAME="$(gh config get -h github.com user)"
+gh pr create --base="${BASE_BRANCH?}" --head="${GITHUB_USERNAME?}:${PR_BRANCH?}" --title="${TITLE?}" --body="${BODY?}"

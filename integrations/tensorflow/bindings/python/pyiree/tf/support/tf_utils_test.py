@@ -89,7 +89,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   ])
   def test_unaltered_state(self, backend_name):
     backend_info = tf_utils.BackendInfo(backend_name)
-    module = backend_info.compile(StatefulCountingModule)
+    module = backend_info.compile_from_class(StatefulCountingModule)
 
     # Test that incrementing works properly.
     self.assertEqual([0.], module.get_count())
@@ -126,8 +126,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     backend_info = tf_utils.BackendInfo(backend_name)
 
     # Test compilation is the same.
-    module_1 = backend_info.compile(RandomInitModule)
-    module_2 = backend_info.compile(RandomInitModule)
+    module_1 = backend_info.compile_from_class(RandomInitModule)
+    module_2 = backend_info.compile_from_class(RandomInitModule)
     self.assertAllEqual(module_1.get(), module_2.get())
 
     # Test reinitialization is the same.

@@ -66,22 +66,22 @@ def _setup_artifacts_dir(module_name: str) -> str:
 
 
 def _parse_target_backends() -> Tuple[Sequence[str], Sequence[str]]:
-  """Decodes --target_backends and creates unique names for their artifacts."""
+  """Decodes --target_backends and creates unique ids for them."""
   backend_names = FLAGS.target_backends.split(",")
   backend_to_index = {k: 0 for k in backend_names if backend_names.count(k) > 1}
-  artifact_names = []
+  backend_ids = []
 
   # If there are multiple copies of the same backend_name, index them. e.g.
   # backend_names = ["tf", "iree_vmla", "tf"]
-  # --> artifact_names = ["tf_0", "iree_vmla", "tf_1"]
+  # --> backend_ids = ["tf_0", "iree_vmla", "tf_1"]
   for backend_name in backend_names:
     if backend_name in backend_to_index:
-      artifact_names.append(f"{backend_name}_{backend_to_index[backend_name]}")
+      backend_ids.append(f"{backend_name}_{backend_to_index[backend_name]}")
       backend_to_index[backend_name] += 1
     else:
-      artifact_names.append(backend_name)
+      backend_ids.append(backend_name)
 
-  return backend_names, artifact_names
+  return backend_names, backend_ids
 
 
 def get_target_backends() -> Sequence[tf_utils.BackendInfo]:
@@ -95,10 +95,10 @@ def get_target_backends() -> Sequence[tf_utils.BackendInfo]:
   """
   if FLAGS.target_backends is not None:
     logging.info("Using backends from command line: %s", FLAGS.target_backends)
-    backend_names, names = _parse_target_backends()
+    backend_names, backend_ids = _parse_target_backends()
     backends = [
-        tf_utils.BackendInfo(backend, name)
-        for backend, name in zip(backend_names, names)
+        tf_utils.BackendInfo(backend_name, backend_id)
+        for backend_name, backend_id in zip(backend_names, backend_ids)
     ]
   else:
     # If no backends are specified, use them all.
@@ -261,10 +261,11 @@ class Trace:
       # Extract metadata from module and function.
       self.module_name = module.module_name
       self.compiled_paths = module.compiled_paths
-      self.backend_name = module.backend
+      self.backend_name = module.backend_info.backend_name
+      self.backend_id = module.backend_info.backend_id
+      self.backend_driver = module.backend_info.driver
       self.iree_serializable = module.iree_serializable()
       self.tflite_serializable = module.tflite_serializable()
-      self.backend_driver = module.backend_driver
       self.function_name = function.__name__
       self.function_sourcefile = inspect.getsourcefile(function)
       source, start_line = inspect.getsourcelines(function)
@@ -276,9 +277,10 @@ class Trace:
       self.module_name = _load_dict["module_name"]
       self.compiled_paths = _load_dict["compiled_paths"]
       self.backend_name = _load_dict["backend_name"]
+      self.backend_id = _load_dict["backend_id"]
+      self.backend_driver = _load_dict["backend_driver"]
       self.iree_serializable = _load_dict["iree_serializable"]
       self.tflite_serializable = _load_dict["tflite_serializable"]
-      self.backend_driver = _load_dict["backend_driver"]
       self.function_name = _load_dict["function_name"]
       self.function_sourcefile = _load_dict["function_sourcefile"]
       self.function_line_numbers = _load_dict["function_line_numbers"]
@@ -286,7 +288,7 @@ class Trace:
       self.calls = _load_dict["calls"]
 
   def __str__(self):
-    header = (f"Trace of {self.module_name} compiled to '{self.backend_name}' "
+    header = (f"Trace of {self.module_name} compiled to '{self.backend_id}' "
               f"on function '{self.function_name}':")
     # Give each call a number so it's easier to compare between multiple traces.
     calls = [f"{i + 1}. {str(call)}" for i, call in enumerate(self.calls)]
@@ -327,11 +329,11 @@ class Trace:
 
       if not calls_match:
         logging.error("Comparision between '%s' and '%s' failed on method '%s'",
-                      ref_trace.backend_name, tar_trace.backend_name,
+                      ref_trace.backend_id, tar_trace.backend_id,
                       ref_call.method)
-        logging.error("Reference call '%s':\n%s", ref_trace.backend_name,
+        logging.error("Reference call '%s':\n%s", ref_trace.backend_id,
                       ref_call)
-        logging.error("Target call '%s':\n%s", tar_trace.backend_name, tar_call)
+        logging.error("Target call '%s':\n%s", tar_trace.backend_id, tar_call)
 
       traces_match = traces_match and calls_match
     return traces_match
@@ -434,14 +436,20 @@ class Trace:
       trace_dir: str, path to the directory to serialize the trace to.
     """
 
+    compiled_paths = None
+    if self.compiled_paths is not None:
+      # Convert to a dict to avoid the issues with serializing defaultdicts.
+      compiled_paths = dict(self.compiled_paths)
+
     # Python serialization.
     metadata = {
         "module_name": self.module_name,
-        "compiled_paths": self.compiled_paths,
+        "compiled_paths": compiled_paths,
         "backend_name": self.backend_name,
+        "backend_id": self.backend_id,
+        "backend_driver": self.backend_driver,
         "iree_serializable": self.iree_serializable,
         "tflite_serializable": self.tflite_serializable,
-        "backend_driver": self.backend_driver,
         "function_name": self.function_name,
         "function_sourcefile": self.function_sourcefile,
         "function_line_numbers": self.function_line_numbers,
@@ -463,9 +471,9 @@ class Trace:
       if self.iree_serializable:
         serialized_inputs = ", ".join(self.calls[0].serialized_inputs)
         flagfile = [
-            f"--input_file={compiled_path}",
+            f"--module_file={compiled_path}",
             f"--driver={self.backend_driver}",
-            f"--inputs={serialized_inputs}",
+            f"--function_inputs={serialized_inputs}",
             f"--entry_function={entry_function}",
         ]
         with open(os.path.join(trace_dir, "flagfile"), "w") as f:
@@ -493,7 +501,7 @@ class Trace:
 
 
 def _get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
-  trace_dir = os.path.join(artifacts_dir, trace.backend_name, "traces",
+  trace_dir = os.path.join(artifacts_dir, trace.backend_id, "traces",
                            trace.function_name)
   os.makedirs(trace_dir, exist_ok=True)
   return trace_dir
@@ -552,24 +560,24 @@ class TracedModule:
       return self._trace_call(module_attr, method_name=attr)
 
 
-Modules = collections.namedtuple('Modules',
-                                 ['ref_module', 'tar_modules', 'artifacts_dir'])
+Modules = collections.namedtuple("Modules",
+                                 ["ref_module", "tar_modules", "artifacts_dir"])
 
 
 def compile_tf_module(
     module_class: Type[tf.Module], exported_names: Sequence[str] = ()
 ) -> Callable[[Any], Any]:
-  """CompiledModuleTestCase decorator that compiles a tf.Module.
-
-  A CompiledModule is created for each backend in --target_backends. They can
-  be accessed individually via self.compiled_modules.backend_name or as a union
-  via self.get_module().
+  """Compiles module_class to each backend that we test.
 
   Args:
     module_class: the tf.Module subclass to compile.
     exported_names: optional iterable of strings representing which of
       module_class's functions to compile. If exported_names is empty all
       functions will be compiled.
+
+  Returns:
+    A 'Modules' namedtuple containing the reference module, target modules and
+    artifacts directory.
   """
 
   # Setup the directory for saving compilation artifacts and traces.
@@ -580,7 +588,7 @@ def compile_tf_module(
                                           f"{FLAGS.reference_backend}_ref")
   tar_backend_infos = get_target_backends()
 
-  compile_backend = lambda backend_info: backend_info.compile(
+  compile_backend = lambda backend_info: backend_info.compile_from_class(
       module_class, exported_names, artifacts_dir)
 
   ref_module = compile_backend(ref_backend_info)
@@ -631,7 +639,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     failed_backend_indices = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
-                   ref_trace.backend_name, tar_trace.backend_name)
+                   ref_trace.backend_id, tar_trace.backend_id)
       traces_match = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
@@ -649,7 +657,7 @@ class TracedModuleTestCase(tf.test.TestCase):
     if failed_backend_indices:
       # Extract info for logging.
       failed_backends = [
-          tar_traces[i].backend_name for i in failed_backend_indices
+          tar_traces[i].backend_id for i in failed_backend_indices
       ]
       self.fail(
           "Comparision between the reference backend and the following targets "

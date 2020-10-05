@@ -127,8 +127,8 @@ providing the following flags:
 
 | Flag              | Description                                      |
 |-------------------|--------------------------------------------------|
-| --input_file      | Absolute path to the IREE compiled VM flatbuffer |
-| --inputs          | A comma delimited string of input tensors        |
+| --module_file     | Absolute path to the IREE compiled VM flatbuffer |
+| --function_inputs | A comma delimited string of input tensors        |
 | --driver          | The backend driver to use for the benchmark      |
 | --entry_function  | The method on the TensorFlow module to benchmark |
 
@@ -239,10 +239,10 @@ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
 ```shell
 adb shell /data/local/tmp/iree-benchmark-module \
   --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
-  --input_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
+  --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
 ```
 
-Note: Because the flagfile uses absolute paths, the `--input_file` flag must be
+Note: Because the flagfile uses absolute paths, the `--module_file` flag must be
 specified manually if the location of the compiled flatbuffer (`compiled.vmfb`)
 changes. The flagfile can still take care of specifying the input data, driver
 and entry function however.

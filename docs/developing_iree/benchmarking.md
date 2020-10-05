@@ -31,10 +31,10 @@ and then benchmark an exported function in that module:
 
 ```shell
 $ bazel run //iree/tools:iree-benchmark-module -- \
-  --input_file=/tmp/module.fb \
+  --module_file=/tmp/module.fb \
   --driver=vmla \
   --entry_function=abs \
-  --inputs="i32=-2"
+  --function_inputs="i32=-2"
 ```
 
 You'll see output like
@@ -78,10 +78,10 @@ Now we'll actually invoke the binary:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --input_file=/tmp/module.fb \
+  --module_file=/tmp/module.fb \
   --driver=vmla \
   --entry_function=abs \
-  --inputs="i32=-2"
+  --function_inputs="i32=-2"
 ```
 
 ```shell
@@ -162,20 +162,20 @@ Prepare the module to profile:
 
 ```shell
 build/iree/tools/iree-benchmark-module \
-  --input_file=/tmp/module.fb \
+  --module_file=/tmp/module.fb \
   --driver=vmla \
   --entry_function=abs \
-  --inputs="i32=-2"
+  --function_inputs="i32=-2"
 ```
 
 Run the module:
 
 ```shell
 build/iree/tools/iree-run-module \
-  --input_file=/tmp/module.fb \
+  --module_file=/tmp/module.fb \
   --driver=vmla \
   --entry_function=abs \
-  --inputs="i32=-2"
+  --function_inputs="i32=-2"
 ```
 
 ## CPU Configuration
