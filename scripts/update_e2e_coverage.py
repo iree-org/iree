@@ -21,6 +21,7 @@ Example usage: python3 update_e2e_coverage.py build-docs
 import argparse
 import collections
 import os
+import re
 import subprocess
 
 REFERENCE_BACKEND = 'tf'
@@ -53,6 +54,12 @@ SINGLE_SOURCE_SUITES = {
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
         'slim_vision_model_test',
 }
+
+TARGET_EXCLUSION_FILTERS = [
+    r'mobilenet_v1_.*',  # Slim vision MobileNetV1.
+    r'mobilenet_v2_.*',  # Slim vision MobileNetV2.
+    r'amoebanet_a_n18_f448',  # SavedModelV2 not available.
+]
 
 # The symbols to show in the table if the operation is supported or not.
 SUCCESS_ELEMENT = '<span class="success-table-element">✓</span>'
@@ -161,6 +168,9 @@ def generate_table(test_suite):
   # Generate the coverage table as a 2D array.
   rows = [first_row, second_row]
   for name, backends in sorted(table.items()):
+    if any(re.match(pattern, name) for pattern in TARGET_EXCLUSION_FILTERS):
+      continue
+
     row = [get_name_element(test_suite, name)]
     row.extend([
         SUCCESS_ELEMENT if backend else FAILURE_ELEMENT for backend in backends
