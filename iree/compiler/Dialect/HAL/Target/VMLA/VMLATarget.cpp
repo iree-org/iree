@@ -48,7 +48,7 @@ bool AreInterfacesEquivalent(IREE::HAL::InterfaceOp lhs,
   auto rhsIt = rhsBindings.begin(), rhsEnd = rhsBindings.end();
   for (; lhsIt != lhsEnd && rhsIt != rhsEnd; ++lhsIt, ++rhsIt) {
     // Assume bindings are in order, check equivalence of each pairing.
-    if (!OperationEquivalence::isEquivalentTo(lhs, rhs)) return false;
+    if (!OperationEquivalence::isEquivalentTo(*lhsIt, *rhsIt)) return false;
   }
 
   if (lhsIt != lhsEnd || rhsIt != rhsEnd) {
