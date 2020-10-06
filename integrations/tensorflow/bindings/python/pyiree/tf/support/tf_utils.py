@@ -364,17 +364,12 @@ class _FunctionWrapper(object):
 class _IreeFunctionWrapper(_FunctionWrapper):
   """Wraps an IREE function, making it callable."""
 
-  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction,
-               output_names: Sequence[str] = None):
+  def __init__(self, context: rt.SystemContext, f: rt.system_api.BoundFunction):
     self._context = context
     self._f = f
-    self._output_names = output_names
 
-  def __call__(self, *args):
-    results = self._f(*args)
-    if self._output_names is not None:
-      results = dict(zip(self._output_names, results))
-    return results
+  def __call__(self, *args, **kwargs):
+    return self._f(*args, **kwargs)
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     """Get cxx serialized inputs and outputs for this function."""
@@ -391,7 +386,6 @@ class IreeCompiledModule(CompiledModule):
       compiled_paths: Dict[str, str],
       vm_module: rt.VmModule,
       config: rt.Config,
-      output_names: Sequence[str] = None,
   ):
     """Base constructor – Use one of the named constructors instead.
 
@@ -403,13 +397,10 @@ class IreeCompiledModule(CompiledModule):
         corresponding to their serialized representations.
       vm_module: A rt.VmModule containing compilation info to wrap.
       config: A rt.Config containing compilation info to wrap.
-      output_names: Temporary compatibility measure for SignatureDef
-        SavedModels.
     """
     super().__init__(module_name, backend_info, compiled_paths)
     self._vm_module = vm_module
     self._config = config
-    self._output_names = output_names
     self.reinitialize()
 
   @classmethod
@@ -492,6 +483,7 @@ class IreeCompiledModule(CompiledModule):
         provided.
     """
     del input_names  # Unused.
+    del output_names  # Unused.
     module_blob, compiled_path = _incrementally_compile_tf_signature_def_saved_model(
         saved_model_dir, saved_model_tags, backend_info, exported_name,
         artifacts_dir)
@@ -503,8 +495,7 @@ class IreeCompiledModule(CompiledModule):
       # IREE bundles every compiled method into the same compiled module :)
       compiled_paths = collections.defaultdict(lambda: compiled_path)
 
-    return cls(module_name, backend_info, compiled_paths, vm_module, config,
-               output_names)
+    return cls(module_name, backend_info, compiled_paths, vm_module, config)
 
   def reinitialize(self):
     """Reinitializes all stateful variables."""
@@ -517,7 +508,7 @@ class IreeCompiledModule(CompiledModule):
     # Try to resolve it as a function.
     m = self._context.modules[self._vm_module.name]
     f = m[attr]
-    return _IreeFunctionWrapper(self._context, f, self._output_names)
+    return _IreeFunctionWrapper(self._context, f)
 
   def iree_serializable(self) -> bool:
     return self.compiled_paths is not None
@@ -557,12 +548,12 @@ class _TfFunctionWrapper(_FunctionWrapper):
                                  check_types=False)
 
 
-def _convert_numpy_args_to_tf_tensor_kwargs(function, input_names):
+def _convert_inputs_to_tensors(function):
 
-  def decorator(*args):
+  def decorator(*args, **kwargs):
     args = [tf.convert_to_tensor(arg) for arg in args]
-    kwargs = dict(zip(input_names, args))
-    return function(**kwargs)
+    kwargs = {k: tf.convert_to_tensor(v) for k, v in kwargs.items()}
+    return function(*args, **kwargs)
 
   return decorator
 
@@ -571,12 +562,11 @@ class SignatureDefSavedModelWrapper(object):
   """Wraps a SavedModel to imitate a tf.Module with a method 'exported_name'."""
 
   def __init__(self, saved_model_dir: str, saved_model_tags: Set[str],
-               input_names: Sequence[str], exported_name: str):
+               exported_name: str):
     self.saved_model = tf.saved_model.load(saved_model_dir,
                                            tags=saved_model_tags)
     inference_func = self.saved_model.signatures[exported_name]
-    inference_func = _convert_numpy_args_to_tf_tensor_kwargs(
-        inference_func, input_names)
+    inference_func = _convert_inputs_to_tensors(inference_func)
     self.__setattr__(exported_name, inference_func)
 
 
@@ -657,7 +647,7 @@ class TfCompiledModule(CompiledModule):
         provided.
     """
     constructor = lambda: SignatureDefSavedModelWrapper(
-        saved_model_dir, saved_model_tags, input_names, exported_name)
+        saved_model_dir, saved_model_tags, exported_name)
     return cls(module_name, backend_info, constructor, [exported_name])
 
   def reinitialize(self):
@@ -801,14 +791,20 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
     self._interpreter = interpreter
 
   def __call__(self, *args, **kwargs) -> Tuple[Any]:
-    if len(kwargs):
-      raise ValueError("kwargs are not supported, but the following kwargs "
-                       f"were provided {kwargs}")
+    if len(args) and len(kwargs):
+      raise ValueError("Passing both args and kwargs is not supported by "
+                       "_TfLiteFunctionWrapper")
 
     # Set up and run the function.
     self._interpreter.allocate_tensors()
-    for arg, detail in zip(args, self._interpreter.get_input_details()):
-      self._interpreter.set_tensor(detail["index"], arg)
+
+    if len(args):
+      for arg, detail in zip(args, self._interpreter.get_input_details()):
+        self._interpreter.set_tensor(detail["index"], arg)
+    else:
+      for detail in self._interpreter.get_input_details():
+        self._interpreter.set_tensor(detail["index"], kwargs[detail["name"]])
+
     self._interpreter.invoke()
 
     # Extract the outputs from the TFLite interpreter.

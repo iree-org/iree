@@ -70,7 +70,10 @@ class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):
       input_mask = np.zeros((1, MAX_SEQ_LENGTH), dtype=np.int32)
       segment_ids = np.zeros((1, MAX_SEQ_LENGTH), dtype=np.int32)
 
-      module.serving_default(input_ids, input_mask, segment_ids, atol=1e0)
+      module.serving_default(input_ids=input_ids,
+                             input_mask=input_mask,
+                             segment_ids=segment_ids,
+                             atol=1e0)
 
     self.compare_backends(serving_default, self._modules)
 
