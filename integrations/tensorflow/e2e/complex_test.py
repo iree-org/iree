@@ -35,8 +35,8 @@ class ComplexModule(tf.Module):
 
 class ComplexTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(ComplexTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(ComplexTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(ComplexModule)
 
   def test_complex(self):

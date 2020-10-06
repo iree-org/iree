@@ -17,6 +17,8 @@
 
 #import <Metal/Metal.h>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/metal/metal_buffer.h"
 
@@ -88,6 +90,27 @@ class MetalCommandBuffer final : public CommandBuffer {
                           device_size_t workgroups_offset) override;
 
  private:
+  // A struct containing all resources states of the current pipeline.
+  struct PipelineStateObject {
+    struct PushState {
+      absl::InlinedVector<DescriptorSet::Binding, 8> resource_bindings;
+    };
+    // Map from set number to push descriptor states
+    absl::flat_hash_map<int32_t, PushState> push_states;
+
+    struct BindState {
+      DescriptorSet* descriptor_set;
+    };
+    // Map from set number to bind descriptor states
+    absl::flat_hash_map<int32_t, BindState> bind_states;
+
+    struct ConstantState {
+      absl::InlinedVector<uint32_t, 16> values;
+    };
+    // Map from set number to push constant states
+    absl::flat_hash_map<uint32_t, ConstantState> constant_states;
+  };
+
   MetalCommandBuffer(CommandBufferModeBitfield mode,
                      CommandCategoryBitfield command_categories,
                      id<MTLCommandBuffer> command_buffer);
@@ -104,11 +127,15 @@ class MetalCommandBuffer final : public CommandBuffer {
   id<MTLComputeCommandEncoder> GetOrBeginComputeEncoder();
   void EndComputeEncoder();
 
+ private:
   bool is_recording_ = false;
   id<MTLCommandBuffer> metal_handle_;
 
   id<MTLComputeCommandEncoder> current_compute_encoder_ = nil;
   id<MTLBlitCommandEncoder> current_blit_encoder_ = nil;
+
+  absl::flat_hash_map<ExecutableLayout*, PipelineStateObject>
+      pipeline_state_objects_;
 };
 
 }  // namespace metal

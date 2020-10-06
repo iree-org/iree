@@ -68,8 +68,8 @@ class GatherModule(tf.Module):
 
 class GatherTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(GatherTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(GatherTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(GatherModule)
 
   def test_gather_axis0_scalar(self):

@@ -40,8 +40,8 @@ class MathModule(tf.Module):
 
 class BooleanTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(BooleanTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(BooleanTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(MathModule)
 
   def test_constant(self):

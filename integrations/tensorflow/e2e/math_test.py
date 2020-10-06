@@ -45,8 +45,8 @@ class MathModule(tf.Module):
 
 class MathTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(MathTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(MathTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(MathModule)
 
   def test_abs(self):
