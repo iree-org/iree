@@ -163,7 +163,6 @@ iree_e2e_test_suite(
 
 iree_vision_test_suite(
     name = "medium_cifar10_internal_tests",
-    test_size = "medium",
     backends = [
         "tf",
         "tflite",
@@ -182,6 +181,7 @@ iree_vision_test_suite(
     ],
     reference_backend = "tf",
     tags = ["manual"],
+    test_size = "medium",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

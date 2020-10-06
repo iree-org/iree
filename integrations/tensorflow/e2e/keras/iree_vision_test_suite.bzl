@@ -125,7 +125,8 @@ def iree_vision_test_suite(
                     args.append("--url={}".format(url))
                 if use_external_weights:
                     args.append(
-                        "--use_external_weights={}".format(use_external_weights))
+                        "--use_external_weights={}".format(use_external_weights),
+                    )
 
                 # TODO(GH-2175): Simplify this after backend names are
                 # standardized.
