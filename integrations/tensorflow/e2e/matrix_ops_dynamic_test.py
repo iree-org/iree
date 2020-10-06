@@ -50,45 +50,37 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
     super(MatrixOpsDynamicTest, self).__init__(methodName)
     self._modules = tf_test_utils.compile_tf_module(MatrixOpsDynamicModule)
 
+  # yapf: disable
   def test_matmul_high_rank_batch(self):
-
     def matmul_high_rank_batch(module):
       module.matmul_high_rank_batch(
           tf_utils.uniform([1, 7, 4, 2]), tf_utils.uniform([7, 1, 2, 4]))
-
     self.compare_backends(matmul_high_rank_batch, self._modules)
 
   def test_matmul_dynamic_matching_batch(self):
-
     def matmul_dynamic_matching_batch(module):
       module.matmul_dynamic(
           tf_utils.uniform([2, 2, 3]), tf_utils.uniform([2, 3, 4]))
-
     self.compare_backends(matmul_dynamic_matching_batch, self._modules)
 
   def test_matmul_dynamic_broadcast_lhs(self):
-
     def matmul_dynamic_broadcast_lhs(module):
       module.matmul_dynamic(
           tf_utils.uniform([1, 2, 3]), tf_utils.uniform([2, 3, 4]))
-
     self.compare_backends(matmul_dynamic_broadcast_lhs, self._modules)
 
   def test_matmul_dynamic_broadcast_rhs(self):
-
     def matmul_dynamic_broadcast_rhs(module):
       module.matmul_dynamic(
           tf_utils.uniform([2, 2, 3]), tf_utils.uniform([1, 3, 4]))
-
     self.compare_backends(matmul_dynamic_broadcast_rhs, self._modules)
 
   def test_matmul_dynamic_rank_broadcasting(self):
-
     def matmul_dynamic_rank_broadcasting(module):
       module.matmul_dynamic_lhs_batch(
           tf_utils.uniform([7, 2, 3]), tf_utils.uniform([3, 4]))
-
     self.compare_backends(matmul_dynamic_rank_broadcasting, self._modules)
+  # yapf: enable
 
 
 def main(argv):

@@ -53,39 +53,33 @@ class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
     super(LogicalOpsTest, self).__init__(methodName)
     self._modules = tf_test_utils.compile_tf_module(LogicalOpsModule)
 
+  # yapf: disable
   def test_logical_and(self):
-
     def logical_and(module):
       module.logical_and(
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
-
     self.compare_backends(logical_and, self._modules)
 
   def test_logical_or(self):
-
     def logical_or(module):
       module.logical_or(
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
-
     self.compare_backends(logical_or, self._modules)
 
   def test_logical_xor(self):
-
     def logical_xor(module):
       module.logical_xor(
           np.array([1, 1, 0, 0], dtype=np.bool),
           np.array([0, 1, 1, 0], dtype=np.bool))
-
     self.compare_backends(logical_xor, self._modules)
 
   def test_logical_not(self):
-
     def logical_not(module):
       module.logical_not(np.array([0, 1, 1, 0], dtype=np.bool))
-
     self.compare_backends(logical_not, self._modules)
+  # yapf: enable
 
 
 def main(argv):
