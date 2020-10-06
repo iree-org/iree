@@ -50,7 +50,7 @@ def check_and_get_output(command: Sequence[str],
 
   if log_stderr:
     for line in stderr:
-      if not any([bool(re.match(pattern, line)) for pattern in stderr_filters]):
+      if not any(re.match(pattern, line) for pattern in stderr_filters):
         print(line)
 
   if process.returncode != 0:
