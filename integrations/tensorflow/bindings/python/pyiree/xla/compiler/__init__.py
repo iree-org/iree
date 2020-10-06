@@ -54,7 +54,7 @@ XLA_IMPORT_PASS_PIPELINE = (
 def xla_load_module_proto(
     xla_computation,
     compiler_context: Optional[Context] = None,
-    exported_names: Collection[str] = (),
+    exported_names: Sequence[str] = (),
     pass_pipeline: Sequence[str] = XLA_IMPORT_PASS_PIPELINE) -> Module:
   """Loads a XLA saved model from its persistent representation.
 
@@ -63,8 +63,7 @@ def xla_load_module_proto(
   Args:
     xla_computation: XLA Computation generate from XLA Python client
     compiler_context: The pyiree.compiler.Context() backing the module.
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
+    exported_names: Optional sequence representing the exported names to keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to XLA_IMPORT_PASS_PIPELINE.
 
@@ -85,21 +84,20 @@ def xla_load_module_proto(
 def xla_compile_module_proto(
     xla_computation,
     compiler_context: Optional[Context] = None,
-    exported_names: Collection[str] = (),
+    exported_names: Sequence[str] = (),
     pass_pipeline: Sequence[str] = XLA_IMPORT_PASS_PIPELINE,
-    target_backends: Collection[str] = ()
+    target_backends: Sequence[str] = ()
 ) -> binding.OpaqueBlob:
   """Loads and compiles a XLA saved model in one shot.
 
   Args:
     xla_computation: XLA Computation generate from XLA Python client
     compiler_context: The pyiree.compiler.Context() backing the module.
-    exported_names: Optional tuple of strings representing the exported names to
-      keep.
+    exported_names: Optional sequence representing the exported names to keep.
     pass_pipeline: Passes to run on the imported module prior to returning.
       Defaults to XLA_IMPORT_PASS_PIPELINE.
-    target_backends: The specific target backends to compile for (defaults to
-      all compiled in targets).
+    target_backends: Optional sequence of specific target backends to compile
+      for (defaults to all compiled in targets).
 
   Returns:
     An OpaqueBlob representing the compiled module.

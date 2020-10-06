@@ -44,3 +44,31 @@ iree_cc_library(
     SDL2-static
     Vulkan::Vulkan
 )
+
+if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
+else()
+  set(_GUI_LINKOPTS "")
+endif()
+
+iree_cc_binary(
+  NAME
+    iree-run-module-vulkan-gui
+  SRCS
+    "iree-run-module-vulkan-gui-main.cc"
+  DEPS
+    ::vulkan_gui_util
+    absl::flags
+    iree::base::file_io
+    iree::base::init
+    iree::base::main
+    iree::base::status
+    iree::base::tracing
+    iree::hal::vulkan::vulkan_driver_module
+    iree::modules::hal
+    iree::tools::utils::vm_util
+    iree::vm
+    iree::vm::bytecode_module
+  LINKOPTS
+    "${_GUI_LINKOPTS}"
+)

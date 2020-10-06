@@ -15,7 +15,10 @@
 #ifndef IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
 #define IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
 
+#include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <numeric>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
@@ -515,6 +518,25 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
     }
     dst_buffer[dst_i] = src_buffer[src_i];
   }
+  return OkStatus();
+}
+
+template <typename T>
+Status Sort::Execute(absl::Span<const T> src_buffer,
+                     absl::Span<int32_t> dst_buffer, ShapeSpan src_shape) {
+  int elements = src_buffer.size();
+  const int sort_size = src_shape.back();
+
+  for (int i = 0; i < elements; i += sort_size) {
+    auto src_subspan = src_buffer.subspan(i, sort_size);
+    auto dst_subspan = dst_buffer.subspan(i, sort_size);
+    std::iota(dst_subspan.begin(), dst_subspan.end(), 0);
+    std::stable_sort(dst_subspan.begin(), dst_subspan.end(),
+                     [&src_subspan](int32_t i1, int32_t i2) {
+                       return src_subspan[i1] < src_subspan[i2];
+                     });
+  }
+
   return OkStatus();
 }
 

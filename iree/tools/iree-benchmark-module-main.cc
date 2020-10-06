@@ -29,17 +29,17 @@
 // TODO(gcmn): Allow stdin in a non-gross way. The benchmark framework invokes
 // the benchmarking function multiple times, so we have to do something to only
 // process stdin once. Probably requires dynamic benchmark registration.
-ABSL_FLAG(std::string, input_file, "",
+ABSL_FLAG(std::string, module_file, "",
           "File containing the module to load that contains the entry "
           "function. Required and cannot be stdin.");
 
 ABSL_FLAG(std::string, entry_function, "",
-          "Name of a function contained in the module specified by input_file "
+          "Name of a function contained in the module specified by module_file "
           "to run.");
 
 ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
 
-ABSL_FLAG(std::vector<std::string>, inputs, {},
+ABSL_FLAG(std::vector<std::string>, function_inputs, {},
           "A comma-separated list of of input buffers of the format:"
           "[shape]xtype=[value]\n"
           "2x2xi32=1 2 3 4\n"
@@ -51,7 +51,7 @@ ABSL_FLAG(std::vector<std::string>, inputs, {},
           "values:\n"
           "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
 
-ABSL_FLAG(std::string, inputs_file, "",
+ABSL_FLAG(std::string, function_inputs_file, "",
           "Provides a file for input shapes and optional values (see "
           "ParseToVariantListFromFile in vm_util.h for details)");
 
@@ -60,12 +60,12 @@ namespace {
 
 StatusOr<std::string> GetModuleContentsFromFlags() {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
-  auto input_file = absl::GetFlag(FLAGS_input_file);
-  if (input_file.empty()) {
+  auto module_file = absl::GetFlag(FLAGS_module_file);
+  if (module_file.empty()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "input_file must be specified";
+           << "module_file must be specified";
   }
-  return file_io::GetFileContents(input_file);
+  return file_io::GetFileContents(module_file);
 }
 
 Status RunFunction(::benchmark::State& state,
@@ -107,20 +107,21 @@ Status RunFunction(::benchmark::State& state,
   IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
   vm::ref<iree_vm_list_t> inputs;
-  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
-    if (!absl::GetFlag(FLAGS_inputs).empty()) {
+  if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of inputs and inputs_file to be set";
+             << "Expected only one of function_inputs and function_inputs_file "
+                "to be set";
     }
-    IREE_ASSIGN_OR_RETURN(
-        inputs, ParseToVariantListFromFile(input_descs,
-                                           iree_hal_device_allocator(device),
-                                           absl::GetFlag(FLAGS_inputs_file)));
+    IREE_ASSIGN_OR_RETURN(inputs,
+                          ParseToVariantListFromFile(
+                              input_descs, iree_hal_device_allocator(device),
+                              absl::GetFlag(FLAGS_function_inputs_file)));
   } else {
     IREE_ASSIGN_OR_RETURN(
         inputs,
         ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                           absl::GetFlag(FLAGS_inputs)));
+                           absl::GetFlag(FLAGS_function_inputs)));
   }
 
   IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
@@ -206,9 +207,10 @@ int main(int argc, char** argv) {
   // normal options. Any remaining flags will be unknown and result in an error.
   absl::SetProgramUsageMessage(
       "iree-benchmark-module \n"
-      "    --input_file=module.vmfb\n"
+      "    --module_file=module.vmfb\n"
       "    --entry_function=exported_function_to_benchmark\n"
-      "    [--inputs=2xi32=1 2,1x2xf32=2 1 | --inputs_file=file_with_inputs]\n"
+      "    [--function_inputs=2xi32=1 2,1x2xf32=2 1 | "
+      "     --function_inputs_file=file_with_function_inputs]\n"
       "    [--driver=vmla]\n"
       "\n\n"
       "  Optional flags from third_party/benchmark/src/benchmark.cc:\n"

@@ -1,7 +1,7 @@
 // RUN: (iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s | iree-run-module --entry_function=many_tensor) | IreeFileCheck %s
 
 // (only checking exit codes).
-// RUN: iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s -o ${TEST_TMPDIR?}/bc.module && iree-benchmark-module --driver=vmla --entry_function=many_tensor --input_file=${TEST_TMPDIR?}/bc.module
+// RUN: iree-translate --iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module %s -o ${TEST_TMPDIR?}/bc.module && iree-benchmark-module --driver=vmla --entry_function=many_tensor --module_file=${TEST_TMPDIR?}/bc.module
 
 // RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 

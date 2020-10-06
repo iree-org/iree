@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test matrix ops."""
 
+from absl import app
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
@@ -43,8 +44,11 @@ class MatrixOpsDynamicModule(tf.Module):
     return tf.matmul(lhs, rhs)
 
 
-@tf_test_utils.compile_module(MatrixOpsDynamicModule)
 class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(MatrixOpsDynamicTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(MatrixOpsDynamicModule)
 
   def test_matmul_high_rank_batch(self):
 
@@ -52,7 +56,7 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
       module.matmul_high_rank_batch(
           tf_utils.uniform([1, 7, 4, 2]), tf_utils.uniform([7, 1, 2, 4]))
 
-    self.compare_backends(matmul_high_rank_batch)
+    self.compare_backends(matmul_high_rank_batch, self._modules)
 
   def test_matmul_dynamic_matching_batch(self):
 
@@ -60,7 +64,7 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
       module.matmul_dynamic(
           tf_utils.uniform([2, 2, 3]), tf_utils.uniform([2, 3, 4]))
 
-    self.compare_backends(matmul_dynamic_matching_batch)
+    self.compare_backends(matmul_dynamic_matching_batch, self._modules)
 
   def test_matmul_dynamic_broadcast_lhs(self):
 
@@ -68,7 +72,7 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
       module.matmul_dynamic(
           tf_utils.uniform([1, 2, 3]), tf_utils.uniform([2, 3, 4]))
 
-    self.compare_backends(matmul_dynamic_broadcast_lhs)
+    self.compare_backends(matmul_dynamic_broadcast_lhs, self._modules)
 
   def test_matmul_dynamic_broadcast_rhs(self):
 
@@ -76,7 +80,7 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
       module.matmul_dynamic(
           tf_utils.uniform([2, 2, 3]), tf_utils.uniform([1, 3, 4]))
 
-    self.compare_backends(matmul_dynamic_broadcast_rhs)
+    self.compare_backends(matmul_dynamic_broadcast_rhs, self._modules)
 
   def test_matmul_dynamic_rank_broadcasting(self):
 
@@ -84,10 +88,15 @@ class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
       module.matmul_dynamic_lhs_batch(
           tf_utils.uniform([7, 2, 3]), tf_utils.uniform([3, 4]))
 
-    self.compare_backends(matmul_dynamic_rank_broadcasting)
+    self.compare_backends(matmul_dynamic_rank_broadcasting, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

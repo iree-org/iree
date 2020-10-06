@@ -34,7 +34,7 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRSideEffectInterfaces
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
   PUBLIC
 )

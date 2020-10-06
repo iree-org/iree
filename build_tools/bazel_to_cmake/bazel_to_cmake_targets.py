@@ -29,17 +29,18 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
         "MLIRAllDialects"
     ],
-    "@llvm-project//mlir:Affine": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
     "@llvm-project//mlir:DialectUtils": [""],
     "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
+    "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
+    "@llvm-project//mlir:StandardOps": ["MLIRStandard"],
     "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
@@ -69,7 +70,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
-    "@sdl2//:SDL2": ["SDL2-static"]
+    "@sdl2//:SDL2": ["SDL2-static"],
+    "@com_github_pytorch_cpuinfo//:cpuinfo": ["cpuinfo"],
 }
 
 

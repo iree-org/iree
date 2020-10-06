@@ -75,8 +75,6 @@ class ModelTrain(tf.Module):
     return loss_value
 
 
-@tf_test_utils.compile_module(
-    ModelTrain.CreateModule, exported_names=["train_step"])
 class ModelTrainTest(tf_test_utils.TracedModuleTestCase):
 
   def generate_regression_data(self, size=8):
@@ -104,11 +102,12 @@ class ModelTrainTest(tf_test_utils.TracedModuleTestCase):
       # Run one iteration of training step.
       module.train_step(inputs, targets)
 
-    self.compare_backends(train_step)
+    self.compare_backends(train_step, self._modules)
 
 
 if __name__ == "__main__":
   if hasattr(tf, "enable_v2_behavior"):
     tf.enable_v2_behavior()
-
+  tf_test_utils.compile_tf_module(ModelTrain.CreateModule,
+                                  exported_names=["train_step"])
   tf.test.main()

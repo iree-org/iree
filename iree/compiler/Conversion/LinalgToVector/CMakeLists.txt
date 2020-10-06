@@ -24,10 +24,10 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     MLIRVector

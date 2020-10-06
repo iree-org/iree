@@ -44,6 +44,7 @@ class StatefulCountingModule(tf.Module):
   def get_count(self):
     return self.count
 
+
 class RandomInitModule(tf.Module):
 
   def __init__(self):
@@ -56,25 +57,15 @@ class RandomInitModule(tf.Module):
 
 class UtilsTests(tf.test.TestCase, parameterized.TestCase):
 
-  @parameterized.named_parameters([
-      {
-          'testcase_name': 'single_backend',
-          'backend_infos': [tf_utils.BackendInfo('iree_vmla')],
-      },
-      {
-          'testcase_name':
-              'multiple_backends',
-          'backend_infos': [
-              tf_utils.BackendInfo('iree_vmla'),
-              tf_utils.BackendInfo('iree_llvmjit')
-          ],
-      },
-  ])
-  def test_artifact_saving(self, backend_infos):
+  def test_artifact_saving(self):
+    backend_info = tf_utils.BackendInfo('iree_vmla')
     with tempfile.TemporaryDirectory() as artifacts_dir:
       tf_module = ConstantModule()
-      iree_compiled_module, compiled_path = tf_utils.compile_tf_module(
-          tf_module, backend_infos=backend_infos, artifacts_dir=artifacts_dir)
+      iree_compiled_module, compiled_path = (
+          tf_utils._incrementally_compile_tf_module(
+              tf_module,
+              backend_info=backend_info,
+              artifacts_dir=artifacts_dir))
 
       artifacts_to_check = [
           'tf_input.mlir',
@@ -98,7 +89,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
   ])
   def test_unaltered_state(self, backend_name):
     backend_info = tf_utils.BackendInfo(backend_name)
-    module = backend_info.compile(StatefulCountingModule)
+    module = backend_info.compile_from_class(StatefulCountingModule)
 
     # Test that incrementing works properly.
     self.assertEqual([0.], module.get_count())
@@ -121,7 +112,6 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     inputs = [np.array([1, 2], dtype=np.float32)]
     self.assertEqual('2xf32=1.0 2.0', tf_utils.save_input_values(inputs))
 
-
   @parameterized.named_parameters([
       {
           'testcase_name': 'tensorflow',
@@ -136,8 +126,8 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     backend_info = tf_utils.BackendInfo(backend_name)
 
     # Test compilation is the same.
-    module_1 = backend_info.compile(RandomInitModule)
-    module_2 = backend_info.compile(RandomInitModule)
+    module_1 = backend_info.compile_from_class(RandomInitModule)
+    module_2 = backend_info.compile_from_class(RandomInitModule)
     self.assertAllEqual(module_1.get(), module_2.get())
 
     # Test reinitialization is the same.

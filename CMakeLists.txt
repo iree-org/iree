@@ -312,6 +312,9 @@ function(add_iree_mlir_src_dep llvm_monorepo_path)
     set(MLIR_VULKAN_RUNNER_ENABLED ON)
   endif()
 
+  # Disable LLVM's warnings
+  set(LLVM_ENABLE_WARNINGS OFF)
+
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting
@@ -384,6 +387,7 @@ add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
 
+add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)

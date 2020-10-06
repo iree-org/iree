@@ -25,7 +25,7 @@ Example usage:
 
 run_binary_test(
     name = "my_test",
-    args = ["--input_file=$(location :data_file)"],
+    args = ["--module_file=$(location :data_file)"],
     data = [":data_file"],
     test_binary = ":some_cc_binary",
 )

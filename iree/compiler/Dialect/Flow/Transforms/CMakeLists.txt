@@ -43,7 +43,7 @@ iree_cc_library(
     MLIRPass
     MLIRShape
     MLIRShapeOpsTransforms
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
