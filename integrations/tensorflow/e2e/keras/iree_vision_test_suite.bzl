@@ -62,7 +62,8 @@ def iree_vision_test_suite(
       url:
         a base url to fetch non-keras trained model weights from.
       use_external_weights:
-        whether or not to load model weights from keras or a supplied url.
+        whether or not to load model weights from the web (either uses keras or
+          the supplied url).
       deps:
         test dependencies.
       size:
