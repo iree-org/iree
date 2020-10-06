@@ -26,6 +26,7 @@
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
@@ -98,22 +99,10 @@ class VMLATargetBackend final : public TargetBackend {
     // compatible VMLA functions into a new "linked" executable, de-duping
     // symbols, and updating references as we go.
     //
-    // Sample IR before:
-    //   hal.executable @main_dispatch_0 {
-    //     hal.interface @legacy_io { ... }
-    //     hal.executable.target @vmla, filter="vmla" {
-    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-    //       module { vm.module @module { vm.func @main_0(...) { ... } } }
-    //     }
-    //     hal.executable.target @other, filter="other" {
-    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-    //       module { ... }
-    //     }
-    //   }
-    //
     // Sample IR after:
     //   hal.executable @linked_vmla {
-    //     hal.interface @legacy_io { ... }
+    //     hal.interface @legacy_io_0 { ... }
+    //     hal.interface @legacy_io_1 { ... }
     //     hal.executable.target @vmla, filter="vmla" {
     //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
     //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
@@ -134,12 +123,6 @@ class VMLATargetBackend final : public TargetBackend {
     //       module { ... }
     //     }
     //   }
-    //
-    // NOTE: Since executables currently must have exactly one interface, we
-    // can't link across executables with different interfaces.
-    // We could link into one executable per unique interface, but a better
-    // solution is to relax that interface constraint.
-    // TODO(#1587): Generalize this to support different interfaces.
 
     OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
     auto executableOps = moduleOp.getOps<IREE::HAL::ExecutableOp>();
@@ -161,7 +144,7 @@ class VMLATargetBackend final : public TargetBackend {
         builder.create<IREE::VM::ModuleOp>(moduleOp.getLoc(), "linked_module");
 
     int executablesLinked = 0;
-    llvm::Optional<IREE::HAL::InterfaceOp> interfaceOp;
+    llvm::SmallVector<IREE::HAL::InterfaceOp, 4> interfaceOps;
     int nextEntryPointOrdinal = 0;
     for (auto executableOp : executableOps) {
       auto targetOps = llvm::to_vector<4>(
@@ -172,18 +155,20 @@ class VMLATargetBackend final : public TargetBackend {
           continue;
         }
 
-        if (interfaceOp.hasValue()) {
-          if (!AreInterfacesEquivalent(interfaceOp.getValue(),
-                                       executableOp.getInterfaceOp())) {
-            // For now, only link together targets sharing an interface with
-            // the first target.
-            // TODO(#1587): Relax this constraint
-            continue;
+        IREE::HAL::InterfaceOp interfaceOpForExecutable;
+        for (auto interfaceOp : interfaceOps) {
+          if (AreInterfacesEquivalent(interfaceOp,
+                                      executableOp.getFirstInterfaceOp())) {
+            interfaceOpForExecutable = interfaceOp;
           }
-        } else {
-          builder.setInsertionPointToStart(linkedExecutableOp.getBody());
-          interfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
-              builder.clone(*executableOp.getInterfaceOp()));
+        }
+        if (!interfaceOpForExecutable) {
+          builder.setInsertionPoint(linkedTargetOp);
+          interfaceOpForExecutable = dyn_cast<IREE::HAL::InterfaceOp>(
+              builder.clone(*executableOp.getFirstInterfaceOp()));
+          interfaceOpForExecutable.setName(
+              llvm::formatv("legacy_io_{0}", interfaceOps.size()).str());
+          interfaceOps.push_back(interfaceOpForExecutable);
         }
 
         // Clone entry point ops, remapping ordinals and updating symbol refs.
@@ -194,7 +179,8 @@ class VMLATargetBackend final : public TargetBackend {
               builder.create<IREE::HAL::ExecutableEntryPointOp>(
                   entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                   builder.getI32IntegerAttr(nextEntryPointOrdinal++),
-                  entryPointOp.interfaceAttr(), entryPointOp.signatureAttr());
+                  builder.getSymbolRefAttr(interfaceOpForExecutable.getName()),
+                  entryPointOp.signatureAttr());
 
           // Update references to @executable::@target::@entry symbols.
           // SymbolTable::replaceAllSymbolUses only looks at root symbols,

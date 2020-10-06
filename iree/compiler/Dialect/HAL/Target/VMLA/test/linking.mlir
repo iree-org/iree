@@ -67,18 +67,26 @@ module {
   }
 }
 
-// @dispatch_0 and @dispatch_1 should be linked together into @linked_vmla
+// All executables (including their interfaces and entry points) should be linked together into @linked_vmla
 // CHECK-NOT: hal.executable @dispatch_0
 // CHECK-NOT: hal.executable @dispatch_1
+// CHECK-NOT: hal.executable @dispatch_2
 // CHECK:       hal.executable @linked_vmla attributes {sym_visibility = "private"} {
-// CHECK-NEXT:    hal.interface @legacy_io {
+// CHECK-NEXT:    hal.interface @legacy_io_0 {
 // CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 // CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
+// CHECK-NEXT:    hal.interface @legacy_io_1 {
+// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.target @vmla, filter="vmla" {
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @legacy_io, ordinal = 1 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @legacy_io_0, ordinal = 1 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_2 attributes {interface = @legacy_io_1, ordinal = 2 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
@@ -89,18 +97,19 @@ module {
 // CHECK-NEXT:            vm.return
 // CHECK-NEXT:          }
 // CHECK-NEXT:          vm.export @dispatch_1
+// CHECK-NEXT:          vm.func @dispatch_2(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32) {
+// CHECK-NEXT:            vm.return
+// CHECK-NEXT:          }
+// CHECK-NEXT:          vm.export @dispatch_2
 // CHECK-NEXT:        }
 // CHECK-NEXT:      }
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
 //
-// @dispatch_2 should not be touched since it has a different hal.interface
-// CHECK:       hal.executable @dispatch_2 attributes {sym_visibility = "private"} {
-//
 // CHECK:       func @main() {
 // CHECK:         hal.command_buffer.dispatch.symbol %cmd, @linked_vmla::@vmla::@dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol %cmd, @linked_vmla::@vmla::@dispatch_1, workgroup_xyz = [%c1, %c1, %c1]
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol %cmd, @dispatch_2::@vmla::@dispatch_2, workgroup_xyz = [%c1, %c1, %c1]
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol %cmd, @linked_vmla::@vmla::@dispatch_2, workgroup_xyz = [%c1, %c1, %c1]
 // CHECK-NEXT:    return
 // CHECK-NEXT:  }
 
@@ -149,13 +158,13 @@ module {
 
 // VMLA target should be pulled out from @dispatch_0
 // CHECK:       hal.executable @linked_vmla attributes {sym_visibility = "private"} {
-// CHECK-NEXT:    hal.interface @legacy_io {
+// CHECK-NEXT:    hal.interface @legacy_io_0 {
 // CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
 // CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.target @vmla, filter="vmla" {
-// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
+// CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<1x1xf32>, tensor<1x1xf32>) -> tensor<1x1xf32>}
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {

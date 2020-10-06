@@ -208,8 +208,11 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
           spvFuncOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
       if (!numWorkgroupsFn) return failure();
+      // Assume only one interface op per executable, which we control by not
+      // linking executables together (at all, or with different interfaces).
       workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
-          loc, numWorkgroupsFn, dispatchState.executableOp.getInterfaceOp(),
+          loc, numWorkgroupsFn,
+          dispatchState.executableOp.getFirstInterfaceOp(),
           dispatchState.operands, dispatchState.results, rewriter);
     } else {
       workgroupCount = calculateDispatchWorkgroupCount(loc, workload,

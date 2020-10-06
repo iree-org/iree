@@ -355,8 +355,9 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
           dispatchOp, dispatchOp.executable()));
 
   // TODO(benvanik): support multiple interfaces. We'd probably want to
-  // store each executable+interface as a variable.
-  auto interfaceOp = executableOp.getInterfaceOp();
+  // store each executable+interface as a variable, or follow interface
+  // references stored on entry points.
+  auto interfaceOp = executableOp.getFirstInterfaceOp();
   auto executableLayout =
       rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
           dispatchOp.getLoc(),

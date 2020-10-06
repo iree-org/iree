@@ -55,10 +55,12 @@ class MaterializeResourceCachesPass
     // other nice thing is that we get ordering similar to the executable
     // variables above.
     for (auto executableOp : executableOps) {
-      auto interfaceOp = executableOp.getInterfaceOp();
-      defineExecutableLayoutOp(interfaceOp.getLoc(),
-                               interfaceOp.getExecutableSetLayoutsAttr(),
-                               interfaceOp.push_constantsAttr());
+      for (auto interfaceOp :
+           executableOp.getBlock().getOps<IREE::HAL::InterfaceOp>()) {
+        defineExecutableLayoutOp(interfaceOp.getLoc(),
+                                 interfaceOp.getExecutableSetLayoutsAttr(),
+                                 interfaceOp.push_constantsAttr());
+      }
     }
 
     // Generate cached resource singletons and replace lookup ops with direct
@@ -233,7 +235,11 @@ class MaterializeResourceCachesPass
 
       // TODO(benvanik): support multiple interfaces. We'd probably want to
       // store each executable+interface as a variable.
-      auto interfaceOp = executableOp.getInterfaceOp();
+      //
+      // This is *only* safe now because any backends that support multiple
+      // interfaces during compilation do *not* use layouts during executable
+      // cache preparation.
+      auto interfaceOp = executableOp.getFirstInterfaceOp();
 
       auto executableLayoutVariableOp = defineExecutableLayoutOp(
           executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),

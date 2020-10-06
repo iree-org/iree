@@ -1610,7 +1610,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
-    IREE::HAL::InterfaceOp getInterfaceOp();
+    IREE::HAL::InterfaceOp getFirstInterfaceOp();
   }];
 
   let verifier = [{ return verifyExecutableOp(*this); }];
