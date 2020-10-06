@@ -27,8 +27,8 @@ class FiniteModule(tf.Module):
 
 class FiniteTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(FiniteTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(FiniteTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(FiniteModule)
 
   def test_finite(self):

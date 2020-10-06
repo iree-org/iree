@@ -42,8 +42,8 @@ class BatchNormModule(tf.Module):
 
 class BatchNormTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(BatchNormTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(BatchNormTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(BatchNormModule)
 
   def test_batch_norm_inference(self):
