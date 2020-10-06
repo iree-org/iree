@@ -143,7 +143,7 @@ def main(argv):
 
   for test_suite in test_suites:
     if FLAGS.run_test_suites and not FLAGS.dry_run:
-      subprocess.check_output([
+      subprocess.check_call([
           'bazel', 'test', test_suite, '--color=yes',
           '--test_arg=--get_saved_model'
       ])
