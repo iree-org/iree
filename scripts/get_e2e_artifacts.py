@@ -65,18 +65,24 @@ WRITTEN_PATHS = set()
 PATHS_TO_TESTS = dict()
 
 
+def _target_to_testlogs_path(target: str) -> str:
+  """Convert target into the path where Bazel stores the artifacts we want."""
+  return os.path.join('bazel-testlogs',
+                      target.replace('//', '').replace(':', os.sep))
+
+
+def _target_to_test_name(target: str, test_suite_path: str) -> str:
+  """Get test_name from `suite_name_test_name__tf__backend_name`."""
+  return target.split('__')[0].replace(f'{test_suite_path}_', '')
+
+
 def get_test_paths_and_names(test_suite_path: str):
   """Get the paths Bazel stores test outputs in and the matching test names."""
   targets = utils.get_test_targets(test_suite_path)
-  # Convert the test target into the path where Bazel stores the artifacts we
-  # put in `TEST_UNDECLARED_OUTPUTS_DIR`.
-  test_paths = [target.replace('//', '') for target in targets]
-  test_paths = [path.replace(':', os.sep) for path in test_paths]
-  test_paths = [os.path.join('bazel-testlogs', path) for path in test_paths]
-
-  # Get test_name from `suite_name_test_name__tf__backend_name`
-  test_names = [target.split('__')[0] for target in targets]
-  test_names = [name.replace(f'{test_suite_path}_', '') for name in test_names]
+  test_paths = [_target_to_testlogs_path(target) for target in targets]
+  test_names = [
+      _target_to_test_name(target, test_suite_path) for target in targets
+  ]
   return test_paths, test_names
 
 
