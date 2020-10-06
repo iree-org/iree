@@ -289,11 +289,21 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
   // TODO(antiagainst): only update the PSO for the current executable.
   for (const auto& pso_kv : pipeline_state_objects_) {
     const auto* pipeline_layout = static_cast<MetalPipelineArgumentBufferLayout*>(pso_kv.first);
-    const auto& pso = pso_kv.second;
     IREE_DVLOG(3) << "Current pipeline layout: " << pipeline_layout->DebugString();
-    IREE_CHECK(pso.push_states.size() <= 1);
-    IREE_CHECK(pso.bind_states.size() <= 1);
-    IREE_CHECK(pso.constant_states.empty());
+
+    const auto& pso = pso_kv.second;
+    if (pso.push_states.size() > 1) {
+      return UnimplementedErrorBuilder(IREE_LOC)
+             << "MetalCommandBuffer::Dispatch with more than one push descriptor sets";
+    }
+    if (!pso.bind_states.empty()) {
+      return UnimplementedErrorBuilder(IREE_LOC)
+             << "MetalCommandBuffer::Dispatch with bound descriptor sets";
+    }
+    if (!pso.constant_states.empty()) {
+      return UnimplementedErrorBuilder(IREE_LOC)
+             << "MetalCommandBuffer::Dispatch with push constants";
+    }
 
     IREE_DVLOG(3) << "Encoding push descriptors..";
     for (const auto& push_kv : pso.push_states) {
@@ -348,16 +358,6 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
       }
 
       [compute_encoder setBuffer:argument_buffer offset:0 atIndex:set_number];
-    }
-
-    if (!pso.bind_states.empty()) {
-      return UnimplementedErrorBuilder(IREE_LOC)
-             << "MetalCommandBuffer::Dispatch with bound descriptor sets";
-    }
-
-    if (!pso.constant_states.empty()) {
-      return UnimplementedErrorBuilder(IREE_LOC)
-             << "MetalCommandBuffer::Dispatch with push constants";
     }
   }
 

@@ -248,7 +248,7 @@ holding the information up until the [command buffer
 dispatch](#command-buffer-dispatch) time.
 
 With the above said, the overall idea is still to map one descriptor set to one
-arugment buffer. It just means we need to condense and remap the bindings.
+argument buffer. It just means we need to condense and remap the bindings.
 
 ### Command buffer dispatch
 
