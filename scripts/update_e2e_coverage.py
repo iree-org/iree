@@ -55,7 +55,7 @@ SINGLE_SOURCE_SUITES = {
         'slim_vision_model_test',
 }
 
-TARGET_FILTERS = [
+TARGET_EXCLUSION_FILTERS = [
     r'mobilenet_v1_.*',  # Slim vision MobileNetV1
     r'mobilenet_v2_.*',  # Slim vision MobileNetV2
 ]
