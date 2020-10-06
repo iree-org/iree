@@ -25,6 +25,7 @@
 #include "iree/hal/metal/metal_command_buffer.h"
 #include "iree/hal/metal/metal_command_queue.h"
 #include "iree/hal/metal/metal_direct_allocator.h"
+#include "iree/hal/metal/metal_pipeline_argument_buffer.h"
 #include "iree/hal/metal/metal_pipeline_cache.h"
 #include "iree/hal/metal/metal_shared_event.h"
 
@@ -83,19 +84,20 @@ StatusOr<ref_ptr<DescriptorSetLayout>> MetalDevice::CreateDescriptorSetLayout(
     DescriptorSetLayout::UsageType usage_type,
     absl::Span<const DescriptorSetLayout::Binding> bindings) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateDescriptorSetLayout");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalDevice::CreateDescriptorSetLayout";
+  return make_ref<MetalArgumentBufferLayout>(usage_type, bindings);
 }
 
 StatusOr<ref_ptr<ExecutableLayout>> MetalDevice::CreateExecutableLayout(
     absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateExecutableLayout");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalDevice::CreateExecutableLayout";
+  return make_ref<MetalPipelineArgumentBufferLayout>(set_layouts, push_constants);
 }
 
 StatusOr<ref_ptr<DescriptorSet>> MetalDevice::CreateDescriptorSet(
     DescriptorSetLayout* set_layout, absl::Span<const DescriptorSet::Binding> bindings) {
   IREE_TRACE_SCOPE0("MetalDevice::CreateDescriptorSet");
-  return UnimplementedErrorBuilder(IREE_LOC) << "MetalDevice::CreateDescriptorSet";
+  return make_ref<MetalArgumentBuffer>(static_cast<MetalArgumentBufferLayout*>(set_layout),
+                                       bindings);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> MetalDevice::CreateCommandBuffer(
