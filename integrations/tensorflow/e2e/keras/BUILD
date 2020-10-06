@@ -162,8 +162,8 @@ iree_e2e_test_suite(
 )
 
 iree_vision_test_suite(
-    name = "medium_cifar10_internal_tests",
-    size = "medium",
+    name = "long_cifar10_internal_tests",
+    size = "long",
     backends = [
         "tf",
         "tflite",
