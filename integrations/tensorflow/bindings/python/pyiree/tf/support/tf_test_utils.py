@@ -30,7 +30,7 @@ import os
 import pickle
 import sys
 import tempfile
-from typing import Any, Callable, Dict, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
 
 from absl import flags
 from absl import logging
@@ -383,13 +383,22 @@ class Trace:
             "Expected ref and tar to have the same dtype, but got %s  and %s",
             ref.dtype, tar.dtype)
         return False
+      if ref.size == tar.size == 0:
+        return True
+
       if np.issubdtype(ref.dtype, np.floating):
         same = np.allclose(ref, tar, rtol=rtol, atol=atol)
+        abs_diff = np.max(np.abs(ref - tar))
+        rel_diff = np.max(np.abs(ref - tar) / np.max(np.abs(tar)))
         if not same:
-          abs_diff = np.max(np.abs(ref - tar))
-          rel_diff = np.max(np.abs(ref - tar) / np.max(tar))
           logging.error(
               "Floating point difference between ref and tar was too large. "
+              "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
+              abs_diff, atol, rel_diff, rtol)
+        else:
+          logging.info(
+              "Floating point difference between ref and tar was within "
+              "tolerance. "
               "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
               abs_diff, atol, rel_diff, rtol)
         return same
@@ -590,6 +599,48 @@ def compile_tf_module(
 
   compile_backend = lambda backend_info: backend_info.compile_from_class(
       module_class, exported_names, artifacts_dir)
+
+  ref_module = compile_backend(ref_backend_info)
+  tar_modules = [
+      compile_backend(backend_info) for backend_info in tar_backend_infos
+  ]
+  return Modules(ref_module, tar_modules, artifacts_dir)
+
+
+def compile_tf_signature_def_saved_model(saved_model_dir: str,
+                                         saved_model_tags: Set[str],
+                                         module_name: str, exported_name: str,
+                                         input_names: Sequence[str],
+                                         output_names: Sequence[str]):
+  """Compiles a SignatureDef SavedModel to each backend that we test.
+
+  Args:
+    saved_model_dir: Directory of the saved model.
+    saved_model_tags: Optional set of tags to use when loading the model.
+    module_name: A name for this compiled module.
+    backend_info: BackendInfo with the details for compiling the saved model.
+    exported_name: A str representing the signature on the saved model to
+      compile.
+    input_names: A sequence of kwargs to feed to the saved model.
+    output_names: A sequence of named outputs to extract from the saved model.
+
+  Returns:
+    A 'Modules' namedtuple containing the reference module, target modules and
+    artifacts directory.
+  """
+
+  # Setup the directory for saving compilation artifacts and traces.
+  artifacts_dir = _setup_artifacts_dir(module_name)
+
+  # Get the backend information for this test.
+  ref_backend_info = tf_utils.BackendInfo(FLAGS.reference_backend,
+                                          f"{FLAGS.reference_backend}_ref")
+  tar_backend_infos = get_target_backends()
+
+  compile_backend = (
+      lambda backend_info: backend_info.compile_signature_def_saved_model(
+          saved_model_dir, saved_model_tags, module_name, exported_name,
+          input_names, output_names, artifacts_dir))
 
   ref_module = compile_backend(ref_backend_info)
   tar_modules = [

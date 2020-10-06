@@ -31,6 +31,9 @@ flags.DEFINE_string('model', 'ResNet50', 'model name')
 flags.DEFINE_string(
     'url', '', 'url with model weights '
     'for example https://storage.googleapis.com/iree_models/')
+flags.DEFINE_bool(
+    'use_external_weights', False,
+    'Whether or not to load external weights from the web')
 flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
 flags.DEFINE_bool(
@@ -111,13 +114,18 @@ def initialize_model():
 
   # If weights == 'imagenet', the model will load the appropriate weights from
   # an external tf.keras URL.
-  weights = 'imagenet' if FLAGS.data == 'imagenet' else None
+  weights = None
+  if FLAGS.use_external_weights and FLAGS.data == 'imagenet':
+    weights = 'imagenet'
 
   model = APP_MODELS[FLAGS.model](weights=weights,
                                   include_top=FLAGS.include_top,
                                   input_shape=input_shape)
 
-  if FLAGS.data == 'cifar10' and FLAGS.url:
+  if FLAGS.use_external_weights and FLAGS.data == 'cifar10':
+    if not FLAGS.url:
+      raise ValueError(
+          'cifar10 weights cannot be loaded without the `--url` flag.')
     model = load_cifar10_weights(model)
   return model
 

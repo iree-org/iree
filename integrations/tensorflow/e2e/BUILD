@@ -218,12 +218,18 @@ iree_e2e_test_suite(
 
 iree_e2e_test_suite(
     name = "mobile_bert_squad_tests",
+    size = "enormous",
     backends_to_srcs = {
         "tf": ["mobile_bert_squad_test.py"],
+        "tflite": ["mobile_bert_squad_test.py"],
+        "iree_vmla": ["mobile_bert_squad_test.py"],
     },
     reference_backend = "tf",
     tags = [
+        "external",
+        "guitar",
         "manual",
+        "no-remote",
         "nokokoro",
         "notap",
     ],
@@ -234,15 +240,17 @@ iree_e2e_test_suite(
 
 iree_e2e_test_suite(
     name = "mobile_bert_squad_tests_failing",
+    size = "enormous",
     backends_to_srcs = {
-        "tflite": ["mobile_bert_squad_test.py"],
-        "iree_vmla": ["mobile_bert_squad_test.py"],
         "iree_llvmjit": ["mobile_bert_squad_test.py"],
         "iree_vulkan": ["mobile_bert_squad_test.py"],
     },
     reference_backend = "tf",
     tags = [
+        "external",
+        "guitar",
         "manual",
+        "no-remote",
         "nokokoro",
         "notap",
     ],
