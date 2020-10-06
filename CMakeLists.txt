@@ -290,6 +290,10 @@ include(iree_setup_toolchain)
 #     dependency is added prior to including this configuration.
 #-------------------------------------------------------------------------------
 
+# Disable LLVM's warnings.
+set(LLVM_ENABLE_ASSERTIONS OFF CACHE STRING "don't use global flags /facepalm")
+set(LLVM_ENABLE_WARNINGS OFF CACHE STRING "don't use global flags /facepalm")
+
 # Adds bundled projects that must be included after the LLVM directory has
 # been added and within the scope of its settings (i.e. build type override,
 # etc).
@@ -300,13 +304,6 @@ function(add_bundled_mlir_dependent_projects)
 endfunction()
 
 function(add_iree_mlir_src_dep llvm_monorepo_path)
-  # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm
-  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
-  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
-  if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
-    set(CMAKE_BUILD_TYPE "Debug")
-  endif()
-
   # experimental model builder uses vulkan runner.
   if(${IREE_BUILD_EXPERIMENTAL})
     set(MLIR_VULKAN_RUNNER_ENABLED ON)
@@ -345,8 +342,8 @@ if(${IREE_ENABLE_MLIR})
     include(HandleLLVMOptions)
 
     # Add include/link directories
-    include_directories(${LLVM_INCLUDE_DIRS})
-    include_directories(${MLIR_INCLUDE_DIRS})
+    include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+    include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
     link_directories(${LLVM_BUILD_LIBRARY_DIR})
     add_definitions(${LLVM_DEFINITIONS})
   else()
