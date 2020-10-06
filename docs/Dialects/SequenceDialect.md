@@ -9,9 +9,7 @@ parent: Dialect Definitions
 # 'sequence' Dialect
 {: .no_toc }
 
-
 A dialect designed to model iterable sequences.
-
 
 The sequence dialect is used to model sequences that support high-level
 operations such as `map`, `sum`, and `reduce`.
@@ -24,7 +22,6 @@ This dialect is currently under construction. Don't use it just yet.
 ## Type definition
 
 ### of
-
 Any type of sequence.
 
 ## Operation definition
@@ -33,12 +30,12 @@ Any type of sequence.
 
 applies a map function to a sequence element-wise
 
+
 Syntax:
 
 ```
 operation ::= `sequence.map` $mapping_function `,` $input_sequence  `:` type($input_sequence) `->` type($output_sequence) attr-dict
 ```
-
 
 Returns a sequence resulting from applying a mapping function elementwise.
 

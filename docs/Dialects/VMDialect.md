@@ -9,9 +9,7 @@ parent: Dialect Definitions
 # 'vm' Dialect
 {: .no_toc }
 
-
 A dialect representing operations against an abstract virtual machine.
-
 
 The virtual machine ops are designed to be either serialized to a bytecode
 representation that can be interpreted at runtime or lowered further to
@@ -43,12 +41,12 @@ VM). Lowering targets can insert the reference counting as needed.
 
 integer add operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.add.i32` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -68,12 +66,12 @@ operation ::= `vm.add.i32` operands attr-dict `:` type($result)
 
 integer add operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.add.i64` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -93,12 +91,12 @@ operation ::= `vm.add.i64` operands attr-dict `:` type($result)
 
 integer binary and operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.and.i32` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -118,12 +116,12 @@ operation ::= `vm.and.i32` operands attr-dict `:` type($result)
 
 integer binary and operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.and.i64` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -143,22 +141,22 @@ operation ::= `vm.and.i64` operands attr-dict `:` type($result)
 
 unconditional branch operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.br` $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
 ```
 
+Represents an unconditional branch operation that branches to a target block
+with the given set of arguments.
 
- Represents an unconditional branch operation that branches to a target block
- with the given set of arguments.
-
- ```
- ^bb0(...):
-   vm.br ^bb1(%a)
- ^bb1(%blockArg1):
-   ...
 ```
+^bb0(...):
+  vm.br ^bb1(%a)
+^bb1(%blockArg1):
+  ...
+``
 
 #### Operands:
 
@@ -176,12 +174,12 @@ operation ::= `vm.br` $dest (`(` $destOperands^ `:` type($destOperands) `)`)? at
 
 unconditional debug break operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.break` $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
 ```
-
 
 Breaks into the attached debugger or asks for attaching a debugger. After
 resuming (or if a debugger is not attached) execution will continue at the
@@ -203,12 +201,12 @@ target block.
 
 call operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.call` $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
 ```
-
 
 Calls an internal VM function with the given arguments.
 
@@ -264,12 +262,12 @@ attribute.
 
 raises a global failure if the condition is true
 
+
 Syntax:
 
 ```
 operation ::= `vm.check.eq` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
 ```
-
 
 When the condition is true this signals a runtime failure that causes the
 entire active invocation - and possibly *all* in-flight and pending
@@ -302,12 +300,12 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 raises a global failure if the condition is true
 
+
 Syntax:
 
 ```
 operation ::= `vm.check.ne` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
 ```
-
 
 When the condition is true this signals a runtime failure that causes the
 entire active invocation - and possibly *all* in-flight and pending
@@ -340,12 +338,12 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 raises a global failure if the condition is true
 
+
 Syntax:
 
 ```
 operation ::= `vm.check.nz` $value (`,` $message^)? attr-dict `:` type($value)
 ```
-
 
 When the condition is true this signals a runtime failure that causes the
 entire active invocation - and possibly *all* in-flight and pending
@@ -377,12 +375,12 @@ vm.check.nz %ref, "!null" : !vm.ref<?>
 
 integer equality comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.eq.i32` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -403,12 +401,12 @@ Compares two operands with the specified predicate.
 
 integer equality comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.eq.i64` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -429,12 +427,12 @@ Compares two operands with the specified predicate.
 
 ref_ptr equality comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.eq.ref` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -455,12 +453,12 @@ Compares two operands with the specified predicate.
 
 signed integer greater-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gte.i32.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -481,12 +479,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer greater-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gte.i32.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -507,12 +505,12 @@ Compares two operands with the specified predicate.
 
 signed integer greater-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gte.i64.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -533,12 +531,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer greater-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gte.i64.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -559,12 +557,12 @@ Compares two operands with the specified predicate.
 
 signed integer greater-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gt.i32.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -585,12 +583,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer greater-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gt.i32.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -611,12 +609,12 @@ Compares two operands with the specified predicate.
 
 signed integer greater-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gt.i64.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -637,12 +635,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer greater-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.gt.i64.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -663,12 +661,12 @@ Compares two operands with the specified predicate.
 
 signed integer less-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lte.i32.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -689,12 +687,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer less-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lte.i32.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -715,12 +713,12 @@ Compares two operands with the specified predicate.
 
 signed integer less-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lte.i64.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -741,12 +739,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer less-than-or-equal comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lte.i64.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -767,12 +765,12 @@ Compares two operands with the specified predicate.
 
 signed integer less-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lt.i32.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -793,12 +791,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer less-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lt.i32.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -819,12 +817,12 @@ Compares two operands with the specified predicate.
 
 signed integer less-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lt.i64.s` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -845,12 +843,12 @@ Compares two operands with the specified predicate.
 
 unsigned integer less-than comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.lt.i64.u` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -871,12 +869,12 @@ Compares two operands with the specified predicate.
 
 integer inequality comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.ne.i32` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -897,12 +895,12 @@ Compares two operands with the specified predicate.
 
 integer inequality comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.ne.i64` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -923,12 +921,12 @@ Compares two operands with the specified predicate.
 
 ref_ptr inequality comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.ne.ref` operands attr-dict `:` type($lhs)
 ```
-
 
 Compares two operands with the specified predicate.
 
@@ -949,12 +947,12 @@ Compares two operands with the specified predicate.
 
 integer non-zero comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.nz.i32` $operand attr-dict `:` type($operand)
 ```
-
 
 Compares the given integer operand for a non-zero value.
 
@@ -974,12 +972,12 @@ Compares the given integer operand for a non-zero value.
 
 integer non-zero comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.nz.i64` $operand attr-dict `:` type($operand)
 ```
-
 
 Compares the given integer operand for a non-zero value.
 
@@ -999,12 +997,12 @@ Compares the given integer operand for a non-zero value.
 
 ref_ptr non-zero comparison operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cmp.nz.ref` $operand attr-dict `:` type($operand)
 ```
-
 
 Compares the given ref_ptr operand for a non-zero/null value.
 
@@ -1024,6 +1022,7 @@ Compares the given ref_ptr operand for a non-zero/null value.
 
 conditional branch operation
 
+
 Syntax:
 
 ```
@@ -1033,18 +1032,17 @@ operation ::= `vm.cond_br` $condition `,`
               attr-dict
 ```
 
+Represents a conditional branch operation that branches to one of the two
+target blocks with the given set of arguments.
 
- Represents a conditional branch operation that branches to one of the two
- target blocks with the given set of arguments.
-
- ```
- ^bb0(...):
-   vm.cond_br %condition, ^bb1(%a), ^bb2(%b)
- ^bb1(%blockArg1):
-   ...
- ^bb2(%blockArg2):
-   ...
 ```
+^bb0(...):
+  vm.cond_br %condition, ^bb1(%a), ^bb2(%b)
+^bb1(%blockArg1):
+  ...
+^bb2(%blockArg2):
+  ...
+``
 
 #### Operands:
 
@@ -1065,13 +1063,13 @@ operation ::= `vm.cond_br` $condition `,`
 
 conditional debug break operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.cond_break` $condition `,` $dest (`(` $destOperands^ `:` type($destOperands) `)`)?
               attr-dict
 ```
-
 
 Breaks into the attached debugger or asks for attaching a debugger if the
 provided condition is true. After resuming (or if a debugger is not
@@ -1149,12 +1147,12 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 32-bit integer constant zero operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.const.i32.zero` `:` type($result) attr-dict
 ```
-
 
 Defines a constant zero integer.
 
@@ -1186,12 +1184,12 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 64-bit integer constant zero operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.const.i64.zero` `:` type($result) attr-dict
 ```
-
 
 Defines a constant zero integer.
 
@@ -1205,12 +1203,12 @@ Defines a constant zero integer.
 
 constant rodata access operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.const.ref.rodata` $rodata attr-dict `:` type($value)
 ```
-
 
 Returns a reference to a read-only buffer.
 
@@ -1230,12 +1228,12 @@ Returns a reference to a read-only buffer.
 
 null ref_ptr constant operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.const.ref.zero` `:` type($result) attr-dict
 ```
-
 
 Defines a constant null ref_ptr that can be used in comparisons and
 initialization.
@@ -1250,12 +1248,12 @@ initialization.
 
 signed integer division operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.div.i32.s` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -1275,12 +1273,12 @@ operation ::= `vm.div.i32.s` operands attr-dict `:` type($result)
 
 unsigned integer division operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.div.i32.u` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -1300,12 +1298,12 @@ operation ::= `vm.div.i32.u` operands attr-dict `:` type($result)
 
 signed integer division operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.div.i64.s` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -1325,12 +1323,12 @@ operation ::= `vm.div.i64.s` operands attr-dict `:` type($result)
 
 unsigned integer division operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.div.i64.u` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -1365,12 +1363,12 @@ exports can reference the same internal functions.
 
 integer sign extend 16 bits to 32 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i16.i32.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1389,12 +1387,12 @@ operation ::= `vm.ext.i16.i32.s` $operand attr-dict `:` type($operand) `->` type
 
 integer zero extend 16 bits to 32 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1413,12 +1411,12 @@ operation ::= `vm.ext.i16.i32.u` $operand attr-dict `:` type($operand) `->` type
 
 integer sign extend 16 bits to 64 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i16.i64.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1437,12 +1435,12 @@ operation ::= `vm.ext.i16.i64.s` $operand attr-dict `:` type($operand) `->` type
 
 integer zero extend 16 bits to 64 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i16.i64.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1461,12 +1459,12 @@ operation ::= `vm.ext.i16.i64.u` $operand attr-dict `:` type($operand) `->` type
 
 integer sign extend 32 bits to 64 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i32.i64.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1485,12 +1483,12 @@ operation ::= `vm.ext.i32.i64.s` $operand attr-dict `:` type($operand) `->` type
 
 integer zero extend 32 bits to 64 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i32.i64.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1509,12 +1507,12 @@ operation ::= `vm.ext.i32.i64.u` $operand attr-dict `:` type($operand) `->` type
 
 integer sign extend 8 bits to 32 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1533,12 +1531,12 @@ operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($operand) `->` type(
 
 integer zero extend 8 bits to 32 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1557,12 +1555,12 @@ operation ::= `vm.ext.i8.i32.u` $operand attr-dict `:` type($operand) `->` type(
 
 integer sign extend 8 bits to 64 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i8.i64.s` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1581,12 +1579,12 @@ operation ::= `vm.ext.i8.i64.s` $operand attr-dict `:` type($operand) `->` type(
 
 integer zero extend 8 bits to 64 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.ext.i8.i64.u` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -1605,12 +1603,12 @@ operation ::= `vm.ext.i8.i64.u` $operand attr-dict `:` type($operand) `->` type(
 
 raises a global failure
 
+
 Syntax:
 
 ```
 operation ::= `vm.fail` $status (`,` $message^)? attr-dict
 ```
-
 
 Signals a runtime failure that causes the entire active invocation - and
 possibly *all* in-flight and pending invocations - to fail with the given
@@ -1657,12 +1655,12 @@ All flow control is performed by VM ops.
 
 returns an address reference to a global
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.address` $global attr-dict `:` type($result)
 ```
-
 
 Returns an indirect address reference to the given global. During export the
 address will be converted to the natural format of the global table (for
@@ -1720,12 +1718,12 @@ Initialized to zero unless a custom initializer function is specified.
 
 global 32-bit integer load operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.load.i32` $global attr-dict `:` type($value)
 ```
-
 
 Loads the value of a global containing an primitive value.
 
@@ -1745,12 +1743,12 @@ Loads the value of a global containing an primitive value.
 
 global 64-bit integer load operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.load.i64` $global attr-dict `:` type($value)
 ```
-
 
 Loads the value of a global containing an primitive value.
 
@@ -1770,12 +1768,12 @@ Loads the value of a global containing an primitive value.
 
 global 32-bit integer load operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.load.indirect.i32` $global attr-dict `:` type($global) `->` type($value)
 ```
-
 
 Loads the value of a global containing a primitive value.
 
@@ -1795,12 +1793,12 @@ Loads the value of a global containing a primitive value.
 
 global 64-bit integer load operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.load.indirect.i64` $global attr-dict `:` type($global) `->` type($value)
 ```
-
 
 Loads the value of a global containing a primitive value.
 
@@ -1820,12 +1818,12 @@ Loads the value of a global containing a primitive value.
 
 global ref_ptr<T> load operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.load.indirect.ref` $global attr-dict `:` type($global) `->` type($value)
 ```
-
 
 Loads the value of a global containing a ref_ptr of the given type.
 
@@ -1845,12 +1843,12 @@ Loads the value of a global containing a ref_ptr of the given type.
 
 global ref_ptr<T> load operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.load.ref` $global attr-dict `:` type($value)
 ```
-
 
 Loads the value of a global containing a ref_ptr of the given type.
 
@@ -1889,12 +1887,12 @@ replaced with a store or reset.
 
 global 32-bit integer store operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.store.i32` $value `,` $global attr-dict `:` type($value)
 ```
-
 
 Stores a primitive value value to a global.
 
@@ -1914,12 +1912,12 @@ Stores a primitive value value to a global.
 
 global 64-bit integer store operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.store.i64` $value `,` $global attr-dict `:` type($value)
 ```
-
 
 Stores a primitive value value to a global.
 
@@ -1939,12 +1937,12 @@ Stores a primitive value value to a global.
 
 global 32-bit integer store operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.store.indirect.i32` $value `,` $global attr-dict `:` type($value) `->` type($global)
 ```
-
 
 Stores a primitive value to a global.
 
@@ -1959,12 +1957,12 @@ Stores a primitive value to a global.
 
 global 64-bit integer store operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.store.indirect.i64` $value `,` $global attr-dict `:` type($value) `->` type($global)
 ```
-
 
 Stores a primitive value to a global.
 
@@ -1979,12 +1977,12 @@ Stores a primitive value to a global.
 
 global ref_ptr<T> stores operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.store.indirect.ref` $value `,` $global attr-dict `:` type($value) `->` type($global)
 ```
-
 
 Stores a ref_ptr<T> to a global, retaining it until the global is reset.
 
@@ -1999,12 +1997,12 @@ Stores a ref_ptr<T> to a global, retaining it until the global is reset.
 
 global ref_ptr<T> stores operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.global.store.ref` $value `,` $global attr-dict `:` type($value)
 ```
-
 
 Stores a ref_ptr<T> to a global, retaining it until the global is reset.
 
@@ -2037,12 +2035,12 @@ an external VM module.
 
 allocates a new empty list
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.alloc` operands attr-dict `:` `(` type($initial_capacity) `)` `->` type($result)
 ```
-
 
 Allocates a new typed list with a minimum initial_capacity.
 
@@ -2062,12 +2060,12 @@ Allocates a new typed list with a minimum initial_capacity.
 
 primitive type element accessor
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.get.i32` operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
 ```
-
 
 Returns the value of the element at the given index.
 
@@ -2088,12 +2086,12 @@ Returns the value of the element at the given index.
 
 primitive type element accessor
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.get.i64` operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
 ```
-
 
 Returns the value of the element at the given index.
 
@@ -2114,12 +2112,12 @@ Returns the value of the element at the given index.
 
 ref type element accessor
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.get.ref` operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
 ```
-
 
 Returns the ref value of the element at the given index. Note that the value
 may be null if the element is null or the type does not match.
@@ -2141,12 +2139,12 @@ may be null if the element is null or the type does not match.
 
 reserves capacity for list growth
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.reserve` operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`
 ```
-
 
 Reserves storage for at least minimum_capacity elements. If the list already
 has at least the specified capacity the operation is ignored.
@@ -2162,12 +2160,12 @@ has at least the specified capacity the operation is ignored.
 
 resizes the list to a new count in elements
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.resize` operands attr-dict `:` `(` type($list) `,` type($new_size) `)`
 ```
-
 
 Resizes the list to contain new_size elements. This will either truncate
 the list if the existing size is greater than new_size or extend the list
@@ -2184,12 +2182,12 @@ with the default list value of 0 if storing primitives and null if refs.
 
 primitive type element mutator
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.set.i32` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 ```
-
 
 Sets the element at the given index to the new value.
 
@@ -2205,12 +2203,12 @@ Sets the element at the given index to the new value.
 
 primitive type element mutator
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.set.i64` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 ```
-
 
 Sets the element at the given index to the new value.
 
@@ -2226,12 +2224,12 @@ Sets the element at the given index to the new value.
 
 ref type element mutator
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.set.ref` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 ```
-
 
 Sets the element at the given index to the new ref value (possibly null).
 
@@ -2247,12 +2245,12 @@ Sets the element at the given index to the new ref value (possibly null).
 
 the size of the list in elements
 
+
 Syntax:
 
 ```
 operation ::= `vm.list.size` operands attr-dict `:` `(` type($list) `)` `->` type($result)
 ```
-
 
 Returns the current size of the list in elements.
 
@@ -2285,6 +2283,7 @@ Top-level container for VM functions.
 
 terminator pseudo-op for the module op
 
+
 Syntax:
 
 ```
@@ -2292,17 +2291,16 @@ operation ::= `vm.module_terminator` attr-dict
 ```
 
 
-
 ### `vm.mul.i32` (::mlir::iree_compiler::IREE::VM::MulI32Op)
 
 integer multiplication operation
+
 
 Syntax:
 
 ```
 operation ::= `vm.mul.i32` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2322,12 +2320,12 @@ operation ::= `vm.mul.i32` operands attr-dict `:` type($result)
 
 integer multiplication operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.mul.i64` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2347,12 +2345,12 @@ operation ::= `vm.mul.i64` operands attr-dict `:` type($result)
 
 integer binary not operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.not.i32` $operand attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2371,12 +2369,12 @@ operation ::= `vm.not.i32` $operand attr-dict `:` type($result)
 
 integer binary not operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.not.i64` $operand attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2395,12 +2393,12 @@ operation ::= `vm.not.i64` $operand attr-dict `:` type($result)
 
 integer binary or operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.or.i32` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2420,12 +2418,12 @@ operation ::= `vm.or.i32` operands attr-dict `:` type($result)
 
 integer binary or operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.or.i64` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2445,12 +2443,12 @@ operation ::= `vm.or.i64` operands attr-dict `:` type($result)
 
 message printing operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.print` $message `(` operands `)` attr-dict `:` type(operands)
 ```
-
 
 Prints the given string message and zero or more values.
 
@@ -2470,12 +2468,12 @@ Prints the given string message and zero or more values.
 
 signed integer division remainder operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.rem.i32.s` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2495,12 +2493,12 @@ operation ::= `vm.rem.i32.s` operands attr-dict `:` type($result)
 
 unsigned integer division remainder operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.rem.i32.u` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2520,12 +2518,12 @@ operation ::= `vm.rem.i32.u` operands attr-dict `:` type($result)
 
 signed integer division remainder operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.rem.i64.s` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2545,12 +2543,12 @@ operation ::= `vm.rem.i64.s` operands attr-dict `:` type($result)
 
 unsigned integer division remainder operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.rem.i64.u` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2570,12 +2568,12 @@ operation ::= `vm.rem.i64.u` operands attr-dict `:` type($result)
 
 return operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.return` attr-dict ($operands^ `:` type($operands))?
 ```
-
 
 Represents a return operation within a function.
 
@@ -2616,12 +2614,12 @@ lifetime.
 
 integer select operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.select.i32` operands attr-dict `:` type($result)
 ```
-
 
 Chooses one value based on a binary condition supplied as its first operand.
 If the value of the condition is true the `true_value` operand is chosen,
@@ -2652,12 +2650,12 @@ combining "select" with "cmpi" as follows:
 
 integer select operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.select.i64` operands attr-dict `:` type($result)
 ```
-
 
 Chooses one value based on a binary condition supplied as its first operand.
 If the value of the condition is true the `true_value` operand is chosen,
@@ -2688,12 +2686,12 @@ combining "select" with "cmpi" as follows:
 
 ref_ptr select operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.select.ref` operands attr-dict `:` type($result)
 ```
-
 
 Chooses one value based on a binary condition supplied as its first operand.
 If the value of the condition is true the `true_value` operand is chosen,
@@ -2717,12 +2715,12 @@ otherwise the `false_value` operand is chosen.
 
 integer shift left operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.shl.i32` $operand `,` $amount attr-dict `:` type($operand)
 ```
-
 
 Shifts the operand in a direction by the number of bits specified.
 
@@ -2748,12 +2746,12 @@ Shifts the operand in a direction by the number of bits specified.
 
 integer shift left operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.shl.i64` $operand `,` $amount attr-dict `:` type($operand)
 ```
-
 
 Shifts the operand in a direction by the number of bits specified.
 
@@ -2779,12 +2777,12 @@ Shifts the operand in a direction by the number of bits specified.
 
 signed integer (arithmetic) shift right operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.shr.i32.s` $operand `,` $amount attr-dict `:` type($operand)
 ```
-
 
 Shifts the operand in a direction by the number of bits specified.
 
@@ -2810,12 +2808,12 @@ Shifts the operand in a direction by the number of bits specified.
 
 unsigned integer (logical) shift right operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.shr.i32.u` $operand `,` $amount attr-dict `:` type($operand)
 ```
-
 
 Shifts the operand in a direction by the number of bits specified.
 
@@ -2841,12 +2839,12 @@ Shifts the operand in a direction by the number of bits specified.
 
 signed integer (arithmetic) shift right operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.shr.i64.s` $operand `,` $amount attr-dict `:` type($operand)
 ```
-
 
 Shifts the operand in a direction by the number of bits specified.
 
@@ -2872,12 +2870,12 @@ Shifts the operand in a direction by the number of bits specified.
 
 unsigned integer (logical) shift right operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.shr.i64.u` $operand `,` $amount attr-dict `:` type($operand)
 ```
-
 
 Shifts the operand in a direction by the number of bits specified.
 
@@ -2903,12 +2901,12 @@ Shifts the operand in a direction by the number of bits specified.
 
 integer subtract operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.sub.i32` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2928,12 +2926,12 @@ operation ::= `vm.sub.i32` operands attr-dict `:` type($result)
 
 integer subtract operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.sub.i64` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -2953,12 +2951,12 @@ operation ::= `vm.sub.i64` operands attr-dict `:` type($result)
 
 integer switch operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.switch.i32` $index `[` $values `]` `else` $default_value attr-dict `:` type($result)
 ```
-
 
 Returns the value with the given `index` in `values` or `default_value` if
 the index is out of bounds.
@@ -2987,12 +2985,12 @@ the index is out of bounds.
 
 integer switch operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.switch.i64` $index `[` $values `]` `else` $default_value attr-dict `:` type($result)
 ```
-
 
 Returns the value with the given `index` in `values` or `default_value` if
 the index is out of bounds.
@@ -3048,12 +3046,12 @@ the index is out of bounds.
 
 trace value(s) operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.trace` $event_name `(` operands `)` attr-dict `:` type(operands)
 ```
-
 
 Traces one or more values at the time the operation is executed.
 These values will be encoded into the active trace depending on the active
@@ -3075,12 +3073,12 @@ trace verbosity setting.
 
 integer truncate to 16 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.trunc.i32.i16` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -3099,12 +3097,12 @@ operation ::= `vm.trunc.i32.i16` $operand attr-dict `:` type($operand) `->` type
 
 integer truncate to 8 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -3123,12 +3121,12 @@ operation ::= `vm.trunc.i32.i8` $operand attr-dict `:` type($operand) `->` type(
 
 integer truncate to 16 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.trunc.i64.i16` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -3147,12 +3145,12 @@ operation ::= `vm.trunc.i64.i16` $operand attr-dict `:` type($operand) `->` type
 
 integer truncate to 32 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.trunc.i64.i32` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -3171,12 +3169,12 @@ operation ::= `vm.trunc.i64.i32` $operand attr-dict `:` type($operand) `->` type
 
 integer truncate to 8 bits
 
+
 Syntax:
 
 ```
 operation ::= `vm.trunc.i64.i8` $operand attr-dict `:` type($operand) `->` type($result)
 ```
-
 
 
 #### Operands:
@@ -3195,12 +3193,12 @@ operation ::= `vm.trunc.i64.i8` $operand attr-dict `:` type($operand) `->` type(
 
 integer binary exclusive-or operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.xor.i32` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -3220,12 +3218,12 @@ operation ::= `vm.xor.i32` operands attr-dict `:` type($result)
 
 integer binary exclusive-or operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.xor.i64` operands attr-dict `:` type($result)
 ```
-
 
 
 #### Operands:
@@ -3245,12 +3243,12 @@ operation ::= `vm.xor.i64` operands attr-dict `:` type($result)
 
 unconditional fiber yield operation
 
+
 Syntax:
 
 ```
 operation ::= `vm.yield` attr-dict
 ```
-
 
 Yields the fiber for some (likely short) amount of time. This can be used to
 perform cooperative scheduling and ensure fair (enough) execution.

@@ -9,9 +9,7 @@ parent: Dialect Definitions
 # 'hal' Dialect
 {: .no_toc }
 
-
 A dialect representing operations against the IREE HAL.
-
 
 This can be thought of as a Vulkan-like model with all of the graphics bits
 chopped out.
@@ -34,11 +32,9 @@ input.
 ## Type definition
 
 ### allocator
-
 Allocates buffers for a particular device memory space.
 
 ### buffer
-
 A memory buffer with a specific memory_type that is used to describe the
 capabilities and behavior of the backing memory of the buffer. Buffers may
 be any mix of host-accessible, host-coherent, or device-accessible for
@@ -46,41 +42,33 @@ various usages. Depending on these memory types the buffers may be mapped
 for access on the host as memory though certain restrictions may be imposed.
 
 ### buffer_view
-
 A shaped and typed buffer reference. This just wraps an existing hal.buffer
 with its associated metadata to make it easier to pass across ABI
 boundaries. In most cases buffer views can be elided entirely by the
 compiler and they'll only be seen when calling external functions.
 
 ### command_buffer
-
 Asynchronous command buffer recording interface. Commands are recorded by
 the implementation for later submission to command queues.
 
 ### descriptor_set
-
 Descriptor set.
 
 ### descriptor_set_layout
-
 Descriptor set layout.
 
 ### device
-
 Logical device instance.
 
 ### event
-
 Events are used for defining synchronization scopes within CommandBuffers.
 An event only exists within a single CommandBuffer and must not be used
 across CommandBuffers from the same device or others.
 
 ### executable
-
 A prepared and ready-to-dispatch executable.
 
 ### executable_cache
-
 A cache of prepared executables for a particular device.
 Caches may be shared across multiple devices from the same driver or
 specific to individual devices. Caches may persist prepared executables
@@ -89,15 +77,12 @@ that the cache is a no-op and the returned Executables only live for as long
 as the cache does.
 
 ### executable_layout
-
 An executable layout describing the descriptor sets and push constants used.
 
 ### ring_buffer
-
 Ringbuffer used for transient buffer allocation.
 
 ### semaphore
-
 Synchronization mechanism for host->device, device->host, host->host,
 and device->device notification. Semaphores behave like Vulkan timeline
 semaphores (or D3D12 fences) and contain a monotonically increasing
@@ -111,12 +96,12 @@ on for a particular value prior to the signal for that value.
 
 loads a value from a global variable
 
+
 Syntax:
 
 ```
 operation ::= `hal.variable.load.indirect` $variable attr-dict `:` type($variable) `->` type($result)
 ```
-
 
 Returns a copy of the variable value.
 
@@ -136,13 +121,13 @@ Returns a copy of the variable value.
 
 constant buffer allocation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.allocator.allocate.const` $allocator `,` $memory_types `,` $buffer_usage attr-dict-with-keyword `:`
               type($result) `=` $value
 ```
-
 
 Allocates a buffer from the allocator with the given constant contents.
 The buffer contents cannot change after the the point of allocation and in
@@ -173,13 +158,13 @@ repeatedly.
 
 empty buffer allocation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.allocator.allocate` $allocator `,` $memory_types `,` $buffer_usage `,` $allocation_size
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 Allocates a buffer of the given size from the allocator.
 The size of the buffer returned may be larger than the requested size if the
@@ -209,13 +194,13 @@ allocator has specific alignment requirements or minimum allocation sizes.
 
 buffer view indices to byte offset computation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.allocator.compute_offset` $allocator `,` `shape` `=` `[` $shape `]` `,` `element_type` `=`
               $element_type `,` `indices` `=` `[` $indices `]` attr-dict
 ```
-
 
 Computes an element byte offset within a buffer produced by the allocator.
 This returns the same value as `hal.buffer_view.compute_offset`.
@@ -244,6 +229,7 @@ This returns the same value as `hal.buffer_view.compute_offset`.
 
 buffer view byte range computation operation
 
+
 Syntax:
 
 ```
@@ -251,7 +237,6 @@ operation ::= `hal.allocator.compute_range` $allocator `,` `shape` `=` `[` $shap
               $element_type `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
               $lengths `]` attr-dict
 ```
-
 
 Computes a byte range within a buffer for one or more elements.
 This returns the same value as `hal.buffer_view.compute_range`.
@@ -282,13 +267,13 @@ This returns the same value as `hal.buffer_view.compute_range`.
 
 buffer allocation size computation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.allocator.compute_size` $allocator `,` `shape` `=` `[` $shape `]` `,` `element_type` `=`
               $element_type attr-dict
 ```
-
 
 Computes the byte size required for a buffer of the given shape and type.
 This returns the same value as `hal.buffer_view.byte_length`.
@@ -316,12 +301,12 @@ This returns the same value as `hal.buffer_view.byte_length`.
 
 buffer allocator accessor operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.allocator` $buffer `:` type($result) attr-dict
 ```
-
 
 Returns the allocator this buffer was allocated from.
 
@@ -341,12 +326,12 @@ Returns the allocator this buffer was allocated from.
 
 buffer-to-buffer copy operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.copy_data` operands attr-dict
 ```
-
 
 Copies data from the provided source_buffer into the buffer.
 
@@ -364,12 +349,12 @@ Copies data from the provided source_buffer into the buffer.
 
 buffer fill operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.fill` operands attr-dict
 ```
-
 
 Fills the target buffer with the given repeating value.
 
@@ -386,12 +371,12 @@ Fills the target buffer with the given repeating value.
 
 buffer element load operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.load` $source_buffer `[` $source_offset `]` `:` type($result) attr-dict
 ```
-
 
 Loads a value from a buffer by mapping it.
 
@@ -412,12 +397,12 @@ Loads a value from a buffer by mapping it.
 
 buffer-to-heap read operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.read_data` operands attr-dict `:` type($target_buffer)
 ```
-
 
 Reads a block of byte data from the resource at the given offset.
 
@@ -435,12 +420,12 @@ Reads a block of byte data from the resource at the given offset.
 
 buffer element store operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.store` $value `,` $target_buffer `[` $target_offset `]` `:` type($value) attr-dict
 ```
-
 
 Stores a value into a buffer by mapping it.
 
@@ -456,12 +441,12 @@ Stores a value into a buffer by mapping it.
 
 buffer subspan operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.subspan` operands attr-dict `:` type($result)
 ```
-
 
 Returns a reference to a subspan of the buffer.
 
@@ -483,12 +468,12 @@ Returns a reference to a subspan of the buffer.
 
 buffer view buffer accessor
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.buffer` $buffer_view `:` type($result) attr-dict
 ```
-
 
 Returns the buffer backing this view's contents.
 
@@ -508,12 +493,12 @@ Returns the buffer backing this view's contents.
 
 buffer view buffer byte length accessor
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.byte_length` $buffer_view `:` type($result) attr-dict
 ```
-
 
 Returns the allocated size of a shaped buffer view in bytes.
 
@@ -533,12 +518,12 @@ Returns the allocated size of a shaped buffer view in bytes.
 
 buffer view indices to byte offset computation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.compute_offset` $buffer_view `,` `indices` `=` `[` $indices `]` attr-dict
 ```
-
 
 Computes an element byte offset within a buffer view.
 
@@ -559,13 +544,13 @@ Computes an element byte offset within a buffer view.
 
 buffer view byte range computation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.compute_range` $buffer_view `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
               $lengths `]` attr-dict
 ```
-
 
 Computes a byte range within a buffer for one or more elements.
 
@@ -588,13 +573,13 @@ Computes a byte range within a buffer for one or more elements.
 
 buffer view constant initializer
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.const` $allocator `,` $memory_types `,` $buffer_usage `:` type($result)
               attr-dict-with-keyword `=` $value
 ```
-
 
 Pseudo-op for allocating a constant buffer view. Expands to a buffer
 allocation and a buffer view wrapper.
@@ -623,13 +608,13 @@ allocation and a buffer view wrapper.
 
 buffer view reference initializer
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.create` $buffer `,` `shape` `=` `[` $shape `]` `,` `element_type` `=` $element_type
               `:` type($result) attr-dict
 ```
-
 
 Creates a reference to a buffer with a particular shape and element type.
 The buffer is not copied and both the original and view references must be
@@ -659,12 +644,12 @@ along with the contents.
 
 buffer view dimension value query
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.dim` $buffer_view `,` $index attr-dict `:` type($result)
 ```
-
 
 Returns the value of the given dimension.
 
@@ -690,12 +675,12 @@ Returns the value of the given dimension.
 
 buffer view multi-value dimension query
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.dims` $buffer_view attr-dict `:` type($result)
 ```
-
 
 Returns each dimension value of the buffer view.
 
@@ -715,12 +700,12 @@ Returns each dimension value of the buffer view.
 
 buffer view rank query
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.rank` $buffer_view attr-dict `:` type($result)
 ```
-
 
 Returns the rank of the buffer view.
 
@@ -740,13 +725,13 @@ Returns the rank of the buffer view.
 
 buffer view subview initializer
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.subview` $buffer_view `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
               $lengths `]` `:` type($result) attr-dict
 ```
-
 
 Returns a view into a another buffer view. The buffer is not copied and both
 the original and sliced references must be synchronized.
@@ -769,12 +754,12 @@ the original and sliced references must be synchronized.
 
 trace value(s) operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer_view.trace` attr-dict ($operands^ `:` type($operands))?
 ```
-
 
 Trace point for dispatchable functions.
 
@@ -794,12 +779,12 @@ Trace point for dispatchable functions.
 
 heap-to-buffer write operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.buffer.write_data` operands attr-dict `:` type($source_buffer)
 ```
-
 
 Writes a block of byte data into the resource at the given offset.
 
@@ -817,12 +802,12 @@ Writes a block of byte data into the resource at the given offset.
 
 raises a global failure if a status is not 'ok'
 
+
 Syntax:
 
 ```
 operation ::= `hal.check_success` $status (`,` $message^)? attr-dict
 ```
-
 
 When the status is not 'ok' this signals a runtime failure that causes the
 entire active invocation - and possibly *all* in-flight and pending
@@ -851,12 +836,12 @@ or pending when the failure occurs will complete.
 
 command buffer recording begin operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.begin` $command_buffer attr-dict
 ```
-
 
 Resets and begins recording into the command buffer, clearing all previously
 recorded contents.
@@ -871,6 +856,7 @@ recorded contents.
 
 command buffer descriptor set binding operation
 
+
 Syntax:
 
 ```
@@ -878,7 +864,6 @@ operation ::= `hal.command_buffer.bind_descriptor_set` $command_buffer `,` $exec
               $descriptor_set (`,` `offsets` `=` `[` $dynamic_offsets^ `]`)?
               attr-dict-with-keyword
 ```
-
 
 Binds a descriptor set to the given set number. The provided descriptor set
 must not be modified once bound to a command buffer.
@@ -902,12 +887,12 @@ must not be modified once bound to a command buffer.
 
 command buffer buffer copy recording operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.copy_buffer` operands attr-dict
 ```
-
 
 Copies a range of one buffer to another.
 
@@ -926,13 +911,13 @@ Copies a range of one buffer to another.
 
 command buffer allocation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.create` $device `,` $modes `,` $command_categories attr-dict-with-keyword `:`
               type($result)
 ```
-
 
 Returns a command buffer from the device pool ready to begin recording.
 
@@ -959,12 +944,12 @@ Returns a command buffer from the device pool ready to begin recording.
 
 command buffer device query operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.device` $command_buffer attr-dict `:` type($device)
 ```
-
 
 Used during conversion to access the device used to create a command buffer.
 
@@ -984,13 +969,13 @@ Used during conversion to access the device used to create a command buffer.
 
 command buffer indirect dispatch recording operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.dispatch.indirect` $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
               `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
 ```
-
 
 Dispatches an execution request with the dispatch parameters loaded from the
 given buffer.
@@ -1020,13 +1005,13 @@ hal.command_buffer.dispatch.indirect %cmd, %executable,
 
 command buffer indirect dispatch recording operation, using symbolref
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.dispatch.indirect.symbol` $command_buffer `,` $entry_point `,`
               `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
 ```
-
 
 Dispatches an execution request with the dispatch parameters loaded from the
 given buffer, using using a nested symbol reference to the entry point.
@@ -1054,6 +1039,7 @@ hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
 
 command buffer dispatch recording operation
 
+
 Syntax:
 
 ```
@@ -1061,7 +1047,6 @@ operation ::= `hal.command_buffer.dispatch` $command_buffer `,` $executable `,` 
               `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
               attr-dict
 ```
-
 
 Dispatches an execution request.
 
@@ -1094,6 +1079,7 @@ hal.command_buffer.dispatch %cmd, %executable,
 
 command buffer dispatch recording operation, using symbolref
 
+
 Syntax:
 
 ```
@@ -1101,7 +1087,6 @@ operation ::= `hal.command_buffer.dispatch.symbol` $command_buffer `,` $entry_po
               `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
               attr-dict
 ```
-
 
 Dispatches an execution request, using a nested symbol reference to the entry point.
 
@@ -1132,12 +1117,12 @@ hal.command_buffer.dispatch.symbol %cmd, @executable::@target::@entry,
 
 command buffer recording end operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.end` $command_buffer attr-dict
 ```
-
 
 Ends recording into the command buffer.
 
@@ -1173,12 +1158,12 @@ barrier.
 
 command buffer buffer fill recording operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.fill_buffer` operands attr-dict
 ```
-
 
 Fills the target buffer with the given repeating value.
 
@@ -1196,13 +1181,13 @@ Fills the target buffer with the given repeating value.
 
 command buffer push constants operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.command_buffer.push_constants` $command_buffer `,` $executable_layout `,` `offset` `=` $offset `,`
               `values` `=` `[` $values `]` `:` `i32` attr-dict-with-keyword
 ```
-
 
 Pushes an inline set of constants that can be accessed by subsequent
 dispatches using a compatible executable layout.
@@ -1296,12 +1281,12 @@ Creates a DescriptorSet from the device pool.
 
 creates a descriptor set layout
 
+
 Syntax:
 
 ```
 operation ::= `hal.descriptor_set_layout.create` $device `,` $usage_type `,` `bindings` `=` $bindings attr-dict `:` type($result)
 ```
-
 
 Creates a descriptor set layout that defines the bindings used within a set.
 The same descriptor set layout may be shared with many different executable
@@ -1338,12 +1323,12 @@ executables that use the same set layouts can be reduced.
 
 descriptor set layout cache lookup pseudo-op
 
+
 Syntax:
 
 ```
 operation ::= `hal.descriptor_set_layout.lookup` $device `,` $usage_type `,` `bindings` `=` $bindings attr-dict `:` type($result)
 ```
-
 
 Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized descriptor set layout.
@@ -1378,12 +1363,12 @@ possibly lazy-initialized descriptor set layout.
 
 device allocator accessor operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.device.allocator` $device attr-dict `:` type($result)
 ```
-
 
 Returns the allocator that can be used to allocate buffers compatible with
 the device.
@@ -1404,13 +1389,13 @@ the device.
 
 returns true if the device ID matches the pattern
 
+
 Syntax:
 
 ```
 operation ::= `hal.device.match.id` $device `,` `pattern` `=` `[` $pattern `]` attr-dict
               `:` `(` type($device) `)` `->` type($result)
 ```
-
 
 Pattern matches the device ID with the given wildcard pattern.
 This can be used to conditionally evaluate device-specific code when the
@@ -1514,12 +1499,12 @@ return the same types.
 
 
 
+
 Syntax:
 
 ```
 operation ::= `hal.ex.defer_release` $operand `:` type($operand) attr-dict
 ```
-
 
 
 #### Operands:
@@ -1532,12 +1517,12 @@ operation ::= `hal.ex.defer_release` $operand `:` type($operand) attr-dict
 
 
 
+
 Syntax:
 
 ```
 operation ::= `hal.ex.shared_device` attr-dict `:` type($result)
 ```
-
 
 
 #### Results:
@@ -1550,12 +1535,12 @@ operation ::= `hal.ex.shared_device` attr-dict `:` type($result)
 
 
 
+
 Syntax:
 
 ```
 operation ::= `hal.ex.submit_and_wait` $device `,` $command_buffer attr-dict
 ```
-
 
 
 #### Operands:
@@ -1569,12 +1554,12 @@ operation ::= `hal.ex.submit_and_wait` $device `,` $command_buffer attr-dict
 
 terminator pseudo-op for the executable binary op
 
+
 Syntax:
 
 ```
 operation ::= `hal.executable.binary_end` attr-dict
 ```
-
 
 
 ### `hal.executable.binary` (::mlir::iree_compiler::IREE::HAL::ExecutableBinaryOp)
@@ -1598,13 +1583,13 @@ executable format in `iree/hal/executable_format.h`.
 
 creates an executable cache
 
+
 Syntax:
 
 ```
 operation ::= `hal.executable_cache.create` $device `,` `identifier` `=` $identifier
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 Caches may be shared across multiple devices from the same driver or
 specific to individual devices. Caches may persist prepared executables
@@ -1648,6 +1633,7 @@ the executables are ready for use.
 
 synchronously prepares an executable for use
 
+
 Syntax:
 
 ```
@@ -1655,7 +1641,6 @@ operation ::= `hal.executable_cache.prepare` $executable_cache `,` `layout` `=` 
               `caching_mode` `=` $caching_mode `,` $executable
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 The provided spec and data will be used to either lookup a previously
 prepared executable in the cache or prepare a new one.
@@ -1696,13 +1681,13 @@ executables - and calls will block until preparation completes.
 
 selects the preferred format from the given list
 
+
 Syntax:
 
 ```
 operation ::= `hal.executable_cache.select_format` $executable_cache `,` `available_formats` `=` $available_formats
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 Returns the index of the preferred format of the cache from the given set or
 -1 if none can be used. Preparation may still fail if the particular version
@@ -1735,12 +1720,12 @@ or features required by the executable are not supported.
 
 terminator pseudo-op for the executable op
 
+
 Syntax:
 
 ```
 operation ::= `hal.executable_end` attr-dict
 ```
-
 
 
 ### `hal.executable.entry_point` (::mlir::iree_compiler::IREE::HAL::ExecutableEntryPointOp)
@@ -1763,6 +1748,7 @@ information describing the IO interface it uses and other dispatch metadata.
 
 creates an executable layout
 
+
 Syntax:
 
 ```
@@ -1770,7 +1756,6 @@ operation ::= `hal.executable_layout.create` $device `,` `set_layouts` `=` `[` $
               `push_constants` `=` $push_constants
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 Creates an executable layout from the given descriptor sets and push
 constant required size. Executable layouts can be shared across any
@@ -1811,6 +1796,7 @@ adjacent to it.
 
 executable layout cache lookup pseudo-op
 
+
 Syntax:
 
 ```
@@ -1818,7 +1804,6 @@ operation ::= `hal.executable_layout.lookup` $device `,` `set_layouts` `=` $set_
               (`,` `push_constants` `=` $push_constants^)?
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized executable layout.
@@ -1855,12 +1840,12 @@ possibly lazy-initialized executable layout.
 
 executable cache lookup pseudo-op
 
+
 Syntax:
 
 ```
 operation ::= `hal.executable.lookup` $device `,` $executable attr-dict `:` type($result)
 ```
-
 
 Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized executable.
@@ -1900,12 +1885,12 @@ kernel/shader/etc.
 
 terminator pseudo-op for the executable target op
 
+
 Syntax:
 
 ```
 operation ::= `hal.executable.target_end` attr-dict
 ```
-
 
 
 ### `hal.executable.target` (::mlir::iree_compiler::IREE::HAL::ExecutableTargetOp)
@@ -1954,6 +1939,7 @@ the scheduler.
 
 terminator pseudo-op for the executable interface op
 
+
 Syntax:
 
 ```
@@ -1961,17 +1947,16 @@ operation ::= `hal.interface_end` attr-dict
 ```
 
 
-
 ### `hal.interface.load.constant` (::mlir::iree_compiler::IREE::HAL::InterfaceLoadConstantOp)
 
 loads a constant value from the interface constant block
+
 
 Syntax:
 
 ```
 operation ::= `hal.interface.load.constant` `offset` `=` $offset attr-dict `:` type($result)
 ```
-
 
 Loads a scalar constant value from an executable IO push constant block.
 The value will be loaded from the given constant offset and will be
@@ -1993,12 +1978,12 @@ bitcast (possibly with truncation or zero-extension) to the result type.
 
 loads a tensor from an executable IO binding
 
+
 Syntax:
 
 ```
 operation ::= `hal.interface.load.tensor` $binding `,` `offset` `=` $offset attr-dict `:` type($result)
 ```
-
 
 Loads a tensor value from an executable IO binding. This is a pseudo op
 that can be used to tie SSA tensor values in the IR to the bindings that
@@ -2067,12 +2052,12 @@ see: https://developer.nvidia.com/vulkan-shader-resource-binding
 
 stores a tensor in an executable IO binding
 
+
 Syntax:
 
 ```
 operation ::= `hal.interface.store.tensor` $operand `,` $binding `,` `offset` `=` $offset attr-dict `:` type($operand)
 ```
-
 
 Stores a tensor value into an executable IO binding. This is a pseudo op
 indicating that the value of the operand tensor should be stored into the
@@ -2106,13 +2091,13 @@ at least a 4 byte boundary.
 
 temporary buffer barrier allocation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.make_buffer_barrier` $source_scope `,` $target_scope `,` operands attr-dict-with-keyword `:`
               type($result)
 ```
-
 
 Allocates a temporary BufferBarrier struct that can be passed to the
 command buffer barrier operations.
@@ -2142,12 +2127,12 @@ command buffer barrier operations.
 
 temporary memory barrier allocation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.make_memory_barrier` $source_scope `,` $target_scope attr-dict-with-keyword `:` type($result)
 ```
-
 
 Allocates a temporary MemoryBarrier struct that can be passed to the
 command buffer barrier operations.
@@ -2169,12 +2154,12 @@ command buffer barrier operations.
 
 return from a hal.device.switch region
 
+
 Syntax:
 
 ```
 operation ::= `hal.return` attr-dict ($operands^ `:` type($operands))?
 ```
-
 
 Returns the given values from the region and back to the host code.
 
@@ -2188,12 +2173,12 @@ Returns the given values from the region and back to the host code.
 
 asynchronous semaphore wait operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.semaphore.await` $semaphore `,` `min_value` `=` $min_value attr-dict-with-keyword `:` type($status)
 ```
-
 
 Yields the caller until the semaphore reaches or exceeds the specified
 payload `min_value`. Returns the `status` of the semaphore after the wait,
@@ -2216,13 +2201,13 @@ with a non-zero value indicating failure.
 
 semaphore allocation operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.semaphore.create` $device `,` `initial_value` `=` $initial_value
               attr-dict-with-keyword `:` type($result)
 ```
-
 
 Returns a semaphore from the device pool with the given initial value.
 
@@ -2243,12 +2228,12 @@ Returns a semaphore from the device pool with the given initial value.
 
 semaphore asynchronous failure operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.semaphore.fail` $semaphore `,` `status` `=` $status attr-dict-with-keyword
 ```
-
 
 Signals the semaphore with a failure. The `status` will be returned from
 `hal.semaphore.query` and `hal.semaphore.signal` for the lifetime
@@ -2265,12 +2250,12 @@ of the semaphore.
 
 semaphore payload value query
 
+
 Syntax:
 
 ```
 operation ::= `hal.semaphore.query` $semaphore attr-dict-with-keyword `:` type($status) `,` type($value)
 ```
-
 
 Queries the current payload and returns a tuple of `(status, value)`.
 As the payload is monotonically increasing it is guaranteed that
@@ -2295,12 +2280,12 @@ specified value via `hal.semaphore.await`.
 
 semaphore payload value signal operation
 
+
 Syntax:
 
 ```
 operation ::= `hal.semaphore.signal` $semaphore `,` `value` `=` $new_value attr-dict-with-keyword
 ```
-
 
 Signals the semaphore to the given payload value.
 The call is ignored if the current payload value exceeds `new_value`.
@@ -2316,12 +2301,12 @@ The call is ignored if the current payload value exceeds `new_value`.
 
 returns an address reference to a variable
 
+
 Syntax:
 
 ```
 operation ::= `hal.variable.address` $variable attr-dict `:` type($result)
 ```
-
 
 Returns the address of a variable as a typed reference. Can be used with the
 variable load and store indirect ops.
@@ -2342,12 +2327,12 @@ variable load and store indirect ops.
 
 loads a value from a global variable
 
+
 Syntax:
 
 ```
 operation ::= `hal.variable.load` $variable attr-dict `:` type($result)
 ```
-
 
 Returns a copy of the variable value.
 
@@ -2385,12 +2370,12 @@ contexts will have different variable storage.
 
 stores a value into a global variable
 
+
 Syntax:
 
 ```
 operation ::= `hal.variable.store.indirect` $value `,` $variable attr-dict `:` type($value) `->` type($variable)
 ```
-
 
 Stores a copy of the value into a variable.
 
@@ -2405,12 +2390,12 @@ Stores a copy of the value into a variable.
 
 stores a value into a global variable
 
+
 Syntax:
 
 ```
 operation ::= `hal.variable.store` $value `,` $variable attr-dict `:` type($value)
 ```
-
 
 Stores a copy of the value into a variable.
 

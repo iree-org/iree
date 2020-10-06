@@ -9,7 +9,6 @@ parent: Dialect Definitions
 # 'shapex' Dialect
 {: .no_toc }
 
-
 A dialect of helper ops for shapifying computations.
 
 1. TOC
@@ -21,12 +20,12 @@ A dialect of helper ops for shapifying computations.
 
 Casts and asserts that one or more shapes are compatible.
 
+
 Syntax:
 
 ```
 operation ::= `shapex.cast_compatible_shape` operands `:` type(operands) `->` type($result) attr-dict
 ```
-
 
 In the most general case, each operand and the result can have different
 shapes, so long as:
@@ -57,12 +56,12 @@ Usage:
 
 A constant ranked_shape.
 
+
 Syntax:
 
 ```
 operation ::= `shapex.const_ranked_shape` attr-dict `:` type($result)
 ```
-
 
 Holds a RankedShape value. Note that it is only legal to store a constant
 RankedShape that is fully static, as anything more specific should be
@@ -179,12 +178,12 @@ Consider a pretty syntax for "concat":
 
 Gets the RankedShape associated with the given Tensor.
 
+
 Syntax:
 
 ```
 operation ::= `shapex.get_ranked_shape` $operand attr-dict `:` type($operand) `->` type($shape)
 ```
-
 
 Early in compilation, this op is used to resolve the RankedShape from an
 arbitrary tensor value. It will typically be converted later to a
@@ -246,12 +245,12 @@ Usage:
 
 Makes a ranked_shape from individual dims.
 
+
 Syntax:
 
 ```
 operation ::= `shapex.make_ranked_shape` $dynamic_dimensions `:` functional-type($dynamic_dimensions, $shape) attr-dict
 ```
-
 
 Given a list of SSA values holding compatible dims, makes a corresponding
 ranked_shape.
@@ -366,12 +365,12 @@ Usage:
 
 Gets all dimension values from a ranked_shape.
 
+
 Syntax:
 
 ```
 operation ::= `shapex.ranked_dims` $shape `:` type($shape) `->` type($result) attr-dict
 ```
-
 
 Static dimensions will fold to constants.
 
@@ -395,12 +394,12 @@ Usage:
 
 Ties a tensor and a shape together.
 
+
 Syntax:
 
 ```
 operation ::= `shapex.tie_shape` operands attr-dict `:` type($operand) `,` type($shape)
 ```
-
 
 Ties a specific tensor and its shape together in the IR, allowing further
 conversions to re-associate the two. This has no runtime implication and

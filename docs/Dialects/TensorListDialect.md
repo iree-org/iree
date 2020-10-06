@@ -9,9 +9,7 @@ parent: Dialect Definitions
 # 'tensorlist' Dialect
 {: .no_toc }
 
-
 A dialect for implementing TensorFlow's TensorList data structure.
-
 
 This dialect contains ops that map 1:1 to the corresponding IREE native
 module.
@@ -25,7 +23,6 @@ a straightforward implementation of those semantics.
 ## Type definition
 
 ### tensorlist.list
-
 IREE VM type representing a TensorList.
 
 ## Operation definition

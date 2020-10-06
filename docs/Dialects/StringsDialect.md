@@ -9,9 +9,7 @@ parent: Dialect Definitions
 # 'strings' Dialect
 {: .no_toc }
 
-
 A custom dialect supporting string operations.
-
 
 The ops in this dialect are lowered to vm.imports to support a standard set
 of string operations.
@@ -23,11 +21,9 @@ TODO(suderman): Add a reference to the intermediate string dialect.
 ## Type definition
 
 ### string
-
 A string type containing a standard ASCII string.
 
 ### string_tensor
-
 A tensor of string types.
 
 ## Operation definition

@@ -9,7 +9,6 @@ parent: Dialect Definitions
 # 'check' Dialect
 {: .no_toc }
 
-
 A dialect implementing test assertions for IREE modules.
 
 1. TOC
@@ -21,12 +20,12 @@ A dialect implementing test assertions for IREE modules.
 
 Checks that the operand contains only values that are true
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_all_true` `(` $operand `)` attr-dict `:` type($operand)
 ```
-
 
 Verifies that the operand contains true values, which are represented by any
 non-zero integer.
@@ -48,12 +47,12 @@ check.expect_all_true(%arg1) : tensor<2x2xi32>
 
 Checks that the tensor operand is almost equal to some constant
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_almost_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
 ```
-
 
 Verifies that the tensor operand with float elements is almost equal to the
 constant attribute within an implementation-defined "reasonable" tolerance.
@@ -82,12 +81,12 @@ check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : 
 
 Checks that the operands are almost equal
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_almost_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
 ```
-
 
 Verifies that the buffer view or tensor operands with float elements are
 almost equal to within an implementation-defined "reasonable" tolerance.
@@ -109,12 +108,12 @@ check.expect_almost_eq(%arg0, %arg1) : tensor<5xf32>
 
 Checks that the tensor operand is equal to some constant
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
 ```
-
 
 Verifies that the tensor operand is exactly equal to a constant attribute.
 
@@ -142,12 +141,12 @@ check.expect_eq_const(%arg0, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
 
 Checks that the tensor or buffer view operands are equal
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
 ```
-
 
 Verifies that the operands are exactly equal.
 
@@ -168,12 +167,12 @@ check.expect_eq(%arg0, %arg1) : tensor<5xi32>
 
 Checks that the operand is false
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_false` `(` $operand `)` attr-dict `:` type($operand)
 ```
-
 
 Verifies that the operand contains a false value, which is represented by
 zero.
@@ -194,12 +193,12 @@ check.expect_false(%arg0) : i32
 
 Checks that the operand is true
 
+
 Syntax:
 
 ```
 operation ::= `check.expect_true` `(` $operand `)` attr-dict `:` type($operand)
 ```
-
 
 Verifies that the operand contains a true value, which is represented by
 any non-zero integer.

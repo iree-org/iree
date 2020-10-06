@@ -9,7 +9,6 @@ parent: Dialect Definitions
 # 'iree' Dialect
 {: .no_toc }
 
-
 A dialect used for types common across IREE subdialects.
 
 1. TOC
@@ -18,15 +17,12 @@ A dialect used for types common across IREE subdialects.
 ## Type definition
 
 ### ptr
-
 Pointer to a typed value.
 
 ### byte_buffer
-
 A constant buffer of mapped host memory.
 
 ### mutable_byte_buffer
-
 A buffer of read-write host memory.
 
 ## Operation definition
@@ -56,12 +52,12 @@ the final step in compilation.
 
 A tensor constant that can have dynamic dimensions
 
+
 Syntax:
 
 ```
 operation ::= `iree.dynamic_shape_constant` $value attr-dict `->` type($result)
 ```
-
 
 Allows specifying a constant where the return value can erase shape
 information. This operation is declared as having side effects and has no
@@ -89,12 +85,12 @@ information should be hidden from the compiler and resolved at runtime.
 
 A placeholder op to feed a value/buffer into computation
 
+
 Syntax:
 
 ```
 operation ::= `iree.placeholder` `for` $purpose attr-dict `:` type($output)
 ```
-
 
 This op is intended as a way to represent a value or buffer that will be fed
 into computation. It can host additional attributes related to the value or
@@ -138,12 +134,12 @@ std.constant wrapped in an iree.do_not_optimize.
 
 unreachable assertion op
 
+
 Syntax:
 
 ```
 operation ::= `iree.unreachable` attr-dict
 ```
-
 
 Signals to the compiler that the parent block should not be reachable.
 This may be converted into a runtime assertion, though ideally they are

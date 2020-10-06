@@ -9,9 +9,7 @@ parent: Dialect Definitions
 # 'flow' Dialect
 {: .no_toc }
 
-
 A dialect designed to model execution data flow and partitioning.
-
 
 The flow dialect is used to model regions of dense computation and the data
 flow between them. MLIR value-semantic tensors are used as the primary data
@@ -148,12 +146,12 @@ same execution stream. This will be replaced with a segmented verison.
 
 terminator pseudo-op for the executable op
 
+
 Syntax:
 
 ```
 operation ::= `flow.executable_end` attr-dict
 ```
-
 
 
 ### `flow.executable` (::mlir::iree_compiler::IREE::Flow::ExecutableOp)
@@ -174,12 +172,12 @@ target-specific backend IR representations.
 
 return from a flow.dispatch_region
 
+
 Syntax:
 
 ```
 operation ::= `flow.return` attr-dict ($operands^ `:` type($operands))?
 ```
-
 
 Returns the given values from the region and back to the host code.
 
@@ -193,12 +191,12 @@ Returns the given values from the region and back to the host code.
 
 performs a full tensor clone operation
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.clone` $operand `:` type($result) attr-dict
 ```
-
 
 Clones the input tensor into an identical output tensor.
 
@@ -218,12 +216,12 @@ Clones the input tensor into an identical output tensor.
 
 loads a value from a tensor element
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.load` $source (`[` $indices^ `]`)? `:` type($source) attr-dict-with-keyword
 ```
-
 
 Returns the element at the given location from within the tensor.
 
@@ -244,12 +242,12 @@ Returns the element at the given location from within the tensor.
 
 reshapes a tensor
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.reshape` $source `:` type($source) `->` type($result) attr-dict
 ```
-
 
 Reshapes a tensor to a new shape without modifying the contents.
 
@@ -269,13 +267,13 @@ Reshapes a tensor to a new shape without modifying the contents.
 
 slices out a subregion of a tensor
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.slice` $source `[` $start_indices `for` $lengths `]` `:` type($source) `->`
               type($result) attr-dict
 ```
-
 
 Clones a subregion of a tensor.
 
@@ -297,12 +295,12 @@ Clones a subregion of a tensor.
 
 splats a value into a shaped tensor
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.splat` $value `:` type($result) attr-dict-with-keyword
 ```
-
 
 Returns a tensor initialized to the given primitive value.
 
@@ -322,13 +320,13 @@ Returns a tensor initialized to the given primitive value.
 
 stores a value into a tensor element
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.store` $value `,` $target (`[` $indices^ `]`)? `:` type($target)
               attr-dict-with-keyword
 ```
-
 
 Returns a tensor with the element at the given index set to the given value.
 
@@ -350,12 +348,12 @@ Returns a tensor with the element at the given index set to the given value.
 
 trace value(s) operation
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.trace` attr-dict ($operands^ `:` type($operands))?
 ```
-
 
 Trace point for dispatchable functions.
 
@@ -375,13 +373,13 @@ Trace point for dispatchable functions.
 
 updates a tensor with the contents of another tensor
 
+
 Syntax:
 
 ```
 operation ::= `flow.tensor.update` $update `,` $target `[` $start_indices `]` `:` type($update) `->`
               type($result) attr-dict
 ```
-
 
 Updates the target tensor with the contents of the update tensor at the
 given offset indices.
@@ -404,12 +402,12 @@ given offset indices.
 
 returns an address reference to a variable
 
+
 Syntax:
 
 ```
 operation ::= `flow.variable.address` $variable attr-dict `:` type($result)
 ```
-
 
 Returns the address of a variable as a typed reference. Can be used with the
 variable load and store indirect ops.
@@ -430,12 +428,12 @@ variable load and store indirect ops.
 
 loads a value from a global variable
 
+
 Syntax:
 
 ```
 operation ::= `flow.variable.load.indirect` $variable attr-dict `:` type($variable) `->` type($result)
 ```
-
 
 Returns a copy of the variable value.
 
@@ -455,12 +453,12 @@ Returns a copy of the variable value.
 
 loads a value from a global variable
 
+
 Syntax:
 
 ```
 operation ::= `flow.variable.load` $variable attr-dict `:` type($result)
 ```
-
 
 Returns a copy of the variable value.
 
@@ -496,12 +494,12 @@ Declares a persistent variable that maintains its value.
 
 stores a value into a global variable
 
+
 Syntax:
 
 ```
 operation ::= `flow.variable.store.indirect` $value `,` $variable attr-dict `:` type($value) `->` type($variable)
 ```
-
 
 Stores a copy of the value into a variable.
 
@@ -516,12 +514,12 @@ Stores a copy of the value into a variable.
 
 stores a value into a global variable
 
+
 Syntax:
 
 ```
 operation ::= `flow.variable.store` $value `,` $variable attr-dict `:` type($value)
 ```
-
 
 Stores a copy of the value into a variable.
 
