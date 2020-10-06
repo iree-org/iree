@@ -38,6 +38,8 @@ BACKENDS_TO_TITLES = collections.OrderedDict([
 TEST_SUITES_TO_HEADERS = {
     '//integrations/tensorflow/e2e:e2e_tests':
         'End to end TensorFlow tests',
+    '//integrations/tensorflow/e2e:mobile_bert_squad_tests':
+        'End to end test of MobileBert on SQuAD',
     '//integrations/tensorflow/e2e/keras:keras_tests':
         'End to end tests written using tf.keras',
     '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
