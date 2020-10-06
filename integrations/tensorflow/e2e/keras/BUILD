@@ -188,7 +188,7 @@ iree_vision_test_suite(
 )
 
 iree_vision_test_suite(
-    name = "long_cifar10_internal_tests",
+    name = "enormous_cifar10_internal_tests",
     size = "enormous",
     backends = [
         "tf",
