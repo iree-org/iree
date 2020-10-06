@@ -56,8 +56,9 @@ SINGLE_SOURCE_SUITES = {
 }
 
 TARGET_EXCLUSION_FILTERS = [
-    r'mobilenet_v1_.*',  # Slim vision MobileNetV1
-    r'mobilenet_v2_.*',  # Slim vision MobileNetV2
+    r'mobilenet_v1_.*',  # Slim vision MobileNetV1.
+    r'mobilenet_v2_.*',  # Slim vision MobileNetV2.
+    r'amoebanet_a_n18_f448',  # SavedModelV2 not available.
 ]
 
 # The symbols to show in the table if the operation is supported or not.
@@ -167,7 +168,7 @@ def generate_table(test_suite):
   # Generate the coverage table as a 2D array.
   rows = [first_row, second_row]
   for name, backends in sorted(table.items()):
-    if any(re.match(pattern, name) for pattern in TARGET_FILTERS):
+    if any(re.match(pattern, name) for pattern in TARGET_EXCLUSION_FILTERS):
       continue
 
     row = [get_name_element(test_suite, name)]

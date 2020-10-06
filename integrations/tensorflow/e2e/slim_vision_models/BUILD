@@ -59,6 +59,19 @@ iree_slim_vision_test_suite(
     ],
     failing_configurations = [
         {
+            # SavedModelV2 (classification/4) not available.
+            "models": [
+                "amoebanet_a_n18_f448",
+            ],
+            "backends": [
+                "tf",
+                "tflite",
+                "iree_vmla",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+        {
             # Failing all but tf and vmla:
             "models": [
                 "inception_resnet_v2",
@@ -109,7 +122,6 @@ iree_slim_vision_test_suite(
         },
     ],
     models = [
-        # "amoebanet_a_n18_f448",  # SavedModelV2 (classification/4) not available.
         "inception_resnet_v2",
         "inception_v1",
         "inception_v2",
@@ -157,9 +169,11 @@ iree_slim_vision_test_suite(
         "nasnet_mobile",
         "nasnet_large",
         "pnasnet_large",
+        # ResNetV1
         "resnet_v1_50",
         "resnet_v1_101",
         "resnet_v1_152",
+        # ResNetV2
         "resnet_v2_50",
         "resnet_v2_101",
         "resnet_v2_152",
