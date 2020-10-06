@@ -49,8 +49,8 @@ class LogicalOpsModule(tf.Module):
 
 class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(LogicalOpsTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(LogicalOpsTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(LogicalOpsModule)
 
   def test_logical_and(self):

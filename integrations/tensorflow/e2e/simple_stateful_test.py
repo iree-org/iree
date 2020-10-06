@@ -36,8 +36,8 @@ class SimpleStatefulModule(tf.Module):
 
 class StatefulTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(StatefulTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(StatefulTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(SimpleStatefulModule)
 
   def test_stateful(self):

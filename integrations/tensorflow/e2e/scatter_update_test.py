@@ -51,8 +51,8 @@ class ScatterUpdateModule(tf.Module):
 
 class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(ScatterUpdateTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(ScatterUpdateTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(ScatterUpdateModule)
 
   def test_scatter_update_1D(self):
