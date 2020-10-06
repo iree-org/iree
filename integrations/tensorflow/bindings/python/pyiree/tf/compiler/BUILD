@@ -51,20 +51,6 @@ config_setting(
 # See: https://github.com/google/iree/issues/1506
 SAVED_MODEL_TF_RUNTIME_DEPS = [
     "@org_tensorflow//tensorflow/core:ops",
-
-    # Deps for MobileBert
-    "@org_tensorflow//tensorflow/core:direct_session",
-    "@org_tensorflow//tensorflow/core/kernels:parameterized_truncated_normal_op",  # TruncatedNormal
-    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops",  #  VarHandleOp
-    "@org_tensorflow//tensorflow/core/kernels:state",  # Assign.
-    "@org_tensorflow//tensorflow/core/kernels:logging_ops",  # Assert
-    "@org_tensorflow//tensorflow/core/kernels:bias_op",  # BiasAdd
-    "@org_tensorflow//tensorflow/core/kernels:softmax_op",  # Softmax
-    "@org_tensorflow//tensorflow/core/kernels:relu_op",  # Relu
-    "@org_tensorflow//tensorflow/core/kernels:regex_full_match_op",  # StaticRegexFullMatch
-    "@org_tensorflow//tensorflow/core/kernels:string_join_op",  # StringJoin
-    "@org_tensorflow//tensorflow/core/kernels:save_op",  # SharedFilename
-    "@org_tensorflow//tensorflow/core/kernels:save_restore_v2_ops",  # SaveV2
 ] + select({
     ":disable_kernels": [],
     "//conditions:default": [
@@ -72,6 +58,32 @@ SAVED_MODEL_TF_RUNTIME_DEPS = [
         "@org_tensorflow//tensorflow/core/kernels:math",
     ],
 })
+
+# TODO: Isolate SignatureDef SavedModel support into its own library to decrease buildtime cost.
+# While it would be nice to simply depend on TensorFlow, manually paring
+# down the dependencies significantly reduces the build time that this adds.
+#
+# Baseline: 449s
+# SignatureDef SavedModels: 546s – 22% increase in build time.
+# SignatureDef SavedModels + Deps for MobileBert: 572s – 27% increase in build time.
+# TF OpenSource: 664s – 49% increase in build time.
+SIGNATURE_DEF_SAVED_MODEL_TF_RUNTIME_DEPS = [
+    # Deps for SignatureDef SavedModels:
+    "@org_tensorflow//tensorflow/core:direct_session",
+    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops",  #  VarHandleOp
+    "@org_tensorflow//tensorflow/core/kernels:regex_full_match_op",  # StaticRegexFullMatch
+    "@org_tensorflow//tensorflow/core/kernels:string_join_op",  # StringJoin
+    "@org_tensorflow//tensorflow/core/kernels:save_op",  # SharedFilename
+    "@org_tensorflow//tensorflow/core/kernels:save_restore_v2_ops",  # SaveV2
+
+    # Deps for MobileBert:
+    "@org_tensorflow//tensorflow/core/kernels:parameterized_truncated_normal_op",  # TruncatedNormal
+    "@org_tensorflow//tensorflow/core/kernels:state",  # Assign.
+    "@org_tensorflow//tensorflow/core/kernels:logging_ops",  # Assert
+    "@org_tensorflow//tensorflow/core/kernels:bias_op",  # BiasAdd
+    "@org_tensorflow//tensorflow/core/kernels:softmax_op",  # Softmax
+    "@org_tensorflow//tensorflow/core/kernels:relu_op",  # Relu
+]
 
 TF_XLA_PASS_DEPS = [
     "//integrations/tensorflow/compiler:tensorflow",
@@ -115,7 +127,7 @@ pybind_cc_library(
     hdrs = [
         "register_tensorflow.h",
     ],
-    deps = SAVED_MODEL_TF_RUNTIME_DEPS + TF_XLA_PASS_DEPS + [
+    deps = SAVED_MODEL_TF_RUNTIME_DEPS + TF_XLA_PASS_DEPS + SIGNATURE_DEF_SAVED_MODEL_TF_RUNTIME_DEPS + [
         "//bindings/python/pyiree/common",
         "//bindings/python/pyiree/compiler:compiler_library",
         "@llvm-project//llvm:Support",
