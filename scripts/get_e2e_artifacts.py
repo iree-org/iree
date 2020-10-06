@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import tempfile
+from typing import Dict, Set
 import zipfile
 
 import utils
@@ -51,7 +52,7 @@ flags.DEFINE_bool(
     'Run without extracting files. Useful for quickly checking for artifact '
     'collisions.')
 flags.DEFINE_string(
-    'artifacts_dir', None,
+    'artifacts_dir', os.path.join(tempfile.gettempdir(), 'iree', 'modules'),
     'Directory to transfer the benchmarking artifacts to. Defaults to '
     '/tmp/iree/modules/')
 flags.DEFINE_bool('run_test_suites', True, 'Run any specified test suites.')
@@ -61,8 +62,6 @@ flags.DEFINE_list('test_suites', list(SUITE_NAME_TO_TARGET.keys()),
 EXPECTED_COLLISIONS = [
     '/tf_ref/', 'tf_input.mlir', 'iree_input.mlir', '/saved_model/'
 ]
-WRITTEN_PATHS = set()
-PATHS_TO_TESTS = dict()
 
 
 def _target_to_testlogs_path(target: str) -> str:
@@ -86,26 +85,27 @@ def get_test_paths_and_names(test_suite_path: str):
   return test_paths, test_names
 
 
-def check_collision(filename: str, test_name: str):
+def check_collision(filename: str, test_name: str, written_paths: Set[str],
+                    paths_to_tests: Dict[str, str]):
   """Check that we aren't overwriting files unless we expect to."""
   # Note: We can't use a check that the files have identical contents because
   # tf_input.mlir can have random numbers appended to its function names.
 
   expected_collision = any([name in filename for name in EXPECTED_COLLISIONS])
-  if filename in WRITTEN_PATHS and not expected_collision:
-    print()  # Clear the unterminated counter line before raising.
+  if filename in written_paths and not expected_collision:
     raise ValueError(f'Collision found on {filename} between {test_name}.py '
-                     f'and {PATHS_TO_TESTS[filename]}.py')
+                     f'and {paths_to_tests[filename]}.py')
   else:
-    WRITTEN_PATHS.add(filename)
-    PATHS_TO_TESTS[filename] = test_name
+    written_paths.add(filename)
+    paths_to_tests[filename] = test_name
 
 
-def update_path(archive_path: str, artifacts_dir: str):
+def update_path(archive_path: str):
   """Update the --input_file flag with the new location of the compiled.vmfb"""
   backend_path = archive_path.split('traces')[0]  # 'ModuleName/backend_name'.
-  compiled_path = os.path.join(artifacts_dir, backend_path, 'compiled.vmfb')
-  flagfile_path = os.path.join(artifacts_dir, archive_path)
+  compiled_path = os.path.join(FLAGS.artifacts_dir, backend_path,
+                               'compiled.vmfb')
+  flagfile_path = os.path.join(FLAGS.artifacts_dir, archive_path)
   for line in fileinput.input(files=[flagfile_path], inplace=True):
     if line.strip().startswith('--input_file'):
       print(f'--input_file={compiled_path}\n', end='')
@@ -113,7 +113,8 @@ def update_path(archive_path: str, artifacts_dir: str):
       print(line, end='')
 
 
-def extract_artifacts(test_path: str, test_name: str, artifacts_dir: str):
+def extract_artifacts(test_path: str, test_name: str, written_paths: Set[str],
+                      paths_to_tests: Dict[str, str]):
   """Unzips all of the benchmarking artifacts for a given test and backend."""
   outputs = os.path.join(test_path, 'test.outputs', 'outputs.zip')
   archive = zipfile.ZipFile(outputs)
@@ -122,25 +123,23 @@ def extract_artifacts(test_path: str, test_name: str, artifacts_dir: str):
 
   for filename in filenames:
     # Check for collisions.
-    check_collision(filename, test_name)
+    check_collision(filename, test_name, written_paths, paths_to_tests)
 
     # Extract and update flagfile path.
     if not FLAGS.dry_run:
-      archive.extract(filename, artifacts_dir)
+      archive.extract(filename, FLAGS.artifacts_dir)
       if filename.endswith('flagfile'):
-        update_path(filename, artifacts_dir)
+        update_path(filename)
 
 
 def main(argv):
   del argv  # Unused.
 
-  # Get the artifacts dir or default to `/tmp/iree/modules/`
-  artifacts_dir = FLAGS.artifacts_dir
-  if artifacts_dir is None:
-    artifacts_dir = os.path.join(tempfile.gettempdir(), 'iree', 'modules')
-
   # Convert test suite shorthands to full test suite targets.
   test_suites = [SUITE_NAME_TO_TARGET[suite] for suite in FLAGS.test_suites]
+
+  written_paths = set()
+  paths_to_tests = dict()
 
   for test_suite in test_suites:
     if FLAGS.run_test_suites and not FLAGS.dry_run:
@@ -154,7 +153,7 @@ def main(argv):
     test_paths, test_names = get_test_paths_and_names(test_suite)
     for i, (test_path, test_name) in enumerate(zip(test_paths, test_names)):
       print(f'\rTransfering {test_suite} {i + 1}/{len(test_paths)}', end='')
-      extract_artifacts(test_path, test_name, artifacts_dir)
+      extract_artifacts(test_path, test_name, written_paths, paths_to_tests)
     print('\n')
 
 
