@@ -22,7 +22,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV})
+if(NOT ${IREE_TARGET_BACKEND_VULKAN-SPIRV} AND NOT ${IREE_TARGET_BACKEND_METAL-SPIRV})
   return()
 endif()
 """,

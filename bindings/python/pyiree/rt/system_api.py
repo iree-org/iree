@@ -137,24 +137,17 @@ class BoundFunction:
     self._serialized_inputs = None
     self._serialized_outputs = None
 
-  def __call__(self, *args):
+  def __call__(self, *args, **kwargs):
     # NOTE: This is just doing sync dispatch right now. In the future,
     # this should default to async and potentially have some kind of policy
     # flag that can allow it to be overridden.
-    inputs = self._abi.raw_pack_inputs(args)
+    inputs = self._abi.pack_inputs(*args, **kwargs)
     self._serialized_inputs = tuple(self._abi.serialize_vm_list(inputs))
     results = self._abi.allocate_results(inputs, static_alloc=False)
     self._context._vm_context.invoke(self._vm_function, inputs, results)
     self._serialized_outputs = tuple(self._abi.serialize_vm_list(results))
-    unpacked_results = self._abi.raw_unpack_results(results)
-    # TODO(laurenzo): When switching from 'raw' to structured pack/unpack,
-    # the ABI should take care of this one-arg special case.
-    if len(unpacked_results) == 1:
-      return unpacked_results[0]
-    elif len(unpacked_results) == 0:
-      return None
-    else:
-      return unpacked_results
+    unpacked_results = self._abi.unpack_results(results)
+    return unpacked_results
 
   def __repr__(self):
     return "<BoundFunction %r (%r)>" % (

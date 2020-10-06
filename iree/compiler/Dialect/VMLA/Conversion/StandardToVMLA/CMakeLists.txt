@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     MLIRIR
     MLIRPass
-    MLIRStandardOps
+    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VMLA::Conversion

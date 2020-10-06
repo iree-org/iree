@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Test scatter update behavior for tensorflow."""
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-"""Test scatter update behavior for tensorflow."""
 
 
 class ScatterUpdateModule(tf.Module):
@@ -48,8 +49,11 @@ class ScatterUpdateModule(tf.Module):
     return tf.tensor_scatter_nd_update(tensor, indices, updates)
 
 
-@tf_test_utils.compile_module(ScatterUpdateModule)
 class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(ScatterUpdateTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(ScatterUpdateModule)
 
   def test_scatter_update_1D(self):
 
@@ -59,7 +63,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([9, 10, 11], dtype=np.int32)
       module.scatter_update_1D(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_1D)
+    self.compare_backends(scatter_update_1D, self._modules)
 
   def test_scatter_update_2D(self):
 
@@ -69,7 +73,7 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([2, 5, 8], dtype=np.int32)
       module.scatter_update_2D(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_2D)
+    self.compare_backends(scatter_update_2D, self._modules)
 
   def test_scatter_update_2D_slice(self):
 
@@ -79,10 +83,15 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
       updates = np.array([[2, 3, 4]], dtype=np.int32)
       module.scatter_update_2D_slice(tensor, indices, updates)
 
-    self.compare_backends(scatter_update_2D_slice)
+    self.compare_backends(scatter_update_2D_slice, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

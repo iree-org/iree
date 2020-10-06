@@ -68,12 +68,13 @@ iree_zone_id_t iree_tracing_zone_begin_impl(
       TracyLfqCommitC;
     }
 #endif  // TRACY_NO_VERIFY
-    auto name_ptr =
-        reinterpret_cast<char*>(tracy::tracy_malloc(name_length + 1));
+    auto name_ptr = reinterpret_cast<char*>(tracy::tracy_malloc(name_length));
     memcpy(name_ptr, name, name_length);
-    name_ptr[name_length] = '\0';
     TracyLfqPrepareC(tracy::QueueType::ZoneName);
-    tracy::MemWrite(&item->zoneText.text, reinterpret_cast<uint64_t>(name_ptr));
+    tracy::MemWrite(&item->zoneTextFat.text,
+                    reinterpret_cast<uint64_t>(name_ptr));
+    tracy::MemWrite(&item->zoneTextFat.size,
+                    static_cast<uint64_t>(name_length));
     TracyLfqCommitC;
   }
 
@@ -84,22 +85,9 @@ iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length) {
-  // NOTE: cloned from tracy::Profiler::AllocSourceLocation so that we can use
-  // the string lengths we already have.
-  const uint32_t src_loc_length =
-      static_cast<uint32_t>(4 + 4 + 4 + function_name_length + 1 +
-                            file_name_length + 1 + name_length);
-  auto ptr = reinterpret_cast<char*>(tracy::tracy_malloc(src_loc_length));
-  memcpy(ptr, &src_loc_length, 4);
-  memset(ptr + 4, 0, 4);
-  memcpy(ptr + 8, &line, 4);
-  memcpy(ptr + 12, function_name, function_name_length + 1);
-  memcpy(ptr + 12 + function_name_length + 1, file_name, file_name_length + 1);
-  if (name_length) {
-    memcpy(ptr + 12 + function_name_length + 1 + file_name_length + 1, name,
-           name_length);
-  }
-  uint64_t src_loc = reinterpret_cast<uint64_t>(ptr);
+  uint64_t src_loc = tracy::Profiler::AllocSourceLocation(
+      line, file_name, file_name_length, function_name, function_name_length,
+      name, name_length);
 
   const iree_zone_id_t zone_id = tracy::GetProfiler().GetNextZoneId();
 
@@ -152,3 +140,19 @@ void iree_tracing_plot_value_f64_impl(const char* name_literal, double value) {
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+#if defined(__cplusplus) && \
+    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
+
+void* operator new(size_t count) noexcept {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
+void operator delete(void* ptr) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
+
+#endif  // __cplusplus && IREE_TRACING_FEATURE_ALLOCATION_TRACKING

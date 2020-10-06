@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -34,8 +35,11 @@ class ControlFlowModule(tf.Module):
     return i
 
 
-@tf_test_utils.compile_module(ControlFlowModule)
 class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(ControlFlowTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(ControlFlowModule)
 
   def test_short_sequence(self):
 
@@ -43,7 +47,7 @@ class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
       input_array = np.array(9., dtype=np.float32)
       module.collatz(input_array)
 
-    self.compare_backends(short_sequence)
+    self.compare_backends(short_sequence, self._modules)
 
   def test_long_sequence(self):
 
@@ -51,10 +55,15 @@ class ControlFlowTest(tf_test_utils.TracedModuleTestCase):
       input_array = np.array(178., dtype=np.float32)
       module.collatz(input_array)
 
-    self.compare_backends(long_sequence)
+    self.compare_backends(long_sequence, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

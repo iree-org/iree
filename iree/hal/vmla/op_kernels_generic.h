@@ -15,7 +15,10 @@
 #ifndef IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
 #define IREE_HAL_VMLA_OP_KERNELS_GENERIC_H_
 
+#include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <numeric>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
@@ -343,8 +346,11 @@ Status Gather::Execute(absl::Span<const T> src_buffer,
   compute_strides(dst_shape, output_strides);
   compute_strides(src_shape, input_strides);
   compute_strides(indices_shape, indices_strides);
-  size_t outer_size = 1;
-  for (size_t i = 0; i < dim; ++i) {
+  size_t outer_size = 1, batching_size = 1;
+  for (size_t i = 0; i < batch_dims; ++i) {
+    batching_size *= src_shape[i];
+  }
+  for (size_t i = batch_dims; i < dim; ++i) {
     outer_size *= src_shape[i];
   }
   // stride for batch outer dims.
@@ -369,15 +375,19 @@ Status Gather::Execute(absl::Span<const T> src_buffer,
   // see:https://www.tensorflow.org/api_docs/python/tf/gather
   // TODO(ataei): Shrink inner loop by scanning indices_buffer for
   // contiguous indices and collide the copy of these slices.
-  for (size_t i = 0; i < outer_size; ++i) {
-    const int batch_offset =
-        batch_dims == 0 ? 0 : (i / batch_stride) * indices_strides[batch_dims];
-    for (size_t j = 0; j < indices_size; ++j) {
-      const size_t dst_offset = i * output_stride + j * slize_size;
-      const size_t src_offset =
-          i * input_stride + indices_buffer[batch_offset + j] * slize_size;
-      std::memcpy(dst_buffer.data() + dst_offset,
-                  src_buffer.data() + src_offset, sizeof(T) * slize_size);
+  for (size_t b = 0; b < batching_size; ++b) {
+    for (size_t i = 0; i < outer_size; ++i) {
+      const int index = b * outer_size + i;
+      for (size_t j = 0; j < indices_size; ++j) {
+        const int indices_batching_stride =
+            batch_dims > 0 ? indices_strides[batch_dims - 1] : 1;
+        const int indices_index = b * indices_batching_stride + j;
+        const size_t dst_offset = index * output_stride + j * slize_size;
+        const size_t src_offset =
+            index * input_stride + indices_buffer[indices_index] * slize_size;
+        std::memcpy(dst_buffer.data() + dst_offset,
+                    src_buffer.data() + src_offset, sizeof(T) * slize_size);
+      }
     }
   }
   return OkStatus();
@@ -508,6 +518,25 @@ Status Reverse::Execute(absl::Span<const T> src_buffer,
     }
     dst_buffer[dst_i] = src_buffer[src_i];
   }
+  return OkStatus();
+}
+
+template <typename T>
+Status Sort::Execute(absl::Span<const T> src_buffer,
+                     absl::Span<int32_t> dst_buffer, ShapeSpan src_shape) {
+  int elements = src_buffer.size();
+  const int sort_size = src_shape.back();
+
+  for (int i = 0; i < elements; i += sort_size) {
+    auto src_subspan = src_buffer.subspan(i, sort_size);
+    auto dst_subspan = dst_buffer.subspan(i, sort_size);
+    std::iota(dst_subspan.begin(), dst_subspan.end(), 0);
+    std::stable_sort(dst_subspan.begin(), dst_subspan.end(),
+                     [&src_subspan](int32_t i1, int32_t i2) {
+                       return src_subspan[i1] < src_subspan[i2];
+                     });
+  }
+
   return OkStatus();
 }
 

@@ -21,21 +21,21 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/tools/vm_util.h"
+#include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
-ABSL_FLAG(std::string, input_file, "-",
+ABSL_FLAG(std::string, module_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
 
 ABSL_FLAG(std::string, entry_function, "",
-          "Name of a function contained in the module specified by input_file "
+          "Name of a function contained in the module specified by module_file "
           "to run.");
 
 ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
 
-ABSL_FLAG(std::vector<std::string>, inputs, {},
+ABSL_FLAG(std::vector<std::string>, function_inputs, {},
           "A comma-separated list of of input buffers of the format:"
           "[shape]xtype=[value]\n"
           "2x2xi32=1 2 3 4\n"
@@ -47,7 +47,7 @@ ABSL_FLAG(std::vector<std::string>, inputs, {},
           "values:\n"
           "2x2xi32=[[1 2][3 4]], 1x2xf32=[[1 2]]");
 
-ABSL_FLAG(std::string, inputs_file, "",
+ABSL_FLAG(std::string, function_inputs_file, "",
           "Provides a file for input shapes and optional values (see "
           "ParseToVariantListFromFile in vm_util.h for details)");
 
@@ -56,13 +56,13 @@ namespace {
 
 StatusOr<std::string> GetModuleContentsFromFlags() {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
-  auto input_file = absl::GetFlag(FLAGS_input_file);
+  auto module_file = absl::GetFlag(FLAGS_module_file);
   std::string contents;
-  if (input_file == "-") {
+  if (module_file == "-") {
     contents = std::string{std::istreambuf_iterator<char>(std::cin),
                            std::istreambuf_iterator<char>()};
   } else {
-    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(input_file));
+    IREE_ASSIGN_OR_RETURN(contents, file_io::GetFileContents(module_file));
   }
   return contents;
 }
@@ -106,20 +106,21 @@ Status Run() {
   IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
 
   vm::ref<iree_vm_list_t> inputs;
-  if (!absl::GetFlag(FLAGS_inputs_file).empty()) {
-    if (!absl::GetFlag(FLAGS_inputs).empty()) {
+  if (!absl::GetFlag(FLAGS_function_inputs_file).empty()) {
+    if (!absl::GetFlag(FLAGS_function_inputs).empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of inputs and inputs_file to be set";
+             << "Expected only one of function_inputs and function_inputs_file "
+                "to be set";
     }
-    IREE_ASSIGN_OR_RETURN(
-        inputs, ParseToVariantListFromFile(input_descs,
-                                           iree_hal_device_allocator(device),
-                                           absl::GetFlag(FLAGS_inputs_file)));
+    IREE_ASSIGN_OR_RETURN(inputs,
+                          ParseToVariantListFromFile(
+                              input_descs, iree_hal_device_allocator(device),
+                              absl::GetFlag(FLAGS_function_inputs_file)));
   } else {
     IREE_ASSIGN_OR_RETURN(
         inputs,
         ParseToVariantList(input_descs, iree_hal_device_allocator(device),
-                           absl::GetFlag(FLAGS_inputs)));
+                           absl::GetFlag(FLAGS_function_inputs)));
   }
 
   IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));

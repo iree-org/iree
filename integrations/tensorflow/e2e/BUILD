@@ -54,6 +54,7 @@ package(
 # keep sorted
 SPECIAL_CASES = [
     "linspace_test.py",
+    "mobile_bert_squad_test.py",
 ]
 
 TFLITE_FAILING = [
@@ -88,12 +89,13 @@ LLVM_FAILING = [
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "finite_test.py",
+    "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
+    "sort_test.py",
     "strings_test.py",
 ]
 
@@ -105,12 +107,13 @@ VULKAN_FAILING = [
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "finite_test.py",
+    "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
+    "sort_test.py",
     "strings_test.py",
 ]
 
@@ -205,6 +208,49 @@ iree_e2e_test_suite(
     reference_backend = "tf",
     tags = [
         "manual",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_e2e_test_suite(
+    name = "mobile_bert_squad_tests",
+    size = "enormous",
+    backends_to_srcs = {
+        "tf": ["mobile_bert_squad_test.py"],
+        "tflite": ["mobile_bert_squad_test.py"],
+        "iree_vmla": ["mobile_bert_squad_test.py"],
+    },
+    reference_backend = "tf",
+    tags = [
+        "external",
+        "guitar",
+        "manual",
+        "no-remote",
+        "nokokoro",
+        "notap",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+iree_e2e_test_suite(
+    name = "mobile_bert_squad_tests_failing",
+    size = "enormous",
+    backends_to_srcs = {
+        "iree_llvmjit": ["mobile_bert_squad_test.py"],
+        "iree_vulkan": ["mobile_bert_squad_test.py"],
+    },
+    reference_backend = "tf",
+    tags = [
+        "external",
+        "guitar",
+        "manual",
+        "no-remote",
         "nokokoro",
         "notap",
     ],

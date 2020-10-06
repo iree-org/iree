@@ -642,6 +642,19 @@ class VMLAModuleState final {
   IREE_VMLA_UNARY_OP(CeilF32, kernels::Ceil, float);
   IREE_VMLA_UNARY_OP(RoundF32, kernels::Round, float);
 
+#define IREE_VMLA_SORT_OP(name, type)                                        \
+  Status name(const vm::ref<Buffer>& src, iree_vmla_shape_t src_shape,       \
+              const vm::ref<Buffer>& dst) {                                  \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
+    return kernels::Sort::Execute<type>(src->As<type>(), dst->As<int32_t>(), \
+                                        src_shape);                          \
+  }
+
+  IREE_VMLA_SORT_OP(SortI8, int8_t);
+  IREE_VMLA_SORT_OP(SortI16, int16_t);
+  IREE_VMLA_SORT_OP(SortI32, int32_t);
+  IREE_VMLA_SORT_OP(SortF32, float);
+
   //===--------------------------------------------------------------------===//
   // VMLA Ops: conversion
   //===--------------------------------------------------------------------===//
@@ -970,6 +983,10 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("floor.f32", &VMLAModuleState::FloorF32),
     vm::MakeNativeFunction("ceil.f32", &VMLAModuleState::CeilF32),
     vm::MakeNativeFunction("round.f32", &VMLAModuleState::RoundF32),
+    vm::MakeNativeFunction("sort.i8", &VMLAModuleState::SortI8),
+    vm::MakeNativeFunction("sort.i16", &VMLAModuleState::SortI16),
+    vm::MakeNativeFunction("sort.i32", &VMLAModuleState::SortI32),
+    vm::MakeNativeFunction("sort.f32", &VMLAModuleState::SortF32),
     vm::MakeNativeFunction("finite.f32", &VMLAModuleState::FiniteF32),
 
     vm::MakeNativeFunction("convert.i8.i16", &VMLAModuleState::ConvertI8I16),

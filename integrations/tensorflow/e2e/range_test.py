@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from absl import app
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
@@ -31,8 +32,11 @@ class RangeModule(tf.Module):
     return tf.range(start, stop, delta)
 
 
-@tf_test_utils.compile_module(RangeModule)
 class RangeTest(tf_test_utils.TracedModuleTestCase):
+
+  def __init__(self, methodName="runTest"):
+    super(RangeTest, self).__init__(methodName)
+    self._modules = tf_test_utils.compile_tf_module(RangeModule)
 
   def test_range(self):
 
@@ -42,10 +46,15 @@ class RangeTest(tf_test_utils.TracedModuleTestCase):
       delta = np.array(3, dtype=np.float32)
       result = module.range(start, stop, delta)
 
-    self.compare_backends(range)
+    self.compare_backends(range, self._modules)
 
 
-if __name__ == "__main__":
-  if hasattr(tf, "enable_v2_behavior"):
+def main(argv):
+  del argv  # Unused
+  if hasattr(tf, 'enable_v2_behavior'):
     tf.enable_v2_behavior()
   tf.test.main()
+
+
+if __name__ == '__main__':
+  app.run(main)

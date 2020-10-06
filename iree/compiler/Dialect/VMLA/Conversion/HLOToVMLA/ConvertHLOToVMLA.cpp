@@ -704,6 +704,29 @@ struct FiniteOpConversion : public OpConversionPattern<mhlo::IsFiniteOp> {
   TypeConverter &typeConverter;
 };
 
+struct SortOpConversion : public OpConversionPattern<IREE::VMLA::SortPseudoOp> {
+  SortOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::VMLA::SortPseudoOp srcOp, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto inputType =
+        srcOp.getOperand().getType().cast<ShapedType>().getElementType();
+    auto src = rawOperands[0];
+    auto src_shape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.value(), typeConverter, rewriter);
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    rewriter.createOrFold<IREE::VMLA::SortOp>(srcOp.getLoc(), src, src_shape,
+                                              dst, TypeAttr::get(inputType));
+    rewriter.replaceOp(srcOp, {dst});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
   ConvertOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -769,6 +792,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
                                    IREE::VMLA::BatchMatMulOp>>(context,
                                                                typeConverter);
 
+  // vmla.sort.pseudo
+  patterns.insert<SortOpConversion>(context, typeConverter);
+
   // Simple 1:1 conversion patterns using the automated trait-based converter.
   // Used for HLO ops that have equivalent VMLA ops such as most arithmetic ops.
   patterns.insert<VMLAOpConversion<mhlo::AddOp, IREE::VMLA::AddOp>>(
@@ -796,6 +822,8 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<VMLAOpConversion<mhlo::OrOp, IREE::VMLA::OrOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<mhlo::XorOp, IREE::VMLA::XorOp>>(
+      context, typeConverter);
+  patterns.insert<VMLAOpConversion<mhlo::NotOp, IREE::VMLA::NotOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<mhlo::ExpOp, IREE::VMLA::ExpOp>>(
       context, typeConverter);

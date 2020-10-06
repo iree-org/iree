@@ -23,7 +23,7 @@ iree_cc_library(
     "TypeConversion.cpp"
   DEPS
     MLIRIR
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     iree::compiler::Dialect::Shape::IR
   PUBLIC

@@ -422,7 +422,7 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
 }
 
 //===----------------------------------------------------------------------===//
-// VMLA Ops: Convultion
+// VMLA Ops: Convolution
 //===----------------------------------------------------------------------===//
 
 def VLMA_ConvOp : VMLA_Op<"conv", [VMLA_IncludeShapes]> {
@@ -458,6 +458,46 @@ def VLMA_ConvOp : VMLA_Op<"conv", [VMLA_IncludeShapes]> {
     `out` $dst`(`$dst_shape `:` type($dst_shape)`)` `:` $dst_type attr-dict
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// VMLA Ops: Sorting
+//===----------------------------------------------------------------------===//
+
+def VMLA_SortPseudoOp : VMLA_Op<"sort.pseudo"> {
+  let summary = "Tensor-level pseudo-op of VMLA::SortOp.";
+  let description = [{
+    This is a tensor-level version of VMLA::SortOp, to facilitate
+    the lowering process.
+
+    This operation generates a sorted index list along the last dimension,
+    performing batch-wise along all other dimensions.
+  }];
+  let arguments = (ins
+    AnyTensor:$value
+  );
+  let results = (outs
+    I32Tensor:$dst
+  );
+
+  let assemblyFormat = [{
+    $value attr-dict `:` `(`type($value)`)` `->` type($dst)
+  }];
+}
+
+def VMLA_SortOp : VMLA_ElementTypeOp<"sort", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Shape:$src_shape,
+    VMLA_Buffer:$dst,
+    VMLA_AnyTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    `out` $dst attr-dict `:` $element_type
+  }];
+}
+
 
 //===----------------------------------------------------------------------===//
 // VMLA Ops: GEMM/GEMV

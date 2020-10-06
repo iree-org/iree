@@ -25,14 +25,14 @@ iree_cc_library(
     "MatmulCodegenStrategy.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
+    MLIRAffine
     MLIRAnalysis
     MLIRIR
-    MLIRLinalgOps
+    MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCF
-    MLIRStandardOps
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     MLIRVector
