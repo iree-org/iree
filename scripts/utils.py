@@ -53,7 +53,7 @@ def check_and_get_output(command: Sequence[str],
       if not any([bool(re.match(pattern, line)) for pattern in stderr_filters]):
         print(line)
 
-  if process.returncode:
+  if process.returncode != 0:
     raise subprocess.CalledProcessError(process.returncode, ' '.join(command))
 
   return stdout, stderr
