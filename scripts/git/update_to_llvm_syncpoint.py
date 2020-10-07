@@ -16,20 +16,18 @@
 # pylint: disable=missing-docstring
 """Updates LLVM-dependent submodules based on the current LLVM commit.
 
-Updates the third_party/tensorflow submodule to a new commit based on the commit
-in the third_party/llvm-project submodule. We have special conditions around
-these submodules since they are synced as part of the integration of LLVM into
-Google's source repository. See
+Updates the third_party/llvm-bazel and third_party/tensorflow submodules to
+commits that match the LLVM commit in third_party/llvm-project submodule. We
+have special conditions around these submodules since they are synced as part of
+the integration of LLVM into Google's source repository. See
 https://google.github.io/iree/developing-iree/repository-management#the-special-relationship-with-llvm-and-tensorflow.
-
-In addition we currently copy LLVM Bazel BUILD files from TensorFlow.
 
 Typical usage:
   Syntax: ./scripts/git/update_to_llvm_syncpoint.py
 
-  By default, this will update the TensorFlow submodule to the most recent
-  commit with an LLVM version that matches IREE's and copy over the LLVM
-  BUILD file changes as needed.
+  By default, this will update llvm-bazel to the tag corresponding to the
+  current LLVM commit and update TensorFlow to the most recent commit that has a
+  matching LLVM commit.
 """
 
 import argparse
@@ -61,20 +59,30 @@ COMMIT_OPTIONS = {
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
+  parser.add_argument("--llvm",
+                      help="Path to the LLVM sources "
+                      "(defaults to third_party/llvm-project)",
+                      default=None)
+  parser.add_argument("--llvm_bazel",
+                      help="Path to the LLVM Bazel BUILD files"
+                      "(defaults to third_party/llvm-bazel)",
+                      default=None)
   parser.add_argument(
-      "--tensorflow",
-      help="Path to the tensorflow sources "
-      "(default to third_party/tensorflow)",
-      default=None)
-  parser.add_argument(
-      "--llvm",
-      help="Path to the LLVM sources "
-      "(defaults to third_party/llvm-project)",
-      default=None)
+      "--llvm_bazel_commit",
+      help=("Update llvm-bazel to this commit, or a named option:"
+            f" {COMMIT_OPTIONS}."
+            f" {LATEST_MATCHING_COMMIT} and {INTEGRATE_COMMIT} are equivalent"
+            " for this repository."),
+      default=LATEST_MATCHING_COMMIT)
+  parser.add_argument("--tensorflow",
+                      help="Path to the tensorflow sources "
+                      "(default to third_party/tensorflow)",
+                      default=None)
   parser.add_argument(
       "--tensorflow_commit",
       "--tf_commit",
-      help=f"Update TensorFlow to this commit, or a named option: {COMMIT_OPTIONS}",
+      help=("Update TensorFlow to this commit, or a named option:"
+            f" {COMMIT_OPTIONS}"),
       default=LATEST_MATCHING_COMMIT)
   parser.add_argument(
       "--validate",
@@ -84,12 +92,6 @@ def parse_arguments():
       default=True,
   )
 
-  parser.add_argument(
-      "--update_build_files",
-      help="Updates the IREE LLVM build files from TensorFlow.",
-      type=utils.str2bool,
-      nargs="?",
-      default=True)
   args = parser.parse_args()
 
   # Default repo path.
@@ -101,6 +103,8 @@ def parse_arguments():
     args.tensorflow = os.path.join(args.repo, "third_party", "tensorflow")
   if not args.llvm:
     args.llvm = os.path.join(args.repo, "third_party", "llvm-project")
+  if not args.llvm_bazel:
+    args.llvm_bazel = os.path.join(args.repo, "third_party", "llvm-bazel")
 
   return args
 
@@ -110,7 +114,7 @@ def main(args):
   print("  IREE Path :", args.repo)
   print("  LLVM Path :", args.llvm)
   print("  TensorFlow Path :", args.tensorflow)
-  print("  Update Build files:", args.update_build_files)
+  print("  LLVM Bazel Path :", args.llvm_bazel)
   current_llvm_commit = get_commit(args.llvm)
   current_tensorflow_commit = get_commit(args.tensorflow)
 
@@ -124,12 +128,20 @@ def main(args):
   utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow)
   stage_path(args.repo, args.tensorflow)
 
-  validate_tf_commit(
-      current_llvm_commit, args.tensorflow, exit_on_failure=args.validate)
+  validate_tf_commit(current_llvm_commit,
+                     args.tensorflow,
+                     exit_on_failure=args.validate)
 
-  if args.update_build_files:
-    print("\n*** Updating BUILD.bazel files ***")
-    update_build_files_from_tensorflow(args.repo, args.tensorflow)
+  new_llvm_bazel_commit = find_new_llvm_bazel_commit(args.llvm_bazel,
+                                                     current_llvm_commit,
+                                                     args.llvm_bazel_commit)
+  print("\n*** Updating LLVM Bazel to", new_llvm_bazel_commit, "***")
+  utils.execute(["git", "checkout", new_llvm_bazel_commit], cwd=args.llvm_bazel)
+  stage_path(args.repo, args.llvm_bazel)
+
+  validate_llvm_bazel_commit(current_llvm_commit,
+                             args.llvm_bazel,
+                             exit_on_failure=args.validate)
 
   # Export SUBMODULE_VERSIONS.
   print()  # Add line break.
@@ -142,6 +154,44 @@ def get_commit(path, rev="HEAD"):
                        silent=True,
                        capture_output=True,
                        universal_newlines=True).strip()
+
+
+def find_new_llvm_bazel_commit(llvm_bazel_path, llvm_commit, llvm_bazel_commit):
+  utils.execute(["git", "fetch"], cwd=llvm_bazel_path)
+
+  if llvm_bazel_commit not in COMMIT_OPTIONS:
+    return get_commit(llvm_bazel_path, rev=llvm_bazel_commit)
+
+  if llvm_bazel_commit == KEEP_COMMIT:
+    return get_commit(llvm_bazel_path)
+
+  if llvm_bazel_commit == REMOTE_HEAD_COMMIT:
+    return get_commit(llvm_bazel_path, "origin/main")
+
+  if (llvm_bazel_commit == INTEGRATE_COMMIT or
+      llvm_bazel_commit == LATEST_MATCHING_COMMIT):
+    return get_commit(llvm_bazel_path, f"llvm-project-{llvm_commit}")
+
+
+def validate_llvm_bazel_commit(llvm_commit,
+                               llvm_bazel_path,
+                               exit_on_failure=True):
+  llvm_bazel_llvm_commit = find_llvm_bazel_llvm_commit(llvm_bazel_path)
+
+  matches = llvm_bazel_llvm_commit == llvm_commit
+  if not matches:
+    print("WARNING: LLVM commit in llvm-bazel does not match that in IREE"
+          f" ({llvm_bazel_llvm_commit} vs {llvm_commit})")
+    if exit_on_failure:
+      sys.exit(1)
+
+
+def find_llvm_bazel_llvm_commit(llvm_bazel_path):
+  return utils.execute(
+      ["git", "submodule", "status", "third_party/llvm-project"],
+      capture_output=True,
+      universal_newlines=True,
+      cwd=llvm_bazel_path).split()[0].lstrip("+-")
 
 
 def find_new_tf_commit(tensorflow_path, llvm_commit, tf_commit):
@@ -232,35 +282,6 @@ def find_tensorflow_llvm_commit(tensorflow_path):
   print("Please file a bug)")
   print("Expected pattern match for:", pattern_text)
   sys.exit(1)
-
-
-def update_build_files_from_tensorflow(repo_path, tensorflow_path):
-  src_llvm_build = os.path.join(tensorflow_path, "third_party", "llvm",
-                                "llvm.autogenerated.BUILD")
-  # NOTE(laurenzo): These will probably move upstream.
-  src_mlir_build = os.path.join(tensorflow_path, "third_party", "mlir", "BUILD")
-  src_mlir_test_build = os.path.join(tensorflow_path, "third_party", "mlir",
-                                     "test.BUILD")
-  overlay_path = os.path.join(repo_path, "build_tools", "bazel",
-                              "third_party_import", "llvm-project", "overlay")
-  copy_text_file(repo_path, src_llvm_build,
-                 os.path.join(overlay_path, "llvm", "BUILD.bazel"))
-  copy_text_file(repo_path, src_mlir_build,
-                 os.path.join(overlay_path, "mlir", "BUILD.bazel"))
-  copy_text_file(repo_path, src_mlir_test_build,
-                 os.path.join(overlay_path, "mlir", "test", "BUILD.bazel"))
-
-
-def copy_text_file(repo_path, src_file, dst_file):
-  print(f"+ cp {src_file} {dst_file}")
-  with open(src_file, "r", encoding="UTF-8") as f:
-    src_contents = f.read()
-
-  if not os.path.exists(dst_file):
-    print("WARNING: Destination file does not exist:", dst_file)
-  with open(dst_file, "w", encoding="UTF-8") as f:
-    f.write(src_contents)
-  stage_path(repo_path, dst_file)
 
 
 def stage_path(repo_path, to_stage):
