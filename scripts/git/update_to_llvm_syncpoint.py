@@ -16,20 +16,18 @@
 # pylint: disable=missing-docstring
 """Updates LLVM-dependent submodules based on the current LLVM commit.
 
-Updates the third_party/tensorflow submodule to a new commit based on the commit
-in the third_party/llvm-project submodule. We have special conditions around
-these submodules since they are synced as part of the integration of LLVM into
-Google's source repository. See
+Updates the third_party/llvm-bazel and third_party/tensorflow submodules to
+commits that match the LLVM commit in third_party/llvm-project submodule. We
+have special conditions around these submodules since they are synced as part of
+the integration of LLVM into Google's source repository. See
 https://google.github.io/iree/developing-iree/repository-management#the-special-relationship-with-llvm-and-tensorflow.
-
-In addition we currently copy LLVM Bazel BUILD files from TensorFlow.
 
 Typical usage:
   Syntax: ./scripts/git/update_to_llvm_syncpoint.py
 
-  By default, this will update the TensorFlow submodule to the most recent
-  commit with an LLVM version that matches IREE's and copy over the LLVM
-  BUILD file changes as needed.
+  By default, this will update llvm-bazel to the tag corresponding to the
+  current LLVM commit and update TensorFlow to the most recent commit that has a
+  matching LLVM commit.
 """
 
 import argparse
