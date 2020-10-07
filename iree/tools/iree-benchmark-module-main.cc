@@ -77,8 +77,7 @@ Status PrepareIREEVMFunction(
       iree_vm_instance_create(iree_allocator_system(), instance));
 
   // Create IREE's device and module.
-  IREE_RETURN_IF_ERROR(
-      iree::CreateDevice(absl::GetFlag(FLAGS_driver), device));
+  IREE_RETURN_IF_ERROR(iree::CreateDevice(absl::GetFlag(FLAGS_driver), device));
   IREE_RETURN_IF_ERROR(CreateHalModule(*device, hal_module));
   IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, input_module));
 
