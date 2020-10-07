@@ -17,7 +17,7 @@ memory, locks, context switches, and many more.
 
 To use tracing in IREE, you need to build IREE with following requirements:
 
-*   Turn `IREE_ENABLE_RUNTIME_TRACING` on.
+*   Set `IREE_ENABLE_RUNTIME_TRACING` to `ON`.
 *   Add `-DNDEBUG` to `IREE_DEFAULT_COPTS`.
 *   Use Release/RelWithDebInfo build.
 
@@ -34,7 +34,7 @@ The above compiles IREE with Tracy APIs so that IREE will stream profiling data
 back to Tracy when running. To be able to collect and analyze these data, you
 can either use GUI or CLI tools. Tracy profiler is the GUI tool. You can find
 the
-[Tracy manual](https://github.com/wolfpld/tracy/releases/download/v0.6.3/tracy.pdf)
+Tracy manual on its [releases page](https://github.com/wolfpld/tracy/releases)
 for more details on Tracy itself.
 
 To build the profiler on Linux, you will need to install some external
@@ -81,12 +81,19 @@ build/iree/tools/iree-run-module \
   --function_inputs="i32=-2"
 ```
 
+Note that typically IREE binaries complete running the module and exit very
+quickly before even connecting to Tracy. For such cases, you can set
+`TRACY_NO_EXIT=1` in the environment to keep the IREE binary alive until
+Tracy connects to it.
+
 ## Vulkan GPU Profiling
 
 Tracy gives us great insights over CPU/GPU interactions and Vulkan API usage
 details. However, information at a finer granularity, especially inside a
 particular shader dispatch, is missing. To supplement, one would typically need
 to use other third-party or vendor-specific tools.
+
+(TODO: add some pictures for each tool)
 
 ### Android GPUs
 
@@ -103,27 +110,40 @@ IREE core libraries together with a specific VM bytecode invocation into an
 Android app. The wrapper and its documentation is placed at
 [`iree/tools/android/run_module_app/`](https://github.com/google/iree/tree/main/iree/tools/android/run_module_app).
 
-For example, to package `iree/tools/test/simple.mlir` as an Android app:
+For example, to package a module compiled from the following `mhlo-dot.mlir` as
+an Android app:
+
+```
+func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32>
+  attributes { iree.module.export } {
+  %0 = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
+  return %0 : tensor<2x2xf32>
+}
+```
 
 ```shell
 # First translate into VM bytecode module
 /path/to/iree/build/iree/tools/iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vmla \
-  /path/to/iree/source/iree/tools/test/simple.mlir \
-  -o /tmp/simple.vmfb
+  --iree-hal-target-backends=vulkan \
+  /path/to/mhlo-dot.mlir \
+  -o /tmp/mhlo-dot.vmfb
 
 # Then package the Android app
 /path/to/iree/source/iree/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
-  --module_file ./iree/tools/test/simple.mlir \
-  --entry_function abs \
+  --module_file /tmp/mhlo-dot.mlir \
+  --entry_function dot \
   --function_inputs_file /path/to/inputs/file \
   --driver vulkan
 ```
 
-Where `/path/to/input/file` is a file containing inputs to `abs`, for example,
-`i32=-2`.
+Where `/path/to/input/file` is a file containing inputs to `dot`, for example:
+
+```
+2x4xf32=[[1.0 2.0 3.0 4.0][5.0 6.0 7.0 8.0]]
+4x2xf32=[[9.0 10.0][11.0 12.0][13.0 14.0][15.0 16.0]]
+```
 
 The above will build an `iree-run-module.apk` under the `./build-apk/`
 directory. One can then install via `adb install`.
@@ -151,7 +171,7 @@ at https://ui.perfetto.dev/.
 
 ### Desktop GPUs
 
-Vulkan is traditionally used for grahpics rendering. So Vulkan profiling tools
+Vulkan is traditionally used for graphics rendering. So Vulkan profiling tools
 at the moment typically have such assumption and require a rendering boundary
 marked by framebuffer presentation. This means additional steps for IREE and
 other Vulkan applications that solely rely on headless compute. We need to wrap
@@ -201,17 +221,17 @@ need the GPU anymore; it can be opened by a RGP application installed anywhere.
 
 #### NVIDIA
 
-For NVIDIA GPUs, [NVIDIA Nsight Grahpics](https://developer.nvidia.com/nsight-graphics)
+For NVIDIA GPUs, [NVIDIA Nsight Graphics](https://developer.nvidia.com/nsight-graphics)
 is the tool to understand fine details of how IREE GPU performs. See the
 [documentation](https://docs.nvidia.com/nsight-graphics/UserGuide/index.html)
 for details. In general the steps to get started are:
 
-* Download and install NVIDIA Nsight Grahpics from https://developer.nvidia.com/nsight-graphics.
+* Download and install NVIDIA Nsight Graphics from https://developer.nvidia.com/nsight-graphics.
 * Compile `iree-run-module-vulkan-gui` as said in the above.
-* Open NVIDIA Nsight Grahpics, select "Quick Launch" on the welcome page.
+* Open NVIDIA Nsight Graphics, select "Quick Launch" on the welcome page.
 * Fill out the "Application Executable" and "Command Line Arguments" to point
   to `iree-run-module-vulkan-gui` and a specific VM bytecode module and its
   invocation information.
 * Select an "Activity" ("Frame Profiler" and "GPU Trace" are particularly
-  intereting) and launch.
+  interesting) and launch.
 * Capture any frame to perform analysis.
