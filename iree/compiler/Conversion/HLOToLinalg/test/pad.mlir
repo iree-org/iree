@@ -1,12 +1,9 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers -canonicalize %s | IreeFileCheck %s
 
 module {
-  // CHECK_LABEL: @pad_cst
   func @pad_cst() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
-    // CHECK: linalg.fill
-    // CHECK: linalg.copy
     %1 = constant dense<0.0> : tensor<f32>
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
@@ -21,17 +18,21 @@ module {
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
   }
 }
+// CHECK_LABEL: @pad_cst
+//   CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
+//   CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+//       CHECK: linalg.fill(%[[OUT]], %[[CST]])
+//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][4, 5] [12, 4] [1, 1]
+//       CHECK: linalg.copy(%[[IN]], %[[SUBVIEW]])
 
 // -----
 
 module {
-  // CHECK_LABEL: @pad_memref
   func @pad_memref() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
     %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<f32>
-    // CHECK: linalg.fill
-    // CHECK: linalg.copy
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
       edge_padding_low = dense<[4, 5]> : tensor<2xi64>,
@@ -46,16 +47,21 @@ module {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
 }
+// CHECK_LABEL: @pad_memref
+//   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
+//   CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+//   CHECK-DAG: %[[PAD_BUF:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<f32>
+//       CHECK: %[[PAD_VAL:.+]] = load %[[PAD_BUF]][] : memref<f32>
+//       CHECK: linalg.fill(%[[OUT]], %[[PAD_VAL]])
+//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][4, 5] [12, 4] [1, 1]
+//       CHECK: linalg.copy(%[[IN]], %[[SUBVIEW]])
 
 // -----
 
 module {
-  // CHECK_LABEL: @pad_no_op
   func @pad_no_op() {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<12x4xf32>
-    // CHECK: linalg.fill
-    // CHECK: linalg.copy
     %1 = constant dense<0.0> : tensor<f32>
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<0> : tensor<2xi64>,
@@ -70,17 +76,22 @@ module {
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
   }
 }
+// TODO(hanchung): Make it just a copy op.
+// CHECK_LABEL: @pad_no_op
+//   CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<12x4xf32>
+//   CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
+//       CHECK: linalg.fill(%[[OUT]], %[[CST]])
+//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][0, 0] [12, 4] [1, 1]
+//       CHECK: linalg.copy(%[[IN]], %[[SUBVIEW]])
 
 // -----
 
 module {
-  // CHECK_LABEL: @cst_pad_cst
   func @cst_pad_cst() {
     %c0 = constant 0 : index
     %0 = constant dense<1.0> : tensor<12x4xf32>
     %1 = constant dense<0.0> : tensor<f32>
-    // CHECK: linalg.fill
-    // CHECK: linalg.fill
     %2 = "mhlo.pad"(%0, %1) {
       edge_padding_high = dense<[2, 3]> : tensor<2xi64>,
       edge_padding_low = dense<[4, 5]> : tensor<2xi64>,
@@ -93,3 +104,10 @@ module {
     hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write"
   }
 }
+// CHECK_LABEL: @cst_pad_cst
+//   CHECK-DAG: %[[ZERO:.+]] = constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[ONE:.+]] = constant 1.000000e+00 : f32
+//   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<18x12xf32>
+//       CHECK: linalg.fill(%[[OUT]], %[[ZERO]])
+//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][4, 5] [12, 4] [1, 1]
+//       CHECK: linalg.fill(%[[SUBVIEW]], %[[ONE]])

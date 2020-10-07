@@ -637,7 +637,7 @@ LogicalResult PadOpConversion::apply(
     Value startIndex = rewriter.create<ConstantIndexOp>(
         loc, std::get<0>(it.value()).getZExtValue());
     offsets.push_back(startIndex);
-    Value size = rewriter.create<DimOp>(loc, resultBuffers[0], it.index());
+    Value size = rewriter.create<DimOp>(loc, inputBuffers[0], it.index());
     sizes.push_back(size);
     Value stride = rewriter.create<ConstantIndexOp>(
         loc, std::get<1>(it.value()).getZExtValue() + 1);
