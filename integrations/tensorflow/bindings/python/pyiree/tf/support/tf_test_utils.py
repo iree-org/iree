@@ -572,6 +572,15 @@ class TracedModule:
 Modules = collections.namedtuple("Modules",
                                  ["ref_module", "tar_modules", "artifacts_dir"])
 
+# We have to use a global variable to store the compiled modules so that we can
+# avoid recompilation. This is because the TestCase class resets it's entire
+# state and calls __init__ before each unittest. It also calls __init__ one
+# additional time before that for good measure, which means without storing the
+# modules somewhere else we would have to compile each of them at least twice.
+# We can't store the modules on the cls because of #2900.
+global _global_modules
+_global_modules = None
+
 
 def compile_tf_module(
     module_class: Type[tf.Module], exported_names: Sequence[str] = ()
@@ -588,6 +597,9 @@ def compile_tf_module(
     A 'Modules' namedtuple containing the reference module, target modules and
     artifacts directory.
   """
+  global _global_modules
+  if _global_modules is not None:
+    return _global_modules
 
   # Setup the directory for saving compilation artifacts and traces.
   artifacts_dir = _setup_artifacts_dir(module_class.__name__)
@@ -604,7 +616,8 @@ def compile_tf_module(
   tar_modules = [
       compile_backend(backend_info) for backend_info in tar_backend_infos
   ]
-  return Modules(ref_module, tar_modules, artifacts_dir)
+  _global_modules = Modules(ref_module, tar_modules, artifacts_dir)
+  return _global_modules
 
 
 def compile_tf_signature_def_saved_model(saved_model_dir: str,
@@ -628,6 +641,9 @@ def compile_tf_signature_def_saved_model(saved_model_dir: str,
     A 'Modules' namedtuple containing the reference module, target modules and
     artifacts directory.
   """
+  global _global_modules
+  if _global_modules is not None:
+    return _global_modules
 
   # Setup the directory for saving compilation artifacts and traces.
   artifacts_dir = _setup_artifacts_dir(module_name)
@@ -646,7 +662,8 @@ def compile_tf_signature_def_saved_model(saved_model_dir: str,
   tar_modules = [
       compile_backend(backend_info) for backend_info in tar_backend_infos
   ]
-  return Modules(ref_module, tar_modules, artifacts_dir)
+  _global_modules = Modules(ref_module, tar_modules, artifacts_dir)
+  return _global_modules
 
 
 class TracedModuleTestCase(tf.test.TestCase):
