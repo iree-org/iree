@@ -90,6 +90,7 @@ def check_collision(filename: str, test_name: str, written_paths: Set[str],
   """Check that we aren't overwriting files unless we expect to."""
   # Note: We can't use a check that the files have identical contents because
   # tf_input.mlir can have random numbers appended to its function names.
+  # See https://github.com/google/iree/issues/3375
 
   expected_collision = any([name in filename for name in EXPECTED_COLLISIONS])
   if filename in written_paths and not expected_collision:
