@@ -137,15 +137,12 @@ struct TileMatmulPattern : public linalg::LinalgBaseTilingPattern {
              benefit),
         launchConfig(launchConfig) {}
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
+  virtual LogicalResult matchAndRewrite(Operation *op,
+                                        PatternRewriter &rewriter) const {
     // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
     // erased.
     FuncOp funcOp = op->getParentOfType<FuncOp>();
-    SmallVector<Value, 4> tensorResults;
-    if (!funcOp ||
-        failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
-        !tensorResults.empty() ||
+    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
         failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
@@ -352,13 +349,14 @@ static void populateTilingToSubgroupPatterns(
     return tileSizesVal;
   };
 
-  auto getSubgroupProcInfoFn = [&launchConfig](
-                                   OpBuilder &builder, Location loc,
-                                   ArrayRef<Range> parallelLoopRanges) {
-    ArrayRef<int64_t> numSubgroups =
-        launchConfig.getNumSubgroups().take_front(parallelLoopRanges.size());
-    return getSubgroupIdsAndCounts(builder, loc, numSubgroups);
-  };
+  auto getSubgroupProcInfoFn =
+      [&launchConfig](OpBuilder &builder, Location loc,
+                      ArrayRef<Range> parallelLoopRanges) {
+        ArrayRef<int64_t> numSubgroups =
+            launchConfig.getNumSubgroups().take_front(
+                parallelLoopRanges.size());
+        return getSubgroupIdsAndCounts(builder, loc, numSubgroups);
+      };
   linalg::LinalgLoopDistributionOptions subgroupDistributionOptions = {
       getSubgroupProcInfoFn,
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
