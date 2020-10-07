@@ -19,7 +19,7 @@
 // precompiled IREE modules use iree-run-module.
 //
 // By default all exported functions in the module will be run in order.
-// All input values, provided via -input-values, will be passed to the
+// All input values, provided via -function-inputs, will be passed to the
 // functions (this means all input signatures must match). Results from the
 // executed functions will be printed to stdout for checking.
 //
@@ -115,14 +115,14 @@ static llvm::cl::opt<bool> print_flatbuffer_flag{
     llvm::cl::init(false),
 };
 
-static llvm::cl::list<std::string> input_values_flag{
-    "input-value",
+static llvm::cl::list<std::string> function_inputs_flag{
+    "function-input",
     llvm::cl::desc("Input shapes and optional values"),
     llvm::cl::ZeroOrMore,
 };
 
-static llvm::cl::opt<std::string> input_values_file_flag{
-    "input-value-file",
+static llvm::cl::opt<std::string> function_inputs_file_flag{
+    "function-input-file",
     llvm::cl::desc("Provides a file for input shapes and optional values (see "
                    "ParseToVariantListFromFile in vm_util.h for details)"),
     llvm::cl::init(""),
@@ -277,21 +277,21 @@ Status EvaluateFunction(iree_vm_context_t* context,
   std::cout << "EXEC @" << export_name << std::endl;
   IREE_ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   vm::ref<iree_vm_list_t> inputs;
-  if (!input_values_file_flag.empty()) {
-    if (!input_values_flag.empty()) {
+  if (!function_inputs_file_flag.empty()) {
+    if (!function_inputs_flag.empty()) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Expected only one of input_values and "
-                "input_values_file to be set";
+             << "Expected only one of function_inputs and "
+                "function_inputs_file to be set";
     }
-    IREE_ASSIGN_OR_RETURN(inputs,
-                          ParseToVariantListFromFile(input_descs, allocator,
-                                                     input_values_file_flag));
-  } else {
-    auto input_values_list = absl::MakeConstSpan(
-        input_values_flag.empty() ? nullptr : &input_values_flag.front(),
-        input_values_flag.size());
     IREE_ASSIGN_OR_RETURN(
-        inputs, ParseToVariantList(input_descs, allocator, input_values_list));
+        inputs, ParseToVariantListFromFile(input_descs, allocator,
+                                           function_inputs_file_flag));
+  } else {
+    auto function_inputs_list = absl::MakeConstSpan(
+        function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
+        function_inputs_flag.size());
+    IREE_ASSIGN_OR_RETURN(inputs, ParseToVariantList(input_descs, allocator,
+                                                     function_inputs_list));
   }
 
   IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));

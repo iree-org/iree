@@ -21,6 +21,7 @@ def iree_e2e_test_suite(
         backends_to_srcs,
         reference_backend,
         deps = None,
+        size = None,
         tags = None,
         python_version = "PY3",
         **kwargs):
@@ -73,6 +74,7 @@ def iree_e2e_test_suite(
                 srcs = [src],
                 deps = deps,
                 args = args,
+                size = size,
                 tags = py_test_tags,
                 python_version = python_version,
                 **kwargs

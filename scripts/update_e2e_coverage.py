@@ -21,7 +21,10 @@ Example usage: python3 update_e2e_coverage.py build-docs
 import argparse
 import collections
 import os
+import re
 import subprocess
+
+import utils
 
 REFERENCE_BACKEND = 'tf'
 # Assumes that tests are expanded for the tf, iree_vmla, iree_llvmjit and
@@ -37,10 +40,12 @@ BACKENDS_TO_TITLES = collections.OrderedDict([
 TEST_SUITES_TO_HEADERS = {
     '//integrations/tensorflow/e2e:e2e_tests':
         'End to end TensorFlow tests',
+    '//integrations/tensorflow/e2e:mobile_bert_squad_tests':
+        'End to end test of MobileBert on SQuAD',
     '//integrations/tensorflow/e2e/keras:keras_tests':
         'End to end tests written using tf.keras',
-    '//integrations/tensorflow/e2e/keras:vision_external_tests':
-        'End to end tests of tf.keras.applications vision models',
+    '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
+        'End to end tests of tf.keras.applications vision models on Imagenet',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
         'End to end tests of TensorFlow slim vision models',
 }
@@ -48,11 +53,17 @@ TEST_SUITES_TO_HEADERS = {
 # Some test suites are generated from a single source. This allows us to point
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
-    '//integrations/tensorflow/e2e/keras:vision_external_tests':
+    '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
         'vision_model_test',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
         'slim_vision_model_test',
 }
+
+TARGET_EXCLUSION_FILTERS = [
+    r'mobilenet_v1_.*',  # Slim vision MobileNetV1.
+    r'mobilenet_v2_.*',  # Slim vision MobileNetV2.
+    r'amoebanet_a_n18_f448',  # SavedModelV2 not available.
+]
 
 # The symbols to show in the table if the operation is supported or not.
 SUCCESS_ELEMENT = '<span class="success-table-element">✓</span>'
@@ -78,8 +89,10 @@ def parse_arguments():
   """Parses command-line options."""
   parser = argparse.ArgumentParser(
       description='Generates Markdown files for op coverage table')
-  parser.add_argument(
-      'build_dir', metavar='BUILD_PATH', type=str, help='Base build directory.')
+  parser.add_argument('build_dir',
+                      metavar='BUILD_PATH',
+                      type=str,
+                      help='Base build directory.')
 
   parsed_args = parser.parse_args()
   if not os.path.isdir(parsed_args.build_dir):
@@ -88,38 +101,22 @@ def parse_arguments():
   return parsed_args
 
 
-def create_markdown_table(rows):
-  """Converts a 2D array to a Markdown table."""
-  return '\n'.join([' | '.join(row) for row in rows])
-
-
 def get_name_and_backend(test_string):
   """Splits a pathless test target into its name and comparison backend."""
   name, backend = test_string.split(f'__{REFERENCE_BACKEND}__')
   return name, backend
 
 
-def get_test_targets(test_suite_path):
-  """Returns a list of test targets stripped of paths and suite names."""
-  # Check if the suite exists (which may not be true for failing suites)
-  target_dir = test_suite.split(':')[0]
-  query = ['bazel', 'query', f'{target_dir}/...']
-  targets = subprocess.check_output(query)
-  if test_suite_path not in targets.decode('ascii'):
-    return []
-
-  query = ['bazel', 'query', f'tests({test_suite_path})']
-  tests = subprocess.check_output(query)
-  tests = tests.decode('ascii').split(os.linesep)
-  tests = list(filter(lambda s: s.startswith(f'{test_suite_path}_'), tests))
-  tests = [test.replace(f'{test_suite_path}_', '') for test in tests]
-  return tests
-
-
 def get_suite_metadata(test_suite):
   """Gets all test names, and passing and failing test-backend pairs."""
-  passing = get_test_targets(test_suite)
-  failing = get_test_targets(f'{test_suite}_failing')
+  passing = utils.get_test_targets(test_suite)
+  failing = utils.get_test_targets(f'{test_suite}_failing')
+
+  # Remove bazel path.
+  passing = [test.replace(f'{test_suite}_', '') for test in passing]
+  failing = [test.replace(f'{test_suite}_failing_', '') for test in failing]
+
+  # Split into (test_name, target_backend).
   passing = [get_name_and_backend(test) for test in passing]
   failing = [get_name_and_backend(test) for test in failing]
   passing_names = [test[0] for test in passing]
@@ -161,12 +158,15 @@ def generate_table(test_suite):
   # Generate the coverage table as a 2D array.
   rows = [first_row, second_row]
   for name, backends in sorted(table.items()):
+    if any(re.match(pattern, name) for pattern in TARGET_EXCLUSION_FILTERS):
+      continue
+
     row = [get_name_element(test_suite, name)]
     row.extend([
         SUCCESS_ELEMENT if backend else FAILURE_ELEMENT for backend in backends
     ])
     rows.append(row)
-  return create_markdown_table(rows)
+  return utils.create_markdown_table(rows)
 
 
 if __name__ == '__main__':

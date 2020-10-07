@@ -83,8 +83,8 @@ backend as a source of truth. For example:
 # Inherit from `TracedModuleTestCase`.
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(SimpleArithmeticTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(SimpleArithmeticTest, self).__init__(*args, **kwargs)
     # Compile a `tf.Module` named `SimpleArithmeticModule` into
     # `CompiledModule`s for each reference and target backend.
     self._modules = tf_test_utils.compile_tf_module(SimpleArithmeticModule)
@@ -221,14 +221,10 @@ debugging iteration can happen in opt.
 
 TODO(silvasean): debugging miscompiles
 
-## Legacy TFLite Compilation
+## Testing SignatureDef SavedModels
 
-_Please don't use this unless you are forced to._
-
-We support using `tf.compat.v1.lite.TFLiteConverter.from_saved_model` to compile
-older `tf.Module`s with TFLite. This will be used if the `tf.Module` being
-tested has a method named `get_legacy_tflite_saved_model_converter_kwargs`. This
-method must return a dict with the following kwargs: `model_path`,
-`input_arrays`, `output_arrays`, and `exported_name`. The module must use only
-one exported name, and `exported_name` should be equal to that name. See
-`mobile_bert_squad_test.py` for a concrete example.
+TensorFlow 1.x SavedModels can be tested using
+`tf_test_utils.compile_tf_signature_def_saved_model` instead of
+`tf_test_utils.compile_tf_module`. See `mobile_bert_squad_test.py` for a
+concrete example. The compilation artifacts will be saved under whatever
+you specify for `module_name`.

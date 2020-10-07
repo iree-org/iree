@@ -102,8 +102,8 @@ class Conv2dModule(tf.Module):
 
 class ConvTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(ConvTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(ConvTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(Conv2dModule)
 
   def test_id_batch_size_1(self):

@@ -46,6 +46,9 @@ class MetalKernelLibrary final : public Executable {
 
   bool supports_debugging() const override { return false; }
 
+  // Returns the MTLFunction for the entry point with the given |ordinal|.
+  StatusOr<id<MTLFunction>> GetKernelForEntryPoint(int ordinal) const;
+
   // Returns the pipeline state object for the entry point with the given
   // |ordinal|.
   StatusOr<id<MTLComputePipelineState>> GetPipelineStateForEntryPoint(
