@@ -577,7 +577,7 @@ Modules = collections.namedtuple("Modules",
 # state and calls __init__ before each unittest. It also calls __init__ one
 # additional time before that for good measure, which means without storing the
 # modules somewhere else we would have to compile each of them at least twice.
-# We can't store the modules on the cls because of #2900.
+# We can't store the modules on the class itself via setUpClass because of #2900
 global _global_modules
 _global_modules = None
 
