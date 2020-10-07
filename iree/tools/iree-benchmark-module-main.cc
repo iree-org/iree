@@ -89,10 +89,12 @@ Status PrepareIREEVMFunction(
       *instance, modules.data(), modules.size(), iree_allocator_system(),
       context));
 
-  IREE_RETURN_IF_ERROR((*input_module)->lookup_function(
-      (*input_module)->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_string_view_t{function_name.data(), function_name.size()},
-      &function));
+  IREE_RETURN_IF_ERROR(
+      (*input_module)
+          ->lookup_function(
+              (*input_module)->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+              iree_string_view_t{function_name.data(), function_name.size()},
+              &function));
   IREE_RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
   // Construct inputs.
