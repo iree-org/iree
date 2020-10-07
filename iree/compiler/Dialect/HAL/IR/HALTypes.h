@@ -133,6 +133,10 @@ class SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
 // Struct types
 //===----------------------------------------------------------------------===//
 
+// Returns the intersection (most conservative) constraints |lhs| ∩ |rhs|.
+BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
+                                                 BufferConstraintsAttr rhs);
+
 class BufferBarrierType {
  public:
   static TupleType get(MLIRContext *context) {

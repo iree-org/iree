@@ -99,8 +99,71 @@ IntegerAttr getElementTypeAttr(Type type) {
 }
 
 //===----------------------------------------------------------------------===//
+// Struct types
+//===----------------------------------------------------------------------===//
+
+BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
+                                                 BufferConstraintsAttr rhs) {
+  Builder b(lhs.getContext());
+  return BufferConstraintsAttr::get(
+      b.getIndexAttr(std::min(lhs.max_allocation_size().getSExtValue(),
+                              rhs.max_allocation_size().getSExtValue())),
+      b.getIndexAttr(
+          std::max(lhs.min_buffer_offset_alignment().getSExtValue(),
+                   rhs.min_buffer_offset_alignment().getSExtValue())),
+      b.getIndexAttr(std::min(lhs.max_buffer_range().getSExtValue(),
+                              rhs.max_buffer_range().getSExtValue())),
+      b.getIndexAttr(
+          std::max(lhs.min_buffer_range_alignment().getSExtValue(),
+                   rhs.min_buffer_range_alignment().getSExtValue())));
+}
+
+//===----------------------------------------------------------------------===//
 // Attribute printing and parsing
 //===----------------------------------------------------------------------===//
+
+// static
+Attribute BufferConstraintsAttr::parse(DialectAsmParser &p) {
+  auto b = p.getBuilder();
+  if (failed(p.parseLess())) return {};
+
+  IntegerAttr maxAllocationSizeAttr;
+  IntegerAttr minBufferOffsetAlignmentAttr;
+  IntegerAttr maxBufferRangeAttr;
+  IntegerAttr minBufferRangeAlignmentAttr;
+  if (failed(p.parseKeyword("max_allocation_size")) || failed(p.parseEqual()) ||
+      failed(p.parseAttribute(maxAllocationSizeAttr, b.getIndexType())) ||
+      failed(p.parseComma()) ||
+      failed(p.parseKeyword("min_buffer_offset_alignment")) ||
+      failed(p.parseEqual()) ||
+      failed(
+          p.parseAttribute(minBufferOffsetAlignmentAttr, b.getIndexType())) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("max_buffer_range")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(maxBufferRangeAttr, b.getIndexType())) ||
+      failed(p.parseComma()) ||
+      failed(p.parseKeyword("min_buffer_range_alignment")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(minBufferRangeAlignmentAttr, b.getIndexType()))) {
+    return {};
+  }
+
+  if (failed(p.parseGreater())) return {};
+  return BufferConstraintsAttr::get(
+      maxAllocationSizeAttr, minBufferOffsetAlignmentAttr, maxBufferRangeAttr,
+      minBufferRangeAlignmentAttr);
+}
+
+void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  os << "max_allocation_size = " << max_allocation_size() << ", ";
+  os << "min_buffer_offset_alignment = " << min_buffer_offset_alignment()
+     << ", ";
+  os << "max_buffer_range = " << max_buffer_range() << ", ";
+  os << "min_buffer_range_alignment = " << min_buffer_range_alignment();
+  os << ">";
+}
 
 // static
 Attribute ByteRangeAttr::parse(DialectAsmParser &p) {

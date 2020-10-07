@@ -499,6 +499,26 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 // HAL structs
 //===----------------------------------------------------------------------===//
 
+def HAL_BufferConstraintsAttr :
+  IREE_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
+    // The maximum size of a memory allocation that can be created, even if
+    // there is more space available in the heap.
+    IREE_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
+    // The minimum required alignment, in bytes, for offsets used in runtime
+    // buffer bindings for target backends. Offset values (both dynamic and
+    // static) must be an integer multiple of this limit.
+    IREE_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
+    // The maximum value that can be specified for size ranges of buffer
+    // bindings. The underlying allocation may be larger than this but only
+    // up to this amount will be visible to kernels.
+    IREE_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
+    // The minimum required alignment, in bytes, for size ranges of buffer
+    // bindings.
+    IREE_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_ByteRangeAttr :
   IREE_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
     IREE_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,

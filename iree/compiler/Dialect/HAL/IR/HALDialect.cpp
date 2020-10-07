@@ -82,9 +82,9 @@ HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
   addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
 
-  addAttributes<ByteRangeAttr, DescriptorSetLayoutBindingAttr, MatchAlwaysAttr,
-                MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
-                DeviceMatchMemoryModelAttr>();
+  addAttributes<BufferConstraintsAttr, ByteRangeAttr,
+                DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+                MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>();
 
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
@@ -105,7 +105,9 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
                                      Type type) const {
   StringRef attrKind;
   if (failed(parser.parseKeyword(&attrKind))) return {};
-  if (attrKind == ByteRangeAttr::getKindName()) {
+  if (attrKind == BufferConstraintsAttr::getKindName()) {
+    return BufferConstraintsAttr::parse(parser);
+  } else if (attrKind == ByteRangeAttr::getKindName()) {
     return ByteRangeAttr::parse(parser);
   } else if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
@@ -127,9 +129,9 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<ByteRangeAttr, DescriptorSetLayoutBindingAttr, MatchAlwaysAttr,
-            MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
-            DeviceMatchMemoryModelAttr>(
+      .Case<BufferConstraintsAttr, ByteRangeAttr,
+            DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+            MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>(
           [&](auto typedAttr) { typedAttr.print(p); })
       .Default(
           [](Attribute) { llvm_unreachable("unhandled HAL attribute kind"); });
