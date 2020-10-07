@@ -61,10 +61,6 @@ COMMIT_OPTIONS = {
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
-  parser.add_argument("--tensorflow",
-                      help="Path to the tensorflow sources "
-                      "(default to third_party/tensorflow)",
-                      default=None)
   parser.add_argument("--llvm",
                       help="Path to the LLVM sources "
                       "(defaults to third_party/llvm-project)",
@@ -74,17 +70,21 @@ def parse_arguments():
                       "(defaults to third_party/llvm-bazel)",
                       default=None)
   parser.add_argument(
-      "--tensorflow_commit",
-      "--tf_commit",
-      help=("Update TensorFlow to this commit, or a named option:"
-            f" {COMMIT_OPTIONS}"),
-      default=LATEST_MATCHING_COMMIT)
-  parser.add_argument(
       "--llvm_bazel_commit",
       help=("Update llvm-bazel to this commit, or a named option:"
             f" {COMMIT_OPTIONS}."
             f" {LATEST_MATCHING_COMMIT} and {INTEGRATE_COMMIT} are equivalent"
             " for this repository."),
+      default=LATEST_MATCHING_COMMIT)
+  parser.add_argument("--tensorflow",
+                      help="Path to the tensorflow sources "
+                      "(default to third_party/tensorflow)",
+                      default=None)
+  parser.add_argument(
+      "--tensorflow_commit",
+      "--tf_commit",
+      help=("Update TensorFlow to this commit, or a named option:"
+            f" {COMMIT_OPTIONS}"),
       default=LATEST_MATCHING_COMMIT)
   parser.add_argument(
       "--validate",

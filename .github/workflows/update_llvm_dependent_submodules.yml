@@ -49,15 +49,15 @@ jobs:
           commit-message: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
           title: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
           body: |
-            Updates TF to
-            [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
-            and llvm-bazel to
-            [${{ env.LLVM_BAZEL_SHA }}](https://github.com/google/llvm-bazel/commit/${{ env.LLVM_BAZEL_SHA }})
-            matching
+            Updates LLVM dependencies to match
             [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }}).
+            - llvm-bazel to
+              [${{ env.LLVM_BAZEL_SHA }}](https://github.com/google/llvm-bazel/commit/${{ env.LLVM_BAZEL_SHA }})
+            - TensorFlow to
+            [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
 
             `./scripts/git/update_to_llvm_syncpoint.py`
 
-            Automated submodule bump from .github/workflows/synchronize_llvm_dependent_submodules.yml
+            Automated submodule bump from .github/workflows/update_llvm_dependent_submodules.yml
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
           branch: "auto_submodule_update"
