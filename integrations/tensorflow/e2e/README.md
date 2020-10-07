@@ -210,7 +210,7 @@ We use our end-to-end TensorFlow integrations tests to generate tested
 compilation and benchmarking artifacts. This allows us to validate that our
 benchmarks are behaving as we expect them to, and to run them using valid inputs
 for each model. An overview of how to run benchmarks on IREE and TFLite can be
-found in [this doc](TODO(meadowlark)).
+found in [this doc](https://google.github.io/iree/developing-iree/e2e-benchmarking).
 
 ## Debugging Tests
 
