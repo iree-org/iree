@@ -23,6 +23,8 @@ import collections
 import os
 import subprocess
 
+import utils
+
 # The symbols to show in the table if the operation is supported or not.
 SUCCESS_ELEMENT = '<span class="success-table-element">✓</span>'
 FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
