@@ -51,14 +51,27 @@ flags.DEFINE_bool(
     "Summarize the inputs and outputs of each module trace logged to disk.")
 flags.DEFINE_bool("log_all_traces", False,
                   "Log all traces to logging.info, even if comparison passes.")
+flags.DEFINE_bool(
+    "get_saved_model", False,
+    "Creates and stores a SavedModel for the tf.Module class to be tested.")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
 
+def _get_from_environment_if_set(variable_name: str) -> Union[str, None]:
+  return os.environ[variable_name] if variable_name in os.environ else None
+
+
 def _setup_artifacts_dir(module_name: str) -> str:
-  parent_dir = FLAGS.artifacts_dir
-  if parent_dir is None:
-    parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
+  parent_dirs = [
+      FLAGS.artifacts_dir,
+      _get_from_environment_if_set('TEST_UNDECLARED_OUTPUTS_DIR'),
+      _get_from_environment_if_set('TEST_TMPDIR'),
+      os.path.join(tempfile.gettempdir(), "iree", "modules"),
+  ]
+  # Use the most preferred path in parent_dirs that isn't None.
+  parent_dir = next(parent for parent in parent_dirs if parent is not None)
+
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
   os.makedirs(artifacts_dir, exist_ok=True)
