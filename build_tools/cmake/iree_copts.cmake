@@ -125,6 +125,12 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4141"
     # 'WIN32_LEAN_AND_MEAN': macro redefinition
     "/wd4005"
+    "/wd4267"
+    "/wd4141"
+    "/wd4244"
+    "/wd4146"
+    "/wd4018"
+    "/wd4065"
     # TODO(benvanik): figure out if really required or accidentally enabled.
     "/EHsc"
     "/bigobj"

@@ -80,7 +80,7 @@ function(iree_cc_test)
     PRIVATE
       ${_RULE_SRCS}
   )
-  target_include_directories(${_NAME}
+  target_include_directories(${_NAME} SYSTEM
     PUBLIC
       ${IREE_COMMON_INCLUDE_DIRS}
   )
