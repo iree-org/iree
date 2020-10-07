@@ -145,8 +145,8 @@ class VisionModule(tf.Module):
 
 class AppTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(AppTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(AppTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(VisionModule,
                                                     exported_names=['predict'])
 

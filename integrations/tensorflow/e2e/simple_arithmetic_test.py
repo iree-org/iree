@@ -40,8 +40,8 @@ class SimpleArithmeticModule(tf.Module):
 
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(SimpleArithmeticTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(SimpleArithmeticTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(SimpleArithmeticModule)
 
   def test_simple_mul(self):

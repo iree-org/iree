@@ -15,6 +15,8 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+file(GLOB _GLOB_BERT_ENCODER_UNROLLED_FAKE_WEIGHTS_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS bert_encoder_unrolled_fake_weights.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_BERT_ENCODER_UNROLLED_FAKE_WEIGHTS_MLIR})
 iree_lit_test_suite(
   NAME
     lit
@@ -25,4 +27,15 @@ iree_lit_test_suite(
     iree::tools::iree-run-mlir
   LABELS
     "hostonly"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmla_vmla
+  SRCS
+    "bert_encoder_unrolled_fake_weights.mlir"
+  TARGET_BACKEND
+    vmla
+  DRIVER
+    vmla
 )
