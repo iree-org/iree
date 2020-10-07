@@ -50,6 +50,16 @@ def HAL_Dialect : Dialect {
 // HAL enums
 //===----------------------------------------------------------------------===//
 
+def HAL_MemoryModel_Unified : I32EnumAttrCase<"Unified", 0>;
+def HAL_MemoryModel_Discrete : I32EnumAttrCase<"Discrete", 1>;
+def HAL_MemoryModelAttr :
+    I32EnumAttr<"MemoryModel", "IREE HAL MemoryModel", [
+      HAL_MemoryModel_Unified,
+      HAL_MemoryModel_Discrete,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_MemoryType_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_MemoryType_Transient : BitEnumAttrCase<"Transient", 0x0001>;
 def HAL_MemoryType_HostVisible : BitEnumAttrCase<"HostVisible", 0x0002>;
@@ -572,6 +582,13 @@ def HAL_MatchAllAttr :
 def HAL_DeviceMatchIDAttr :
   IREE_StructAttr<"device.match.id", "DeviceMatchIDAttr", HAL_Dialect, [
     IREE_StructFieldAttr<"pattern", StrAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DeviceMatchMemoryModelAttr : IREE_StructAttr<
+    "device.match.memory_model", "DeviceMatchMemoryModelAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"memory_model", HAL_MemoryModelAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

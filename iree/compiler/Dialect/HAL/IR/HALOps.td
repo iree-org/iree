@@ -1569,6 +1569,32 @@ def HAL_DeviceMatchIDOp : HAL_PureOp<"device.match.id"> {
   }];
 }
 
+def HAL_DeviceMatchMemoryModelOp : HAL_PureOp<"device.match.memory_model"> {
+  let summary = [{returns true if the device memory model matches the value}];
+  let description = [{
+    Compares the device's memory model against the specified model.
+    This can be used to conditionally evaluate device-specific code when the
+    device is not known at compile-time.
+
+    ```mlir
+    %is_match = hal.device.match.memory_model %device, memory_model = "Unified" : (!hal.device) -> i1
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_MemoryModelAttr:$model
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` `model` `=` `[` $model `]` attr-dict
+    `:` `(` type($device) `)` `->` type($result)
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Executable
 //===----------------------------------------------------------------------===//

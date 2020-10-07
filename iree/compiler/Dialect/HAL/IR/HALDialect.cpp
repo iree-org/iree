@@ -83,7 +83,8 @@ HALDialect::HALDialect(MLIRContext *context)
   addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
 
   addAttributes<ByteRangeAttr, DescriptorSetLayoutBindingAttr, MatchAlwaysAttr,
-                MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr>();
+                MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
+                DeviceMatchMemoryModelAttr>();
 
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
@@ -116,6 +117,8 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
     return MatchAllAttr::parse(parser);
   } else if (attrKind == DeviceMatchIDAttr::getKindName()) {
     return DeviceMatchIDAttr::parse(parser);
+  } else if (attrKind == DeviceMatchMemoryModelAttr::getKindName()) {
+    return DeviceMatchMemoryModelAttr::parse(parser);
   }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << attrKind;
@@ -125,7 +128,8 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
       .Case<ByteRangeAttr, DescriptorSetLayoutBindingAttr, MatchAlwaysAttr,
-            MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr>(
+            MatchAnyAttr, MatchAllAttr, DeviceMatchIDAttr,
+            DeviceMatchMemoryModelAttr>(
           [&](auto typedAttr) { typedAttr.print(p); })
       .Default(
           [](Attribute) { llvm_unreachable("unhandled HAL attribute kind"); });

@@ -273,6 +273,24 @@ void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
   os << "\">";
 }
 
+// static
+Attribute DeviceMatchMemoryModelAttr::parse(DialectAsmParser &p) {
+  IntegerAttr memoryModelAttr;
+  if (failed(p.parseLess()) ||
+      failed(parseEnumAttr<MemoryModel>(p, "memory_model", memoryModelAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(memoryModelAttr);
+}
+
+void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<\"";
+  os << stringifyMemoryModel(memory_model());
+  os << "\">";
+}
+
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
 
 }  // namespace HAL
