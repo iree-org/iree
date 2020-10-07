@@ -71,13 +71,17 @@ struct FusionOfTensorOpsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList patterns;
+    OwningRewritePatternList fusionPatterns, interfacePatterns;
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
-    populateLinalgTensorOpsFusionPatterns(context, patterns);
-    patterns.insert<FuseWithHALInterfaceLoadTensor,
-                    FuseWithHALInterfaceStoreTensor>(context);
-    applyPatternsAndFoldGreedily(op->getRegions(), patterns);
+    interfacePatterns.insert<FuseWithHALInterfaceLoadTensor,
+                             FuseWithHALInterfaceStoreTensor>(context);
+    applyPatternsAndFoldGreedily(op->getRegions(), interfacePatterns);
+
+    populateLinalgTensorOpsFusionPatterns(context, fusionPatterns);
+    applyPatternsAndFoldGreedily(op->getRegions(), fusionPatterns);
+
+    applyPatternsAndFoldGreedily(op->getRegions(), interfacePatterns);
   }
 };
 }  // namespace
