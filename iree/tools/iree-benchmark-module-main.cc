@@ -223,12 +223,12 @@ int main(int argc, char** argv) {
       &instance, &device, &hal_module, &context, &input_module, function,
       inputs, output_descs, function_name, module_data);
   if (prepare_vm_func_status.ok()) {
-    assert(instance);
-    assert(device);
-    assert(hal_module);
-    assert(context);
-    assert(input_module);
-    assert(inputs.get());
+    IREE_DCHECK(instance);
+    IREE_DCHECK(device);
+    IREE_DCHECK(hal_module);
+    IREE_DCHECK(context);
+    IREE_DCHECK(input_module);
+    IREE_DCHECK(inputs.get());
   }
 
   // Register function benchmarks...
