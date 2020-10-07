@@ -70,6 +70,9 @@ IREE HAL Class                             | Metal Protocol
 [`hal::Buffer`][hal-buffer]                | [`MTLBuffer`][mtl-buffer]
 [`hal::Executable`][hal-executable]        | [`MTLLibrary`][mtl-library]
 [`hal::ExecutableCache`][hal-executable-cache] | N/A
+[`hal::DescriptorSetLayout`][hal-descriptor-set-layout] | N/A
+[`hal::DescriptorSet`][hal-descriptor-set] | N/A
+[`hal::ExecutableLayout`][hal-executable-layout] | N/A
 
 In the following subsections, we go over each pair to provide more details.
 
@@ -166,6 +169,10 @@ preprared GPU executables for a particular device. At the moment the Metal
 HAL driver does not peforming any cache on GPU programs; it simply reads the
 program from the FlatBuffer and hands it over to Metal driver.
 
+### DescriptorSetLayout, DescriptorSet, ExecutableLayout
+
+See [Resource descriptors](#resource-descriptors) for more details.
+
 ## Compute Pipeline
 
 ### Shader/kernel compilation
@@ -205,6 +212,70 @@ For the Metal HAL driver, it means we need to embed the MSL kernels inside the
 module FlatBuffer. Right now we just encode the MSL source strings and compile
 them at Metal run-time. In the future this should be changed to allow encoding
 the library instead.
+
+### Resource descriptors
+
+A descriptor is an opaque handle pointing to a resource that is accessed in
+the compute kernel. IREE's HAL is inspired by the Vulkan API; it models several
+concepts related to GPU resource management explicitly:
+
+* [`hal::DescriptorSetLayout`][hal-descriptor-set-layout]: a schema for
+  describing an array of descriptor bindings. Each descriptor binding specifies
+  the resource type, access mode and other information.
+* [`hal::DescriptorSet`][hal-descriptor-set]: a concrete set of resources that
+  gets bound to a compute pipeline in a batch. It must match the
+  `DescriptorSetLayout` describing its layout. `DescriptorSet` can be thought as
+  the "object" from the `DescriptorSetLayout` "class".
+* [`hal::ExecutableLayout`][hal-executable-layout]: a schema for describing all
+  the resources accessed by a compute pipeline. It includes zero or more
+  `DescriptorSetLayout`s and (optional) push constants.
+
+One can create `DescriptorSetLayout`, `DescriptorSet`, and `ExecutableLayout`
+objects beforehand to avoid incurring overhead during tight computing loops
+and also amortize costs by sharing these objects. However, this isn't totally
+matching Metal's paradigm.
+
+In the Metal framework, the closest concept to `DescriptorSet` would be [argument
+buffer][mtl-argument-buffer]. There is no direct correspondence to
+`DescriptorSetLayout` and `ExecutableLayout`. Rather, the layout is implicitly
+encoded in Metal shaders as MSL structs. The APIs for creating argument buffers
+do not encourage early creation without pipelines: one typically creates them
+for each `MTLFunction`. Besides, unlike Vulkan where different descriptor sets
+can have the same binding number, in Metal even if we have multiple argument
+buffers, the indices for resources are in the same namespace and are typically
+assigned sequentially. That means we need to remap `DescriptorSet`s with a set
+number greater than zero by applying an offset to each of its bindings.
+
+All of this means it's better to defer the creation of the argument buffer
+until the point of compute pipeline creation and dispatch. Therefore, although
+the Metal HAL driver provides the implementation for `DescriptorSet`
+(i.e., `hal::metal::MetalArgumentBuffer`), `DescriptorSetLayout` (i.e.,
+`hal::metal::MetalArgumentBufferLayout`), and `ExecutableLayout` (i.e.,
+`hal::metal::MetalPipelineArgumentBufferLayout`), they are just containers
+holding the information up until the [command buffer
+dispatch](#command-buffer-dispatch) time.
+
+With the above said, the overall idea is still to map one descriptor set to one
+argument buffer. It just means we need to condense and remap the bindings.
+
+### Command buffer dispatch
+
+`MetalCommandBuffer::Dispatch()` performs the following steps with the current
+active `MTLComputeCommandEncoder`:
+
+1. Bind the `MTLComputePipelineState` for the current entry function queried
+   from `MetalKernelLibrary`.
+1. For each bound descriptor set at set #`S`:
+   1. Create a [`MTLArgumentEncoder`][mtl-argument-encoder] for encoding an
+      associated argument `MTLBuffer`.
+   1. For each bound resource buffer at binding #`B` in this descriptor set,
+      encode it to the argument buffer index #`B` with
+      `setBuffer::offset::atIndex:` and inform the `MTLComputeCommandEncoder`
+      that the dispatch will use this resource with `useResource:usage:`.
+  1. Set the argument `MTLBuffer` to buffer index #`S`.
+1. Dispatch with `dispatchThreadgroups:threadsPerThreadgroup:`.
+
+(TODO: condense and remap bindings)
 
 ## Memory Management
 
@@ -247,6 +318,9 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [hal-buffer]: https://github.com/google/iree/blob/main/iree/hal/buffer.h
 [hal-command-queue]: https://github.com/google/iree/blob/main/iree/hal/command_queue.h
 [hal-command-buffer]: https://github.com/google/iree/blob/main/iree/hal/command_buffer.h
+[hal-descriptor-set]: https://github.com/google/iree/blob/main/iree/hal/descriptor_set.h
+[hal-descriptor-set-layout]: https://github.com/google/iree/blob/main/iree/hal/descriptor_set_layout.h
+[hal-executable-layout]: https://github.com/google/iree/blob/main/iree/hal/executable_layout.h
 [hal-device]: https://github.com/google/iree/blob/main/iree/hal/device.h
 [hal-driver]: https://github.com/google/iree/blob/main/iree/hal/driver.h
 [hal-executable]: https://github.com/google/iree/blob/main/iree/hal/executable.h
@@ -259,6 +333,8 @@ be backed by `MTLStorageModeManaged` `MTLBuffer`s in macOS. To respect the
 [metal-kernel-library]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_kernel_library.h
 [metal-shared-event]: https://github.com/google/iree/blob/main/iree/hal/metal/metal_shared_event.h
 [metal-spirv-target]: https://github.com/google/iree/tree/hal-metal/iree/compiler/Dialect/HAL/Target/MetalSPIRV
+[mtl-argument-buffer]: https://developer.apple.com/documentation/metal/buffers/about_argument_buffers?language=objc
+[mtl-argument-encoder]: https://developer.apple.com/documentation/metal/mtlargumentencoder?language=objc
 [mtl-buffer]: https://developer.apple.com/documentation/metal/mtlbuffer?language=objc
 [mtl-command-buffer]: https://developer.apple.com/documentation/metal/mtlcommandbuffer?language=objc
 [mtl-command-encoder]: https://developer.apple.com/documentation/metal/mtlcommandencoder?language=objc
