@@ -100,6 +100,38 @@ class AllocatorAllocateConstOpConversion
   mutable IREE::VM::ImportOp importOp;
 };
 
+class AllocatorMapOpConversion
+    : public OpConversionPattern<IREE::HAL::AllocatorMapOp> {
+ public:
+  AllocatorMapOpConversion(TypeConverter &typeConverter, MLIRContext *context,
+                           SymbolTable &importSymbols)
+      : OpConversionPattern(typeConverter, context) {
+    wrapByteBufferImportOp = importSymbols.lookup<IREE::VM::ImportOp>(
+        "hal.allocator.wrap.byte_buffer");
+    assert(wrapByteBufferImportOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::AllocatorMapOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    IREE::HAL::AllocatorMapOp::Adaptor opAdaptor(operands);
+    rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, wrapByteBufferImportOp.getName(),
+        ArrayRef<Type>{getTypeConverter()->convertType(op.getType())},
+        ArrayRef<Value>{opAdaptor.allocator(),
+                        rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                            op.getLoc(), op.memory_typesAttr()),
+                        rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                            op.getLoc(), op.buffer_usageAttr()),
+                        opAdaptor.source(), opAdaptor.offset(),
+                        opAdaptor.length()});
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp wrapByteBufferImportOp;
+};
+
 }  // namespace
 
 void populateHALAllocatorToVMPatterns(MLIRContext *context,
@@ -116,6 +148,8 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.allocator.allocate");
   patterns.insert<AllocatorAllocateConstOpConversion>(
       context, importSymbols, typeConverter, "hal.allocator.allocate.const");
+  patterns.insert<AllocatorMapOpConversion>(typeConverter, context,
+                                            importSymbols);
 }
 
 }  // namespace iree_compiler

@@ -62,6 +62,7 @@ iree_cc_library(
     MLIRTransformUtils
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
   PUBLIC
 )

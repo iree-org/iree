@@ -72,6 +72,7 @@ cc_library(
         ":IR",
         "//iree/compiler/Dialect/HAL:hal_imports",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

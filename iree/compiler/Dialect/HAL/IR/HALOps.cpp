@@ -438,6 +438,28 @@ void AllocatorAllocateConstOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.allocator.map
+//===----------------------------------------------------------------------===//
+
+void AllocatorMapOp::build(OpBuilder &builder, OperationState &state,
+                           Value allocator,
+                           IREE::HAL::MemoryTypeBitfield memoryTypes,
+                           IREE::HAL::BufferUsageBitfield bufferUsage,
+                           Value source, Value offset, Value length) {
+  state.addOperands({allocator, source, offset, length});
+  state.addAttribute("memory_types", builder.getI32IntegerAttr(
+                                         static_cast<int32_t>(memoryTypes)));
+  state.addAttribute("buffer_usage", builder.getI32IntegerAttr(
+                                         static_cast<int32_t>(bufferUsage)));
+  state.addTypes({BufferType::get(builder.getContext())});
+}
+
+void AllocatorMapOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "mapped");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer.allocator
 //===----------------------------------------------------------------------===//
 

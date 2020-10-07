@@ -65,6 +65,17 @@ vm.import @allocator.allocate.const(
   %value : !vm.ref<!iree.byte_buffer>
 ) -> !vm.ref<!hal.buffer>
 
+// Wraps a subrange of a read-only host memory buffer.
+// Host mapping must be supported by the allocator.
+vm.import @allocator.wrap.byte_buffer(
+  %allocator : !vm.ref<!hal.allocator>,
+  %memory_types : i32,
+  %buffer_usage : i32,
+  %source : !vm.ref<!iree.byte_buffer>,
+  %offset : i32,
+  %length : i32
+) -> !vm.ref<!hal.buffer>
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
 //===----------------------------------------------------------------------===//

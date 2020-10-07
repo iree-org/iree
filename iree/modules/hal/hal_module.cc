@@ -243,6 +243,35 @@ class HALModuleState final {
     return buffer;
   }
 
+  StatusOr<vm::ref<iree_hal_buffer_t>> AllocatorWrapByteBuffer(
+      const vm::ref<iree_hal_allocator_t>& allocator,
+      iree_hal_memory_type_t memory_types, iree_hal_buffer_usage_t buffer_usage,
+      const vm::ref<iree_vm_ro_byte_buffer_t>& source, int32_t offset,
+      int32_t length) {
+    IREE_TRACE_SCOPE0("HALModuleState::AllocatorWrapByteBuffer");
+
+    // TODO(benvanik): wrap when supported.
+
+    size_t buffer_length = source->data.data_length;
+    if (offset >= buffer_length || offset + length > buffer_length) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Byte range out of bounds (requested " << offset << "-"
+             << (offset + length - 1) << " of available " << buffer_length
+             << ")";
+    }
+
+    vm::ref<iree_hal_buffer_t> buffer;
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+        allocator.get(), memory_types, buffer_usage, length, &buffer))
+        << "Failed to allocate buffer";
+
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_write_data(
+        buffer.get(), 0, source->data.data + offset, length))
+        << "Writing constant data";
+
+    return buffer;
+  }
+
   //===--------------------------------------------------------------------===//
   // iree::hal::Buffer
   //===--------------------------------------------------------------------===//
@@ -780,6 +809,8 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::AllocatorAllocate),
     vm::MakeNativeFunction("allocator.allocate.const",
                            &HALModuleState::AllocatorAllocateConst),
+    vm::MakeNativeFunction("allocator.wrap.byte_buffer",
+                           &HALModuleState::AllocatorWrapByteBuffer),
 
     vm::MakeNativeFunction("buffer.allocator",
                            &HALModuleState::BufferAllocator),

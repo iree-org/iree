@@ -28,3 +28,14 @@ func @allocatorAllocateConst(%arg0 : !hal.allocator) -> !hal.buffer {
   %buffer = hal.allocator.allocate.const %arg0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
   return %buffer : !hal.buffer
 }
+
+// -----
+
+// CHECK-LABEL: func @allocatorMapByteBuffer
+func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !iree.byte_buffer) -> !hal.buffer {
+  %offset = constant 128 : index
+  %length = constant 256 : index
+  // CHECK: = vm.call @hal.allocator.wrap.byte_buffer(%arg0, %c6, %c2, %arg1, %c128, %c256) : (!vm.ref<!hal.allocator>, i32, i32, !vm.ref<!iree.byte_buffer>, i32, i32) -> !vm.ref<!hal.buffer>
+  %buffer = hal.allocator.map %arg0, "HostVisible|HostCoherent", "Transfer", %arg1[%offset, %length] : !iree.byte_buffer -> !hal.buffer
+  return %buffer : !hal.buffer
+}

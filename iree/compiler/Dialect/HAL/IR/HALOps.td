@@ -497,6 +497,49 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
   ];
 }
 
+def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{allocator-supported host buffer wrapping operation}];
+  let description = [{
+    Wraps a !hal.buffer around host read-only memory backed by the given byte
+    buffer. The returned buffer may be host-only and not directly usable on
+    devices.
+  }];
+
+  let arguments = (ins
+    HAL_Allocator:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    // TODO(benvanik): support other types (and mutable buffers).
+    ByteBufferType:$source,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+  let results = (outs
+    HAL_Buffer:$result
+  );
+
+  let assemblyFormat = [{
+    $allocator `,` $memory_types `,` $buffer_usage `,`
+    $source `[` $offset `,` $length `]` attr-dict-with-keyword
+    `:` type($source) `->` type($result)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state,
+      Value allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      Value source,
+      Value offset,
+      Value length
+    }]>,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
 //===----------------------------------------------------------------------===//
