@@ -19,12 +19,23 @@ import argparse
 import os
 import re
 import subprocess
-from typing import Sequence
+from typing import Any, Sequence
 
 BAZEL_FILTERS = [
     r'Loading: [0-9]+ packages loaded',
     r'.*Using python binary from PYTHON_BIN = .*'
 ]
+
+TERMINAL_BLUE = '\033[94m'
+TERMINAL_RESET = '\033[0m'
+
+
+def colored_print(value: Any, **kwargs):
+  print(f'{TERMINAL_BLUE}{value}{TERMINAL_RESET}', **kwargs)
+
+
+def print_command(command: Sequence[str]):
+  colored_print(f'Running: `{" ".join(command)}`')
 
 
 def create_markdown_table(rows: Sequence[Sequence[str]]):
@@ -36,7 +47,7 @@ def check_and_get_output(command: Sequence[str],
                          dry_run: bool = False,
                          log_stderr: bool = True,
                          stderr_filters: Sequence[str] = ()):
-  print(f'Running: `{" ".join(command)}`')
+  print_command(command)
   if dry_run:
     return None, None
   process = subprocess.Popen(command,

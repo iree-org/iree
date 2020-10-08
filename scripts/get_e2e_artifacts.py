@@ -144,10 +144,12 @@ def main(argv):
 
   for test_suite in test_suites:
     if FLAGS.run_test_suites and not FLAGS.dry_run:
-      subprocess.check_call([
+      command = [
           'bazel', 'test', test_suite, '--color=yes',
           '--test_arg=--get_saved_model'
-      ])
+      ]
+      utils.print_command(command)
+      subprocess.check_call(command)
       print()
 
     # Extract all of the artifacts for this test suite.
