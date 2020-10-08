@@ -57,12 +57,16 @@ SPECIAL_CASES = [
     "mobile_bert_squad_test.py",
 ]
 
+# keep sorted
 TFLITE_FAILING = [
     "broadcasting_test.py",
     "complex_test.py",
     "concat_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
+    "einsum_dynamic_test.py",
+    "einsum_static_test.py",
+    "einsum_vector_test.py",
     "finite_test.py",
     "gather_test.py",
     "mandelbrot_test.py",
@@ -77,6 +81,9 @@ TFLITE_FAILING = [
 
 # keep sorted
 VMLA_FAILING = [
+    "einsum_dynamic_test.py",
+    "einsum_static_test.py",
+    "einsum_vector_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
@@ -88,6 +95,9 @@ LLVM_FAILING = [
     "broadcasting_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
+    "einsum_dynamic_test.py",
+    "einsum_static_test.py",
+    "einsum_vector_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
@@ -106,6 +116,9 @@ VULKAN_FAILING = [
     "broadcasting_test.py",
     "dynamic_mlp_relu_test.py",
     "dynamic_mlp_test.py",
+    "einsum_dynamic_test.py",
+    "einsum_static_test.py",
+    "einsum_vector_test.py",
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.

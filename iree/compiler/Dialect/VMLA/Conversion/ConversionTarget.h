@@ -88,19 +88,15 @@ template <typename SRC, typename DST,
           VMLAOpSemantics semantics = VMLAOpSemantics::kDefault>
 class VMLAOpConversion : public OpConversionPattern<SRC> {
  public:
-  VMLAOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern<SRC>(context), typeConverter(typeConverter) {}
+  using OpConversionPattern<SRC>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       SRC srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     return VMLAConversionTarget::applyDefaultBufferRewrite(
-        srcOp, operands, semantics, DST::getOperationName(), typeConverter,
-        rewriter);
+        srcOp, operands, semantics, DST::getOperationName(),
+        *this->getTypeConverter(), rewriter);
   }
-
- protected:
-  TypeConverter &typeConverter;
 };
 
 }  // namespace iree_compiler
