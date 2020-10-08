@@ -225,6 +225,10 @@ class MaterializeResourceCachesPass
             loc, executableCacheType, deviceValue,
             blockBuilder.getStringAttr("default"));
 
+    // Create a switch statement with a case for each backend.
+    // Each case should then cache only executables which contain a matching
+    // ExecutableTargetOp.
+    // Afterwards, we could inline and de-dup across switch cases.
     DeviceSwitchBuilder2 switchBuilder(loc, /*resultTypes=*/TypeRange{},
                                        deviceValue, blockBuilder);
     auto targetBackends = matchTargetBackends(targetOptions_.targets);
@@ -244,6 +248,7 @@ class MaterializeResourceCachesPass
                          ExecutableCachingModeBitfield::AllowPersistentCaching |
                          ExecutableCachingModeBitfield::AllowOptimization;
       for (auto executableOp : executableOps) {
+        // Skip executables with no matching target ops.
         auto executableTargetOps =
             executableOp.getOps<IREE::HAL::ExecutableTargetOp>();
         bool hasMatchingTarget = false;
@@ -281,8 +286,8 @@ class MaterializeResourceCachesPass
                 executableLayoutValue, cachingMode, executableOp.sym_name());
         caseBuilder.create<VariableStoreOp>(loc, executableValue,
                                             executableVariableOp.sym_name());
-        caseBuilder.create<IREE::HAL::ReturnOp>(loc);
       }
+      caseBuilder.create<IREE::HAL::ReturnOp>(loc);
     }
     switchBuilder.build();
 
