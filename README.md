@@ -99,14 +99,18 @@ IREE aims to
 
 ## Roadmap and Milestones
 
-IREE is still at its early stage; we have lots of exciting future plans. Please
-check out the [long-term design roadmap](./docs/design_roadmap.md) and
-[short-term focus areas](./docs/milestones.md).
+IREE is in the early stages of development and not yet ready for broad adoption.
+Check out the [long-term design roadmap](./docs/design_roadmap.md) to get
+a sense of where we're headed.
+
+We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
+Review our latest [objectives](./docs/objectives.md) to get a sense of what
+we're up to in the near term.
 
 We use [GitHub Projects](https://github.com/google/iree/projects) to track
-various IREE components and
-[GitHub Milestones](https://github.com/google/iree/milestones) for major
-features and quarterly plans. Please check out for updated information.
+progress on IREE components and specific efforts. We use
+[GitHub Milestones](https://github.com/google/iree/milestones) to track the
+work associated with plans for each quarter.
 
 ## Build Status
 

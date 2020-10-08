@@ -58,9 +58,9 @@ DOC_TITLE_DICT = {
     'getting_started_macos_cmake.md': 'macOS with CMake',
     'getting_started_android_cmake.md': 'Android with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
-    'getting_started_python.md': 'Python',
-    'milestones.md': 'Short-term Focus Areas',
+    'getting_started_python.md': 'Python',   
     'design_roadmap.md': 'Long-term Design Roadmap',
+    'objectives.md': 'Short-term Objectives',
     'tensorflow_integrations.md': 'TensorFlow Integrations',
     'e2e_benchmarking.md': 'Benchmarking TensorFlow with IREE and TFLite',
 }
