@@ -662,4 +662,37 @@ def VMLA_InterfaceBindingOp :
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// VMLA Ops: FFT
+//===----------------------------------------------------------------------===//
+
+def VMLA_FftPseudoOp : VMLA_Op<"fft.pseudo"> {
+  let summary = "pseudo-op of VMLA::FftOp.";
+  let description = [{
+    This is a tensor-level version of VMLA::FftOp, to facilitate
+    the lowering process.
+
+    The op that takes two tensors as input and returns two tensors as output.
+    These represent the [real, imag] components of a complex number.
+
+    This is a placeholder for the actual implementation of fft.
+    In addition, only the base version of FFT is currently implemented.
+    (TODO: natashaknk)
+  }];
+  let arguments = (ins
+    AnyTensor:$real_in,
+    AnyTensor:$imag_in
+  );
+  let results = (outs
+    AnyTensor:$real_out,
+    AnyTensor:$imag_out
+  );
+
+  let assemblyFormat = [{
+  $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
+  `->` `(`type($real_out)`,` type($imag_out)`)`
+  }];
+}
+
+
 #endif  // IREE_DIALECT_VMLA_OPS
