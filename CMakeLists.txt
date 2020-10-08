@@ -291,8 +291,8 @@ include(iree_setup_toolchain)
 #-------------------------------------------------------------------------------
 
 # Disable LLVM's warnings.
-set(LLVM_ENABLE_ASSERTIONS OFF CACHE STRING "don't use global flags /facepalm")
-set(LLVM_ENABLE_WARNINGS OFF CACHE STRING "don't use global flags /facepalm")
+set(LLVM_ENABLE_ASSERTIONS OFF CACHE BOOL "don't use global flags /facepalm")
+set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 
 # Adds bundled projects that must be included after the LLVM directory has
 # been added and within the scope of its settings (i.e. build type override,
@@ -304,17 +304,17 @@ function(add_bundled_mlir_dependent_projects)
 endfunction()
 
 function(add_iree_mlir_src_dep llvm_monorepo_path)
+  # Stash cmake build type in case LLVM messes with it.
+  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+
   # experimental model builder uses vulkan runner.
   if(${IREE_BUILD_EXPERIMENTAL})
     set(MLIR_VULKAN_RUNNER_ENABLED ON)
   endif()
 
-  # Disable LLVM's warnings
-  set(LLVM_ENABLE_WARNINGS OFF)
-
   add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
-  # Reset CMAKE_BUILD_TYPE to its previous setting
+  # Reset CMAKE_BUILD_TYPE to its previous setting.
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
 endfunction()
 
