@@ -18,6 +18,3 @@ FROM gcr.io/iree-oss/bazel-python AS final
 
 # Install tensorflow.
 RUN python3 -m pip install tf-nightly
-
-# Install python2 future for TensorFlow.
-RUN python2 -m pip install future
