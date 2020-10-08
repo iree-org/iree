@@ -833,10 +833,13 @@ void SetupFunctionAbiBindings(pybind11::module m) {
            })
       .def("allocate_results", &PyAllocateResults, py::arg("f_results"),
            py::arg("static_alloc") = true)
-      .def("unpack_results", [](FunctionAbi* self, VmVariantList& f_results) {
-        return self->Unpack(absl::MakeConstSpan(self->raw_config().results),
-                            f_results);
-      });
+      .def(
+          "unpack_results",
+          [](FunctionAbi* self, VmVariantList& f_results) {
+            return self->Unpack(absl::MakeConstSpan(self->raw_config().results),
+                                f_results);
+          },
+          py::keep_alive<0, 1>());
 }
 
 }  // namespace python
