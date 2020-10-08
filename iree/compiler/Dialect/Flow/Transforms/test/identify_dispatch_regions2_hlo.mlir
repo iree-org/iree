@@ -144,3 +144,19 @@ func @clone_broadcast(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<
   %3 = "mhlo.add"(%0, %2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   return %3: tensor<4x4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @reshaped_dot
+func @reshaped_dot(%arg0: tensor<16xf32>, %arg1: tensor<16xf32>) -> tensor<16xf32> {
+  // CHECK: flow.dispatch.region
+  // CHECK:     "mhlo.reshape"
+  // CHECK:     "mhlo.reshape"
+  // CHECK:     "mhlo.dot"
+  // CHECK:     "mhlo.reshape"
+  %0 = "mhlo.reshape"(%arg0) : (tensor<16xf32>) -> tensor<4x4xf32>
+  %1 = "mhlo.reshape"(%arg1) : (tensor<16xf32>) -> tensor<4x4xf32>
+  %2 = "mhlo.dot"(%0, %1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %3 = "mhlo.reshape"(%2) : (tensor<4x4xf32>) -> tensor<16xf32>
+  return %3 : tensor<16xf32>
+}
