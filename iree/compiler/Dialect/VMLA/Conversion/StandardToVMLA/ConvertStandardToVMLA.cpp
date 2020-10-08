@@ -26,6 +26,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -109,7 +110,7 @@ struct CmpIOpConversion
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     auto newOp = rewriter.create<IREE::VMLA::CmpOp>(
         srcOp.getLoc(), predicate, operands[0], operands[1], dst,
         TypeAttr::get(inputType.getElementType()));
@@ -165,7 +166,7 @@ class CmpFOpConversion
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     auto newOp = rewriter.create<IREE::VMLA::CmpOp>(
         srcOp.getLoc(), predicate, operands[0], operands[1], dst,
         TypeAttr::get(inputType.getElementType()));
@@ -179,69 +180,71 @@ class CmpFOpConversion
 void populateStandardToVMLAPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
                                     TypeConverter &typeConverter) {
-  patterns.insert<ConstantOpConversion>(context, typeConverter);
-  patterns.insert<CmpIOpConversion>(context, typeConverter);
-  patterns.insert<CmpFOpConversion>(context, typeConverter);
+  patterns.insert<ConstantOpConversion>(typeConverter, context);
+  patterns.insert<CmpIOpConversion>(typeConverter, context);
+  patterns.insert<CmpFOpConversion>(typeConverter, context);
 
+  patterns.insert<VMLAOpConversion<mlir::ReturnOp, mlir::ReturnOp>>(
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::AddIOp, IREE::VMLA::AddOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::AddFOp, IREE::VMLA::AddOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::SubIOp, IREE::VMLA::SubOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::SubFOp, IREE::VMLA::SubOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::MulIOp, IREE::VMLA::MulOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::MulFOp, IREE::VMLA::MulOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::SignedDivIOp, IREE::VMLA::DivOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::UnsignedDivIOp, IREE::VMLA::DivOp,
                                    VMLAOpSemantics::kForceUnsigned>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::DivFOp, IREE::VMLA::DivOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::AbsFOp, IREE::VMLA::AbsOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::SignedRemIOp, IREE::VMLA::RemOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::UnsignedRemIOp, IREE::VMLA::RemOp,
                                    VMLAOpSemantics::kForceUnsigned>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::RemFOp, IREE::VMLA::RemOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::LogOp, IREE::VMLA::LogOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::ExpOp, IREE::VMLA::ExpOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::SqrtOp, IREE::VMLA::SqrtOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::CosOp, IREE::VMLA::CosOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::TanhOp, IREE::VMLA::TanhOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::NegFOp, IREE::VMLA::NegOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::AndOp, IREE::VMLA::AndOp>>(
-      context, typeConverter);
-  patterns.insert<VMLAOpConversion<mlir::OrOp, IREE::VMLA::OrOp>>(
-      context, typeConverter);
+      typeConverter, context);
+  patterns.insert<VMLAOpConversion<mlir::OrOp, IREE::VMLA::OrOp>>(typeConverter,
+                                                                  context);
   patterns.insert<VMLAOpConversion<mlir::XOrOp, IREE::VMLA::XorOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::ShiftLeftOp, IREE::VMLA::ShlOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns
       .insert<VMLAOpConversion<mlir::SignedShiftRightOp, IREE::VMLA::ShrOp>>(
-          context, typeConverter);
+          typeConverter, context);
   patterns
       .insert<VMLAOpConversion<mlir::UnsignedShiftRightOp, IREE::VMLA::ShrOp,
-                               VMLAOpSemantics::kForceUnsigned>>(context,
-                                                                 typeConverter);
+                               VMLAOpSemantics::kForceUnsigned>>(typeConverter,
+                                                                 context);
   patterns.insert<VMLAOpConversion<mlir::CeilFOp, IREE::VMLA::CeilOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mlir::SelectOp, IREE::VMLA::SelectOp>>(
-      context, typeConverter);
+      typeConverter, context);
 }
 
 }  // namespace iree_compiler

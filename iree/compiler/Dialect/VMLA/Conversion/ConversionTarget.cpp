@@ -53,7 +53,11 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   });
   addDynamicallyLegalOp<ConstantOp>(
       [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
-  addLegalOp<ReturnOp>();
+  addDynamicallyLegalOp<ReturnOp>([&](ReturnOp op) {
+    return llvm::all_of(op.getOperandTypes(), [&typeConverter](Type t) {
+      return typeConverter.isLegal(t);
+    });
+  });
 }
 
 bool VMLAConversionTarget::isDynamicallyLegal(Operation *op) const {
