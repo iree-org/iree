@@ -151,7 +151,7 @@
 // use it. Note that this means that unless code is instrumented we won't be
 // able to tell what's happening in the Tracy UI.
 #if IREE_TRACING_MAX_CALLSTACK_DEPTH == 0
-#undef TRACY_HAS_CALLSTACK
+#undef TRACY_CALLSTACK
 #endif  // IREE_TRACING_MAX_CALLSTACK_DEPTH
 
 //===----------------------------------------------------------------------===//
@@ -390,7 +390,7 @@ void operator delete(void* ptr) noexcept;
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // TODO(#1886): update these to tracy and drop the 0.
-#define IREE_TRACE_SCOPE0(name_spec) ZoneScopedNS(name_spec, 13)
+#define IREE_TRACE_SCOPE0(name_spec) ZoneScopedN(name_spec)
 #define IREE_TRACE_SCOPE(name_spec, ...)
 #define IREE_TRACE_EVENT0
 #define IREE_TRACE_EVENT
