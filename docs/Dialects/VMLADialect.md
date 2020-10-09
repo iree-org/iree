@@ -751,6 +751,42 @@ operation ::= `vmla.exp` $src`,` `out` $dst attr-dict `:` $element_type
 `src` | buffer
 `dst` | buffer
 
+### `vmla.fft.pseudo` (::mlir::iree_compiler::IREE::VMLA::FftPseudoOp)
+
+pseudo-op of VMLA::FftOp.
+
+
+Syntax:
+
+```
+operation ::= `vmla.fft.pseudo` $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
+              `->` `(`type($real_out)`,` type($imag_out)`)`
+```
+
+This is a tensor-level version of VMLA::FftOp, to facilitate
+the lowering process.
+
+The op that takes two tensors as input and returns two tensors as output.
+These represent the [real, imag] components of a complex number.
+
+This is a placeholder for the actual implementation of fft.
+In addition, only the base version of FFT is currently implemented.
+(TODO: natashaknk)
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | tensor of any type values
+`imag_in` | tensor of any type values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`real_out` | tensor of any type values
+`imag_out` | tensor of any type values
+
 ### `vmla.finite` (::mlir::iree_compiler::IREE::VMLA::FiniteOp)
 
 
