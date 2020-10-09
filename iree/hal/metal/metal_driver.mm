@@ -16,13 +16,10 @@
 
 #import <Metal/Metal.h>
 
-#include "absl/flags/flag.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/metal/metal_capture_manager.h"
 #include "iree/hal/metal/metal_device.h"
-
-ABSL_FLAG(bool, metal_capture, false, "Enables capturing Metal commands.");
 
 namespace iree {
 namespace hal {
@@ -45,7 +42,7 @@ NSArray<id<MTLDevice>>* GetAvailableMetalDevices() {
 }  // namespace
 
 // static
-StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create() {
+StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create(const MetalDriverOptions& options) {
   IREE_TRACE_SCOPE0("MetalDriver::Create");
 
   @autoreleasepool {
@@ -55,8 +52,9 @@ StatusOr<ref_ptr<MetalDriver>> MetalDriver::Create() {
     }
 
     std::unique_ptr<MetalCaptureManager> metal_capture_manager;
-    if (absl::GetFlag(FLAGS_metal_capture)) {
-      IREE_ASSIGN_OR_RETURN(metal_capture_manager, MetalCaptureManager::Create());
+    if (options.enable_capture) {
+      IREE_ASSIGN_OR_RETURN(metal_capture_manager,
+                            MetalCaptureManager::Create(options.capture_file));
       IREE_RETURN_IF_ERROR(metal_capture_manager->Connect());
     }
 

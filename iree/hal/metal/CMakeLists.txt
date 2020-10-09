@@ -24,7 +24,6 @@ iree_cc_library(
   SRCS
     "metal_capture_manager.mm"
   DEPS
-    absl::flags
     iree::base::file_io
     iree::base::logging
     iree::base::status
@@ -132,7 +131,6 @@ iree_cc_library(
   SRCS
     "metal_driver.mm"
   DEPS
-    absl::flags
     ::metal_capture_manager
     ::metal_device
     iree::base::status
@@ -151,6 +149,7 @@ iree_cc_library(
     "metal_driver_module.cc"
   DEPS
     ::metal_driver
+    absl::flags
     iree::base::init
     iree::base::status
     iree::hal::driver_registry

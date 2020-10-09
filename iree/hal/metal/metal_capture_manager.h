@@ -27,10 +27,12 @@ namespace hal {
 namespace metal {
 
 // A DebugCaptureManager implementation for Metal that directly wraps a
-// MTLCpatureManager.
+// MTLCaptureManager.
 class MetalCaptureManager final : public DebugCaptureManager {
  public:
-  static StatusOr<std::unique_ptr<MetalCaptureManager>> Create();
+  // Creates a capture manager that captures Metal commands to the given |capture_file| if not
+  // empty. Capture to Xcode otherwise.
+  static StatusOr<std::unique_ptr<MetalCaptureManager>> Create(const std::string& capture_file);
   ~MetalCaptureManager() override;
 
   Status Connect() override;

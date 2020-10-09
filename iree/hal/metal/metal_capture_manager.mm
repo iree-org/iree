@@ -16,26 +16,23 @@
 
 #include <string>
 
-#include "absl/flags/flag.h"
+#include "absl/memory/memory.h"
 #include "iree/base/file_io.h"
 #include "iree/base/logging.h"
 #include "iree/base/tracing.h"
-
-ABSL_FLAG(std::string, metal_capture_to_file, "",
-          "Full path to store the GPU trace file (empty means capture to Xcode)");
 
 namespace iree {
 namespace hal {
 namespace metal {
 
 // static
-StatusOr<std::unique_ptr<MetalCaptureManager>> MetalCaptureManager::Create() {
+StatusOr<std::unique_ptr<MetalCaptureManager>> MetalCaptureManager::Create(
+    const std::string& capture_file) {
   IREE_TRACE_SCOPE0("MetalCaptureManager::Create");
   @autoreleasepool {
     NSURL* capture_url = nil;
-    std::string cpp_path = absl::GetFlag(FLAGS_metal_capture_to_file);
-    if (!cpp_path.empty()) {
-      NSString* ns_string = [NSString stringWithCString:cpp_path.c_str()
+    if (!capture_file.empty()) {
+      NSString* ns_string = [NSString stringWithCString:capture_file.c_str()
                                                encoding:[NSString defaultCStringEncoding]];
       NSString* capture_path = ns_string.stringByStandardizingPath;
       capture_url = [[NSURL fileURLWithPath:capture_path isDirectory:false] retain];
