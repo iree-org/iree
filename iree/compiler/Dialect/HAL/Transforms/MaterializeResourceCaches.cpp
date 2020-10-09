@@ -230,7 +230,7 @@ class MaterializeResourceCachesPass
     // ExecutableTargetOp.
     // Afterwards, we could inline and de-dup across switch cases.
     DeviceSwitchBuilder switchBuilder(loc, /*resultTypes=*/TypeRange{},
-                                       deviceValue, blockBuilder);
+                                      deviceValue, blockBuilder);
     auto targetBackends = matchTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {
       auto *region = switchBuilder.addConditionRegion(

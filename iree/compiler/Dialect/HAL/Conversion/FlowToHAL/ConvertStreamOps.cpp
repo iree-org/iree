@@ -423,8 +423,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
 
   // Ask each target backend to record their dispatch logic.
   IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
-                                               /*resultTypes=*/TypeRange{},
-                                               device, rewriter);
+                                                 /*resultTypes=*/TypeRange{},
+                                                 device, rewriter);
   for (auto targetOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
     for (auto &targetBackend : IREE::HAL::matchTargetBackends(
@@ -439,8 +439,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
       // sequence them together during the call to |recordDispatch| below.
       dispatchState.entryPointOp = *entryPointOps.begin();
 
-      if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(),
-                                               dispatchState, switchRewriter))) {
+      if (failed(targetBackend->recordDispatch(
+              dispatchOp.getLoc(), dispatchState, switchRewriter))) {
         return dispatchOp.emitError()
                << "unable to record dispatch for target backend "
                << targetBackend->name();

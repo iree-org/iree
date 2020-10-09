@@ -112,7 +112,7 @@ class DeviceSwitchCaseBuilder {
 class DeviceSwitchBuilder {
  public:
   DeviceSwitchBuilder(Location loc, TypeRange resultTypes, Value device,
-                       OpBuilder builder)
+                      OpBuilder builder)
       : loc_(loc),
         resultTypes_(resultTypes),
         device_(device),
@@ -166,7 +166,7 @@ class DeviceSwitchBuilder {
 class DeviceSwitchRewriter {
  public:
   DeviceSwitchRewriter(Location loc, TypeRange resultTypes, Value device,
-                      ConversionPatternRewriter &rewriter)
+                       ConversionPatternRewriter &rewriter)
       : loc_(loc),
         resultTypes_(resultTypes),
         device_(device),
