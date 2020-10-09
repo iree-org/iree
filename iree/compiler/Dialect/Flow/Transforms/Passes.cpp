@@ -27,6 +27,12 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+namespace {
+static llvm::cl::opt<bool> exportDispatchFunctions(
+    "iree-flow-export-dispatch-functions",
+    llvm::cl::desc("Exports all the dispatch functions to the module"),
+    llvm::cl::init(false));
+}  // namespace
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
@@ -164,6 +170,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Outline the dispatch regions into their own functions. This separates the
   // sequencer functions performing dispatches from the dispatchees.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -203,6 +210,18 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(createSymbolDCEPass());
+
+  // Export all the dispatch functions. This creates functions and feeds
+  // iree.unfoldable_constant as inputs to the exported functions.
+  if (exportDispatchFunctions) {
+    passManager.addPass(IREE::Flow::createCreateFuncsToInvokeExecOpsPass());
+    passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
+    passManager.addPass(IREE::Flow::createMergeExportedReflection());
+    passManager.addPass(IREE::Flow::createFormStreamsPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addPass(createSymbolDCEPass());
+  }
 }
 
 void registerFlowTransformPassPipeline() {
