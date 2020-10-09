@@ -20,11 +20,47 @@
 # TODO(hanchung): Reorganize/fix existing tests so the above is true.
 
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+iree_check_single_backend_test_suite(
+  NAME
+    check_metal-spirv_metal
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "broadcast.mlir"
+    "broadcast_in_dim.mlir"
+    "convert.mlir"
+    "constant.mlir"
+    "cosine.mlir"
+    "exponential.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    metal-spirv
+  DRIVER
+    metal
+)
+""",
 )
 
 iree_check_single_backend_test_suite(
