@@ -355,9 +355,9 @@ module attributes {
 //       CHECK:   %[[VIEW2:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
 //       CHECK:   %[[VIEW3:.+]] = subview %[[RET0]][%[[LBY_2]], %[[LBX_2]]]
 //       CHECK:   linalg.fill(%[[VIEW3]], %{{.+}})
-//  CHECK-SAME:     "workgroup_numprocs_ge_numiters"
+//  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.matmul
-//  CHECK-SAME:     "workgroup_numprocs_ge_numiters"
+//  CHECK-SAME:     "workgroup"
 //  CHECK-SAME:     ins(%[[VIEW0]], %[[VIEW1]]
 //  CHECK-SAME:     outs(%[[VIEW2]]
 
@@ -407,7 +407,7 @@ module attributes {
 //       CHECK:   %[[VIEW2:.+]] = subview %[[RET0]]
 //  CHECK-SAME:     [%[[BIDZ]], %[[LBY_2]], %[[LBX_2]], 0]
 //       CHECK:   %[[VIEW3:.+]] = subview %[[RET0]]
-//  CHECK-SAME:     [%[[BIDX]], %[[LBY_2]], %[[LBX_2]], 0]
+//  CHECK-SAME:     [%[[BIDZ]], %[[LBY_2]], %[[LBX_2]], 0]
 //       CHECK:   linalg.fill(%[[VIEW3]], %{{.*}})
 //  CHECK-SAME:     "workgroup"
 //       CHECK:   linalg.conv

@@ -151,7 +151,8 @@ struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
         failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
-             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
+             rewriter, cast<linalg::LinalgOp>(op), funcOp,
+             launchConfig.getTileSizes(op, 0))))) {
       return failure();
     }
     setMarker(op, getDeleteMarker());
@@ -163,22 +164,20 @@ struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
 };
 
 /// Pattern for tile + fuse of operations. Updates the workgroup size in the
-/// surrounding function operation if tiling succeeds, and generates the function that
-/// computes the number of workgroups for the launch..
+/// surrounding function operation if tiling succeeds, and generates the
+/// function that computes the number of workgroups for the launch..
 template <typename LinalgOpTy>
 struct TileAndFuseToWorkgroupsPattern
     : public linalg::LinalgTileAndFusePattern<LinalgOpTy> {
   using Base = linalg::LinalgTileAndFusePattern<LinalgOpTy>;
-  TileAndFuseMatmulPattern(MLIRContext *context,
-                           const linalg::LinalgDependenceGraph &dependenceGraph,
-                           linalg::LinalgTilingOptions tilingOptions,
-                           linalg::LinalgMarker marker,
-                           const LaunchConfig &launchConfig,
-                           PatternBenefit benefit = 1)
-      : Base(context, dependenceGraph,
-             tilingOptions,
-             linalg::LinalgFusionOptions().setIndicesToFuse({2}),
-             marker, marker,
+  TileAndFuseToWorkgroupsPattern(
+      MLIRContext *context,
+      const linalg::LinalgDependenceGraph &dependenceGraph,
+      linalg::LinalgTilingOptions tilingOptions, linalg::LinalgMarker marker,
+      const LaunchConfig &launchConfig, PatternBenefit benefit = 1)
+      : Base(context, dependenceGraph, tilingOptions,
+             linalg::LinalgFusionOptions().setIndicesToFuse({2}), marker,
+             marker,
              linalg::LinalgMarker(ArrayRef<Identifier>(),
                                   Identifier::get(getDeleteMarker(), context)),
              benefit),
@@ -308,23 +307,6 @@ static void populatePromotionPatterns(MLIRContext *context,
 //===----------------------------------------------------------------------===//
 // Patterns and methods for subgroup tiling.
 //===----------------------------------------------------------------------===//
-
-namespace {
-/// Pattern to tile linalg.matmul for subgroups.
-struct TileMatmulSubgroupPattern
-    : public linalg::LinalgTilingPattern<linalg::MatmulOp> {
-  using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
-  TileMatmulSubgroupPattern(MLIRContext *context,
-                            linalg::LinalgTilingOptions options,
-                            PatternBenefit benefit = 1)
-      : Base(context, options,
-             linalg::LinalgMarker(
-                 Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
-                                 context),
-                 Identifier::get(getVectorizeMarker(), context)),
-             benefit) {}
-};
-}  // namespace
 
 /// Computes the Value for subgroupID along each dimension given number of
 /// subgroups `numSubGroups` along each dimension (x-first, y-second, z-third).
