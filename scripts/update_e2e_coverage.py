@@ -24,6 +24,8 @@ import os
 import re
 import subprocess
 
+import utils
+
 REFERENCE_BACKEND = 'tf'
 # Assumes that tests are expanded for the tf, iree_vmla, iree_llvmjit and
 # iree_vulkan backends.
@@ -87,8 +89,10 @@ def parse_arguments():
   """Parses command-line options."""
   parser = argparse.ArgumentParser(
       description='Generates Markdown files for op coverage table')
-  parser.add_argument(
-      'build_dir', metavar='BUILD_PATH', type=str, help='Base build directory.')
+  parser.add_argument('build_dir',
+                      metavar='BUILD_PATH',
+                      type=str,
+                      help='Base build directory.')
 
   parsed_args = parser.parse_args()
   if not os.path.isdir(parsed_args.build_dir):
@@ -97,38 +101,22 @@ def parse_arguments():
   return parsed_args
 
 
-def create_markdown_table(rows):
-  """Converts a 2D array to a Markdown table."""
-  return '\n'.join([' | '.join(row) for row in rows])
-
-
 def get_name_and_backend(test_string):
   """Splits a pathless test target into its name and comparison backend."""
   name, backend = test_string.split(f'__{REFERENCE_BACKEND}__')
   return name, backend
 
 
-def get_test_targets(test_suite_path):
-  """Returns a list of test targets stripped of paths and suite names."""
-  # Check if the suite exists (which may not be true for failing suites)
-  target_dir = test_suite.split(':')[0]
-  query = ['bazel', 'query', f'{target_dir}/...']
-  targets = subprocess.check_output(query)
-  if test_suite_path not in targets.decode('ascii'):
-    return []
-
-  query = ['bazel', 'query', f'tests({test_suite_path})']
-  tests = subprocess.check_output(query)
-  tests = tests.decode('ascii').split(os.linesep)
-  tests = list(filter(lambda s: s.startswith(f'{test_suite_path}_'), tests))
-  tests = [test.replace(f'{test_suite_path}_', '') for test in tests]
-  return tests
-
-
 def get_suite_metadata(test_suite):
   """Gets all test names, and passing and failing test-backend pairs."""
-  passing = get_test_targets(test_suite)
-  failing = get_test_targets(f'{test_suite}_failing')
+  passing = utils.get_test_targets(test_suite)
+  failing = utils.get_test_targets(f'{test_suite}_failing')
+
+  # Remove bazel path.
+  passing = [test.replace(f'{test_suite}_', '') for test in passing]
+  failing = [test.replace(f'{test_suite}_failing_', '') for test in failing]
+
+  # Split into (test_name, target_backend).
   passing = [get_name_and_backend(test) for test in passing]
   failing = [get_name_and_backend(test) for test in failing]
   passing_names = [test[0] for test in passing]
@@ -178,7 +166,7 @@ def generate_table(test_suite):
         SUCCESS_ELEMENT if backend else FAILURE_ELEMENT for backend in backends
     ])
     rows.append(row)
-  return create_markdown_table(rows)
+  return utils.create_markdown_table(rows)
 
 
 if __name__ == '__main__':

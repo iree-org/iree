@@ -113,7 +113,7 @@ function(flatbuffer_cc_library)
 
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_GEN_TARGET})
-  target_include_directories(${_NAME}
+  target_include_directories(${_NAME} SYSTEM
     INTERFACE
       "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
       ${CMAKE_CURRENT_BINARY_DIR}

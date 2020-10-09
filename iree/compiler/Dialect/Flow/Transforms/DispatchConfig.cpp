@@ -141,6 +141,10 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseInput(Operation *anchorOp,
     // original position. This should apply to any such "metadata" ops.
     return FusionType::CLONE_INTO;
   }
+  if (isUnsupportedFusionOp(anchorOp) && isa<mhlo::ReshapeOp>(inputOp)) {
+    // Clones reshape op to the same region as its consumer.
+    return FusionType::CLONE_INTO;
+  }
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(inputOp)) {
     return FusionType::DISABLED;
   }
@@ -159,6 +163,11 @@ OpDispatchPolicy::FusionType OpDispatchPolicy::fuseOutput(Operation *anchorOp,
     return FusionType::DISABLED;
   }
   if (isIdentityMetadata(outputOp)) {
+    return FusionType::MOVE_INTO;
+  }
+
+  if (isUnsupportedFusionOp(anchorOp) && isa<mhlo::ReshapeOp>(outputOp)) {
+    // Moves reshape op to the same region as its producer.
     return FusionType::MOVE_INTO;
   }
   if (isUnsupportedFusionOp(anchorOp) || isUnsupportedFusionOp(outputOp)) {

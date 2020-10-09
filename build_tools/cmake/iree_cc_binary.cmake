@@ -110,7 +110,7 @@ function(iree_cc_binary)
   else()
     set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   endif()
-  target_include_directories(${_NAME}
+  target_include_directories(${_NAME} SYSTEM
     PUBLIC
       ${IREE_COMMON_INCLUDE_DIRS}
   )

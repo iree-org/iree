@@ -46,8 +46,8 @@ class MatrixOpsDynamicModule(tf.Module):
 
 class MatrixOpsDynamicTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(MatrixOpsDynamicTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(MatrixOpsDynamicTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(MatrixOpsDynamicModule)
 
   def test_matmul_high_rank_batch(self):

@@ -140,6 +140,13 @@ StatusOr<id<MTLComputePipelineState>> MetalKernelLibrary::GetPipelineStateForEnt
   return pipelines_[ordinal];
 }
 
+StatusOr<id<MTLFunction>> MetalKernelLibrary::GetKernelForEntryPoint(int ordinal) const {
+  if (ordinal < 0 || ordinal >= pipelines_.size()) {
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal: " << ordinal;
+  }
+  return functions_[ordinal];
+}
+
 }  // namespace metal
 }  // namespace hal
 }  // namespace iree

@@ -298,4 +298,10 @@ build:windows --define=override_eigen_strong_inline=true
 # Another TensorFlow flag from their config script.
 build:windows --define with_default_optimizations=true
 
+# TensorFlow builds depend on these flags so we will as well
+# MSVC (Windows): Standards-conformant preprocessor mode
+# See https://docs.microsoft.com/en-us/cpp/preprocessor/preprocessor-experimental-overview
+build:windows --copt=/experimental:preprocessor
+build:windows --host_copt=/experimental:preprocessor
+
 ###############################################################################

@@ -23,6 +23,8 @@ import collections
 import os
 import subprocess
 
+import utils
+
 # The symbols to show in the table if the operation is supported or not.
 SUCCESS_ELEMENT = '<span class="success-table-element">✓</span>'
 FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
@@ -47,8 +49,10 @@ def parse_arguments():
   """Parses command-line options."""
   parser = argparse.ArgumentParser(
       description='Generates Markdown files for op coverage table')
-  parser.add_argument(
-      'build_dir', metavar='BUILD_PATH', type=str, help='Base build directory.')
+  parser.add_argument('build_dir',
+                      metavar='BUILD_PATH',
+                      type=str,
+                      help='Base build directory.')
 
   parsed_args = parser.parse_args()
   if not os.path.isdir(parsed_args.build_dir):
@@ -87,11 +91,6 @@ def get_tested_ops_for_backends(build_dir):
   return res
 
 
-def create_markdown_table(rows):
-  """Converts a 2D array to a Markdown table."""
-  return '\n'.join([' | '.join(row) for row in rows])
-
-
 def generate_table(build_dir):
   """Generates an op coverage Markdown table for each backend."""
   backend_ops = get_tested_ops_for_backends(build_dir)
@@ -109,10 +108,10 @@ def generate_table(build_dir):
   for op in all_ops:
     row = [op]
     for backend in backends:
-      row.append(
-          SUCCESS_ELEMENT if (op in backend_ops[backend]) else FAILURE_ELEMENT)
+      row.append(SUCCESS_ELEMENT if (
+          op in backend_ops[backend]) else FAILURE_ELEMENT)
     rows.append(row)
-  return create_markdown_table(rows)
+  return utils.create_markdown_table(rows)
 
 
 if __name__ == '__main__':

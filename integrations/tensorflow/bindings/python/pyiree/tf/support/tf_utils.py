@@ -23,14 +23,11 @@ import re
 import tempfile
 from typing import Any, Callable, Dict, Sequence, Set, Tuple, Type, Union
 
-from absl import flags
 from absl import logging
 import numpy as np
 from pyiree import rt
 from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
-
-FLAGS = flags.FLAGS
 
 
 def set_random_seed(seed: int = 0) -> None:

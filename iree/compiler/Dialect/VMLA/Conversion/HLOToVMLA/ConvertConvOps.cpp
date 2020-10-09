@@ -40,8 +40,6 @@ namespace {
 
 struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
   using OpConversionPattern::OpConversionPattern;
-  VMLAConvOpConverter(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
       mhlo::ConvOp op, ArrayRef<Value> operands,
@@ -105,14 +103,14 @@ struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
     }
 
     auto inputShape = VMLAConversionTarget::getTensorShape(
-        op.getLoc(), op.lhs(), typeConverter, rewriter);
+        op.getLoc(), op.lhs(), *getTypeConverter(), rewriter);
     auto filterShape = VMLAConversionTarget::getTensorShape(
-        op.getLoc(), op.rhs(), typeConverter, rewriter);
+        op.getLoc(), op.rhs(), *getTypeConverter(), rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        op.getLoc(), op.getResult(), typeConverter, rewriter);
+        op.getLoc(), op.getResult(), *getTypeConverter(), rewriter);
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        op.getLoc(), op.getResult(), typeConverter, rewriter);
+        op.getLoc(), op.getResult(), *getTypeConverter(), rewriter);
 
     auto lhsType =
         TypeAttr::get(op.lhs().getType().cast<ShapedType>().getElementType());
@@ -164,7 +162,6 @@ struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
 
     return success();
   }
-  TypeConverter &typeConverter;
 };
 
 }  // namespace
@@ -172,7 +169,7 @@ struct VMLAConvOpConverter : public OpConversionPattern<mhlo::ConvOp> {
 void populateHLOConvToVMLAPatterns(MLIRContext *context,
                                    OwningRewritePatternList &patterns,
                                    TypeConverter &typeConverter) {
-  patterns.insert<VMLAConvOpConverter>(context, typeConverter);
+  patterns.insert<VMLAConvOpConverter>(typeConverter, context);
 }
 
 }  // namespace iree_compiler
