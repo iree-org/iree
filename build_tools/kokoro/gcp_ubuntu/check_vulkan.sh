@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,28 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For use within a IREE bazel-nvidia docker image on a Kokoro VM.
+# For use within a IREE bazel-swiftshader docker image on a Kokoro VM.
 # Log some information about the environment, initialize the submodules and then
 # run the bazel integrations tests.
 
 set -e
 set -x
 
-# Print the UTC time when set -x is on
-export PS4='[$(date -u "+%T %Z")] '
+# Print Vulkan related information: SDK version and GPU ICD version
+vulkaninfo 2> /tmp/vulkaninfo.stderr 1> /tmp/vulkaninfo.stdout
+VULKAN_INSTANCE="$(grep "Vulkan Instance" /tmp/vulkaninfo.stdout)"
+VK_PHYSICAL_DEVICE_PROPERTIES="$(grep -A7 "VkPhysicalDeviceProperties" /tmp/vulkaninfo.stdout)"
 
-# Check these exist and print the versions for later debugging
-bazel --version
-"${CXX?}" --version
-"${CC?}" --version
-"${PYTHON_BIN?}" -V
-# TODO(#1875): Make PYTHON_BIN also control the runtime version
-python3 -V
+if [[ -z "${VULKAN_INSTANCE?}" ]] || [[ -z "${VK_PHYSICAL_DEVICE_PROPERTIES?}" ]]; then
+  echo "Vulkan not found!"
+  cat /tmp/vulkaninfo.stdout
+  cat /tmp/vulkaninfo.stderr
+  exit 1
+fi
 
-./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
-echo "Building and testing with bazel"
-./build_tools/bazel/build_tensorflow.sh
+echo "${VULKAN_INSTANCE?}"
+echo "${VK_PHYSICAL_DEVICE_PROPERTIES?}"

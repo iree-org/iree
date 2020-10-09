@@ -367,6 +367,23 @@ class LowerSortOp : public OpRewritePattern<mhlo::SortOp> {
   }
 };
 
+class LowerFftOp : public OpRewritePattern<mhlo::FftOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::FftOp op,
+                                PatternRewriter &rewriter) const override {
+    auto tensor_type = op.operand().getType().cast<RankedTensorType>();
+    auto real = rewriter.create<mhlo::RealOp>(op.getLoc(), op.getOperand());
+    auto imag = rewriter.create<mhlo::ImagOp>(op.getLoc(), op.getOperand());
+    auto results = rewriter.create<VMLA::FftPseudoOp>(
+        op.getLoc(), real.getType(), imag.getType(), real, imag);
+    auto complex_result = rewriter.create<mhlo::ComplexOp>(
+        op.getLoc(), tensor_type, results.real_out(), results.imag_out());
+    rewriter.replaceOp(op, {complex_result});
+    return success();
+  }
+};
+
 class PreConversionLoweringPass
     : public PassWrapper<PreConversionLoweringPass, OperationPass<FuncOp>> {
  public:
@@ -402,6 +419,8 @@ class PreConversionLoweringPass
     patterns.insert<LowerBroadcastOp>(context);
     target.addIllegalOp<mhlo::SortOp>();
     patterns.insert<LowerSortOp>(context);
+    target.addIllegalOp<mhlo::FftOp>();
+    patterns.insert<LowerFftOp>(context);
 
     if (failed(applyPartialConversion(getOperation(), target, patterns))) {
       return signalPassFailure();

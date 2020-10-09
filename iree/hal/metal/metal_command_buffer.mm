@@ -45,7 +45,9 @@ StatusOr<ref_ptr<CommandBuffer>> MetalCommandBuffer::Create(
 MetalCommandBuffer::MetalCommandBuffer(CommandBufferModeBitfield mode,
                                        CommandCategoryBitfield command_categories,
                                        id<MTLCommandBuffer> command_buffer)
-    : CommandBuffer(mode, command_categories), metal_handle_([command_buffer retain]) {}
+    : CommandBuffer(mode, command_categories), metal_handle_([command_buffer retain]) {
+  metal_handle_.label = @"IREE MetalCommandBuffer";
+}
 
 MetalCommandBuffer::~MetalCommandBuffer() {
   IREE_TRACE_SCOPE0("MetalCommandBuffer::dtor");
@@ -313,6 +315,7 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
 
       id<MTLArgumentEncoder> argument_encoder =
           [metal_kernel newArgumentEncoderWithBufferIndex:set_number];  // retained
+      argument_encoder.label = @"IREE MetalCommandBuffer::Dispatch ArgumentEncoder";
       if (!argument_encoder) {
         return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Buffer index #" << set_number << " is not an argument buffer";
@@ -321,6 +324,7 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
       __block id<MTLBuffer> argument_buffer =
           [metal_handle_.device newBufferWithLength:argument_encoder.encodedLength
                                             options:MTLResourceStorageModeShared];  // retained
+      argument_encoder.label = @"IREE MetalCommandBuffer::Dispatch ArgumentBuffer";
       if (!argument_buffer) {
         return InternalErrorBuilder(IREE_LOC)
                << "Failed to create argument buffer with length=" << argument_encoder.encodedLength;

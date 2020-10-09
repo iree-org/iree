@@ -67,6 +67,18 @@ func @f(%arg0: tensor<3xf32>) -> tensor<5x6x3xf32> {
 // -----
 
 // CHECK-LABEL: func @f
+func @f(%arg0: tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>> attributes { sym_visibility = "private" } {
+  // CHECK-DAG: [[REAL:%.+]] = "mhlo.real"(%arg0)
+  // CHECK-DAG: [[IMAG:%.+]] = "mhlo.imag"(%arg0)
+  // CHECK-DAG: [[REAL_OUT:%.+]], [[IMAG_OUT:%.+]] = vmla.fft.pseudo [[REAL]], [[IMAG]]
+  // CHECK: "mhlo.complex"([[REAL_OUT]], [[IMAG_OUT]])
+  %0 = "mhlo.fft"(%arg0) {fft_length = dense<8> : tensor<1xi64>, fft_type = "FFT"} : (tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>>
+  return %0 : tensor<8xcomplex<f32>>
+}
+
+// -----
+
+// CHECK-LABEL: func @f
 func @f(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
   // CHECK-NOT: "mhlo.complex"
   %0 = "mhlo.complex"(%arg0, %arg1) : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xcomplex<f32>>
