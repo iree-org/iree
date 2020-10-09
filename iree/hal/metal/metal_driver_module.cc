@@ -14,17 +14,28 @@
 
 #include <memory>
 
+#include "absl/flags/flag.h"
 #include "iree/base/init.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/hal/metal/metal_driver.h"
+
+ABSL_FLAG(bool, metal_capture, false, "Enables capturing Metal commands.");
+ABSL_FLAG(
+    std::string, metal_capture_to_file, "",
+    "Full path to store the GPU trace file (empty means capture to Xcode)");
 
 namespace iree {
 namespace hal {
 namespace metal {
 namespace {
 
-StatusOr<ref_ptr<Driver>> CreateMetalDriver() { return MetalDriver::Create(); }
+StatusOr<ref_ptr<Driver>> CreateMetalDriver() {
+  MetalDriverOptions options;
+  options.enable_capture = absl::GetFlag(FLAGS_metal_capture);
+  options.capture_file = absl::GetFlag(FLAGS_metal_capture_to_file);
+  return MetalDriver::Create(options);
+}
 
 }  // namespace
 }  // namespace metal
