@@ -51,14 +51,27 @@ flags.DEFINE_bool(
     "Summarize the inputs and outputs of each module trace logged to disk.")
 flags.DEFINE_bool("log_all_traces", False,
                   "Log all traces to logging.info, even if comparison passes.")
+flags.DEFINE_bool(
+    "get_saved_model", False,
+    "Creates and stores a SavedModel for the tf.Module class to be tested.")
 FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
 
+def _get_from_environment_if_set(variable_name: str) -> Union[str, None]:
+  return os.environ[variable_name] if variable_name in os.environ else None
+
+
 def _setup_artifacts_dir(module_name: str) -> str:
-  parent_dir = FLAGS.artifacts_dir
-  if parent_dir is None:
-    parent_dir = os.path.join(tempfile.gettempdir(), "iree", "modules")
+  parent_dirs = [
+      FLAGS.artifacts_dir,
+      _get_from_environment_if_set('TEST_UNDECLARED_OUTPUTS_DIR'),
+      _get_from_environment_if_set('TEST_TMPDIR'),
+      os.path.join(tempfile.gettempdir(), "iree", "modules"),
+  ]
+  # Use the most preferred path in parent_dirs that isn't None.
+  parent_dir = next(parent for parent in parent_dirs if parent is not None)
+
   artifacts_dir = os.path.join(parent_dir, module_name)
   logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
   os.makedirs(artifacts_dir, exist_ok=True)
@@ -572,6 +585,15 @@ class TracedModule:
 Modules = collections.namedtuple("Modules",
                                  ["ref_module", "tar_modules", "artifacts_dir"])
 
+# We have to use a global variable to store the compiled modules so that we can
+# avoid recompilation. This is because the TestCase class resets it's entire
+# state and calls __init__ before each unittest. It also calls __init__ one
+# additional time before that for good measure, which means without storing the
+# modules somewhere else we would have to compile each of them at least twice.
+# We can't store the modules on the class itself via setUpClass because of #2900
+global _global_modules
+_global_modules = None
+
 
 def compile_tf_module(
     module_class: Type[tf.Module], exported_names: Sequence[str] = ()
@@ -588,6 +610,9 @@ def compile_tf_module(
     A 'Modules' namedtuple containing the reference module, target modules and
     artifacts directory.
   """
+  global _global_modules
+  if _global_modules is not None:
+    return _global_modules
 
   # Setup the directory for saving compilation artifacts and traces.
   artifacts_dir = _setup_artifacts_dir(module_class.__name__)
@@ -604,7 +629,8 @@ def compile_tf_module(
   tar_modules = [
       compile_backend(backend_info) for backend_info in tar_backend_infos
   ]
-  return Modules(ref_module, tar_modules, artifacts_dir)
+  _global_modules = Modules(ref_module, tar_modules, artifacts_dir)
+  return _global_modules
 
 
 def compile_tf_signature_def_saved_model(saved_model_dir: str,
@@ -628,6 +654,9 @@ def compile_tf_signature_def_saved_model(saved_model_dir: str,
     A 'Modules' namedtuple containing the reference module, target modules and
     artifacts directory.
   """
+  global _global_modules
+  if _global_modules is not None:
+    return _global_modules
 
   # Setup the directory for saving compilation artifacts and traces.
   artifacts_dir = _setup_artifacts_dir(module_name)
@@ -646,7 +675,8 @@ def compile_tf_signature_def_saved_model(saved_model_dir: str,
   tar_modules = [
       compile_backend(backend_info) for backend_info in tar_backend_infos
   ]
-  return Modules(ref_module, tar_modules, artifacts_dir)
+  _global_modules = Modules(ref_module, tar_modules, artifacts_dir)
+  return _global_modules
 
 
 class TracedModuleTestCase(tf.test.TestCase):

@@ -120,9 +120,12 @@ function(iree_cc_library)
         ${_RULE_TEXTUAL_HDRS}
         ${_RULE_HDRS}
     )
-    target_include_directories(${_NAME}
+    target_include_directories(${_NAME} SYSTEM
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+    )
+    target_include_directories(${_NAME}
+      PUBLIC
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
     )
     target_compile_options(${_NAME}
@@ -167,7 +170,7 @@ function(iree_cc_library)
   else()
     # Generating header-only library.
     add_library(${_NAME} INTERFACE)
-    target_include_directories(${_NAME}
+    target_include_directories(${_NAME} SYSTEM
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
     )

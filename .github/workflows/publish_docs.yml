@@ -15,6 +15,7 @@
 name: Publish Documentation
 
 on:
+  workflow_dispatch:
   schedule:
     # Every working day at 12pm UTC
     - cron: '0 12 * * 1-5'

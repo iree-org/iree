@@ -70,8 +70,8 @@ class TensorListModule(tf.Module):
 
 class TensorListTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(TensorListTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(TensorListTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(TensorListModule)
 
   def test_identity_through_tensorlist(self):

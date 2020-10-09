@@ -141,7 +141,7 @@ class VMImportOpConversion : public OpConversionPattern<T> {
  public:
   VMImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                        TypeConverter &typeConverter, StringRef importName)
-      : OpConversionPattern<T>(context), typeConverter(typeConverter) {
+      : OpConversionPattern<T>(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
@@ -149,13 +149,12 @@ class VMImportOpConversion : public OpConversionPattern<T> {
   LogicalResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    return rewriteToCall(op, Adaptor{operands}, importOp, typeConverter,
-                         rewriter);
+    return rewriteToCall(op, Adaptor{operands}, importOp,
+                         *this->getTypeConverter(), rewriter);
   }
 
  protected:
   mutable IREE::VM::ImportOp importOp;
-  TypeConverter &typeConverter;
 };
 
 }  // namespace iree_compiler

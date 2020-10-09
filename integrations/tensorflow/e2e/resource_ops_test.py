@@ -31,8 +31,8 @@ class ResourcesOpsModule(tf.Module):
 
 class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(ResourcesOpsTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(ResourcesOpsTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(ResourcesOpsModule)
 
   def test_add_assign(self):

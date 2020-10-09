@@ -83,8 +83,8 @@ backend as a source of truth. For example:
 # Inherit from `TracedModuleTestCase`.
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
-  def __init__(self, methodName="runTest"):
-    super(SimpleArithmeticTest, self).__init__(methodName)
+  def __init__(self, *args, **kwargs):
+    super(SimpleArithmeticTest, self).__init__(*args, **kwargs)
     # Compile a `tf.Module` named `SimpleArithmeticModule` into
     # `CompiledModule`s for each reference and target backend.
     self._modules = tf_test_utils.compile_tf_module(SimpleArithmeticModule)
@@ -210,7 +210,7 @@ We use our end-to-end TensorFlow integrations tests to generate tested
 compilation and benchmarking artifacts. This allows us to validate that our
 benchmarks are behaving as we expect them to, and to run them using valid inputs
 for each model. An overview of how to run benchmarks on IREE and TFLite can be
-found in [this doc](TODO(meadowlark)).
+found in [this doc](https://google.github.io/iree/developing-iree/e2e-benchmarking).
 
 ## Debugging Tests
 

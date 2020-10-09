@@ -92,18 +92,17 @@ struct IdentityOpConversion : public OpConversionPattern<SRC> {
 // dialect is currently where we have it stuffed.
 struct BroadcastInDimOpConversion
     : public OpConversionPattern<Shape::RankedBroadcastInDimOp> {
-  BroadcastInDimOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern<Shape::RankedBroadcastInDimOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       Shape::RankedBroadcastInDimOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto srcShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.operand(), *getTypeConverter(), rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
 
     auto tensorType = srcOp.operand().getType().cast<TensorType>();
     if (tensorType.getRank() == 0) {
@@ -141,13 +140,10 @@ struct BroadcastInDimOpConversion
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 struct IotaOpConversion : public OpConversionPattern<Shape::IotaOp> {
-  IotaOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
       Shape::IotaOp op, ArrayRef<Value> operandValues,
       ConversionPatternRewriter &rewriter) const override {
@@ -175,8 +171,6 @@ struct IotaOpConversion : public OpConversionPattern<Shape::IotaOp> {
 
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 struct CanonicalizeBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
@@ -209,8 +203,7 @@ struct CanonicalizeBroadcastOp : public OpRewritePattern<mhlo::BroadcastOp> {
 // Converts a concat into a set of copies into the destination buffer.
 struct ConcatenateOpConversion
     : public OpConversionPattern<mhlo::ConcatenateOp> {
-  ConcatenateOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::ConcatenateOp srcOp, ArrayRef<Value> operands,
@@ -218,9 +211,9 @@ struct ConcatenateOpConversion
     auto zero = rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(), 0);
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
 
     auto finalType = srcOp.getResult().getType().cast<TensorType>();
     int rank = finalType.getRank();
@@ -232,7 +225,7 @@ struct ConcatenateOpConversion
       std::tie(tensorOperand, bufferOperand) = srcDstOperand;
 
       auto srcShape = VMLAConversionTarget::getTensorShape(
-          srcOp.getLoc(), tensorOperand, typeConverter, rewriter);
+          srcOp.getLoc(), tensorOperand, *getTypeConverter(), rewriter);
       SmallVector<Value, 4> lengths(rank);
       for (int i = 0; i < rank; ++i) {
         lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(
@@ -252,16 +245,13 @@ struct ConcatenateOpConversion
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 // Lowers a subset of gathers along axis 0 that are really just a slice and
 // reshape.
 // TODO(ataei): Move this to vmla.gather lowering.
 struct GatherOpConversion : public OpConversionPattern<mhlo::GatherOp> {
-  GatherOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   // TODO(gcmn): This only handles a minimal number of cases. When XLA
   // redefines gather to be simpler, lower it properly.
@@ -321,9 +311,9 @@ struct GatherOpConversion : public OpConversionPattern<mhlo::GatherOp> {
     }
 
     auto srcShape = VMLAConversionTarget::getTensorShape(
-        gatherOp.getLoc(), gatherOp.operand(), typeConverter, rewriter);
+        gatherOp.getLoc(), gatherOp.operand(), *getTypeConverter(), rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        gatherOp.getLoc(), gatherOp.getResult(), typeConverter, rewriter);
+        gatherOp.getLoc(), gatherOp.getResult(), *getTypeConverter(), rewriter);
 
     auto srcRsType = srcShape.getType().dyn_cast<Shape::RankedShapeType>();
     if (!srcRsType) {
@@ -370,7 +360,7 @@ struct GatherOpConversion : public OpConversionPattern<mhlo::GatherOp> {
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        gatherOp.getLoc(), gatherOp.getResult(), typeConverter, rewriter);
+        gatherOp.getLoc(), gatherOp.getResult(), *getTypeConverter(), rewriter);
     rewriter.create<IREE::VMLA::CopyOp>(
         gatherOp.getLoc(), operands.operand(), srcShape, srcIndices, dst,
         dstShape, dstIndices, lengths,
@@ -378,14 +368,11 @@ struct GatherOpConversion : public OpConversionPattern<mhlo::GatherOp> {
     rewriter.replaceOp(gatherOp, {dst});
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 // Converts a static slice op to a copy (if the source must be preserved).
 struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
-  SliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::SliceOp srcOp, ArrayRef<Value> operands,
@@ -401,9 +388,9 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
     // a vmla.buffer.view op.
 
     auto srcShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.operand(), *getTypeConverter(), rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
 
     int rank = srcOp.operand().getType().cast<ShapedType>().getRank();
     SmallVector<Value, 4> srcIndices(rank);
@@ -422,7 +409,7 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     rewriter.create<IREE::VMLA::CopyOp>(
         srcOp.getLoc(), operands[0], srcShape, srcIndices, dst, dstShape,
         dstIndices, lengths,
@@ -430,8 +417,6 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 // This lowering converts a subset of the XLA ScatterOp to a VMLA equivalent.
@@ -439,8 +424,7 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
 // batch dimension and support both scattered updates per-element and per-slice.
 // It does not support swizzling / reordering slices.
 struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
-  ScatterOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::ScatterOp scatterOp, ArrayRef<Value> operands,
@@ -521,16 +505,17 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto result = scatterOp.getResult();
 
     auto srcShape = VMLAConversionTarget::getTensorShape(
-        scatterOp.getLoc(), src, typeConverter, rewriter);
+        scatterOp.getLoc(), src, *getTypeConverter(), rewriter);
     auto indicesShape = VMLAConversionTarget::getTensorShape(
-        scatterOp.getLoc(), indices, typeConverter, rewriter);
+        scatterOp.getLoc(), indices, *getTypeConverter(), rewriter);
     auto updateShape = VMLAConversionTarget::getTensorShape(
-        scatterOp.getLoc(), update, typeConverter, rewriter);
+        scatterOp.getLoc(), update, *getTypeConverter(), rewriter);
     auto resultShape = VMLAConversionTarget::getTensorShape(
-        scatterOp.getLoc(), result, typeConverter, rewriter);
+        scatterOp.getLoc(), result, *getTypeConverter(), rewriter);
 
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        scatterOp.getLoc(), scatterOp.getResult(), typeConverter, rewriter);
+        scatterOp.getLoc(), scatterOp.getResult(), *getTypeConverter(),
+        rewriter);
 
     SmallVector<Value, 4> lengths(rank);
     for (int i = 0; i < rank; ++i) {
@@ -555,7 +540,8 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     llvm::SmallVector<Value, 4> srcOffset(rank, zero);
     llvm::SmallVector<Value, 4> dstOffset(rank, zero);
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        scatterOp.getLoc(), scatterOp.getResult(), typeConverter, rewriter);
+        scatterOp.getLoc(), scatterOp.getResult(), *getTypeConverter(),
+        rewriter);
     rewriter.create<IREE::VMLA::CopyOp>(
         scatterOp.getLoc(), src, resultShape, srcOffset, dst, dstShape,
         dstOffset, lengths,
@@ -570,14 +556,12 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
 
     return success();
   }
-  TypeConverter &typeConverter;
 };
 
 // Converts a dynamic slice op to a copy (if the source must be preserved).
 struct DynamicSliceOpConversion
     : public OpConversionPattern<mhlo::DynamicSliceOp> {
-  DynamicSliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::DynamicSliceOp srcOp, ArrayRef<Value> rawOperands,
@@ -587,9 +571,9 @@ struct DynamicSliceOpConversion
     // a vmla.buffer.view op.
 
     auto srcShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.operand(), *getTypeConverter(), rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
-        srcOp.getLoc(), srcOp.result(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.result(), *getTypeConverter(), rewriter);
 
     int rank = srcOp.operand().getType().cast<ShapedType>().getRank();
     SmallVector<Value, 4> srcIndices(rank);
@@ -611,7 +595,7 @@ struct DynamicSliceOpConversion
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     rewriter.create<IREE::VMLA::CopyOp>(
         srcOp.getLoc(), operands.operand(), srcShape, srcIndices, dst, dstShape,
         dstIndices, lengths,
@@ -619,13 +603,10 @@ struct DynamicSliceOpConversion
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 struct CompareOpConversion : public OpConversionPattern<mhlo::CompareOp> {
-  CompareOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::CompareOp srcOp, ArrayRef<Value> rawOperands,
@@ -673,20 +654,17 @@ struct CompareOpConversion : public OpConversionPattern<mhlo::CompareOp> {
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     auto newOp = rewriter.create<IREE::VMLA::CmpOp>(
         srcOp.getLoc(), predicate, rawOperands[0], rawOperands[1], dst,
         TypeAttr::get(linputType.getElementType()));
     rewriter.replaceOp(srcOp, newOp.dst());
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 struct FiniteOpConversion : public OpConversionPattern<mhlo::IsFiniteOp> {
-  FiniteOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::IsFiniteOp srcOp, ArrayRef<Value> rawOperands,
@@ -694,14 +672,12 @@ struct FiniteOpConversion : public OpConversionPattern<mhlo::IsFiniteOp> {
     auto inputType =
         srcOp.getOperand().getType().cast<ShapedType>().getElementType();
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
-        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+        srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
     rewriter.createOrFold<IREE::VMLA::FiniteOp>(srcOp.getLoc(), rawOperands[0],
                                                 dst, TypeAttr::get(inputType));
     rewriter.replaceOp(srcOp, {dst});
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 struct SortOpConversion : public OpConversionPattern<IREE::VMLA::SortPseudoOp> {
@@ -728,8 +704,7 @@ struct SortOpConversion : public OpConversionPattern<IREE::VMLA::SortPseudoOp> {
 };
 
 struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
-  ConvertOpConversion(MLIRContext *context, TypeConverter &typeConverter)
-      : OpConversionPattern(context), typeConverter(typeConverter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mhlo::ConvertOp srcOp, ArrayRef<Value> rawOperands,
@@ -752,7 +727,7 @@ struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
         (srcType.getElementTypeBitWidth() == 8 &&
          dstType.getElementTypeBitWidth() == 1)) {
       auto dst = VMLAConversionTarget::allocateOutputBuffer(
-          srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+          srcOp.getLoc(), srcOp.getResult(), *getTypeConverter(), rewriter);
       auto bitMask = rewriter.createOrFold<mlir::ConstantIntOp>(
           srcOp.getLoc(), 1, rewriter.getI32Type());
       rewriter.createOrFold<IREE::VMLA::AndBroadcastOp>(
@@ -762,13 +737,12 @@ struct ConvertOpConversion : public OpConversionPattern<mhlo::ConvertOp> {
     } else {
       return VMLAConversionTarget::applyDefaultBufferRewrite(
           srcOp, rawOperands, VMLAOpSemantics::kDefault,
-          IREE::VMLA::ConvertOp::getOperationName(), typeConverter, rewriter);
+          IREE::VMLA::ConvertOp::getOperationName(), *getTypeConverter(),
+          rewriter);
     }
 
     return success();
   }
-
-  TypeConverter &typeConverter;
 };
 
 }  // namespace
@@ -789,8 +763,8 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
 
   // vmla.batch.matmul.pseudo
   patterns.insert<VMLAOpConversion<IREE::VMLA::BatchMatMulPseudoOp,
-                                   IREE::VMLA::BatchMatMulOp>>(context,
-                                                               typeConverter);
+                                   IREE::VMLA::BatchMatMulOp>>(typeConverter,
+                                                               context);
 
   // vmla.sort.pseudo
   patterns.insert<SortOpConversion>(context, typeConverter);
@@ -798,78 +772,78 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // Simple 1:1 conversion patterns using the automated trait-based converter.
   // Used for HLO ops that have equivalent VMLA ops such as most arithmetic ops.
   patterns.insert<VMLAOpConversion<mhlo::AddOp, IREE::VMLA::AddOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::SubOp, IREE::VMLA::SubOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::DivOp, IREE::VMLA::DivOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::MulOp, IREE::VMLA::MulOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::PowOp, IREE::VMLA::PowOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::RemOp, IREE::VMLA::RemOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::ShiftLeftOp, IREE::VMLA::ShlOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<
       VMLAOpConversion<mhlo::ShiftRightArithmeticOp, IREE::VMLA::ShrOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::ShiftRightLogicalOp, IREE::VMLA::ShrOp,
                                    VMLAOpSemantics::kForceUnsigned>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::AndOp, IREE::VMLA::AndOp>>(
-      context, typeConverter);
-  patterns.insert<VMLAOpConversion<mhlo::OrOp, IREE::VMLA::OrOp>>(
-      context, typeConverter);
+      typeConverter, context);
+  patterns.insert<VMLAOpConversion<mhlo::OrOp, IREE::VMLA::OrOp>>(typeConverter,
+                                                                  context);
   patterns.insert<VMLAOpConversion<mhlo::XorOp, IREE::VMLA::XorOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::NotOp, IREE::VMLA::NotOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::ExpOp, IREE::VMLA::ExpOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::LogOp, IREE::VMLA::LogOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::FloorOp, IREE::VMLA::FloorOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::RoundOp, IREE::VMLA::RoundOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::RsqrtOp, IREE::VMLA::RsqrtOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::SqrtOp, IREE::VMLA::SqrtOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::CosOp, IREE::VMLA::CosOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::SinOp, IREE::VMLA::SinOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::TanhOp, IREE::VMLA::TanhOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::Atan2Op, IREE::VMLA::Atan2Op>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::SelectOp, IREE::VMLA::SelectOp>>(
-      context, typeConverter);
-  patterns.insert<ConvertOpConversion>(context, typeConverter);
+      typeConverter, context);
+  patterns.insert<ConvertOpConversion>(typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::ReverseOp, IREE::VMLA::ReverseOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::TransposeOp, IREE::VMLA::TransposeOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::PadOp, IREE::VMLA::PadOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns
       .insert<VMLAOpConversion<mhlo::TorchIndexSelectOp, IREE::VMLA::GatherOp>>(
-          context, typeConverter);
+          typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::AbsOp, IREE::VMLA::AbsOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::NegOp, IREE::VMLA::NegOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::MaxOp, IREE::VMLA::MaxOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::MinOp, IREE::VMLA::MinOp>>(
-      context, typeConverter);
+      typeConverter, context);
   patterns.insert<VMLAOpConversion<mhlo::ClampOp, IREE::VMLA::ClampOp>>(
-      context, typeConverter);
+      typeConverter, context);
 
-  patterns.insert<CompareOpConversion>(context, typeConverter);
-  patterns.insert<FiniteOpConversion>(context, typeConverter);
+  patterns.insert<CompareOpConversion>(typeConverter, context);
+  patterns.insert<FiniteOpConversion>(typeConverter, context);
 
   // Ops that are only used for type information that we erase. We can elide
   // these entirely by just passing on their input values.
@@ -880,13 +854,13 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
 
   // Conversions that don't have a 1:1 mapping, mostly involving buffer views
   // or transfers.
-  patterns.insert<BroadcastInDimOpConversion>(context, typeConverter);
-  patterns.insert<ConcatenateOpConversion>(context, typeConverter);
-  patterns.insert<GatherOpConversion>(context, typeConverter);
-  patterns.insert<ScatterOpConversion>(context, typeConverter);
-  patterns.insert<SliceOpConversion>(context, typeConverter);
-  patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
-  patterns.insert<IotaOpConversion>(context, typeConverter);
+  patterns.insert<BroadcastInDimOpConversion>(typeConverter, context);
+  patterns.insert<ConcatenateOpConversion>(typeConverter, context);
+  patterns.insert<GatherOpConversion>(typeConverter, context);
+  patterns.insert<ScatterOpConversion>(typeConverter, context);
+  patterns.insert<SliceOpConversion>(typeConverter, context);
+  patterns.insert<DynamicSliceOpConversion>(typeConverter, context);
+  patterns.insert<IotaOpConversion>(context);
 
   // Tensor-level canonicalizations to reduce the op surface area of the
   // runtime.

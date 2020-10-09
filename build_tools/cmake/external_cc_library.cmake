@@ -120,7 +120,7 @@ function(external_cc_library)
         ${_RULE_SRCS}
         ${_RULE_HDRS}
     )
-    target_include_directories(${_NAME}
+    target_include_directories(${_NAME} SYSTEM
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
@@ -162,7 +162,7 @@ function(external_cc_library)
   else()
     # Generating header-only library
     add_library(${_NAME} INTERFACE)
-    target_include_directories(${_NAME}
+    target_include_directories(${_NAME} SYSTEM
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"

@@ -5,8 +5,7 @@
 #### `CMAKE_BUILD_TYPE`:STRING
 
 Sets the build type. Possible values are `Release`, `Debug`,
-`RelWithDebInfo`/`FastBuild` and `MinSizeRel`. If unset, build type is set to
-`Release`.
+`RelWithDebInfo` and `MinSizeRel`. If unset, build type is set to `Release`.
 
 #### `CMAKE_<LANG>_COMPILER`:STRING
 
