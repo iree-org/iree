@@ -26,6 +26,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// Aligns |value| to |alignment|, rounding up if needed.
+static inline uint64_t align(uint64_t value, uint64_t alignment) {
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
+static inline uint64_t align(uint64_t value, const APInt &alignment) {
+  return align(value, alignment.getZExtValue());
+}
+
 // Returns the number of bytes an element of the given type occupies
 // post-conversion. For example, the size of i1 would be '1 byte'.
 int32_t getRoundedElementByteWidth(Type type);

@@ -48,6 +48,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
+        "//iree/compiler/Dialect/HAL/Conversion/HALToHAL",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
         "@llvm-project//mlir:Pass",
     ],

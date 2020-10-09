@@ -47,6 +47,16 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TransformOptions &transformOptions) {
   passManager.addPass(createCanonicalizerPass());
 
+  // Handle large constants (weights/params/etc) first so that we can use the
+  // resulting constant pools to determine the interfaces.
+  passManager.addPass(createIdentifyConstantPoolsPass(targetOptions));
+  passManager.addPass(createPackConstantPoolStoragePass());
+  passManager.addPass(createMaterializeConstantPoolBuffersPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createSymbolDCEPass());
+
+  // Each executable needs a hal.interface to specify how the host and device
+  // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
 
   // TODO(#1036): when dynamic pass registration is supported we can just

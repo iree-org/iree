@@ -892,6 +892,75 @@ void CommandBufferDispatchSymbolOp::build(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.constant_pool
+//===----------------------------------------------------------------------===//
+
+void ConstantPoolOp::build(OpBuilder &builder, OperationState &state,
+                           StringRef name,
+                           BufferConstraintsAttr bufferConstraints) {
+  ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute("buffer_constraints", bufferConstraints);
+}
+
+static ParseResult parseConstantPoolOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  // Parse the module body.
+  auto *body = result->addRegion();
+  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
+    return failure();
+  }
+
+  // Ensure that this module has a valid terminator.
+  ConstantPoolOp::ensureTerminator(*body, parser.getBuilder(),
+                                   result->location);
+  return success();
+}
+
+static void printConstantPoolOp(OpAsmPrinter &p, ConstantPoolOp op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/false);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant_pool.load
+//===----------------------------------------------------------------------===//
+
+void ConstantPoolLoadOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "const");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant_storage.lookup
+//===----------------------------------------------------------------------===//
+
+void ConstantStorageLookupOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "storage");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant.subspan
+//===----------------------------------------------------------------------===//
+
+void ConstantSubspanOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "const_span");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.descriptor_set.create
 //===----------------------------------------------------------------------===//
 

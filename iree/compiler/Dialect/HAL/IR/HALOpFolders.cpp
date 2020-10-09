@@ -286,6 +286,42 @@ void CommandBufferDeviceOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.constant_pool.load
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Resolves hal.constant.buffer ops to their runtime hal.variable buffer.
+struct ResolveConstantPoolLoadToRuntimeBuffer
+    : public OpRewritePattern<ConstantPoolLoadOp> {
+  using OpRewritePattern<ConstantPoolLoadOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(ConstantPoolLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto *constOp = SymbolTable::lookupNearestSymbolFrom(op, op.constant());
+    SymbolRefAttr runtimeBufferSymRef;
+    ByteRangeAttr runtimeBufferRange;
+    if (auto spanOp = dyn_cast<ConstantPoolSpanOp>(constOp)) {
+      runtimeBufferSymRef = spanOp.runtime_bufferAttr();
+      runtimeBufferRange = spanOp.runtime_rangeAttr();
+    } else if (auto splatOp = dyn_cast<ConstantPoolSplatOp>(constOp)) {
+      runtimeBufferSymRef = splatOp.runtime_bufferAttr();
+      runtimeBufferRange = splatOp.runtime_rangeAttr();
+    }
+    if (!runtimeBufferSymRef || !runtimeBufferRange) return failure();
+    rewriter.replaceOpWithNewOp<IREE::HAL::ConstantSubspanOp>(
+        op, op.getType(), runtimeBufferSymRef, runtimeBufferRange);
+    return success();
+  }
+};
+
+}  // namespace
+
+void ConstantPoolLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ResolveConstantPoolLoadToRuntimeBuffer>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.device.switch
 //===----------------------------------------------------------------------===//
 

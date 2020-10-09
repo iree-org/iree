@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,32 +19,19 @@ package(
 )
 
 cc_library(
-    name = "HALToVM",
+    name = "HALToHAL",
     srcs = [
-        "ConvertAllocatorOps.cpp",
-        "ConvertBufferOps.cpp",
-        "ConvertBufferViewOps.cpp",
-        "ConvertCommandBufferOps.cpp",
         "ConvertConstantOps.cpp",
-        "ConvertControlFlowOps.cpp",
-        "ConvertDeviceOps.cpp",
-        "ConvertExecutableOps.cpp",
-        "ConvertExperimentalOps.cpp",
-        "ConvertHALToVM.cpp",
-        "ConvertSemaphoreOps.cpp",
-        "ConvertVariableOps.cpp",
+        "ConvertHALToHAL.cpp",
     ],
     hdrs = [
-        "ConvertHALToVM.h",
+        "ConvertHALToHAL.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL:hal_imports",
+        "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

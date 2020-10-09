@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,35 +16,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Conversion
+    HALToHAL
   HDRS
-    "ConversionDialectInterface.h"
-    "ConversionTarget.h"
-    "TypeConverter.h"
+    "ConvertHALToHAL.h"
   SRCS
-    "ConversionTarget.cpp"
-    "TypeConverter.cpp"
+    "ConvertConstantOps.cpp"
+    "ConvertHALToHAL.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
+    MLIRPass
     MLIRStandard
     MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    Passes
-  HDRS
-    "Passes.h"
-  DEPS
-    MLIRPass
-    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
-    iree::compiler::Dialect::HAL::Conversion::HALToHAL
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
   PUBLIC
 )
