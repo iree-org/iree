@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
@@ -201,6 +202,21 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
   } else {
     llvm_unreachable("unknown HAL type");
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Dialect hooks
+//===----------------------------------------------------------------------===//
+
+Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                           Type type, Location loc) {
+  if (type.isa<IndexType>()) {
+    // Some folders materialize raw index types, which just become std
+    // constants.
+    return builder.create<mlir::ConstantIndexOp>(
+        loc, value.cast<IntegerAttr>().getValue().getSExtValue());
+  }
+  return nullptr;
 }
 
 }  // namespace HAL

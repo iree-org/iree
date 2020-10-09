@@ -53,7 +53,7 @@ llvm::Optional<int32_t> getElementTypeValue(Type type);
 IntegerAttr getElementTypeAttr(Type type);
 
 //===----------------------------------------------------------------------===//
-// RefObject types
+// Object types
 //===----------------------------------------------------------------------===//
 
 class AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
