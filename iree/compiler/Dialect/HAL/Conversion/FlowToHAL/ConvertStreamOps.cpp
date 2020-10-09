@@ -422,7 +422,7 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   dispatchState.results = resultAdaptors;
 
   // Ask each target backend to record their dispatch logic.
-  IREE::HAL::DeviceSwitchBuilder switchBuilder(dispatchOp.getLoc(),
+  IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
                                                /*resultTypes=*/TypeRange{},
                                                device, rewriter);
   for (auto targetOp :
@@ -440,14 +440,14 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
       dispatchState.entryPointOp = *entryPointOps.begin();
 
       if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(),
-                                               dispatchState, switchBuilder))) {
+                                               dispatchState, switchRewriter))) {
         return dispatchOp.emitError()
                << "unable to record dispatch for target backend "
                << targetBackend->name();
       }
     }
   }
-  switchBuilder.build();
+  switchRewriter.build();
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could

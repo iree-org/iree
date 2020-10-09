@@ -229,7 +229,7 @@ class MaterializeResourceCachesPass
     // Each case should then cache only executables which contain a matching
     // ExecutableTargetOp.
     // Afterwards, we could inline and de-dup across switch cases.
-    DeviceSwitchBuilder2 switchBuilder(loc, /*resultTypes=*/TypeRange{},
+    DeviceSwitchBuilder switchBuilder(loc, /*resultTypes=*/TypeRange{},
                                        deviceValue, blockBuilder);
     auto targetBackends = matchTargetBackends(targetOptions_.targets);
     for (auto &targetBackend : targetBackends) {

@@ -125,7 +125,7 @@ void SPIRVTargetBackend::buildTranslationPassPipeline(
 
 LogicalResult SPIRVTargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
-    DeviceSwitchBuilder &switchBuilder) {
+    DeviceSwitchRewriter &switchRewriter) {
   // Multiple entry points might be generated for a single dispatch function.
   // Under such circumstances, we will have a special attribute indicating the
   // schedule of the split entry points. Try to see if we can find such
@@ -177,7 +177,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     }
   }
 
-  auto *region = switchBuilder.addConditionRegion(
+  auto *region = switchRewriter.addConditionRegion(
       IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
           dispatchState.workload,
@@ -185,7 +185,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       });
 
   auto &entryBlock = region->front();
-  ConversionPatternRewriter &rewriter = switchBuilder.getRewriter();
+  ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(&entryBlock);
   auto workload = entryBlock.getArgument(0);
