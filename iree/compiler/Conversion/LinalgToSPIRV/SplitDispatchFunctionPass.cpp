@@ -56,11 +56,48 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-namespace {
+/// Returns true if an op can be fused with the list of ops that are to be put
+/// in the same entry point function. This should be consistent with whatthe
+/// downstream passes can handle.
+static bool isFusableWithCurrentOpsList(
+    Operation *nextOp, ArrayRef<Operation *> currOpsList,
+    const linalg::LinalgDependenceGraph &dependenceGraph) {
+  if (currOpsList.empty()) return true;
+
+  linalg::LinalgOp dstOp = dyn_cast<linalg::LinalgOp>(nextOp);
+  linalg::LinalgOp srcOp = dyn_cast<linalg::LinalgOp>(currOpsList.back());
+  if (dstOp && srcOp) {
+    // TODO(#2963): This splits independent linalg opreations into its own
+    // dispatch, but in reality if the iteration domain of the ops are the same,
+    // and they have all iterator types parallel, they could be put in the same
+    // dispatch region.
+    if (!dependenceGraph.hasDependenceFrom(srcOp, dstOp)) return false;
+
+#define ADD_FUSABLE_PAIR(SrcOpTy, DstOpTy, DependenceTy)             \
+  if (isa<SrcOpTy>(srcOp.getOperation()) &&                          \
+      isa<DstOpTy>(dstOp.getOperation()) &&                          \
+      dependenceGraph.hasDependenceFrom(srcOp, dstOp, DependenceTy)) \
+    return true;
+
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMinOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingSumOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+
+#undef ADD_FUSABLE_PAIR
+  }
+  return false;
+}
 
 /// For the list of operations in `ops` returns a list of lists where each list
 /// contains the operations that need to be put in a separate dispatch function.
-LogicalResult separateOps(
+static LogicalResult separateOps(
     ArrayRef<Operation *> ops,
     const linalg::LinalgDependenceGraph &dependenceGraph,
     SmallVectorImpl<SmallVector<Operation *, 1>> &fusedOpList) {
@@ -86,27 +123,14 @@ LogicalResult separateOps(
 
     // If the nextOp is not fusible with the currOp, then record the list of ops
     // so far, and start a new list.
-    if (isa<linalg::LinalgOp>(*currOp) && isa<linalg::LinalgOp>(*nextOp) &&
-        dependenceGraph.hasDependenceFrom(
-            *currOp, *nextOp,
-            linalg::LinalgDependenceGraph::DependenceType::WAW)) {
-#define ADD_FUSABLE_PAIR(SrcOpTy, DstOpTy) \
-  if (isa<SrcOpTy>(*currOp) && isa<DstOpTy>(*nextOp)) continue;
-
-      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp)
-      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp)
-      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp)
-      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMinOp)
-      ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingSumOp)
-
-#undef ADD_FUSABLE_PAIR
+    if (isFusableWithCurrentOpsList(*nextOp, currList, dependenceGraph)) {
+      continue;
     }
 
     // Push the current list of ops into the list of lists `currList` and
     // start a new list.
-    SmallVector<Operation *, 2> newList;
-    std::swap(newList, currList);
-    fusedOpList.emplace_back(std::move(newList));
+    fusedOpList.emplace_back();
+    std::swap(fusedOpList.back(), currList);
   }
   currList.push_back(ops.back());
   fusedOpList.emplace_back(std::move(currList));
@@ -115,8 +139,9 @@ LogicalResult separateOps(
 
 /// Recursively collects all the operations that are referenced by given
 /// `rootOp` into `closure`.
-void collectAllReferencedOps(ArrayRef<Operation *> rootOps,
-                             llvm::SmallPtrSetImpl<Operation *> &closure) {
+static void collectAllReferencedOps(
+    ArrayRef<Operation *> rootOps,
+    llvm::SmallPtrSetImpl<Operation *> &closure) {
   llvm::SmallVector<Operation *, 8> workList;
   workList.assign(rootOps.begin(), rootOps.end());
 
@@ -136,8 +161,6 @@ void collectAllReferencedOps(ArrayRef<Operation *> rootOps,
     }
   }
 }
-
-}  // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass and patterns
