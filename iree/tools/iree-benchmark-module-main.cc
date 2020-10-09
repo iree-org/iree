@@ -60,7 +60,7 @@ namespace iree {
 namespace {
 
 void RegisterModuleBenchmarks(
-    std::string& function_name, iree_vm_context_t* context,
+    const std::string& function_name, iree_vm_context_t* context,
     iree_vm_function_t function, iree_vm_list_t* inputs,
     const std::vector<RawSignatureParser::Description>& output_descs) {
   auto benchmark_name = "BM_" + function_name;
@@ -173,7 +173,7 @@ class IREEBenchmark {
     return iree::OkStatus();
   }
 
-  Status RegisterSpecificFunction(std::string& function_name) {
+  Status RegisterSpecificFunction(const std::string& function_name) {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(input_module_->lookup_function(
         input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
@@ -196,8 +196,7 @@ class IREEBenchmark {
     }
 
     // Creates output singnature.
-    std::vector<iree::RawSignatureParser::Description> output_descs;
-    IREE_ASSIGN_OR_RETURN(output_descs, ParseOutputSignature(function));
+    IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
     RegisterModuleBenchmarks(function_name, context_, function, inputs_.get(),
                              output_descs);
     return iree::OkStatus();
@@ -205,7 +204,6 @@ class IREEBenchmark {
 
   Status RegisterAllExportedFunctions() {
     iree_vm_function_t function;
-    std::vector<iree::RawSignatureParser::Description> output_descs;
     iree_vm_module_signature_t signature =
         input_module_->signature(input_module_->self);
     for (int i = 0; i < signature.export_function_count; ++i) {
@@ -222,7 +220,7 @@ class IREEBenchmark {
                << "Expect not to have input arguments for '" << function_name
                << "'";
       }
-      IREE_ASSIGN_OR_RETURN(output_descs, ParseOutputSignature(function));
+      IREE_ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
       iree::RegisterModuleBenchmarks(function_name, context_, function,
                                      /*inputs=*/nullptr, output_descs);
     }
