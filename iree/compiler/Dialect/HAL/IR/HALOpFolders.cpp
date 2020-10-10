@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -30,7 +31,7 @@ namespace IREE {
 namespace HAL {
 
 //===----------------------------------------------------------------------===//
-// Variables
+// hal.variable.*
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -155,7 +156,173 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Buffer
+// hal.allocator.*
+//===----------------------------------------------------------------------===//
+
+// Computes the element count of a possibly-dynamic shaped tensor.
+static Value getElementCount(Location loc, Value baseValue,
+                             ValueRange shapeDims, OpBuilder &builder) {
+  Value value = baseValue;
+  for (auto dim : shapeDims) {
+    value = builder.createOrFold<mlir::MulIOp>(loc, value, dim);
+  }
+  return value;
+}
+
+namespace {
+
+/// Expands hal.allocator.compute_size to IR performing the math.
+struct ExpandAllocatorComputeSizeOp
+    : public OpRewritePattern<AllocatorComputeSizeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AllocatorComputeSizeOp op,
+                                PatternRewriter &rewriter) const override {
+    // TODO(benvanik): use buffer constraints for alignment.
+    BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
+
+    auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
+        op.getLoc(), getElementByteCount(op.element_typeAttr()));
+    auto byteSize =
+        getElementCount(op.getLoc(), elementSize, op.shape(), rewriter);
+
+    rewriter.replaceOp(op, {byteSize});
+    return success();
+  }
+};
+
+}  // namespace
+
+void AllocatorComputeSizeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandAllocatorComputeSizeOp>(context);
+}
+
+namespace {
+
+/// Expands hal.allocator.compute_offset to IR performing the math.
+struct ExpandAllocatorComputeOffsetOp
+    : public OpRewritePattern<AllocatorComputeOffsetOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AllocatorComputeOffsetOp op,
+                                PatternRewriter &rewriter) const override {
+    // TODO(benvanik): use buffer constraints.
+    BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
+
+    auto offset = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
+    for (size_t i = 0; i < op.indices().size(); ++i) {
+      // TODO(benvanik): check error case in debug builds.
+      // if (indices[i] >= shape[i]) {
+      //   return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+      //                           "index[%zu] out of bounds: %d >= %d", i,
+      //                           indices[i], shape[i]);
+      // }
+      auto axisOffset = op.indices()[i];
+      for (size_t j = i + 1; j < op.shape().size(); ++j) {
+        axisOffset = rewriter.createOrFold<mlir::MulIOp>(
+            op.getLoc(), axisOffset, op.shape()[j]);
+      }
+      offset =
+          rewriter.createOrFold<mlir::AddIOp>(op.getLoc(), offset, axisOffset);
+    }
+    auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
+        op.getLoc(), getElementByteCount(op.element_typeAttr()));
+    auto byteOffset =
+        rewriter.createOrFold<mlir::MulIOp>(op.getLoc(), offset, elementSize);
+
+    rewriter.replaceOp(op, {byteOffset});
+    return success();
+  }
+};
+
+}  // namespace
+
+void AllocatorComputeOffsetOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandAllocatorComputeOffsetOp>(context);
+}
+
+namespace {
+
+/// Expands hal.allocator.compute_range to IR performing the math.
+struct ExpandAllocatorComputeRangeOp
+    : public OpRewritePattern<AllocatorComputeRangeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AllocatorComputeRangeOp op,
+                                PatternRewriter &rewriter) const override {
+    // TODO(benvanik): use buffer constraints.
+    BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
+
+    SmallVector<Value, 6> endIndices(op.shape().size());
+    auto one = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 1);
+    for (size_t i = 0; i < endIndices.size(); ++i) {
+      endIndices[i] = rewriter.createOrFold<mlir::SubIOp>(
+          op.getLoc(),
+          rewriter.createOrFold<mlir::AddIOp>(op.getLoc(), op.indices()[i],
+                                              op.lengths()[i]),
+          one);
+    }
+
+    auto startByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
+        op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
+        op.element_typeAttr(), op.indices());
+    auto endByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
+        op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
+        op.element_typeAttr(), endIndices);
+
+    auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
+        op.getLoc(), getElementByteCount(op.element_typeAttr()));
+    auto offsetLength = rewriter.createOrFold<mlir::AddIOp>(
+        op.getLoc(),
+        rewriter.createOrFold<mlir::SubIOp>(op.getLoc(), endByteOffset,
+                                            startByteOffset),
+        elementSize);
+
+    rewriter.replaceOp(op, {startByteOffset, offsetLength});
+    return success();
+  }
+};
+
+}  // namespace
+
+void AllocatorComputeRangeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandAllocatorComputeRangeOp>(context);
+}
+
+namespace {
+
+/// Expands hal.allocator.allocate.const to an allocation and data write.
+struct ExpandAllocatorAllocateConstOp
+    : public OpRewritePattern<AllocatorAllocateConstOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AllocatorAllocateConstOp op,
+                                PatternRewriter &rewriter) const override {
+    auto hostBuffer = rewriter.createOrFold<IREE::ByteBufferConstantOp>(
+        op.getLoc(), IREE::ByteBufferType::get(rewriter.getContext()),
+        op.value());
+    auto zero = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
+    auto neg1 = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), -1);
+    auto deviceBuffer = rewriter.createOrFold<AllocatorMapOp>(
+        op.getLoc(), op.allocator(), op.memory_types(), op.buffer_usage(),
+        hostBuffer, zero, neg1);
+    rewriter.replaceOp(op, {deviceBuffer});
+    return success();
+  }
+};
+
+}  // namespace
+
+void AllocatorAllocateConstOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandAllocatorAllocateConstOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer.*
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -193,7 +360,7 @@ void BufferAllocatorOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::BufferView
+// hal.buffer_view.*
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -261,7 +428,7 @@ void BufferViewBufferOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::CommandBuffer
+// hal.command_buffer.*
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -290,8 +457,54 @@ void CommandBufferDeviceOp::getCanonicalizationPatterns(
   results.insert<SkipCommandBufferDeviceOp>(context);
 }
 
+namespace {
+
+/// Folds hal.buffer.subspans into push descriptor bindings.
+/// The binding range is always equal to or a subset of the subspan.
+struct FoldCommandBufferPushDescriptorSetBufferSubspan
+    : public OpRewritePattern<CommandBufferPushDescriptorSetOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CommandBufferPushDescriptorSetOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto bindingBuffers = llvm::to_vector<4>(op.binding_buffers());
+    auto bindingOffsets = llvm::to_vector<4>(op.binding_offsets());
+    for (size_t i = 0; i < bindingBuffers.size(); ++i) {
+      auto *definingOp = bindingBuffers[i].getDefiningOp();
+      if (!definingOp) continue;
+      if (auto subspanOp = dyn_cast<BufferSubspanOp>(definingOp)) {
+        needsUpdate = true;
+        bindingBuffers[i] = subspanOp.source_buffer();
+        bindingOffsets[i] = rewriter.createOrFold<mlir::AddIOp>(
+            subspanOp.getLoc(), subspanOp.source_offset(), bindingOffsets[i]);
+      }
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      auto mutableBindingBuffers = op.binding_buffersMutable();
+      mutableBindingBuffers.clear();
+      mutableBindingBuffers.append(bindingBuffers);
+      auto mutableBindingOffsets = op.binding_offsetsMutable();
+      mutableBindingOffsets.clear();
+      mutableBindingOffsets.append(bindingOffsets);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldCommandBufferPushDescriptorSetBufferSubspan>(context);
+}
+
 //===----------------------------------------------------------------------===//
-// hal.constant_pool.load
+// hal.constant_pool.*
 //===----------------------------------------------------------------------===//
 
 namespace {

@@ -20,49 +20,12 @@ vm.import @ex.submit_and_wait(
 // iree::hal::Allocator
 //===----------------------------------------------------------------------===//
 
-// Computes the byte size required for a buffer of the given shape and type.
-vm.import @allocator.compute_size(
-  %allocator : !vm.ref<!hal.allocator>,
-  %shape : i32 ...,
-  %element_type : i32
-) -> i32
-attributes {nosideeffects}
-
-// Computes an element byte offset within a buffer.
-vm.import @allocator.compute_offset(
-  %allocator : !vm.ref<!hal.allocator>,
-  %shape : i32 ...,
-  %element_type : i32,
-  %indices : i32 ...
-) -> i32
-attributes {nosideeffects}
-
-// Computes a byte range within a buffer for one or more elements.
-vm.import @allocator.compute_range(
-  %allocator : !vm.ref<!hal.allocator>,
-  %shape : i32 ...,
-  %element_type : i32,
-  %indices : i32 ...,
-  %lengths : i32 ...
-) -> (i32, i32)
-attributes {nosideeffects}
-
 // Allocates a buffer from the allocator.
 vm.import @allocator.allocate(
   %allocator : !vm.ref<!hal.allocator>,
   %memory_types : i32,
   %buffer_usage : i32,
   %allocation_size : i32
-) -> !vm.ref<!hal.buffer>
-
-// Allocates a buffer from the allocator with the given constant contents.
-vm.import @allocator.allocate.const(
-  %allocator : !vm.ref<!hal.allocator>,
-  %memory_types : i32,
-  %buffer_usage : i32,
-  %shape : i32 ...,
-  %element_type : i32,
-  %value : !vm.ref<!iree.byte_buffer>
 ) -> !vm.ref<!hal.buffer>
 
 // Wraps a subrange of a read-only host memory buffer.

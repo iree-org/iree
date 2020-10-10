@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -98,6 +99,14 @@ IntegerAttr getElementTypeAttr(Type type) {
                           elementType.getValue());
 }
 
+size_t getElementBitCount(IntegerAttr elementType) {
+  return static_cast<size_t>((elementType.getValue().getZExtValue()) & 0xFF);
+}
+
+size_t getElementByteCount(IntegerAttr elementType) {
+  return (getElementBitCount(elementType) + 8 - 1) / 8;
+}
+
 //===----------------------------------------------------------------------===//
 // Struct types
 //===----------------------------------------------------------------------===//
@@ -116,6 +125,45 @@ BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
       b.getIndexAttr(
           std::max(lhs.min_buffer_range_alignment().getSExtValue(),
                    rhs.min_buffer_range_alignment().getSExtValue())));
+}
+
+// TODO(benvanik): runtime buffer constraint queries from the allocator.
+// We can add folders for those when the allocator is strongly-typed with
+// #hal.buffer_constraints and otherwise leave them for runtime queries.
+BufferConstraintsAdaptor::BufferConstraintsAdaptor(Location loc,
+                                                   Value allocator)
+    : loc_(loc), allocator_(allocator) {
+  // Picked to represent what we kind of want on CPU today.
+  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferOffsetAlignment = 16ull;
+  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferRangeAlignment = 16ull;
+  Builder b(loc.getContext());
+  bufferConstraints_ = BufferConstraintsAttr::get(
+      b.getIndexAttr(maxAllocationSize),
+      b.getIndexAttr(minBufferOffsetAlignment), b.getIndexAttr(maxBufferRange),
+      b.getIndexAttr(minBufferRangeAlignment));
+}
+
+Value BufferConstraintsAdaptor::getMaxAllocationSize(OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.max_allocation_sizeAttr());
+}
+
+Value BufferConstraintsAdaptor::getMinBufferOffsetAlignment(
+    OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.min_buffer_offset_alignmentAttr());
+}
+
+Value BufferConstraintsAdaptor::getMaxBufferRange(OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.max_buffer_rangeAttr());
+}
+
+Value BufferConstraintsAdaptor::getMinBufferRangeAlignment(OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.min_buffer_range_alignmentAttr());
 }
 
 //===----------------------------------------------------------------------===//

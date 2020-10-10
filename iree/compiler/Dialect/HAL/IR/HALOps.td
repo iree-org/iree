@@ -341,13 +341,14 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
     $element_type attr-dict
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementSize
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
@@ -376,13 +377,14 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
     $element_type `,` `indices` `=` `[` $indices `]` attr-dict
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementType, ValueRange indices
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
@@ -414,7 +416,6 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
     $lengths `]` attr-dict
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value allocator,
@@ -422,6 +423,8 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
       ValueRange lengths
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
@@ -495,6 +498,8 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
       ElementsAttr value
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
@@ -1191,6 +1196,8 @@ def HAL_CommandBufferPushDescriptorSetOp :
       ArrayRef<DescriptorSetBindingValue> bindings
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_CommandBufferBindDescriptorSetOp :

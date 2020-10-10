@@ -52,6 +52,12 @@ llvm::Optional<int32_t> getElementTypeValue(Type type);
 // Returns an attribute with the MLIR element type or {}.
 IntegerAttr getElementTypeAttr(Type type);
 
+// Returns the total bit count of elements of the given type.
+size_t getElementBitCount(IntegerAttr elementType);
+
+// Returns the rounded-up byte count of elements of the given type.
+size_t getElementByteCount(IntegerAttr elementType);
+
 //===----------------------------------------------------------------------===//
 // Object types
 //===----------------------------------------------------------------------===//
@@ -136,6 +142,24 @@ class SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
 // Returns the intersection (most conservative) constraints |lhs| ∩ |rhs|.
 BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
                                                  BufferConstraintsAttr rhs);
+
+// TODO(benvanik): runtime buffer constraint queries from the allocator.
+// We can add folders for those when the allocator is strongly-typed with
+// #hal.buffer_constraints and otherwise leave them for runtime queries.
+class BufferConstraintsAdaptor {
+ public:
+  BufferConstraintsAdaptor(Location loc, Value allocator);
+
+  Value getMaxAllocationSize(OpBuilder &builder);
+  Value getMinBufferOffsetAlignment(OpBuilder &builder);
+  Value getMaxBufferRange(OpBuilder &builder);
+  Value getMinBufferRangeAlignment(OpBuilder &builder);
+
+ private:
+  Location loc_;
+  Value allocator_;
+  BufferConstraintsAttr bufferConstraints_;
+};
 
 class BufferBarrierType {
  public:

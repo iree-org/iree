@@ -20,17 +20,6 @@ func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
 
 // -----
 
-// CHECK: vm.rodata @allocatorAllocateConst_const_0 dense<123> : tensor<4x4xi32>
-// CHECK-LABEL: func @allocatorAllocateConst
-func @allocatorAllocateConst(%arg0 : !hal.allocator) -> !hal.buffer {
-  // CHECK: %allocatorAllocateConst_const_0 = vm.const.ref.rodata @allocatorAllocateConst_const_0 : !vm.ref<!iree.byte_buffer>
-  // CHECK: %ref = vm.call.variadic @hal.allocator.allocate.const(%arg0, %c6, %c2, [%c4, %c4_0], %c16777248, %allocatorAllocateConst_const_0) : (!vm.ref<!hal.allocator>, i32, i32, i32 ..., i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.buffer>
-  %buffer = hal.allocator.allocate.const %arg0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
-  return %buffer : !hal.buffer
-}
-
-// -----
-
 // CHECK-LABEL: func @allocatorMapByteBuffer
 func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !iree.byte_buffer) -> !hal.buffer {
   %offset = constant 128 : index

@@ -757,6 +757,9 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
   auto i32Type = parser.getBuilder().getIntegerType(32);
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute, 4> bindingAttrs;
+  SmallVector<Value, 4> bindingBuffers;
+  SmallVector<Value, 4> bindingOffsets;
+  SmallVector<Value, 4> bindingLengths;
   do {
     IntegerAttr bindingAttr;
     NamedAttrList attrList;
@@ -768,15 +771,15 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
         failed(parser.parseEqual()) || failed(parser.parseLParen()) ||
         failed(parser.parseOperand(buffer)) ||
         failed(parser.resolveOperand(
-            buffer, BufferType::get(result->getContext()), result->operands)) ||
+            buffer, BufferType::get(result->getContext()), bindingBuffers)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseOperand(bufferOffset)) ||
         failed(
-            parser.resolveOperand(bufferOffset, indexType, result->operands)) ||
+            parser.resolveOperand(bufferOffset, indexType, bindingOffsets)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseOperand(bufferLength)) ||
         failed(
-            parser.resolveOperand(bufferLength, indexType, result->operands)) ||
+            parser.resolveOperand(bufferLength, indexType, bindingLengths)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
@@ -784,6 +787,9 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
   } while (succeeded(parser.parseOptionalComma()));
   result->addAttribute("bindings",
                        parser.getBuilder().getArrayAttr(bindingAttrs));
+  result->addOperands(bindingBuffers);
+  result->addOperands(bindingOffsets);
+  result->addOperands(bindingLengths);
   return success();
 }
 
