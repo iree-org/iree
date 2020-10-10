@@ -62,7 +62,14 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
     TargetOptions targetOptions);
 
 //===----------------------------------------------------------------------===//
-// Module Analysis and Assignment
+// Module layout
+//===----------------------------------------------------------------------===//
+
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createHoistInlinedRodataPass();
+
+//===----------------------------------------------------------------------===//
+// Module analysis and ordinal assignment
 //===----------------------------------------------------------------------===//
 
 // Gathers all module-level global init/deinit functions into single locations
@@ -90,6 +97,7 @@ inline void registerVMPasses() {
   auto targetOptions = getTargetOptionsFromFlags();
   registerVMTransformPassPipeline();
   createConversionPass(targetOptions);
+  createHoistInlinedRodataPass();
   createGlobalInitializationPass();
   createOrdinalAllocationPass();
 }

@@ -28,8 +28,28 @@
 
 namespace mlir {
 namespace iree_compiler {
-
 namespace {
+
+//===----------------------------------------------------------------------===//
+// iree.byte_buffer.*
+//===----------------------------------------------------------------------===//
+
+class ByteBufferConstantOpConversion
+    : public OpConversionPattern<IREE::ByteBufferConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::ByteBufferConstantOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
+        op, IREE::VM::RefType::get(op.getType()), op.value());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
 
 class UnreachableOpConversion
     : public OpConversionPattern<IREE::UnreachableOp> {
@@ -52,6 +72,7 @@ class UnreachableOpConversion
 
 void populateIREEToVMPatterns(MLIRContext *context,
                               OwningRewritePatternList &patterns) {
+  patterns.insert<ByteBufferConstantOpConversion>(context);
   patterns.insert<UnreachableOpConversion>(context);
 }
 

@@ -32,6 +32,30 @@ class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
     IREE_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
+// Byte buffers and host data
+//===----------------------------------------------------------------------===//
+
+def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
+  let summary = "constant host-side byte buffer";
+  let description = [{
+    Defines a compile-time byte buffer based on the given attribute value.
+    The attribute will be serialized into the canonical IREE format for the
+    chosen host target.
+  }];
+
+  let arguments = (ins
+    ElementsAttr:$value
+  );
+  let results = (outs
+    ByteBufferType:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result) `=` $value
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Executable ABI
 //===----------------------------------------------------------------------===//
 
