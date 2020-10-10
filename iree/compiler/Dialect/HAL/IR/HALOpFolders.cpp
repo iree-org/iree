@@ -160,7 +160,7 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 
 namespace {
 
-/// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
+/// Skips a hal.buffer.allocator accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferAllocatorOp : public OpRewritePattern<BufferAllocatorOp> {
   using OpRewritePattern<BufferAllocatorOp>::OpRewritePattern;
@@ -174,6 +174,11 @@ struct SkipBufferAllocatorOp : public OpRewritePattern<BufferAllocatorOp> {
     } else if (auto allocateOp = dyn_cast_or_null<AllocatorAllocateConstOp>(
                    op.buffer().getDefiningOp())) {
       rewriter.replaceOp(op, allocateOp.allocator());
+      return success();
+    } else if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+                   op.buffer().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<BufferAllocatorOp>(op,
+                                                     subspanOp.source_buffer());
       return success();
     }
     return failure();
