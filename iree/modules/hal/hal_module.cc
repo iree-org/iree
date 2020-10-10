@@ -285,13 +285,22 @@ class HALModuleState final {
       const vm::ref<iree_hal_buffer_t>& source_buffer, int32_t source_offset,
       int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferSubspan");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferSubspan";
+    vm::ref<iree_hal_buffer_t> target_buffer;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
+        source_buffer.get(), source_offset, length, allocator_, &target_buffer))
+        << "Subspan of an existing buffer (source_offset=" << source_offset
+        << ", length=" << length << ")";
+    return target_buffer;
   }
 
   Status BufferFill(const vm::ref<iree_hal_buffer_t>& target_buffer,
                     int32_t target_offset, int32_t length, int32_t pattern) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferFill");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferFill";
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(
+        target_buffer.get(), target_offset, length, &pattern, sizeof(pattern)))
+        << "Fill range failed (target_offset=" << target_offset
+        << ", length=" << length << ")";
+    return OkStatus();
   }
 
   Status BufferReadData(const vm::ref<iree_hal_buffer_t>& source_buffer,
