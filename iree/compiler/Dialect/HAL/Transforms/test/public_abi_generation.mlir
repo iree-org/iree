@@ -14,7 +14,7 @@ func @noReflectionExport(%arg0 : tensor<4xf32>) -> tensor<4xf32>
 //   (%arg0 : tensor<4x4xi64>, %arg1 : tensor<5x6xi64>) -> tensor<5x6xi64>
 // Original func should be rewritten to export with $raw suffix with no
 // reflection metadata.
-// CHECK-SAME: {iree.module.export = "staticTwoArg$raw"}
+// CHECK-SAME: iree.module.export = "staticTwoArg$raw"
 // A new function with $async suffix based on buffer_view with wait and signal
 // semaphore arguments should be generated.
 // CHECK: func @staticTwoArg$async(%[[ARG0:.+]]: !hal.semaphore, %[[ARG1:.+]]: index, %[[ARG2:.+]]: !hal.buffer_view, %[[ARG3:.+]]: !hal.buffer_view, %[[ARG4:.+]]: !hal.semaphore, %[[ARG5:.+]]: index)
@@ -59,7 +59,7 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
 //   (%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32>
 // Original func should be rewritten to export with $raw suffix with no
 // reflection metadata.
-// CHECK-SAME: {iree.module.export = "dynamicTwoDims$raw"}
+// CHECK-SAME: iree.module.export = "dynamicTwoDims$raw"
 // A new function with $async suffix based on buffer_view with wait and signal
 // semaphore arguments should be generated.
 // CHECK: func @dynamicTwoDims$async(%[[ARG0:.+]]: !hal.semaphore, %[[ARG1:.+]]: index, %[[ARG2:.+]]: !hal.buffer_view, %[[ARG3:.+]]: !hal.semaphore, %[[ARG4:.+]]: index)

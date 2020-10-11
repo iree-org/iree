@@ -416,6 +416,7 @@ class PublicABIGenerationPass
         funcOp.setAttr("iree.module.export",
                        StringAttr::get((*exportName + "$raw").str(), ctx));
         funcOp.removeAttr("iree.reflection");
+        funcOp.setAttr("noinline", UnitAttr::get(ctx));
 
         if (reflection) {
           if (failed(generateAbiFunctions(funcOp, *exportName, reflection))) {
