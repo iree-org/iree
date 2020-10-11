@@ -38,7 +38,7 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   // The VMLA dialect expects both standard ops and the VMLA ops (in case some
   // conversion has already happened).
   addLegalOp<ModuleOp, ModuleTerminatorOp>();
-  addLegalDialect<IREE::VMLA::VMLADialect>();
+  addLegalDialect("vmla");
   // Pseudo-ops are illegal.
   // If we end up with a lot of these, consider using an "is pseudo" trait.
   addIllegalOp<IREE::VMLA::BatchMatMulPseudoOp>();

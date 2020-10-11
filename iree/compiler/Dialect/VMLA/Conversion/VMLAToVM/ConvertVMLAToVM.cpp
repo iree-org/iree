@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "iree/compiler/Dialect/VMLA/vmla.imports.h"
@@ -183,24 +184,37 @@ class VMLAConstantOpConversion
   LogicalResult matchAndRewrite(
       IREE::VMLA::ConstantOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // Encode constant data into a rodata segment. These will eventually get
-    // deduped and combined.
-    auto ip = rewriter.saveInsertionPoint();
-    auto parentFuncOp = op.getParentOfType<IREE::VM::FuncOp>();
-    rewriter.setInsertionPoint(parentFuncOp);
-    auto constName = (parentFuncOp.getName() + "_const_" +
-                      std::to_string(allocateUniqueId(parentFuncOp)))
-                         .str();
-    auto rodataOp =
-        rewriter.create<IREE::VM::RodataOp>(op.getLoc(), constName, op.value());
-    rewriter.restoreInsertionPoint(ip);
-    auto loadRodataOp =
-        rewriter.create<IREE::VM::ConstRefRodataOp>(op.getLoc(), rodataOp);
-
-    // Dereference constant data.
-    rewriter.replaceOpWithNewOp<IREE::VMLA::BufferConstOp>(
-        op, IREE::VMLA::BufferType::get(op.getContext()),
-        loadRodataOp.getResult());
+    if (auto splatAttr = op.value().dyn_cast<SplatElementsAttr>()) {
+      // Encode just a single splat element and use a buffer fill.
+      auto rodataValue = rewriter.createOrFold<IREE::VM::RodataInlineOp>(
+          op.getLoc(),
+          IREE::VM::RefType::get(IREE::ByteBufferType::get(op.getContext())),
+          DenseElementsAttr::get(
+              RankedTensorType::get({1}, splatAttr.getSplatValue().getType()),
+              splatAttr.getSplatValue()));
+      auto fillValue = rewriter.createOrFold<IREE::VMLA::BufferConstOp>(
+          op.getLoc(), IREE::VMLA::BufferType::get(op.getContext()),
+          rodataValue);
+      auto bufferLengthValue = rewriter.createOrFold<mlir::ConstantIndexOp>(
+          op.getLoc(), splatAttr.getType().cast<ShapedType>().getNumElements() *
+                           VMLATypeConverter::getRoundedElementByteWidth(
+                               splatAttr.getSplatValue().getType()));
+      auto bufferValue = rewriter.createOrFold<IREE::VMLA::BufferAllocOp>(
+          op.getLoc(), IREE::VMLA::BufferType::get(op.getContext()),
+          bufferLengthValue);
+      rewriter.create<IREE::VMLA::BufferFillOp>(op.getLoc(), fillValue,
+                                                bufferValue);
+      rewriter.replaceOp(op, bufferValue);
+    } else {
+      // Encode constant data into a rodata segment. These will eventually get
+      // deduped and combined.
+      auto rodataValue = rewriter.createOrFold<IREE::VM::RodataInlineOp>(
+          op.getLoc(),
+          IREE::VM::RefType::get(IREE::ByteBufferType::get(op.getContext())),
+          op.value());
+      rewriter.replaceOpWithNewOp<IREE::VMLA::BufferConstOp>(
+          op, IREE::VMLA::BufferType::get(op.getContext()), rodataValue);
+    }
     return success();
   }
 
