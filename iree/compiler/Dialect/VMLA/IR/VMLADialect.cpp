@@ -35,7 +35,7 @@ class VMLAToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
-  OwningModuleRef getVMImportModule() const override {
+  OwningModuleRef parseVMImportModule() const override {
     return mlir::parseSourceString(
         StringRef(vmla_imports_create()->data, vmla_imports_create()->size),
         getDialect()->getContext());
