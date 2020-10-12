@@ -147,7 +147,7 @@ void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
   tracy::MemWrite(&item->lockAnnounce.id, lock_id);
   tracy::MemWrite(&item->lockAnnounce.time, tracy::Profiler::GetTime());
   tracy::MemWrite(&item->lockAnnounce.lckloc,
-                  reinterpret_cast<uint64_t>(srcloc));
+                  reinterpret_cast<uint64_t>(src_loc));
   tracy::MemWrite(&item->lockAnnounce.type, tracy::LockType::Lockable);
   tracy::Profiler::QueueSerialFinish();
 }
@@ -161,12 +161,12 @@ void iree_tracing_mutex_terminate(uint32_t lock_id) {
 }
 
 void iree_tracing_mutex_before_lock(uint32_t lock_id) {
-  auto item = Profiler::QueueSerial();
+  auto item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockWait);
   tracy::MemWrite(&item->lockWait.thread, tracy::GetThreadHandle());
   tracy::MemWrite(&item->lockWait.id, lock_id);
   tracy::MemWrite(&item->lockWait.time, tracy::Profiler::GetTime());
-  Profiler::QueueSerialFinish();
+  tracy::Profiler::QueueSerialFinish();
 }
 
 void iree_tracing_mutex_after_lock(uint32_t lock_id) {
