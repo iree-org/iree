@@ -28,7 +28,6 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#include <sys/sysctl.h>
 #include <time.h>
 #include <unistd.h>
 
