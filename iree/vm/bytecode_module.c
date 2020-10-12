@@ -570,7 +570,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
     iree_vm_RodataSegmentDef_table_t segment =
         iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
     iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];
-    iree_atomic_store(&ref->ref_object.counter, 1);
+    iree_atomic_ref_count_init(&ref->ref_object.counter);
     ref->data.data = iree_vm_RodataSegmentDef_data(segment);
     ref->data.data_length =
         flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment));

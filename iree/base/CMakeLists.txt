@@ -455,6 +455,50 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_select_compiler_opts(_SYNCHRONIZATION_LINKOPTS
+  CLANG_OR_GCC
+    "-lpthread"
+)
+
+iree_cc_library(
+  NAME
+    synchronization
+  HDRS
+    "synchronization.h"
+  SRCS
+    "synchronization.c"
+  LINKOPTS
+    ${_SYNCHRONIZATION_LINKOPTS}
+  DEPS
+    ::api
+    ::atomics
+    ::target_platform
+    ::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    synchronization_benchmark
+  SRCS
+    "synchronization_benchmark.cc"
+  DEPS
+    ::synchronization
+    benchmark
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    synchronization_test
+  SRCS
+    "synchronization_test.cc"
+  DEPS
+    ::synchronization
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     target_platform
@@ -480,6 +524,60 @@ iree_cc_test(
     "time_test.cc"
   DEPS
     ::time
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_select_compiler_opts(_THREADING_LINKOPTS
+  CLANG_OR_GCC
+    "-ldl"
+    "-lpthread"
+)
+
+iree_cc_library(
+  NAME
+    threading
+  HDRS
+    "threading.h"
+  SRCS
+    "threading.c"
+    "threading_darwin.c"
+    "threading_impl.h"
+    "threading_pthreads.c"
+    "threading_win32.c"
+  COPTS
+    "-D_GNU_SOURCE=1"
+  LINKOPTS
+    ${_THREADING_LINKOPTS}
+  DEPS
+    ::api
+    ::atomics
+    ::synchronization
+    ::target_platform
+    ::tracing
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    threading_benchmark
+  SRCS
+    "threading_benchmark.cc"
+  DEPS
+    ::threading
+    benchmark
+    iree::testing::benchmark_main
+)
+
+iree_cc_test(
+  NAME
+    threading_test
+  SRCS
+    "threading_impl.h"
+    "threading_test.cc"
+  DEPS
+    ::synchronization
+    ::threading
     iree::testing::gtest
     iree::testing::gtest_main
 )
