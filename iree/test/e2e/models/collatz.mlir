@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
+// RUN: iree-run-mlir -export-all -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @collatz
 func @collatz() -> tensor<f32> {

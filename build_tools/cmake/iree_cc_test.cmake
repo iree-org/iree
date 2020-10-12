@@ -112,7 +112,7 @@ function(iree_cc_test)
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_TEST_NAME "${_PACKAGE_PATH}:${_RULE_NAME}")
+  set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
 
   # Case for cross-compiling towards Android.
   if(ANDROID)

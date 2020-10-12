@@ -94,7 +94,7 @@ static llvm::cl::opt<bool> split_input_file_flag{
 static llvm::cl::opt<bool> export_all_flag{
     "export-all",
     llvm::cl::desc("Adds iree.module.export to all functions"),
-    llvm::cl::init(true),
+    llvm::cl::init(false),
 };
 
 static llvm::cl::opt<bool> print_mlir_flag{
