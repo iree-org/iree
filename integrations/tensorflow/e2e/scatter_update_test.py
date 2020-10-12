@@ -55,35 +55,31 @@ class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
     super(ScatterUpdateTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(ScatterUpdateModule)
 
+  # yapf: disable
   def test_scatter_update_1D(self):
-
     def scatter_update_1D(module):
       tensor = np.ones([8], dtype=np.int32)
       indices = np.array([[4], [5], [6]], dtype=np.int32)
       updates = np.array([9, 10, 11], dtype=np.int32)
       module.scatter_update_1D(tensor, indices, updates)
-
     self.compare_backends(scatter_update_1D, self._modules)
 
   def test_scatter_update_2D(self):
-
     def scatter_update_2D(module):
       tensor = np.ones([4, 3], dtype=np.int32)
       indices = np.array([[1, 0], [2, 1], [3, 2]], dtype=np.int32)
       updates = np.array([2, 5, 8], dtype=np.int32)
       module.scatter_update_2D(tensor, indices, updates)
-
     self.compare_backends(scatter_update_2D, self._modules)
 
   def test_scatter_update_2D_slice(self):
-
     def scatter_update_2D_slice(module):
       tensor = np.ones([4, 3], dtype=np.int32)
       indices = np.array([[1]], dtype=np.int32)
       updates = np.array([[2, 3, 4]], dtype=np.int32)
       module.scatter_update_2D_slice(tensor, indices, updates)
-
     self.compare_backends(scatter_update_2D_slice, self._modules)
+  # yapf: enable
 
 
 def main(argv):
