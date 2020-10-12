@@ -209,7 +209,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
         spvFuncOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
     if (!numWorkgroupsFn) {
-      return spvFuncOp.emitError("unable to fund function ")
+      return spvFuncOp.emitError("unable to find function ")
              << numWorkgroupsFnAttr
              << " that computes the number of workgroups to use";
     }
