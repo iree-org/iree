@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test keras Model training."""
 
+from absl import app
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
@@ -77,6 +78,11 @@ class ModelTrain(tf.Module):
 
 class ModelTrainTest(tf_test_utils.TracedModuleTestCase):
 
+  def __init__(self, *args, **kwargs):
+    super(ModelTrainTest, self).__init__(*args, **kwargs)
+    self._modules = tf_test_utils.compile_tf_module(
+        ModelTrain.CreateModule, exported_names=["train_step"])
+
   def generate_regression_data(self, size=8):
     x = np.arange(size) - size // 2
     y = 1.0 * x**3 + 1.0 * x**2 + 1.0 * x + np.random.randn(size) * size
@@ -105,9 +111,13 @@ class ModelTrainTest(tf_test_utils.TracedModuleTestCase):
     self.compare_backends(train_step, self._modules)
 
 
-if __name__ == "__main__":
+def main(argv):
+  del argv  # Unused
   if hasattr(tf, "enable_v2_behavior"):
     tf.enable_v2_behavior()
-  tf_test_utils.compile_tf_module(ModelTrain.CreateModule,
-                                  exported_names=["train_step"])
+
   tf.test.main()
+
+
+if __name__ == "__main__":
+  app.run(main)
