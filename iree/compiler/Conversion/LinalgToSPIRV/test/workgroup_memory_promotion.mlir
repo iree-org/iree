@@ -43,7 +43,7 @@ module attributes {
 //       CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW2]])
 //  CHECK-SAME:       "copy_to_workgroup_memory"
 //       CHECK:     linalg.matmul
-//  CHECK-SAME:       "workgroup_memory_numprocs_ge_numiters"
+//  CHECK-SAME:       "workgroup_memory"
 //  CHECK-SAME:       ins(%[[SUBVIEW1]], %[[SUBVIEW2]]
 //  CHECK-SAME:      outs(%[[RET0SV]]
 //   CHECK-DAG:     dealloc %[[ALLOC1]] : memref<8x32xf32, 3>
@@ -56,7 +56,8 @@ module attributes {
     #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                     {max_compute_workgroup_invocations = 128 : i32,
                      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @conv_no_padding_tile() {
+  func @conv_no_padding_tile()
+    attributes {vkspv.num_workgroups_fn = @conv_no_padding_tile__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x3x2xf32>
     %1 = iree.placeholder for "interace buffer"
@@ -67,6 +68,10 @@ module attributes {
       : memref<3x4x3x2xf32>, memref<?x?x?x3xf32>, memref<?x?x?x2xf32>
     return
   }
+  func @conv_no_padding_tile__num_workgroups__
+    (!shapex.ranked_shape<[3,4,3,2]>, !shapex.ranked_shape<[?,?,?,3]>,
+     !shapex.ranked_shape<[?,?,?,2]>) -> (index, index, index)
+    attributes {symbol_visibility = "private"}
   hal.interface @legacy_io attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -77,13 +82,12 @@ module attributes {
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interace buffer" {binding = @legacy_io::@ret0
-//       CHECK:   scf.parallel (%{{.*}}, %{{.*}}, %{{.*}})
-//       CHECK:     %[[ARG1SV:.+]] = subview %[[ARG1]]
-//       CHECK:     %[[RET0SV:.+]] = subview %[[RET0]]
-//       CHECK:     %[[ALLOC1:.+]] = alloc() : memref<1x6x35x3xf32, 3>
-//       CHECK:     %[[SUBVIEW1:.+]] = subview %[[ALLOC1]]
-//       CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
-//  CHECK-SAME:        "copy_to_workgroup_memory"
-//       CHECK:     linalg.conv(%[[ARG0]], %[[SUBVIEW1]], %[[RET0SV]])
-//  CHECK-SAME:        "workgroup_memory"
-//       CHECK:     dealloc %[[ALLOC1]] : memref<1x6x35x3xf32, 3>
+//       CHECK:   %[[ARG1SV:.+]] = subview %[[ARG1]]
+//       CHECK:   %[[RET0SV:.+]] = subview %[[RET0]]
+//       CHECK:   %[[ALLOC1:.+]] = alloc() : memref<1x6x35x3xf32, 3>
+//       CHECK:   %[[SUBVIEW1:.+]] = subview %[[ALLOC1]]
+//       CHECK:   linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
+//  CHECK-SAME:      "copy_to_workgroup_memory"
+//       CHECK:   linalg.conv(%[[ARG0]], %[[SUBVIEW1]], %[[RET0SV]])
+//  CHECK-SAME:      "workgroup_memory"
+//       CHECK:   dealloc %[[ALLOC1]] : memref<1x6x35x3xf32, 3>
