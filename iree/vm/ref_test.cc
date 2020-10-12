@@ -70,8 +70,9 @@ static iree_vm_ref_t MakeRef() {
 }
 
 static int32_t ReadCounter(iree_vm_ref_t* ref) {
-  return *((iree_atomic_ref_count_t*)(((uintptr_t)ref->ptr) +
-                                      ref->offsetof_counter));
+  return iree_atomic_load_int32(
+      (iree_atomic_ref_count_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter),
+      iree_memory_order_seq_cst);
 }
 
 static iree_vm_ref_type_t kCTypeID = IREE_VM_REF_TYPE_NULL;
