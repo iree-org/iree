@@ -127,7 +127,7 @@ class IREEBenchmark {
         context_(nullptr),
         input_module_(nullptr){};
   ~IREEBenchmark() {
-    // Order matters. This is caller's responsibility to clean up the resources.
+    // Order matters.
     inputs_.reset();
     iree_vm_module_release(hal_module_);
     iree_vm_module_release(input_module_);
