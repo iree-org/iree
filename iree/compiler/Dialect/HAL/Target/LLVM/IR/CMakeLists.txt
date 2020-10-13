@@ -33,6 +33,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
+    iree::compiler::Dialect::Shape::IR
     iree::schemas::llvmir_executable_def_cc_fbs
   PUBLIC
 )

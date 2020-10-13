@@ -19,10 +19,14 @@ iree_cc_library(
     CodegenUtils
   HDRS
     "FunctionUtils.h"
+    "MarkerUtils.h"
     "MatmulCodegenStrategy.h"
+    "WorkgroupCalculation.h"
   SRCS
     "FunctionUtils.cpp"
+    "MarkerUtils.cpp"
     "MatmulCodegenStrategy.cpp"
+    "WorkgroupCalculation.cpp"
   DEPS
     LLVMSupport
     MLIRAffine
@@ -37,5 +41,9 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorToSCF
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )

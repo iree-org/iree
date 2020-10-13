@@ -154,9 +154,10 @@ Status LLVMJITExecutable::DispatchTile(DispatchState* state,
   IREE_TRACE_SCOPE0("LLVMJITExecutable::DispatchTile");
   auto* dispatch_state = static_cast<LLVMJITDispatchState*>(state);
 
-  auto func_ptr =
-      (void (*)(void**, int32_t*))dispatch_state->symbol.getAddress();
-  func_ptr(dispatch_state->args.data(), dispatch_state->push_constant.data());
+  auto func_ptr = (void (*)(void**, int32_t*, int32_t, int32_t,
+                            int32_t))dispatch_state->symbol.getAddress();
+  func_ptr(dispatch_state->args.data(), dispatch_state->push_constant.data(),
+           workgroup_xyz[0], workgroup_xyz[1], workgroup_xyz[2]);
 
   return OkStatus();
 }

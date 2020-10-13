@@ -75,6 +75,38 @@ def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
   let assemblyFormat = [{ `for` $purpose attr-dict `:` type($output) }];
 }
 
+def IREE_ThreadIdOp : IREE_Op<"thread_id"> {
+  let summary = "Get grid index of an iree thread among a specific dimension.";
+  let description = [{
+    IREE threads are logically distributed among a hypergrid, each point sampled 
+    from the grid corresponds to a logical thread. For example in a 3d grid case 
+    the op quries (x, y, z) dimensions:
+
+    ```mlir
+     %0 = iree.thread_id {dimension = "x"} : index
+     %1 = iree.thread_id {dimension = "y"} : index
+     %2 = iree.thread_id {dimension = "z"} : index
+    ```
+  }];
+  
+  let arguments = (ins StrAttr:$dimension);
+  let results = (outs Index:$result);
+
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def IREE_NumThreadsOp : IREE_Op<"num_threads"> {
+  let summary = "Get grid size of an iree thread among a specific dimension";
+  let description = [{
+    Get grid size of an iree thread among a specific dimension
+  }];
+  let arguments = (ins StrAttr:$dimension);
+ let results = (outs Index:$result);
+
+ let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+
 //===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
