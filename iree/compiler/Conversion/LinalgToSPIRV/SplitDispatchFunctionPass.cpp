@@ -35,6 +35,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -55,37 +56,94 @@ namespace iree_compiler {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-namespace {
+/// Returns true if an op can be fused with the list of ops that are to be put
+/// in the same entry point function. This should be consistent with whatthe
+/// downstream passes can handle.
+static bool isFusableWithCurrentOpsList(
+    Operation *nextOp, ArrayRef<Operation *> currOpsList,
+    const linalg::LinalgDependenceGraph &dependenceGraph) {
+  if (currOpsList.empty()) return true;
 
-/// Returns true if the Linalg ops can be separated to multiple kernels.
-bool canSeparateOps(ArrayRef<Operation *> ops) {
-  if (llvm::any_of(ops, [](Operation *op) {
-        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op))
-          return !linalgOp.hasBufferSemantics();
-        return false;
-      }))
-    return false;
+  linalg::LinalgOp dstOp = dyn_cast<linalg::LinalgOp>(nextOp);
+  linalg::LinalgOp srcOp = dyn_cast<linalg::LinalgOp>(currOpsList.back());
+  if (dstOp && srcOp) {
+    // TODO(#2963): This splits independent linalg opreations into its own
+    // dispatch, but in reality if the iteration domain of the ops are the same,
+    // and they have all iterator types parallel, they could be put in the same
+    // dispatch region.
+    if (!dependenceGraph.hasDependenceFrom(srcOp, dstOp)) return false;
 
-  // Require no other non-metadata ops interleave with Linalg structured ops for
-  // now. This is the common case and it simplifies further analysis.
+#define ADD_FUSABLE_PAIR(SrcOpTy, DstOpTy, DependenceTy)             \
+  if (isa<SrcOpTy>(srcOp.getOperation()) &&                          \
+      isa<DstOpTy>(dstOp.getOperation()) &&                          \
+      dependenceGraph.hasDependenceFrom(srcOp, dstOp, DependenceTy)) \
+    return true;
+
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::ConvOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::MatmulOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMaxOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingMinOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+    ADD_FUSABLE_PAIR(linalg::FillOp, linalg::PoolingSumOp,
+                     linalg::LinalgDependenceGraph::DependenceType::WAW)
+
+#undef ADD_FUSABLE_PAIR
+  }
+  return false;
+}
+
+/// For the list of operations in `ops` returns a list of lists where each list
+/// contains the operations that need to be put in a separate dispatch function.
+static LogicalResult separateOps(
+    ArrayRef<Operation *> ops,
+    const linalg::LinalgDependenceGraph &dependenceGraph,
+    SmallVectorImpl<SmallVector<Operation *, 1>> &fusedOpList) {
+  assert(!ops.empty() &&
+         "expected at least one separable op for splitting dispatch function");
+  SmallVector<Operation *, 1> currList;
   for (auto currOp = ops.begin(), nextOp = std::next(ops.begin());
        nextOp != ops.end(); ++currOp, ++nextOp) {
+    // Check that the operation has buffer semantics.
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*currOp)) {
+      if (!linalgOp.hasBufferSemantics()) return failure();
+    }
+
+    // Require no other non-metadata ops interleave with Linalg structured ops
+    // for now. This is the common case and it simplifies further analysis.
     Operation *iter = (*currOp)->getNextNode();
     while (iter != *nextOp && (MemoryEffectOpInterface::hasNoEffect(iter) ||
                                isa<IREE::PlaceholderOp>(iter)))
       iter = iter->getNextNode();
-    if (iter != *nextOp) return false;
-  }
+    if (iter != *nextOp) return failure();
 
-  return true;
+    currList.push_back(*currOp);
+
+    // If the nextOp is not fusible with the currOp, then record the list of ops
+    // so far, and start a new list.
+    if (isFusableWithCurrentOpsList(*nextOp, currList, dependenceGraph)) {
+      continue;
+    }
+
+    // Push the current list of ops into the list of lists `currList` and
+    // start a new list.
+    fusedOpList.emplace_back();
+    std::swap(fusedOpList.back(), currList);
+  }
+  currList.push_back(ops.back());
+  fusedOpList.emplace_back(std::move(currList));
+  return success();
 }
 
 /// Recursively collects all the operations that are referenced by given
 /// `rootOp` into `closure`.
-void collectAllReferencedOps(Operation *rootOp,
-                             llvm::SmallPtrSetImpl<Operation *> &closure) {
+static void collectAllReferencedOps(
+    ArrayRef<Operation *> rootOps,
+    llvm::SmallPtrSetImpl<Operation *> &closure) {
   llvm::SmallVector<Operation *, 8> workList;
-  workList.push_back(rootOp);
+  workList.assign(rootOps.begin(), rootOps.end());
 
   while (!workList.empty()) {
     Operation *curOp = workList.pop_back_val();
@@ -103,8 +161,6 @@ void collectAllReferencedOps(Operation *rootOp,
     }
   }
 }
-
-}  // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass and patterns
@@ -161,10 +217,16 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
       separableOps.push_back(&op);
 
   if (separableOps.size() <= 1) return success();
-  if (!canSeparateOps(separableOps)) {
+
+  linalg::Aliases aliases;
+  linalg::LinalgDependenceGraph dependenceGraph =
+      linalg::LinalgDependenceGraph::buildDependenceGraph(aliases, oldFn);
+  SmallVector<SmallVector<Operation *, 1>, 1> fusedOpsList;
+  if (failed(separateOps(separableOps, dependenceGraph, fusedOpsList))) {
     return oldFn.emitError(
         "cannot separate Linalg/Parallel ops into multiple kernels");
   }
+  if (fusedOpsList.size() <= 1) return success();
 
   ModuleOp moduleOp = cast<ModuleOp>(oldFn.getParentOp());
   Block &oldFnBlock = oldFn.getBlocks().front();
@@ -174,10 +236,11 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
   splitKernels.reserve(separableOps.size());
   llvm::SmallPtrSet<Operation *, 16> closure;
 
-  for (const auto &separableOp : llvm::enumerate(separableOps)) {
+  for (const auto &fusedOps : llvm::enumerate(fusedOpsList)) {
+    if (fusedOps.value().empty()) continue;
     // Create a new function for hosting this op.
-    splitKernels.emplace_back(llvm::formatv("{0}_dispatch_{1}", oldFn.getName(),
-                                            separableOp.index()));
+    splitKernels.emplace_back(
+        llvm::formatv("{0}_dispatch_{1}", oldFn.getName(), fusedOps.index()));
     StringRef newFnName = splitKernels.back();
     builder.setInsertionPointToStart(moduleOp.getBody());
     auto newFn = builder.create<FuncOp>(loc, newFnName, oldFn.getType());
@@ -210,7 +273,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
 
     // Collect the closure for the current Linalg op.
     closure.clear();
-    collectAllReferencedOps(separableOp.value(), closure);
+    collectAllReferencedOps(fusedOps.value(), closure);
 
     // Clone all ops in the closure to the new function.
     Block *newFnBlock = newFn.addEntryBlock();
@@ -219,7 +282,7 @@ LogicalResult SplitDispatchFunctionPass::splitDispatchFunction(
     for (Operation &op : oldFnBlock) {
       if (closure.count(&op) == 0) continue;
       builder.insert(op.clone(remapper));
-      if (&op == separableOp.value()) break;
+      if (&op == fusedOps.value().back()) break;
     }
     builder.insert(oldFnBlock.getTerminator()->clone(remapper));
   }

@@ -44,6 +44,12 @@ StringRef getCopyToWorkgroupMemoryMarker();
 /// Marker for operations that are going to be vectorized.
 StringRef getVectorizeMarker();
 
+/// Marker for tagging an operation for deletion. Tile and fuse pattern does not
+/// delete the original operation to not invalidate the
+/// `linalg::LinalgDependenceGraph` data structure. Instead it is marked with a
+/// marker that can be used later to delete these operations.
+StringRef getDeleteMarker();
+
 /// Returns true if an operation has the specified `marker`. When `marker` is
 /// empty, returns true if the operation has any marker.
 bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
