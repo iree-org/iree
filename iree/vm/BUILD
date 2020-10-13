@@ -142,6 +142,13 @@ gentbl(
 )
 
 cc_library(
+    name = "c_funcs",
+    hdrs = [
+        "c_funcs.h",
+    ],
+)
+
+cc_library(
     name = "context",
     srcs = ["context.c"],
     hdrs = ["context.h"],
@@ -387,12 +394,5 @@ cc_library(
         ":type_def",
         ":value",
         "//iree/base:api",
-    ],
-)
-
-cc_library(
-    name = "vm_c_funcs",
-    hdrs = [
-        "vm_c_funcs.h",
     ],
 )

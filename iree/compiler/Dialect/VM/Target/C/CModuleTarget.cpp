@@ -229,18 +229,18 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
            << "outer module does not contain a vm.module op";
   }
 
-  auto printInlcude = [&output](std::string include) {
+  auto printInclude = [&output](std::string include) {
     output << "#include \"" << include << "\"\n";
   };
 
-  printInlcude("iree/vm/context.h");
-  printInlcude("iree/vm/instance.h");
-  printInlcude("iree/vm/native_module.h");
-  printInlcude("iree/vm/ref.h");
-  printInlcude("iree/vm/stack.h");
+  printInclude("iree/vm/context.h");
+  printInclude("iree/vm/instance.h");
+  printInclude("iree/vm/native_module.h");
+  printInclude("iree/vm/ref.h");
+  printInclude("iree/vm/stack.h");
   output << "\n";
 
-  printInlcude("iree/vm/vm_c_funcs.h");
+  printInclude("iree/vm/c_funcs.h");
   output << "\n";
 
   for (auto moduleOp : moduleOps) {
