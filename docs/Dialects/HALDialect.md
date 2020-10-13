@@ -1495,24 +1495,6 @@ return the same types.
 | :----: | ----------- |
 `results` | any type
 
-### `hal.ex.defer_release` (::mlir::iree_compiler::IREE::HAL::ExDeferReleaseOp)
-
-
-
-
-Syntax:
-
-```
-operation ::= `hal.ex.defer_release` $operand `:` type($operand) attr-dict
-```
-
-
-#### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-`operand` | allocator or buffer or buffer_view or command_buffer or descriptor_set or descriptor_set_layout or device or event or executable or executable_cache or executable_layout or ring_buffer or semaphore
-
 ### `hal.ex.shared_device` (::mlir::iree_compiler::IREE::HAL::ExSharedDeviceOp)
 
 
