@@ -128,11 +128,11 @@ Status RunModuleAndUpdateImGuiWindow(
                ImGuiWindowFlags_AlwaysAutoResize);
 
   ImGui::Text("Entry function:");
-  ImGui::Text(function_name.c_str());
+  ImGui::Text("%s", function_name.c_str());
   ImGui::Separator();
 
   ImGui::Text("Invocation result:");
-  ImGui::Text(oss.str().c_str());
+  ImGui::Text("%s", oss.str().c_str());
   ImGui::Separator();
 
   // Framerate counter.

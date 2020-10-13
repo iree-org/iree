@@ -103,9 +103,6 @@ static Value allocateOutputBuffer(Value streamValue, Value externalValue,
                                                   bufferUsage, allocationSize)
           .getResult();
 
-  // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(loc, buffer);
-
   return buffer;
 }
 
@@ -159,9 +156,6 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
           .create<IREE::HAL::AllocatorAllocateOp>(loc, allocator, memoryTypes,
                                                   bufferUsage, allocationSize)
           .getResult();
-
-  // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(loc, buffer);
 
   return buffer;
 }
@@ -502,14 +496,6 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
       updateOp.getLoc(), commandBuffer, update->getBuffer(), zeroOffset,
       result->getBuffer(), targetRange->offset, targetRange->length);
-
-  // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               target->getBuffer());
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               update->getBuffer());
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               result->getBuffer());
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could

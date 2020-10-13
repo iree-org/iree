@@ -339,7 +339,7 @@ class RefObject {
   RefObject(const RefObject&) = default;
   RefObject& operator=(const RefObject&) { return *this; }
 
-  std::atomic<intptr_t> counter_{0};
+  std::atomic<int32_t> counter_{0};
 };
 
 // Various comparison operator overloads.

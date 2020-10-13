@@ -77,9 +77,6 @@ class ConstantTensorOpConversion
     auto buffer = rewriter.createOrFold<IREE::HAL::AllocatorAllocateConstOp>(
         constantOp.getLoc(), allocator, memoryTypes, bufferUsage, elementsAttr);
 
-    // TODO(benvanik): implement resource sets.
-    rewriter.create<IREE::HAL::ExDeferReleaseOp>(constantOp.getLoc(), buffer);
-
     rewriter.replaceOp(constantOp, {buffer});
     return success();
   }

@@ -38,6 +38,7 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-benchmark-module
+    iree::tools::iree-translate
   LABELS
     "hostonly"
 )

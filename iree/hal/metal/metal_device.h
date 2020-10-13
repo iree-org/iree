@@ -22,6 +22,7 @@
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
 #include "iree/hal/allocator.h"
+#include "iree/hal/debug_capture_manager.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
 #include "iree/hal/semaphore.h"
@@ -35,8 +36,9 @@ class MetalDevice final : public Device {
  public:
   // Creates a device that retains the underlying Metal GPU device.
   // The DriverDeviceID in |device_info| is expected to be an id<MTLDevice>.
-  static StatusOr<ref_ptr<MetalDevice>> Create(ref_ptr<Driver> driver,
-                                               const DeviceInfo& device_info);
+  static StatusOr<ref_ptr<MetalDevice>> Create(
+      ref_ptr<Driver> driver, const DeviceInfo& device_info,
+      DebugCaptureManager* debug_capture_manager);
 
   ~MetalDevice() override;
 
@@ -81,7 +83,8 @@ class MetalDevice final : public Device {
   Status WaitIdle(Time deadline_ns) override;
 
  private:
-  MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info);
+  MetalDevice(ref_ptr<Driver> driver, const DeviceInfo& device_info,
+              DebugCaptureManager* debug_capture_manager);
 
   ref_ptr<Driver> driver_;
   id<MTLDevice> metal_handle_;
@@ -102,6 +105,8 @@ class MetalDevice final : public Device {
   // semaphore.
   dispatch_queue_t wait_notifier_;
   MTLSharedEventListener* event_listener_;
+
+  DebugCaptureManager* debug_capture_manager_ = nullptr;
 };
 
 }  // namespace metal

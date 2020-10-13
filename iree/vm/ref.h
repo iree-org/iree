@@ -65,7 +65,7 @@ typedef enum {
 // Usage (C++):
 //  Prefer using RefObject as a base type.
 typedef struct {
-  iree_atomic_intptr_t counter;
+  iree_atomic_ref_count_t counter;
 } iree_vm_ref_object_t;
 
 // A pointer reference to a reference-counted object.
@@ -82,7 +82,7 @@ typedef struct {
   // Pointer to the object. Type is resolved based on the |type| field.
   // Will be NULL if the reference points to nothing.
   void* ptr;
-  // Offset from ptr, in bytes, to the start of an atomic_intptr_t representing
+  // Offset from ptr, in bytes, to the start of an atomic_int32_t representing
   // the current reference count. We store this here to avoid the need for an
   // indirection in the (extremely common) case of just reference count inc/dec.
   uint32_t offsetof_counter : 8;
@@ -103,7 +103,7 @@ typedef struct {
   // Function called when references of this type reach 0 and should be
   // destroyed.
   iree_vm_ref_destroy_t destroy;
-  // Offset from ptr, in bytes, to the start of an atomic_intptr_t representing
+  // Offset from ptr, in bytes, to the start of an atomic_int32_t representing
   // the current reference count.
   uint32_t offsetof_counter : 8;
   // The type ID assigned to this type from the iree_vm_ref_type_t table (or an

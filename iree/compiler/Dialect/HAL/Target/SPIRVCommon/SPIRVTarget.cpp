@@ -188,7 +188,6 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(&entryBlock);
-  auto workload = entryBlock.getArgument(0);
   auto commandBuffer = entryBlock.getArgument(1);
 
   // We have multiple entry points to dispatch. Record in the order
@@ -196,28 +195,27 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
   // ones.
   for (auto it : llvm::enumerate(spvEntryPointFns)) {
     spirv::FuncOp spvFuncOp = it.value();
-    auto workgroupSize = calculateDispatchWorkgroupSize(
-        loc, spvModuleOp, spvFuncOp.sym_name(), workload, rewriter);
 
     FlatSymbolRefAttr numWorkgroupsFnAttr =
         spvFuncOp.getAttrOfType<FlatSymbolRefAttr>(
             getNumWorkgroupsFnAttrName());
+    if (!numWorkgroupsFnAttr) {
+      return spvFuncOp.emitError(
+          "expected vkspv.num_workgroups_fn attribute to refer to function "
+          "that computes number of workgroups to use");
+    }
 
     std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
-    if (numWorkgroupsFnAttr) {
-      FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-          spvFuncOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
-      if (!numWorkgroupsFn) return failure();
-      // Assume only one interface op per executable, which we control by not
-      // linking executables together (at all, or with different interfaces).
-      workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
-          loc, numWorkgroupsFn,
-          dispatchState.executableOp.getFirstInterfaceOp(),
-          dispatchState.operands, dispatchState.results, rewriter);
-    } else {
-      workgroupCount = calculateDispatchWorkgroupCount(loc, workload,
-                                                       workgroupSize, rewriter);
+    FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
+        spvFuncOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
+    if (!numWorkgroupsFn) {
+      return spvFuncOp.emitError("unable to find function ")
+             << numWorkgroupsFnAttr
+             << " that computes the number of workgroups to use";
     }
+    workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
+        loc, numWorkgroupsFn, dispatchState.executableOp.getFirstInterfaceOp(),
+        dispatchState.operands, dispatchState.results, rewriter);
 
     if (llvm::any_of(workgroupCount,
                      [](Value v) -> bool { return v == nullptr; }))

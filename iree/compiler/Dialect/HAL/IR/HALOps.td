@@ -50,15 +50,6 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
-// TODO(benvanik): replace with resource sets.
-def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
-  let arguments = (ins
-    HAL_ObjectType:$operand
-  );
-
-  let assemblyFormat = "$operand `:` type($operand) attr-dict";
-}
-
 def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
   let arguments = (ins
     HAL_Device:$device,

@@ -26,7 +26,9 @@ namespace metal {
 
 MetalCommandQueue::MetalCommandQueue(std::string name, CommandCategoryBitfield supported_categories,
                                      id<MTLCommandQueue> queue)
-    : CommandQueue(std::move(name), supported_categories), metal_handle_([queue retain]) {}
+    : CommandQueue(std::move(name), supported_categories), metal_handle_([queue retain]) {
+  metal_handle_.label = @"IREE MetalQueue";
+}
 
 MetalCommandQueue::~MetalCommandQueue() { [metal_handle_ release]; }
 
@@ -37,6 +39,8 @@ Status MetalCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
       // Wait for semaphores blocking this batch.
       if (!batch.wait_semaphores.empty()) {
         id<MTLCommandBuffer> wait_buffer = [metal_handle_ commandBufferWithUnretainedReferences];
+        wait_buffer.label = @"IREE MetalCommandQueue::Submit Wait Semaphore CommandBuffer";
+
         for (const auto& semaphore : batch.wait_semaphores) {
           auto* event = static_cast<MetalSharedEvent*>(semaphore.semaphore);
           [wait_buffer encodeWaitForEvent:event->handle() value:semaphore.value];
@@ -53,6 +57,8 @@ Status MetalCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
       // Signal semaphores advanced by this batch.
       if (!batch.signal_semaphores.empty()) {
         id<MTLCommandBuffer> signal_buffer = [metal_handle_ commandBufferWithUnretainedReferences];
+        signal_buffer.label = @"IREE MetalCommandQueue::Submit Signal Semaphore CommandBuffer";
+
         for (const auto& semaphore : batch.signal_semaphores) {
           auto* event = static_cast<MetalSharedEvent*>(semaphore.semaphore);
           [signal_buffer encodeSignalEvent:event->handle() value:semaphore.value];
@@ -73,6 +79,7 @@ Status MetalCommandQueue::WaitIdle(Time deadline_ns) {
   // work has completed too.
   @autoreleasepool {
     id<MTLCommandBuffer> comand_buffer = [metal_handle_ commandBufferWithUnretainedReferences];
+    comand_buffer.label = @"IREE MetalCommandQueue::WaitIdle Command Buffer";
     __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
     [comand_buffer addCompletedHandler:^(id<MTLCommandBuffer>) {
       dispatch_semaphore_signal(work_done);

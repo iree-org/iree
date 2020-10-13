@@ -15,11 +15,22 @@
 #ifndef IREE_HAL_METAL_METAL_DRIVER_H_
 #define IREE_HAL_METAL_METAL_DRIVER_H_
 
+#include <memory>
+#include <string>
+
+#include "iree/hal/debug_capture_manager.h"
 #include "iree/hal/driver.h"
 
 namespace iree {
 namespace hal {
 namespace metal {
+
+struct MetalDriverOptions {
+  // Whether to enable Metal command capture.
+  bool enable_capture;
+  // The file to contain the Metal capture. Empty means capturing to Xcode.
+  std::string capture_file;
+};
 
 // A pseudo Metal GPU driver which retains all available Metal GPU devices
 // during its lifetime.
@@ -27,7 +38,8 @@ namespace metal {
 // It uses the DriverDeviceID to store the underlying id<MTLDevice>.
 class MetalDriver final : public Driver {
  public:
-  static StatusOr<ref_ptr<MetalDriver>> Create();
+  static StatusOr<ref_ptr<MetalDriver>> Create(
+      const MetalDriverOptions& options);
 
   ~MetalDriver() override;
 
@@ -38,9 +50,12 @@ class MetalDriver final : public Driver {
   StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
 
  private:
-  explicit MetalDriver(std::vector<DeviceInfo> devices);
+  MetalDriver(std::vector<DeviceInfo> devices,
+              std::unique_ptr<DebugCaptureManager> debug_capture_manager);
 
   std::vector<DeviceInfo> devices_;
+
+  std::unique_ptr<DebugCaptureManager> debug_capture_manager_;
 };
 
 }  // namespace metal

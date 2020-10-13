@@ -449,13 +449,8 @@ static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
 }
 
 /// Distributes scf.parallel to workitems using local invocation ID.
-static LogicalResult mapToLocalInvocationId(
-    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    bool useCyclicDistribution = false) {
-  if (useCyclicDistribution) {
-    return distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
-        rewriter, pLoopOp);
-  }
+static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
+                                            scf::ParallelOp pLoopOp) {
   return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
                                                gpu::BlockDimOp>(rewriter,
                                                                 pLoopOp);
@@ -546,9 +541,7 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
   if (loops.getValue().empty()) return success();
 
   auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
-  return mapToLocalInvocationId(
-      rewriter, pLoopOp,
-      hasMarker(linalgOp, {getWorkgroupMarker(), getWorkgroupMemoryMarker()}));
+  return mapToLocalInvocationId(rewriter, pLoopOp);
 }
 
 static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,

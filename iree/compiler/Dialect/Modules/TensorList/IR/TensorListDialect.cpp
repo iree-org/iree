@@ -37,7 +37,7 @@ class TensorListToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
-  OwningModuleRef getVMImportModule() const override {
+  OwningModuleRef parseVMImportModule() const override {
     return mlir::parseSourceString(StringRef(tensorlist_imports_create()->data,
                                              tensorlist_imports_create()->size),
                                    getDialect()->getContext());

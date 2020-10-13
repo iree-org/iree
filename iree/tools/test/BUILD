@@ -41,6 +41,7 @@ iree_lit_test_suite(
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",
+        "//iree/tools:iree-translate",
     ],
     tags = ["hostonly"],
 )

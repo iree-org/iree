@@ -22,7 +22,7 @@
 #include "iree/base/tracing.h"
 
 struct iree_vm_context {
-  iree_atomic_intptr_t ref_count;
+  iree_atomic_ref_count_t ref_count;
   iree_vm_instance_t* instance;
   iree_allocator_t allocator;
   intptr_t context_id;
@@ -209,13 +209,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
 
   iree_vm_context_t* context = NULL;
   iree_allocator_malloc(allocator, context_size, (void**)&context);
-  iree_atomic_store(&context->ref_count, 1);
+  iree_atomic_ref_count_init(&context->ref_count);
   context->instance = instance;
   iree_vm_instance_retain(context->instance);
   context->allocator = allocator;
 
-  static iree_atomic_intptr_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
-  context->context_id = iree_atomic_fetch_add(&next_context_id, 1);
+  static iree_atomic_int32_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
+  context->context_id = iree_atomic_fetch_add_int32(&next_context_id, 1,
+                                                    iree_memory_order_seq_cst);
 
   uint8_t* p = (uint8_t*)context + sizeof(iree_vm_context_t);
   context->list.modules = (iree_vm_module_t**)p;
@@ -266,13 +267,13 @@ static void iree_vm_context_destroy(iree_vm_context_t* context) {
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_retain(iree_vm_context_t* context) {
   if (context) {
-    iree_atomic_fetch_add(&context->ref_count, 1);
+    iree_atomic_ref_count_inc(&context->ref_count);
   }
 }
 
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context) {
-  if (context && iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
+  if (context && iree_atomic_ref_count_dec(&context->ref_count) == 1) {
     iree_vm_context_destroy(context);
   }
 }

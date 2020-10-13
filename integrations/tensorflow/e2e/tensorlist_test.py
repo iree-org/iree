@@ -74,45 +74,37 @@ class TensorListTest(tf_test_utils.TracedModuleTestCase):
     super(TensorListTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(TensorListModule)
 
+  # yapf: disable
   def test_identity_through_tensorlist(self):
-
     def identity_through_tensorlist(module):
       module.identity_through_tensorlist(np.array(42., dtype=np.float32))
-
     self.compare_backends(identity_through_tensorlist, self._modules)
 
   def test_add_through_tensorlist(self):
-
     def add_through_tensorlist(module):
       module.add_through_tensorlist(np.array(42., dtype=np.float32),
                                     np.array(43., dtype=np.float32))
-
     self.compare_backends(add_through_tensorlist, self._modules)
 
   def test_slice_first_element_with_from_tensor(self):
-
     def slice_first_element_with_from_tensor(module):
       module.slice_first_element_with_from_tensor(
           np.arange(STATIC_SIZE, dtype=np.float32))
-
     self.compare_backends(slice_first_element_with_from_tensor, self._modules)
 
   def test_slice_first_element_with_from_tensor_high_rank(self):
-
     def slice_first_element_with_from_tensor_high_rank(module):
       module.slice_first_element_with_from_tensor_high_rank(
           tf_utils.ndarange([STATIC_SIZE, STATIC_SIZE]))
-
     self.compare_backends(slice_first_element_with_from_tensor_high_rank,
                           self._modules)
 
   def test_concat_with_tensorlist_stack(self):
-
     def concat_with_tensorlist_stack(module):
       module.concat_with_tensorlist_stack(np.array(42., dtype=np.float32),
                                           np.array(43., dtype=np.float32))
-
     self.compare_backends(concat_with_tensorlist_stack, self._modules)
+  # yapf: enable
 
 
 def main(argv):
