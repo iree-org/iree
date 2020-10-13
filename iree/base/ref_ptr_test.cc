@@ -214,11 +214,12 @@ TEST(RefPtrTest, Move) {
   EXPECT_NE(nullptr, b.get());
 }
 
-// TODO(#3451): Fix test under ASAN
-TEST(RefPtrTest, DISABLED_MoveCompatible) {
+TEST(RefPtrTest, MoveCompatible) {
   struct MyBaseType : public RefObject<MyBaseType> {
     int x = 5;
     using RefObject<MyBaseType>::counter_;  // Expose for testing.
+
+    virtual ~MyBaseType() = default;
   };
   struct MyTypeA : public MyBaseType {
     int a = 6;
