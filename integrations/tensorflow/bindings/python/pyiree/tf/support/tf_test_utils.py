@@ -758,7 +758,7 @@ class TracedModuleTestCase(tf.test.TestCase):
       failed_backends = [
           tar_traces[i].backend_id for i in failed_backend_indices
       ]
-      error_list = '\n  - ' + '\n  - '.join(error_messages)
+      error_list = ''.join([f'\n  - {message}' for message in error_messages])
       self.fail(
           "Comparison between the reference backend and the following targets "
           f"failed: {failed_backends}. Errors: {error_list}\n"
