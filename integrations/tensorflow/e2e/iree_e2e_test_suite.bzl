@@ -20,6 +20,7 @@ def iree_e2e_test_suite(
         name,
         backends_to_srcs,
         reference_backend,
+        data = None,  # DO NOT SUBMIT
         deps = None,
         size = None,
         tags = None,
@@ -34,6 +35,8 @@ def iree_e2e_test_suite(
         a dictionary mapping backends to a list of test files to run on them.
       reference_backend:
         the backend to use as a source of truth for the expected output results.
+      data:
+        external data for iree_py_test.
       deps:
         test dependencies.
       tags:
@@ -72,6 +75,7 @@ def iree_e2e_test_suite(
                 name = test_name,
                 main = src,
                 srcs = [src],
+                data = data,
                 deps = deps,
                 args = args,
                 size = size,
