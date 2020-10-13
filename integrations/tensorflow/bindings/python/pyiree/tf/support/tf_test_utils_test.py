@@ -171,7 +171,9 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
     vmla_trace = tf_test_utils.Trace(vmla_module, vmla_function)
     vmla_function(tf_test_utils.TracedModule(vmla_module, vmla_trace))
 
-    self.assertFalse(tf_test_utils.Trace.compare_traces(tf_trace, vmla_trace))
+    same, error_messages = tf_test_utils.Trace.compare_traces(
+        tf_trace, vmla_trace)
+    self.assertFalse(same)
 
   def test_trace_serialize_and_load(self):
 

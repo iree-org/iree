@@ -424,7 +424,7 @@ class Trace:
               "Floating point difference between ref and tar was within "
               "tolerance. %s", diff_string)
         return same, error
-      else:
+      elif np.issubdtype(ref.dtype, np.integer):
         same = np.array_equal(ref, tar)
         if not same:
           abs_diff = np.max(np.abs(ref - tar))
@@ -434,6 +434,8 @@ class Trace:
         else:
           error = None
         return same, error
+      else:
+        return np.array_equal(ref, tar), None
 
     # Base check for native number types.
     elif isinstance(ref, (int, float)):
