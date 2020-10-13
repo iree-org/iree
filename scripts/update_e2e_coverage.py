@@ -50,6 +50,15 @@ TEST_SUITES_TO_HEADERS = {
         'End to end tests of TensorFlow slim vision models',
 }
 
+# Key to use as the name of the rows in the left column for each test in the
+# suite.
+TEST_SUITE_TO_ROW_ID_KEY = {
+    '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
+        'model',
+    '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
+        'model',
+}
+
 # Some test suites are generated from a single source. This allows us to point
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
@@ -101,6 +110,34 @@ def parse_arguments():
   return parsed_args
 
 
+def parse_test_name(test_name, test_suite):
+  """Splits a test name into a dictionary with its source file and backend."""
+  test_name = test_name.split("__")
+  test_info = {}
+
+  # The iree_e2e_test_suite elides a 'src' key before the name of the test
+  # of brevity.
+  if len(test_name) % 2 == 1:
+    test_info['src'] = test_name.pop(0)
+
+  # The rest of the test name should follow 'key__value__key__value__...'.
+  for key, value in zip(test_name[::2], test_name[1::2]):
+    test_info[key] = value
+
+  # Default to using the test source file name as the row id for the table.
+  if 'src' in test_info:
+    test_info['row_id'] = test_info['src']
+  else:
+    test_info['src'] = SINGLE_SOURCE_SUITES[test_suite]
+    test_info['row_id'] = test_info[TEST_SUITE_TO_ROW_ID_KEY[test_suite]]
+
+  if 'target_backends' not in test_info:
+    raise ValueError('Expected `target_backends` to be in the test name but '
+                     f'got `{test_name}`.')
+
+  return test_info
+
+
 def get_name_and_backend(test_string):
   """Splits a pathless test target into its name and comparison backend."""
   name, backend = test_string.split(f'__{REFERENCE_BACKEND}__')
@@ -113,42 +150,41 @@ def get_suite_metadata(test_suite):
   failing = utils.get_test_targets(f'{test_suite}_failing')
 
   # Remove bazel path.
-  passing = [test.replace(f'{test_suite}_', '') for test in passing]
-  failing = [test.replace(f'{test_suite}_failing_', '') for test in failing]
+  passing = [test.replace(f'{test_suite}__', '') for test in passing]
+  failing = [test.replace(f'{test_suite}_failing__', '') for test in failing]
 
-  # Split into (test_name, target_backend).
-  passing = [get_name_and_backend(test) for test in passing]
-  failing = [get_name_and_backend(test) for test in failing]
-  passing_names = [test[0] for test in passing]
-  failing_names = [test[0] for test in failing]
-  all_names = list(sorted(set(passing_names + failing_names)))
-  return all_names, passing, failing
+  # Split into a dictionary mapping 'src', 'target_backend', ... to the
+  # appropriate values for each test target.
+  passing_info = [parse_test_name(test, test_suite) for test in passing]
+  failing_info = [parse_test_name(test, test_suite) for test in failing]
+  return passing_info, failing_info
 
 
-def get_name_element(test_suite, name):
+def get_row_hyperlink(test_suite, row_id, test_source):
   """Returns a Markdown hyperlink pointing to the test source on GitHub."""
   # Convert `//path/to/tests:test_suite` to `path/to/tests`
-  test_path = test_suite.split(':')[0]
-  test_path = test_path.replace('//', '')
+  test_path = test_suite.replace('//', '').split(':')[0]
 
-  if test_suite in SINGLE_SOURCE_SUITES:
-    test_name = SINGLE_SOURCE_SUITES[test_suite]
-  else:
-    test_name = name
-
-  test_url = os.path.join(MAIN_URL, test_path, f'{test_name}.py')
-  return f'[{name}]({test_url})'
+  test_url = os.path.join(MAIN_URL, test_path, f'{test_source}.py')
+  return f'[{row_id}]({test_url})'
 
 
 def generate_table(test_suite):
   """Generates an e2e backend coverage Markdown table."""
-  all_names, passing, _ = get_suite_metadata(test_suite)
+  passing_info, _ = get_suite_metadata(test_suite)
 
-  # Generate a dictionary mapping test names to their backend coverage.
+  # Create a dictionary mapping row names to source file names.
+  row_id_to_source = {}
+  for test_info in passing_info:
+    row_id_to_source[test_info['row_id']] = test_info['src']
+
+  # Create a dictionary mapping test names to a list of bools representing their
+  # backend coverage.
   table = collections.defaultdict(lambda: [False] * len(BACKENDS_TO_TITLES))
   ordered_backends = list(BACKENDS_TO_TITLES.keys())
-  for name, backend in passing:
-    table[name][ordered_backends.index(backend)] = True
+  for test_info in passing_info:
+    backend_index = ordered_backends.index(test_info['target_backends'])
+    table[test_info['row_id']][backend_index] = True
 
   # Create a header for the coverage table.
   ordered_backend_titles = list(BACKENDS_TO_TITLES.values())
@@ -157,11 +193,12 @@ def generate_table(test_suite):
 
   # Generate the coverage table as a 2D array.
   rows = [first_row, second_row]
-  for name, backends in sorted(table.items()):
-    if any(re.match(pattern, name) for pattern in TARGET_EXCLUSION_FILTERS):
+  for row_id, backends in sorted(table.items()):
+    # Skip any rows defined in the TARGET_EXCLUSION_FILTERS.
+    if any(re.match(pattern, row_id) for pattern in TARGET_EXCLUSION_FILTERS):
       continue
 
-    row = [get_name_element(test_suite, name)]
+    row = [get_row_hyperlink(test_suite, row_id, row_id_to_source[row_id])]
     row.extend([
         SUCCESS_ELEMENT if backend else FAILURE_ELEMENT for backend in backends
     ])

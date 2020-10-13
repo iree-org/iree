@@ -25,8 +25,8 @@ load(
     "iree_py_binary",
 )
 load(
-    "//integrations/tensorflow/e2e/slim_vision_models:iree_slim_vision_test_suite.bzl",
-    "iree_slim_vision_test_suite",
+    "//integrations/tensorflow/e2e:iree_e2e_product_test_suite.bzl",
+    "iree_e2e_product_test_suite",
 )
 
 package(
@@ -47,33 +47,18 @@ iree_py_binary(
     ],
 )
 
-iree_slim_vision_test_suite(
+iree_e2e_product_test_suite(
     name = "slim_vision_tests",
     size = "enormous",
-    backends = [
-        "tf",
-        "tflite",
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
+    srcs = ["slim_vision_model_test.py"],
     failing_configurations = [
         {
             # SavedModelV2 (classification/4) not available.
-            "models": [
-                "amoebanet_a_n18_f448",
-            ],
-            "backends": [
-                "tf",
-                "tflite",
-                "iree_vmla",
-                "iree_llvmjit",
-                "iree_vulkan",
-            ],
+            "model": "amoebanet_a_n18_f448",
         },
         {
             # Failing llvmjit and vulkan:
-            "models": [
+            "model": [
                 "nasnet_mobile",
                 "nasnet_large",
                 "pnasnet_large",
@@ -81,84 +66,95 @@ iree_slim_vision_test_suite(
                 "resnet_v2_101",
                 "resnet_v2_152",
             ],
-            "backends": [
+            "target_backends": [
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
         },
         {
             # Failing vulkan:
-            "models": [
+            "model": [
                 # [ERROR]: cannot separate Linalg/Parallel ops into multiple kernels
                 "inception_v1",
                 "inception_v2",
                 "inception_v3",
                 "inception_resnet_v2",
             ],
-            "backends": [
+            "target_backends": [
                 "iree_vulkan",
             ],
         },
     ],
-    models = [
-        "amoebanet_a_n18_f448",
-        "inception_resnet_v2",
-        "inception_v1",
-        "inception_v2",
-        "inception_v3",
-        # MobileNetV1
-        "mobilenet_v1_025_128",
-        "mobilenet_v1_025_160",
-        "mobilenet_v1_025_192",
-        "mobilenet_v1_025_224",
-        "mobilenet_v1_050_128",
-        "mobilenet_v1_050_160",
-        "mobilenet_v1_050_192",
-        "mobilenet_v1_050_224",
-        "mobilenet_v1_075_128",
-        "mobilenet_v1_075_160",
-        "mobilenet_v1_075_192",
-        "mobilenet_v1_075_224",
-        "mobilenet_v1_100_128",
-        "mobilenet_v1_100_160",
-        "mobilenet_v1_100_192",
-        "mobilenet_v1_100_224",
-        # MobileNetV2:
-        "mobilenet_v2_035_96",
-        "mobilenet_v2_035_128",
-        "mobilenet_v2_035_160",
-        "mobilenet_v2_035_192",
-        "mobilenet_v2_035_224",
-        "mobilenet_v2_050_96",
-        "mobilenet_v2_050_128",
-        "mobilenet_v2_050_160",
-        "mobilenet_v2_050_192",
-        "mobilenet_v2_050_224",
-        "mobilenet_v2_075_96",
-        "mobilenet_v2_075_128",
-        "mobilenet_v2_075_160",
-        "mobilenet_v2_075_192",
-        "mobilenet_v2_075_224",
-        "mobilenet_v2_100_96",
-        "mobilenet_v2_100_128",
-        "mobilenet_v2_100_160",
-        "mobilenet_v2_100_192",
-        "mobilenet_v2_100_224",
-        "mobilenet_v2_130_224",
-        "mobilenet_v2_140_224",
-        "nasnet_mobile",
-        "nasnet_large",
-        "pnasnet_large",
-        # ResNetV1
-        "resnet_v1_50",
-        "resnet_v1_101",
-        "resnet_v1_152",
-        # ResNetV2
-        "resnet_v2_50",
-        "resnet_v2_101",
-        "resnet_v2_152",
-    ],
-    reference_backend = "tf",
+    flags_to_values = {
+        "reference_backend": "tf",
+        "tf_hub_url": ["https://tfhub.dev/google/imagenet/"],
+        "model": [
+            "amoebanet_a_n18_f448",
+            "inception_resnet_v2",
+            "inception_v1",
+            "inception_v2",
+            "inception_v3",
+            # MobileNetV1
+            "mobilenet_v1_025_128",
+            "mobilenet_v1_025_160",
+            "mobilenet_v1_025_192",
+            "mobilenet_v1_025_224",
+            "mobilenet_v1_050_128",
+            "mobilenet_v1_050_160",
+            "mobilenet_v1_050_192",
+            "mobilenet_v1_050_224",
+            "mobilenet_v1_075_128",
+            "mobilenet_v1_075_160",
+            "mobilenet_v1_075_192",
+            "mobilenet_v1_075_224",
+            "mobilenet_v1_100_128",
+            "mobilenet_v1_100_160",
+            "mobilenet_v1_100_192",
+            "mobilenet_v1_100_224",
+            # MobileNetV2:
+            "mobilenet_v2_035_96",
+            "mobilenet_v2_035_128",
+            "mobilenet_v2_035_160",
+            "mobilenet_v2_035_192",
+            "mobilenet_v2_035_224",
+            "mobilenet_v2_050_96",
+            "mobilenet_v2_050_128",
+            "mobilenet_v2_050_160",
+            "mobilenet_v2_050_192",
+            "mobilenet_v2_050_224",
+            "mobilenet_v2_075_96",
+            "mobilenet_v2_075_128",
+            "mobilenet_v2_075_160",
+            "mobilenet_v2_075_192",
+            "mobilenet_v2_075_224",
+            "mobilenet_v2_100_96",
+            "mobilenet_v2_100_128",
+            "mobilenet_v2_100_160",
+            "mobilenet_v2_100_192",
+            "mobilenet_v2_100_224",
+            "mobilenet_v2_130_224",
+            "mobilenet_v2_140_224",
+            "nasnet_mobile",
+            "nasnet_large",
+            "pnasnet_large",
+            # ResNetV1
+            "resnet_v1_50",
+            "resnet_v1_101",
+            "resnet_v1_152",
+            # ResNetV2
+            "resnet_v2_50",
+            "resnet_v2_101",
+            "resnet_v2_152",
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "slim_vision_model_test.py",
     tags = [
         "external",
         "guitar",
@@ -167,7 +163,6 @@ iree_slim_vision_test_suite(
         "nokokoro",
         "notap",
     ],
-    tf_hub_url = "https://tfhub.dev/google/imagenet/",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

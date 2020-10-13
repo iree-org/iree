@@ -20,6 +20,7 @@ def iree_e2e_test_suite(
         name,
         backends_to_srcs,
         reference_backend,
+        data = None,
         deps = None,
         size = None,
         tags = None,
@@ -34,6 +35,8 @@ def iree_e2e_test_suite(
         a dictionary mapping backends to a list of test files to run on them.
       reference_backend:
         the backend to use as a source of truth for the expected output results.
+      data:
+        external data for iree_py_test.
       deps:
         test dependencies.
       tags:
@@ -49,10 +52,9 @@ def iree_e2e_test_suite(
 
     for backend, srcs in backends_to_srcs.items():
         for src in srcs:
-            test_name = "{}_{}__{}__{}".format(
+            test_name = "{}__{}__target_backends__{}".format(
                 name,
                 src[:-3],
-                reference_backend,
                 backend,
             )
             args = [
@@ -61,7 +63,8 @@ def iree_e2e_test_suite(
             ]
 
             # TODO(GH-2175): Simplify this after backend names are standardized.
-            driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
+            # "iree_<driver>" --> "<driver>"
+            driver = backend.replace("iree_", "")
             if driver == "llvmjit":
                 driver = "llvm"
             py_test_tags = ["driver={}".format(driver)]
@@ -72,8 +75,9 @@ def iree_e2e_test_suite(
                 name = test_name,
                 main = src,
                 srcs = [src],
-                deps = deps,
                 args = args,
+                data = data,
+                deps = deps,
                 size = size,
                 tags = py_test_tags,
                 python_version = python_version,
