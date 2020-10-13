@@ -411,19 +411,17 @@ class Trace:
         same = np.allclose(ref, tar, rtol=rtol, atol=atol)
         abs_diff = np.max(np.abs(ref - tar))
         rel_diff = np.max(np.abs(ref - tar) / np.max(np.abs(tar)))
+        diff_string = (f"Max abs diff: {abs_diff:.2e}, atol: {atol:.2e}, "
+                       f"max relative diff: {rel_diff:.2e}, rtol: {rtol:.2e}")
         if not same:
-          error = (
-              "Floating point difference between ref and tar was too large. "
-              f"Max abs diff: {abs_diff}, atol: {atol}, "
-              f"max relative diff: {rel_diff}, rtol: {rtol}")
+          error = ("Floating point difference between ref and tar was too "
+                   f"large. {diff_string}")
           logging.error(error)
         else:
           error = None
           logging.info(
               "Floating point difference between ref and tar was within "
-              "tolerance. "
-              "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
-              abs_diff, atol, rel_diff, rtol)
+              "tolerance. %s", diff_string)
         return same, error
       else:
         same = np.array_equal(ref, tar)
