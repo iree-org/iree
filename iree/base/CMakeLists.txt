@@ -455,10 +455,15 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_select_compiler_opts(_SYNCHRONIZATION_LINKOPTS
-  CLANG_OR_GCC
-    "-lpthread"
-)
+if(NOT ANDROID)
+  iree_select_compiler_opts(_SYNCHRONIZATION_LINKOPTS
+    CLANG_OR_GCC
+      "-lpthread"
+  )
+else()
+  # Android provides its own pthreads support with no linking required.
+  set(_SYNCHRONIZATION_LINKOPTS "")
+endif()
 
 iree_cc_library(
   NAME
@@ -528,11 +533,19 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_select_compiler_opts(_THREADING_LINKOPTS
-  CLANG_OR_GCC
-    "-ldl"
-    "-lpthread"
-)
+if(NOT ANDROID)
+  iree_select_compiler_opts(_THREADING_LINKOPTS
+    CLANG_OR_GCC
+      "-ldl"
+      "-lpthread"
+  )
+else()
+  iree_select_compiler_opts(_THREADING_LINKOPTS
+    CLANG_OR_GCC
+      "-ldl"
+      # Android provides its own pthreads support with no linking required.
+  )
+endif()
 
 iree_cc_library(
   NAME
