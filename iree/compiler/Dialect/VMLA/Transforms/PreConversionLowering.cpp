@@ -375,6 +375,14 @@ class LowerFftOp : public OpRewritePattern<mhlo::FftOp> {
     auto tensor_type = op.operand().getType().cast<RankedTensorType>();
     auto real = rewriter.create<mhlo::RealOp>(op.getLoc(), op.getOperand());
     auto imag = rewriter.create<mhlo::ImagOp>(op.getLoc(), op.getOperand());
+
+    RankedTensorType realType = real.getType().dyn_cast<RankedTensorType>();
+    RankedTensorType imagType = real.getType().dyn_cast<RankedTensorType>();
+
+    if (realType.getShape() != imagType.getShape()) {
+      return failure();
+    }
+
     auto results = rewriter.create<VMLA::FftPseudoOp>(
         op.getLoc(), real.getType(), imag.getType(), real, imag);
     auto complex_result = rewriter.create<mhlo::ComplexOp>(

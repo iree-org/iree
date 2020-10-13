@@ -694,5 +694,24 @@ def VMLA_FftPseudoOp : VMLA_Op<"fft.pseudo"> {
   }];
 }
 
+def VMLA_FftOp : VMLA_ElementTypeOp<"fft", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$real_in,
+    VMLA_Shape:$real_in_shape,
+    VMLA_Buffer:$imag_in,
+    VMLA_Shape:$imag_in_shape,
+    VMLA_Buffer:$real_out,
+    VMLA_Buffer:$imag_out,
+    VMLA_AnyTypeAttr:$real_element_type,
+    VMLA_AnyTypeAttr:$imag_element_type
+  );
+
+  let assemblyFormat = [{
+    $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+    $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+    `out` $real_out `,` $imag_out attr-dict `:` $real_element_type `,` $imag_element_type
+  }];
+}
+
 
 #endif  // IREE_DIALECT_VMLA_OPS
