@@ -833,6 +833,8 @@ void SetupFunctionAbiBindings(pybind11::module m) {
            })
       .def("allocate_results", &PyAllocateResults, py::arg("f_results"),
            py::arg("static_alloc") = true)
+      // TODO(laurenzo): Generalize this keep_alive fix (for #3381) to handle
+      //                 multi-return functions
       .def(
           "unpack_results",
           [](FunctionAbi* self, VmVariantList& f_results) {
