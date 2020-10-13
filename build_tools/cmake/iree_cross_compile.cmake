@@ -131,13 +131,13 @@ endfunction()
 
 # iree_get_build_command
 #
-# Gets the CMake build command for the given `EXECUTABLE`.
+# Gets the CMake build command for the given `EXECUTABLE_TARGET`.
 #
 # Parameters:
-# EXECUTABLE: the executable to build.
+# EXECUTABLE_TARGET: the target for the executable to build.
 # BINDIR: root binary directory containing CMakeCache.txt.
 # CMDVAR: variable name for receiving the build command.
-function(iree_get_build_command EXECUTABLE)
+function(iree_get_build_command EXECUTABLE_TARGET)
   cmake_parse_arguments(_RULE "" "BINDIR;CMDVAR;CONFIG" "" ${ARGN})
   if(NOT _RULE_CONFIG)
     set(_RULE_CONFIG "$<CONFIG>")
@@ -145,11 +145,11 @@ function(iree_get_build_command EXECUTABLE)
   if (CMAKE_GENERATOR MATCHES "Make")
     # Use special command for Makefiles to support parallelism.
     set(${_RULE_CMDVAR}
-        "$(MAKE)" "-C" "${_RULE_BINDIR}" "${EXECUTABLE}" PARENT_SCOPE)
+        "$(MAKE)" "-C" "${_RULE_BINDIR}" "${EXECUTABLE_TARGET}" PARENT_SCOPE)
   else()
     set(${_RULE_CMDVAR}
         "${CMAKE_COMMAND}" --build ${_RULE_BINDIR}
-                           --target ${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}
+                           --target ${EXECUTABLE_TARGET}
                            --config ${_RULE_CONFIG} PARENT_SCOPE)
   endif()
 endfunction()
@@ -201,14 +201,15 @@ endfunction()
 #
 # Parameters:
 # EXECUTABLE: the executable to build on host.
+# EXECUTABLE_TARGET: the target name for the executable.
 # BUILDONLY: only generates commands for building the target.
 # DEPENDS: any additional dependencies for the target.
-function(iree_declare_host_excutable EXECUTABLE)
+function(iree_declare_host_excutable EXECUTABLE EXECUTABLE_TARGET)
   cmake_parse_arguments(_RULE "BUILDONLY" "" "DEPENDS" ${ARGN})
 
   iree_get_executable_path(_OUTPUT_PATH ${EXECUTABLE})
 
-  iree_get_build_command(${EXECUTABLE}
+  iree_get_build_command(${EXECUTABLE_TARGET}
     BINDIR ${IREE_HOST_BINARY_ROOT}
     CMDVAR build_cmd)
 
