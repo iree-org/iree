@@ -240,7 +240,7 @@ LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
   printInlcude("iree/vm/stack.h");
   output << "\n";
 
-  printInlcude("iree/vm/vm_c_funcs.h");
+  printInlcude("iree/vm/c_funcs.h");
   output << "\n";
 
   for (auto moduleOp : moduleOps) {
