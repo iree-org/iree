@@ -104,7 +104,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
         ],
     }
     # yapf: enable
-    same = tf_test_utils.Trace._check_same(ref, tar, rtol=1e-6, atol=1e-6)
+    same, _ = tf_test_utils.Trace._check_same(ref, tar, rtol=1e-6, atol=1e-6)
     self.assertEqual(tar_same, same)
 
   def test_trace_inputs_and_outputs(self):
