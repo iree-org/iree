@@ -40,7 +40,7 @@ class SPIRVTargetBackend : public TargetBackend {
                                     OpPassManager &passManager) override;
 
   LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
-                               DeviceSwitchBuilder &switchBuilder) override;
+                               DeviceSwitchRewriter &switchRewriter) override;
 
   // Finds the spv.ExecutionMode operation to get the workgroup size from.
   std::array<Value, 3> calculateDispatchWorkgroupSize(

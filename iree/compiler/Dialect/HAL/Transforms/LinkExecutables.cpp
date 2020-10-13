@@ -47,6 +47,17 @@ class LinkExecutablesPass
         return signalPassFailure();
       }
     }
+
+    // Backends may move target ops from executables into linked executables.
+    // If an executable ends up with no targets, remove it.
+    auto executableOps =
+        llvm::to_vector<4>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
+    for (auto executableOp : executableOps) {
+      auto targetOps = executableOp.getOps<IREE::HAL::ExecutableTargetOp>();
+      if (targetOps.empty()) {
+        executableOp.erase();
+      }
+    }
   }
 
  private:

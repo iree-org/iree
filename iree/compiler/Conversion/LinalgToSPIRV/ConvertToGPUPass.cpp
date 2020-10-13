@@ -605,8 +605,9 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
     // If the `linalgOp` writes to workgroup memory insert barrier after the
     // op.
     if (llvm::any_of(linalgOp.getOperands(), [](Value output) {
-          return output.getType().cast<MemRefType>().getMemorySpace() ==
-                 getWorkgroupMemorySpace();
+          MemRefType outputType = output.getType().dyn_cast<MemRefType>();
+          return outputType &&
+                 outputType.getMemorySpace() == getWorkgroupMemorySpace();
         })) {
       rewriter.create<spirv::ControlBarrierOp>(
           linalgOp.getLoc(), spirv::Scope::Workgroup, spirv::Scope::Workgroup,
@@ -751,6 +752,7 @@ void ConvertToGPUPass::runOnOperation() {
                   MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
                   MapLinalgOpToLocalInvocationId<linalg::ConvOp>,
                   MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
+                  MapLinalgOpToLocalInvocationId<linalg::FillOp>,
                   MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
                   MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,

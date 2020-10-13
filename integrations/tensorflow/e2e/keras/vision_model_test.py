@@ -153,7 +153,7 @@ class AppTest(tf_test_utils.TracedModuleTestCase):
   def test_application(self):
 
     def predict(module):
-      module.predict(tf_utils.uniform(get_input_shape()))
+      module.predict(tf_utils.uniform(get_input_shape()), atol=1e-5, rtol=1e-5)
 
     self.compare_backends(predict, self._modules)
 

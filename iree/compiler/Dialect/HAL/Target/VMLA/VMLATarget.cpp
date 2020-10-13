@@ -26,9 +26,11 @@
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -36,6 +38,29 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+namespace {
+
+bool AreInterfacesEquivalent(IREE::HAL::InterfaceOp lhs,
+                             IREE::HAL::InterfaceOp rhs) {
+  auto lhsBindings = lhs.getBlock().getOps<IREE::HAL::InterfaceBindingOp>();
+  auto rhsBindings = rhs.getBlock().getOps<IREE::HAL::InterfaceBindingOp>();
+  auto lhsIt = lhsBindings.begin(), lhsEnd = lhsBindings.end();
+  auto rhsIt = rhsBindings.begin(), rhsEnd = rhsBindings.end();
+  for (; lhsIt != lhsEnd && rhsIt != rhsEnd; ++lhsIt, ++rhsIt) {
+    // Assume bindings are in order, check equivalence of each pairing.
+    if (!OperationEquivalence::isEquivalentTo(*lhsIt, *rhsIt)) return false;
+  }
+
+  if (lhsIt != lhsEnd || rhsIt != rhsEnd) {
+    // Not finished iterating through one, number of interface bindings differ.
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
 
 VMLATargetOptions getVMLATargetOptionsFromFlags() {
   VMLATargetOptions targetOptions;
@@ -64,6 +89,169 @@ class VMLATargetBackend final : public TargetBackend {
 
     IREE::VM::buildVMTransformPassPipeline(
         passManager, IREE::VM::getTargetOptionsFromFlags());
+  }
+
+  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
+    // --- Linking overview ---
+    //
+    // We start with a `module` containing multiple `hal.executable`s, each with
+    // potentially multiple `hal.executable.target`s. We want to move all
+    // compatible VMLA functions into a new "linked" executable, de-duping
+    // symbols, and updating references as we go.
+    //
+    // Sample IR after:
+    //   hal.executable @linked_vmla {
+    //     hal.interface @legacy_io_0 { ... }
+    //     hal.interface @legacy_io_1 { ... }
+    //     hal.executable.target @vmla, filter="vmla" {
+    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
+    //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
+    //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
+    //       module {
+    //         vm.module @module {
+    //           vm.func @main_0(...) { ... }
+    //           vm.func @main_1(...) { ... }
+    //           vm.func @main_2(...) { ... }
+    //         }
+    //       }
+    //     }
+    //   }
+    //   hal.executable @main_dispatch_0 {
+    //     hal.interface @legacy_io { ... }
+    //     hal.executable.target @other, filter="other" {
+    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
+    //       module { ... }
+    //     }
+    //   }
+
+    OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
+    auto executableOps = moduleOp.getOps<IREE::HAL::ExecutableOp>();
+
+    // Create our new "linked" hal.executable.
+    auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
+        moduleOp.getLoc(), "linked_vmla");
+    SymbolTable::setSymbolVisibility(linkedExecutableOp,
+                                     SymbolTable::Visibility::Private);
+    // Add our VMLA hal.executable.target with an empty module.
+    builder.setInsertionPointToStart(linkedExecutableOp.getBody());
+    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableTargetOp>(
+        moduleOp.getLoc(), name(), filter_pattern());
+    builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
+    auto linkedModuleOp = builder.create<ModuleOp>(moduleOp.getLoc());
+    // Add an empty vm.module to that module.
+    builder.setInsertionPointToStart(linkedModuleOp.getBody());
+    auto linkedVmModuleOp =
+        builder.create<IREE::VM::ModuleOp>(moduleOp.getLoc(), "linked_module");
+
+    int executablesLinked = 0;
+    llvm::SmallVector<IREE::HAL::InterfaceOp, 4> interfaceOps;
+    int nextEntryPointOrdinal = 0;
+    for (auto executableOp : executableOps) {
+      auto targetOps = llvm::to_vector<4>(
+          executableOp.getOps<IREE::HAL::ExecutableTargetOp>());
+      for (auto targetOp : targetOps) {
+        // Only process targets matching our pattern.
+        if (!matchPattern(targetOp.target_backend_filter(), filter_pattern())) {
+          continue;
+        }
+
+        IREE::HAL::InterfaceOp interfaceOpForExecutable;
+        for (auto interfaceOp : interfaceOps) {
+          if (AreInterfacesEquivalent(interfaceOp,
+                                      executableOp.getFirstInterfaceOp())) {
+            interfaceOpForExecutable = interfaceOp;
+          }
+        }
+        if (!interfaceOpForExecutable) {
+          builder.setInsertionPoint(linkedTargetOp);
+          interfaceOpForExecutable = dyn_cast<IREE::HAL::InterfaceOp>(
+              builder.clone(*executableOp.getFirstInterfaceOp()));
+          interfaceOpForExecutable.setName(
+              llvm::formatv("legacy_io_{0}", interfaceOps.size()).str());
+          interfaceOps.push_back(interfaceOpForExecutable);
+        }
+
+        // Clone entry point ops, remapping ordinals and updating symbol refs.
+        builder.setInsertionPoint(linkedModuleOp);
+        for (auto entryPointOp :
+             targetOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+          auto newEntryPointOp =
+              builder.create<IREE::HAL::ExecutableEntryPointOp>(
+                  entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
+                  builder.getI32IntegerAttr(nextEntryPointOrdinal++),
+                  builder.getSymbolRefAttr(interfaceOpForExecutable.getName()),
+                  entryPointOp.signatureAttr());
+
+          // Update references to @executable::@target::@entry symbols.
+          // SymbolTable::replaceAllSymbolUses only looks at root symbols,
+          // which we can't blindly replace (other targets will map to other
+          // linked executables).
+          auto executableUses =
+              SymbolTable::getSymbolUses(executableOp, moduleOp);
+          if (!executableUses.hasValue()) continue;
+          for (auto executableUse : executableUses.getValue()) {
+            auto executableUser = executableUse.getUser();
+            // Only process symbols for this @target::@entry.
+            auto nestedRefs =
+                executableUse.getSymbolRef().getNestedReferences();
+            if (nestedRefs.size() != 2 ||
+                nestedRefs[0].getValue() != targetOp.sym_name() ||
+                nestedRefs[1].getValue() != entryPointOp.sym_name()) {
+              continue;
+            }
+            if (auto dispatchOp =
+                    dyn_cast<IREE::HAL::CommandBufferDispatchSymbolOp>(
+                        executableUser)) {
+              // New nested reference to the linked exe/target/entry.
+              StringRef newExecutableOpSymName =
+                  linkedExecutableOp
+                      .getAttrOfType<StringAttr>(
+                          SymbolTable::getSymbolAttrName())
+                      .getValue();
+              auto newSymbolRefAttr = builder.getSymbolRefAttr(
+                  newExecutableOpSymName,
+                  {builder.getSymbolRefAttr(linkedTargetOp),
+                   builder.getSymbolRefAttr(newEntryPointOp)});
+              dispatchOp.setAttr("entry_point", newSymbolRefAttr);
+            }
+          }
+        }
+
+        // Clone vm.module ops, including their contents.
+        auto vmModuleOps =
+            targetOp.getInnerModule().getOps<IREE::VM::ModuleOp>();
+        if (vmModuleOps.empty()) {
+          return targetOp.getInnerModule().emitError()
+                 << "target's outer module does not contain a vm.module op";
+        }
+        auto vmModuleOp = *vmModuleOps.begin();
+        builder.setInsertionPoint(&linkedVmModuleOp.getBlock().back());
+        // Use a SymbolTable to guard against inserting duplicate symbols.
+        SymbolTable symbolTable(linkedVmModuleOp.getOperation());
+
+        for (auto &op : vmModuleOp.getBody()->getOperations()) {
+          if (auto terminatorOp = dyn_cast<IREE::VM::ModuleTerminatorOp>(op)) {
+            continue;
+          }
+          if (op.hasTrait<SymbolOpInterface::Trait>() &&
+              symbolTable.lookup(dyn_cast<SymbolOpInterface>(op).getName())) {
+            continue;
+          }
+          builder.clone(op);
+        }
+
+        // Now that we're done cloning its ops, delete the original target op.
+        targetOp.erase();
+
+        executablesLinked++;
+      }
+    }
+
+    if (executablesLinked == 0) {
+      linkedExecutableOp.erase();
+    }
+
+    return success();
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,

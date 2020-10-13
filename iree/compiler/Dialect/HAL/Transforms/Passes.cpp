@@ -35,6 +35,10 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Whether to serialize hal.executable.target ops to "
                      "hal.executable.binary ops."),
       llvm::cl::init(true)};
+  Option<bool> linkExecutables{
+      *this, "link-executables",
+      llvm::cl::desc("Whether to link hal.executable ops together."),
+      llvm::cl::init(true)};
 };
 
 }  // namespace
@@ -52,12 +56,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // this pass.
   passManager.addPass(createTranslateExecutablesPass(targetOptions));
 
-  // After all executables are translated we allow the backends to link them
-  // together. For example, the LLVM AOT backend may combine all executable
-  // targets for the same architecture into a single executable and link it as
-  // a shared library.
-  passManager.addPass(createLinkExecutablesPass(targetOptions));
-
   passManager.addPass(createConvertFlowToHALPass());
 
   // Phase ordering note: Before this pass, functions signatures will be based
@@ -74,6 +72,17 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Phase ordering note: This operates on functions whose signatures have
   // been expanded to primitives.
   passManager.addPass(createPublicABIGenerationPass());
+
+  // After all executables are translated and before resolving entry point
+  // ordinals, we allow the backends to link executables together. For example,
+  // the LLVM AOT backend may combine all executable targets for the same
+  // architecture into a single executable and link it as a shared library.
+  // TODO(scotttodd): Move after createTranslateExecutablesPass
+  //   * ConvertStreamOps under ConvertFlowToHALPass assumes one entry point.
+  //     Adjust it to handle multiple entry points then this can move up.
+  if (transformOptions.linkExecutables) {
+    passManager.addPass(createLinkExecutablesPass(targetOptions));
+  }
 
   // Resolve entry point ordinals from nested symbol references prior to
   // serialization. As this pass creates lookup ops it should run before

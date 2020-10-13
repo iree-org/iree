@@ -200,7 +200,7 @@ iree_vision_test_suite(
     datasets = ["cifar10"],
     failing_configurations = [
         {
-            # Failing all but tf and vmla:
+            # Failing on llvm and vulkan:
             "models": [
                 "NASNetLarge",
                 "NASNetMobile",
@@ -210,7 +210,6 @@ iree_vision_test_suite(
             ],
             "datasets": ["cifar10"],
             "backends": [
-                "tflite",
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
@@ -284,10 +283,19 @@ iree_vision_test_suite(
     datasets = ["imagenet"],
     failing_configurations = [
         {
-            # Failing all but tf and vmla:
+            # Failing vulkan:
             "models": [
                 "InceptionResNetV2",
                 "InceptionV3",
+            ],
+            "datasets": ["imagenet"],
+            "backends": [
+                "iree_vulkan",
+            ],
+        },
+        {
+            # Failing llvm and vulkan:
+            "models": [
                 "NASNetLarge",
                 "NASNetMobile",
                 "ResNet50V2",
@@ -297,7 +305,6 @@ iree_vision_test_suite(
             ],
             "datasets": ["imagenet"],
             "backends": [
-                "tflite",
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
