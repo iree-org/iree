@@ -313,7 +313,8 @@ class Trace:
       yield call
 
   @staticmethod
-  def compare_traces(ref_trace: "Trace", tar_trace: "Trace") -> bool:
+  def compare_traces(ref_trace: "Trace",
+                     tar_trace: "Trace") -> Tuple[bool, Sequence[str]]:
     traces_match = True
     error_messages = []
 
