@@ -315,6 +315,7 @@ class Trace:
   @staticmethod
   def compare_traces(ref_trace: "Trace", tar_trace: "Trace") -> bool:
     traces_match = True
+    error_messages = []
 
     # Check that all method invocations match.
     ref_methods = [(call.method, call.rtol, call.atol) for call in ref_trace]
@@ -330,13 +331,17 @@ class Trace:
       logging.info("Comparing calls to '%s'", ref_call.method)
       rtol, atol = ref_call.get_tolerances()
 
-      inputs_match = Trace._check_same(ref_call.inputs, tar_call.inputs, rtol,
-                                       atol)
+      inputs_match, error_message = Trace._check_same(ref_call.inputs,
+                                                      tar_call.inputs, rtol,
+                                                      atol)
       if not inputs_match:
+        error_messages.append(error_message)
         logging.error("Inputs did not match.")
-      outputs_match = Trace._check_same(ref_call.outputs, tar_call.outputs,
-                                        rtol, atol)
+      outputs_match, error_message = Trace._check_same(ref_call.outputs,
+                                                       tar_call.outputs, rtol,
+                                                       atol)
       if not outputs_match:
+        error_messages.append(error_message)
         logging.error("Outputs did not match.")
       calls_match = inputs_match and outputs_match
 
@@ -349,83 +354,96 @@ class Trace:
         logging.error("Target call '%s':\n%s", tar_trace.backend_id, tar_call)
 
       traces_match = traces_match and calls_match
-    return traces_match
+    return traces_match, error_messages
 
   @staticmethod
-  def _check_same(ref: Any, tar: Any, rtol: float, atol: float) -> bool:
+  def _check_same(ref: Any, tar: Any, rtol: float,
+                  atol: float) -> Tuple[bool, Union[str, None]]:
     """Checks that ref and tar have identical datastructures and values."""
     # Check for matching types.
     if not isinstance(tar, type(ref)):
-      logging.error(
-          "Expected ref and tar to have the same type but got '%s' and '%s'",
-          type(ref), type(tar))
-      return False
+      error = ("Expected ref and tar to have the same type but got "
+               f"'{type(ref)}' and '{type(tar)}'")
+      logging.error(error)
+      return False, error
 
     if ref is None:
       # Nothing to compare (e.g. the called method had no outputs).
-      return True
+      return True, None
 
     # Recursive check for dicts.
     if isinstance(ref, dict):
       if ref.keys() != tar.keys():
-        logging.error(
-            "Expected ref and tar to have the same keys, but got '%s' and '%s'",
-            ref.keys(), tar.keys())
-        return False
+        error = ("Expected ref and tar to have the same keys, but got "
+                 f"'{ref.keys()}' and '{tar.keys()}'")
+        logging.error(error)
+        return False, error
       # Check that all of the dictionaries' values are the same.
       for key in ref:
-        if not Trace._check_same(ref[key], tar[key], rtol, atol):
-          return False
+        same, error = Trace._check_same(ref[key], tar[key], rtol, atol)
+        if not same:
+          return same, error
 
     # Recursive check for iterables.
     elif isinstance(ref, list) or isinstance(ref, tuple):
       if len(ref) != len(tar):
-        logging.error(
-            "Expected ref and tar to have the same length, but got %s and %s",
-            len(ref), len(tar))
-        return False
+        error = ("Expected ref and tar to have the same length, but got "
+                 f"{len(ref)} and {len(tar)}")
+        logging.error(error)
+        return False, error
       # Check that all of the iterables' values are the same.
       for i in range(len(ref)):
-        if not Trace._check_same(ref[i], tar[i], rtol, atol):
-          return False
+        same, error = Trace._check_same(ref[i], tar[i], rtol, atol)
+        if not same:
+          return same, error
 
     # Base check for numpy arrays.
     elif isinstance(ref, np.ndarray):
       if ref.dtype != tar.dtype:
-        logging.error(
-            "Expected ref and tar to have the same dtype, but got %s  and %s",
-            ref.dtype, tar.dtype)
-        return False
+        error = ("Expected ref and tar to have the same dtype, but got "
+                 f"'{ref.dtype}' and '{tar.dtype}'")
+        logging.error(error)
+        return False, error
       if ref.size == tar.size == 0:
-        return True
+        return True, None
 
       if np.issubdtype(ref.dtype, np.floating):
         same = np.allclose(ref, tar, rtol=rtol, atol=atol)
         abs_diff = np.max(np.abs(ref - tar))
         rel_diff = np.max(np.abs(ref - tar) / np.max(np.abs(tar)))
         if not same:
-          logging.error(
+          error = (
               "Floating point difference between ref and tar was too large. "
-              "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
-              abs_diff, atol, rel_diff, rtol)
+              f"Max abs diff: {abs_diff}, atol: {atol}, "
+              f"max relative diff: {rel_diff}, rtol: {rtol}")
+          logging.error(error)
         else:
+          error = None
           logging.info(
               "Floating point difference between ref and tar was within "
               "tolerance. "
               "Max abs diff: %s, atol: %s, max relative diff: %s, rtol: %s",
               abs_diff, atol, rel_diff, rtol)
-        return same
+        return same, error
       else:
-        return np.array_equal(ref, tar)
+        same = np.array_equal(ref, tar)
+        if not same:
+          abs_diff = np.max(np.abs(ref - tar))
+          error = ("Expected array equality between ref and tar, but got "
+                   f"a max elementwise difference of {abs_diff}")
+          logging.error(error)
+        else:
+          error = None
+        return same, error
 
     # Base check for native number types.
     elif isinstance(ref, (int, float)):
-      return ref == tar
+      return ref == tar, None
 
     # If outputs end up here then an extra branch for that type should be added.
     else:
       raise TypeError(f"Encountered results with unexpected type {type(ref)}")
-    return True
+    return True, None
 
   def save_plaintext(self, trace_dir: str, summarize: bool = True) -> None:
     """Saves a human-readable string representation of this trace to disk.
@@ -718,12 +736,14 @@ class TracedModuleTestCase(tf.test.TestCase):
 
     # Compare each target trace of trace_function with the reference trace.
     failed_backend_indices = []
+    error_messages = []
     for i, tar_trace in enumerate(tar_traces):
       logging.info("Comparing the reference backend '%s' with '%s'",
                    ref_trace.backend_id, tar_trace.backend_id)
-      traces_match = Trace.compare_traces(ref_trace, tar_trace)
+      traces_match, errors = Trace.compare_traces(ref_trace, tar_trace)
       if not traces_match:
         failed_backend_indices.append(i)
+        error_messages.extend(errors)
 
     # Save the results to disk before validating.
     ref_trace_dir = _get_trace_dir(modules.artifacts_dir, ref_trace)
@@ -740,10 +760,11 @@ class TracedModuleTestCase(tf.test.TestCase):
       failed_backends = [
           tar_traces[i].backend_id for i in failed_backend_indices
       ]
+      error_list = '\n  - ' + '\n  - '.join(error_messages)
       self.fail(
-          "Comparision between the reference backend and the following targets "
-          f"failed: {failed_backends}. The errors above show the inputs and "
-          "outputs of the non-matching calls.")
+          "Comparison between the reference backend and the following targets "
+          f"failed: {failed_backends}. Errors: {error_list}\n"
+          "See the logs above for more details about the non-matching calls.")
 
   @classmethod
   def tearDownClass(cls) -> None:
