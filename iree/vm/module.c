@@ -140,20 +140,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
   memset(module, 0, sizeof(iree_vm_module_t));
   module->self = self;
-  iree_atomic_store(&module->ref_count, 1);
+  iree_atomic_ref_count_init(&module->ref_count);
   return iree_ok_status();
 }
 
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_module_retain(iree_vm_module_t* module) {
   if (module) {
-    iree_atomic_fetch_add(&module->ref_count, 1);
+    iree_atomic_ref_count_inc(&module->ref_count);
   }
 }
 
 IREE_API_EXPORT void IREE_API_CALL
 iree_vm_module_release(iree_vm_module_t* module) {
-  if (module && iree_atomic_fetch_sub(&module->ref_count, 1) == 1) {
+  if (module && iree_atomic_ref_count_dec(&module->ref_count) == 1) {
     module->destroy(module->self);
   }
 }

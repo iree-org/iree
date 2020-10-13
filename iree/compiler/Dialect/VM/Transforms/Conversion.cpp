@@ -103,8 +103,16 @@ class ConversionPass
             innerModuleOp);
     for (auto *dialectInterface : usedDialects) {
       auto outerImportModuleOp = dialectInterface->getVMImportModule();
+      if (!outerImportModuleOp) {
+        innerModuleOp.emitError()
+            << "unable load the VM import module for dialect '"
+            << dialectInterface->getDialect()->getNamespace()
+            << "'; possibly a bad file structure or malformed vm.import";
+        signalPassFailure();
+        return;
+      }
       for (auto importModuleOp :
-           outerImportModuleOp->getOps<IREE::VM::ModuleOp>()) {
+           outerImportModuleOp.getOps<IREE::VM::ModuleOp>()) {
         if (failed(appendImportModule(importModuleOp, innerModuleOp))) {
           importModuleOp.emitError() << "failed to import module";
           return signalPassFailure();

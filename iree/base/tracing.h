@@ -65,6 +65,18 @@
 // events when allocation tracking is enabled.
 #define IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS (1 << 3)
 
+// Tracks fast locks in all cases (both contended and uncontended).
+// This may introduce contention where there would otherwise be none as what
+// would be a handful of instructions and little memory access may become
+// hundreds. To see only locks under contention use
+// IREE_TRACING_FEATURE_SLOW_LOCKS.
+#define IREE_TRACING_FEATURE_FAST_LOCKS (1 << 4)
+
+// Tracks slow locks that end up going to the OS for waits/wakes in futexes.
+// Uncontended locks will not be displayed and only waits will be visible in the
+// Tracy UI.
+#define IREE_TRACING_FEATURE_SLOW_LOCKS (1 << 5)
+
 #if !defined(IREE_TRACING_MAX_CALLSTACK_DEPTH)
 // Tracing functions that capture stack traces will only capture up to N frames.
 // The overhead for stack walking scales linearly with the number of frames
@@ -171,9 +183,11 @@ extern "C" {
 
 void iree_tracing_set_thread_name_impl(const char* name);
 
-ABSL_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_impl(
-    const struct ___tracy_source_location_data* src_loc, const char* name,
-    size_t name_length);
+typedef struct ___tracy_source_location_data iree_tracing_location_t;
+
+ABSL_MUST_USE_RESULT iree_zone_id_t
+iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
+                             const char* name, size_t name_length);
 ABSL_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
@@ -184,6 +198,13 @@ void iree_tracing_set_plot_type_impl(const char* name_literal,
 void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value);
 void iree_tracing_plot_value_f32_impl(const char* name_literal, float value);
 void iree_tracing_plot_value_f64_impl(const char* name_literal, double value);
+
+void iree_tracing_mutex_announce(const iree_tracing_location_t* src_loc,
+                                 uint32_t* out_lock_id);
+void iree_tracing_mutex_terminate(uint32_t lock_id);
+void iree_tracing_mutex_before_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_lock(uint32_t lock_id);
+void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
 #endif  // IREE_TRACING_FEATURES
 
@@ -234,7 +255,7 @@ enum {
 
 // Begins a new zone with the given compile-time literal name.
 #define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal)                    \
-  static const struct ___tracy_source_location_data TracyConcat(              \
+  static const iree_tracing_location_t TracyConcat(                           \
       __tracy_source_location, __LINE__) = {name_literal, __FUNCTION__,       \
                                             __FILE__, (uint32_t)__LINE__, 0}; \
   iree_zone_id_t zone_id = iree_tracing_zone_begin_impl(                      \
@@ -243,7 +264,7 @@ enum {
 // Begins a new zone with the given runtime dynamic string name.
 // The |value| string will be copied into the trace buffer.
 #define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length)   \
-  static const struct ___tracy_source_location_data TracyConcat(          \
+  static const iree_tracing_location_t TracyConcat(                       \
       __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
                                             (uint32_t)__LINE__, 0};       \
   iree_zone_id_t zone_id = iree_tracing_zone_begin_impl(                  \

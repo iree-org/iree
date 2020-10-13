@@ -125,10 +125,10 @@ class HALModuleState final {
         reinterpret_cast<iree_hal_device_t*>(shared_device_.get()));
   }
 
-  Status ExDeferRelease(vm::opaque_ref operand) {
+  template <typename T>
+  void ExDeferRelease(const vm::ref<T>& value) {
     deferred_releases_.push_back({0});
-    iree_vm_ref_move(&operand, &deferred_releases_.back());
-    return OkStatus();
+    iree_vm_ref_retain((iree_vm_ref_t*)&value, &deferred_releases_.back());
   }
 
   Status ExSubmitAndWait(
@@ -491,6 +491,7 @@ class HALModuleState final {
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       const vm::ref<iree_hal_buffer_t>& target_buffer, int32_t target_offset,
       int32_t length, uint32_t pattern) {
+    ExDeferRelease(target_buffer);
     return iree_hal_command_buffer_fill_buffer(
         command_buffer.get(), target_buffer.get(), target_offset, length,
         &pattern, sizeof(pattern));
@@ -501,6 +502,8 @@ class HALModuleState final {
       const vm::ref<iree_hal_buffer_t>& source_buffer, int32_t source_offset,
       const vm::ref<iree_hal_buffer_t>& target_buffer, int32_t target_offset,
       int32_t length) {
+    ExDeferRelease(source_buffer);
+    ExDeferRelease(target_buffer);
     return iree_hal_command_buffer_copy_buffer(
         command_buffer.get(), source_buffer.get(), source_offset,
         target_buffer.get(), target_offset, length);
@@ -510,6 +513,7 @@ class HALModuleState final {
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       const vm::ref<iree_hal_executable_layout_t>& executable_layout,
       uint32_t offset, absl::Span<const uint32_t> values) {
+    ExDeferRelease(executable_layout);
     return iree_hal_command_buffer_push_constants(
         command_buffer.get(), executable_layout.get(), offset, values.data(),
         values.size() * sizeof(uint32_t));
@@ -522,6 +526,7 @@ class HALModuleState final {
       absl::Span<const vm::ref<iree_hal_buffer_t>> binding_buffers,
       absl::Span<const int32_t> binding_offsets,
       absl::Span<const int32_t> binding_lengths) {
+    ExDeferRelease(executable_layout);
     absl::InlinedVector<iree_hal_descriptor_set_binding_t, 16> binding_structs(
         binding_ordinals.size());
     for (int i = 0; i < binding_ordinals.size(); ++i) {
@@ -529,8 +534,7 @@ class HALModuleState final {
           binding_ordinals[i], binding_buffers[i].get(),
           static_cast<iree_device_size_t>(binding_offsets[i]),
           static_cast<iree_device_size_t>(binding_lengths[i])};
-      deferred_releases_.push_back(
-          iree_hal_buffer_retain_ref(binding_buffers[i].get()));
+      ExDeferRelease(binding_buffers[i]);
     }
     return iree_hal_command_buffer_push_descriptor_set(
         command_buffer.get(), executable_layout.get(), set,
@@ -542,6 +546,8 @@ class HALModuleState final {
       const vm::ref<iree_hal_executable_layout_t>& executable_layout,
       int32_t set, const vm::ref<iree_hal_descriptor_set_t>& descriptor_set,
       absl::Span<const int32_t> dynamic_offsets) {
+    ExDeferRelease(executable_layout);
+    ExDeferRelease(descriptor_set);
     absl::InlinedVector<iree_device_size_t, 4> dynamic_offset_values(
         dynamic_offsets.size());
     for (int i = 0; i < dynamic_offsets.size(); ++i) {
@@ -558,6 +564,7 @@ class HALModuleState final {
       const vm::ref<iree_hal_command_buffer_t>& command_buffer,
       const vm::ref<iree_hal_executable_t>& executable, int32_t entry_point,
       uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
+    ExDeferRelease(executable);
     return iree_hal_command_buffer_dispatch(
         command_buffer.get(), executable.get(), entry_point, workgroup_x,
         workgroup_y, workgroup_z);
@@ -568,6 +575,8 @@ class HALModuleState final {
       const vm::ref<iree_hal_executable_t>& executable, int32_t entry_point,
       const vm::ref<iree_hal_buffer_t>& workgroups_buffer,
       int32_t workgroups_offset) {
+    ExDeferRelease(executable);
+    ExDeferRelease(workgroups_buffer);
     return iree_hal_command_buffer_dispatch_indirect(
         command_buffer.get(), executable.get(), entry_point,
         workgroups_buffer.get(), workgroups_offset);
@@ -758,7 +767,6 @@ class HALModuleState final {
 
 static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
     vm::MakeNativeFunction("ex.shared_device", &HALModuleState::ExSharedDevice),
-    vm::MakeNativeFunction("ex.defer_release", &HALModuleState::ExDeferRelease),
     vm::MakeNativeFunction("ex.submit_and_wait",
                            &HALModuleState::ExSubmitAndWait),
 

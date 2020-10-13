@@ -79,6 +79,7 @@ class ModuleTerminatorOpConversion
 constexpr const char *kRetainedAttributes[] = {
     "iree.reflection",
     "sym_visibility",
+    "noinline",
 };
 
 class FuncOpConversion : public OpConversionPattern<FuncOp> {
