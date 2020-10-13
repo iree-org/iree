@@ -241,11 +241,15 @@ static void iree_thread_set_priority_class(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+#if defined(IREE_PLATFORM_ANDROID)
+  // TODO(benvanik): Some sort of solution on Android, if possible (see above)
+#else
   int policy = 0;
   struct sched_param param;
   pthread_getschedparam(thread->handle, &policy, &param);
   param = iree_thread_sched_param_for_priority_class(policy, priority_class);
   pthread_setschedparam(thread->handle, policy, &param);
+#endif  // IREE_PLATFORM_ANDROID
 
   IREE_TRACE_ZONE_END(z0);
 }
