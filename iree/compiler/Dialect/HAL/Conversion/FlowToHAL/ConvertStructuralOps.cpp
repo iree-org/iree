@@ -33,26 +33,27 @@ namespace {
 
 class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
  public:
-  FuncOpSignatureConversion(MLIRContext *ctx, TypeConverter &converter)
-      : OpConversionPattern(ctx), converter(converter) {}
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       mlir::FuncOp funcOp, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter();
+
     // Convert the input signature types.
     // TODO(benvanik): dynamic shapes by passing in tensor dynamic dims.
     auto originalType = funcOp.getType();
     TypeConverter::SignatureConversion newSignature(
         originalType.getNumInputs());
     for (auto argType : llvm::enumerate(originalType.getInputs())) {
-      if (failed(converter.convertSignatureArg(argType.index(), argType.value(),
-                                               newSignature))) {
+      if (failed(typeConverter.convertSignatureArg(
+              argType.index(), argType.value(), newSignature))) {
         return failure();
       }
     }
     SmallVector<Type, 4> newResultTypes;
-    if (failed(converter.convertTypes(originalType.getResults(),
-                                      newResultTypes))) {
+    if (failed(typeConverter.convertTypes(originalType.getResults(),
+                                          newResultTypes))) {
       return failure();
     }
 
@@ -63,16 +64,26 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
                                 newFuncOp.end());
     newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
                                                newResultTypes));
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), converter,
-                                           &newSignature)))
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
+                                           &newSignature))) {
       return failure();
+    }
 
     rewriter.eraseOp(funcOp);
     return success();
   }
+};
 
- private:
-  TypeConverter &converter;
+class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::ReturnOp returnOp, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, operands);
+    return success();
+  }
 };
 
 }  // namespace
@@ -80,7 +91,8 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
 void populateFlowStructuralToHALPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns,
                                          TypeConverter &converter) {
-  patterns.insert<FuncOpSignatureConversion>(context, converter);
+  patterns.insert<FuncOpSignatureConversion, ReturnOpConversion>(converter,
+                                                                 context);
 }
 
 }  // namespace iree_compiler

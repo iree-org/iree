@@ -59,6 +59,8 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
     return typeConverter.isSignatureLegal(op.getType()) &&
            typeConverter.isLegal(&op.getBody());
   });
+  addDynamicallyLegalOp<ReturnOp>(
+      [&](ReturnOp op) { return typeConverter.isLegal(op.getOperandTypes()); });
   addDynamicallyLegalOp<ConstantOp>(
       [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
 }

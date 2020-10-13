@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -65,6 +66,8 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, OwningRewritePatternList &patterns,
       TypeConverter &typeConverter) const override {
+    populateHALToHALPatterns(getDialect()->getContext(), patterns,
+                             typeConverter);
     populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
                             typeConverter);
   }
