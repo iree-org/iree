@@ -138,24 +138,34 @@ static ParseResult parseVariableOp(OpAsmParser &parser,
     }
   }
 
-  if (failed(parser.parseOptionalColon())) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  Type type;
+  if (succeeded(parser.parseOptionalEqual())) {
+    // @foo = 4 : i32
     Attribute initialValueAttr;
     if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
                                      result->attributes))) {
       return failure();
     }
-    result->addAttribute("type", TypeAttr::get(initialValueAttr.getType()));
+    type = initialValueAttr.getType();
   } else {
-    Type type;
-    if (failed(parser.parseType(type))) {
+    // @foo : index = 4 : i32
+    if (failed(parser.parseColonType(type)) ||
+        failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
       return failure();
     }
-    result->addAttribute("type", TypeAttr::get(type));
+    if (succeeded(parser.parseOptionalEqual())) {
+      Attribute initialValueAttr;
+      if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
+                                       result->attributes))) {
+        return failure();
+      }
+    }
   }
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
+  result->addAttribute("type", TypeAttr::get(type));
 
   return success();
 }
@@ -171,10 +181,11 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
     p.printSymbolName(op.initializer().getValue());
     p << ')';
   }
-  if (op.initial_value().hasValue()) {
-    p << ' ';
-    p.printAttribute(op.initial_value().getValue());
+  if (op.initial_value().hasValue() &&
+      op.type() == op.initial_value().getValue().getType()) {
+    // @foo = 4 : i32
   } else {
+    // @foo : index = 4 : i32
     p << " : ";
     p.printType(op.type());
   }
@@ -185,6 +196,10 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
                                          "initializer",
                                          "initial_value",
                                      });
+  if (op.initial_value().hasValue()) {
+    p << " = ";
+    p.printAttribute(op.initial_value().getValue());
+  }
 }
 
 static LogicalResult verifyVariableOp(VariableOp op) {
@@ -207,14 +222,6 @@ static LogicalResult verifyVariableOp(VariableOp op) {
              << "initializer type mismatch; variable " << op.sym_name()
              << " is " << op.type() << " but initializer function "
              << initializerOp.getName() << " is " << initializerOp.getType();
-    }
-  } else if (op.initial_value().hasValue()) {
-    // Ensure the value is something we can store in the variable
-    if (!isVariableTypeCompatible(op.type(), op.initial_value()->getType())) {
-      return op.emitOpError()
-             << "initial value type mismatch; variable " << op.sym_name()
-             << " is " << op.type() << " but initial value provided is "
-             << op.initial_value()->getType();
     }
   }
   return success();

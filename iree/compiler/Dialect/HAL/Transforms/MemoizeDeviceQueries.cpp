@@ -75,11 +75,13 @@ class MemoizeDeviceQueriesPass
           moduleBuilder.getFunctionType({}, {moduleBuilder.getI1Type()}));
       SymbolTable::setSymbolVisibility(initializerOp,
                                        SymbolTable::Visibility::Private);
+      moduleBuilder.setInsertionPoint(initializerOp);
       auto variableOp = moduleBuilder.create<IREE::HAL::VariableOp>(
           fusedLoc, variableName,
           /*isMutable=*/false, initializerOp);
       SymbolTable::setSymbolVisibility(variableOp,
                                        SymbolTable::Visibility::Private);
+      moduleBuilder.setInsertionPointAfter(initializerOp);
 
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       auto device =

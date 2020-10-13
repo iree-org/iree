@@ -39,10 +39,10 @@ func @fn() {
 // -----
 // Checks that an initializer function is generated, used and operates on
 // a hal.buffer (versus tensor).
-// CHECK-LABEL: func @__var_with_tensor_initializer_initializer() -> !hal.buffer
 // CHECK: hal.variable @var_with_tensor_initializer
 // CHECK-SAME: init(@__var_with_tensor_initializer_initializer)
 // CHECK-SAME: : !hal.buffer
+// CHECK-LABEL: func @__var_with_tensor_initializer_initializer() -> !hal.buffer
 flow.variable @var_with_tensor_initializer mutable dense<0.000000e+00> : tensor<f32>
 func @fn() {
   %0 = flow.variable.load @var_with_tensor_initializer : tensor<f32>

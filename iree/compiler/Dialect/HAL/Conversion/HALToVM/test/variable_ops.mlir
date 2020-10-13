@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
 // CHECK: vm.global.i32 @v_initialized_const 4 : i32
-hal.variable @v_initialized_const 4 : i32
+hal.variable @v_initialized_const = 4 : i32
 
 // -----
 

@@ -1,14 +1,13 @@
-// Tests folding and canonicalization of HAL buffer view ops.
-
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @expand_buffer_view_const
 func @expand_buffer_view_const() -> !hal.buffer_view {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
-  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate.const %0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<[4, 1, 2]> : tensor<3xi32>
-  // CHECK-NEXT: %[[VIEW:.+]] = hal.buffer_view.create %[[BUFFER]], shape = [%c3], element_type = 16777248 : !hal.buffer_view
+  //      CHECK: [[CONST:%.+]] = iree.byte_buffer.constant : !iree.byte_buffer = dense<[4, 1, 2]> : tensor<3xi32>
+  // CHECK-NEXT: [[BUFFER:%.+]] = hal.allocator.map {{.+}}, "HostVisible|HostCoherent", "Transfer", [[CONST]][%c0, %c-1] : !iree.byte_buffer -> !hal.buffer
+  // CHECK-NEXT: [[VIEW:%.+]] = hal.buffer_view.create [[BUFFER]], shape = [%c3], element_type = 16777248 : !hal.buffer_view
   %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer_view = dense<[4, 1, 2]> : tensor<3xi32>
-  // CHECK-NEXT: return %[[VIEW]]
+  // CHECK-NEXT: return [[VIEW]]
   return %view : !hal.buffer_view
 }
 

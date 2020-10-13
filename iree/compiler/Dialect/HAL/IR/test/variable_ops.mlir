@@ -9,8 +9,14 @@ hal.variable @v_mutable mutable : tensor<i32>
 
 // -----
 
-// CHECK: hal.variable @v_initialized_const 4 : i32
-hal.variable @v_initialized_const 4 : i32
+// CHECK: hal.variable @v_initialized_const0 = 4 : i32
+hal.variable @v_initialized_const0 = 4 : i32
+
+// CHECK: hal.variable @v_initialized_const1 = 40 : i32
+hal.variable @v_initialized_const1 : i32 = 40 : i32
+
+// CHECK: hal.variable @v_initialized_const2 : i32 = 40 : i64
+hal.variable @v_initialized_const2 : i32 = 40 : i64
 
 // -----
 
