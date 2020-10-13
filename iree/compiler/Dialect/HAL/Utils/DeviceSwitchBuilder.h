@@ -94,8 +94,9 @@ class DeviceSwitchCaseBuilder {
 // Builder for hal.device.switch ops that allows for nesting of conditions.
 //
 // Example:
-//   DeviceSwitchBuilder b0(.../*initialCondition=*/Z);
-//   b0.addRegion();   // condition: Z
+//   DeviceSwitchBuilder builder();
+//   auto b0 = builder.nest(Z);
+//   b0.addRegion();            // condition: Z
 //   b0.addConditionRegion(A);  // condition: Z && A
 //   auto b1 = b0.nest(B);
 //   b1.addConditionRegion(C);  // condition: Z && B && C
@@ -111,7 +112,61 @@ class DeviceSwitchCaseBuilder {
 class DeviceSwitchBuilder {
  public:
   DeviceSwitchBuilder(Location loc, TypeRange resultTypes, Value device,
-                      ConversionPatternRewriter &rewriter)
+                      OpBuilder builder)
+      : loc_(loc),
+        resultTypes_(resultTypes),
+        device_(device),
+        builder_(builder) {
+    // FIXME: Keep the same listener as the provided builder.
+    builder.setListener(nullptr);
+  }
+
+  // Pushes a new condition onto the stack and returns a builder that must have
+  // all previously nested conditions met in order to execute any conditions.
+  DeviceSwitchCaseBuilder nest(Attribute conditionAttr) {
+    return DeviceSwitchCaseBuilder(loc_, resultTypes_, device_, conditionAttr,
+                                   caseOps_, builder_);
+  }
+
+  // Adds a new condition region that must satisfy |conditionAttr| and all
+  // parent conditions. The region will have a single entry block with the
+  // given |args|.
+  Region *addConditionRegion(Attribute conditionAttr,
+                             const SmallVector<Value, 4> &args) {
+    return nest(conditionAttr).addRegion(args);
+  }
+
+  // Constructs a single hal.device.switch from all added regions.
+  IREE::HAL::DeviceSwitchOp build() {
+    SmallVector<Attribute, 4> conditionAttrs;
+    SmallVector<SmallVector<Value, 4>, 4> conditionArgs;
+    llvm::SetVector<Value> capturedFromAbove;
+    for (auto caseOp : caseOps_) {
+      conditionAttrs.push_back(caseOp.conditions().getValue()[0]);
+      conditionArgs.push_back(caseOp.args());
+    }
+    auto switchOp = builder_.create<IREE::HAL::DeviceSwitchOp>(
+        loc_, resultTypes_, device_, conditionAttrs, conditionArgs);
+    for (int i = 0; i < caseOps_.size(); ++i) {
+      switchOp.getRegion(i).takeBody(caseOps_[i].getRegion(0));
+      caseOps_[i].erase();
+    }
+    return switchOp;
+  }
+
+ private:
+  Location loc_;
+  SmallVector<Type, 4> resultTypes_;
+  Value device_;
+  SmallVector<IREE::HAL::DeviceSwitchOp, 4> caseOps_;
+  OpBuilder builder_;
+};
+
+// Rewriter-compatible version of DeviceSwitchBuilder.
+class DeviceSwitchRewriter {
+ public:
+  DeviceSwitchRewriter(Location loc, TypeRange resultTypes, Value device,
+                       ConversionPatternRewriter &rewriter)
       : loc_(loc),
         resultTypes_(resultTypes),
         device_(device),

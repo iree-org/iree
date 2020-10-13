@@ -125,7 +125,7 @@ void SPIRVTargetBackend::buildTranslationPassPipeline(
 
 LogicalResult SPIRVTargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
-    DeviceSwitchBuilder &switchBuilder) {
+    DeviceSwitchRewriter &switchRewriter) {
   // Multiple entry points might be generated for a single dispatch function.
   // Under such circumstances, we will have a special attribute indicating the
   // schedule of the split entry points. Try to see if we can find such
@@ -177,7 +177,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
     }
   }
 
-  auto *region = switchBuilder.addConditionRegion(
+  auto *region = switchRewriter.addConditionRegion(
       IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
           dispatchState.workload,
@@ -185,7 +185,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
       });
 
   auto &entryBlock = region->front();
-  ConversionPatternRewriter &rewriter = switchBuilder.getRewriter();
+  ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(&entryBlock);
   auto commandBuffer = entryBlock.getArgument(1);
@@ -214,7 +214,7 @@ LogicalResult SPIRVTargetBackend::recordDispatch(
              << " that computes the number of workgroups to use";
     }
     workgroupCount = calculateWorkgroupCountFromNumWorkgroupsFn(
-        loc, numWorkgroupsFn, dispatchState.executableOp.getInterfaceOp(),
+        loc, numWorkgroupsFn, dispatchState.executableOp.getFirstInterfaceOp(),
         dispatchState.operands, dispatchState.results, rewriter);
 
     if (llvm::any_of(workgroupCount,

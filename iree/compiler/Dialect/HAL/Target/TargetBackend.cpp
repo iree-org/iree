@@ -133,8 +133,8 @@ std::array<Value, 3> TargetBackend::calculateDispatchWorkgroupCount(
 
 LogicalResult TargetBackend::recordDispatch(
     Location loc, DispatchState dispatchState,
-    DeviceSwitchBuilder &switchBuilder) {
-  auto *region = switchBuilder.addConditionRegion(
+    DeviceSwitchRewriter &switchRewriter) {
+  auto *region = switchRewriter.addConditionRegion(
       IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
       {
           dispatchState.workload,
