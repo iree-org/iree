@@ -79,9 +79,9 @@ typedef struct {
 typedef struct {
   int64_t __val;
 } iree_atomic_int64_t;
-typedef __declspec(align(16)) struct {
-  uint64_t __val[2];
-} iree_atomic_int128_t;
+// typedef __declspec(align(16)) struct {
+//   uint64_t __val[2];
+// } iree_atomic_int128_t;
 
 #define iree_atomic_load_int32(object, order) \
   InterlockedExchangeAdd((volatile LONG*)object, 0)
@@ -153,7 +153,8 @@ typedef enum iree_memory_order_e {
 
 typedef _Atomic int32_t iree_atomic_int32_t;
 typedef _Atomic int64_t iree_atomic_int64_t;
-typedef _Atomic __int128 iree_atomic_int128_t;
+// TODO(#3453): check for __int128 support before using
+// typedef _Atomic __int128 iree_atomic_int128_t;
 
 #define iree_atomic_load_auto(object, order) \
   __c11_atomic_load((object), (order))
@@ -192,7 +193,7 @@ typedef enum iree_memory_order_e {
 
 typedef int32_t iree_atomic_int32_t;
 typedef int64_t iree_atomic_int64_t;
-typedef __int128 iree_atomic_int128_t;
+// typedef __int128 iree_atomic_int128_t;
 
 #ifdef __cplusplus
 // Equiv to C++ auto keyword in C++ mode.
