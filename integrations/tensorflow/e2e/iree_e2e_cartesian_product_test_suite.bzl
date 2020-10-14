@@ -79,7 +79,7 @@ def iree_e2e_cartesian_product_test_suite(
                 "target_backends": "iree_vulkan",
             },
             {
-                "model": "ResNet50",
+                "model": ["ResNet50"],
             },
         ]
 
