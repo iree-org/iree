@@ -29,7 +29,7 @@ def write_platform(bazelrc):
   platform_config = "generic_clang"
   if platform.system() == "Windows":
     platform_config = "windows"
-  print("build --config={}".format(platform_config), file=bazelrc)
+  print("build --config={}".format(      platform_config), file=bazelrc)
 
 
 def write_python_bin(bazelrc):
