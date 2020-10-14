@@ -16,14 +16,14 @@
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 
-def normalize_dictionary(dictionary):
+def _normalize_dictionary(dictionary):
     """Wraps every value of dictionary in a list if it isn't one already."""
     for key, value in dictionary.items():
         if type(value) != type([]):
             dictionary[key] = [value]
     return dictionary
 
-def dictionary_product(dictionary):
+def _dictionary_product(dictionary):
     """Returns a named cartesian product of dictionary's values."""
 
     # Converts {'a': [1, 2], 'b': [3, 4]} into
@@ -126,14 +126,14 @@ def iree_e2e_product_test_suite(
 
     # Normalize flags_to_values to always have lists as its values.
     # e.g. {use_external_data: True} -> {use_external_data: [True]}
-    flags_to_values = normalize_dictionary(flags_to_values)
+    flags_to_values = _normalize_dictionary(flags_to_values)
 
-    all_flag_configurations = dictionary_product(flags_to_values)
+    all_flag_configurations = _dictionary_product(flags_to_values)
 
     failing_flag_configurations = []
     if failing_configurations != None:
         for failing_configuration in failing_configurations:
-            failing_configuration = normalize_dictionary(failing_configuration)
+            failing_configuration = _normalize_dictionary(failing_configuration)
 
             # If a flag isn't specified in the failing configuration, assume it
             # is failing for all values of that flag.
@@ -142,7 +142,7 @@ def iree_e2e_product_test_suite(
                     failing_configuration[key] = value
 
             failing_flag_configurations.extend(
-                dictionary_product(failing_configuration),
+                _dictionary_product(failing_configuration),
             )
 
     tests = []

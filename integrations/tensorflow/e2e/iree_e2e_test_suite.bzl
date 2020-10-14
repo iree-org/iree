@@ -38,7 +38,7 @@ def iree_e2e_test_suite(
       data:
         external data for iree_py_test.
       deps:
-        test dependencies.
+        test dependencies for iree_py_test.
       tags:
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
