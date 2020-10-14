@@ -203,6 +203,8 @@ def iree_e2e_cartesian_product_test_suite(
             **kwargs
         )
 
+    if tags == None:
+        tags = []
     native.test_suite(
         name = name,
         tests = tests,
