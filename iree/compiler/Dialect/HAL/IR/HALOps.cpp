@@ -1136,7 +1136,7 @@ static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
 
 InterfaceOp ExecutableOp::getFirstInterfaceOp() {
   auto interfaceOps = llvm::to_vector<1>(getBlock().getOps<InterfaceOp>());
-  assert(interfaceOps.size() >= 1 &&
+  assert(!interfaceOps.empty() &&
          "executable must have at least one interface");
   return interfaceOps.front();
 }
