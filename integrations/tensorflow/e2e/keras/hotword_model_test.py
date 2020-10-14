@@ -16,6 +16,7 @@
 
 from absl import app
 from absl import flags
+from absl import logging
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
@@ -29,6 +30,7 @@ base_path = str(Path(__file__).resolve())
 # Remove `integrations/tensorflow/e2e/keras/test_name.py`.
 base_path = os.sep.join(base_path.split(os.sep)[:-5])
 research_path = os.path.join(base_path, 'third_party/google-research')
+logging.warning(research_path)
 sys.path.append(research_path)
 
 from kws_streaming.models import model_params

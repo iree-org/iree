@@ -372,3 +372,62 @@ iree_py_binary(
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
+
+# Hotword Model Tests:
+iree_e2e_cartesian_product_test_suite(
+    name = "hotword_model_tests",
+    srcs = ["hotword_model_test.py"],
+    failing_configurations = [
+        {
+            # Failing on IREE:
+            "model": [
+                "att_mh_rnn",  # b/147824465
+                "att_rnn",  # b/147824465
+                "crnn",  # b/162067867
+                "ds_tc_resnet",
+                "gru",  # b/162067867
+                "lstm",  # b/162067867
+            ],
+            "target_backends": [
+                "iree_vmla",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+    ],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "model": [
+            "svdf",
+            "svdf_resnet",
+            "ds_cnn",
+            "gru",
+            "lstm",
+            "cnn_stride",
+            "cnn",
+            "tc_resnet",
+            "tc_resnet_v2",
+            "crnn",
+            "dnn",
+            "att_rnn",
+            "att_mh_rnn",
+            "mobilenet",
+            "mobilenet_v2",
+            "xception",
+            "inception",
+            "inception_resnet",
+            "ds_tc_resnet",
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "hotword_model_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
