@@ -131,6 +131,23 @@ vm.module @mul_i32_folds {
 
 // -----
 
+// CHECK-LABEL: @mul_mul_i32_folds
+vm.module @mul_mul_i32_folds {
+  // CHECK-LABEL: @mul_mul_i32_const
+  vm.func @mul_mul_i32_const(%arg0 : i32) -> i32 {
+    // CHECK: %c40 = vm.const.i32 40 : i32
+    %c4 = vm.const.i32 4 : i32
+    %c10 = vm.const.i32 10 : i32
+    // CHECK: %0 = vm.mul.i32 %arg0, %c40 : i32
+    %0 = vm.mul.i32 %arg0, %c4 : i32
+    %1 = vm.mul.i32 %0, %c10 : i32
+    // CHECK-NEXT: vm.return %0 : i32
+    vm.return %1 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @div_i32_folds
 vm.module @div_i32_folds {
   // CHECK-LABEL: @div_i32_0_y

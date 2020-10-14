@@ -507,12 +507,45 @@ static OpFoldResult foldMulOp(T op, ArrayRef<Attribute> operands) {
       operands, [](const APInt &a, const APInt &b) { return a * b; });
 }
 
+template <typename T, typename CONST_OP>
+struct FoldConstantMulOperand : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    IntegerAttr c1, c2;
+    if (!matchPattern(op.rhs(), m_Constant(&c1))) return failure();
+    if (auto mulOp = dyn_cast_or_null<T>(op.lhs().getDefiningOp())) {
+      if (matchPattern(mulOp.rhs(), m_Constant(&c2))) {
+        auto c = rewriter.createOrFold<CONST_OP>(
+            FusedLoc::get({mulOp.getLoc(), op.getLoc()}, rewriter.getContext()),
+            constFoldBinaryOp<IntegerAttr>(
+                {c1, c2},
+                [](const APInt &a, const APInt &b) { return a * b; }));
+        rewriter.replaceOpWithNewOp<T>(op, op.getType(), mulOp.lhs(), c);
+        return success();
+      }
+    }
+    return failure();
+  }
+};
+
 OpFoldResult MulI32Op::fold(ArrayRef<Attribute> operands) {
   return foldMulOp(*this, operands);
 }
 
+void MulI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<FoldConstantMulOperand<MulI32Op, ConstI32Op>>(context);
+}
+
 OpFoldResult MulI64Op::fold(ArrayRef<Attribute> operands) {
   return foldMulOp(*this, operands);
+}
+
+void MulI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {
+  results.insert<FoldConstantMulOperand<MulI64Op, ConstI64Op>>(context);
 }
 
 template <typename T>
