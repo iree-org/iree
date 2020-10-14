@@ -15,6 +15,10 @@
 """Macro for building e2e tests from a single source with multiple flags."""
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
+load(
+    "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
+    "get_driver",
+)
 
 def _normalize_dictionary(dictionary):
     """Wraps every value of dictionary in a list if it isn't one already."""
@@ -107,7 +111,7 @@ def iree_e2e_cartesian_product_test_suite(
         example above).
       flags_to_values:
         a dictionary of strings (flag names) to lists (of values for the flags)
-        to take a cartesian product of.
+        to take a cartesian product of. `target_backends` must be specified.
       tags:
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
@@ -123,6 +127,8 @@ def iree_e2e_cartesian_product_test_suite(
         any additional arguments that will be passed to the underlying tests and
         test_suite.
     """
+    if not "target_backends" in flags_to_values:
+        fail("`target_backends` must be a key in `flags_to_values`.")
 
     # Normalize flags_to_values to always have lists as its values.
     # e.g. {use_external_data: True} -> {use_external_data: [True]}
@@ -164,22 +170,14 @@ def iree_e2e_cartesian_product_test_suite(
 
         args = ["--{}={}".format(k, v) for k, v in flags.items()]
 
-        py_test_tags = []
-        if "target_backends" in flags:
-            # TODO(#2175): Simplify this after backend names are standardized.
-            # "iree_<driver>" --> "<driver>"
-            backend = flags["target_backends"]
-            if len(backend.split(",")) > 1:
-                fail("Expected only one target backend but got '{}'".format(
-                    backend,
-                ))
+        if len(flags["target_backends"].split(",")) > 1:
+            fail("Multiple target backends cannot be specified at once, but " +
+                 "got `{}`".format(flags["target_backends"]))
 
-            driver = backend.replace("iree_", "")
-            if driver == "llvmjit":
-                driver = "llvm"
-            py_test_tags += ["driver={}".format(driver)]
-            if tags != None:  # `is` is not supported.
-                py_test_tags += tags
+        driver = get_driver(flags["target_backends"])
+        py_test_tags = ["driver={}".format(driver)]
+        if tags != None:  # `is` is not supported.
+            py_test_tags += tags
 
         # Add additional tags if this is a failing configuration.
         if failing:

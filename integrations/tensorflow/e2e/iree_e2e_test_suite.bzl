@@ -16,6 +16,13 @@
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 
+def get_driver(backend):
+    # TODO(#2175): Simplify this after backend names are standardized.
+    driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
+    if driver == "llvmjit":
+        driver = "llvm"
+    return driver
+
 def iree_e2e_test_suite(
         name,
         backends_to_srcs,
@@ -62,11 +69,7 @@ def iree_e2e_test_suite(
                 "--target_backends={}".format(backend),
             ]
 
-            # TODO(#2175): Simplify this after backend names are standardized.
-            # "iree_<driver>" --> "<driver>"
-            driver = backend.replace("iree_", "")
-            if driver == "llvmjit":
-                driver = "llvm"
+            driver = get_driver(backend)
             py_test_tags = ["driver={}".format(driver)]
             if tags != None:  # `is` is not supported.
                 py_test_tags += tags
