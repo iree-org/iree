@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if(CMAKE_CROSSCOMPILING)
-  iree_declare_host_excutable(generate_cc_embed_data)
+  iree_declare_host_excutable(generate_cc_embed_data "generate_cc_embed_data")
 else()
   add_executable(generate_cc_embed_data)
   target_sources(generate_cc_embed_data PRIVATE generate_cc_embed_data_main.cc)
