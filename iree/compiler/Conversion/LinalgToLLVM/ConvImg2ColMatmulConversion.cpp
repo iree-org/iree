@@ -23,7 +23,7 @@ namespace iree_compiler {
 namespace {
 
 // clang-format off
-// 
+//
 // Convert linalg.conv op into img2col packing operation (linalg.generic) +
 // linalg.matmul. See details below:
 // A convolution operaton can be written as a matrix-matrix multiplication by
@@ -39,13 +39,13 @@ namespace {
 // The packed input data (img2col) is a matrix with |rows| = output spatial
 // size, |columns| = filter spatial size. To compute the output Y(i, j) we need
 // to calculate the dot product between filter window at input X(x, y)) and the
-// filter which will look like the following where r.h.s is the img2col matrix and 
+// filter which will look like the following where r.h.s is the img2col matrix and
 // l.h.s is the flattned filter:
-// [x(0, 0), x(0, 1), x(1, 0), x(1, 1)] 
-// [x(0, 1), x(1, 1), x(0, 2), x(1, 2)] (matmul) [w(0, 0), w(0, 1), w(1, 0), w(1, 1)] 
+// [x(0, 0), x(0, 1), x(1, 0), x(1, 1)]
+// [x(0, 1), x(1, 1), x(0, 2), x(1, 2)] (matmul) [w(0, 0), w(0, 1), w(1, 0), w(1, 1)]
 // [x(0, 1), x(1, 1), x(0, 2), x(1, 2)]
 // [   .   ,    .   ,    .   ,    .   ]
-// In general for 2D case with (N, H, W, C) input and (Kh, Kw, C, D) filter 
+// In general for 2D case with (N, H, W, C) input and (Kh, Kw, C, D) filter
 // and output (N, Ho, Wo, D) the convolutin is the following matrix-matrix multiplication
 // (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in the N input.
 // For the case where N > 1 its a batched matrxi-matrix multplication.
@@ -70,7 +70,8 @@ class ConvImg2ColMatmulConversion : public OpRewritePattern<linalg::ConvOp> {
     auto loc = op.getLoc();
 
     auto inputFeatures =
-        filterShapeType.getShape()[filterShapeType.getRank() - 1];
+        inputShapeType.getShape()[op.getNumBatchDimensions() +
+                                  op.getNumSpatialDimensions()];
     auto outputFeatures = filterShapeType.getShape().back();
 
     // Col buffer shape (n, d1, d1, d2, ...dn, k1, k2, k3, ...kn, ci)
@@ -129,26 +130,31 @@ class ConvImg2ColMatmulConversion : public OpRewritePattern<linalg::ConvOp> {
         });
 
     auto getIndicesVector = [](int start, int end) {
-      SmallVector<int64_t, 2> indices;
-      for (int i = start; i <= end; ++i) {
-        indices.push_back(i);
-      }
-      return indices;
+      return llvm::to_vector<2>(llvm::seq<int64_t>(start, end));
     };
 
-    // n, d1, d2,....dn
-    auto batchAndSpatialIndices =
-        getIndicesVector(0, op.getNumSpatialDimensions());
-    auto featureIndices = getIndicesVector(op.getNumSpatialDimensions() + 1,
-                                           op.getNumSpatialDimensions() + 3);
-
     SmallVector<linalg::ReassociationIndices, 4> lhsCollapsedDimsList = {
-        batchAndSpatialIndices, featureIndices};
+        getIndicesVector(
+            0, op.getNumBatchDimensions() + op.getNumSpatialDimensions()),
+        getIndicesVector(
+            op.getNumBatchDimensions() + op.getNumSpatialDimensions(),
+            op.getNumBatchDimensions() + op.getNumSpatialDimensions() * 2 +
+                op.getNumInputFeatureDimensions())};
     SmallVector<linalg::ReassociationIndices, 4> rhsCollapsedDimsList = {
-        batchAndSpatialIndices, {op.getNumSpatialDimensions() + 1}};
+        getIndicesVector(0, op.getNumSpatialDimensions() +
+                                op.getNumInputFeatureDimensions()),
+        getIndicesVector(
+            op.getNumSpatialDimensions() + op.getNumInputFeatureDimensions(),
+            op.getNumSpatialDimensions() + op.getNumInputFeatureDimensions() +
+                op.getNumOutputFeatureDimensions())};
 
     SmallVector<linalg::ReassociationIndices, 4> resultCollapsedDimsList = {
-        batchAndSpatialIndices, {op.getNumSpatialDimensions() + 1}};
+        getIndicesVector(
+            0, op.getNumBatchDimensions() + op.getNumSpatialDimensions()),
+        getIndicesVector(
+            op.getNumBatchDimensions() + op.getNumSpatialDimensions(),
+            op.getNumBatchDimensions() + op.getNumSpatialDimensions() +
+                op.getNumOutputFeatureDimensions())};
 
     auto reshapedColBufferType =
         MemRefType::get({spatialSize, filterSpatialSize * inputFeatures},
