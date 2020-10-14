@@ -444,29 +444,43 @@ static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
   return {};
 }
 
-template <typename T>
-static OpFoldResult foldAddOp(T op, ArrayRef<Attribute> operands) {
+template <typename ADD, typename SUB>
+static OpFoldResult foldAddOp(ADD op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.rhs(), m_Zero())) {
     // x + 0 = x or 0 + y = y (commutative)
     return op.lhs();
+  }
+  if (auto subOp = dyn_cast_or_null<SUB>(op.lhs().getDefiningOp())) {
+    if (subOp.lhs() == op.rhs()) return subOp.rhs();
+    if (subOp.rhs() == op.rhs()) return subOp.lhs();
+  } else if (auto subOp = dyn_cast_or_null<SUB>(op.rhs().getDefiningOp())) {
+    if (subOp.lhs() == op.lhs()) return subOp.rhs();
+    if (subOp.rhs() == op.lhs()) return subOp.lhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a + b; });
 }
 
 OpFoldResult AddI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldAddOp(*this, operands);
+  return foldAddOp<AddI32Op, SubI32Op>(*this, operands);
 }
 
 OpFoldResult AddI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldAddOp(*this, operands);
+  return foldAddOp<AddI64Op, SubI64Op>(*this, operands);
 }
 
-template <typename T>
-static OpFoldResult foldSubOp(T op, ArrayRef<Attribute> operands) {
+template <typename SUB, typename ADD>
+static OpFoldResult foldSubOp(SUB op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.rhs(), m_Zero())) {
     // x - 0 = x
     return op.lhs();
+  }
+  if (auto addOp = dyn_cast_or_null<ADD>(op.lhs().getDefiningOp())) {
+    if (addOp.lhs() == op.rhs()) return addOp.rhs();
+    if (addOp.rhs() == op.rhs()) return addOp.lhs();
+  } else if (auto addOp = dyn_cast_or_null<ADD>(op.rhs().getDefiningOp())) {
+    if (addOp.lhs() == op.lhs()) return addOp.rhs();
+    if (addOp.rhs() == op.lhs()) return addOp.lhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a - b; });
