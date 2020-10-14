@@ -81,17 +81,20 @@ class IdentifyConstantPoolsPass
 
     SymbolTable moduleSymbolTable(moduleOp);
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
+    auto variableUsages = gatherVariableUsages(moduleOp);
 
     // Process the mutable ops where each constant is only used as an
     // initializer. The lifetime of these is short as we only use them to
     // populate the initial variable buffer contents.
     makeConstantPool("_const_pool_init", mutableOps, bufferConstraints,
-                     moduleSymbolTable, moduleBuilder);
+                     variableUsages, moduleOp, moduleSymbolTable,
+                     moduleBuilder);
 
     // Process the immutable ops where the same buffer will be used for the
     // lifetime of the module.
     makeConstantPool("_const_pool", immutableOps, bufferConstraints,
-                     moduleSymbolTable, moduleBuilder);
+                     variableUsages, moduleOp, moduleSymbolTable,
+                     moduleBuilder);
 
     // NOTE: pools now contain the values but they are in an undefined order.
     // We should have following passes that reorder the values to cluster them
@@ -100,6 +103,39 @@ class IdentifyConstantPoolsPass
   }
 
  private:
+  enum VariableUsage {
+    kAddress = 1 << 0,
+    kLoad = 1 << 1,
+  };
+
+  // Gathers information about the usage of all variables in the module.
+  DenseMap<StringRef, VariableUsage> gatherVariableUsages(
+      mlir::ModuleOp moduleOp) {
+    DenseMap<StringRef, VariableUsage> uses;
+    for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+      funcOp.walk([&](Operation *op) {
+        if (auto addressOp = dyn_cast<IREE::Flow::VariableAddressOp>(op)) {
+          auto it = uses.find(addressOp.variable());
+          if (it == uses.end()) {
+            uses[addressOp.variable()] = VariableUsage::kAddress;
+          } else {
+            uses[addressOp.variable()] = static_cast<VariableUsage>(
+                it->second | VariableUsage::kAddress);
+          }
+        } else if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(op)) {
+          auto it = uses.find(loadOp.variable());
+          if (it == uses.end()) {
+            uses[loadOp.variable()] = VariableUsage::kLoad;
+          } else {
+            uses[loadOp.variable()] =
+                static_cast<VariableUsage>(it->second | VariableUsage::kLoad);
+          }
+        }
+      });
+    }
+    return uses;
+  }
+
   // Tries to find the min/max constraints on buffers across all target
   // backends. This should really be done per pool based on the usage of the
   // constants (if pool 0 is used by device A and pool 1 is used by device B
@@ -124,7 +160,9 @@ class IdentifyConstantPoolsPass
   // replaced with constant loads. Returns the constant pool, if it was created.
   Optional<ConstantPoolOp> makeConstantPool(
       StringRef poolName, ArrayRef<IREE::Flow::VariableOp> variableOps,
-      BufferConstraintsAttr bufferConstraints, SymbolTable &moduleSymbolTable,
+      BufferConstraintsAttr bufferConstraints,
+      DenseMap<StringRef, VariableUsage> &variableUsages,
+      mlir::ModuleOp moduleOp, SymbolTable &moduleSymbolTable,
       OpBuilder &moduleBuilder) {
     // Create the pool to be filled with constant values.
     auto poolOp = OpBuilder(moduleBuilder.getContext())
@@ -133,6 +171,11 @@ class IdentifyConstantPoolsPass
     moduleSymbolTable.insert(poolOp, moduleBuilder.getInsertionPoint());
     SymbolTable::setSymbolVisibility(poolOp, SymbolTable::Visibility::Private);
 
+    // Replace each variable and keep track of the mapping from variable->value.
+    // This allows us to do one run through the module to replace usages as a
+    // post-processing step.
+    DenseMap<StringRef, IREE::HAL::ConstantPoolValueOp> constantReplacements;
+    SmallVector<Operation *, 4> deadOps;
     auto poolBuilder = OpBuilder::atBlockBegin(poolOp.getBody());
     for (auto variableOp : variableOps) {
       // Grab the constant value from the variable that we'll be pooling.
@@ -147,22 +190,25 @@ class IdentifyConstantPoolsPass
       SymbolTable::setSymbolVisibility(valueOp,
                                        SymbolTable::Visibility::Nested);
 
-      // Find all variable loads in the module.
-      // May fail if the variable is used in ways not supported by constant
-      // pools.
-      auto loadOps = findVariableLoadOps(variableOp);
+      // If the variable is an immutable constant and used in compatible
+      // ways we can turn them into constant loads instead. These will avoid
+      // the additional runtime overhead of variable lifetime tracking and
+      // allow further optimizations at use sites where we know the values
+      // come from constant memory.
+      auto variableUsage = variableUsages[variableOp.getName()];
+      if (!variableOp.is_mutable() &&
+          (variableUsage & VariableUsage::kAddress)) {
+        variableOp.emitWarning() << "variable is used indirectly; currently "
+                                    "unsupported for constant pooling";
+        continue;
+      }
 
-      // If the variable is an immutable constant and used in compatible ways
-      // we can turn them into constant loads instead. These will avoid the
-      // additional runtime overhead of variable lifetime tracking and allow
-      // further optimizations at use sites where we know the values come from
-      // constant memory.
-      if (loadOps.hasValue() && !variableOp.is_mutable()) {
+      if (!variableOp.is_mutable()) {
         // Replace all loads of the variable with loads of the constant.
-        for (auto loadOp : loadOps.getValue()) {
-          replaceVariableLoadWithConstantLoad(loadOp, valueOp);
-        }
-        variableOp.erase();
+        // We do the actual replacement in a post-processing step so we don't
+        // modify the IR during this loop.
+        constantReplacements[variableOp.getName()] = valueOp;
+        deadOps.push_back(variableOp);
       } else {
         // Build an initializer function to populate the variable with the
         // constant value on startup.
@@ -175,6 +221,15 @@ class IdentifyConstantPoolsPass
       poolOp.erase();
       return None;
     }
+
+    // Process pending usage replacements.
+    replaceConstantVariableLoads(moduleOp, constantReplacements);
+
+    // Cleanup any inlined variables we no longer need after replacement.
+    for (auto deadOp : deadOps) {
+      deadOp->erase();
+    }
+
     return poolOp;
   }
 
@@ -209,33 +264,25 @@ class IdentifyConstantPoolsPass
     return initializerFunc;
   }
 
-  // Returns a list of all load ops referencing |variableOp| or None if the
-  // variable has undefined/unsupported uses that prevent it from being pooled.
-  Optional<SmallVector<IREE::Flow::VariableLoadOp, 8>> findVariableLoadOps(
-      IREE::Flow::VariableOp variableOp) {
-    // Find all uses of the variable within the module.
-    auto variableUses =
-        SymbolTable::getSymbolUses(variableOp, variableOp.getParentRegion());
-    if (!variableUses.hasValue()) {
-      // Cannot turn this variable into a constant as its used in undefined
-      // places.
-      variableOp.emitWarning()
-          << "symbol may be used in an undefined op; ignoring";
-      return None;
+  // Replaces uses of each variable with references to the constant pool value.
+  void replaceConstantVariableLoads(
+      mlir::ModuleOp moduleOp,
+      DenseMap<StringRef, IREE::HAL::ConstantPoolValueOp> &replacements) {
+    SmallVector<
+        std::pair<IREE::Flow::VariableLoadOp, IREE::HAL::ConstantPoolValueOp>,
+        8>
+        loadValues;
+    for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+      funcOp.walk([&](IREE::Flow::VariableLoadOp loadOp) {
+        auto replacement = replacements.find(loadOp.variable());
+        if (replacement != replacements.end()) {
+          loadValues.push_back(std::make_pair(loadOp, replacement->second));
+        }
+      });
     }
-
-    SmallVector<IREE::Flow::VariableLoadOp, 8> loadOps;
-    for (auto variableUse : variableUses.getValue()) {
-      if (isa<IREE::Flow::VariableAddressOp>(variableUse.getUser())) {
-        variableOp.emitWarning() << "variable is used indirectly; currently "
-                                    "unsupported for constant pooling";
-        return None;
-      } else if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(
-                     variableUse.getUser())) {
-        loadOps.push_back(loadOp);
-      }
+    for (auto &loadValue : loadValues) {
+      replaceVariableLoadWithConstantLoad(loadValue.first, loadValue.second);
     }
-    return loadOps;
   }
 
   // Replaces a flow.variable.load with a hal.constant_pool.load of a pooled
