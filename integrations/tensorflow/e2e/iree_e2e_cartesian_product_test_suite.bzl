@@ -166,7 +166,7 @@ def iree_e2e_cartesian_product_test_suite(
 
         py_test_tags = []
         if "target_backends" in flags:
-            # TODO(GH-2175): Simplify this after backend names are standardized.
+            # TODO(#2175): Simplify this after backend names are standardized.
             # "iree_<driver>" --> "<driver>"
             backend = flags["target_backends"]
             if len(backend.split(",")) > 1:
@@ -184,7 +184,7 @@ def iree_e2e_cartesian_product_test_suite(
         # Add additional tags if this is a failing configuration.
         if failing:
             py_test_tags += [
-                "failing",  # Only used for test_suite filtering below.
+                "failing",
                 "manual",
                 "nokokoro",
                 "notap",
