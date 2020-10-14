@@ -137,9 +137,9 @@ def iree_e2e_product_test_suite(
 
             # If a flag isn't specified in the failing configuration, assume it
             # is failing for all values of that flag.
-            for key, value in flags_to_values.items():
+            for key, values in flags_to_values.items():
                 if key not in failing_configuration:
-                    failing_configuration[key] = value
+                    failing_configuration[key] = values
 
             failing_flag_configurations.extend(
                 _dictionary_product(failing_configuration),
