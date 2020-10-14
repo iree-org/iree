@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -74,6 +72,36 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   }
 };
 
+class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::BranchOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    mlir::BranchOpAdaptor adaptor(operands);
+    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
+                                                adaptor.destOperands());
+    return success();
+  }
+};
+
+class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::CondBranchOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    mlir::CondBranchOpAdaptor adaptor(operands,
+                                      op.getOperation()->getAttrDictionary());
+    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+        op, adaptor.condition(), op.trueDest(), adaptor.trueDestOperands(),
+        op.falseDest(), op.falseDestOperands());
+    return success();
+  }
+};
+
 class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
@@ -88,11 +116,12 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
 
 }  // namespace
 
-void populateFlowStructuralToHALPatterns(MLIRContext *context,
-                                         OwningRewritePatternList &patterns,
-                                         TypeConverter &converter) {
-  patterns.insert<FuncOpSignatureConversion, ReturnOpConversion>(converter,
-                                                                 context);
+void populateStandardStructuralToHALPatterns(MLIRContext *context,
+                                             OwningRewritePatternList &patterns,
+                                             TypeConverter &converter) {
+  patterns.insert<FuncOpSignatureConversion, BranchOpConversion,
+                  CondBranchOpConversion, ReturnOpConversion>(converter,
+                                                              context);
 }
 
 }  // namespace iree_compiler

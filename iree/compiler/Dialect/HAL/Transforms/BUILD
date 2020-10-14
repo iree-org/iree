@@ -46,6 +46,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
         "//iree/compiler/Dialect/HAL/Conversion/HALToHAL",
         "//iree/compiler/Dialect/HAL/Conversion/IREEToHAL",
+        "//iree/compiler/Dialect/HAL/Conversion/StandardToHAL",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",

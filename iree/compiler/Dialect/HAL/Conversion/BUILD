@@ -31,7 +31,6 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
@@ -47,8 +46,6 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
-        "//iree/compiler/Dialect/HAL/Conversion/HALToHAL",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
         "@llvm-project//mlir:Pass",
     ],

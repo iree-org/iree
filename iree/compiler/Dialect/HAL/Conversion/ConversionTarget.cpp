@@ -34,11 +34,15 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   // illegal types.
   markUnknownOpDynamicallyLegal();
 
-  // The HAL dialect expects both standard ops and the HAL ops (in case some
-  // conversion has already happened).
-  addLegalDialect<StandardOpsDialect>();
-  addLegalOp<ModuleOp, ModuleTerminatorOp>();
-  addLegalDialect<IREE::HAL::HALDialect>();
+  // The HAL dialect allows hal ops as input as we may be running on partially
+  // processed files or may have already lowered some constructs (like constant
+  // pools).
+  addLegalDialect("hal");
+
+  // We don't care about the contents of a HAL executable: it may have any kind
+  // of dialect and type usage.
+  addLegalOp<IREE::HAL::ExecutableOp>();
+  markOpRecursivelyLegal<IREE::HAL::ExecutableOp>();
 
   // There are a variety of patterns which convert std.dim and std.rank ops
   // to corresponding HAL ops. All should be eliminated.
@@ -49,20 +53,6 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   addDynamicallyLegalOp<Shape::TieShapeOp>([&](Shape::TieShapeOp op) {
     return typeConverter.isLegal(op.result().getType());
   });
-
-  // We don't care about the contents of a HAL executable: it may have any kind
-  // of dialect and type usage.
-  addLegalOp<IREE::HAL::ExecutableOp>();
-  markOpRecursivelyLegal<IREE::HAL::ExecutableOp>();
-
-  addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
-    return typeConverter.isSignatureLegal(op.getType()) &&
-           typeConverter.isLegal(&op.getBody());
-  });
-  addDynamicallyLegalOp<ReturnOp>(
-      [&](ReturnOp op) { return typeConverter.isLegal(op.getOperandTypes()); });
-  addDynamicallyLegalOp<ConstantOp>(
-      [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
 }
 
 bool HALConversionTarget::isDynamicallyLegal(Operation *op) const {

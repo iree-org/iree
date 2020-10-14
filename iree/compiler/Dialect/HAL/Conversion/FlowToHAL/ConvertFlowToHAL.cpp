@@ -26,11 +26,6 @@ void populateFlowStreamToHALPatterns(MLIRContext *context,
                                      OwningRewritePatternList &patterns,
                                      TypeConverter &converter);
 
-// Populates only the structural (module/function/etc) conversion patterns.
-void populateFlowStructuralToHALPatterns(MLIRContext *context,
-                                         OwningRewritePatternList &patterns,
-                                         TypeConverter &converter);
-
 // Populates only the flow.tensor.* conversion patterns.
 void populateFlowTensorToHALPatterns(MLIRContext *context,
                                      OwningRewritePatternList &patterns,
@@ -57,7 +52,6 @@ void populateFlowToHALPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                TypeConverter &typeConverter) {
   populateFlowStreamToHALPatterns(context, patterns, typeConverter);
-  populateFlowStructuralToHALPatterns(context, patterns, typeConverter);
   populateFlowTensorToHALPatterns(context, patterns, typeConverter);
   populateFlowVariableToHALPatterns(context, patterns, typeConverter);
   populateHalBufferViewShapePatterns(context, patterns, typeConverter);

@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/IREEToHAL/ConvertIREEToHAL.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -73,17 +74,20 @@ class ConvertToHALPass
 
     OwningRewritePatternList patterns;
 
-    populateFlowToHALPatterns(context, patterns, typeConverter);
-    setupFlowToHALLegality(context, conversionTarget, typeConverter);
-
-    populateHALToHALPatterns(context, patterns, typeConverter);
-    setupHALToHALLegality(context, conversionTarget, typeConverter);
-
-    populateIREEToHALPatterns(context, patterns);
     setupIREEToHALLegality(context, conversionTarget);
+    populateIREEToHALPatterns(context, patterns);
 
-    populatePreserveCompilerHintsPatterns(context, patterns);
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
+    populatePreserveCompilerHintsPatterns(context, patterns);
+
+    setupStandardToHALLegality(context, conversionTarget, typeConverter);
+    populateStandardToHALPatterns(context, patterns, typeConverter);
+
+    setupFlowToHALLegality(context, conversionTarget, typeConverter);
+    populateFlowToHALPatterns(context, patterns, typeConverter);
+
+    setupHALToHALLegality(context, conversionTarget, typeConverter);
+    populateHALToHALPatterns(context, patterns, typeConverter);
 
     // Gather all HAL dialect conversion patterns from custom dialects.
     // These will perform the tensor->buffer mapping for their ops.

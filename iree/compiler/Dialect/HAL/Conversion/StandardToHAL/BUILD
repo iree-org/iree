@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,26 +19,20 @@ package(
 )
 
 cc_library(
-    name = "FlowToHAL",
+    name = "StandardToHAL",
     srcs = [
-        "ConvertFlowToHAL.cpp",
-        "ConvertShapeQueryOps.cpp",
-        "ConvertStreamOps.cpp",
-        "ConvertTensorOps.cpp",
-        "ConvertVariableOps.cpp",
+        "ConvertStandardToHAL.cpp",
+        "ConvertStructuralOps.cpp",
     ],
     hdrs = [
-        "ConvertFlowToHAL.h",
+        "ConvertStandardToHAL.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

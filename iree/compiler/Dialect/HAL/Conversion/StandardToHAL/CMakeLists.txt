@@ -16,28 +16,22 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    FlowToHAL
+    StandardToHAL
   HDRS
-    "ConvertFlowToHAL.h"
+    "ConvertStandardToHAL.h"
   SRCS
-    "ConvertFlowToHAL.cpp"
-    "ConvertShapeQueryOps.cpp"
-    "ConvertStreamOps.cpp"
-    "ConvertTensorOps.cpp"
-    "ConvertVariableOps.cpp"
+    "ConvertStandardToHAL.cpp"
+    "ConvertStructuralOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRStandard
     MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )

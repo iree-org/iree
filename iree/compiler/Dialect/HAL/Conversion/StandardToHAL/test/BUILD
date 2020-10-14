@@ -12,36 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
-iree_cc_library(
-  NAME
-    Conversion
-  HDRS
-    "ConversionDialectInterface.h"
-    "ConversionTarget.h"
-    "TypeConverter.h"
-  SRCS
-    "ConversionTarget.cpp"
-    "TypeConverter.cpp"
-  DEPS
-    MLIRIR
-    MLIRStandard
-    MLIRTransforms
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cc_library(
-  NAME
-    Passes
-  HDRS
-    "Passes.h"
-  DEPS
-    MLIRPass
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
-  PUBLIC
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )
