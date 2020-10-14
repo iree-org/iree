@@ -67,13 +67,11 @@ class MandelbrotModule(tf.Module):
     # and imaginary part is broadcasted "horizontally").
     # We use a Nx1 * 1xN -> NxN matmul to do the broadcast.
     c_re = tf.reshape(
-        tf.matmul(
-            tf.ones([view_pixels, 1]), tf.reshape(re_coords, [1, view_pixels])),
-        [-1])
+        tf.matmul(tf.ones([view_pixels, 1]),
+                  tf.reshape(re_coords, [1, view_pixels])), [-1])
     c_im = tf.reshape(
-        tf.matmul(
-            tf.reshape(im_coords, [view_pixels, 1]), tf.ones([1, view_pixels])),
-        [-1])
+        tf.matmul(tf.reshape(im_coords, [view_pixels, 1]),
+                  tf.ones([1, view_pixels])), [-1])
 
     z_re = tf.zeros_like(c_re)
     z_im = tf.zeros_like(c_im)

@@ -47,11 +47,10 @@ def parse_arguments():
 
   parser = argparse.ArgumentParser(
       description="Bazel to CMake conversion helper.")
-  parser.add_argument(
-      "--preview",
-      help="Prints results instead of writing files",
-      action="store_true",
-      default=False)
+  parser.add_argument("--preview",
+                      help="Prints results instead of writing files",
+                      action="store_true",
+                      default=False)
   parser.add_argument(
       "--allow_partial_conversion",
       help="Generates partial files, ignoring errors during conversion",
@@ -60,10 +59,9 @@ def parse_arguments():
 
   # Specify only one of these (defaults to --root_dir=iree).
   group = parser.add_mutually_exclusive_group()
-  group.add_argument(
-      "--dir",
-      help="Converts the BUILD file in the given directory",
-      default=None)
+  group.add_argument("--dir",
+                     help="Converts the BUILD file in the given directory",
+                     default=None)
   group.add_argument(
       "--root_dir",
       help="Converts all BUILD files under a root directory (defaults to iree/)",
@@ -168,13 +166,11 @@ def main(args):
   write_files = not args.preview
 
   if args.root_dir:
-    convert_directory_tree(
-        os.path.join(repo_root, args.root_dir), write_files,
-        args.allow_partial_conversion)
+    convert_directory_tree(os.path.join(repo_root, args.root_dir), write_files,
+                           args.allow_partial_conversion)
   elif args.dir:
-    convert_directory(
-        os.path.join(repo_root, args.dir), write_files,
-        args.allow_partial_conversion)
+    convert_directory(os.path.join(repo_root, args.dir), write_files,
+                      args.allow_partial_conversion)
 
 
 if __name__ == "__main__":

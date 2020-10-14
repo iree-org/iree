@@ -61,9 +61,8 @@ class BooleanTest(tf_test_utils.TracedModuleTestCase):
   def test_logical_and(self):
 
     def logical_and(module):
-      module.logical_and(
-          np.array([True, True, False, False], dtype=np.bool),
-          np.array([True, False, False, True], dtype=np.bool))
+      module.logical_and(np.array([True, True, False, False], dtype=np.bool),
+                         np.array([True, False, False, True], dtype=np.bool))
 
     self.compare_backends(logical_and, self._modules)
 

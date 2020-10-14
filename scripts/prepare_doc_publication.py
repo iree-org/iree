@@ -29,11 +29,10 @@ def parse_arguments():
   """Parses command-line options."""
   parser = argparse.ArgumentParser(
       description='Processes MarkDown files for publication')
-  parser.add_argument(
-      'base_dir',
-      metavar='PATH',
-      type=str,
-      help='Base documentation directory.')
+  parser.add_argument('base_dir',
+                      metavar='PATH',
+                      type=str,
+                      help='Base documentation directory.')
 
   parsed_args = parser.parse_args()
   if not os.path.isdir(parsed_args.base_dir):
@@ -58,7 +57,7 @@ DOC_TITLE_DICT = {
     'getting_started_macos_cmake.md': 'macOS with CMake',
     'getting_started_android_cmake.md': 'Android with CMake',
     'generic_vulkan_env_setup.md': 'Generic Vulkan Setup',
-    'getting_started_python.md': 'Python',   
+    'getting_started_python.md': 'Python',
     'design_roadmap.md': 'Long-term Design Roadmap',
     'objectives.md': 'Short-term Objectives',
     'tensorflow_integrations.md': 'TensorFlow Integrations',

@@ -34,13 +34,11 @@ class LstmStaticModule(tf.Module):
     super(LstmStaticModule, self).__init__()
     tf_utils.set_random_seed()
     inputs = tf.keras.layers.Input(batch_size=NUM_BATCH, shape=INPUT_SHAPE[1:])
-    outputs = tf.keras.layers.LSTM(
-        units=NUM_UNITS, return_sequences=True)(
-            inputs)
+    outputs = tf.keras.layers.LSTM(units=NUM_UNITS,
+                                   return_sequences=True)(inputs)
     self.m = tf.keras.Model(inputs, outputs)
     self.predict = tf.function(
-        input_signature=[tf.TensorSpec(INPUT_SHAPE, tf.float32)])(
-            self.m.call)
+        input_signature=[tf.TensorSpec(INPUT_SHAPE, tf.float32)])(self.m.call)
 
 
 class LstmStaticTest(tf_test_utils.TracedModuleTestCase):

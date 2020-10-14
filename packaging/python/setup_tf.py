@@ -28,15 +28,17 @@ import common_setup
 
 
 def run():
-  package_dir = common_setup.get_package_dir(
-      prefix=("integrations", "tensorflow", "bindings", "python"))
-  packages = setuptools.find_namespace_packages(
-      package_dir,
-      include=[
-          "pyiree.tf.compiler", "pyiree.tf.compiler.*", "pyiree.tf.support",
-          "pyiree.tf.support.*"
-      ],
-      exclude=["*.CMakeFiles"])
+  package_dir = common_setup.get_package_dir(prefix=("integrations",
+                                                     "tensorflow", "bindings",
+                                                     "python"))
+  packages = setuptools.find_namespace_packages(package_dir,
+                                                include=[
+                                                    "pyiree.tf.compiler",
+                                                    "pyiree.tf.compiler.*",
+                                                    "pyiree.tf.support",
+                                                    "pyiree.tf.support.*"
+                                                ],
+                                                exclude=["*.CMakeFiles"])
   print("Found packages:", packages)
   if not packages:
     print("ERROR: Did not find packages under", package_dir)
@@ -45,12 +47,12 @@ def run():
       sub_project="tf",
       description="IREE TensorFlow Compiler",
       package_dir=package_dir)
-  common_setup.setup(
-      packages=packages,
-      ext_modules=[
-          setuptools.Extension(name="pyiree.tf.compiler.binding", sources=[]),
-      ],
-      **setup_kwargs)
+  common_setup.setup(packages=packages,
+                     ext_modules=[
+                         setuptools.Extension(name="pyiree.tf.compiler.binding",
+                                              sources=[]),
+                     ],
+                     **setup_kwargs)
 
 
 if __name__ == "__main__":

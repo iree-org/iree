@@ -127,7 +127,6 @@ def setup(**kwargs):
   package_data = {
       "": ["*%s" % (sysconfig.get_config_var("EXT_SUFFIX"),)],
   }
-  setuptools.setup(
-      package_data=package_data,
-      cmdclass={"bdist_wheel": bdist_wheel},
-      **kwargs)
+  setuptools.setup(package_data=package_data,
+                   cmdclass={"bdist_wheel": bdist_wheel},
+                   **kwargs)
