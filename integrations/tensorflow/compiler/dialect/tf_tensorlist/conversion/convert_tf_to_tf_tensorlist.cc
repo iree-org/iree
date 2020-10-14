@@ -83,7 +83,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
   // It only knows how to handle blindly convert one type to another type.
 
   OwningRewritePatternList patterns;
-  populateWithGenerated(&getContext(), &patterns);
+  populateWithGenerated(&getContext(), patterns);
   patterns.insert<ConvertTfTensorlistConcatV2>(&getContext());
 
   ConversionTarget target(getContext());

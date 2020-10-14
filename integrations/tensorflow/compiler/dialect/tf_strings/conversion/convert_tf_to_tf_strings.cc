@@ -156,7 +156,7 @@ class LowerTensorflowToStringsPass
 
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns) {
-  populateWithGenerated(ctx, &patterns);
+  populateWithGenerated(ctx, patterns);
   patterns.insert<StringFormatOpLowering>(ctx);
 }
 
