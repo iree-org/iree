@@ -16,10 +16,18 @@
 
 load("//bindings/python:build_defs.oss.bzl", "iree_py_test")
 
+def get_driver(backend):
+    # TODO(#2175): Simplify this after backend names are standardized.
+    driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
+    if driver == "llvmjit":
+        driver = "llvm"
+    return driver
+
 def iree_e2e_test_suite(
         name,
         backends_to_srcs,
         reference_backend,
+        data = None,
         deps = None,
         size = None,
         tags = None,
@@ -34,8 +42,10 @@ def iree_e2e_test_suite(
         a dictionary mapping backends to a list of test files to run on them.
       reference_backend:
         the backend to use as a source of truth for the expected output results.
+      data:
+        external data for iree_py_test.
       deps:
-        test dependencies.
+        test dependencies for iree_py_test.
       tags:
         tags to apply to the test. Note that as in standard test suites, manual
         is treated specially and will also apply to the test suite itself.
@@ -49,10 +59,9 @@ def iree_e2e_test_suite(
 
     for backend, srcs in backends_to_srcs.items():
         for src in srcs:
-            test_name = "{}_{}__{}__{}".format(
+            test_name = "{}__{}__target_backends__{}".format(
                 name,
                 src[:-3],
-                reference_backend,
                 backend,
             )
             args = [
@@ -60,10 +69,7 @@ def iree_e2e_test_suite(
                 "--target_backends={}".format(backend),
             ]
 
-            # TODO(GH-2175): Simplify this after backend names are standardized.
-            driver = backend.replace("iree_", "")  # "iree_<driver>" --> "<driver>"
-            if driver == "llvmjit":
-                driver = "llvm"
+            driver = get_driver(backend)
             py_test_tags = ["driver={}".format(driver)]
             if tags != None:  # `is` is not supported.
                 py_test_tags += tags
@@ -72,8 +78,9 @@ def iree_e2e_test_suite(
                 name = test_name,
                 main = src,
                 srcs = [src],
-                deps = deps,
                 args = args,
+                data = data,
+                deps = deps,
                 size = size,
                 tags = py_test_tags,
                 python_version = python_version,
