@@ -72,56 +72,36 @@ iree_slim_vision_test_suite(
             ],
         },
         {
-            # Failing all but tf and vmla:
+            # Failing llvmjit and vulkan:
             "models": [
-                "inception_resnet_v2",
-                # tflite: RuntimeError: tensorflow/lite/kernels/reshape.cc:66 num_input_elements != num_output_elements (38400 != -1571481807)Node number 333 (RESHAPE) failed to prepare.
-                # llvmjit: *** Received signal 6 ***
-                # vulkan: Floating point difference was too large. Max abs diff: 1.3961234, atol: 5e-05, max relative diff: 0.27304956, rtol: 1e-06
+                "nasnet_mobile",
+                "nasnet_large",
+                "pnasnet_large",
+                "resnet_v2_50",
                 "resnet_v2_101",
-                # tflite: RuntimeError: tensorflow/lite/core/subgraph.cc BytesRequired number of elements overflowed.
-                # llvmjit: Floating point difference was too large. Max abs diff: 11.668068, atol: 5e-05, max relative diff: 0.93950737, rtol: 1e-06
-                # vulkan: Floating point difference was too large. Max abs diff: 11.668067, atol: 5e-05, max relative diff: 0.93950737, rtol: 1e-06
                 "resnet_v2_152",
-                # tflite: RuntimeError: tensorflow/lite/core/subgraph.cc BytesRequired number of elements overflowed.
-                # llvmjit: Floating point difference was too large. Max abs diff: 7.080696, atol: 5e-05, max relative diff: 0.97750616, rtol: 1e-06
-                # vulkan: Floating point difference was too large. Max abs diff: 7.08069, atol: 5e-05, max relative diff: 0.97750485, rtol: 1e-06
             ],
             "backends": [
-                "tflite",
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
         },
         {
-            # Failing llvmjit and vulkan:
+            # Failing vulkan:
             "models": [
+                # [ERROR]: cannot separate Linalg/Parallel ops into multiple kernels
+                "inception_v1",
                 "inception_v2",
-                # llvmjit: double free or corruption (!prev); *** Received signal 6 ***
-                # vulkan: Floating point difference was too large. Max abs diff: 1.0769763, atol: 5e-05, max relative diff: 0.19576924, rtol: 1e-06
                 "inception_v3",
-                # llvmjit: double free or corruption (!prev); *** Received signal 6 ***
-                # vulkan: Floating point difference was too large. Max abs diff: 2.5201874, atol: 5e-05, max relative diff: 0.53700095, rtol: 1e-06
-                "nasnet_mobile",
-                # llvmjit: corrupted size vs. prev_size; *** Received signal 6 ***
-                # vulkan: *** Received signal 11 ***
-                "nasnet_large",
-                # llvmjit: *** Received signal 6 ***
-                # vulkan: *** Received signal 11 ***
-                "pnasnet_large",
-                # llvmjit: Floating point difference was too large. Max abs diff: 1.0411791, atol: 5e-05, max relative diff: 0.20533353, rtol: 1e-06
-                # vulkan: *** Received signal 11 ***
-                "resnet_v2_50",
-                # llvmjit: Floating point difference was too large. Max abs diff: 5.8187943, atol: 5e-05, max relative diff: 0.7946711, rtol: 1e-06
-                # vulkan: Floating point difference was too large. Max abs diff: 5.8187933, atol: 5e-05, max relative diff: 0.79467094, rtol: 1e-06
+                "inception_resnet_v2",
             ],
             "backends": [
-                "iree_llvmjit",
                 "iree_vulkan",
             ],
         },
     ],
     models = [
+        "amoebanet_a_n18_f448",
         "inception_resnet_v2",
         "inception_v1",
         "inception_v2",
