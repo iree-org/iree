@@ -25,8 +25,8 @@ load(
     "iree_py_binary",
 )
 load(
-    "//integrations/tensorflow/e2e:iree_e2e_product_test_suite.bzl",
-    "iree_e2e_product_test_suite",
+    "//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "iree_e2e_cartesian_product_test_suite",
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
@@ -162,7 +162,7 @@ iree_e2e_test_suite(
     ],
 )
 
-iree_e2e_product_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "large_cifar10_internal_tests",
     size = "large",
     srcs = ["vision_model_test.py"],
@@ -192,7 +192,7 @@ iree_e2e_product_test_suite(
     ],
 )
 
-iree_e2e_product_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "enormous_cifar10_internal_tests",
     size = "enormous",
     srcs = ["vision_model_test.py"],
@@ -247,7 +247,7 @@ iree_e2e_product_test_suite(
     ],
 )
 
-iree_e2e_product_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "cifar10_external_tests",
     size = "large",
     srcs = ["vision_model_test.py"],
@@ -283,7 +283,7 @@ iree_e2e_product_test_suite(
     ],
 )
 
-iree_e2e_product_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "imagenet_external_tests",
     size = "enormous",
     srcs = ["vision_model_test.py"],

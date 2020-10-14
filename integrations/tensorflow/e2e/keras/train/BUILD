@@ -18,8 +18,8 @@ load(
     "NUMPY_DEPS",
 )
 load(
-    "//integrations/tensorflow/e2e:iree_e2e_product_test_suite.bzl",
-    "iree_e2e_product_test_suite",
+    "//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "iree_e2e_cartesian_product_test_suite",
 )
 
 package(
@@ -28,7 +28,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_e2e_product_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "train_tests",
     srcs = ["model_train_test.py"],
     failing_configurations = [

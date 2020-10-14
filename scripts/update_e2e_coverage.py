@@ -112,16 +112,16 @@ def parse_arguments():
 
 def parse_test_name(test_name, test_suite):
   """Splits a test name into a dictionary with its source file and backend."""
-  test_name = test_name.split("__")
+  test_name_parts = test_name.split("__")
   test_info = {}
 
   # The iree_e2e_test_suite elides a 'src' key before the name of the test
-  # of brevity.
-  if len(test_name) % 2 == 1:
-    test_info['src'] = test_name.pop(0)
+  # for brevity.
+  if len(test_name_parts) % 2 == 1:
+    test_info['src'] = test_name_parts.pop(0)
 
   # The rest of the test name should follow 'key__value__key__value__...'.
-  for key, value in zip(test_name[::2], test_name[1::2]):
+  for key, value in zip(test_name_parts[::2], test_name_parts[1::2]):
     test_info[key] = value
 
   # Default to using the test source file name as the row id for the table.

@@ -25,8 +25,8 @@ load(
     "iree_py_binary",
 )
 load(
-    "//integrations/tensorflow/e2e:iree_e2e_product_test_suite.bzl",
-    "iree_e2e_product_test_suite",
+    "//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "iree_e2e_cartesian_product_test_suite",
 )
 
 package(
@@ -47,7 +47,7 @@ iree_py_binary(
     ],
 )
 
-iree_e2e_product_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "slim_vision_tests",
     size = "enormous",
     srcs = ["slim_vision_model_test.py"],

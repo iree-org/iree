@@ -35,7 +35,7 @@ def _dictionary_product(dictionary):
     dicts = [{k: v for k, v in zip(dictionary, element)} for element in product]
     return dicts
 
-def iree_e2e_product_test_suite(
+def iree_e2e_cartesian_product_test_suite(
         name,
         srcs,
         main,
