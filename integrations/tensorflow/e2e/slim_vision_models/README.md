@@ -7,4 +7,4 @@ can be installed as follows:
 python3 -m pip install tensorflow_hub
 ```
 
-Like the `vision_external_tests`, these tests are not checked by the OSS CI.
+These tests are not checked by the OSS CI.

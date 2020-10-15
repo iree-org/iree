@@ -105,7 +105,6 @@ LLVM_FAILING = [
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "sort_test.py",
     "strings_test.py",
 ]
 
@@ -126,7 +125,6 @@ VULKAN_FAILING = [
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
-    "sort_test.py",
     "strings_test.py",
 ]
 
@@ -180,6 +178,7 @@ iree_e2e_test_suite(
     },
     reference_backend = "tf",
     tags = [
+        "failing",
         "manual",
         "nokokoro",
         "notap",
@@ -220,6 +219,7 @@ iree_e2e_test_suite(
     },
     reference_backend = "tf",
     tags = [
+        "failing",
         "manual",
         "nokokoro",
         "notap",
@@ -261,6 +261,7 @@ iree_e2e_test_suite(
     reference_backend = "tf",
     tags = [
         "external",
+        "failing",
         "guitar",
         "manual",
         "no-remote",

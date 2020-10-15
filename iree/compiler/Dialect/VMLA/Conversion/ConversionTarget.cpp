@@ -43,6 +43,7 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   // If we end up with a lot of these, consider using an "is pseudo" trait.
   addIllegalOp<IREE::VMLA::BatchMatMulPseudoOp>();
   addIllegalOp<IREE::VMLA::SortPseudoOp>();
+  addIllegalOp<IREE::VMLA::FftPseudoOp>();
 
   // Allow other ops to pass through so long as their type is valid (not a
   // tensor, basically).

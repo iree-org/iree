@@ -1311,6 +1311,7 @@ def VM_MulI32Op :
     VM_BinaryArithmeticOp<I32, "mul.i32", VM_OPC_MulI32, [Commutative]> {
   let summary = [{integer multiplication operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_MulI64Op :
@@ -1318,6 +1319,7 @@ def VM_MulI64Op :
                           [VM_ExtI64, Commutative]> {
   let summary = [{integer multiplication operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_DivI32SOp :
