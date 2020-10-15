@@ -21,6 +21,7 @@
 load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
+    "INTREE_TF_HUB_DEPS",
     "NUMPY_DEPS",
     "iree_py_binary",
 )
@@ -42,7 +43,7 @@ iree_py_binary(
     args = ["--tf_hub_url=https://tfhub.dev/google/imagenet/"],
     main = "slim_vision_model_test.py",
     python_version = "PY3",
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+    deps = INTREE_TENSORFLOW_PY_DEPS + INTREE_TF_HUB_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
