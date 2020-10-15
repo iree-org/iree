@@ -56,6 +56,41 @@ vm.module @sub_i32_folds {
 
 // -----
 
+// CHECK-LABEL: @add_sub_i32_folds
+vm.module @add_sub_i32_folds {
+  // CHECK-LABEL: @add_sub_x
+  vm.func @add_sub_x(%arg0 : i32, %arg1 : i32) -> i32 {
+    // CHECK-NEXT: vm.return %arg0
+    %0 = vm.add.i32 %arg0, %arg1 : i32
+    %1 = vm.sub.i32 %0, %arg1 : i32
+    vm.return %1 : i32
+  }
+  // CHECK-LABEL: @add_sub_x_rev
+  vm.func @add_sub_x_rev(%arg0 : i32, %arg1 : i32) -> i32 {
+    // CHECK-NEXT: vm.return %arg0
+    %0 = vm.add.i32 %arg1, %arg0 : i32
+    %1 = vm.sub.i32 %arg1, %0 : i32
+    vm.return %1 : i32
+  }
+
+  // CHECK-LABEL: @sub_add_x
+  vm.func @sub_add_x(%arg0 : i32, %arg1 : i32) -> i32 {
+    // CHECK-NEXT: vm.return %arg0
+    %0 = vm.sub.i32 %arg0, %arg1 : i32
+    %1 = vm.add.i32 %0, %arg1 : i32
+    vm.return %1 : i32
+  }
+  // CHECK-LABEL: @sub_add_x_rev
+  vm.func @sub_add_x_rev(%arg0 : i32, %arg1 : i32) -> i32 {
+    // CHECK-NEXT: vm.return %arg0
+    %0 = vm.sub.i32 %arg0, %arg1 : i32
+    %1 = vm.add.i32 %arg1, %0 : i32
+    vm.return %1 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @mul_i32_folds
 vm.module @mul_i32_folds {
   // CHECK-LABEL: @mul_i32_by_0
@@ -91,6 +126,23 @@ vm.module @mul_i32_folds {
     %c4 = vm.const.i32 4 : i32
     %0 = vm.mul.i32 %c2, %c4 : i32
     vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @mul_mul_i32_folds
+vm.module @mul_mul_i32_folds {
+  // CHECK-LABEL: @mul_mul_i32_const
+  vm.func @mul_mul_i32_const(%arg0 : i32) -> i32 {
+    // CHECK: %c40 = vm.const.i32 40 : i32
+    %c4 = vm.const.i32 4 : i32
+    %c10 = vm.const.i32 10 : i32
+    // CHECK: %0 = vm.mul.i32 %arg0, %c40 : i32
+    %0 = vm.mul.i32 %arg0, %c4 : i32
+    %1 = vm.mul.i32 %0, %c10 : i32
+    // CHECK-NEXT: vm.return %0 : i32
+    vm.return %1 : i32
   }
 }
 
