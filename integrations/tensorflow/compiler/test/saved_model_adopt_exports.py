@@ -53,7 +53,6 @@ tf_test_driver.add_test(test_name="T0001_FlatArgsResultsNoBoundGlobals",
 
 # T0002: Tests that bound global vars import properly.
 
-
 # CHECK-LABEL: RUN_TEST: T0002a_SimpleVarRead
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
 # CHECK: func @f() -> tensor<f32>
