@@ -43,14 +43,21 @@ jobs:
 
   yapf:
     runs-on: ubuntu-18.04
+    env:
+      BASE_REF: ${{ github.base_ref }}
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
+        # We have to explicitly fetch the base branch as well
+      - name: Fetching Base Branch
+        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Running yapf
         run: |
           python3 -m pip install yapf
-          printf "\nIf the lint below fails it can be fixed by running \n  python3 -m yapf --verbose --in-place --exclude='*/third_party/*' --recursive ../iree\n\n"
-          python3 -m yapf --diff --exclude='*/third_party/*' --recursive ../iree
+          printf "If the lint below fails it can be fixed by running\n"
+          printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/yapf_format_diff/yapf_format_diff.py --verbose -i\n\n"
+          git diff -U0 "${BASE_REF?}" | python3 third_party/yapf_format_diff/yapf_format_diff.py --verbose -i
+          git diff --exit-code
 
   clang-format:
     runs-on: ubuntu-18.04
