@@ -295,14 +295,13 @@ iree_e2e_cartesian_product_test_suite(
                 "InceptionResNetV2",
                 "InceptionV3",
             ],
-            "datasets": ["imagenet"],
-            "backends": [
+            "target_backends": [
                 "iree_vulkan",
             ],
         },
         {
             # Failing llvm and vulkan:
-            "models": [
+            "model": [
                 "NASNetLarge",
                 "NASNetMobile",
                 "ResNet50V2",
