@@ -24,8 +24,8 @@
 #include <intrin.h>
 #endif  // IREE_COMPILER_MSVC
 
-int iree_strncpy_s(char* restrict dest, size_t destsz, const char* restrict src,
-                   size_t count) {
+int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,
+                   const char* IREE_RESTRICT src, size_t count) {
 #if defined(IREE_COMPILER_MSVC) || defined(__STDC_LIB_EXT1__)
   return strncpy_s(dest, destsz, src, count);
 #else
