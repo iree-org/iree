@@ -21,9 +21,6 @@ set(RUY_SRC_ROOT
 iree_select_compiler_opts(RUY_COPTS_BASE
   ALL
     "-I${IREE_ROOT_DIR}/third_party/ruy"
-  CLANG_OR_GCC
-    # TODO(benoitjacob) fix missing #include <cstring> in kernel_x86.h
-    -include cstring
 )
 
 # Some clang-based Windows toolchains have more aggressive interpretations
@@ -51,16 +48,29 @@ set(RUY_COPTS
 )
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-  set(RUY_COPTS_AVX -mavx)
-  set(RUY_COPTS_AVX2_FMA
-    -mavx2
-    -mfma)
-  set(RUY_COPTS_AVX512
-    -mavx512f
-    -mavx512vl
-    -mavx512cd
-    -mavx512bw
-    -mavx512dq)
+  iree_select_compiler_opts(RUY_COPTS_AVX
+    CLANG_OR_GCC
+      -mavx
+    MSVC_OR_CLANG_CL
+      /arch:AVX
+  )
+  iree_select_compiler_opts(RUY_COPTS_AVX2_FMA
+    CLANG_OR_GCC
+      -mavx2
+      -mfma
+    MSVC_OR_CLANG_CL
+      /arch:AVX2
+  )
+  iree_select_compiler_opts(RUY_COPTS_AVX512
+    CLANG_OR_GCC
+      -mavx512f
+      -mavx512vl
+      -mavx512cd
+      -mavx512bw
+      -mavx512dq
+    MSVC_OR_CLANG_CL
+      /arch:AVX512
+  )
 endif()
 
 iree_select_compiler_opts(RUY_LINKOPTS_PTHREAD
