@@ -54,5 +54,5 @@ iree_check_single_backend_test_suite(
   DRIVER
     vulkan
   COMPILER_FLAGS
-    "-iree-spirv-use-vector-pass"
+    "-iree-spirv-use-vectorize-memref-pass"
 )

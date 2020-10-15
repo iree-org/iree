@@ -152,6 +152,10 @@ class LaunchConfig {
   Optional<StringRef> getKey(Operation *op) const;
 };
 
+/// Return the size of instruction in `vector` dialect that maps directly to the
+/// hardware.
+Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 #endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_DISPATCHUTILS_H_

@@ -33,6 +33,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
@@ -224,16 +225,15 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
   std::tie(workgroupSize[0], workgroupSize[1]) =
       distributeProcs2D(maxWorkgroupSize);
   workgroupSize[2] = 1;
-  // TODO(#3131): This is just being hard-wired for now to be minimal viable,
-  // but this can be decided better when we have better estimates of device
-  // charecteristics.
+  // This is just being hard-wired for now to be minimal viable, but this can be
+  // decided better when we have better estimates of device charecteristics.
   const int64_t nRowsPerWorkitem = 1;
   const int64_t nColsPerWorkitem = 1;
   const int64_t nBatchesPerWorkitem = 1;
   int64_t tileSizeK = 0;
   if (options.useWorkgroupMemory) {
-    // TODO(#3131): This number should be decided based on the amount of
-    // shared memory available (maybe). For now, just hard-wire it.
+    // This number should be decided based on the amount of shared memory
+    // available (maybe). For now, just hard-wire it.
     tileSizeK = 32;
   }
   assert(tileSizes.empty());
@@ -245,39 +245,51 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
 }
 
 /// The size of the co-operative matrix multiply operations on the device.
-// TODO(#3131): This needs to be queried from the device.
-Optional<std::array<int64_t, 3>> getCooperativeMatmulSubgroupSize(
-    Type dataType, Type accumulatorType) {
-  if (dataType.isInteger(8) && accumulatorType.isInteger(32)) {
-    return std::array<int64_t, 3>{8, 8, 32};
+static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
+    spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
+    Type initType, Type resultType) {
+  for (auto coopMatmulProperties :
+       resourceLimits.cooperative_matrix_properties_nv()
+           .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>()) {
+    if (coopMatmulProperties.a_type().getValue() == lhsType &&
+        coopMatmulProperties.b_type().getValue() == rhsType &&
+        coopMatmulProperties.c_type().getValue() == initType &&
+        coopMatmulProperties.result_type().getValue() == resultType &&
+        spirv::symbolizeScope(
+            coopMatmulProperties.scope().getValue().getZExtValue())
+                .getValue() == spirv::Scope::Subgroup) {
+      return SmallVector<int64_t, 4>{
+          coopMatmulProperties.m_size().getValue().getSExtValue(),
+          coopMatmulProperties.n_size().getValue().getSExtValue(),
+          coopMatmulProperties.k_size().getValue().getSExtValue()};
+    }
   }
-  if (dataType.isF16() &&
-      (accumulatorType.isF32() || accumulatorType.isF16())) {
-    return std::array<int64_t, 3>{8, 8, 16};
-  }
-  return {};
+  return llvm::None;
 }
 
 /// Launch configuration for using spv.CooperativeMatrixMulAddNV
 /// operations. Needs two levels of tiling.
 static LogicalResult getConfigForCooperativeMatmul(
-    linalg::MatmulOp op, spirv::ResourceLimitsAttr resourceLimits,
-    TileSizesListType &tileSizes, std::array<int64_t, 3> &workgroupSize,
+    linalg::MatmulOp op, const SPIRVCodegenOptions &options,
+    spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
+    std::array<int64_t, 3> &workgroupSize,
     std::array<int64_t, 3> &numSubgroups) {
   auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix))
     return failure();
 
-  ShapedType lhsType = op.getOperand(0).getType().cast<ShapedType>();
+  ShapedType lhsType = op.inputs().front().getType().cast<ShapedType>();
   ArrayRef<int64_t> lhsShape = lhsType.getShape();
-  ShapedType rhsType = op.getOperand(1).getType().cast<ShapedType>();
+  ShapedType rhsType = op.inputs().back().getType().cast<ShapedType>();
   ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  ShapedType outputType = op.getOperand(2).getType().cast<ShapedType>();
+  ShapedType outputType =
+      op.output_buffers().front().getType().cast<ShapedType>();
 
-  Optional<std::array<int64_t, 3>> coopMatmulSize =
-      getCooperativeMatmulSubgroupSize(lhsType.getElementType(),
-                                       outputType.getElementType());
+  Optional<SmallVector<int64_t, 4>> coopMatmulSize =
+      getCooperativeMatmulSubgroupSize(
+          resourceLimits, lhsType.getElementType(), rhsType.getElementType(),
+          outputType.getElementType(), outputType.getElementType());
   if (!coopMatmulSize) return failure();
 
   // Check that the matmul sizes are a multiple of the tilesize.
@@ -290,30 +302,35 @@ static LogicalResult getConfigForCooperativeMatmul(
       !isMultipleOf(rhsShape[0], (*coopMatmulSize)[2]))
     return failure();
 
-  // TODO(ravishankarm, antiagainst): For now hardwire the subgroup size.
-  const int64_t subgroupSize = 32;
-  unsigned maxWorkgroupSize =
-      resourceLimits.max_compute_workgroup_invocations().getInt();
-  std::tie(numSubgroups[0], numSubgroups[1]) =
-      distributeProcs2D(maxWorkgroupSize / subgroupSize);
+  int64_t subgroupSize =
+      resourceLimits.subgroup_size().getValue().getSExtValue();
+  if (options.useWorkgroupMemory) {
+    numSubgroups[0] = 2;
+    numSubgroups[1] = 2;
+  } else {
+    numSubgroups[0] = 1;
+    numSubgroups[1] = 1;
+  }
   numSubgroups[2] = 1;
-  // TODO(#3131): This is just being hard-wired for now to be minimal viable,
-  // but this can be decided better when we have better estimates of device
-  // charecteristics.
-  const int64_t numVecMatmulPerSubgroupX = 1;
-  const int64_t numVecMatmulPerSubgroupY = 1;
+
+  // For now this is being hard-wired to be {2, 2}. This can actually be set to
+  // whatever, but ultimately depends on register pressure.
+  const int64_t numVecMatmulPerSubgroupX = 4;
+  const int64_t numVecMatmulPerSubgroupY = 4;
+  const int64_t numVecMatmulPerSubgroupK = 2;
   SmallVector<int64_t, 4> ts = {
       numVecMatmulPerSubgroupY * (*coopMatmulSize)[0] * numSubgroups[1],
-      numVecMatmulPerSubgroupX * (*coopMatmulSize)[1] * numSubgroups[0]};
+      numVecMatmulPerSubgroupX * (*coopMatmulSize)[1] * numSubgroups[0],
+      numVecMatmulPerSubgroupK * (*coopMatmulSize)[2]};
   tileSizes.emplace_back(std::move(ts));
 
-  workgroupSize[0] = numSubgroups[0] * subgroupSize;
-  workgroupSize[1] = numSubgroups[1];
+  workgroupSize[0] = numSubgroups[0] * numSubgroups[1] * subgroupSize;
+  workgroupSize[1] = 1;
   workgroupSize[2] = 1;
   // Subgroup tile sizes
   SmallVector<int64_t, 4> subgroupTs = {
       numVecMatmulPerSubgroupY * (*coopMatmulSize)[0],
-      numVecMatmulPerSubgroupX * (*coopMatmulSize)[1], (*coopMatmulSize)[2]};
+      numVecMatmulPerSubgroupX * (*coopMatmulSize)[1]};
   tileSizes.emplace_back(std::move(subgroupTs));
   return success();
 }
@@ -325,9 +342,9 @@ LogicalResult getOpLaunchConfig(linalg::MatmulOp op,
                                 TileSizesListType &tileSizes,
                                 std::array<int64_t, 3> &workgroupSize,
                                 std::array<int64_t, 3> &numSubgroups) {
-  if (options.useVectorization &&
-      succeeded(getConfigForCooperativeMatmul(op, resourceLimits, tileSizes,
-                                              workgroupSize, numSubgroups))) {
+  if (options.useVectorization && succeeded(getConfigForCooperativeMatmul(
+                                      op, options, resourceLimits, tileSizes,
+                                      workgroupSize, numSubgroups))) {
     return success();
   }
   unsigned maxWorkgroupSize =
@@ -478,8 +495,36 @@ LogicalResult LaunchConfig::init(MLIRContext *context,
 void LaunchConfig::finalize(FuncOp funcOp) {
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
     linalgOp.removeAttr(Identifier::get(kLaunchInfoKey, funcOp.getContext()));
-    ;
   });
+}
+
+template <typename OpTy>
+static Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize(OpTy op) {
+  return llvm::None;
+}
+
+template <>
+Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
+    vector::ContractionOp op) {
+  spirv::ResourceLimitsAttr resourceLimits =
+      spirv::lookupTargetEnv(op).getResourceLimits();
+  return getCooperativeMatmulSubgroupSize(
+      resourceLimits, op.getLhsType().getElementType(),
+      op.getRhsType().getElementType(),
+      op.getAccType().cast<VectorType>().getElementType(),
+      op.getResultType().cast<VectorType>().getElementType());
+}
+
+Optional<SmallVector<int64_t, 4>> getNativeVectorSize(Operation *op) {
+#define DISPATCH(opname)                            \
+  if (isa<opname>(op)) {                            \
+    return getOpNativeVectorSize(cast<opname>(op)); \
+  }
+
+  DISPATCH(vector::ContractionOp)
+
+#undef DISPATCH
+  return llvm::None;
 }
 
 }  // namespace iree_compiler
