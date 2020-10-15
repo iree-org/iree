@@ -196,6 +196,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  // Prior to leaving the pipeline we need to clean things up for following
+  // layers. These transforms may be undone by subsequent CSE/folding passes.
+  passManager.addPass(createOutlineLargeConstantsPass());
+
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(createSymbolDCEPass());

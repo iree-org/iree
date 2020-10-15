@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -98,9 +99,188 @@ IntegerAttr getElementTypeAttr(Type type) {
                           elementType.getValue());
 }
 
+size_t getElementBitCount(IntegerAttr elementType) {
+  return static_cast<size_t>((elementType.getValue().getZExtValue()) & 0xFF);
+}
+
+size_t getElementByteCount(IntegerAttr elementType) {
+  return (getElementBitCount(elementType) + 8 - 1) / 8;
+}
+
+//===----------------------------------------------------------------------===//
+// Struct types
+//===----------------------------------------------------------------------===//
+
+BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
+                                                 BufferConstraintsAttr rhs) {
+  Builder b(lhs.getContext());
+  return BufferConstraintsAttr::get(
+      b.getIndexAttr(std::min(lhs.max_allocation_size().getSExtValue(),
+                              rhs.max_allocation_size().getSExtValue())),
+      b.getIndexAttr(
+          std::max(lhs.min_buffer_offset_alignment().getSExtValue(),
+                   rhs.min_buffer_offset_alignment().getSExtValue())),
+      b.getIndexAttr(std::min(lhs.max_buffer_range().getSExtValue(),
+                              rhs.max_buffer_range().getSExtValue())),
+      b.getIndexAttr(
+          std::max(lhs.min_buffer_range_alignment().getSExtValue(),
+                   rhs.min_buffer_range_alignment().getSExtValue())));
+}
+
+// TODO(benvanik): runtime buffer constraint queries from the allocator.
+// We can add folders for those when the allocator is strongly-typed with
+// #hal.buffer_constraints and otherwise leave them for runtime queries.
+BufferConstraintsAdaptor::BufferConstraintsAdaptor(Location loc,
+                                                   Value allocator)
+    : loc_(loc), allocator_(allocator) {
+  // Picked to represent what we kind of want on CPU today.
+  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferOffsetAlignment = 16ull;
+  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferRangeAlignment = 16ull;
+  Builder b(loc.getContext());
+  bufferConstraints_ = BufferConstraintsAttr::get(
+      b.getIndexAttr(maxAllocationSize),
+      b.getIndexAttr(minBufferOffsetAlignment), b.getIndexAttr(maxBufferRange),
+      b.getIndexAttr(minBufferRangeAlignment));
+}
+
+Value BufferConstraintsAdaptor::getMaxAllocationSize(OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.max_allocation_sizeAttr());
+}
+
+Value BufferConstraintsAdaptor::getMinBufferOffsetAlignment(
+    OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.min_buffer_offset_alignmentAttr());
+}
+
+Value BufferConstraintsAdaptor::getMaxBufferRange(OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.max_buffer_rangeAttr());
+}
+
+Value BufferConstraintsAdaptor::getMinBufferRangeAlignment(OpBuilder &builder) {
+  return builder.createOrFold<mlir::ConstantOp>(
+      loc_, bufferConstraints_.min_buffer_range_alignmentAttr());
+}
+
 //===----------------------------------------------------------------------===//
 // Attribute printing and parsing
 //===----------------------------------------------------------------------===//
+
+// static
+Attribute BufferConstraintsAttr::parse(DialectAsmParser &p) {
+  auto b = p.getBuilder();
+  if (failed(p.parseLess())) return {};
+
+  IntegerAttr maxAllocationSizeAttr;
+  IntegerAttr minBufferOffsetAlignmentAttr;
+  IntegerAttr maxBufferRangeAttr;
+  IntegerAttr minBufferRangeAlignmentAttr;
+  if (failed(p.parseKeyword("max_allocation_size")) || failed(p.parseEqual()) ||
+      failed(p.parseAttribute(maxAllocationSizeAttr, b.getIndexType())) ||
+      failed(p.parseComma()) ||
+      failed(p.parseKeyword("min_buffer_offset_alignment")) ||
+      failed(p.parseEqual()) ||
+      failed(
+          p.parseAttribute(minBufferOffsetAlignmentAttr, b.getIndexType())) ||
+      failed(p.parseComma()) || failed(p.parseKeyword("max_buffer_range")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(maxBufferRangeAttr, b.getIndexType())) ||
+      failed(p.parseComma()) ||
+      failed(p.parseKeyword("min_buffer_range_alignment")) ||
+      failed(p.parseEqual()) ||
+      failed(p.parseAttribute(minBufferRangeAlignmentAttr, b.getIndexType()))) {
+    return {};
+  }
+
+  if (failed(p.parseGreater())) return {};
+  return BufferConstraintsAttr::get(
+      maxAllocationSizeAttr, minBufferOffsetAlignmentAttr, maxBufferRangeAttr,
+      minBufferRangeAlignmentAttr);
+}
+
+void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  os << "max_allocation_size = " << max_allocation_size() << ", ";
+  os << "min_buffer_offset_alignment = " << min_buffer_offset_alignment()
+     << ", ";
+  os << "max_buffer_range = " << max_buffer_range() << ", ";
+  os << "min_buffer_range_alignment = " << min_buffer_range_alignment();
+  os << ">";
+}
+
+// static
+Attribute ByteRangeAttr::parse(DialectAsmParser &p) {
+  auto b = p.getBuilder();
+  if (failed(p.parseLess())) return {};
+
+  // TODO(benvanik): support the range syntax; the dialect asm parser fights
+  // with it though by checking for proper []/() nesting.
+
+  // Try first the range style: byte_range<[start..end)>
+  bool startInclusive;
+  if (succeeded(p.parseOptionalLSquare())) {  // [...
+    startInclusive = true;
+  } else if (succeeded(p.parseOptionalLParen())) {  // (...
+    startInclusive = false;
+  } else {
+    // byte_range<offset, length>
+    IntegerAttr offsetAttr;
+    IntegerAttr lengthAttr;
+    if (failed(p.parseAttribute(offsetAttr, b.getIndexType())) ||
+        failed(p.parseComma()) ||
+        failed(p.parseAttribute(lengthAttr, b.getIndexType())) ||
+        failed(p.parseGreater())) {
+      return {};
+    }
+    return get(offsetAttr, lengthAttr);
+  }
+
+  IntegerAttr startAttr;
+  IntegerAttr endAttr;
+  if (failed(p.parseAttribute(startAttr, b.getIndexType())) ||
+      failed(p.parseKeyword("to")) ||
+      failed(p.parseAttribute(endAttr, b.getIndexType()))) {
+    return {};
+  }
+
+  bool endInclusive;
+  if (succeeded(p.parseOptionalRSquare())) {  // ...]
+    endInclusive = true;
+  } else if (succeeded(p.parseOptionalRParen())) {  // ...)
+    endInclusive = false;
+  } else {
+    p.emitError(p.getCurrentLocation()) << "expected ] or ) to end range";
+    return {};
+  }
+
+  if (failed(p.parseGreater())) return {};
+
+  startAttr = startInclusive
+                  ? startAttr
+                  : b.getIndexAttr((startAttr.getValue() + 1).getSExtValue());
+  endAttr = endInclusive
+                ? endAttr
+                : b.getIndexAttr((endAttr.getValue() - 1).getSExtValue());
+
+  IntegerAttr offsetAttr = startAttr;
+  IntegerAttr lengthAttr = b.getIndexAttr(
+      (endAttr.getValue() - startAttr.getValue()).getSExtValue());
+  return get(offsetAttr, lengthAttr);
+}
+
+void ByteRangeAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  os << offset();
+  os << ", ";
+  os << length();
+  os << ">";
+}
 
 // static
 Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
@@ -201,6 +381,24 @@ void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
   os << getKindName() << "<\"";
   os << pattern();
+  os << "\">";
+}
+
+// static
+Attribute DeviceMatchMemoryModelAttr::parse(DialectAsmParser &p) {
+  IntegerAttr memoryModelAttr;
+  if (failed(p.parseLess()) ||
+      failed(parseEnumAttr<MemoryModel>(p, "memory_model", memoryModelAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(memoryModelAttr);
+}
+
+void DeviceMatchMemoryModelAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<\"";
+  os << stringifyMemoryModel(memory_model());
   os << "\">";
 }
 

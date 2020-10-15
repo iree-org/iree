@@ -45,7 +45,7 @@ func @unfoldable_constant() -> i32 {
 
 // -----
 
-// CHECK-LABEL: vm.rodata @dynamic_constant_const_0 dense<3.000000e+00> : tensor<2x3xf32>
+// CHECK-LABEL: vm.rodata @dynamic_constant_const dense<3.000000e+00> : tensor<2x3xf32>
 // CHECK: vm.func @dynamic_constant
 func @dynamic_constant() -> tensor<?x?xf32> {
   // CHECK: vm.call @hal.buffer_view.dim

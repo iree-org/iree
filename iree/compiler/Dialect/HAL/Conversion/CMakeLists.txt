@@ -29,7 +29,6 @@ iree_cc_library(
     MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
@@ -43,7 +42,6 @@ iree_cc_library(
     "Passes.h"
   DEPS
     MLIRPass
-    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::Conversion::HALToVM
   PUBLIC
 )

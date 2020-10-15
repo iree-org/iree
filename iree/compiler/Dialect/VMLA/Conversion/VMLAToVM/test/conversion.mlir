@@ -1,17 +1,5 @@
 // RUN: iree-opt -split-input-file -iree-convert-vmla-to-vm -cse %s | IreeFileCheck %s
 
-// CHECK: vm.rodata @[[CONST_SYM:.+]] dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>
-// CHECK-NEXT: vm.func @constValues
-func @constValues() -> !vmla.buffer {
-  // CHECK-NEXT: %[[BYTES_REF:.+]] = vm.const.ref.rodata @[[CONST_SYM]] : !vm.ref<!iree.byte_buffer>
-  // CHECK-NEXT: %[[BUFFER:.+]] = vm.call @vmla.buffer.const(%[[BYTES_REF]]) : (!vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer>
-  %0 = vmla.constant dense<[1.0, 2.0, 3.0]> : tensor<3xf32> -> !vmla.buffer
-  // CHECK-NEXT: vm.return %[[BUFFER]] : !vm.ref<!vmla.buffer>
-  return %0 : !vmla.buffer
-}
-
-// -----
-
 // CHECK-LABEL: vm.func @bufferImport
 func @bufferImport() -> !vmla.buffer {
   %c0 = std.constant 1 : index

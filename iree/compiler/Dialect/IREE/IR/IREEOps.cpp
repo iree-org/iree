@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"

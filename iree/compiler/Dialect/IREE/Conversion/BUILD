@@ -19,23 +19,6 @@ package(
 )
 
 cc_library(
-    name = "ConvertToHAL",
-    srcs = [
-        "ConvertToHAL.cpp",
-    ],
-    hdrs = [
-        "ConvertToHAL.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Transforms",
-    ],
-)
-
-cc_library(
     name = "PreserveCompilerHints",
     srcs = [
         "PreserveCompilerHints.cpp",

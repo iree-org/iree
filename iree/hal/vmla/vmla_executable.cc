@@ -141,7 +141,8 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
       void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())
                        ->mutable_data();
       data = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(data) +
-                                     binding.buffer->byte_offset());
+                                     binding.buffer->byte_offset() +
+                                     binding.offset);
       IREE_ASSIGN_OR_RETURN(
           auto buffer, Buffer::WrapMutable(data, binding.buffer->byte_length(),
                                            iree_allocator_null()));

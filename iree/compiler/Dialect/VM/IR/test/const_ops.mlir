@@ -44,3 +44,14 @@ vm.module @my_module {
     vm.return %buf0 : !vm.ref<!iree.byte_buffer>
   }
 }
+
+// -----
+
+vm.module @my_module {
+  // CHECK-LABEL: @inlined_rodata
+  vm.func @inlined_rodata() -> !vm.ref<!iree.byte_buffer> {
+    // CHECK-NEXT: = vm.rodata.inline : !vm.ref<!iree.byte_buffer> = dense<[0, 1, 2]> : tensor<3xi8>
+    %0 = vm.rodata.inline : !vm.ref<!iree.byte_buffer> = dense<[0, 1, 2]> : tensor<3xi8>
+    vm.return %0 : !vm.ref<!iree.byte_buffer>
+  }
+}

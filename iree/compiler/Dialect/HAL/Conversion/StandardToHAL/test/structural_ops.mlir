@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-flow-to-hal %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-to-hal %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @tensorIO(%arg0: !hal.buffer) -> !hal.buffer
 func @tensorIO(%arg0 : tensor<1x1xi32>) -> tensor<1x1xi32> {

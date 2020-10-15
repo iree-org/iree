@@ -341,13 +341,14 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
     $element_type attr-dict
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementSize
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
@@ -376,13 +377,14 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
     $element_type `,` `indices` `=` `[` $indices `]` attr-dict
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementType, ValueRange indices
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
@@ -414,7 +416,6 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
     $lengths `]` attr-dict
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       OpBuilder &builder, OperationState &state, Value allocator,
@@ -422,6 +423,8 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
       ValueRange lengths
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
@@ -493,6 +496,51 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
       ElementsAttr value
+    }]>,
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{allocator-supported host buffer wrapping operation}];
+  let description = [{
+    Wraps a !hal.buffer around host read-only memory backed by the given byte
+    buffer. The returned buffer may be host-only and not directly usable on
+    devices.
+  }];
+
+  let arguments = (ins
+    HAL_Allocator:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    // TODO(benvanik): support other types (and mutable buffers).
+    ByteBufferType:$source,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+  let results = (outs
+    HAL_Buffer:$result
+  );
+
+  let assemblyFormat = [{
+    $allocator `,` $memory_types `,` $buffer_usage `,`
+    $source `[` $offset `,` $length `]` attr-dict-with-keyword
+    `:` type($source) `->` type($result)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state,
+      Value allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      Value source,
+      Value offset,
+      Value length
     }]>,
   ];
 }
@@ -1148,6 +1196,8 @@ def HAL_CommandBufferPushDescriptorSetOp :
       ArrayRef<DescriptorSetBindingValue> bindings
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_CommandBufferBindDescriptorSetOp :
@@ -1301,6 +1351,231 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
     `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Constant pooling
+//===----------------------------------------------------------------------===//
+
+def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
+    IsolatedFromAbove,
+    SingleBlockImplicitTerminator<"IREE::HAL::ConstantPoolEndOp">,
+    Symbol,
+    SymbolTable,
+  ]> {
+  let summary = [{pool of constants with similar lifetimes}];
+  let description = [{
+    A pool of constants that share a similiar lifetime and that should be stored
+    together both in the source files and at runtime. By logically grouping
+    constants by their frequency and locality of access we can reduce the number
+    of bindings required on hal.interface by sourcing constants from the same
+    buffer. We can also optimize module loading by mapping or DMA transferring
+    constant data (based on device).
+  }];
+
+  let arguments = (ins
+    StrAttr:$sym_name,
+    HAL_BufferConstraintsAttr:$buffer_constraints
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state, StringRef name,
+      BufferConstraintsAttr bufferConstraints
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    Block& getBlock() { return body().front(); }
+  }];
+}
+
+def HAL_ConstantPoolEndOp : HAL_Op<"constant_pool_end", [
+    HasParent<"IREE::HAL::ConstantPoolOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the constant pool op}];
+  let assemblyFormat = "attr-dict-with-keyword";
+}
+
+def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
+    Symbol,
+    HasParent<"IREE::HAL::ConstantPoolOp">,
+  ]> {
+  let summary = [{constant value within a parent constant pool}];
+  let description = [{
+    Represents a constant value as part of a constant pool containing constants
+    with a similar lifetime.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    ElementsAttr:$value
+  );
+
+  let assemblyFormat = [{
+    $sym_name attr-dict `=` $value
+  }];
+}
+
+def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
+    Symbol,
+    HasParent<"IREE::HAL::ConstantPoolOp">,
+  ]> {
+  let summary = [{constant span within a parent storage block}];
+  let description = [{
+    Represents a constant stored within a hal.constant_pool. Provides a
+    symbol that can be used to reference the constant data as a stored range
+    within the module file.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttr:$tensor_type,
+    SymbolRefAttr:$storage_buffer,
+    HAL_ByteRangeAttr:$storage_range,
+    OptionalAttr<SymbolRefAttr>:$runtime_buffer,
+    OptionalAttr<HAL_ByteRangeAttr>:$runtime_range
+  );
+
+  let assemblyFormat = [{
+    $sym_name `:` $tensor_type attr-dict
+    `=` $storage_buffer `[` $storage_range `]`
+    (`->` $runtime_buffer^ `[` $runtime_range `]`)?
+  }];
+}
+
+def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
+    Symbol,
+    HasParent<"IREE::HAL::ConstantPoolOp">,
+  ]> {
+  let summary = [{constant splat within a parent storage block}];
+  let description = [{
+    Represents a splatted constant that has no representation in the storage
+    but must be represented at runtime as splatted 4-byte value.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    ElementsAttr:$value,
+    OptionalAttr<SymbolRefAttr>:$runtime_buffer,
+    OptionalAttr<HAL_ByteRangeAttr>:$runtime_range
+  );
+
+  let assemblyFormat = [{
+    $sym_name attr-dict `=` $value
+    (`->` $runtime_buffer^ `[` $runtime_range `]`)?
+  }];
+}
+
+def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{constant pool tensor load pseudo-op}];
+  let description = [{
+    Used during conversion to provide a placeholder for a globally cached and
+    possibly lazy-initialized compile-time constants. Will be replaced with a
+    direct variable access during transformation.
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$constant
+  );
+  let results = (outs
+    TypeAlias<AnyRankedTensor>:$result
+  );
+
+  let assemblyFormat = "$constant attr-dict `:` type($result)";
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state,
+      Type resultType, SymbolRefAttr constant
+    }], [{
+      state.addTypes({resultType});
+      state.addAttribute("constant", constant);
+    }]>,
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
+    Symbol,
+  ]> {
+  let summary = [{constant data storage block}];
+  let description = [{
+    Represents a packed constant storage buffer meeting the buffer constraints
+    placed on the parent pool. Referenced by other constant pool ops.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    ElementsAttr:$value
+  );
+
+  let assemblyFormat = [{
+    $sym_name attr-dict-with-keyword `=` $value
+  }];
+}
+
+def HAL_ConstantStorageLookupOp :
+    HAL_PureOp<"constant_storage.lookup", [
+      DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    ]> {
+  let summary = [{constant storage byte buffer accessor}];
+  let description = [{
+    Returns the read-only host byte buffer storing the constant data.
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$constant
+  );
+  let results = (outs
+    ByteBufferType:$result
+  );
+
+  let assemblyFormat = [{
+    $constant `:` type($result) attr-dict
+  }];
+}
+
+def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{runtime constant buffer lookup pseudo-op}];
+  let description = [{
+    Used during conversion to resolve a runtime representation of a constant as
+    a tensor backed by a buffer range.
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$runtime_buffer,
+    HAL_ByteRangeAttr:$runtime_range
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $runtime_buffer `[` $runtime_range `]` `:` type($result) attr-dict
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      OpBuilder &builder, OperationState &state,
+      Type resultType, SymbolRefAttr runtimeBuffer, ByteRangeAttr runtimeRange
+    }], [{
+      state.addTypes({resultType});
+      state.addAttribute("runtime_buffer", runtimeBuffer);
+      state.addAttribute("runtime_range", runtimeRange);
+    }]>,
+  ];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1565,6 +1840,32 @@ def HAL_DeviceMatchIDOp : HAL_PureOp<"device.match.id"> {
 
   let assemblyFormat = [{
     $device `,` `pattern` `=` `[` $pattern `]` attr-dict
+    `:` `(` type($device) `)` `->` type($result)
+  }];
+}
+
+def HAL_DeviceMatchMemoryModelOp : HAL_PureOp<"device.match.memory_model"> {
+  let summary = [{returns true if the device memory model matches the value}];
+  let description = [{
+    Compares the device's memory model against the specified model.
+    This can be used to conditionally evaluate device-specific code when the
+    device is not known at compile-time.
+
+    ```mlir
+    %is_match = hal.device.match.memory_model %device, memory_model = "Unified" : (!hal.device) -> i1
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_MemoryModelAttr:$model
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` `model` `=` `[` $model `]` attr-dict
     `:` `(` type($device) `)` `->` type($result)
   }];
 }

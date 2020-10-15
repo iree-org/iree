@@ -138,24 +138,34 @@ static ParseResult parseVariableOp(OpAsmParser &parser,
     }
   }
 
-  if (failed(parser.parseOptionalColon())) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  Type type;
+  if (succeeded(parser.parseOptionalEqual())) {
+    // @foo = 4 : i32
     Attribute initialValueAttr;
     if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
                                      result->attributes))) {
       return failure();
     }
-    result->addAttribute("type", TypeAttr::get(initialValueAttr.getType()));
+    type = initialValueAttr.getType();
   } else {
-    Type type;
-    if (failed(parser.parseType(type))) {
+    // @foo : index = 4 : i32
+    if (failed(parser.parseColonType(type)) ||
+        failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
       return failure();
     }
-    result->addAttribute("type", TypeAttr::get(type));
+    if (succeeded(parser.parseOptionalEqual())) {
+      Attribute initialValueAttr;
+      if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
+                                       result->attributes))) {
+        return failure();
+      }
+    }
   }
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
+  result->addAttribute("type", TypeAttr::get(type));
 
   return success();
 }
@@ -171,10 +181,11 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
     p.printSymbolName(op.initializer().getValue());
     p << ')';
   }
-  if (op.initial_value().hasValue()) {
-    p << ' ';
-    p.printAttribute(op.initial_value().getValue());
+  if (op.initial_value().hasValue() &&
+      op.type() == op.initial_value().getValue().getType()) {
+    // @foo = 4 : i32
   } else {
+    // @foo : index = 4 : i32
     p << " : ";
     p.printType(op.type());
   }
@@ -185,6 +196,10 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
                                          "initializer",
                                          "initial_value",
                                      });
+  if (op.initial_value().hasValue()) {
+    p << " = ";
+    p.printAttribute(op.initial_value().getValue());
+  }
 }
 
 static LogicalResult verifyVariableOp(VariableOp op) {
@@ -207,14 +222,6 @@ static LogicalResult verifyVariableOp(VariableOp op) {
              << "initializer type mismatch; variable " << op.sym_name()
              << " is " << op.type() << " but initializer function "
              << initializerOp.getName() << " is " << initializerOp.getType();
-    }
-  } else if (op.initial_value().hasValue()) {
-    // Ensure the value is something we can store in the variable
-    if (!isVariableTypeCompatible(op.type(), op.initial_value()->getType())) {
-      return op.emitOpError()
-             << "initial value type mismatch; variable " << op.sym_name()
-             << " is " << op.type() << " but initial value provided is "
-             << op.initial_value()->getType();
     }
   }
   return success();
@@ -435,6 +442,28 @@ void AllocatorAllocateConstOp::build(OpBuilder &builder, OperationState &state,
 void AllocatorAllocateConstOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "cbuffer");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.allocator.map
+//===----------------------------------------------------------------------===//
+
+void AllocatorMapOp::build(OpBuilder &builder, OperationState &state,
+                           Value allocator,
+                           IREE::HAL::MemoryTypeBitfield memoryTypes,
+                           IREE::HAL::BufferUsageBitfield bufferUsage,
+                           Value source, Value offset, Value length) {
+  state.addOperands({allocator, source, offset, length});
+  state.addAttribute("memory_types", builder.getI32IntegerAttr(
+                                         static_cast<int32_t>(memoryTypes)));
+  state.addAttribute("buffer_usage", builder.getI32IntegerAttr(
+                                         static_cast<int32_t>(bufferUsage)));
+  state.addTypes({BufferType::get(builder.getContext())});
+}
+
+void AllocatorMapOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "mapped");
 }
 
 //===----------------------------------------------------------------------===//
@@ -735,6 +764,9 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
   auto i32Type = parser.getBuilder().getIntegerType(32);
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute, 4> bindingAttrs;
+  SmallVector<Value, 4> bindingBuffers;
+  SmallVector<Value, 4> bindingOffsets;
+  SmallVector<Value, 4> bindingLengths;
   do {
     IntegerAttr bindingAttr;
     NamedAttrList attrList;
@@ -746,15 +778,15 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
         failed(parser.parseEqual()) || failed(parser.parseLParen()) ||
         failed(parser.parseOperand(buffer)) ||
         failed(parser.resolveOperand(
-            buffer, BufferType::get(result->getContext()), result->operands)) ||
+            buffer, BufferType::get(result->getContext()), bindingBuffers)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseOperand(bufferOffset)) ||
         failed(
-            parser.resolveOperand(bufferOffset, indexType, result->operands)) ||
+            parser.resolveOperand(bufferOffset, indexType, bindingOffsets)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseOperand(bufferLength)) ||
         failed(
-            parser.resolveOperand(bufferLength, indexType, result->operands)) ||
+            parser.resolveOperand(bufferLength, indexType, bindingLengths)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
@@ -762,6 +794,9 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
   } while (succeeded(parser.parseOptionalComma()));
   result->addAttribute("bindings",
                        parser.getBuilder().getArrayAttr(bindingAttrs));
+  result->addOperands(bindingBuffers);
+  result->addOperands(bindingOffsets);
+  result->addOperands(bindingLengths);
   return success();
 }
 
@@ -867,6 +902,75 @@ void CommandBufferDispatchSymbolOp::build(
                          executableOpSymName,
                          {builder.getSymbolRefAttr(entryPoint.getParentOp()),
                           builder.getSymbolRefAttr(entryPoint)}));
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant_pool
+//===----------------------------------------------------------------------===//
+
+void ConstantPoolOp::build(OpBuilder &builder, OperationState &state,
+                           StringRef name,
+                           BufferConstraintsAttr bufferConstraints) {
+  ensureTerminator(*state.addRegion(), builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute("buffer_constraints", bufferConstraints);
+}
+
+static ParseResult parseConstantPoolOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  // Parse the module body.
+  auto *body = result->addRegion();
+  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
+    return failure();
+  }
+
+  // Ensure that this module has a valid terminator.
+  ConstantPoolOp::ensureTerminator(*body, parser.getBuilder(),
+                                   result->location);
+  return success();
+}
+
+static void printConstantPoolOp(OpAsmPrinter &p, ConstantPoolOp op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/false);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant_pool.load
+//===----------------------------------------------------------------------===//
+
+void ConstantPoolLoadOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "const");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant_storage.lookup
+//===----------------------------------------------------------------------===//
+
+void ConstantStorageLookupOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "storage");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.constant.subspan
+//===----------------------------------------------------------------------===//
+
+void ConstantSubspanOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "const_span");
 }
 
 //===----------------------------------------------------------------------===//

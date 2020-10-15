@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "Conversion.cpp"
     "GlobalInitialization.cpp"
+    "HoistInlinedRodata.cpp"
     "MarkPublicSymbolsExported.cpp"
     "OrdinalAllocation.cpp"
     "Passes.cpp"

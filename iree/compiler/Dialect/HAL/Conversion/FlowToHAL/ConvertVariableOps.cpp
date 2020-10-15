@@ -70,6 +70,7 @@ class VariableOpConversion
     // an appropriate HAL Buffer-based initializer.
     if (auto initialValueElements =
             variableOp.initial_valueAttr().dyn_cast_or_null<ElementsAttr>()) {
+      rewriter.setInsertionPointAfter(variableOp);
       auto initializerFunc = createInitializerFromImmediate(
           variableOp, initialValueElements, rewriter);
       initializer = initializerFunc.getName();

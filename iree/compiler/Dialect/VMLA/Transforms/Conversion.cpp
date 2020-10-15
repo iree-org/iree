@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/StandardToVMLA/ConvertStandardToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"

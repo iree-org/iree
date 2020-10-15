@@ -14,13 +14,16 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
@@ -63,6 +66,8 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, OwningRewritePatternList &patterns,
       TypeConverter &typeConverter) const override {
+    populateHALToHALPatterns(getDialect()->getContext(), patterns,
+                             typeConverter);
     populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
                             typeConverter);
   }
@@ -80,10 +85,13 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
+  context->loadDialect<IREEDialect>();
+
   addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
 
-  addAttributes<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-                MatchAllAttr, DeviceMatchIDAttr>();
+  addAttributes<BufferConstraintsAttr, ByteRangeAttr,
+                DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+                MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>();
 
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
@@ -104,7 +112,11 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
                                      Type type) const {
   StringRef attrKind;
   if (failed(parser.parseKeyword(&attrKind))) return {};
-  if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
+  if (attrKind == BufferConstraintsAttr::getKindName()) {
+    return BufferConstraintsAttr::parse(parser);
+  } else if (attrKind == ByteRangeAttr::getKindName()) {
+    return ByteRangeAttr::parse(parser);
+  } else if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
   } else if (attrKind == MatchAlwaysAttr::getKindName()) {
     return MatchAlwaysAttr::parse(parser);
@@ -114,6 +126,8 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
     return MatchAllAttr::parse(parser);
   } else if (attrKind == DeviceMatchIDAttr::getKindName()) {
     return DeviceMatchIDAttr::parse(parser);
+  } else if (attrKind == DeviceMatchMemoryModelAttr::getKindName()) {
+    return DeviceMatchMemoryModelAttr::parse(parser);
   }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << attrKind;
@@ -122,8 +136,9 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
-            MatchAllAttr, DeviceMatchIDAttr>(
+      .Case<BufferConstraintsAttr, ByteRangeAttr,
+            DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+            MatchAllAttr, DeviceMatchIDAttr, DeviceMatchMemoryModelAttr>(
           [&](auto typedAttr) { typedAttr.print(p); })
       .Default(
           [](Attribute) { llvm_unreachable("unhandled HAL attribute kind"); });
@@ -190,6 +205,21 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
   } else {
     llvm_unreachable("unknown HAL type");
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Dialect hooks
+//===----------------------------------------------------------------------===//
+
+Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                           Type type, Location loc) {
+  if (type.isa<IndexType>()) {
+    // Some folders materialize raw index types, which just become std
+    // constants.
+    return builder.create<mlir::ConstantIndexOp>(
+        loc, value.cast<IntegerAttr>().getValue().getSExtValue());
+  }
+  return nullptr;
 }
 
 }  // namespace HAL

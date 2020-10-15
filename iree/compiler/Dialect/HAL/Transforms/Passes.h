@@ -45,9 +45,16 @@ namespace HAL {
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   TargetOptions targetOptions);
+                                   const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
+
+//===----------------------------------------------------------------------===//
+// Conversion
+//===----------------------------------------------------------------------===//
+
+// Convert input flow/std/etc dialects to the IREE HAL dialect.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 
 //===----------------------------------------------------------------------===//
 // Device management
@@ -96,6 +103,20 @@ std::unique_ptr<OperationPass<ModuleOp>> createPublicABIGenerationPass();
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
 
+// Combines constant variables into one or more hal.constant_pools based on
+// usage semantics.
+std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass(
+    TargetOptions executableOptions);
+
+// Packs all constant data in a hal.constant_pool into their storage formats
+// and maps them with hal.constant_pool.span.
+std::unique_ptr<OperationPass<ConstantPoolOp>>
+createPackConstantPoolStoragePass();
+
+// Materializes runtime buffers for constant pools.
+std::unique_ptr<OperationPass<ModuleOp>>
+createMaterializeConstantPoolBuffersPass();
+
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
 // references.
@@ -109,6 +130,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 inline void registerHALPasses() {
   registerHALTransformPassPipeline();
   auto executableOptions = getTargetOptionsFromFlags();
+  createConvertToHALPass();
   createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
   createMaterializeInterfacesPass(executableOptions);
@@ -117,6 +139,9 @@ inline void registerHALPasses() {
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass(executableOptions);
   createPublicABIGenerationPass();
+  createIdentifyConstantPoolsPass(executableOptions);
+  createPackConstantPoolStoragePass();
+  createMaterializeConstantPoolBuffersPass();
   createMaterializeResourceCachesPass(executableOptions);
 }
 

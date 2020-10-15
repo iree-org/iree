@@ -33,6 +33,7 @@ cc_library(
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VMLA:vmla_imports",
+        "//iree/compiler/Dialect/VMLA/Conversion",
         "//iree/compiler/Dialect/VMLA/IR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

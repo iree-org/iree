@@ -50,6 +50,16 @@ def HAL_Dialect : Dialect {
 // HAL enums
 //===----------------------------------------------------------------------===//
 
+def HAL_MemoryModel_Unified : I32EnumAttrCase<"Unified", 0>;
+def HAL_MemoryModel_Discrete : I32EnumAttrCase<"Discrete", 1>;
+def HAL_MemoryModelAttr :
+    I32EnumAttr<"MemoryModel", "IREE HAL MemoryModel", [
+      HAL_MemoryModel_Unified,
+      HAL_MemoryModel_Discrete,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_MemoryType_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_MemoryType_Transient : BitEnumAttrCase<"Transient", 0x0001>;
 def HAL_MemoryType_HostVisible : BitEnumAttrCase<"HostVisible", 0x0002>;
@@ -489,6 +499,34 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 // HAL structs
 //===----------------------------------------------------------------------===//
 
+def HAL_BufferConstraintsAttr :
+  IREE_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
+    // The maximum size of a memory allocation that can be created, even if
+    // there is more space available in the heap.
+    IREE_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
+    // The minimum required alignment, in bytes, for offsets used in runtime
+    // buffer bindings for target backends. Offset values (both dynamic and
+    // static) must be an integer multiple of this limit.
+    IREE_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
+    // The maximum value that can be specified for size ranges of buffer
+    // bindings. The underlying allocation may be larger than this but only
+    // up to this amount will be visible to kernels.
+    IREE_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
+    // The minimum required alignment, in bytes, for size ranges of buffer
+    // bindings.
+    IREE_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_ByteRangeAttr :
+  IREE_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,
+    IREE_StructFieldAttr<"length", HAL_DeviceSizeAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_MemoryBarrier : NamedTupleOf<[
     NamedTupleElement<0, "source_scope", I32>,
     NamedTupleElement<1, "target_scope", I32>
@@ -564,6 +602,13 @@ def HAL_MatchAllAttr :
 def HAL_DeviceMatchIDAttr :
   IREE_StructAttr<"device.match.id", "DeviceMatchIDAttr", HAL_Dialect, [
     IREE_StructFieldAttr<"pattern", StrAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DeviceMatchMemoryModelAttr : IREE_StructAttr<
+    "device.match.memory_model", "DeviceMatchMemoryModelAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"memory_model", HAL_MemoryModelAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

@@ -30,6 +30,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createConversionPass(targetOptions));
+  passManager.addPass(createHoistInlinedRodataPass());
   passManager.addPass(createGlobalInitializationPass());
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());

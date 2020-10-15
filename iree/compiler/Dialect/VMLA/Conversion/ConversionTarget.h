@@ -15,7 +15,6 @@
 #ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_CONVERSIONTARGET_H_
 #define IREE_COMPILER_DIALECT_VMLA_CONVERSION_CONVERSIONTARGET_H_
 
-#include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"

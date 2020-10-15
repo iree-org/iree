@@ -123,6 +123,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 // TODO(benvanik): pass to dedupe similar executables (by making dynamically
 // shaped, adjusting types, etc).
 
+// Outlines large tensor constants into flow.variables at the module level.
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass();
+
 //===----------------------------------------------------------------------===//
 // Stream Formation and Folding
 //===----------------------------------------------------------------------===//
@@ -158,6 +161,7 @@ inline void registerFlowPasses() {
   createFoldCompatibleDispatchRegionsPass();
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
+  createOutlineLargeConstantsPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();
 }

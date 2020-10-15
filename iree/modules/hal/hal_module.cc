@@ -168,42 +168,6 @@ class HALModuleState final {
   // iree::hal::Allocator
   //===--------------------------------------------------------------------===//
 
-  StatusOr<int32_t> AllocatorComputeSize(
-      const vm::ref<iree_hal_allocator_t>& allocator,
-      absl::Span<const int32_t> shape, iree_hal_element_type_t element_type) {
-    iree_device_size_t allocation_size = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_allocator_compute_size(
-        allocator.get(), shape.data(), shape.size(), element_type,
-        &allocation_size));
-    return static_cast<int32_t>(allocation_size);
-  }
-
-  StatusOr<int32_t> AllocatorComputeOffset(
-      const vm::ref<iree_hal_allocator_t>& allocator,
-      absl::Span<const int32_t> shape, iree_hal_element_type_t element_type,
-      absl::Span<const int32_t> indices) {
-    iree_device_size_t offset = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_allocator_compute_offset(
-        allocator.get(), shape.data(), shape.size(), element_type,
-        indices.data(), indices.size(), &offset));
-    return static_cast<int32_t>(offset);
-  }
-
-  StatusOr<std::tuple<int32_t, int32_t>> AllocatorComputeRange(
-      const vm::ref<iree_hal_allocator_t>& allocator,
-      absl::Span<const int32_t> shape, iree_hal_element_type_t element_type,
-      absl::Span<const int32_t> start_indices,
-      absl::Span<const int32_t> lengths) {
-    iree_device_size_t offset = 0;
-    iree_device_size_t length = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_allocator_compute_range(
-        allocator.get(), shape.data(), shape.size(), element_type,
-        start_indices.data(), start_indices.size(), lengths.data(),
-        lengths.size(), &offset, &length));
-    return std::make_tuple(static_cast<int32_t>(offset),
-                           static_cast<int32_t>(length));
-  }
-
   StatusOr<vm::ref<iree_hal_buffer_t>> AllocatorAllocate(
       const vm::ref<iree_hal_allocator_t>& allocator,
       iree_hal_memory_type_t memory_types, iree_hal_buffer_usage_t buffer_usage,
@@ -215,29 +179,34 @@ class HALModuleState final {
     return std::move(buffer);
   }
 
-  StatusOr<vm::ref<iree_hal_buffer_t>> AllocatorAllocateConst(
+  StatusOr<vm::ref<iree_hal_buffer_t>> AllocatorWrapByteBuffer(
       const vm::ref<iree_hal_allocator_t>& allocator,
       iree_hal_memory_type_t memory_types, iree_hal_buffer_usage_t buffer_usage,
-      absl::Span<const int32_t> shape, iree_hal_element_type_t element_type,
-      const vm::ref<iree_vm_ro_byte_buffer_t>& value) {
-    IREE_TRACE_SCOPE0("HALModuleState::AllocatorAllocateConst");
+      const vm::ref<iree_vm_ro_byte_buffer_t>& source, int32_t offset,
+      int32_t length) {
+    IREE_TRACE_SCOPE0("HALModuleState::AllocatorWrapByteBuffer");
 
-    iree_device_size_t allocation_size = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_allocator_compute_size(
-        allocator.get(), shape.data(), shape.size(), element_type,
-        &allocation_size));
-    if (allocation_size < value->data.data_length) {
+    // TODO(benvanik): wrap when supported.
+
+    size_t buffer_length = source->data.data_length;
+    if (length == -1) {
+      length = buffer_length;
+    }
+    if (length < 0 || offset < 0 || offset > buffer_length ||
+        offset + length > buffer_length) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Constant data is too large for the minimum allocation size";
+             << "Byte range out of bounds (requested " << offset << "-"
+             << (offset + length - 1) << " of available " << buffer_length
+             << ")";
     }
 
     vm::ref<iree_hal_buffer_t> buffer;
     IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-        allocator.get(), memory_types, buffer_usage, allocation_size, &buffer))
+        allocator.get(), memory_types, buffer_usage, length, &buffer))
         << "Failed to allocate buffer";
 
     IREE_RETURN_IF_ERROR(iree_hal_buffer_write_data(
-        buffer.get(), 0, value->data.data, value->data.data_length))
+        buffer.get(), 0, source->data.data + offset, length))
         << "Writing constant data";
 
     return buffer;
@@ -256,13 +225,22 @@ class HALModuleState final {
       const vm::ref<iree_hal_buffer_t>& source_buffer, int32_t source_offset,
       int32_t length) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferSubspan");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferSubspan";
+    vm::ref<iree_hal_buffer_t> target_buffer;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
+        source_buffer.get(), source_offset, length, allocator_, &target_buffer))
+        << "Subspan of an existing buffer (source_offset=" << source_offset
+        << ", length=" << length << ")";
+    return target_buffer;
   }
 
   Status BufferFill(const vm::ref<iree_hal_buffer_t>& target_buffer,
                     int32_t target_offset, int32_t length, int32_t pattern) {
     IREE_TRACE_SCOPE0("HALModuleState::BufferFill");
-    return UnimplementedErrorBuilder(IREE_LOC) << "BufferFill";
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(
+        target_buffer.get(), target_offset, length, &pattern, sizeof(pattern)))
+        << "Fill range failed (target_offset=" << target_offset
+        << ", length=" << length << ")";
+    return OkStatus();
   }
 
   Status BufferReadData(const vm::ref<iree_hal_buffer_t>& source_buffer,
@@ -770,16 +748,10 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
     vm::MakeNativeFunction("ex.submit_and_wait",
                            &HALModuleState::ExSubmitAndWait),
 
-    vm::MakeNativeFunction("allocator.compute_size",
-                           &HALModuleState::AllocatorComputeSize),
-    vm::MakeNativeFunction("allocator.compute_offset",
-                           &HALModuleState::AllocatorComputeOffset),
-    vm::MakeNativeFunction("allocator.compute_range",
-                           &HALModuleState::AllocatorComputeRange),
     vm::MakeNativeFunction("allocator.allocate",
                            &HALModuleState::AllocatorAllocate),
-    vm::MakeNativeFunction("allocator.allocate.const",
-                           &HALModuleState::AllocatorAllocateConst),
+    vm::MakeNativeFunction("allocator.wrap.byte_buffer",
+                           &HALModuleState::AllocatorWrapByteBuffer),
 
     vm::MakeNativeFunction("buffer.allocator",
                            &HALModuleState::BufferAllocator),

@@ -1,9 +1,10 @@
-// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -canonicalize -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK-LABEL: @allocatorComputeSize
-func @allocatorComputeSize(%arg0 : !hal.allocator) -> index {
+// CHECK-LABEL: @allocatorComputeSizeFoldsAway
+func @allocatorComputeSizeFoldsAway(%arg0 : !hal.allocator) -> index {
+  // CHECK: %c4194304 = vm.const.i32 4194304 : i32
+  // CHECK-NOT: hal.allocator.compute_size
   %c1024 = constant 1024 : index
-  // CHECK: %0 = vm.call.variadic @hal.allocator.compute_size(%arg0, [%c1024, %c1024], %c32) : (!vm.ref<!hal.allocator>, i32 ..., i32) -> i32
   %0 = hal.allocator.compute_size %arg0, shape=[%c1024, %c1024], element_type=32
   return %0 : index
 }
@@ -20,11 +21,11 @@ func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
 
 // -----
 
-// CHECK: vm.rodata @allocatorAllocateConst_const_0 dense<123> : tensor<4x4xi32>
-// CHECK-LABEL: func @allocatorAllocateConst
-func @allocatorAllocateConst(%arg0 : !hal.allocator) -> !hal.buffer {
-  // CHECK: %allocatorAllocateConst_const_0 = vm.const.ref.rodata @allocatorAllocateConst_const_0 : !vm.ref<!iree.byte_buffer>
-  // CHECK: %ref = vm.call.variadic @hal.allocator.allocate.const(%arg0, %c6, %c2, [%c4, %c4_0], %c16777248, %allocatorAllocateConst_const_0) : (!vm.ref<!hal.allocator>, i32, i32, i32 ..., i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.buffer>
-  %buffer = hal.allocator.allocate.const %arg0, "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
+// CHECK-LABEL: func @allocatorMapByteBuffer
+func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !iree.byte_buffer) -> !hal.buffer {
+  %offset = constant 128 : index
+  %length = constant 256 : index
+  // CHECK: = vm.call @hal.allocator.wrap.byte_buffer(%arg0, %c6, %c2, %arg1, %c128, %c256) : (!vm.ref<!hal.allocator>, i32, i32, !vm.ref<!iree.byte_buffer>, i32, i32) -> !vm.ref<!hal.buffer>
+  %buffer = hal.allocator.map %arg0, "HostVisible|HostCoherent", "Transfer", %arg1[%offset, %length] : !iree.byte_buffer -> !hal.buffer
   return %buffer : !hal.buffer
 }
