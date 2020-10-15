@@ -49,8 +49,8 @@ jobs:
       - name: Running yapf
         run: |
           python3 -m pip install yapf
-          python3 -m yapf --verbose --diff --exclude='*/third_party/*' --recursive ../iree
-          printf "\nIf the lint above failed it can be fixed by running \n  python3 -m yapf --verbose --in-place --exclude='*/third_party/*'' --recursive ../iree\n"
+          printf "\nIf the lint below fails it can be fixed by running \n  python3 -m yapf --verbose --in-place --exclude='*/third_party/*' --recursive ../iree\n\n"
+          python3 -m yapf --diff --exclude='*/third_party/*' --recursive ../iree
 
   clang-format:
     runs-on: ubuntu-18.04
