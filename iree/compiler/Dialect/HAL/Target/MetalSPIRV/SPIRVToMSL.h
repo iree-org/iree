@@ -34,7 +34,7 @@ struct MetalShader {
   } threadgroupSize;
 };
 
-// Cross compiles SPIR-V into Meteal Shading Language source code for the
+// Cross compiles SPIR-V into Metal Shading Language source code for the
 // compute shader with |entryPoint|. Returns llvm::None on failure.
 llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
     llvm::ArrayRef<uint32_t> spvBinary, const std::string& entryPoint);
