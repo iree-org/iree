@@ -40,6 +40,10 @@ PYBIND_EXTENSION_COPTS = [
 # defaults to getting TensorFlow from the python environment (empty).
 INTREE_TENSORFLOW_PY_DEPS = []
 
+# Optional deps to enable intree TensorFlow Hub. This build configuration
+# defaults to getting TensorFlow from the python environment (empty).
+INTREE_TF_HUB_DEPS = []
+
 def pybind_cc_library(
         name,
         copts = [],
