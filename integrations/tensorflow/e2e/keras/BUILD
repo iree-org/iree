@@ -25,8 +25,8 @@ load(
     "iree_py_binary",
 )
 load(
-    "//integrations/tensorflow/e2e/keras:iree_vision_test_suite.bzl",
-    "iree_vision_test_suite",
+    "//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "iree_e2e_cartesian_product_test_suite",
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_test_suite.bzl",
@@ -152,6 +152,7 @@ iree_e2e_test_suite(
     },
     reference_backend = "tf",
     tags = [
+        "failing",
         "manual",
         "nokokoro",
         "notap",
@@ -161,74 +162,80 @@ iree_e2e_test_suite(
     ],
 )
 
-iree_vision_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "large_cifar10_internal_tests",
     size = "large",
-    backends = [
-        "tf",
-        "tflite",
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
-    datasets = ["cifar10"],
-    models = [
-        # All models with runtime shorter than ResNet50.
-        "MobileNet",  # Max: Vulkan 61.0s
-        "MobileNetV2",  # Max: LLVM 96.3s
-        "ResNet50",  # Max: LLVM 145.6s
-        "VGG16",  # Max: LLVM 89.5s
-        "VGG19",  # Max: LLVM 94.7s
-    ],
-    reference_backend = "tf",
+    srcs = ["vision_model_test.py"],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "data": "cifar10",
+        "model": [
+            # All models with runtime shorter than ResNet50.
+            "MobileNet",  # Max: Vulkan 61.0s
+            "MobileNetV2",  # Max: LLVM 96.3s
+            "ResNet50",  # Max: LLVM 145.6s
+            "VGG16",  # Max: LLVM 89.5s
+            "VGG19",  # Max: LLVM 94.7s
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "vision_model_test.py",
     tags = ["manual"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
 
-iree_vision_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "enormous_cifar10_internal_tests",
     size = "enormous",
-    backends = [
-        "tf",
-        "tflite",
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
-    datasets = ["cifar10"],
+    srcs = ["vision_model_test.py"],
     failing_configurations = [
         {
-            # Failing all but tf and vmla:
-            "models": [
+            # Failing on llvm and vulkan:
+            "model": [
                 "NASNetLarge",
                 "NASNetMobile",
                 "ResNet50V2",
                 "ResNet101V2",
                 "ResNet152V2",
             ],
-            "datasets": ["cifar10"],
-            "backends": [
-                "tflite",
+            "target_backends": [
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
         },
     ],
-    models = [
-        "DenseNet121",
-        "DenseNet169",
-        "DenseNet201",
-        "NASNetLarge",
-        "NASNetMobile",
-        "ResNet50V2",
-        "ResNet101",
-        "ResNet101V2",
-        "ResNet152",
-        "ResNet152V2",
-    ],
-    reference_backend = "tf",
+    flags_to_values = {
+        "reference_backend": "tf",
+        "data": "cifar10",
+        "model": [
+            "DenseNet121",
+            "DenseNet169",
+            "DenseNet201",
+            "NASNetLarge",
+            "NASNetMobile",
+            "ResNet50V2",
+            "ResNet101",
+            "ResNet101V2",
+            "ResNet152",
+            "ResNet152V2",
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "vision_model_test.py",
     tags = [
         "guitar",
         "manual",
@@ -240,22 +247,29 @@ iree_vision_test_suite(
     ],
 )
 
-iree_vision_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "cifar10_external_tests",
-    backends = [
-        "tf",
-        "tflite",
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
-    datasets = ["cifar10"],
-    models = [
-        "MobileNet",
-        "MobileNetV2",
-        "ResNet50",
-    ],
-    reference_backend = "tf",
+    size = "large",
+    srcs = ["vision_model_test.py"],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "data": "cifar10",
+        "url": "https://storage.googleapis.com/iree_models/",
+        "use_external_weights": True,
+        "model": [
+            "MobileNet",
+            "MobileNetV2",
+            "ResNet50",
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "vision_model_test.py",
     tags = [
         "external",
         "guitar",
@@ -264,30 +278,30 @@ iree_vision_test_suite(
         "nokokoro",
         "notap",
     ],
-    url = "https://storage.googleapis.com/iree_models/",
-    use_external_weights = True,
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )
 
-iree_vision_test_suite(
+iree_e2e_cartesian_product_test_suite(
     name = "imagenet_external_tests",
     size = "enormous",
-    backends = [
-        "tf",
-        "tflite",
-        "iree_vmla",
-        "iree_llvmjit",
-        "iree_vulkan",
-    ],
-    datasets = ["imagenet"],
+    srcs = ["vision_model_test.py"],
     failing_configurations = [
         {
-            # Failing all but tf and vmla:
-            "models": [
+            # Failing vulkan:
+            "model": [
                 "InceptionResNetV2",
                 "InceptionV3",
+            ],
+            "datasets": ["imagenet"],
+            "backends": [
+                "iree_vulkan",
+            ],
+        },
+        {
+            # Failing llvm and vulkan:
+            "models": [
                 "NASNetLarge",
                 "NASNetMobile",
                 "ResNet50V2",
@@ -295,35 +309,45 @@ iree_vision_test_suite(
                 "ResNet152V2",
                 "Xception",
             ],
-            "datasets": ["imagenet"],
-            "backends": [
-                "tflite",
+            "target_backends": [
                 "iree_llvmjit",
                 "iree_vulkan",
             ],
         },
     ],
-    models = [
-        "DenseNet121",
-        "DenseNet169",
-        "DenseNet201",
-        "InceptionResNetV2",
-        "InceptionV3",
-        "MobileNet",
-        "MobileNetV2",
-        "NASNetLarge",
-        "NASNetMobile",
-        "ResNet50",
-        "ResNet50V2",
-        "ResNet101",
-        "ResNet101V2",
-        "ResNet152",
-        "ResNet152V2",
-        "VGG16",
-        "VGG19",
-        "Xception",
-    ],
-    reference_backend = "tf",
+    flags_to_values = {
+        "reference_backend": "tf",
+        "data": "imagenet",
+        "use_external_weights": True,
+        "model": [
+            "DenseNet121",
+            "DenseNet169",
+            "DenseNet201",
+            "InceptionResNetV2",
+            "InceptionV3",
+            "MobileNet",
+            "MobileNetV2",
+            "NASNetLarge",
+            "NASNetMobile",
+            "ResNet50",
+            "ResNet50V2",
+            "ResNet101",
+            "ResNet101V2",
+            "ResNet152",
+            "ResNet152V2",
+            "VGG16",
+            "VGG19",
+            "Xception",
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "vision_model_test.py",
     tags = [
         "external",
         "guitar",
@@ -331,7 +355,6 @@ iree_vision_test_suite(
         "nokokoro",
         "notap",
     ],
-    use_external_weights = True,
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

@@ -25,8 +25,6 @@ void populateHALExperimentalToVMPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::ExSharedDeviceOp>>(
       context, importSymbols, typeConverter, "hal.ex.shared_device");
-  patterns.insert<VMImportOpConversion<IREE::HAL::ExDeferReleaseOp>>(
-      context, importSymbols, typeConverter, "hal.ex.defer_release");
   patterns.insert<VMImportOpConversion<IREE::HAL::ExSubmitAndWaitOp>>(
       context, importSymbols, typeConverter, "hal.ex.submit_and_wait");
 }

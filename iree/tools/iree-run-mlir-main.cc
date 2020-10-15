@@ -91,10 +91,15 @@ static llvm::cl::opt<bool> split_input_file_flag{
     llvm::cl::init(true),
 };
 
+static llvm::cl::opt<bool> verifyPasses(
+    "verify-each",
+    llvm::cl::desc("Run the verifier after each transformation pass"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> export_all_flag{
     "export-all",
     llvm::cl::desc("Adds iree.module.export to all functions"),
-    llvm::cl::init(true),
+    llvm::cl::init(false),
 };
 
 static llvm::cl::opt<bool> print_mlir_flag{
@@ -206,7 +211,7 @@ StatusOr<std::string> PrepareModule(
   hal_target_options.targets = {std::move(target_backend)};
   auto vm_target_options =
       mlir::iree_compiler::IREE::VM::getTargetOptionsFromFlags();
-  mlir::PassManager pass_manager(mlir_module->getContext());
+  mlir::PassManager pass_manager(mlir_module->getContext(), verifyPasses);
   mlir::applyPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(

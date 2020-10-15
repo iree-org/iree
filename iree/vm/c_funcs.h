@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_TARGET_C_VM_C_FUNCS_H_
-#define IREE_COMPILER_DIALECT_VM_TARGET_C_VM_C_FUNCS_H_
+#ifndef IREE_VM_C_FUNCS_H_
+#define IREE_VM_C_FUNCS_H_
 
 #include <stdint.h>
 
 inline int32_t vm_add_i32(int32_t a, int32_t b) { return a + b; }
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_C_VM_C_FUNCS_H_
+#endif  // IREE_VM_C_FUNCS_H_

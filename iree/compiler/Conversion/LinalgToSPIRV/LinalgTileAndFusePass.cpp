@@ -27,6 +27,7 @@
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -105,13 +106,14 @@ struct LinalgTileAndFusePass
           "Enable use of vectorization in SPIR-V code generation pipeline"),
       llvm::cl::init(false)};
 };
+}  // namespace
 
 //===----------------------------------------------------------------------===//
 // Patterns to tile computation to map to workgroups.
 //===----------------------------------------------------------------------===//
 
-/// Distribution options for linalg.matmul when targeting workgroups.
-static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
+/// Distribution options for operations when targeting workgroups.
+static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
     [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
       return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
           builder, loc, parallelLoopRanges.size());
@@ -120,21 +122,21 @@ static linalg::LinalgLoopDistributionOptions matmulDistributionOptions = {
      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
      linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
+namespace {
 /// Pattern for tiling operations. Updates the workgroup size in the surrounding
-/// function operation if tiling succeeds.
-template <typename MatmulOp>
-struct TileMatmulPattern : public linalg::LinalgBaseTilingPattern {
+/// function operation if tiling succeeds, and generates the function that
+/// computes the number of workgroups for the launch.
+template <typename LinalgOpTy>
+struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
   using Base = linalg::LinalgBaseTilingPattern;
-  TileMatmulPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
-                    const LaunchConfig &launchConfig,
-                    PatternBenefit benefit = 1)
-      : Base(MatmulOp::getOperationName(), context,
-             options.setDistributionOptions(matmulDistributionOptions),
-             linalg::LinalgMarker(
-                 ArrayRef<Identifier>(),
-                 Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
-                                 context)),
-             benefit),
+  TileToWorkgroupsPattern(MLIRContext *context,
+                          const linalg::LinalgDependenceGraph &dependenceGraph,
+                          linalg::LinalgTilingOptions options,
+                          linalg::LinalgMarker marker,
+                          const LaunchConfig &launchConfig,
+                          PatternBenefit benefit = 1)
+      : Base(LinalgOpTy::getOperationName(), context, options, marker, benefit),
+        dependenceGraph(dependenceGraph),
         launchConfig(launchConfig) {}
 
   LogicalResult matchAndRewrite(Operation *op,
@@ -153,71 +155,59 @@ struct TileMatmulPattern : public linalg::LinalgBaseTilingPattern {
              launchConfig.getTileSizes(op, 0))))) {
       return failure();
     }
-    rewriter.eraseOp(op);
+    setMarker(op, getDeleteMarker());
     return success();
   }
 
+  const linalg::LinalgDependenceGraph &dependenceGraph;
   const LaunchConfig &launchConfig;
 };
 
-/// Pattern to tile linalg.matmul for subgroups.
-struct TileMatmulSubgroupPattern
-    : public linalg::LinalgTilingPattern<linalg::MatmulOp> {
-  using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
-  TileMatmulSubgroupPattern(MLIRContext *context,
-                            linalg::LinalgTilingOptions options,
-                            PatternBenefit benefit = 1)
-      : Base(context, options,
-             linalg::LinalgMarker(
-                 Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
-                                 context),
-                 Identifier::get(getVectorizeMarker(), context)),
-             benefit) {}
-};
-
-/// Distribution options for targeting workgroups for convolution/pooling
-/// operations.
-static linalg::LinalgLoopDistributionOptions convPoolDistributionOptions = {
-    [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
-      return getGPUProcessorIdsAndCounts<gpu::BlockIdOp, gpu::GridDimOp>(
-          builder, loc, parallelLoopRanges.size());
-    },
-    {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-     linalg::DistributionMethod::Cyclic}};
-
-/// Pattern for tiling convolution and pooling operations.
-template <typename OpTy>
-struct TileConvPoolPattern : public linalg::LinalgTilingPattern<OpTy> {
-  using Base = linalg::LinalgTilingPattern<OpTy>;
-  TileConvPoolPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
-                      const LaunchConfig &launchConfig,
-                      PatternBenefit benefit = 1)
-      : Base(context,
-             options.setDistributionOptions(convPoolDistributionOptions),
-             linalg::LinalgMarker(
-                 ArrayRef<Identifier>(),
-                 Identifier::get(getWorkgroupMarker(), context)),
+/// Pattern for tile + fuse of operations. Updates the workgroup size in the
+/// surrounding function operation if tiling succeeds, and generates the
+/// function that computes the number of workgroups for the launch..
+template <typename LinalgOpTy>
+struct TileAndFuseToWorkgroupsPattern
+    : public linalg::LinalgTileAndFusePattern<LinalgOpTy> {
+  using Base = linalg::LinalgTileAndFusePattern<LinalgOpTy>;
+  TileAndFuseToWorkgroupsPattern(
+      MLIRContext *context,
+      const linalg::LinalgDependenceGraph &dependenceGraph,
+      linalg::LinalgTilingOptions tilingOptions, linalg::LinalgMarker marker,
+      const LaunchConfig &launchConfig, PatternBenefit benefit = 1)
+      : Base(context, dependenceGraph, tilingOptions,
+             linalg::LinalgFusionOptions().setIndicesToFuse({2}), marker,
+             marker,
+             linalg::LinalgMarker(ArrayRef<Identifier>(),
+                                  Identifier::get(getDeleteMarker(), context)),
              benefit),
+        dependenceGraph(dependenceGraph),
         launchConfig(launchConfig) {}
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    if (hasPadding(cast<OpTy>(op))) return failure();
+  virtual LogicalResult matchAndRewrite(Operation *op,
+                                        PatternRewriter &rewriter) const {
     FuncOp funcOp = op->getParentOfType<FuncOp>();
-    if (!funcOp || failed(Base::matchAndRewrite(op, rewriter)) ||
-        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())))
+    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
+    if (!funcOp || !dependenceGraph.hasDependentOperations(linalgOp) ||
+        failed(Base::matchAndRewrite(op, rewriter)) ||
+        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
+        (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+         failed(createNumWorkgroupsFromResultShape(
+             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
       return failure();
-    funcOp.removeAttr(getNumWorkgroupsFnAttrName());
+    }
     return success();
   }
 
+  const linalg::LinalgDependenceGraph &dependenceGraph;
   const LaunchConfig &launchConfig;
 };
+}  // namespace
 
 /// Populate patterns for first-level tiling.
 static void populateTilingToWorkgroupPatterns(
-    MLIRContext *context, const LaunchConfig &launchConfig,
-    OwningRewritePatternList &patterns) {
+    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
+    const LaunchConfig &launchConfig, OwningRewritePatternList &patterns) {
   // Function to compute first level tiling values.
   std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
       getOuterTileSizeFn =
@@ -233,16 +223,25 @@ static void populateTilingToWorkgroupPatterns(
     }
     return tileSizesVal;
   };
-  patterns.insert<TileConvPoolPattern<linalg::ConvOp>,
-                  TileMatmulPattern<linalg::MatmulOp>,
-                  TileMatmulPattern<linalg::BatchMatmulOp>,
-                  TileConvPoolPattern<linalg::PoolingMaxOp>,
-                  TileConvPoolPattern<linalg::PoolingMinOp>,
-                  TileConvPoolPattern<linalg::PoolingSumOp>>(
-      context,
+  patterns.insert<TileAndFuseToWorkgroupsPattern<linalg::BatchMatmulOp>,
+                  TileAndFuseToWorkgroupsPattern<linalg::ConvOp>,
+                  TileAndFuseToWorkgroupsPattern<linalg::MatmulOp>,
+                  TileAndFuseToWorkgroupsPattern<linalg::PoolingMaxOp>,
+                  TileAndFuseToWorkgroupsPattern<linalg::PoolingMinOp>,
+                  TileAndFuseToWorkgroupsPattern<linalg::PoolingSumOp>,
+                  TileToWorkgroupsPattern<linalg::BatchMatmulOp>,
+                  TileToWorkgroupsPattern<linalg::ConvOp>,
+                  TileToWorkgroupsPattern<linalg::MatmulOp>,
+                  TileToWorkgroupsPattern<linalg::PoolingMaxOp>,
+                  TileToWorkgroupsPattern<linalg::PoolingMinOp>,
+                  TileToWorkgroupsPattern<linalg::PoolingSumOp>>(
+      context, dependenceGraph,
       linalg::LinalgTilingOptions()
+          .setDistributionOptions(workgroupDistributionOptions)
           .setTileSizeComputationFunction(getOuterTileSizeFn)
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
+      linalg::LinalgMarker(ArrayRef<Identifier>(),
+                           Identifier::get(getWorkgroupMarker(), context)),
       launchConfig);
 }
 
@@ -250,23 +249,19 @@ static void populateTilingToWorkgroupPatterns(
 // Patterns to promote subviews to workgroup memory
 //===----------------------------------------------------------------------===//
 
+namespace {
 /// Pattern to promote matmul operands to workgroup memory.
 struct PromoteMatmulSubviewsPattern
     : public linalg::LinalgPromotionPattern<linalg::MatmulOp> {
-  PromoteMatmulSubviewsPattern(
-      MLIRContext *context, linalg::LinalgPromotionOptions options,
-      linalg::LinalgMarker marker = linalg::LinalgMarker(),
-      PatternBenefit benefit = 1)
+  PromoteMatmulSubviewsPattern(MLIRContext *context,
+                               linalg::LinalgPromotionOptions options,
+                               linalg::LinalgMarker marker,
+                               PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<linalg::MatmulOp>(
             context,
             options.setOperandsToPromote({0, 1}).setUseFullTileBuffers(
                 {false, false}),
-            linalg::LinalgMarker(
-                Identifier::get(getWorkgroupNumItemsGENumItersMarker(),
-                                context),
-                Identifier::get(getWorkgroupMemoryNumItemsGENumItersMarker(),
-                                context)),
-            benefit) {}
+            marker, benefit) {}
 };
 
 /// Patterns to promote convolution operands to workgroup memory.
@@ -283,18 +278,15 @@ struct PromoteMatmulSubviewsPattern
 //    constants. This is TBD.
 struct PromoteConvolutionSubviewsPattern
     : public linalg::LinalgPromotionPattern<linalg::ConvOp> {
-  PromoteConvolutionSubviewsPattern(
-      MLIRContext *context, linalg::LinalgPromotionOptions options,
-      linalg::LinalgMarker marker = linalg::LinalgMarker(),
-      PatternBenefit benefit = 1)
+  PromoteConvolutionSubviewsPattern(MLIRContext *context,
+                                    linalg::LinalgPromotionOptions options,
+                                    linalg::LinalgMarker marker,
+                                    PatternBenefit benefit = 1)
       : linalg::LinalgPromotionPattern<linalg::ConvOp>(
             context,
             options.setOperandsToPromote({1}).setUseFullTileBuffers(
                 {false, false}),
-            linalg::LinalgMarker(
-                Identifier::get(getWorkgroupMarker(), context),
-                Identifier::get(getWorkgroupMemoryMarker(), context)),
-            benefit) {}
+            marker, benefit) {}
 };
 }  // namespace
 
@@ -306,7 +298,10 @@ static void populatePromotionPatterns(MLIRContext *context,
           linalg::LinalgPromotionOptions()
               .setAllocationDeallocationFns(allocateWorkgroupMemory,
                                             deallocateWorkgroupMemory)
-              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory));
+              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory),
+          linalg::LinalgMarker(
+              Identifier::get(getWorkgroupMarker(), context),
+              Identifier::get(getWorkgroupMemoryMarker(), context)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -332,6 +327,19 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
   }
   return procInfo;
 }
+
+namespace {
+/// Pattern to tile linalg.matmul for subgroups.
+struct TileMatmulSubgroupPattern
+    : public linalg::LinalgTilingPattern<linalg::MatmulOp> {
+  using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
+  TileMatmulSubgroupPattern(MLIRContext *context,
+                            linalg::LinalgTilingOptions options,
+                            linalg::LinalgMarker marker,
+                            PatternBenefit benefit = 1)
+      : Base(context, options, marker, benefit) {}
+};
+}  // namespace
 
 /// Patterns for second level tiling to target subgroups.
 static void populateTilingToSubgroupPatterns(
@@ -364,10 +372,13 @@ static void populateTilingToSubgroupPatterns(
       {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
        linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
   patterns.insert<TileMatmulSubgroupPattern>(
-      context, linalg::LinalgTilingOptions()
-                   .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-                   .setTileSizeComputationFunction(getInnerTileSizeFn)
-                   .setDistributionOptions(subgroupDistributionOptions));
+      context,
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(getInnerTileSizeFn)
+          .setDistributionOptions(subgroupDistributionOptions),
+      linalg::LinalgMarker(Identifier::get(getWorkgroupMarker(), context),
+                           Identifier::get(getVectorizeMarker(), context)));
 }
 
 //====---------------------------------------------------------------------===//
@@ -420,9 +431,9 @@ void LinalgTileAndFusePass::runOnOperation() {
     if (linalgOps.empty()) continue;
 
     LaunchConfig launchConfig;
-    SmallVector<linalg::LinalgOp, 4> linalgOpsVec(linalgOps.begin(),
-                                                  linalgOps.end());
-    if (failed(launchConfig.init(options, linalgOpsVec))) {
+    SmallVector<Operation *, 4> linalgOpsVec(linalgOps.begin(),
+                                             linalgOps.end());
+    if (failed(launchConfig.init(context, options, linalgOpsVec))) {
       funcOp.emitError("unable to find launch configuration");
       return signalPassFailure();
     }
@@ -446,11 +457,24 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
     });
 
-    OwningRewritePatternList firstLevelTilingPatterns;
-    populateTilingToWorkgroupPatterns(context, launchConfig,
-                                      firstLevelTilingPatterns);
-    applyPatternsAndFoldGreedily(funcOp, firstLevelTilingPatterns);
-    applyCanonicalizationPatterns(context, funcOp);
+    {
+      // Compute the Linalg Dependence Graph.
+      linalg::Aliases aliases;
+      linalg::LinalgDependenceGraph dependenceGraph =
+          linalg::LinalgDependenceGraph::buildDependenceGraph(aliases, funcOp);
+
+      OwningRewritePatternList firstLevelTilingPatterns;
+      populateTilingToWorkgroupPatterns(context, dependenceGraph, launchConfig,
+                                        firstLevelTilingPatterns);
+      applyPatternsAndFoldGreedily(funcOp, firstLevelTilingPatterns);
+      applyCanonicalizationPatterns(context, funcOp);
+
+      // Delete the ops that are marked for deletion.
+      funcOp.walk([](linalg::LinalgOp linalgOp) {
+        if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
+          linalgOp.getOperation()->erase();
+      });
+    }
 
     if (options.useWorkgroupMemory) {
       // The promotion patterns are put separate from the tiling patterns to
@@ -474,6 +498,13 @@ void LinalgTileAndFusePass::runOnOperation() {
                                     vectorizationPatterns);
       applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns);
     }
+
+    launchConfig.finalize(funcOp);
+    SmallVector<linalg::LinalgOp, 1> toDelete;
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
+        linalgOp.erase();
+    });
   }
 }
 

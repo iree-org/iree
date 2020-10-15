@@ -449,13 +449,8 @@ static LogicalResult mapToWorkgroups(ConversionPatternRewriter &rewriter,
 }
 
 /// Distributes scf.parallel to workitems using local invocation ID.
-static LogicalResult mapToLocalInvocationId(
-    ConversionPatternRewriter &rewriter, scf::ParallelOp pLoopOp,
-    bool useCyclicDistribution = false) {
-  if (useCyclicDistribution) {
-    return distributeCyclicallyToProcessors<gpu::ThreadIdOp, gpu::BlockDimOp>(
-        rewriter, pLoopOp);
-  }
+static LogicalResult mapToLocalInvocationId(ConversionPatternRewriter &rewriter,
+                                            scf::ParallelOp pLoopOp) {
   return distributeSingleIterationPerProcessor<gpu::ThreadIdOp,
                                                gpu::BlockDimOp>(rewriter,
                                                                 pLoopOp);
@@ -546,9 +541,7 @@ static LogicalResult mapLinalgOpToLocalInvocationIdImpl(
   if (loops.getValue().empty()) return success();
 
   auto pLoopOp = cast<scf::ParallelOp>(loops.getValue()[0]);
-  return mapToLocalInvocationId(
-      rewriter, pLoopOp,
-      hasMarker(linalgOp, {getWorkgroupMarker(), getWorkgroupMemoryMarker()}));
+  return mapToLocalInvocationId(rewriter, pLoopOp);
 }
 
 static LogicalResult distributeCopyOp(linalg::CopyOp copyOp,
@@ -612,8 +605,9 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
     // If the `linalgOp` writes to workgroup memory insert barrier after the
     // op.
     if (llvm::any_of(linalgOp.getOperands(), [](Value output) {
-          return output.getType().cast<MemRefType>().getMemorySpace() ==
-                 getWorkgroupMemorySpace();
+          MemRefType outputType = output.getType().dyn_cast<MemRefType>();
+          return outputType &&
+                 outputType.getMemorySpace() == getWorkgroupMemorySpace();
         })) {
       rewriter.create<spirv::ControlBarrierOp>(
           linalgOp.getLoc(), spirv::Scope::Workgroup, spirv::Scope::Workgroup,
@@ -758,6 +752,7 @@ void ConvertToGPUPass::runOnOperation() {
                   MapLinalgOpToGlobalInvocationId<linalg::IndexedGenericOp>,
                   MapLinalgOpToLocalInvocationId<linalg::ConvOp>,
                   MapLinalgOpToLocalInvocationId<linalg::CopyOp>,
+                  MapLinalgOpToLocalInvocationId<linalg::FillOp>,
                   MapLinalgOpToLocalInvocationId<linalg::MatmulOp>,
                   MapLinalgOpToLocalInvocationId<linalg::BatchMatmulOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMaxOp>,

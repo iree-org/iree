@@ -200,18 +200,6 @@ extern "C" {
 #define IREE_UNLIKELY(x) (x)
 #endif  // IREE_HAVE_ATTRIBUTE(likely)
 
-#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
-     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-#define IREE_IS_LITTLE_ENDIAN 1
-#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
-    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#define IREE_IS_BIG_ENDIAN 1
-#elif defined(_WIN32)
-#define IREE_IS_LITTLE_ENDIAN 1
-#else
-#error "IREE endian detection needs to be set up for your compiler"
-#endif  // __BYTE_ORDER__
-
 // Size, in bytes, of a buffer on the host.
 typedef size_t iree_host_size_t;
 
@@ -240,6 +228,9 @@ static inline iree_host_size_t iree_math_align(iree_host_size_t value,
                                                iree_host_size_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
+
+#define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
+#define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
 
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities

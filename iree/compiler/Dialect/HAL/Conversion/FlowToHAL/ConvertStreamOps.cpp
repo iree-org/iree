@@ -103,9 +103,6 @@ static Value allocateOutputBuffer(Value streamValue, Value externalValue,
                                                   bufferUsage, allocationSize)
           .getResult();
 
-  // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(loc, buffer);
-
   return buffer;
 }
 
@@ -159,9 +156,6 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
           .create<IREE::HAL::AllocatorAllocateOp>(loc, allocator, memoryTypes,
                                                   bufferUsage, allocationSize)
           .getResult();
-
-  // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(loc, buffer);
 
   return buffer;
 }
@@ -355,8 +349,9 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
           dispatchOp, dispatchOp.executable()));
 
   // TODO(benvanik): support multiple interfaces. We'd probably want to
-  // store each executable+interface as a variable.
-  auto interfaceOp = executableOp.getInterfaceOp();
+  // store each executable+interface as a variable, or follow interface
+  // references stored on entry points.
+  auto interfaceOp = executableOp.getFirstInterfaceOp();
   auto executableLayout =
       rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
           dispatchOp.getLoc(),
@@ -421,9 +416,9 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   dispatchState.results = resultAdaptors;
 
   // Ask each target backend to record their dispatch logic.
-  IREE::HAL::DeviceSwitchBuilder switchBuilder(dispatchOp.getLoc(),
-                                               /*resultTypes=*/TypeRange{},
-                                               device, rewriter);
+  IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
+                                                 /*resultTypes=*/TypeRange{},
+                                                 device, rewriter);
   for (auto targetOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
     for (auto &targetBackend : IREE::HAL::matchTargetBackends(
@@ -438,15 +433,15 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
       // sequence them together during the call to |recordDispatch| below.
       dispatchState.entryPointOp = *entryPointOps.begin();
 
-      if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(),
-                                               dispatchState, switchBuilder))) {
+      if (failed(targetBackend->recordDispatch(
+              dispatchOp.getLoc(), dispatchState, switchRewriter))) {
         return dispatchOp.emitError()
                << "unable to record dispatch for target backend "
                << targetBackend->name();
       }
     }
   }
-  switchBuilder.build();
+  switchRewriter.build();
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could
@@ -501,14 +496,6 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
       updateOp.getLoc(), commandBuffer, update->getBuffer(), zeroOffset,
       result->getBuffer(), targetRange->offset, targetRange->length);
-
-  // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               target->getBuffer());
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               update->getBuffer());
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
-                                               result->getBuffer());
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could

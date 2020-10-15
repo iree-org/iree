@@ -237,7 +237,7 @@ class TargetBackend {
   // such as by inserting an  `hal.command_buffer.execution_barrier`.
   virtual LogicalResult recordDispatch(Location loc,
                                        DispatchState dispatchState,
-                                       DeviceSwitchBuilder &switchBuilder);
+                                       DeviceSwitchRewriter &switchRewriter);
 
   // Inserts passes used to translate the `hal.executable.target` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline

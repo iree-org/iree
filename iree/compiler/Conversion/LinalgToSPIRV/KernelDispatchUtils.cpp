@@ -63,23 +63,22 @@ FuncOp getNumWorkgroupsFn(FuncOp entryPointFn) {
     entryPointFn.emitError("unable to find num workgroups fn ") << attr;
     return nullptr;
   }
-  if (!numWorkgroupsFn.empty()) {
-    entryPointFn.emitError("num workgroups fn expected to be empty");
-    return nullptr;
-  }
   return numWorkgroupsFn;
 }
 
 /// Computes the bounds of the parallel loops partitioned across workgroups.
 static Optional<SmallVector<Value, 2>> getParallelLoopRange(
-    PatternRewriter &rewriter, Location loc, linalg::LinalgOp linalgOp) {
-  FuncOp numWorkgroupsFn =
-      getNumWorkgroupsFn(linalgOp.getParentOfType<FuncOp>());
-  if (!numWorkgroupsFn) return {};
+    PatternRewriter &rewriter, FuncOp numWorkgroupsFn, Location loc,
+    linalg::LinalgOp linalgOp) {
+  if (!numWorkgroupsFn.empty()) {
+    numWorkgroupsFn.emitError("num workgroups fn expected to be empty");
+    return {};
+  }
   LLVM_DEBUG({
     llvm::dbgs() << "Found num workgroups function : "
                  << numWorkgroupsFn.getName();
   });
+
   rewriter.setInsertionPointToEnd(numWorkgroupsFn.addEntryBlock());
   llvm::SetVector<Operation *> slice;
   getBackwardSlice(linalgOp, &slice);
@@ -127,17 +126,23 @@ LogicalResult createNumWorkgroupsFromResultShape(PatternRewriter &rewriter,
                                                  linalg::LinalgOp linalgOp,
                                                  FuncOp entryPointFn,
                                                  ArrayRef<int64_t> tileSizes) {
+  FuncOp numWorkgroupsFn =
+      getNumWorkgroupsFn(linalgOp.getParentOfType<FuncOp>());
+  if (!numWorkgroupsFn) return failure();
+
   Location loc = linalgOp.getLoc();
   OpBuilder::InsertionGuard gaurd(rewriter);
   Optional<SmallVector<Value, 2>> parallelLoopRange =
-      getParallelLoopRange(rewriter, loc, linalgOp);
+      getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
   if (!parallelLoopRange) return failure();
   Value one = rewriter.create<ConstantIndexOp>(loc, 1);
   SmallVector<Value, 3> returnValues(3, one);
   for (size_t i = 0, e = std::min<size_t>(parallelLoopRange->size(), 3); i != e;
        ++i) {
-    returnValues[i] = buildCeilDivConstDenominator(
-        rewriter, loc, (*parallelLoopRange)[e - i - 1], tileSizes[e - i - 1]);
+    if (tileSizes[e - i - 1] != 0) {
+      returnValues[i] = buildCeilDivConstDenominator(
+          rewriter, loc, (*parallelLoopRange)[e - i - 1], tileSizes[e - i - 1]);
+    }
   }
   rewriter.create<mlir::ReturnOp>(loc, returnValues);
   return success();
@@ -146,10 +151,23 @@ LogicalResult createNumWorkgroupsFromResultShape(PatternRewriter &rewriter,
 LogicalResult createNumWorkgroupsFromLinearizedResultShape(
     PatternRewriter &rewriter, linalg::LinalgOp linalgOp, FuncOp entryPointFn,
     int64_t workgroupSizeX) {
+  FuncOp numWorkgroupsFn =
+      getNumWorkgroupsFn(linalgOp.getParentOfType<FuncOp>());
+  if (!numWorkgroupsFn) return failure();
+  if (!numWorkgroupsFn.empty()) {
+    // TODO(ravishankarm): We can end up with multiple linalg operations
+    // (typically linalg.generic operations) that have the same workload in a
+    // dispatch region. In that case, the first linalg.generic creates the body
+    // of number of workgroups. For now, just returning if the body is not empty
+    // assuming that it is correct for all the ops in the dispatch region. This
+    // needs to be enforced somehow.
+    return success();
+  }
+
   Location loc = linalgOp.getLoc();
   OpBuilder::InsertionGuard gaurd(rewriter);
   Optional<SmallVector<Value, 2>> parallelLoopRange =
-      getParallelLoopRange(rewriter, loc, linalgOp);
+      getParallelLoopRange(rewriter, numWorkgroupsFn, loc, linalgOp);
   if (!parallelLoopRange) return failure();
   Value one = rewriter.create<ConstantIndexOp>(loc, 1);
   SmallVector<Value, 3> returnValues(3, one);
@@ -165,6 +183,10 @@ LogicalResult createNumWorkgroupsFromLinearizedResultShape(
 //===----------------------------------------------------------------------===//
 // Launch config calculation.
 //===----------------------------------------------------------------------===//
+
+/// Name of the StrAttr that can be used to get the key to access the tile size
+/// information.
+static const char kLaunchInfoKey[] = "launch_info_key";
 
 /// Given `nprocs` try to distribute it evenly across 2 logical x and y.
 static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
@@ -345,16 +367,24 @@ LogicalResult getOpLaunchConfig(linalg::ConvOp op,
   return success();
 }
 
+template <typename PoolingOpTy>
 static LogicalResult getPoolingOpLaunchConfig(
-    const SPIRVCodegenOptions &options,
+    PoolingOpTy op, const SPIRVCodegenOptions &options,
     spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes,
     std::array<int64_t, 3> &workgroupSize,
     std::array<int64_t, 3> &numSubgroups) {
   unsigned maxWorkgroupSize =
       resourceLimits.max_compute_workgroup_invocations().getInt();
+  // Pooling op seems to be rank polymorphic but is not well specified enough to
+  // be able to figure out which dimensions of the output correspond to the
+  // pooled dimension and which are not. Need to fix that, but for now just use
+  // a working heuristic.
+  SmallVector<int64_t, 4> ts(std::min<int64_t>(
+      op.output().getType().template cast<ShapedType>().getRank(), 3));
   const int64_t tileSizeX = 32;
   int64_t tileSizeY = maxWorkgroupSize / tileSizeX;
-  SmallVector<int64_t, 4> ts = {tileSizeY, tileSizeX};
+  ts[ts.size() - 2] = tileSizeY;
+  ts[ts.size() - 1] = tileSizeX;
   tileSizes.emplace_back(std::move(ts));
   workgroupSize = {tileSizeX, tileSizeY, 1};
   return success();
@@ -367,7 +397,7 @@ static LogicalResult getPoolingOpLaunchConfig(
       spirv::ResourceLimitsAttr resourceLimits, TileSizesListType &tileSizes, \
       std::array<int64_t, 3> &workgroupSize,                                  \
       std::array<int64_t, 3> &numSubgroups) {                                 \
-    return getPoolingOpLaunchConfig(options, resourceLimits, tileSizes,       \
+    return getPoolingOpLaunchConfig(op, options, resourceLimits, tileSizes,   \
                                     workgroupSize, numSubgroups);             \
   }
 
@@ -377,12 +407,27 @@ DEFINE_POOLING_OP_CONFIG(linalg::PoolingSumOp)
 
 #undef DEFINE_POOLINGOP_CONFIG
 
-LogicalResult LaunchConfig::init(const SPIRVCodegenOptions &options,
-                                 ArrayRef<linalg::LinalgOp> linalgOps) {
+Optional<StringRef> LaunchConfig::getKey(Operation *op) const {
+  StringAttr attr = op->getAttrOfType<StringAttr>(kLaunchInfoKey);
+  if (!attr) return {};
+  return attr.getValue();
+}
+
+LogicalResult LaunchConfig::init(MLIRContext *context,
+                                 const SPIRVCodegenOptions &options,
+                                 ArrayRef<Operation *> linalgOps) {
+  unsigned numTiledOps = 0;
+  auto setKey = [&](Operation *op) -> std::string {
+    std::string key = llvm::formatv("__op_num_{0}__", numTiledOps++).str();
+    op->setAttr(Identifier::get(kLaunchInfoKey, context),
+                StringAttr::get(key, context));
+    return key;
+  };
+
   if (!options.workgroupSize.empty()) {
-    for (linalg::LinalgOp op : linalgOps)
-      tileSizes[op.getOperation()->getName().getStringRef()].emplace_back(
-          options.tileSizes.begin(), options.tileSizes.end());
+    for (Operation *linalgOp : linalgOps)
+      tileSizes[setKey(linalgOp)].emplace_back(options.tileSizes.begin(),
+                                               options.tileSizes.end());
     workgroupSize = {1, 1, 1};
     for (unsigned i = 0,
                   e = std::min<unsigned>(3, options.workgroupSize.size());
@@ -396,17 +441,18 @@ LogicalResult LaunchConfig::init(const SPIRVCodegenOptions &options,
   spirv::ResourceLimitsAttr resourceLimits =
       spirv::lookupTargetEnv(*linalgOps.begin()).getResourceLimits();
 
-  for (linalg::LinalgOp op : linalgOps) {
-    StringRef key = op.getOperation()->getName().getStringRef();
-    if (tileSizes.count(key)) {
-      return op.emitError("unexpected multiple ")
-             << key << " operations within dispatch region";
-    }
+  Optional<linalg::LinalgOp> rootOperation = {};
 
-    TileSizesListType &tileSizesInfo = tileSizes[key];
-
+  for (Operation *op : linalgOps) {
+    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
 #define DISPATCH(opName)                                                      \
-  if (auto lOp = dyn_cast<opName>(op.getOperation())) {                       \
+  if (auto lOp = dyn_cast<opName>(linalgOp.getOperation())) {                 \
+    if (rootOperation) {                                                      \
+      return lOp.emitError(                                                   \
+          "unhandled multiple root operations in dispatch region");           \
+    }                                                                         \
+    rootOperation = cast<linalg::LinalgOp>(lOp.getOperation());               \
+    TileSizesListType &tileSizesInfo = tileSizes[setKey(*rootOperation)];     \
     if (failed(getOpLaunchConfig(lOp, options, resourceLimits, tileSizesInfo, \
                                  workgroupSize, numSubgroups))) {             \
       return failure();                                                       \
@@ -427,6 +473,13 @@ LogicalResult LaunchConfig::init(const SPIRVCodegenOptions &options,
   // TODO(ravishankarm): Verify that the set configurations is within the device
   // limits.
   return success();
+}
+
+void LaunchConfig::finalize(FuncOp funcOp) {
+  funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    linalgOp.removeAttr(Identifier::get(kLaunchInfoKey, funcOp.getContext()));
+    ;
+  });
 }
 
 }  // namespace iree_compiler

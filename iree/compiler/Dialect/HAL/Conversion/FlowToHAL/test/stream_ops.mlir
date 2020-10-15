@@ -21,9 +21,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK-DAG: %[[C128:.+]] = constant 128
   %cst = constant 128 : index
   // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate {{.+}}, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch"
-  // CHECK-NEXT: hal.ex.defer_release %[[RET_BUF]]
   // CHECK: %[[TMP_BUF:.+]] = hal.allocator.allocate {{.+}}, "DeviceVisible|DeviceLocal", "Transfer|Dispatch"
-  // CHECK-NEXT: hal.ex.defer_release %[[TMP_BUF]]
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin %[[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {

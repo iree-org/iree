@@ -78,7 +78,7 @@ function(iree_cc_binary)
     # The binary is marked as host only. We need to declare the rules for
     # generating them under host configuration so when cross-compiling towards
     # target we can still have this binary.
-    iree_declare_host_excutable(${_RULE_NAME})
+    iree_declare_host_excutable(${_RULE_NAME} ${_NAME})
 
     # Still define the package-prefixed target so we can have a consistent way
     # to reference this binary, whether cross-compiling or not. But this time

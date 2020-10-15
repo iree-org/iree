@@ -15,6 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONDIALECTINTERFACE_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONDIALECTINTERFACE_H_
 
+#include <mutex>
+
 #include "mlir/IR/DialectInterface.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -34,7 +36,11 @@ class VMConversionDialectInterface
   // Returns a module containing one or more vm.modules with vm.import ops.
   // These modules will be merged into the module being compiled to provide
   // import definitions to the conversion and lowering process.
-  virtual OwningModuleRef getVMImportModule() const = 0;
+  mlir::ModuleOp getVMImportModule() const {
+    std::call_once(importParseFlag,
+                   [&]() { importModuleRef = parseVMImportModule(); });
+    return importModuleRef.get();
+  }
 
   // Populates |patterns| with rewrites that convert from the implementation
   // dialect to the VM dialect. Many of these can just be default conversions
@@ -50,6 +56,14 @@ class VMConversionDialectInterface
   virtual void walkAttributeStorage(
       Attribute attr,
       const function_ref<void(Attribute elementAttr)> &fn) const {}
+
+ protected:
+  // Parses the vm.import module to be cached by the caller.
+  virtual OwningModuleRef parseVMImportModule() const = 0;
+
+ private:
+  mutable std::once_flag importParseFlag;
+  mutable OwningModuleRef importModuleRef;
 };
 
 }  // namespace iree_compiler

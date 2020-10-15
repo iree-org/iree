@@ -165,7 +165,7 @@ static const int kRegSize = sizeof(uint16_t);
 
 // Bytecode data access macros for reading values of a given type from a byte
 // offset within the current function.
-#if defined(IREE_IS_LITTLE_ENDIAN)
+#if defined(IREE_ENDIANNESS_LITTLE)
 #define OP_I8(i) bytecode_data[pc + (i)]
 #define OP_I16(i) *((uint16_t*)&bytecode_data[pc + (i)])
 #define OP_I32(i) *((uint32_t*)&bytecode_data[pc + (i)])
@@ -189,7 +189,7 @@ static const int kRegSize = sizeof(uint16_t);
       ((uint64_t)bytecode_data[pc + 5 + (i)] << 40) | \
       ((uint64_t)bytecode_data[pc + 6 + (i)] << 48) | \
       ((uint64_t)bytecode_data[pc + 7 + (i)] << 56)
-#endif  // IREE_IS_LITTLE_ENDIAN
+#endif  // IREE_ENDIANNESS_LITTLE
 
 //===----------------------------------------------------------------------===//
 // Utilities matching the tablegen op encoding scheme

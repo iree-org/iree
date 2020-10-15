@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -iree-hal-target-backends=vmla %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false link-executables=false},canonicalize' -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 
 // CHECK-LABEL: @i1_op_usage(%arg0: !hal.buffer) -> !hal.buffer
 func @i1_op_usage(%arg0: tensor<4xi1>) -> tensor<4xi1> {

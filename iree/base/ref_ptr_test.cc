@@ -218,6 +218,8 @@ TEST(RefPtrTest, MoveCompatible) {
   struct MyBaseType : public RefObject<MyBaseType> {
     int x = 5;
     using RefObject<MyBaseType>::counter_;  // Expose for testing.
+
+    virtual ~MyBaseType() = default;
   };
   struct MyTypeA : public MyBaseType {
     int a = 6;

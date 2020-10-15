@@ -16,7 +16,9 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -55,10 +57,12 @@ class MaterializeResourceCachesPass
     // other nice thing is that we get ordering similar to the executable
     // variables above.
     for (auto executableOp : executableOps) {
-      auto interfaceOp = executableOp.getInterfaceOp();
-      defineExecutableLayoutOp(interfaceOp.getLoc(),
-                               interfaceOp.getExecutableSetLayoutsAttr(),
-                               interfaceOp.push_constantsAttr());
+      for (auto interfaceOp :
+           executableOp.getBlock().getOps<IREE::HAL::InterfaceOp>()) {
+        defineExecutableLayoutOp(interfaceOp.getLoc(),
+                                 interfaceOp.getExecutableSetLayoutsAttr(),
+                                 interfaceOp.push_constantsAttr());
+      }
     }
 
     // Generate cached resource singletons and replace lookup ops with direct
@@ -221,33 +225,71 @@ class MaterializeResourceCachesPass
             loc, executableCacheType, deviceValue,
             blockBuilder.getStringAttr("default"));
 
-    // TODO(benvanik): use targetOptions_ to determine these flags.
-    auto cachingMode = ExecutableCachingModeBitfield::AliasProvidedData |
-                       ExecutableCachingModeBitfield::AllowPersistentCaching |
-                       ExecutableCachingModeBitfield::AllowOptimization;
-    for (auto executableOp : executableOps) {
-      auto executableIt = executableCache_.find(executableOp.sym_name());
-      assert(executableIt != executableCache_.end() &&
-             "executable must have been cached");
-      auto executableVariableOp = executableIt->second;
+    // Create a switch statement with a case for each backend.
+    // Each case should then cache only executables which contain a matching
+    // ExecutableTargetOp.
+    // Afterwards, we could inline and de-dup across switch cases.
+    DeviceSwitchBuilder switchBuilder(loc, /*resultTypes=*/TypeRange{},
+                                      deviceValue, blockBuilder);
+    auto targetBackends = matchTargetBackends(targetOptions_.targets);
+    for (auto &targetBackend : targetBackends) {
+      auto *region = switchBuilder.addConditionRegion(
+          IREE::HAL::DeviceMatchIDAttr::get(targetBackend->filter_pattern(),
+                                            blockBuilder.getContext()),
+          {
+              executableCacheValue,
+          });
+      auto &entryBlock = region->front();
+      auto executableCache = entryBlock.getArgument(0);
+      auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
-      // TODO(benvanik): support multiple interfaces. We'd probably want to
-      // store each executable+interface as a variable.
-      auto interfaceOp = executableOp.getInterfaceOp();
+      // TODO(benvanik): use targetOptions_ to determine these flags.
+      auto cachingMode = ExecutableCachingModeBitfield::AliasProvidedData |
+                         ExecutableCachingModeBitfield::AllowPersistentCaching |
+                         ExecutableCachingModeBitfield::AllowOptimization;
+      for (auto executableOp : executableOps) {
+        // Skip executables with no matching target ops.
+        auto executableTargetOps =
+            executableOp.getOps<IREE::HAL::ExecutableTargetOp>();
+        bool hasMatchingTarget = false;
+        for (auto executableTargetOp : executableTargetOps) {
+          if (TargetBackend::matchPattern(
+                  executableTargetOp.target_backend_filter(),
+                  targetBackend->filter_pattern())) {
+            hasMatchingTarget = true;
+          }
+        }
+        if (!hasMatchingTarget) continue;
 
-      auto executableLayoutVariableOp = defineExecutableLayoutOp(
-          executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),
-          interfaceOp.push_constantsAttr());
-      auto executableLayoutValue = blockBuilder.createOrFold<VariableLoadOp>(
-          loc, ExecutableLayoutType::get(loc.getContext()),
-          executableLayoutVariableOp.sym_name());
-      auto executableValue =
-          blockBuilder.createOrFold<ExecutableCachePrepareOp>(
-              loc, ExecutableType::get(loc.getContext()), executableCacheValue,
-              executableLayoutValue, cachingMode, executableOp.sym_name());
-      blockBuilder.create<VariableStoreOp>(loc, executableValue,
-                                           executableVariableOp.sym_name());
+        auto executableIt = executableCache_.find(executableOp.sym_name());
+        assert(executableIt != executableCache_.end() &&
+               "executable must have been cached");
+        auto executableVariableOp = executableIt->second;
+
+        // TODO(benvanik): support multiple interfaces. We'd probably want to
+        // store each executable+interface as a variable.
+        //
+        // This is *only* safe now because any backends that support multiple
+        // interfaces during compilation do *not* use layouts during executable
+        // cache preparation.
+        auto interfaceOp = executableOp.getFirstInterfaceOp();
+
+        auto executableLayoutVariableOp = defineExecutableLayoutOp(
+            executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),
+            interfaceOp.push_constantsAttr());
+        auto executableLayoutValue = caseBuilder.createOrFold<VariableLoadOp>(
+            loc, ExecutableLayoutType::get(loc.getContext()),
+            executableLayoutVariableOp.sym_name());
+        auto executableValue =
+            caseBuilder.createOrFold<ExecutableCachePrepareOp>(
+                loc, ExecutableType::get(loc.getContext()), executableCache,
+                executableLayoutValue, cachingMode, executableOp.sym_name());
+        caseBuilder.create<VariableStoreOp>(loc, executableValue,
+                                            executableVariableOp.sym_name());
+      }
+      caseBuilder.create<IREE::HAL::ReturnOp>(loc);
     }
+    switchBuilder.build();
 
     blockBuilder.create<mlir::ReturnOp>(loc, executableCacheValue);
 

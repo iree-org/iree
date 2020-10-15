@@ -156,6 +156,14 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
+    c_funcs
+  HDRS
+    "c_funcs.h"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     context
   HDRS
     "context.h"
@@ -436,13 +444,5 @@ iree_cc_library(
     ::type_def
     ::value
     iree::base::api
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    vm_c_funcs
-  HDRS
-    "vm_c_funcs.h"
   PUBLIC
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s -iree-hal-target-backends=vmla | IreeFileCheck %s
 
 //      CHECK: hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout
 // CHECK-NEXT: func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
@@ -87,12 +87,14 @@ func @otherDescriptorSetLayoutLookup(%arg0 : !hal.device) -> !hal.descriptor_set
 
 // -----
 
+// TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
+//   - If there is no matching hal.executable.target then the executable will not be cached
 hal.executable @exe {
   hal.interface @interface {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @target, filter="target" {
+  hal.executable.target @vmla, filter="vmla" {
     hal.executable.entry_point @entry attributes {
       interface = @interface,
       ordinal = 0 : i32,
@@ -119,8 +121,12 @@ hal.executable @exe {
 //      CHECK: hal.variable @_executable_cache init(@_executable_cache_initializer) : !hal.executable_cache
 // CHECK-NEXT: func @_executable_cache_initializer
 //      CHECK: %[[CACHE:.+]] = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
-// CHECK-NEXT: %[[LAYOUT:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-// CHECK-NEXT: %[[EXE:.+]] = hal.executable_cache.prepare %[[CACHE]], layout = %[[LAYOUT]], caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
+// CHECK-NEXT: hal.device.switch(%dev : !hal.device)
+// CHECK-NEXT: #hal.device.match.id<"vmla">(%[[CACHE_CAPTURE:.+]] = %executable_cache_default : !hal.executable_cache) {
+// CHECK-NEXT:   %[[LAYOUT:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
+// CHECK-NEXT:   %[[EXE:.+]] = hal.executable_cache.prepare %[[CACHE_CAPTURE]], layout = %[[LAYOUT]], caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
+// CHECK-NEXT:   hal.variable.store %[[EXE]], @_executable_exe : !hal.executable
+// CHECK-NEXT:   hal.return
 
 // CHECK-LABEL: @exeLookup
 func @exeLookup(%arg0 : !hal.device) -> !hal.executable {

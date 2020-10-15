@@ -394,8 +394,8 @@ add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 if(CMAKE_CROSSCOMPILING)
   # We need flatc to generate some source code. When cross-compiling, we need
   # to make sure the flatc binary is configured under host environment.
-  iree_declare_host_excutable(flatc BUILDONLY)
-  iree_declare_host_excutable(flatcc_cli BUILDONLY)
+  iree_declare_host_excutable(flatc "flatc" BUILDONLY)
+  iree_declare_host_excutable(flatcc_cli "flatcc_cli" BUILDONLY)
 
   # Set the FLATBUFFERS_FLATC_EXECUTABLE. It controls where to find the flatc
   # binary in BuildFlatBuffers().
@@ -414,7 +414,7 @@ if(CMAKE_CROSSCOMPILING)
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different
         "${PROJECT_SOURCE_DIR}/third_party/flatcc/bin/flatcc${IREE_HOST_EXECUTABLE_SUFFIX}"
-        "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli"
+        "${IREE_HOST_BINARY_ROOT}/bin/flatcc_cli${IREE_HOST_EXECUTABLE_SUFFIX}"
     DEPENDS iree_host_build_flatcc_cli
     COMMENT "Installing host flatcc..."
   )

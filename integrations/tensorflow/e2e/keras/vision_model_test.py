@@ -150,10 +150,10 @@ class AppTest(tf_test_utils.TracedModuleTestCase):
     self._modules = tf_test_utils.compile_tf_module(VisionModule,
                                                     exported_names=['predict'])
 
-  def test_application(self):
+  def test_predict(self):
 
     def predict(module):
-      module.predict(tf_utils.uniform(get_input_shape()))
+      module.predict(tf_utils.uniform(get_input_shape()), atol=1e-5, rtol=1e-5)
 
     self.compare_backends(predict, self._modules)
 

@@ -41,9 +41,9 @@ def VMLA_ConstantOp : VMLA_PureOp<"constant"> {
   );
 
   let builders = [
-    OpBuilder<"OpBuilder &builder, OperationState &result, ElementsAttr value",
+    OpBuilder<"ElementsAttr value",
     [{
-      build(builder, result, IREE::VMLA::BufferType::get(builder.getContext()),
+      build($_builder, $_state, IREE::VMLA::BufferType::get($_builder.getContext()),
             value);
     }]>,
   ];
@@ -691,6 +691,25 @@ def VMLA_FftPseudoOp : VMLA_Op<"fft.pseudo"> {
   let assemblyFormat = [{
   $real_in`,` $imag_in attr-dict `:` `(`type($real_in)`,` type($imag_in)`)`
   `->` `(`type($real_out)`,` type($imag_out)`)`
+  }];
+}
+
+def VMLA_FftOp : VMLA_ElementTypeOp<"fft", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$real_in,
+    VMLA_Shape:$real_in_shape,
+    VMLA_Buffer:$imag_in,
+    VMLA_Shape:$imag_in_shape,
+    VMLA_Buffer:$real_out,
+    VMLA_Buffer:$imag_out,
+    VMLA_AnyTypeAttr:$real_element_type,
+    VMLA_AnyTypeAttr:$imag_element_type
+  );
+
+  let assemblyFormat = [{
+    $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+    $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+    `out` $real_out `,` $imag_out attr-dict `:` $real_element_type `,` $imag_element_type
   }];
 }
 

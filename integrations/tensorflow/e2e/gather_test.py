@@ -49,14 +49,12 @@ class GatherModule(tf.Module):
   def gather_axis2_batch1(self, params, indices):
     return tf.gather(params, indices, axis=2, batch_dims=1)
 
-
   @tf.function(input_signature=[
       tf.TensorSpec([4, 7, 8, 2], tf.float32),
       tf.TensorSpec([4, 1], tf.int32)
   ])
   def gather_axis1_batch1(self, params, indices):
     return tf.gather(params, indices, axis=1, batch_dims=1)
-
 
   @tf.function(input_signature=[
       tf.TensorSpec([2, 4], tf.int32),
@@ -72,60 +70,49 @@ class GatherTest(tf_test_utils.TracedModuleTestCase):
     super(GatherTest, self).__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(GatherModule)
 
+  # yapf: disable
   def test_gather_axis0_scalar(self):
-
     def gather_axis0_scalar(module):
       indices = np.array(2, dtype=np.int32)
       params = tf_utils.ndarange([4, 8])
       module.gather_axis0_scalar(params, indices)
-
     self.compare_backends(gather_axis0_scalar, self._modules)
 
   def test_gather_axis0_batch0(self):
-
     def gather_axis0_batch0(module):
       indices = np.array([2, 3], dtype=np.int32)
       params = tf_utils.ndarange([4, 8])
       module.gather_axis0_batch0(params, indices)
-
     self.compare_backends(gather_axis0_batch0, self._modules)
 
   def test_gather_axis1_batch0(self):
-
     def gather_axis1_batch0(module):
       indices = np.array([2, 3], dtype=np.int32)
       params = tf_utils.ndarange([4, 7, 8])
       module.gather_axis1_batch0(params, indices)
-
     self.compare_backends(gather_axis1_batch0, self._modules)
 
   def test_gather_axis2_batch1(self):
-
     def gather_axis2_batch1(module):
       indices = np.array([[2], [3], [0], [1]], dtype=np.int32)
       params = tf_utils.ndarange([4, 7, 8, 2])
       module.gather_axis2_batch1(params, indices)
-
     self.compare_backends(gather_axis2_batch1, self._modules)
 
   def test_gather_axis1_batch1(self):
-
     def gather_axis1_batch1(module):
       indices = np.array([[2], [3], [0], [1]], dtype=np.int32)
       params = tf_utils.ndarange([4, 7, 8, 2])
       module.gather_axis1_batch1(params, indices)
-
     self.compare_backends(gather_axis1_batch1, self._modules)
 
   def test_gather_axis2_batch2(self):
-
     def gather_axis2_batch2(module):
       indices = np.array([[0, 1, 2, 3], [3, 2, 1, 0]], dtype=np.int32)
       values = np.array([[0, 1, 2, 3], [9, 8, 7, 0]], dtype=np.int32)
       module.gather_axis2_batch2(values, indices)
-
     self.compare_backends(gather_axis2_batch2, self._modules)
-
+  # yapf: enable
 
 
 def main(argv):
