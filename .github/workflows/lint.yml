@@ -57,8 +57,8 @@ jobs:
         run: |
           python3 -m pip install yapf
           printf "If the lint below fails it can be fixed by running\n"
-          printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/yapf_diff/yapf_diff.py --verbose -i\n\n"
-          git diff -U0 "${BASE_REF?}" | python3 third_party/yapf_diff/yapf_diff.py --verbose -i
+          printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n\n"
+          git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
           git diff --exit-code
 
   clang-format:
