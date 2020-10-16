@@ -15,7 +15,7 @@ Example usage:
   git diff -U0 HEAD^ | python3 format_diff.py yapf -i
   git diff -U0 HEAD^ | python3 format_diff.py clang-format -i
 
-  svn diff --diff-cmd=diff -x-U0 | format_diff.py clang-format -i -p0
+  svn diff --diff-cmd=diff -x-U0 | python3 format_diff.py clang-format -i -p0
 
 It should be noted that the filename contained in the diff is used unmodified
 to determine the source file to update. Users calling this script directly
