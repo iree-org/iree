@@ -76,6 +76,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     TargetOptions executableOptions);
 
+// Canonicalizes hal.interfaces across executables to reduce the total number of
+// unique interfaces across the module. This optimization reduces runtime
+// overhead for executable/descriptor set layout management and overhead for
+// command buffer recording and resource tracking.
+std::unique_ptr<OperationPass<ModuleOp>> createCanonicalizeInterfacesPass();
+
 // Translates hal.executable.target ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createTranslateExecutablesPass(TargetOptions executableOptions);

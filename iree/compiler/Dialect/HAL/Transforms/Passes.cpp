@@ -58,6 +58,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Each executable needs a hal.interface to specify how the host and device
   // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass(targetOptions));
+  passManager.addPass(createCanonicalizeInterfacesPass());
 
   // TODO(#1036): when dynamic pass registration is supported we can just
   // directly call TargetBackend::buildTranslationPassPipeline function. For now

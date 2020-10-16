@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CanonicalizeInterfaces.cpp",
         "ConvertToHAL.cpp",
         "IdentifyConstantPools.cpp",
         "InlineDeviceSwitches.cpp",
