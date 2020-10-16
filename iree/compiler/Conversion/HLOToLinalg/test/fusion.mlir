@@ -133,3 +133,38 @@ module {
 //  CHECK-SAME:     %[[ARG0]], %[[ARG1]]
 //   CHECK-DAG:   hal.interface.store.tensor %[[RES]]
 //   CHECK-DAG:   hal.interface.store.tensor %[[RES]]
+
+// -----
+
+module {
+  func @issue_3302() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<128xf32>
+    %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : tensor<128xf32>) {
+    ^bb0(%arg0: f32):  // no predecessors
+      linalg.yield %arg0 : f32
+    } -> tensor<384x128xf32>
+    %2 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<384x4x32xf32>
+    %3 = linalg.tensor_reshape %1 [affine_map<(d0, d1, d2) -> (d0)>, affine_map<(d0, d1, d2) -> (d1, d2)>] : tensor<384x128xf32> into tensor<384x4x32xf32>
+    %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2, %3 : tensor<384x4x32xf32>, tensor<384x4x32xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+      %5 = addf %arg0, %arg1 : f32
+      linalg.yield %5 : f32
+    } -> tensor<4x384x32xf32>
+    hal.interface.store.tensor %4, @legacy_io::@ret0, offset = %c0 : tensor<4x384x32xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+// CHECK-LABEL: func @issue_3302
+//       CHECK:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %[[C0]] : tensor<384x4x32xf32>
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %[[C0]] : tensor<4x32xf32>
+//       CHECK:   %[[T0:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]] : tensor<384x4x32xf32>, tensor<4x32xf32>)
+//       CHECK:   hal.interface.store.tensor %[[T0]], @legacy_io::@ret0, offset = %[[C0]] : tensor<4x384x32xf32>
