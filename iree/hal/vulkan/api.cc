@@ -89,7 +89,7 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
   if (features & IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS) {
-    spec.optional_layers.push_back("VK_LAYER_LUNARG_standard_validation");
+    spec.optional_layers.push_back("VK_LAYER_KHRONOS_standard_validation");
   }
 
   if (features & IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS) {

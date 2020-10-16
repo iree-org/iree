@@ -48,7 +48,7 @@ typedef enum {
 
 // Bitfield that defines sets of Vulkan features.
 typedef enum {
-  // Use VK_LAYER_LUNARG_standard_validation.
+  // Use VK_LAYER_KHRONOS_standard_validation.
   IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS = 1 << 0,
 
   // Use VK_EXT_debug_utils, record markers, and log errors.
