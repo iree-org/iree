@@ -120,7 +120,7 @@ def main():
       if args.lines_style == "yapf":
         lines = ["--lines", str(start_line) + "-" + str(end_line)]
       elif args.lines_style == "clang-format":
-        lines = ['-lines', str(start_line) + ':' + str(end_line)]
+        lines = ["-lines", str(start_line) + ":" + str(end_line)]
       lines_by_file.setdefault(filename, []).extend(lines)
 
   # Pass the changed lines to --binary alongside any 'unknown' args (e.g. -i).
