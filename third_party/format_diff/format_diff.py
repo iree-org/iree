@@ -142,13 +142,20 @@ def main():
     if p.returncode != 0:
       sys.exit(p.returncode)
 
-    # Print 'binary's output if in-place formatting isn't specified.
-    if "-i" not in binary_args:
+    # If the formatter printed the formatted code to stdout then print out
+    # a unified diff between the formatted and unformatted code.
+    # If flags like --verbose are passed to binary then the diffs this produces
+    # won't be particularly helpful.
+    formatted_code = io.StringIO(stdout).readlines()
+    if len(formatted_code):
       with open(filename) as f:
-        code = f.readlines()
-      formatted_code = io.StringIO(stdout).readlines()
-      diff = difflib.unified_diff(code, formatted_code, filename, filename,
-                                  "(before formatting)", "(after formatting)")
+        unformatted_code = f.readlines()
+      diff = difflib.unified_diff(unformatted_code,
+                                  formatted_code,
+                                  fromfile=filename,
+                                  tofile=filename,
+                                  fromfiledate="(before formatting)",
+                                  tofiledate="(after formatting)")
       diff_string = "".join(diff)
       if len(diff_string) > 0:
         sys.stdout.write(diff_string)
