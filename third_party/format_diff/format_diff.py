@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
-#===- format_diff.py - Diff Reformatter ----*- python -*--===#
+#===- format_diff.py - Diff Reformatter ----*- python3 -*--===#
 #
 # This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -14,8 +14,10 @@ Example usage:
 
   git diff -U0 HEAD^ | python3 format_diff.py yapf -i
   git diff -U0 HEAD^ | python3 format_diff.py clang-format -i
+  svn diff --diff-cmd=diff -x-U0 | python3 format_diff.py -p0 clang-format -i
 
-  svn diff --diff-cmd=diff -x-U0 | python3 format_diff.py clang-format -i -p0
+General usage:
+  <some diff> | python3 format_diff.py [--regex] [--lines-style] [-p] binary [args for binary]
 
 It should be noted that the filename contained in the diff is used unmodified
 to determine the source file to update. Users calling this script directly
@@ -45,20 +47,21 @@ def parse_arguments():
       "binary",
       help="Location of binary to use for formatting. This controls the "
       "default values of --regex and --lines-style. If binary isn't 'yapf' "
-      "or 'clang-format' then --regex and --lines-style must be specified.")
+      "or 'clang-format' then --regex and --lines-style are required.")
   parser.add_argument(
       "--regex",
       metavar="PATTERN",
       default=None,
-      help="Custom pattern selecting file paths from the diff to reformat. "
-      "Must be specified if --binary is not 'yapf' or 'clang-format', and "
-      "overrides the default --binary sets otherwise. (case sensitive)")
+      help="Regex pattern for selecting file paths to reformat from the piped "
+      "diff. This flag is required if 'binary' is not set to 'yapf' or "
+      "'clang-format'. Otherwise, this flag overrides the default pattern that "
+      "--binary sets.")
   parser.add_argument(
       "--lines-style",
       default=None,
-      help="How to style the --lines argument for --binary. Must be one of "
-      "Either 'yapf' or 'clang-format'. This must be set manually if --binary "
-      "is not 'yapf' or 'clang-format'.")
+      help="How to style the 'lines' argument for the given binary. Can be set "
+      "to 'yapf' or 'clang-format'. This flag is required if 'binary' is not "
+      "set to 'yapf' or 'clang-format'.")
   parser.add_argument(
       "-p",
       metavar="NUM",
@@ -70,13 +73,13 @@ def parse_arguments():
   args, binary_args = parser.parse_known_args()
   if args.binary not in BINARY_TO_DEFAULT_REGEX:
     if not args.regex:
-      raise parser.error("If --binary is not 'yapf' or 'clang-format' then "
+      raise parser.error("If 'binary' is not 'yapf' or 'clang-format' then "
                          "--regex must be set.")
     if not args.lines_style:
-      raise parser.error("If --binary is not 'yapf' or 'clang-format' then "
+      raise parser.error("If 'binary' is not 'yapf' or 'clang-format' then "
                          "--lines-style must be set.")
   else:
-    # Set defaults based off of --binary.
+    # Set defaults based off of 'binary'.
     if not args.regex:
       args.regex = BINARY_TO_DEFAULT_REGEX[args.binary]
     if not args.lines_style:
@@ -96,14 +99,14 @@ def main():
   lines_by_file = {}
   for line in sys.stdin:
     # Match all filenames.
-    match = re.search(r"^\+\+\+\ (.*?/){%s}(\S*)" % args.p, line)
+    match = re.search(fr"^\+\+\+\ (.*?/){{{args.p}}}(\S*)", line)
     if match:
       filename = match.group(2)
     if filename is None:
       continue
 
     # Match all filenames specified by --regex.
-    if not re.match("^%s$" % args.regex, filename):
+    if not re.match(f"^{args.regex}$", filename):
       continue
 
     # Match unified diff line numbers.
@@ -123,7 +126,7 @@ def main():
         lines = ["-lines", f"{start_line}:{end_line}"]
       lines_by_file.setdefault(filename, []).extend(lines)
 
-  # Pass the changed lines to --binary alongside any 'unknown' args (e.g. -i).
+  # Pass the changed lines to 'binary' alongside any unparsed args (e.g. -i).
   for filename, lines in lines_by_file.items():
     command = [args.binary, filename]
     command.extend(lines)
@@ -139,7 +142,7 @@ def main():
     if p.returncode != 0:
       sys.exit(p.returncode)
 
-    # Print --binary's output if in-place formatting isn't specified.
+    # Print 'binary's output if in-place formatting isn't specified.
     if "-i" not in binary_args:
       with open(filename) as f:
         code = f.readlines()
