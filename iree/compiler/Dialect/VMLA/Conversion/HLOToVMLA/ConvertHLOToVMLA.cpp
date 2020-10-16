@@ -377,8 +377,19 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
   LogicalResult matchAndRewrite(
       mhlo::SliceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    DenseIntElementsAttr start_indices;
+    DenseIntElementsAttr limit_indices;
+    DenseIntElementsAttr strides;
+    if (!matchPattern(srcOp.start_indices(), m_Constant(&start_indices)) ||
+        !matchPattern(srcOp.limit_indices(), m_Constant(&limit_indices)) ||
+        !matchPattern(srcOp.strides(), m_Constant(&strides))) {
+      srcOp.emitWarning() << "Could not lower with dynamic start_indices, "
+                             "limit_indices, or strides";
+      return failure();
+    }
+
     auto isNotOne = [](APInt stride) { return stride != 1; };
-    if (llvm::any_of(srcOp.strides(), isNotOne)) {
+    if (llvm::any_of(strides, isNotOne)) {
       srcOp.emitWarning()
           << "Could not lower slice op with non-singular strides";
       return failure();
@@ -401,11 +412,11 @@ struct SliceOpConversion : public OpConversionPattern<mhlo::SliceOp> {
     for (int i = 0; i < rank; ++i) {
       uint64_t ui = static_cast<uint64_t>(i);
       srcIndices[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
-          srcOp.getLoc(), srcOp.start_indices().getValue<int64_t>({ui}));
+          srcOp.getLoc(), start_indices.getValue<int64_t>({ui}));
       dstIndices[i] = zero;
       lengths[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
-          srcOp.getLoc(), srcOp.limit_indices().getValue<int64_t>({ui}) -
-                              srcOp.start_indices().getValue<int64_t>({ui}));
+          srcOp.getLoc(), limit_indices.getValue<int64_t>({ui}) -
+                              start_indices.getValue<int64_t>({ui}));
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(

@@ -679,6 +679,14 @@ struct SliceOpConversion
 LogicalResult SliceOpConversion::apply(
     mhlo::SliceOp op, ArrayRef<Value> inputBuffers,
     ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
+  DenseIntElementsAttr start_indices;
+  DenseIntElementsAttr strides_attr;
+  if (!matchPattern(op.start_indices(), m_Constant(&start_indices)) ||
+      !matchPattern(op.strides(), m_Constant(&strides_attr))) {
+    return op.emitError()
+           << "Could not lower with dynamic start_indices or strides";
+  }
+
   auto loc = op.getLoc();
   auto argType = inputBuffers[0].getType().template dyn_cast<ShapedType>();
   if (!argType || !argType.hasRank()) {
@@ -688,12 +696,12 @@ LogicalResult SliceOpConversion::apply(
   SmallVector<Value, 3> offsets, sizes, strides;
   for (int i = 0, e = argType.getRank(); i < e; ++i) {
     Value startIndex = rewriter.create<ConstantIndexOp>(
-        loc, op.start_indices().getValue<int64_t>(i));
+        loc, start_indices.getValue<int64_t>(i));
     offsets.push_back(startIndex);
     Value size = rewriter.create<DimOp>(loc, resultBuffers[0], i);
     sizes.push_back(size);
     Value stride = rewriter.create<ConstantIndexOp>(
-        loc, op.strides().getValue<int64_t>(i));
+        loc, strides_attr.getValue<int64_t>(i));
     strides.push_back(stride);
   }
   auto subViewOp =

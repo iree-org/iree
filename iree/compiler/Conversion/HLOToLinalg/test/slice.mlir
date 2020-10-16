@@ -8,11 +8,11 @@ module {
     attributes {signature = (tensor<3x4xi32>) -> (tensor<3x4xi32>)} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<3x4xi32>
-    %1 = "mhlo.slice"(%0) {
-      start_indices = dense<[0, 0]> : tensor<2xi64>,
-      limit_indices = dense<[3, 4]> : tensor<2xi64>,
-      strides = dense<1> : tensor<2xi64>
-    } : (tensor<3x4xi32>) -> tensor<3x4xi32>
+    %start_indices = constant dense<[0, 0]> : tensor<2xi64>
+    %limit_indices = constant dense<[3, 4]> : tensor<2xi64>
+    %strides = constant dense<1> : tensor<2xi64>
+    %1 = "mhlo.slice"(%0, %start_indices, %limit_indices, %strides)
+      : (tensor<3x4xi32>, tensor<2xi64>, tensor<2xi64>, tensor<2xi64>) -> tensor<3x4xi32>
     hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<3x4xi32>
     return
   }
@@ -43,11 +43,11 @@ module {
     attributes {signature = (tensor<3x4xi32>) -> (tensor<1x4xi32>)} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<3x4xi32>
-    %1 = "mhlo.slice"(%0) {
-      start_indices = dense<[1, 0]> : tensor<2xi64>,
-      limit_indices = dense<[2, 4]> : tensor<2xi64>,
-      strides = dense<1> : tensor<2xi64>
-    } : (tensor<3x4xi32>) -> tensor<1x4xi32>
+    %start_indices = constant dense<[1, 0]> : tensor<2xi64>
+    %limit_indices = constant dense<[2, 4]> : tensor<2xi64>
+    %strides = constant dense<1> : tensor<2xi64>
+    %1 = "mhlo.slice"(%0, %start_indices, %limit_indices, %strides)
+      : (tensor<3x4xi32>, tensor<2xi64>, tensor<2xi64>, tensor<2xi64>) -> tensor<1x4xi32>
     hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<1x4xi32>
     return
   }
@@ -78,11 +78,11 @@ module {
     attributes {signature = (tensor<3x4xi32>) -> (tensor<1x2xi32>)} {
     %c0 = constant 0 : index
     %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<3x4xi32>
-    %1 = "mhlo.slice"(%0) {
-      start_indices = dense<[1, 1]> : tensor<2xi64>,
-      limit_indices = dense<[2, 3]> : tensor<2xi64>,
-      strides = dense<1> : tensor<2xi64>
-    } : (tensor<3x4xi32>) -> tensor<1x2xi32>
+    %start_indices = constant dense<[1, 1]> : tensor<2xi64>
+    %limit_indices = constant dense<[2, 3]> : tensor<2xi64>
+    %strides = constant dense<1> : tensor<2xi64>
+    %1 = "mhlo.slice"(%0, %start_indices, %limit_indices, %strides)
+      : (tensor<3x4xi32>, tensor<2xi64>, tensor<2xi64>, tensor<2xi64>) -> tensor<1x2xi32>
     hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<1x2xi32>
     return
   }
