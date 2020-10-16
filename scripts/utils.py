@@ -32,31 +32,26 @@ def create_markdown_table(rows: Sequence[Sequence[str]]):
   return '\n'.join([' | '.join(row) for row in rows])
 
 
-def check_and_get_output(command: Sequence[str],
-                         dry_run: bool = False,
-                         log_stderr: bool = True,
-                         stderr_filters: Sequence[str] = ()):
+def check_and_get_output_lines(command: Sequence[str],
+                               dry_run: bool = False,
+                               log_stderr: bool = True,
+                               stderr_filters: Sequence[str] = ()):
   print(f'Running: `{" ".join(command)}`')
   if dry_run:
     return None, None
-  process = subprocess.Popen(command,
-                             bufsize=1,
-                             stderr=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             universal_newlines=True)
-  process.wait()
-  stdout = [line.strip(os.linesep) for line in process.stdout]
-  stderr = [line.strip(os.linesep) for line in process.stderr]
+  process = subprocess.run(command,
+                           stderr=subprocess.PIPE,
+                           stdout=subprocess.PIPE,
+                           universal_newlines=True)
 
   if log_stderr:
-    for line in stderr:
+    for line in process.stderr.split(os.linesep):
       if not any(re.match(pattern, line) for pattern in stderr_filters):
         print(line)
 
-  if process.returncode != 0:
-    raise subprocess.CalledProcessError(process.returncode, ' '.join(command))
+  process.check_returncode()
 
-  return stdout, stderr
+  return [line.strip(os.linesep) for line in process.stdout]
 
 
 def get_test_targets(test_suite_path: str):
@@ -66,10 +61,10 @@ def get_test_targets(test_suite_path: str):
   # unfortunately the same as the return code for a bazel configuration error.
   target_dir = test_suite_path.split(':')[0]
   query = ['bazel', 'query', f'{target_dir}/...']
-  targets, _ = check_and_get_output(query, stderr_filters=BAZEL_FILTERS)
+  targets = check_and_get_output_lines(query, stderr_filters=BAZEL_FILTERS)
   if test_suite_path not in targets:
     return []
 
   query = ['bazel', 'query', f'tests({test_suite_path})']
-  tests, _ = check_and_get_output(query, stderr_filters=BAZEL_FILTERS)
+  tests = check_and_get_output_lines(query, stderr_filters=BAZEL_FILTERS)
   return tests
