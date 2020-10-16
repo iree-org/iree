@@ -144,8 +144,8 @@ def main():
 
     # If the formatter printed the formatted code to stdout then print out
     # a unified diff between the formatted and unformatted code.
-    # If flags like --verbose are passed to binary then the diffs this produces
-    # won't be particularly helpful.
+    # If flags like --verbose are passed to the binary then the diffs this
+    # produces won't be particularly helpful.
     formatted_code = io.StringIO(stdout).readlines()
     if len(formatted_code):
       with open(filename) as f:
