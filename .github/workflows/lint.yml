@@ -53,7 +53,7 @@ jobs:
         run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Running yapf
         run: |
-          python3 -m pip install yapf
+          python3 -m pip install --user yapf
           MODULE_PATH=$(python3 -m pip show yapf | grep Location: | sed -e 's|Location: ||')
           export PATH="${PATH}:${MODULE_PATH}"
           printf "If the lint below fails it can be fixed by running\n"
