@@ -51,7 +51,7 @@ def check_and_get_output_lines(command: Sequence[str],
 
   process.check_returncode()
 
-  return [line.strip(os.linesep) for line in process.stdout]
+  return process.stdout.split(os.linesep)
 
 
 def get_test_targets(test_suite_path: str):
