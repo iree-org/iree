@@ -35,6 +35,7 @@ external_cc_library(
   SRCS
     "lib/Dialect/mhlo/IR/chlo_ops.cc"
     "lib/Dialect/mhlo/IR/hlo_ops.cc"
+    "lib/Dialect/mhlo/IR/hlo_ops_base_structs.cc"
     "lib/Dialect/mhlo/IR/infer_fusibility_op_interface.cc"
     "lib/Dialect/mhlo/IR/lhlo_ops.cc"
     "lib/Dialect/mhlo/transforms/chlo_legalize_to_hlo.cc"
@@ -54,6 +55,7 @@ external_cc_library(
   HDRS
     "include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
     "include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+    "include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base_structs.h"
     "include/mlir-hlo/Dialect/mhlo/IR/infer_fusibility_op_interface.h"
     "include/mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
     "include/mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
@@ -87,6 +89,7 @@ external_cc_library(
     tensorflow_mlir_hlo_chlo_ops_gen
     tensorflow_mlir_hlo_chlo_legalize_to_hlo_inc_gen
     tensorflow_mlir_hlo_hlo_ops_base_gen
+    tensorflow_mlir_hlo_hlo_ops_base_structs_gen
     tensorflow_mlir_hlo_hlo_ops_gen
     tensorflow_mlir_hlo_hlo_ops_pattern_gen
     tensorflow_mlir_hlo_infer_fusibility_op_interface_gen
@@ -145,6 +148,22 @@ external_tablegen_library(
   OUTS
     -gen-op-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base.h.inc
     -gen-op-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base.cc.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_hlo_hlo_ops_base_structs_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_HLO_SRC_ROOT}
+  SRCS
+    "include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base.td"
+  OUTS
+    -gen-struct-attr-decls include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base_structs.h.inc
+    -gen-struct-attr-defs include/mlir-hlo/Dialect/mhlo/IR/hlo_ops_base_structs.cc.inc
 )
 
 external_tablegen_library(

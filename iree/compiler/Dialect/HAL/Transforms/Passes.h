@@ -106,7 +106,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createPublicABIGenerationPass();
 // Combines constant variables into one or more hal.constant_pools based on
 // usage semantics.
 std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass(
-    TargetOptions executableOptions);
+    TargetOptions targetOptions);
 
 // Packs all constant data in a hal.constant_pool into their storage formats
 // and maps them with hal.constant_pool.span.
