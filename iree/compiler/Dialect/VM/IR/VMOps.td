@@ -382,6 +382,8 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
 class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      // HACK: works around the lack of symbol side effects in C++.
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     ])> {
   let arguments = (ins
     VM_GlobalRefAttr:$global

@@ -429,6 +429,35 @@ static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
   return success();
 }
 
+template <typename T>
+static void addMemoryEffectsForGlobal(
+    Operation *op, StringRef global,
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // HACK: works around the lack of symbol side effects in mlir by only saying
+  // we have a side-effect if the variable we are loading is mutable.
+  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, global);
+  assert(symbolOp);
+  auto globalOp = dyn_cast<T>(symbolOp);
+  if (globalOp.is_mutable()) {
+    effects.emplace_back(MemoryEffects::Read::get());
+  }
+}
+
+void GlobalLoadI32Op::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  addMemoryEffectsForGlobal<GlobalI32Op>(*this, global(), effects);
+}
+
+void GlobalLoadI64Op::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  addMemoryEffectsForGlobal<GlobalI64Op>(*this, global(), effects);
+}
+
+void GlobalLoadRefOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  addMemoryEffectsForGlobal<GlobalRefOp>(*this, global(), effects);
+}
+
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
