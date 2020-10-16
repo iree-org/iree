@@ -45,13 +45,13 @@ def check_and_get_output_lines(command: Sequence[str],
                            universal_newlines=True)
 
   if log_stderr:
-    for line in process.stderr.split(os.linesep):
+    for line in process.stderr.splitlines():
       if not any(re.match(pattern, line) for pattern in stderr_filters):
         print(line)
 
   process.check_returncode()
 
-  return process.stdout.split(os.linesep)
+  return process.stdout.splitlines()
 
 
 def get_test_targets(test_suite_path: str):
