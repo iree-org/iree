@@ -54,6 +54,8 @@ jobs:
       - name: Running yapf
         run: |
           python3 -m pip install yapf
+          MODULE_PATH=$(python3 -m pip show yapf | grep Location: | sed -e 's|Location: ||')
+          export PATH="${PATH}:${MODULE_PATH}"
           printf "If the lint below fails it can be fixed by running\n"
           printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/yapf_diff/yapf_diff.py --verbose -i\n\n"
           git diff -U0 "${BASE_REF?}" | python3 third_party/yapf_diff/yapf_diff.py --verbose -i
