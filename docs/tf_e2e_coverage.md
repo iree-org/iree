@@ -58,7 +58,7 @@ target | tensorflow | tflite | vmla | llvm-ir | vulkan-spirv
 
 target | tensorflow | tflite | vmla | llvm-ir | vulkan-spirv
 :-: | :-: | :-: | :-: | :-: | :-:
-[mobile_bert_squad_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span> | <span class="failure-table-element">✗</span>
+[mobile_bert_squad_test](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py) | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> | <span class="failure-table-element">✗</span>
 
 ## End to end tests written using tf.keras
 
