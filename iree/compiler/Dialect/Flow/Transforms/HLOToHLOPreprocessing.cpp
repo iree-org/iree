@@ -38,6 +38,11 @@ static llvm::cl::opt<bool> extractPadFromConv(
     llvm::cl::desc("Extract padding attributes from conv op"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> orderConvFeatures(
+    "iree-flow-order-conv-features",
+    llvm::cl::desc("Guarantees input/output features ordered for conv kernel"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> conv1x1toDot(
     "iree-flow-1x1-conv-to-dot",
     llvm::cl::desc("Rewrites mhlo.conv with 1x1 filter into mhlo.dot"),
@@ -149,6 +154,63 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
         op.feature_group_countAttr(), op.batch_group_countAttr(),
         op.precision_configAttr());
     rewriter.replaceOp(op, newOp.getResult());
+    return success();
+  }
+};
+
+struct OrderConvFeatureDimensions : public OpRewritePattern<mhlo::ConvOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mhlo::ConvOp op,
+                                PatternRewriter &rewriter) const override {
+    auto dimensionNumbers = op.dimension_numbers();
+    auto inputFeatureDimension =
+        dimensionNumbers.kernel_input_feature_dimension().getInt();
+    auto outputFeatureDimension =
+        dimensionNumbers.kernel_output_feature_dimension().getInt();
+
+    // Input feature dimension is first.
+    if (inputFeatureDimension <= outputFeatureDimension) {
+      return failure();
+    }
+
+    auto rhs = op.rhs();
+    auto rhsType = rhs.getType().cast<ShapedType>();
+    if (!rhsType.hasRank()) return failure();
+
+    // Convert the permutation for the transpose.
+    llvm::SmallVector<int64_t, 4> permutation;
+    permutation.resize(rhsType.getRank());
+    std::iota(permutation.begin(), permutation.end(), 0);
+    permutation[inputFeatureDimension] = outputFeatureDimension;
+    permutation[outputFeatureDimension] = inputFeatureDimension;
+
+    llvm::SmallVector<int64_t, 4> new_shape(rhsType.getShape().begin(),
+                                            rhsType.getShape().end());
+    std::swap(new_shape[inputFeatureDimension],
+              new_shape[outputFeatureDimension]);
+
+    auto newInputTy =
+        RankedTensorType::get(new_shape, rhsType.getElementType());
+    auto transposeRhs = rewriter.create<mhlo::TransposeOp>(
+        op.getLoc(), newInputTy, rhs, rewriter.getI64TensorAttr(permutation));
+
+    auto newDimensionNumbers = mhlo::ConvDimensionNumbers::get(
+        dimensionNumbers.input_batch_dimension(),
+        dimensionNumbers.input_feature_dimension(),
+        dimensionNumbers.input_spatial_dimensions(),
+        dimensionNumbers.kernel_output_feature_dimension(),
+        dimensionNumbers.kernel_input_feature_dimension(),
+        dimensionNumbers.kernel_spatial_dimensions(),
+        dimensionNumbers.output_batch_dimension(),
+        dimensionNumbers.output_feature_dimension(),
+        dimensionNumbers.output_spatial_dimensions(), op.getContext());
+
+    SmallVector<Value, 2> operands = {op.lhs(), transposeRhs};
+    mhlo::ConvOp newConv = rewriter.create<mhlo::ConvOp>(
+        op.getLoc(), op.getType(), operands, op.getAttrs());
+    newConv.dimension_numbersAttr(newDimensionNumbers);
+
+    rewriter.replaceOp(op, {newConv.getResult()});
     return success();
   }
 };
@@ -718,6 +780,9 @@ struct HLOToHLOPreprocessing
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::XorOp>>(context);
     if (extractPadFromConv) {
       patterns.insert<ExtractConvOpPaddingAttributes>(context);
+    }
+    if (orderConvFeatures) {
+      patterns.insert<OrderConvFeatureDimensions>(context);
     }
     if (conv1x1toDot) {
       patterns.insert<Lower1x1ConvolutionToDotOp>(context);
