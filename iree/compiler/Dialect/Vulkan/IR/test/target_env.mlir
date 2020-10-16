@@ -22,6 +22,34 @@
 // -----
 
 "vk_configure_op"() {
+  //      CHECK: #vk.target_env
+  // CHECK-SAME:   VK_NV_cooperative_matrix
+  // CHECK-SAME:   cooperativeMatrixPropertiesNV =
+  // CHECK-SAME:     aType = i8, bType = i8, cType = i32, kSize = 32 : i32,
+  // CHECK-SAME:       mSize = 8 : i32, nSize = 8 : i32, resultType = i32,
+  // CHECK-SAME:       scope = 3 : i32
+  // CHECK-SAME:     aType = f16, bType = f16, cType = f16, kSize = 16 : i32,
+  // CHECK-SAME:       mSize = 8 : i32, nSize = 8 : i32, resultType = f16,
+  // CHECK-SAME:       scope = 3 : i32
+  target_env =
+    #vk.target_env<v1.2, r(133),
+      [VK_KHR_storage_buffer_storage_class, VK_NV_cooperative_matrix],
+      NVIDIA:DiscreteGPU,
+      {maxComputeSharedMemorySize = 49152: i32,
+       maxComputeWorkGroupInvocations = 1024: i32,
+       maxComputeWorkGroupSize = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
+       subgroupFeatures = 63: i32, subgroupSize = 32: i32,
+       cooperativeMatrixPropertiesNV = [
+         {mSize = 8: i32, nSize = 8: i32, kSize = 32: i32, aType = i8,
+          bType = i8, cType = i32, resultType = i32, scope = 3: i32},
+         {mSize = 8: i32, nSize = 8: i32, kSize = 16: i32, aType = f16,
+          bType = f16, cType = f16, resultType = f16, scope = 3: i32}]
+      }>
+} : () -> ()
+
+// -----
+
+"vk_configure_op"() {
   // CHECK:      Qualcomm:IntegratedGPU:100925441
   // CHECK-SAME: shaderFloat64
   // CHECK-SAME: shaderInt16

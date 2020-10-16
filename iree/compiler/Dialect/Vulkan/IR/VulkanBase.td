@@ -98,12 +98,13 @@ def VK_KHR_shader_float16_int8 : StrEnumAttrCase<"VK_KHR_shader_float16_int8">;
 def VK_KHR_spirv_1_4 : StrEnumAttrCase<"VK_KHR_spirv_1_4">;
 def VK_KHR_storage_buffer_storage_class : StrEnumAttrCase<"VK_KHR_storage_buffer_storage_class">;
 def VK_KHR_variable_pointers: StrEnumAttrCase<"VK_KHR_variable_pointers">;
+def VK_NV_Cooperative_matrix : StrEnumAttrCase<"VK_NV_cooperative_matrix">;
 
 def VK_ExtensionAttr :
     VK_StrEnumAttr<"Extension", "supported Vulkan extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
       VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
-      VK_KHR_variable_pointers
+      VK_KHR_variable_pointers, VK_NV_Cooperative_matrix
     ]>;
 
 //===----------------------------------------------------------------------===//
@@ -124,6 +125,17 @@ def VK_SubgroupFeatureAttr : VK_BitEnumAttr<
   "SubgroupFeature", "supported Vulkan subgroup feature", [
     VK_SF_Basic, VK_SF_Vote, VK_SF_Arithmetic, VK_SF_Ballot, VK_SF_Shuffle,
     VK_SF_ShuffleRelative, VK_SF_Clustered, VK_SF_Quad, VK_SF_PartitionedNV
+  ]>;
+
+def VK_SNV_Device      : I32EnumAttrCase<"Device", 1>;
+def VK_SNV_Workgroup   : I32EnumAttrCase<"Workgroup", 2>;
+def VK_SNV_Subgroup    : I32EnumAttrCase<"Subgroup", 3>;
+def VK_SNV_QueueFamily : I32EnumAttrCase<"QueueFamily", 5>;
+
+def VK_ScopeNV_Attr :
+  VK_I32EnumAttr<"ScopeNV", "valid VkScopeNV", [
+    VK_SNV_Device, VK_SNV_Workgroup, VK_SNV_Subgroup,
+    VK_SNV_QueueFamily
   ]>;
 
 #endif  // IREE_DIALECT_VULKAN_BASE
