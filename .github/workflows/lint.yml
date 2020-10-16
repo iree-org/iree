@@ -41,6 +41,29 @@ jobs:
           # use this.
           warnings: "-native-cc"
 
+  yapf:
+    runs-on: ubuntu-18.04
+    env:
+      BASE_REF: ${{ github.base_ref }}
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Setting up python
+        uses: actions/setup-python@v2
+        # We have to explicitly fetch the base branch as well
+      - name: Fetching Base Branch
+        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
+      - name: Install yapf
+        run: python3 -m pip install yapf
+      - name: Run format_diff.py with yapf
+        run: |
+          git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
+          git diff --exit-code
+      - name: Instructions for fixing these linting errors
+        run: |
+          printf "If the lint above failed it can be fixed by running\n"
+          printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
+
   clang-format:
     runs-on: ubuntu-18.04
     env:

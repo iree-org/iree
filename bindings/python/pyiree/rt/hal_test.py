@@ -26,20 +26,18 @@ class HalTest(absltest.TestCase):
     logging.info("HOST_VISIBLE: %s", int(rt.MemoryType.HOST_VISIBLE))
 
   def testAllocateHeap(self):
-    b = rt.HalBuffer.allocate_heap(
-        memory_type=int(rt.MemoryType.HOST_LOCAL),
-        usage=int(rt.BufferUsage.ALL),
-        allocation_size=4096)
+    b = rt.HalBuffer.allocate_heap(memory_type=int(rt.MemoryType.HOST_LOCAL),
+                                   usage=int(rt.BufferUsage.ALL),
+                                   allocation_size=4096)
     self.assertIsNot(b, None)
     b.fill_zero(0, 4096)
     shape = rt.Shape([1, 1024])
     unused_bv = b.create_view(shape, 4)
 
   def testStrideCalculation(self):
-    b = rt.HalBuffer.allocate_heap(
-        memory_type=int(rt.MemoryType.HOST_LOCAL),
-        usage=int(rt.BufferUsage.ALL),
-        allocation_size=4096)
+    b = rt.HalBuffer.allocate_heap(memory_type=int(rt.MemoryType.HOST_LOCAL),
+                                   usage=int(rt.BufferUsage.ALL),
+                                   allocation_size=4096)
     self.assertIsNot(b, None)
     b.fill_zero(0, 4096)
     shape = rt.Shape([16, 1, 8, 4, 2])

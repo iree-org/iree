@@ -31,9 +31,8 @@ flags.DEFINE_string('model', 'ResNet50', 'model name')
 flags.DEFINE_string(
     'url', '', 'url with model weights '
     'for example https://storage.googleapis.com/iree_models/')
-flags.DEFINE_bool(
-    'use_external_weights', False,
-    'Whether or not to load external weights from the web')
+flags.DEFINE_bool('use_external_weights', False,
+                  'Whether or not to load external weights from the web')
 flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
 flags.DEFINE_bool(

@@ -46,14 +46,12 @@ class T0001_FlatArgsResultsNoBoundGlobals(tf.Module):
     return a * b
 
 
-tf_test_driver.add_test(
-    test_name="T0001_FlatArgsResultsNoBoundGlobals",
-    tf_module_builder=T0001_FlatArgsResultsNoBoundGlobals,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0001_FlatArgsResultsNoBoundGlobals",
+                        tf_module_builder=T0001_FlatArgsResultsNoBoundGlobals,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 # T0002: Tests that bound global vars import properly.
-
 
 # CHECK-LABEL: RUN_TEST: T0002a_SimpleVarRead
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
@@ -155,38 +153,32 @@ class T0002f_Error_UnsupportedResourceOp(tf.Module):
     self.v.assign_add(tf.constant([0., 1.]))
 
 
-tf_test_driver.add_test(
-    test_name="T0002a_SimpleVarRead",
-    tf_module_builder=T0002a_SimpleVarRead,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
-tf_test_driver.add_test(
-    test_name="T0002b_SimpleVarWrite",
-    tf_module_builder=T0002b_SimpleVarWrite,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
-tf_test_driver.add_test(
-    test_name="T0002c_SimpleConst",
-    tf_module_builder=T0002c_SimpleConst,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
-tf_test_driver.add_test(
-    test_name="T0002d_VarCompatibleShapeChange",
-    tf_module_builder=T0002d_VarCompatibleShapeChange,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
-tf_test_driver.add_test(
-    test_name="T0002e_Error_VarMultipleExportedNames",
-    tf_module_builder=T0002e_Error_VarMultipleExportedNames,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True,
-    expect_pass_failure=True)
-tf_test_driver.add_test(
-    test_name="T0002f_Error_UnsupportedResourceOp",
-    tf_module_builder=T0002f_Error_UnsupportedResourceOp,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True,
-    expect_pass_failure=True)
+tf_test_driver.add_test(test_name="T0002a_SimpleVarRead",
+                        tf_module_builder=T0002a_SimpleVarRead,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
+tf_test_driver.add_test(test_name="T0002b_SimpleVarWrite",
+                        tf_module_builder=T0002b_SimpleVarWrite,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
+tf_test_driver.add_test(test_name="T0002c_SimpleConst",
+                        tf_module_builder=T0002c_SimpleConst,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
+tf_test_driver.add_test(test_name="T0002d_VarCompatibleShapeChange",
+                        tf_module_builder=T0002d_VarCompatibleShapeChange,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
+tf_test_driver.add_test(test_name="T0002e_Error_VarMultipleExportedNames",
+                        tf_module_builder=T0002e_Error_VarMultipleExportedNames,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True,
+                        expect_pass_failure=True)
+tf_test_driver.add_test(test_name="T0002f_Error_UnsupportedResourceOp",
+                        tf_module_builder=T0002f_Error_UnsupportedResourceOp,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True,
+                        expect_pass_failure=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -207,11 +199,10 @@ class T0003a_StructuredArgs(tf.Module):
     return d["x"] * d["y"]
 
 
-tf_test_driver.add_test(
-    test_name="T0003a_StructuredArgs",
-    tf_module_builder=T0003a_StructuredArgs,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0003a_StructuredArgs",
+                        tf_module_builder=T0003a_StructuredArgs,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -233,11 +224,10 @@ class T0003b_StructuredMultipleDictResult(tf.Module):
     return {"x": product, "x_squared": product * product}
 
 
-tf_test_driver.add_test(
-    test_name="T0003b_StructuredMultipleDictResult",
-    tf_module_builder=T0003b_StructuredMultipleDictResult,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0003b_StructuredMultipleDictResult",
+                        tf_module_builder=T0003b_StructuredMultipleDictResult,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -259,11 +249,10 @@ class T0003c_StructuredSingleDictResult(tf.Module):
     return {"x": product}
 
 
-tf_test_driver.add_test(
-    test_name="T0003c_StructuredSingleDictResult",
-    tf_module_builder=T0003c_StructuredSingleDictResult,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0003c_StructuredSingleDictResult",
+                        tf_module_builder=T0003c_StructuredSingleDictResult,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -285,11 +274,10 @@ class T0003d_StructuredSingleResult(tf.Module):
     return product
 
 
-tf_test_driver.add_test(
-    test_name="T0003d_StructuredSingleResult",
-    tf_module_builder=T0003d_StructuredSingleResult,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0003d_StructuredSingleResult",
+                        tf_module_builder=T0003d_StructuredSingleResult,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -311,11 +299,10 @@ class T0003e_StructuredSequenceResult(tf.Module):
     return product, a, b
 
 
-tf_test_driver.add_test(
-    test_name="T0003e_StructuredSequenceResult",
-    tf_module_builder=T0003e_StructuredSequenceResult,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0003e_StructuredSequenceResult",
+                        tf_module_builder=T0003e_StructuredSequenceResult,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -337,11 +324,10 @@ class T0003f_StructuredNestedResult(tf.Module):
     return product, {"a": a, "b": b}
 
 
-tf_test_driver.add_test(
-    test_name="T0003f_StructuredNestedResult",
-    tf_module_builder=T0003f_StructuredNestedResult,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True)
+tf_test_driver.add_test(test_name="T0003f_StructuredNestedResult",
+                        tf_module_builder=T0003f_StructuredNestedResult,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
@@ -364,12 +350,11 @@ class T0005_MultipleExportedFuncNames(tf.Module):
 T0005_MultipleExportedFuncNames.another_copy = (
     T0005_MultipleExportedFuncNames.simple_mul)
 
-tf_test_driver.add_test(
-    test_name="T0005_MultipleExportedFuncNames",
-    tf_module_builder=T0005_MultipleExportedFuncNames,
-    passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True,
-    expect_pass_failure=True)
+tf_test_driver.add_test(test_name="T0005_MultipleExportedFuncNames",
+                        tf_module_builder=T0005_MultipleExportedFuncNames,
+                        passes=SAVED_MODEL_IMPORT_PASSES,
+                        print_input_module=True,
+                        expect_pass_failure=True)
 
 if __name__ == "__main__":
   tf_test_driver.run_tests(__file__, with_filecheck=True)

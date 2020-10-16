@@ -98,8 +98,9 @@ class FunctionAbiTest(absltest.TestCase):
     input_ids = np.zeros((1, 384), dtype=np.int32)
     input_mask = np.zeros((1, 384), dtype=np.int32)
     segment_ids = np.zeros((1, 384), dtype=np.int32)
-    f_args = fabi.pack_inputs(
-        input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids)
+    f_args = fabi.pack_inputs(input_ids=input_ids,
+                              input_mask=input_mask,
+                              segment_ids=segment_ids)
     self.assertEqual(
         "<VmVariantList(3): [HalBufferView(1x384:0x1000020), HalBufferView(1x384:0x1000020), HalBufferView(1x384:0x1000020)]>",
         repr(f_args))

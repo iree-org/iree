@@ -61,20 +61,19 @@ COMMIT_OPTIONS = {
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
-  parser.add_argument(
-      "--tensorflow",
-      help="Path to the tensorflow sources "
-      "(default to third_party/tensorflow)",
-      default=None)
-  parser.add_argument(
-      "--llvm",
-      help="Path to the LLVM sources "
-      "(defaults to third_party/llvm-project)",
-      default=None)
+  parser.add_argument("--tensorflow",
+                      help="Path to the tensorflow sources "
+                      "(default to third_party/tensorflow)",
+                      default=None)
+  parser.add_argument("--llvm",
+                      help="Path to the LLVM sources "
+                      "(defaults to third_party/llvm-project)",
+                      default=None)
   parser.add_argument(
       "--tensorflow_commit",
       "--tf_commit",
-      help=f"Update TensorFlow to this commit, or a named option: {COMMIT_OPTIONS}",
+      help=
+      f"Update TensorFlow to this commit, or a named option: {COMMIT_OPTIONS}",
       default=LATEST_MATCHING_COMMIT)
   parser.add_argument(
       "--validate",
@@ -84,12 +83,11 @@ def parse_arguments():
       default=True,
   )
 
-  parser.add_argument(
-      "--update_build_files",
-      help="Updates the IREE LLVM build files from TensorFlow.",
-      type=utils.str2bool,
-      nargs="?",
-      default=True)
+  parser.add_argument("--update_build_files",
+                      help="Updates the IREE LLVM build files from TensorFlow.",
+                      type=utils.str2bool,
+                      nargs="?",
+                      default=True)
   args = parser.parse_args()
 
   # Default repo path.
@@ -124,8 +122,9 @@ def main(args):
   utils.execute(["git", "checkout", new_tf_commit], cwd=args.tensorflow)
   stage_path(args.repo, args.tensorflow)
 
-  validate_tf_commit(
-      current_llvm_commit, args.tensorflow, exit_on_failure=args.validate)
+  validate_tf_commit(current_llvm_commit,
+                     args.tensorflow,
+                     exit_on_failure=args.validate)
 
   if args.update_build_files:
     print("\n*** Updating BUILD.bazel files ***")

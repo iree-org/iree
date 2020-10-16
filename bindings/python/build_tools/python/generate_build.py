@@ -28,8 +28,8 @@ extra_srcs = []
 exec_prefix = sys.base_exec_prefix
 
 # Print some directives for the calling starlark program.
-print("# SYMLINK: {abs}\t{ws}".format(
-    abs=sysconfig.get_python_inc(), ws="include"))
+print("# SYMLINK: {abs}\t{ws}".format(abs=sysconfig.get_python_inc(),
+                                      ws="include"))
 
 # If running on Windows, find the import library, which is named
 # libs/pythonXY.lib (where (X, Y) == (major, minor)).
@@ -38,8 +38,8 @@ print("# SYMLINK: {abs}\t{ws}".format(
 # this is integral to linking on Windows and parsing the header
 # will require it, so it is included.
 if os.name == "nt":
-  implib_basename = "python{major}{minor}.lib".format(
-      major=sys.version_info[0], minor=sys.version_info[1])
+  implib_basename = "python{major}{minor}.lib".format(major=sys.version_info[0],
+                                                      minor=sys.version_info[1])
   implib_abs_path = os.path.join(exec_prefix, "libs", implib_basename)
   if not os.path.exists(implib_abs_path):
     raise RuntimeError("Could not find Windows python import library: %s" %

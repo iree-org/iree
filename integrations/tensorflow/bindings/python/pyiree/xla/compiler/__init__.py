@@ -74,8 +74,9 @@ def xla_load_module_proto(
   """
   if not compiler_context:
     compiler_context = Context()
-  input_module = binding.load_xla_module_proto(
-      compiler_context, xla_computation, exported_names=exported_names)
+  input_module = binding.load_xla_module_proto(compiler_context,
+                                               xla_computation,
+                                               exported_names=exported_names)
   if pass_pipeline:
     input_module.run_pass_pipeline(pass_pipeline)
   return input_module

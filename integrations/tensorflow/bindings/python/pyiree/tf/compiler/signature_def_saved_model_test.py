@@ -51,8 +51,8 @@ class RuntimeTest(tf.test.TestCase):
         builder = tf.compat.v1.saved_model.Builder(sm_dir)
         with tf.compat.v1.Session(graph=graph) as sess:
           sess.run(v.initializer)
-          builder.add_meta_graph_and_variables(
-              sess, ["bar"], {"baz": sig}, strip_default_attrs=True)
+          builder.add_meta_graph_and_variables(sess, ["bar"], {"baz": sig},
+                                               strip_default_attrs=True)
           builder.save()
 
       module = compiler.tf_signature_def_saved_model_to_compiler_module(
