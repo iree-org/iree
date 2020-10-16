@@ -21,7 +21,7 @@ import tensorflow.compat.v2 as tf
 class ResourcesOpsModule(tf.Module):
 
   def __init__(self):
-    super(ResourcesOpsModule, self).__init__()
+    super().__init__()
     self.counter = tf.Variable(0.0)
 
   @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
@@ -32,7 +32,7 @@ class ResourcesOpsModule(tf.Module):
 class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(ResourcesOpsTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(ResourcesOpsModule)
 
   def test_add_assign(self):

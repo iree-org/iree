@@ -31,7 +31,7 @@ INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 class LstmStaticModule(tf.Module):
 
   def __init__(self):
-    super(LstmStaticModule, self).__init__()
+    super().__init__()
     tf_utils.set_random_seed()
     inputs = tf.keras.layers.Input(batch_size=NUM_BATCH, shape=INPUT_SHAPE[1:])
     outputs = tf.keras.layers.LSTM(units=NUM_UNITS,
@@ -44,7 +44,7 @@ class LstmStaticModule(tf.Module):
 class LstmStaticTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(LstmStaticTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(LstmStaticModule,
                                                     exported_names=["predict"])
 

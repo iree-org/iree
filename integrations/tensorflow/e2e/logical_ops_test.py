@@ -50,7 +50,7 @@ class LogicalOpsModule(tf.Module):
 class LogicalOpsTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(LogicalOpsTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(LogicalOpsModule)
 
   # yapf: disable

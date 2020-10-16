@@ -34,7 +34,7 @@ class BroadcastingModule(tf.Module):
 class BroadcastingTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(BroadcastingTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(BroadcastingModule)
 
   def test_add_same_shape(self):

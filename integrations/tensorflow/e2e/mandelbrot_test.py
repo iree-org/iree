@@ -92,7 +92,7 @@ class MandelbrotModule(tf.Module):
 class MandelbrotTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(MandelbrotTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(MandelbrotModule)
 
   def test_mandelbrot(self):

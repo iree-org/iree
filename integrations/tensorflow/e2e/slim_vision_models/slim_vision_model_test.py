@@ -62,7 +62,7 @@ def get_input_shape():
 class SlimVisionModule(tf.Module):
 
   def __init__(self):
-    super(SlimVisionModule, self).__init__()
+    super().__init__()
     tf_utils.set_random_seed()
     model_path = posixpath.join(FLAGS.tf_hub_url, FLAGS.model, MODE)
     hub_layer = hub.KerasLayer(model_path)
@@ -76,7 +76,7 @@ class SlimVisionModule(tf.Module):
 class SlimVisionTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(SlimVisionTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(SlimVisionModule,
                                                     exported_names=['predict'])
 
