@@ -58,15 +58,11 @@ FLAGS = flags.FLAGS
 NUMPY_LINEWIDTH = 120
 
 
-def _get_from_environment_if_set(variable_name: str) -> Union[str, None]:
-  return os.environ[variable_name] if variable_name in os.environ else None
-
-
 def _setup_artifacts_dir(module_name: str) -> str:
   parent_dirs = [
       FLAGS.artifacts_dir,
-      _get_from_environment_if_set('TEST_UNDECLARED_OUTPUTS_DIR'),
-      _get_from_environment_if_set('TEST_TMPDIR'),
+      os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'),
+      os.environ.get('TEST_TMPDIR'),
       os.path.join(tempfile.gettempdir(), "iree", "modules"),
   ]
   # Use the most preferred path in parent_dirs that isn't None.
