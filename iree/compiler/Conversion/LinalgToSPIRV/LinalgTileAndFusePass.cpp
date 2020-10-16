@@ -145,14 +145,14 @@ struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
     // erased.
     FuncOp funcOp = op->getParentOfType<FuncOp>();
     SmallVector<Value, 4> tensorResults;
-    if (!funcOp ||
+    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
+    if (!funcOp || dependenceGraph.hasDependentOperations(linalgOp) ||
         failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
         !tensorResults.empty() ||
         failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
-             rewriter, cast<linalg::LinalgOp>(op), funcOp,
-             launchConfig.getTileSizes(op, 0))))) {
+             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
       return failure();
     }
     setMarker(op, getDeleteMarker());

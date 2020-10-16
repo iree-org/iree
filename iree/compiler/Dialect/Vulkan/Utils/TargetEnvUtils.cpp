@@ -75,6 +75,9 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
       case Extension::VK_KHR_variable_pointers:
         extensions.push_back(spirv::Extension::SPV_KHR_variable_pointers);
         break;
+      case Extension::VK_NV_cooperative_matrix:
+        extensions.push_back(spirv::Extension::SPV_NV_cooperative_matrix);
+        break;
     }
   }
 }
@@ -142,6 +145,11 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
   if (vkCapabilities.variablePointersStorageBuffer()) {
     capabilities.push_back(spirv::Capability::VariablePointersStorageBuffer);
   }
+  if (ArrayAttr attr = vkCapabilities.cooperativeMatrixPropertiesNV()) {
+    if (!attr.empty()) {
+      capabilities.push_back(spirv::Capability::CooperativeMatrixNV);
+    }
+  }
 }
 
 /// Gets the corresponding SPIR-V resource limits for the given Vulkan target
@@ -150,11 +158,26 @@ spirv::ResourceLimitsAttr convertResourceLimits(
     Vulkan::TargetEnvAttr vkTargetEnv) {
   MLIRContext *context = vkTargetEnv.getContext();
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
+  SmallVector<Attribute, 1> spvAttrs;
+  if (ArrayAttr attr = vkCapabilities.cooperativeMatrixPropertiesNV()) {
+    for (auto cooperativeMatrixPropertiesNV :
+         attr.getAsRange<Vulkan::CooperativeMatrixPropertiesNVAttr>()) {
+      spvAttrs.push_back(spirv::CooperativeMatrixPropertiesNVAttr::get(
+          cooperativeMatrixPropertiesNV.mSize(),
+          cooperativeMatrixPropertiesNV.nSize(),
+          cooperativeMatrixPropertiesNV.kSize(),
+          cooperativeMatrixPropertiesNV.aType(),
+          cooperativeMatrixPropertiesNV.bType(),
+          cooperativeMatrixPropertiesNV.cType(),
+          cooperativeMatrixPropertiesNV.resultType(),
+          cooperativeMatrixPropertiesNV.scope(), context));
+    }
+  }
   return spirv::ResourceLimitsAttr::get(
       vkCapabilities.maxComputeSharedMemorySize(),
       vkCapabilities.maxComputeWorkGroupInvocations(),
       vkCapabilities.maxComputeWorkGroupSize(), vkCapabilities.subgroupSize(),
-      nullptr, context);
+      ArrayAttr::get(spvAttrs, context), context);
 }
 }  // anonymous namespace
 
@@ -212,6 +235,33 @@ const char *getTargetEnvForTriple(llvm::StringRef triple) {
     }>)";
   }
 
+  if (triple == "turing-t4-unknown-linux") {
+    return R"(#vk.target_env<
+     v1.2, r(133), [VK_KHR_storage_buffer_storage_class,
+       VK_NV_cooperative_matrix], NVIDIA:DiscreteGPU, {
+       maxComputeSharedMemorySize = 49152: i32,
+       maxComputeWorkGroupInvocations = 1024: i32,
+       maxComputeWorkGroupSize = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
+       shaderFloat64, shaderInt16, shaderInt64,
+       subgroupFeatures = 63: i32, subgroupSize = 32: i32,
+       storageBuffer16BitAccess, storagePushConstant16,
+       uniformAndStorageBuffer16BitAccess,
+       storageBuffer8BitAccess, storagePushConstant8,
+       uniformAndStorageBuffer8BitAccess,
+       shaderFloat16, shaderInt8,
+       variablePointersStorageBuffer, variablePointers,
+       cooperativeMatrixPropertiesNV = [{
+         mSize = 8: i32, nSize = 8: i32, kSize = 32: i32, aType = i8,
+         bType = i8, cType = i32, resultType = i32, scope = 3: i32
+       }, {
+         mSize = 8: i32, nSize = 8: i32, kSize = 16: i32, aType = f16,
+         bType = f16, cType = f16, resultType = f16, scope = 3: i32
+       }, {
+         mSize = 8: i32, nSize = 8: i32, kSize = 16: i32, aType = f16,
+         bType = f16, cType = f32, resultType = f32, scope = 3: i32
+       }]
+    }>)";
+  }
   return nullptr;
 }
 

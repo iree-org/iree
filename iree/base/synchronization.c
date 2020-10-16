@@ -262,7 +262,7 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 #if defined(IREE_PLATFORM_APPLE)
 
 void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex) {
-  *out_mutex->value = OS_UNFAIR_LOCK_INIT;
+  out_mutex->value = OS_UNFAIR_LOCK_INIT;
 }
 
 void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
@@ -495,8 +495,8 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 void iree_notification_initialize(iree_notification_t* out_notification) {
   memset(out_notification, 0, sizeof(*out_notification));
 #if !defined(IREE_PLATFORM_HAS_FUTEX)
-  pthread_mutex_init(&out_notification->mutex);
-  pthread_cond_init(&out_notification->cond);
+  pthread_mutex_init(&out_notification->mutex, NULL);
+  pthread_cond_init(&out_notification->cond, NULL);
 #endif  // IREE_PLATFORM_HAS_FUTEX
 }
 
@@ -554,7 +554,7 @@ void iree_notification_commit_wait(iree_notification_t* notification,
                         wait_token, IREE_INFINITE_TIMEOUT_MS));
 #else
     pthread_mutex_lock(&notification->mutex);
-    pthread_mutex_wait(&notification->cond, &notification->mutex);
+    pthread_cond_wait(&notification->cond, &notification->mutex);
     pthread_mutex_unlock(&notification->mutex);
 #endif  // IREE_PLATFORM_HAS_FUTEX
   }

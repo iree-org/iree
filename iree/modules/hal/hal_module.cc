@@ -410,11 +410,12 @@ class HALModuleState final {
     for (auto& view : buffer_views) {
       std::string result_str(4096, '\0');
       iree_status_t status;
+      auto max_element_count = std::numeric_limits<iree_host_size_t>::max();
       do {
         iree_host_size_t actual_length = 0;
-        status = iree_hal_buffer_view_format(
-            view.get(), /*max_element_count=*/1024, result_str.size() + 1,
-            &result_str[0], &actual_length);
+        status = iree_hal_buffer_view_format(view.get(), max_element_count,
+                                             result_str.size() + 1,
+                                             &result_str[0], &actual_length);
         result_str.resize(actual_length);
       } while (iree_status_is_out_of_range(status));
       IREE_RETURN_IF_ERROR(status);

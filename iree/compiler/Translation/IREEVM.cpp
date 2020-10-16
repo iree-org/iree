@@ -48,7 +48,7 @@ LogicalResult convertToHALModule(ModuleOp moduleOp,
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
-           << "failed to run flow transformation pass pipeline";
+           << "failed to run HAL transformation pass pipeline";
   }
   return success();
 }

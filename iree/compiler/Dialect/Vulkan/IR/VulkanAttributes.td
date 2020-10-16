@@ -17,6 +17,26 @@
 
 include "iree/compiler/Dialect/Vulkan/IR/VulkanBase.td"
 
+// Attribute that can be used to specify the configuration of the
+// cooperative matrix multiply instructions supported by the target
+// device. This corresponds to `VkCooperativeMatrixPropertiesNV` structure:
+// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
+def VK_CooperativeMatrixPropertiesNVAttr :
+  StructAttr<"CooperativeMatrixPropertiesNVAttr", VK_Dialect, [
+    StructFieldAttr<"mSize", I32Attr>,
+    StructFieldAttr<"nSize", I32Attr>,
+    StructFieldAttr<"kSize", I32Attr>,
+    StructFieldAttr<"aType", TypeAttr>,
+    StructFieldAttr<"bType", TypeAttr>,
+    StructFieldAttr<"cType", TypeAttr>,
+    StructFieldAttr<"resultType", TypeAttr>,
+    StructFieldAttr<"scope", VK_ScopeNV_Attr>
+]>;
+
+def VK_CooperativeMatrixPropertiesNVArrayAttr :
+  TypedArrayAttrBase<VK_CooperativeMatrixPropertiesNVAttr,
+                     "CooperativeMatrixPropertiesNV array attribute">;
+
 // TODO(antiagainst): consider auto-generating this file (or part of it) from
 // vk.xml:
 // https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/master/xml/vk.xml
@@ -85,7 +105,14 @@ def VK_CapabilitiesAttr : StructAttr<"CapabilitiesAttr", VK_Dialect, [
   // structure:
   // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceVariablePointersFeatures.html
   StructFieldAttr<"variablePointersStorageBuffer", UnitAttr>,
-  StructFieldAttr<"variablePointers", UnitAttr>
+  StructFieldAttr<"variablePointers", UnitAttr>,
+
+  // VkCooperativeMatrixPropertiesNV features.
+  // This corresponds to `VkCoooperativeMatrixPropertiesNV` structure:
+  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
+  StructFieldAttr<
+      "cooperativeMatrixPropertiesNV",
+      DefaultValuedAttr<VK_CooperativeMatrixPropertiesNVArrayAttr, "{}">>
 ]>;
 
 #endif  // IREE_DIALECT_VULKAN_VULKANATTRIBUTES
