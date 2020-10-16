@@ -347,7 +347,6 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true
 ```
 
 ```shell
@@ -357,7 +356,6 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy_gemv \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true
 ```
 
 ```shell
@@ -367,7 +365,6 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true
 ```
 
 ```shell
@@ -377,7 +374,6 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true \
   --use_gpu=true
 ```
 
@@ -395,3 +391,30 @@ benchmark, as the `graph_path` file assumes that the graph has not moved. The
 name of the `.tflite` graph that you need to benchmark _may_ be different from
 the name of the trace that you want to benchmark, but you can use `cat` on
 the `graph_path` file to verify the correct `.tflite` filename if you're unsure.
+
+### Profile
+
+There are 2 profilers built into TFLite's `benchmark_model` program. Both of them impact latencies, so they should only be used to get a breakdown of the relative time spent in each operator type, they should not be enabled for the purpose of measuring a latency.
+
+The first is `enable_op_profiling`. It's based on timestamps before and after each op. It's a runtime commandline flag taken by `benchmark_model`. Example:
+
+```
+adb shell taskset f0 /data/local/tmp/benchmark_model \
+  --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
+  --warmup_runs=1 \
+  --num_threads=1 \
+  --num_runs=10 \
+  --enable_op_profiling=true
+```
+
+The second is `ruy_profiler`. Despite its name, it's available regardless of whether `ruy` is used for the matrix multiplications. It's a sampling profiler, which allows it to provide some more detailed informations, particularly on matrix multiplications. It's a build-time switch:
+
+```
+blaze build \
+  --define=ruy_profiler=true \
+  -c opt \
+  --config=android_arm64 \
+  //tensorflow/lite/tools/benchmark:benchmark_model
+```
+
+The binary thus built can be run like above, no commandline flag needed.
