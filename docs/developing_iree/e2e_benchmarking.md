@@ -178,11 +178,13 @@ weights. For example:
 # Enter the TensorFlow Bazel workspace.
 cd third_party/tensorflow/
 
-# Build the benchmark_model binary without RUY...
+# Build the benchmark_model binary.
 bazel build --copt=-mavx2 -c opt \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
-# ...or build the benchmark_model binary with RUY. This will overwrite the
+# By default, TFLite/x86 uses various matrix multiplication libraries.
+# It is possible to force it to only use Ruy for all matrix multiplications.
+# That is the default on ARM but not on x86. This will overwrite the
 # previous binary unless you move it.
 bazel build --copt=-mavx2 -c opt \
   --define=tflite_with_ruy=true \
@@ -277,6 +279,9 @@ in the following ways:
 
 ```shell
 # Build the benchmark_model binary without any add-ons.
+# Note that unlike TFLite/x86, TFLite/ARM uses Ruy by default for all
+# matrix multiplications (No need to pass tflite_with_ruy), except for some
+# matrix*vector products. Below we show how to force using ruy also for that.
 bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
@@ -289,20 +294,21 @@ adb shell chmod +x /data/local/tmp/benchmark_model
 ```
 
 ```shell
-# Build the benchmark_model binary with ruy.
+# Build the benchmark_model binary using ruy even for matrix*vector
+# products. This is only worth trying in models that are heavy on matrix*vector
+# shapes, typically LSTMs and other RNNs.
 bazel build --copt=-mavx2 -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
-  --define=tflite_with_ruy=true \
   --copt=-DTFLITE_WITH_RUY_GEMV \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
 # Rename the binary for comparison with the standard benchmark_model.
 mv bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
-  bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy
-adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy \
+  bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv
+adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv \
   /data/local/tmp/
-adb shell chmod +x /data/local/tmp/benchmark_model_plus_ruy
+adb shell chmod +x /data/local/tmp/benchmark_model_plus_ruy_gemv
 ```
 
 ```shell
@@ -343,8 +349,8 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
 ```
 
 ```shell
-# Benchmark with TFLite + RUY.
-adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy \
+# Benchmark with TFLite + RUY GEMV
+adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy_gemv \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
