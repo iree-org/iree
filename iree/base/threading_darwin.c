@@ -14,6 +14,7 @@
 
 #include "iree/base/atomics.h"
 #include "iree/base/threading.h"
+#include "iree/base/threading_impl.h"
 #include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_APPLE)
@@ -103,7 +104,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
 
   // Ensure we start with the right QoS class.
   qos_class_t qos_class =
-      iree_thread_qos_class_for_priority_class(priority_class);
+      iree_thread_qos_class_for_priority_class(params.priority_class);
   pthread_attr_set_qos_class_np(&thread_attr, qos_class, 0);
 
   // Always create the thread suspended.
