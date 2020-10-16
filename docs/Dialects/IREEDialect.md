@@ -14,7 +14,7 @@ A dialect used for types common across IREE subdialects.
 1. TOC
 {:toc}
 
-## Type definition
+## Type constraint definition
 
 ### ptr
 Pointer to a typed value.
@@ -26,6 +26,33 @@ A constant buffer of mapped host memory.
 A buffer of read-write host memory.
 
 ## Operation definition
+
+### `iree.byte_buffer.constant` (::mlir::iree_compiler::IREE::ByteBufferConstantOp)
+
+constant host-side byte buffer
+
+
+Syntax:
+
+```
+operation ::= `iree.byte_buffer.constant` attr-dict `:` type($result) `=` $value
+```
+
+Defines a compile-time byte buffer based on the given attribute value.
+The attribute will be serialized into the canonical IREE format for the
+chosen host target.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | byte_buffer
 
 ### `iree.do_not_optimize` (::mlir::iree_compiler::IREE::DoNotOptimizeOp)
 

@@ -94,6 +94,21 @@ the above; it lives in upstream MLIR repo and is documented
 [`SPIRVAttribues.h`][mlir-spirv-attr] and
 [`TargetAndABI.td`][mlir-spirv-target-td].
 
+[PR #3469][pr-3469], along with patch [D89364][d89364], shows an example of the
+changes needed to add support for the
+[VK_NV_cooperative_matrix][vk-coop-mat-ext] extension for Vulkan/SPIR-V. The
+overall steps are as follows:
+1. Add the enum corresponding to the extension to `VK_ExtensionAttr` in
+   [VulkanBase.td][iree-vulkan-base-td].
+1. Add necessary capability bits to [`VK_CapabilitiesAttr`][iree-vulkan-cap-td].
+1. Add a corresponding attribute to the `SPV_ResourceLimitsAttr` in
+   [TargetAndABI.td][mlir-spirv-target-td]. (Note: The corresponding SPIR-V
+   extension is likely already defined in
+   [`SPV_ExtensionAttr`][mlir-spirv-extensions-attr])
+1. Convert the capability bits specified in the attribute added to
+   `VK_CapabilitiesAttr` to the attribute added to `SPV_ResourceLimitsAttr`.
+
+[d89364]: https://reviews.llvm.org/D89364
 [iree-hal]: https://github.com/google/iree/tree/main/iree/hal
 [iree-hal-c-api]: https://github.com/google/iree/blob/main/iree/hal/api.h
 [iree-hal-dialect]: https://google.github.io/iree/Dialects/HALDialect
@@ -104,7 +119,10 @@ the above; it lives in upstream MLIR repo and is documented
 [iree-vulkan-target-triple]: https://github.com/google/iree/blob/main/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.cpp
 [iree-vulkan-target-conv]: https://github.com/google/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h#L29-L42
 [iree-spirv-target-attach]: https://github.com/google/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L228-L240
+[mlir-spirv-extensions-attr]: https://github.com/llvm/llvm-project/blob/076305568cd6c7c02ceb9cfc35e1543153406d19/mlir/include/mlir/Dialect/SPIRV/SPIRVBase.td#L314
 [mlir-spirv-target]: https://mlir.llvm.org/docs/Dialects/SPIR-V/#target-environment
 [mlir-spirv-attr]: https://github.com/llvm/llvm-project/blob/076305568cd6c7c02ceb9cfc35e1543153406d19/mlir/include/mlir/Dialect/SPIRV/SPIRVAttributes.h
 [mlir-spirv-target-td]: https://github.com/llvm/llvm-project/blob/076305568cd6c7c02ceb9cfc35e1543153406d19/mlir/include/mlir/Dialect/SPIRV/TargetAndABI.td
+[pr-3469]: https://github.com/google/iree/pull/3469
+[vk-coop-mat-ext]: khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_NV_cooperative_matrix.html
 [vulkaninfo]: https://vulkan.lunarg.com/doc/view/latest/linux/vulkaninfo.html

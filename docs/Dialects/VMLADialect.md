@@ -20,7 +20,7 @@ See `vmla.imports.mlir` for the full list of exported functions.
 1. TOC
 {:toc}
 
-## Type definition
+## Type constraint definition
 
 ### buffer
 A lightweight unshaped byte buffer.
@@ -750,6 +750,38 @@ operation ::= `vmla.exp` $src`,` `out` $dst attr-dict `:` $element_type
 | :-----: | ----------- |
 `src` | buffer
 `dst` | buffer
+
+### `vmla.fft` (::mlir::iree_compiler::IREE::VMLA::FftOp)
+
+
+
+
+Syntax:
+
+```
+operation ::= `vmla.fft` $real_in`(`$real_in_shape `:` type($real_in_shape)`)` `,`
+              $imag_in`(`$imag_in_shape `:` type($imag_in_shape)`)` `,`
+              `out` $real_out `,` $imag_out attr-dict `:` $real_element_type `,` $imag_element_type
+```
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`real_element_type` | ::mlir::TypeAttr | any type attribute
+`imag_element_type` | ::mlir::TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`real_in` | buffer
+`real_in_shape` | Ranked shape type
+`imag_in` | buffer
+`imag_in_shape` | Ranked shape type
+`real_out` | buffer
+`imag_out` | buffer
 
 ### `vmla.fft.pseudo` (::mlir::iree_compiler::IREE::VMLA::FftPseudoOp)
 

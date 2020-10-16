@@ -20,7 +20,7 @@ a straightforward implementation of those semantics.
 1. TOC
 {:toc}
 
-## Type definition
+## Type constraint definition
 
 ### tensorlist.list
 IREE VM type representing a TensorList.

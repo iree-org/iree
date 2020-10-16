@@ -18,7 +18,7 @@ TODO(suderman): Add a reference to the intermediate string dialect.
 1. TOC
 {:toc}
 
-## Type definition
+## Type constraint definition
 
 ### string
 A string type containing a standard ASCII string.

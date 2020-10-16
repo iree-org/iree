@@ -29,7 +29,7 @@ input.
 1. TOC
 {:toc}
 
-## Type definition
+## Type constraint definition
 
 ### allocator
 Allocates buffers for a particular device memory space.
@@ -296,6 +296,45 @@ This returns the same value as `hal.buffer_view.byte_length`.
 | Result | Description |
 | :----: | ----------- |
 `result` | index
+
+### `hal.allocator.map` (::mlir::iree_compiler::IREE::HAL::AllocatorMapOp)
+
+allocator-supported host buffer wrapping operation
+
+
+Syntax:
+
+```
+operation ::= `hal.allocator.map` $allocator `,` $memory_types `,` $buffer_usage `,`
+              $source `[` $offset `,` $length `]` attr-dict-with-keyword
+              `:` type($source) `->` type($result)
+```
+
+Wraps a !hal.buffer around host read-only memory backed by the given byte
+buffer. The returned buffer may be host-only and not directly usable on
+devices.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`memory_types` | ::mlir::IntegerAttr | valid MemoryType
+`buffer_usage` | ::mlir::IntegerAttr | valid BufferUsage
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`allocator` | allocator
+`source` | byte_buffer
+`offset` | index
+`length` | index
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | buffer
 
 ### `hal.buffer.allocator` (::mlir::iree_compiler::IREE::HAL::BufferAllocatorOp)
 
@@ -1249,6 +1288,209 @@ hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindin
 `binding_offsets` | index
 `binding_lengths` | index
 
+### `hal.constant_pool_end` (::mlir::iree_compiler::IREE::HAL::ConstantPoolEndOp)
+
+terminator pseudo-op for the constant pool op
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_pool_end` attr-dict-with-keyword
+```
+
+
+### `hal.constant_pool.load` (::mlir::iree_compiler::IREE::HAL::ConstantPoolLoadOp)
+
+constant pool tensor load pseudo-op
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_pool.load` $constant attr-dict `:` type($result)
+```
+
+Used during conversion to provide a placeholder for a globally cached and
+possibly lazy-initialized compile-time constants. Will be replaced with a
+direct variable access during transformation.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`constant` | ::mlir::SymbolRefAttr | symbol reference attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ranked tensor of any type values
+
+### `hal.constant_pool` (::mlir::iree_compiler::IREE::HAL::ConstantPoolOp)
+
+pool of constants with similar lifetimes
+
+A pool of constants that share a similiar lifetime and that should be stored
+together both in the source files and at runtime. By logically grouping
+constants by their frequency and locality of access we can reduce the number
+of bindings required on hal.interface by sourcing constants from the same
+buffer. We can also optimize module loading by mapping or DMA transferring
+constant data (based on device).
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
+`buffer_constraints` | BufferConstraintsAttr | structured attribute of BufferConstraintsAttr
+
+### `hal.constant_pool.span` (::mlir::iree_compiler::IREE::HAL::ConstantPoolSpanOp)
+
+constant span within a parent storage block
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_pool.span` $sym_name `:` $tensor_type attr-dict
+              `=` $storage_buffer `[` $storage_range `]`
+              (`->` $runtime_buffer^ `[` $runtime_range `]`)?
+```
+
+Represents a constant stored within a hal.constant_pool. Provides a
+symbol that can be used to reference the constant data as a stored range
+within the module file.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
+`tensor_type` | ::mlir::TypeAttr | any type attribute
+`storage_buffer` | ::mlir::SymbolRefAttr | symbol reference attribute
+`storage_range` | ByteRangeAttr | structured attribute of ByteRangeAttr
+`runtime_buffer` | ::mlir::SymbolRefAttr | symbol reference attribute
+`runtime_range` | ByteRangeAttr | structured attribute of ByteRangeAttr
+
+### `hal.constant_pool.splat` (::mlir::iree_compiler::IREE::HAL::ConstantPoolSplatOp)
+
+constant splat within a parent storage block
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_pool.splat` $sym_name attr-dict `=` $value
+              (`->` $runtime_buffer^ `[` $runtime_range `]`)?
+```
+
+Represents a splatted constant that has no representation in the storage
+but must be represented at runtime as splatted 4-byte value.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+`runtime_buffer` | ::mlir::SymbolRefAttr | symbol reference attribute
+`runtime_range` | ByteRangeAttr | structured attribute of ByteRangeAttr
+
+### `hal.constant_pool.value` (::mlir::iree_compiler::IREE::HAL::ConstantPoolValueOp)
+
+constant value within a parent constant pool
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_pool.value` $sym_name attr-dict `=` $value
+```
+
+Represents a constant value as part of a constant pool containing constants
+with a similar lifetime.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+
+### `hal.constant_storage.lookup` (::mlir::iree_compiler::IREE::HAL::ConstantStorageLookupOp)
+
+constant storage byte buffer accessor
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_storage.lookup` $constant `:` type($result) attr-dict
+```
+
+Returns the read-only host byte buffer storing the constant data.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`constant` | ::mlir::SymbolRefAttr | symbol reference attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | byte_buffer
+
+### `hal.constant_storage` (::mlir::iree_compiler::IREE::HAL::ConstantStorageOp)
+
+constant data storage block
+
+
+Syntax:
+
+```
+operation ::= `hal.constant_storage` $sym_name attr-dict-with-keyword `=` $value
+```
+
+Represents a packed constant storage buffer meeting the buffer constraints
+placed on the parent pool. Referenced by other constant pool ops.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`sym_name` | ::mlir::StringAttr | string attribute
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+
+### `hal.constant.subspan` (::mlir::iree_compiler::IREE::HAL::ConstantSubspanOp)
+
+runtime constant buffer lookup pseudo-op
+
+
+Syntax:
+
+```
+operation ::= `hal.constant.subspan` $runtime_buffer `[` $runtime_range `]` `:` type($result) attr-dict
+```
+
+Used during conversion to resolve a runtime representation of a constant as
+a tensor backed by a buffer range.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`runtime_buffer` | ::mlir::SymbolRefAttr | symbol reference attribute
+`runtime_range` | ByteRangeAttr | structured attribute of ByteRangeAttr
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ranked tensor of any type values
+
 ### `hal.descriptor_set.create` (::mlir::iree_compiler::IREE::HAL::DescriptorSetCreateOp)
 
 allocates a descriptor set from the device pool
@@ -1410,6 +1652,44 @@ device is not known at compile-time.
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
 `pattern` | ::mlir::StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`device` | device
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 1-bit signless integer
+
+### `hal.device.match.memory_model` (::mlir::iree_compiler::IREE::HAL::DeviceMatchMemoryModelOp)
+
+returns true if the device memory model matches the value
+
+
+Syntax:
+
+```
+operation ::= `hal.device.match.memory_model` $device `,` `model` `=` `[` $model `]` attr-dict
+              `:` `(` type($device) `)` `->` type($result)
+```
+
+Compares the device's memory model against the specified model.
+This can be used to conditionally evaluate device-specific code when the
+device is not known at compile-time.
+
+```mlir
+%is_match = hal.device.match.memory_model %device, memory_model = "Unified" : (!hal.device) -> i1
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`model` | ::mlir::IntegerAttr | IREE HAL MemoryModel
 
 #### Operands:
 

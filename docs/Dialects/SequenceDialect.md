@@ -19,7 +19,7 @@ This dialect is currently under construction. Don't use it just yet.
 1. TOC
 {:toc}
 
-## Type definition
+## Type constraint definition
 
 ### of
 Any type of sequence.

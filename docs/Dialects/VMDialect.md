@@ -2589,6 +2589,31 @@ vm.func @foo(%0, %1) : (i32, f8) {
 | :-----: | ----------- |
 `operands` | 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref
 
+### `vm.rodata.inline` (::mlir::iree_compiler::IREE::VM::RodataInlineOp)
+
+inlined constant rodata
+
+
+Syntax:
+
+```
+operation ::= `vm.rodata.inline` attr-dict `:` type($result) `=` $value
+```
+
+vm.rodata that can be embedded inline in functions.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`value` | ::mlir::ElementsAttr | constant vector/tensor attribute
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | ref<byte_buffer>
+
 ### `vm.rodata` (::mlir::iree_compiler::IREE::VM::RodataOp)
 
 read-only data definition operation
