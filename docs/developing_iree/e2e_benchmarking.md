@@ -186,6 +186,11 @@ bazel build --copt=-mavx2 -c opt \
 # It is possible to force it to only use Ruy for all matrix multiplications.
 # That is the default on ARM but not on x86. This will overwrite the
 # previous binary unless you move it.
+#
+# Note that Ruy takes care of -mavx2 and other AVX extensions internally,
+# so this passing this flag here isn't going to make a difference to
+# matrix multiplications. However, the rest of TFLite's kernels outside
+# of ruy will still benefit from -mavx2.
 bazel build --copt=-mavx2 -c opt \
   --define=tflite_with_ruy=true \
   //tensorflow/lite/tools/benchmark:benchmark_model
@@ -297,7 +302,7 @@ adb shell chmod +x /data/local/tmp/benchmark_model
 # Build the benchmark_model binary using ruy even for matrix*vector
 # products. This is only worth trying in models that are heavy on matrix*vector
 # shapes, typically LSTMs and other RNNs.
-bazel build --copt=-mavx2 -c opt \
+bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
   --copt=-DTFLITE_WITH_RUY_GEMV \
