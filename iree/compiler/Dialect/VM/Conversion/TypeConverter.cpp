@@ -77,6 +77,12 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     return IntegerType::get(targetOptions_.indexBits, indexType.getContext());
   });
 
+  // Vectors are used for arbitrary byte storage.
+  addConversion([](VectorType vectorType) -> Optional<Type> {
+    return IREE::VM::RefType::get(
+        IREE::ByteBufferType::get(vectorType.getContext()));
+  });
+
   // Convert ranked shape types (expanding all dims).
   addConversion([this](Shape::RankedShapeType rankedShape,
                        SmallVectorImpl<Type> &results) {

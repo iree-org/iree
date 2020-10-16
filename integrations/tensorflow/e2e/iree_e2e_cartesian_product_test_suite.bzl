@@ -141,6 +141,12 @@ def iree_e2e_cartesian_product_test_suite(
         for failing_configuration in failing_configurations:
             failing_configuration = _normalize_dictionary(failing_configuration)
 
+            for key in failing_configuration:
+                if key not in flags_to_values:
+                    fail("Encountered unexpected key \"{}\" ".format(key) +
+                         "in a failing configuration. Expected one of " +
+                         "{}.".format(list(flags_to_values.keys())))
+
             # If a flag isn't specified in the failing configuration, assume it
             # is failing for all values of that flag.
             for key, values in flags_to_values.items():

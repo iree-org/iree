@@ -2,7 +2,7 @@
 
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
 
-// CHECK: hal.variable @v_initialized 4 : i32
+// CHECK: hal.variable @v_initialized = 4 : i32
 hal.variable @v_initialized init(@initializer) : i32
 func @initializer() -> i32 {
   %0 = constant 4 : i32

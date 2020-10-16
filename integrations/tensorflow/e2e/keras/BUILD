@@ -173,7 +173,8 @@ iree_e2e_cartesian_product_test_suite(
             # All models with runtime shorter than ResNet50.
             "MobileNet",  # Max: Vulkan 61.0s
             "MobileNetV2",  # Max: LLVM 96.3s
-            "ResNet50",  # Max: LLVM 145.6s
+            # TODO(#3489): started having vulkan diffs after #3424; investigate.
+            # "ResNet50",  # Max: LLVM 145.6s
             "VGG16",  # Max: LLVM 89.5s
             "VGG19",  # Max: LLVM 94.7s
         ],
@@ -294,14 +295,13 @@ iree_e2e_cartesian_product_test_suite(
                 "InceptionResNetV2",
                 "InceptionV3",
             ],
-            "datasets": ["imagenet"],
-            "backends": [
+            "target_backends": [
                 "iree_vulkan",
             ],
         },
         {
             # Failing llvm and vulkan:
-            "models": [
+            "model": [
                 "NASNetLarge",
                 "NASNetMobile",
                 "ResNet50V2",

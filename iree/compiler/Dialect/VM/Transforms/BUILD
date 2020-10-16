@@ -23,6 +23,7 @@ cc_library(
     srcs = [
         "Conversion.cpp",
         "GlobalInitialization.cpp",
+        "HoistInlinedRodata.cpp",
         "MarkPublicSymbolsExported.cpp",
         "OrdinalAllocation.cpp",
         "Passes.cpp",

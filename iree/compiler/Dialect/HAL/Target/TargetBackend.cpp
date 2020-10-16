@@ -71,6 +71,26 @@ bool TargetBackend::matchPattern(StringRef value, StringRef pattern) {
   return false;
 }
 
+// static
+BufferConstraintsAttr TargetBackend::makeDefaultBufferConstraints(
+    MLIRContext *context) {
+  // Picked to represent what we kind of want on CPU today.
+  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferOffsetAlignment = 16ull;
+  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferRangeAlignment = 16ull;
+  Builder b(context);
+  return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
+                                    b.getIndexAttr(minBufferOffsetAlignment),
+                                    b.getIndexAttr(maxBufferRange),
+                                    b.getIndexAttr(minBufferRangeAlignment));
+}
+
+BufferConstraintsAttr TargetBackend::queryBufferConstraints(
+    MLIRContext *context) {
+  return makeDefaultBufferConstraints(context);
+}
+
 void TargetBackend::declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                                      IREE::HAL::ExecutableOp executableOp) {
   OpBuilder targetBuilder(&executableOp.getBlock().back());

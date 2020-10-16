@@ -33,6 +33,9 @@ class HALDialect : public Dialect {
 
   Type parseType(DialectAsmParser &parser) const override;
   void printType(Type type, DialectAsmPrinter &p) const override;
+
+  Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
+                                 Location loc) override;
 };
 
 }  // namespace HAL

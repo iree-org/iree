@@ -62,3 +62,22 @@ func @allocator_allocate_const() -> !hal.buffer {
   // CHECK-NEXT: return %[[CB]]
   return %buffer : !hal.buffer
 }
+
+// -----
+
+// CHECK-LABEL: @allocator_map_byte_buffer
+func @allocator_map_byte_buffer() -> !hal.buffer {
+  // CHECK-DAG: [[SOURCE:%.+]] = "test_hal.immutable_data"
+  %source = "test_hal.immutable_data"() : () -> !iree.byte_buffer
+  // CHECK-DAG: [[OFFSET:%.+]] = "test_hal.offset"
+  %offset = "test_hal.offset"() : () -> index
+  // CHECK-DAG: [[LENGTH:%.+]] = "test_hal.length"
+  %length = "test_hal.length"() : () -> index
+  // CHECK-DAG: [[AL:%.+]] = "test_hal.allocator"
+  %allocator = "test_hal.allocator"() : () -> !hal.allocator
+  //      CHECK: = hal.allocator.map [[AL]], "HostVisible|HostCoherent", "Transfer", [[SOURCE]][
+  // CHECK-SAME:   [[OFFSET]], [[LENGTH]]
+  // CHECK-SAME: ] : !iree.byte_buffer -> !hal.buffer
+  %buffer = hal.allocator.map %allocator, "HostVisible|HostCoherent", "Transfer", %source[%offset, %length] : !iree.byte_buffer -> !hal.buffer
+  return %buffer : !hal.buffer
+}

@@ -819,6 +819,26 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
+
+def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
+    VM_PseudoOp,
+  ]> {
+  let summary = [{inlined constant rodata}];
+  let description = [{
+    vm.rodata that can be embedded inline in functions.
+  }];
+
+  let arguments = (ins
+    ElementsAttr:$value
+  );
+
+  let results = (outs
+    VM_RefOf<ByteBufferType>:$result
+  );
+
+  let assemblyFormat = "attr-dict `:` type($result) `=` $value";
+}
+
 //===----------------------------------------------------------------------===//
 // Lists
 //===----------------------------------------------------------------------===//

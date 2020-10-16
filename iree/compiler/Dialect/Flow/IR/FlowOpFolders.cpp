@@ -156,7 +156,10 @@ OpFoldResult VariableLoadOp::fold(ArrayRef<Attribute> operands) {
   auto variableOp = dyn_cast_or_null<VariableOp>(
       SymbolTable::lookupNearestSymbolFrom(*this, variable()));
   if (!variableOp) return {};
-  if (variableOp.is_mutable()) {
+  if (variableOp.getAttr("noinline")) {
+    // Inlining of the constant has been disabled.
+    return {};
+  } else if (variableOp.is_mutable()) {
     // We can't inline mutable variables as they may be changed at any time.
     // There may still be other folders/canonicalizers that can help (such as
     // store-forwarding).

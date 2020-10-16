@@ -144,6 +144,22 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // clang-format on
   }
 
+  BufferConstraintsAttr queryBufferConstraints(MLIRContext *context) override {
+    // Picked from here to start:
+    // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=minStorageBufferOffsetAlignment&platform=android
+    // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=maxStorageBufferRange&platform=android
+    // We should instead be querying the vulkan environment attributes.
+    uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
+    uint64_t minBufferOffsetAlignment = 256ull;
+    uint64_t maxBufferRange = 128 * 1024 * 1024ull;
+    uint64_t minBufferRangeAlignment = 16ull;
+    Builder b(context);
+    return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
+                                      b.getIndexAttr(minBufferOffsetAlignment),
+                                      b.getIndexAttr(maxBufferRange),
+                                      b.getIndexAttr(minBufferRangeAlignment));
+  }
+
   void declareTargetOps(IREE::Flow::ExecutableOp sourceOp,
                         IREE::HAL::ExecutableOp executableOp) override {
     spirv::TargetEnvAttr spvTargetEnv =

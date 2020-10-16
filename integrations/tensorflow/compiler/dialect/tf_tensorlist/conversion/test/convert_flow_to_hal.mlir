@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt <%s -iree-convert-flow-to-hal -split-input-file | IreeFileCheck %s
+// RUN: iree-tf-opt <%s -iree-convert-to-hal -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: func @Reserve(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !tensorlist.list {
 func @Reserve(%arg0: tensor<0xi32>, %arg1: tensor<i32>) -> !tf_tensorlist.list{
