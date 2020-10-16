@@ -78,7 +78,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 
   if (absl::GetFlag(FLAGS_vulkan_validation_layers)) {
     options.instance_extensibility.optional_layers.push_back(
-        "VK_LAYER_LUNARG_standard_validation");
+        "VK_LAYER_KHRONOS_validation");
   }
 
   if (absl::GetFlag(FLAGS_vulkan_debug_report)) {

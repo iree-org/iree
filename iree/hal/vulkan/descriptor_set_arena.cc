@@ -46,8 +46,7 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
     auto& buffer_info = buffer_infos[i];
     IREE_ASSIGN_OR_RETURN(auto buffer, CastBuffer(binding.buffer));
     buffer_info.buffer = buffer->handle();
-    // TODO(benvanik): properly subrange (add to BufferBinding).
-    buffer_info.offset = binding.buffer->byte_offset();
+    buffer_info.offset = binding.buffer->byte_offset() + binding.offset;
     // Round up to a multiple of 32-bit. 32-bit is the most native bitwidth on
     // GPUs; it has the best support compared to other bitwidths. We use VMA to
     // manage GPU memory for us and VMA should already handled proper alignment
@@ -65,7 +64,10 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
     // the shader is considered as out of bounds per the Vulkan spec.
     // See https://github.com/google/iree/issues/2022#issuecomment-640617234
     // for more details.
-    buffer_info.range = iree_align(binding.buffer->byte_length(), 4);
+    buffer_info.range =
+        iree_align(std::min(binding.length,
+                            binding.buffer->byte_length() - binding.offset),
+                   4);
 
     auto& write_info = write_infos[i];
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
