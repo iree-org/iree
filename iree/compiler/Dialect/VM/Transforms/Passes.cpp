@@ -35,6 +35,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());
   passManager.addPass(createSymbolDCEPass());
+  passManager.addPass(createSinkDefiningOpsPass());
 }
 
 void registerVMTransformPassPipeline() {
