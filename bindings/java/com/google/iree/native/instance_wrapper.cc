@@ -14,6 +14,8 @@
 
 #include "bindings/java/com/google/iree/native/instance_wrapper.h"
 
+#include <mutex>
+
 #include "iree/base/init.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/strings_module.h"
