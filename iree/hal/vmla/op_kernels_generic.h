@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <iterator>
 #include <numeric>
 
 #include "absl/container/flat_hash_set.h"
@@ -537,6 +538,18 @@ Status Sort::Execute(absl::Span<const T> src_buffer,
                      });
   }
 
+  return OkStatus();
+}
+
+template <typename T>
+Status Fft::Execute(absl::Span<const T> real_src_buffer,
+                    absl::Span<const T> imag_src_buffer,
+                    absl::Span<T> real_dst_buffer,
+                    absl::Span<T> imag_dst_buffer, ShapeSpan real_src_shape,
+                    ShapeSpan imag_src_shape) {
+  // TODO (natashaknk): implement
+  std::fill(real_dst_buffer.begin(), real_dst_buffer.end(), 1);
+  std::fill(imag_dst_buffer.begin(), imag_dst_buffer.end(), 2);
   return OkStatus();
 }
 
