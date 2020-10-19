@@ -595,6 +595,11 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_select_compiler_opts(IREE_LINKOPTS_TRACING
+  GCC_OR_CLANG
+    -ldl
+)
+
 if(${IREE_ENABLE_RUNTIME_TRACING})
   iree_cc_library(
     NAME
@@ -605,6 +610,8 @@ if(${IREE_ENABLE_RUNTIME_TRACING})
       "${IREE_ROOT_DIR}/third_party/tracy/TracyC.h"
     SRCS
       "tracing.cc"
+    LINKOPTS
+      ${IREE_LINKOPTS_TRACING}
     DEPS
       absl::core_headers
     DEFINES

@@ -38,10 +38,6 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_BINARY_DIR}
 )
 
-if(${IREE_ENABLE_RUNTIME_TRACING})
-  string (APPEND CMAKE_EXE_LINKER_FLAGS -ldl)
-endif()
-
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG
     # LINT.IfChange(clang_diagnostics)
