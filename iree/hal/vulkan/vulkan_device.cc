@@ -43,9 +43,6 @@
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
-ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
-          "Uses timeline semaphore emulation even if native support exists.");
-
 namespace iree {
 namespace hal {
 namespace vulkan {
@@ -227,6 +224,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     VkPhysicalDevice physical_device,
     const ExtensibilitySpec& extensibility_spec,
     const ref_ptr<DynamicSymbols>& syms,
+    bool force_timeline_semaphore_emulation,
     DebugCaptureManager* debug_capture_manager) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
 
@@ -325,7 +323,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   features2.pNext = &semaphore_features;
 
   if (!enabled_device_extensions.timeline_semaphore ||
-      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
+      force_timeline_semaphore_emulation) {
     device_create_info.pNext = nullptr;
   } else {
     device_create_info.pNext = &features2;
@@ -386,7 +384,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
   if (syms->vkGetSemaphoreCounterValue == nullptr ||
-      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
+      force_timeline_semaphore_emulation) {
     IREE_ASSIGN_OR_RETURN(semaphore_pool, TimePointSemaphorePool::Create(
                                               add_ref(logical_device)));
     IREE_ASSIGN_OR_RETURN(fence_pool,
@@ -411,7 +409,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const ExtensibilitySpec& extensibility_spec,
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
-    const ref_ptr<DynamicSymbols>& syms) {
+    const ref_ptr<DynamicSymbols>& syms,
+    bool force_timeline_semaphore_emulation) {
   IREE_TRACE_SCOPE0("VulkanDevice::Wrap");
 
   uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
@@ -468,7 +467,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
   if (syms->vkGetSemaphoreCounterValue == nullptr ||
-      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation)) {
+      force_timeline_semaphore_emulation) {
     IREE_ASSIGN_OR_RETURN(
         semaphore_pool, TimePointSemaphorePool::Create(add_ref(device_handle)));
     IREE_ASSIGN_OR_RETURN(fence_pool,

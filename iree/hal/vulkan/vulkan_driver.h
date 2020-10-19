@@ -42,6 +42,18 @@ class VulkanDriver final : public Driver {
     // Device descriptions will be used for all devices created by the driver.
     ExtensibilitySpec instance_extensibility;
     ExtensibilitySpec device_extensibility;
+
+    // Index of the default Vulkan device to use within the list of available
+    // devices. Devices are discovered via vkEnumeratePhysicalDevices then
+    // considered "available" if compatible with the driver options.
+    int default_device_index = 0;
+
+    // Enables RenderDoc integration, connecting via RenderDoc's API and
+    // recording Vulkan calls for offline inspection and debugging.
+    bool enable_renderdoc = false;
+
+    // Uses timeline semaphore emulation even if native support exists.
+    bool force_timeline_semaphore_emulation = false;
   };
 
   // Creates a VulkanDriver that manages its own VkInstance.
@@ -86,15 +98,18 @@ class VulkanDriver final : public Driver {
  private:
   VulkanDriver(
       ref_ptr<DynamicSymbols> syms, VkInstance instance, bool owns_instance,
-      std::unique_ptr<DebugReporter> debug_reporter,
+      int default_device_index, std::unique_ptr<DebugReporter> debug_reporter,
       ExtensibilitySpec device_extensibility_spec,
+      bool force_timeline_semaphore_emulation,
       std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager);
 
   ref_ptr<DynamicSymbols> syms_;
   VkInstance instance_;
   bool owns_instance_;
+  int default_device_index_;
   std::unique_ptr<DebugReporter> debug_reporter_;
   ExtensibilitySpec device_extensibility_spec_;
+  bool force_timeline_semaphore_emulation_;
   std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager_;
 };
 

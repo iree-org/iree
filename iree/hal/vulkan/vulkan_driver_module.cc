@@ -30,6 +30,10 @@ ABSL_FLAG(bool, vulkan_debug_report, false,
           "Enables VK_EXT_debug_report and logs errors.");
 ABSL_FLAG(bool, vulkan_push_descriptors, true,
           "Enables use of vkCmdPushDescriptorSetKHR, if available.");
+ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
+ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
+ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
+          "Uses timeline semaphore emulation even if native support exists.");
 
 namespace iree {
 namespace hal {
@@ -94,6 +98,11 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
     options.device_extensibility.optional_extensions.push_back(
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
   }
+
+  options.default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
+  options.enable_renderdoc = absl::GetFlag(FLAGS_vulkan_renderdoc);
+  options.force_timeline_semaphore_emulation =
+      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation);
 
   // Create the driver and VkInstance.
   IREE_ASSIGN_OR_RETURN(auto driver,
