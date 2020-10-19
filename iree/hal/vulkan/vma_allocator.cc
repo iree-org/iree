@@ -14,7 +14,6 @@
 
 #include "iree/hal/vulkan/vma_allocator.h"
 
-#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
@@ -23,6 +22,7 @@
 #include "iree/hal/vulkan/vma_buffer.h"
 
 #if VMA_RECORDING_ENABLED
+#include "absl/flags/flag.h"
 ABSL_FLAG(std::string, vma_recording_file, "",
           "File path to write a CSV containing the VMA recording.");
 ABSL_FLAG(bool, vma_recording_flush_after_call, false,
