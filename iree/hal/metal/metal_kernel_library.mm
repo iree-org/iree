@@ -30,32 +30,39 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
   if (!metal_executable_def.entry_points() || metal_executable_def.entry_points()->size() == 0) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "No entry points defined";
   }
+  if (!metal_executable_def.threadgroup_sizes() ||
+      metal_executable_def.threadgroup_sizes()->size() == 0) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No threadgroup sizes present";
+  }
   if (!metal_executable_def.shader_sources() ||
       metal_executable_def.shader_sources()->size() == 0) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "No MSL source string present";
   }
 
   const auto& entry_points = *metal_executable_def.entry_points();
+  const auto& threadgroup_sizes = *metal_executable_def.threadgroup_sizes();
   const auto& msl_sources = *metal_executable_def.shader_sources();
 
-  if (entry_points.size() != msl_sources.size()) {
+  if (entry_points.size() != threadgroup_sizes.size() ||
+      entry_points.size() != msl_sources.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Number of entry points and source strings mismatch";
+           << "Mismatch among the numbers of entry points, thread group sizes, and source strings";
   }
 
   // Compile each MSL source string into a MTLLibrary and get the MTLFunction for the entry point to
   // build the pipeline state object.
 
   absl::InlinedVector<id<MTLLibrary>, 1> libraries;
-  absl::InlinedVector<id<MTLFunction>, 1> functions;
-  absl::InlinedVector<id<MTLComputePipelineState>, 1> states;
+  absl::InlinedVector<KernelObjects, 1> kernel_objects;
 
   MTLCompileOptions* msl_compile_options = [MTLCompileOptions new];
   msl_compile_options.languageVersion = MTLLanguageVersion2_0;
 
   auto cleanup = MakeCleanup([&]() {
-    for (id<MTLComputePipelineState> state : states) [state release];
-    for (id<MTLFunction> function : functions) [function release];
+    for (const auto& kernel : kernel_objects) {
+      [kernel.pipeline_state release];
+      [kernel.function release];
+    }
     for (id<MTLLibrary> library : libraries) [library release];
     [msl_compile_options release];
   });
@@ -94,7 +101,6 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
                << "Cannot find entry point '" << entry_points[i] << "' in shader source index "
                << i;
       }
-      functions.push_back(function);
 
       id<MTLComputePipelineState> pso = [device newComputePipelineStateWithFunction:function
                                                                               error:&error];
@@ -105,46 +111,55 @@ StatusOr<ref_ptr<MetalKernelLibrary>> MetalKernelLibrary::Create(
 #endif
         return InvalidArgumentErrorBuilder(IREE_LOC) << "Invalid MSL source";
       }
-      states.push_back(pso);
+
+      kernel_objects.push_back(KernelObjects{function, *threadgroup_sizes[i], pso});
     }
   }
 
   std::string tag = metal_executable_def.tag() ? metal_executable_def.tag()->str() : "";
   return assign_ref(new MetalKernelLibrary([device retain], std::move(libraries),
-                                           std::move(functions), std::move(states),
-                                           std::move(tag)));
+                                           std::move(kernel_objects), std::move(tag)));
 }
 
-MetalKernelLibrary::MetalKernelLibrary(
-    id<MTLDevice> device, absl::InlinedVector<id<MTLLibrary>, 1> libraries,
-    absl::InlinedVector<id<MTLFunction>, 1> functions,
-    absl::InlinedVector<id<MTLComputePipelineState>, 1> pipelines, std::string tag)
+MetalKernelLibrary::MetalKernelLibrary(id<MTLDevice> device,
+                                       absl::InlinedVector<id<MTLLibrary>, 1> libraries,
+                                       absl::InlinedVector<KernelObjects, 1> kernel_objects,
+                                       std::string tag)
     : tag_(std::move(tag)),
       device_(device),
-      libraries_(libraries),
-      functions_(functions),
-      pipelines_(pipelines) {}
+      libraries_(std::move(libraries)),
+      kernel_objects_(std::move(kernel_objects)) {}
 
 MetalKernelLibrary::~MetalKernelLibrary() {
   IREE_TRACE_SCOPE0("MetalKernelLibrary::dtor");
-  for (id<MTLComputePipelineState> pso : pipelines_) [pso release];
-  for (id<MTLFunction> function : functions_) [function release];
+  for (const auto& kernel : kernel_objects_) {
+    [kernel.pipeline_state release];
+    [kernel.function release];
+  }
   for (id<MTLLibrary> library : libraries_) [library release];
+}
+
+StatusOr<id<MTLFunction>> MetalKernelLibrary::GetKernelForEntryPoint(int ordinal) const {
+  if (ordinal < 0 || ordinal >= kernel_objects_.size()) {
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal: " << ordinal;
+  }
+  return kernel_objects_[ordinal].function;
+}
+
+StatusOr<MetalThreadgroupSize> MetalKernelLibrary::GetThreadgroupSizeForEntryPoint(
+    int ordinal) const {
+  if (ordinal < 0 || ordinal >= kernel_objects_.size()) {
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal: " << ordinal;
+  }
+  return kernel_objects_[ordinal].threadgroup_size;
 }
 
 StatusOr<id<MTLComputePipelineState>> MetalKernelLibrary::GetPipelineStateForEntryPoint(
     int ordinal) const {
-  if (ordinal < 0 || ordinal >= pipelines_.size()) {
+  if (ordinal < 0 || ordinal >= kernel_objects_.size()) {
     return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal: " << ordinal;
   }
-  return pipelines_[ordinal];
-}
-
-StatusOr<id<MTLFunction>> MetalKernelLibrary::GetKernelForEntryPoint(int ordinal) const {
-  if (ordinal < 0 || ordinal >= pipelines_.size()) {
-    return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal: " << ordinal;
-  }
-  return functions_[ordinal];
+  return kernel_objects_[ordinal].pipeline_state;
 }
 
 }  // namespace metal

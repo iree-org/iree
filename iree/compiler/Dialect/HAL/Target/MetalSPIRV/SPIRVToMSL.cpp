@@ -23,10 +23,25 @@
 namespace mlir {
 namespace iree_compiler {
 
-using SPIRVToMSLCompiler = SPIRV_CROSS_NAMESPACE::CompilerMSL;
+namespace {
+class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
+ public:
+  using CompilerMSL::CompilerMSL;
 
-std::string crossCompileSPIRVToMSL(llvm::ArrayRef<uint32_t> spvBinary,
-                                   const std::string &entryPoint) {
+  MetalShader::ThreadGroupSize getWorkgroupSizeForEntryPoint(
+      const std::string& entryName) {
+    const auto& entryPoint = get_entry_point(
+        entryName, spv::ExecutionModel::ExecutionModelGLCompute);
+    const auto& workgroupSize = entryPoint.workgroup_size;
+    // TODO(antiagainst): support specialization constant.
+    if (workgroupSize.constant != 0) return {0, 0, 0};
+    return {workgroupSize.x, workgroupSize.y, workgroupSize.z};
+  }
+};
+}  // namespace
+
+llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
+    llvm::ArrayRef<uint32_t> spvBinary, const std::string& entryPoint) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 
   // All spirv-cross operations work on the current entry point. It should be
@@ -50,7 +65,12 @@ std::string crossCompileSPIRVToMSL(llvm::ArrayRef<uint32_t> spvBinary,
              << "Cross compiled Metal Shading Language source code:\n-----\n"
              << mslSource << "\n-----\n");
 
-  return mslSource;
+  auto workgroupSize =
+      spvCrossCompiler.getWorkgroupSizeForEntryPoint(entryPoint);
+  if (!workgroupSize.x || !workgroupSize.y || !workgroupSize.z) {
+    return llvm::None;
+  }
+  return MetalShader{std::move(mslSource), workgroupSize};
 }
 
 }  // namespace iree_compiler

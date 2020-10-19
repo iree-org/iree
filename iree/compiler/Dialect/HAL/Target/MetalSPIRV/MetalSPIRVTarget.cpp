@@ -115,12 +115,16 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     }
 
     // 2. Cross compile SPIR-V to MSL source code.
-    llvm::SmallVector<std::string, 2> mslSources;
+    llvm::SmallVector<MetalShader, 2> mslShaders;
     for (const std::string &entryPoint : entryPoints) {
-      std::string mslSource = crossCompileSPIRVToMSL(
+      llvm::Optional<MetalShader> mslShader = crossCompileSPIRVToMSL(
           // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
           llvm::makeArrayRef(spvBinary.data(), spvBinary.size()), entryPoint);
-      mslSources.emplace_back(std::move(mslSource));
+      if (!mslShader) {
+        return targetOp.emitError()
+               << "failed to cross compile SPIR-V to Metal shader";
+      }
+      mslShaders.push_back(std::move(*mslShader));
     }
 
     // 3. Compile MSL to MTLLibrary.
@@ -134,8 +138,11 @@ class MetalSPIRVTargetBackend : public SPIRVTargetBackend {
     // 4. Pack the MTLLibrary and metadata into a flatbuffer.
     iree::MetalExecutableDefT metalExecutableDef;
     metalExecutableDef.entry_points = entryPoints;
-    for (const auto &source : mslSources) {
-      metalExecutableDef.shader_sources.push_back(source);
+    for (auto &shader : mslShaders) {
+      metalExecutableDef.shader_sources.push_back(std::move(shader.source));
+      const auto &sizes = shader.threadgroupSize;
+      metalExecutableDef.threadgroup_sizes.push_back(
+          {sizes.x, sizes.y, sizes.z});
     }
 
     // Pack the executable definition and get the bytes with the proper header.
