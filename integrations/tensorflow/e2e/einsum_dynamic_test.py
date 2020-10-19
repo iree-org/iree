@@ -57,8 +57,8 @@ class EinsumDynamicModule(tf.Module):
     return tf.einsum('abij -> ab', x)
 
   @tf.function(input_signature=[
-    tf.TensorSpec([None, None], tf.float32),
-    tf.TensorSpec([None, None], tf.float32),
+      tf.TensorSpec([None, None], tf.float32),
+      tf.TensorSpec([None, None], tf.float32),
   ])
   def einsum_dynamic_dim_matmul(self, lhs, rhs):
     return tf.einsum('ij, jk -> ik', lhs, rhs)
