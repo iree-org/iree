@@ -98,12 +98,11 @@ def parse_arguments():
   current_year = datetime.date.today().year
   parser = argparse.ArgumentParser()
   input_group = parser.add_mutually_exclusive_group()
-  input_group.add_argument(
-      "infile",
-      nargs="?",
-      type=argparse.FileType("r", encoding="UTF-8"),
-      help="Input file to format. Default: stdin",
-      default=sys.stdin)
+  input_group.add_argument("infile",
+                           nargs="?",
+                           type=argparse.FileType("r", encoding="UTF-8"),
+                           help="Input file to format. Default: stdin",
+                           default=sys.stdin)
   parser.add_argument(
       "--filename",
       "--assume-filename",
@@ -118,10 +117,9 @@ def parse_arguments():
       help="Year to add copyright. Default: the current year ({})".format(
           current_year),
       default=current_year)
-  parser.add_argument(
-      "--holder",
-      help="Copyright holder. Default: Google LLC",
-      default="Google LLC")
+  parser.add_argument("--holder",
+                      help="Copyright holder. Default: Google LLC",
+                      default="Google LLC")
   parser.add_argument(
       "--quiet",
       help=("Don't raise a runtime error on encountering an unhandled filetype."
@@ -129,26 +127,23 @@ def parse_arguments():
       action="store_true",
       default=False)
   output_group = parser.add_mutually_exclusive_group()
-  output_group.add_argument(
-      "-o",
-      "--outfile",
-      "--output",
-      help="File to send output. Default: stdout",
-      type=argparse.FileType("w", encoding="UTF-8"),
-      default=sys.stdout)
-  output_group.add_argument(
-      "--in_place",
-      "-i",
-      action="store_true",
-      help="Run formatting in place. Default: False",
-      default=False)
+  output_group.add_argument("-o",
+                            "--outfile",
+                            "--output",
+                            help="File to send output. Default: stdout",
+                            type=argparse.FileType("w", encoding="UTF-8"),
+                            default=sys.stdout)
+  output_group.add_argument("--in_place",
+                            "-i",
+                            action="store_true",
+                            help="Run formatting in place. Default: False",
+                            default=False)
   comment_group = parser.add_mutually_exclusive_group()
-  comment_group.add_argument(
-      "--comment",
-      "-c",
-      type=comment_arg_parser,
-      help="Override comment syntax.",
-      default=None)
+  comment_group.add_argument("--comment",
+                             "-c",
+                             type=comment_arg_parser,
+                             help="Override comment syntax.",
+                             default=None)
   comment_group.add_argument(
       "--default_comment",
       type=comment_arg_parser,

@@ -225,9 +225,6 @@ ls build-android/iree/tools/
 
 # Copy the benchmarking binary to phone.
 adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
-
-# Allow executing benchmarking file as a program.
-adb shell chmod +x /data/local/tmp/iree-benchmark-module
 ```
 
 ### 4.2 Push the IREE's compilation / benchmarking artifacts to the device
@@ -241,7 +238,7 @@ example:
 
 ```shell
 # Make a directory for the module/backend pair we want to benchmark.
-mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
+adb shell mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
 
 # Transfer the files.
 adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
@@ -252,7 +249,7 @@ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
 
 ```shell
 adb shell /data/local/tmp/iree-benchmark-module \
-  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
+  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile" \
   --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
 ```
 

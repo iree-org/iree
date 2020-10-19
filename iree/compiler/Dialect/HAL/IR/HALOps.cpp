@@ -271,6 +271,18 @@ void VariableOp::build(OpBuilder &builder, OperationState &result,
 // hal.variable.load
 //===----------------------------------------------------------------------===//
 
+void VariableLoadOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // HACK: works around the lack of symbol side effects in mlir by only saying
+  // we have a side-effect if the variable we are loading is mutable.
+  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(*this, variable());
+  assert(symbolOp);
+  auto variableOp = dyn_cast<VariableOp>(symbolOp);
+  if (variableOp.is_mutable()) {
+    effects.emplace_back(MemoryEffects::Read::get());
+  }
+}
+
 static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
   auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
   if (!symbolOp) {

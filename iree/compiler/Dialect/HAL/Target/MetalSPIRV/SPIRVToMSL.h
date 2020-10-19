@@ -15,17 +15,29 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_SPIRVTOMSL_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_SPIRVTOMSL_H_
 
+#include <array>
 #include <string>
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Cross compiles SPIR-V into Meteal Shading Language source code.
-std::string crossCompileSPIRVToMSL(llvm::ArrayRef<uint32_t> spvBinary,
-                                   const std::string &entryPoint);
+struct MetalShader {
+  std::string source;
+  struct ThreadGroupSize {
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+  } threadgroupSize;
+};
+
+// Cross compiles SPIR-V into Metal Shading Language source code for the
+// compute shader with |entryPoint|. Returns llvm::None on failure.
+llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
+    llvm::ArrayRef<uint32_t> spvBinary, const std::string& entryPoint);
 
 }  // namespace iree_compiler
 }  // namespace mlir

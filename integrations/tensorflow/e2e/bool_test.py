@@ -41,7 +41,7 @@ class BooleanModule(tf.Module):
 class BooleanTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(BooleanTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(BooleanModule)
 
   def test_constant(self):
@@ -61,9 +61,8 @@ class BooleanTest(tf_test_utils.TracedModuleTestCase):
   def test_logical_and(self):
 
     def logical_and(module):
-      module.logical_and(
-          np.array([True, True, False, False], dtype=np.bool),
-          np.array([True, False, False, True], dtype=np.bool))
+      module.logical_and(np.array([True, True, False, False], dtype=np.bool),
+                         np.array([True, False, False, True], dtype=np.bool))
 
     self.compare_backends(logical_and, self._modules)
 

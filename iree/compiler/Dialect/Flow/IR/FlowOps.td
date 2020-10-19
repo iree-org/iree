@@ -84,7 +84,10 @@ def FLOW_VariableAddressOp : FLOW_PureOp<"variable.address"> {
   let assemblyFormat = "$variable attr-dict `:` type($result)";
 }
 
-def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [MemoryEffects<[MemRead]>]> {
+def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
+    // HACK: works around the lack of symbol side effects in C++.
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  ]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the variable value.
@@ -200,8 +203,8 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     /// the new DispatchRegionOp and anchor operation within the region.
     /// Returns llvm::None on failure.
     /// The insertion point of the OpBuilder will be modified.
-    static llvm::Optional<std::pair<DispatchRegionOp, Operation *>> 
-        formFromAnchorOp(Value workload, Operation *anchorOp, 
+    static llvm::Optional<std::pair<DispatchRegionOp, Operation *>>
+        formFromAnchorOp(Value workload, Operation *anchorOp,
                          OpBuilder &builder);
 
     /// Performs an in-place DCE optimization on unused operands and results.
@@ -227,7 +230,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     /// into an adjacent dispatch region.
     /// Note that the original op is cloned but not erased. It is up to the
     /// caller to cleanup the original op as needed.
-    Operation *inlineOp(Operation *origOp, OpBuilder &builder, 
+    Operation *inlineOp(Operation *origOp, OpBuilder &builder,
         bool positionAtEnd=false);
   }];
 
@@ -240,7 +243,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     }]>,
   ];
 
-  let hasCanonicalizer = 1;  
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {

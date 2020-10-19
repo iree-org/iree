@@ -38,9 +38,8 @@ def write_python_bin(bazelrc):
   # IREE extension compilation requires PYTHON_BIN
   print("build --action_env PYTHON_BIN=\"{}\"".format(python_bin), file=bazelrc)
   # TensorFlow defines this one. No idea why.
-  print(
-      "build --action_env PYTHON_BIN_PATH=\"{}\"".format(python_bin),
-      file=bazelrc)
+  print("build --action_env PYTHON_BIN_PATH=\"{}\"".format(python_bin),
+        file=bazelrc)
 
 
 def write_python_path(bazelrc):
@@ -53,9 +52,9 @@ def write_python_path(bazelrc):
   except OSError:
     print("Could not resolve user site directory")
     return
-  print(
-      "build --action_env PYTHONPATH=\"{}\"".format(normalize_path(user_site)),
-      file=bazelrc)
+  print("build --action_env PYTHONPATH=\"{}\"".format(
+      normalize_path(user_site)),
+        file=bazelrc)
 
 
 local_bazelrc = os.path.join(os.path.dirname(__file__), "configured.bazelrc")

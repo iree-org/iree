@@ -84,7 +84,7 @@ backend as a source of truth. For example:
 class SimpleArithmeticTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(SimpleArithmeticTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     # Compile a `tf.Module` named `SimpleArithmeticModule` into
     # `CompiledModule`s for each reference and target backend.
     self._modules = tf_test_utils.compile_tf_module(SimpleArithmeticModule)

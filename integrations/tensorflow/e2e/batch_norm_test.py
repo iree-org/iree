@@ -31,19 +31,18 @@ class BatchNormModule(tf.Module):
       tf.TensorSpec([16], tf.float32),
   ])
   def batch_norm_inference(self, x, mean, variance, offset, scale):
-    return tf.nn.batch_normalization(
-        x,
-        mean=mean,
-        variance=variance,
-        offset=offset,
-        scale=scale,
-        variance_epsilon=1e-4)
+    return tf.nn.batch_normalization(x,
+                                     mean=mean,
+                                     variance=variance,
+                                     offset=offset,
+                                     scale=scale,
+                                     variance_epsilon=1e-4)
 
 
 class BatchNormTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(BatchNormTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(BatchNormModule)
 
   def test_batch_norm_inference(self):

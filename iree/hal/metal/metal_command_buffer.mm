@@ -284,6 +284,8 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
   auto* kernel_library = static_cast<MetalKernelLibrary*>(executable);
   IREE_ASSIGN_OR_RETURN(auto metal_kernel, kernel_library->GetKernelForEntryPoint(entry_point));
   IREE_ASSIGN_OR_RETURN(auto metal_pso, kernel_library->GetPipelineStateForEntryPoint(entry_point));
+  IREE_ASSIGN_OR_RETURN(auto workgroup_size,
+                        kernel_library->GetThreadgroupSizeForEntryPoint(entry_point));
 
   id<MTLComputeCommandEncoder> compute_encoder = GetOrBeginComputeEncoder();
   [compute_encoder setComputePipelineState:metal_pso];
@@ -366,10 +368,11 @@ Status MetalCommandBuffer::Dispatch(Executable* executable, int32_t entry_point,
   }
 
   IREE_DVLOG(2) << "Dispatch workgroup count: (" << workgroups[0] << ", " << workgroups[1] << ", "
-                << workgroups[2] << "), workgroup size: (32, 1, 1)";
-  // TODO(antiagainst): fix workgroup size
+                << workgroups[2] << "), workgroup size: (" << workgroup_size.x() << ", "
+                << workgroup_size.y() << ", " << workgroup_size.z() << ")";
   [compute_encoder dispatchThreadgroups:MTLSizeMake(workgroups[0], workgroups[1], workgroups[2])
-                  threadsPerThreadgroup:MTLSizeMake(32, 1, 1)];
+                  threadsPerThreadgroup:MTLSizeMake(workgroup_size.x(), workgroup_size.y(),
+                                                    workgroup_size.z())];
 
   return OkStatus();
 }

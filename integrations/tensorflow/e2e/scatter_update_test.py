@@ -52,7 +52,7 @@ class ScatterUpdateModule(tf.Module):
 class ScatterUpdateTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(ScatterUpdateTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(ScatterUpdateModule)
 
   # yapf: disable

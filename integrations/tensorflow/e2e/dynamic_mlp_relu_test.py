@@ -68,7 +68,7 @@ class DynamicMlpReluModule(tf.Module):
 class DynamicMlpReluTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(DynamicMlpReluTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(DynamicMlpReluModule,
                                                     exported_names=["predict"])
 

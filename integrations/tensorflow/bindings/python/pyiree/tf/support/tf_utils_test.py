@@ -63,8 +63,7 @@ class UtilsTests(tf.test.TestCase, parameterized.TestCase):
       tf_module = ConstantModule()
       iree_compiled_module, compiled_path = (
           tf_utils._incrementally_compile_tf_module(
-              tf_module,
-              backend_info=backend_info,
+              tf_module, backend_info=backend_info,
               artifacts_dir=artifacts_dir))
 
       artifacts_to_check = [

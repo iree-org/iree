@@ -31,9 +31,8 @@ flags.DEFINE_string('model', 'ResNet50', 'model name')
 flags.DEFINE_string(
     'url', '', 'url with model weights '
     'for example https://storage.googleapis.com/iree_models/')
-flags.DEFINE_bool(
-    'use_external_weights', False,
-    'Whether or not to load external weights from the web')
+flags.DEFINE_bool('use_external_weights', False,
+                  'Whether or not to load external weights from the web')
 flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
                   'data sets on which model was trained: imagenet, cifar10')
 flags.DEFINE_bool(
@@ -133,7 +132,7 @@ def initialize_model():
 class VisionModule(tf.Module):
 
   def __init__(self):
-    super(VisionModule, self).__init__()
+    super().__init__()
     self.m = initialize_model()
     self.m.predict = lambda x: self.m.call(x, training=False)
     # Specify input shape with a static batch size.
@@ -146,7 +145,7 @@ class VisionModule(tf.Module):
 class AppTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(AppTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(VisionModule,
                                                     exported_names=['predict'])
 

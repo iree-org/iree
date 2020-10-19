@@ -200,7 +200,10 @@ def HAL_VariableAddressOp : HAL_PureOp<"variable.address"> {
   let assemblyFormat = "$variable attr-dict `:` type($result)";
 }
 
-def HAL_VariableLoadOp : HAL_Op<"variable.load", [MemoryEffects<[MemRead]>]> {
+def HAL_VariableLoadOp : HAL_Op<"variable.load", [
+    // HACK: works around the lack of symbol side effects in C++.
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  ]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the variable value.

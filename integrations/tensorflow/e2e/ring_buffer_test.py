@@ -146,7 +146,7 @@ class RingBuffer(tf.Module):
 class StatefulRingBuffer(tf.keras.layers.Layer):
 
   def __init__(self, state_shape=None, consume=False, **kwargs):
-    super(StatefulRingBuffer, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.state_shape = state_shape
     self.consume = consume
 
@@ -173,7 +173,7 @@ class StatefulRingBuffer(tf.keras.layers.Layer):
 class StatefulRingBufferModule(tf.Module):
 
   def __init__(self):
-    super(StatefulRingBufferModule, self).__init__()
+    super().__init__()
     state_shape = [BATCH_SIZE, TIME_SIZE, FEATURE_SIZE]
     self.rb = StatefulRingBuffer(state_shape=state_shape)
 
@@ -186,7 +186,7 @@ class StatefulRingBufferModule(tf.Module):
 class StatefulRingBufferTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(StatefulRingBufferTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(StatefulRingBufferModule,
                                                     exported_names=["predict"])
 

@@ -146,8 +146,8 @@ def check_submodule_versions(repo_dir):
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
-  parser.add_argument(
-      "command", help="Command to run (show|import|export|check|init)")
+  parser.add_argument("command",
+                      help="Command to run (show|import|export|check|init)")
   args = parser.parse_args()
 
   # Default repo path.

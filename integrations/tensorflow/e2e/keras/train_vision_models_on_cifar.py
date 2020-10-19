@@ -90,20 +90,19 @@ def main(_):
 
   # It is a toy model for debugging (not optimized for accuracy or speed).
 
-  model = APP_MODELS[FLAGS.model](
-      weights=None, include_top=FLAGS.include_top, input_shape=INPUT_SHAPE[1:])
+  model = APP_MODELS[FLAGS.model](weights=None,
+                                  include_top=FLAGS.include_top,
+                                  input_shape=INPUT_SHAPE[1:])
   model.summary()
-  model.compile(
-      optimizer='adam',
-      loss='sparse_categorical_crossentropy',
-      metrics=['accuracy'])
+  model.compile(optimizer='adam',
+                loss='sparse_categorical_crossentropy',
+                metrics=['accuracy'])
 
   # train model
-  model.fit(
-      train_images,
-      train_labels,
-      epochs=1,
-      validation_data=(test_images, test_labels))
+  model.fit(train_images,
+            train_labels,
+            epochs=1,
+            validation_data=(test_images, test_labels))
 
   file_name = os.path.join(
       FLAGS.model_path,

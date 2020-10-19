@@ -54,3 +54,38 @@ module {
 //  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]] :
 //  CHECK-SAME:     outs(%[[RET0]] :
 //       CHECK:   linalg.copy(%[[RET0]], %[[RET1]])
+
+// -----
+
+module {
+  func @issue_3188() {
+    %c0 = constant 0 : index
+    %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4x1x1x512xf32>
+    %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<512xf32>
+    %2 = "mhlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<3> : tensor<1xi64>} : (tensor<512xf32>) -> tensor<4x1x1x512xf32>
+    %3 = mhlo.add %0, %2 : tensor<4x1x1x512xf32>
+    %4 = "mhlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<3> : tensor<1xi64>} : (tensor<512xf32>) -> tensor<4x1x1x512xf32>
+    %5 = "mhlo.reshape"(%3) : (tensor<4x1x1x512xf32>) -> tensor<1x4x1x512xf32>
+    %6 = "mhlo.transpose"(%5) {permutation = dense<[1, 0, 2, 3]> : tensor<4xi64>} : (tensor<1x4x1x512xf32>) -> tensor<4x1x1x512xf32>
+    %7 = mhlo.subtract %6, %4 : tensor<4x1x1x512xf32>
+    %8 = "mhlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<3> : tensor<1xi64>} : (tensor<512xf32>) -> tensor<4x1x1x512xf32>
+    %9 = mhlo.multiply %7, %8 : tensor<4x1x1x512xf32>
+    hal.interface.store.tensor %9, @legacy_io::@ret0, offset = %c0 : tensor<4x1x1x512xf32>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+}
+
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-LABEL: func @issue_3188()
+//   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x512xf32>
+//   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<512xf32>
+//   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x512xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG1]], %[[ARG1]] :
+//  CHECK-SAME:     outs(%[[RET0]] :
