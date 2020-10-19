@@ -60,9 +60,9 @@ class VulkanDevice final : public Device {
 
   // Creates a device that wraps an externally managed VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Wrap(
-      ref_ptr<Driver> driver, const DeviceInfo& device_info,
-      VkPhysicalDevice physical_device, VkDevice logical_device,
-      const ExtensibilitySpec& extensibility_spec,
+      ref_ptr<Driver> driver, VkInstance instance,
+      const DeviceInfo& device_info, VkPhysicalDevice physical_device,
+      VkDevice logical_device, const ExtensibilitySpec& extensibility_spec,
       const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
       const ref_ptr<DynamicSymbols>& syms);
 

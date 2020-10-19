@@ -25,8 +25,8 @@
 #include "absl/synchronization/mutex.h"
 #include "iree/base/logging.h"
 
-// Use std::vector instead of the VMA version.
-#define VMA_USE_STL_VECTOR 1
+// Uncomment to try using std::vector instead of the VMA version.
+// #define VMA_USE_STL_VECTOR 1
 
 // TODO(benvanik): figure out why std::list cannot be used.
 // #define VMA_USE_STL_LIST 1
@@ -54,13 +54,21 @@ class AbslVmaRWMutex {
  public:
   void LockRead() ABSL_SHARED_LOCK_FUNCTION() { mutex_.ReaderLock(); }
   void UnlockRead() ABSL_UNLOCK_FUNCTION() { mutex_.ReaderUnlock(); }
+  bool TryLockRead() ABSL_SHARED_TRYLOCK_FUNCTION(true) {
+    return mutex_.ReaderTryLock();
+  }
   void LockWrite() ABSL_EXCLUSIVE_LOCK_FUNCTION() { mutex_.WriterLock(); }
   void UnlockWrite() ABSL_UNLOCK_FUNCTION() { mutex_.WriterUnlock(); }
+  bool TryLockWrite() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) {
+    return mutex_.WriterTryLock();
+  }
 
  private:
   absl::Mutex mutex_;
 };
 #define VMA_RW_MUTEX AbslVmaRWMutex
+
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"

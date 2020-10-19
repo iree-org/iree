@@ -311,10 +311,10 @@ StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
   // Attempt to create the device.
   // This may fail if the VkDevice does not support all necessary features.
   IREE_ASSIGN_OR_RETURN(
-      auto device,
-      VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
-                         logical_device, device_extensibility_spec_,
-                         compute_queue_set, transfer_queue_set, syms()));
+      auto device, VulkanDevice::Wrap(
+                       add_ref(this), instance(), device_info, physical_device,
+                       logical_device, device_extensibility_spec_,
+                       compute_queue_set, transfer_queue_set, syms()));
   return device;
 }
 
