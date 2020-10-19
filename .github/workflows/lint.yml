@@ -60,8 +60,9 @@ jobs:
           git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
           git diff --exit-code
       - name: Instructions for fixing these linting errors
+        if: ${{ failure() }}
         run: |
-          printf "If the lint above failed it can be fixed by running\n"
+          printf "You can fix the lint errors above by running\n"
           printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
 
   clang-format:
