@@ -127,7 +127,7 @@ class EinsumStaticModule(tf.Module):
 class EinsumStaticTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(EinsumStaticTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(EinsumStaticModule)
 
   # yapf: disable

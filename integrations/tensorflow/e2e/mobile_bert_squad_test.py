@@ -45,7 +45,7 @@ class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):
   """Tests of MobileBertSquad."""
 
   def __init__(self, *args, **kwargs):
-    super(MobileBertSquadTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     model_type = 'quant_saved_model' if FLAGS.use_quantized_weights else 'float'
 
     # Get_file will download the model weights from a publicly available folder,

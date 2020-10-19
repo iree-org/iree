@@ -27,7 +27,7 @@ class SlidingWindow(tf.keras.layers.Layer):
   # during call() it appends new update and remove the oldest one
 
   def __init__(self, state_shape=None, **kwargs):
-    super(SlidingWindow, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self.state_shape = state_shape
 
@@ -66,7 +66,7 @@ class SlidingWindow(tf.keras.layers.Layer):
 class SlidingWindowModule(tf.Module):
 
   def __init__(self):
-    super(SlidingWindowModule, self).__init__()
+    super().__init__()
     state_shape = [BATCH_SIZE, TIME_SIZE, FEATURE_SIZE]
     self.sw = SlidingWindow(state_shape=state_shape)
 
@@ -79,7 +79,7 @@ class SlidingWindowModule(tf.Module):
 class SlidingWindowTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(SlidingWindowTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(SlidingWindowModule,
                                                     exported_names=["predict"])
 
