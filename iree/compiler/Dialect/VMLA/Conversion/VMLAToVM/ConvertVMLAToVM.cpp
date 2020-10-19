@@ -267,6 +267,16 @@ class VMLAConvImportOpConversion
            getTypedTypeStr(op.dst_type());
   }
 };
+
+class VMLAFftImportOpConversion
+    : public VMLAImportOpConversion<IREE::VMLA::FftOp> {
+ public:
+  using VMLAImportOpConversion<IREE::VMLA::FftOp>::VMLAImportOpConversion;
+
+  std::string getImportSuffix(IREE::VMLA::FftOp op) const override {
+    return std::string(".") + getTypedTypeStr(op.real_element_type());
+  }
+};
 }  // namespace
 
 void populateVMLAToVMPatterns(MLIRContext *context,
@@ -343,6 +353,8 @@ void populateVMLAToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "vmla.batch.matmul");
   patterns.insert<VMLAConvImportOpConversion>(context, importSymbols,
                                               typeConverter, "vmla.conv");
+  patterns.insert<VMLAFftImportOpConversion>(context, importSymbols,
+                                             typeConverter, "vmla.fft");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceSumOp, "vmla.reduce.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");
