@@ -250,58 +250,73 @@ build:rs --project_id=iree-oss
 # Windows specific flags for building with VC.
 ###############################################################################
 
-build:windows --define=iree_is_msvc=true
-build:windows --copt=/wd4624 # destructor was implicitly defined as deleted
-build:windows --copt=/wd4244 # possible loss of data
-build:windows --copt=/wd4005 # macro redefinition
-build:windows --copt=/wd4267 # initializing: possible loss of data
-build:windows --copt=/wd4141 # inline used more than once
-build:windows --per_file_copt=mkl_dnn@/wd4551 # missing argument list
-build:windows --per_file_copt=mkl_dnn@/wd4068 # unknown pragma
-build:windows --per_file_copt=farmhash@/wd4319 # zero extending to T of greater size
+build:_msvc_base --define=iree_is_msvc=true
 
-build:windows --linkopt=/IGNORE:4217 # mismatch import/export declspec
+# Disable warnings for dependencies. We don't control these.
+# absl forces /W3 in their copts, so we exclude them to avoid D9025
+build:_msvc_base --per_file_copt=+external,-com_google_absl@/w
+# And some more explicit disables. For some reason `/w` doesn't work for these
+# although it does catch some other warnings...
+build:_msvc_base --per_file_copt=external@/wd4244 # possible loss of data
+build:_msvc_base --copt=/wd4624 # destructor was implicitly defined as deleted
+build:_msvc_base --copt=/wd4005 # macro redefinition
+build:_msvc_base --copt=/wd4267 # initializing: possible loss of data
+build:_msvc_base --copt=/wd4141 # inline used more than once
+build:_msvc_base --per_file_copt=mkl_dnn@/wd4551 # missing argument list
+build:_msvc_base --per_file_copt=mkl_dnn@/wd4068 # unknown pragma
+build:_msvc_base --per_file_copt=farmhash@/wd4319 # zero extending to T of greater size
+
+build:_msvc_base --linkopt=/IGNORE:4217 # mismatch import/export declspec
+build:_msvc_base --linkopt=/IGNORE:4001 # no object files
 
 # Enables unix-style runfiles link trees (requires symlink permission).
 # See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
 # Generally: Enable Developer Mode in the Developer Settings page of the
 # system settings.
-build:windows --experimental_enable_runfiles
+build:_msvc_base --experimental_enable_runfiles
 # Flags to make tensorflow build.
 # Some of these are also of general use and fine to enable globally for windows.
-build:windows --copt=/arch:AVX
+build:_msvc_base --copt=/arch:AVX
 # Host and target are the same in windows so don't waste time building both.
-build:windows --distinct_host_configuration=false
+build:_msvc_base --distinct_host_configuration=false
 # Avoids incompatible versions of winsock and other badness.
-build:windows --copt=/DWIN32_LEAN_AND_MEAN --host_copt=/DWIN32_LEAN_AND_MEAN
-# That is one way to have less warnings :(
-build:windows --per_file_copt=tensorflow@-w
-build:windows --per_file_copt=protobuf@-w
+build:_msvc_base --copt=/DWIN32_LEAN_AND_MEAN --host_copt=/DWIN32_LEAN_AND_MEAN
 # Why are min/max macros? No one knows.
-build:windows --copt=/DNOMINMAX --host_copt=/DNOMINMAX
+build:_msvc_base --copt=/DNOMINMAX --host_copt=/DNOMINMAX
 # Yay for security warnings. Boo for non-standard.
-build:windows --copt=/D_CRT_SECURE_NO_WARNINGS --host_copt=/D_CRT_SECURE_NO_WARNINGS
+build:_msvc_base --copt=/D_CRT_SECURE_NO_WARNINGS --host_copt=/D_CRT_SECURE_NO_WARNINGS
 # TensorFlow requires the "monolithic" build mode for now on Windows.
-build:windows --define framework_shared_object=false
+build:_msvc_base --define framework_shared_object=false
 # Necessary for M_* math constants.
-build:windows --copt=/D_USE_MATH_DEFINES --host_copt=/D_USE_MATH_DEFINES
+build:_msvc_base --copt=/D_USE_MATH_DEFINES --host_copt=/D_USE_MATH_DEFINES
 
 # Workaround WinGDI.h defining `ERROR`, which conflicts with logging macros.
 # Note that IREE and TensorFlow both `#undef ERROR` and define their own
 # separate logging constants with the same name, but IREE needs the Windows
 # "graphics device interface" (GDI) for certain GUI sample projects.
-build:windows --per_file_copt=tensorflow@-DNOGDI
+build:_msvc_base --per_file_copt=tensorflow@-DNOGDI
 
 # Disables TensorFlow eigen bloat and reduces compile times.
-build:windows --define=override_eigen_strong_inline=true
+build:_msvc_base --define=override_eigen_strong_inline=true
 
 # Another TensorFlow flag from their config script.
-build:windows --define with_default_optimizations=true
+build:_msvc_base --define with_default_optimizations=true
+
+# Separate configs for different MSVC versions as we might want slightly different options.
+build:msvc2017 --config=_msvc_base
+build:msvc2019 --config=_msvc_base
 
 # TensorFlow builds depend on this flag, but it doesn't appear to work with
 # gmock in some of our unit tests, so only enable it for TensorFlow files.
 # MSVC (Windows): Standards-conformant preprocessor mode
 # See https://docs.microsoft.com/en-us/cpp/preprocessor/preprocessor-experimental-overview
-build:windows --per_file_copt=tensorflow@/experimental:preprocessor
+build:msvc2017 --per_file_copt=tensorflow@/experimental:preprocessor
+# It's also called different things in different MSVC versions and will spam the logs
+# if we use the old name with a newer msvc.
+build:msvc2019 --per_file_copt=tensorflow@/Zc:preprocessor
+
+# Assume the newer version and alias to --config=windows
+build:msvc --config=msvc2019
+build:windows --config=msvc
 
 ###############################################################################
