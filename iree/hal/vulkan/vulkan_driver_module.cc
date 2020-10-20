@@ -35,6 +35,15 @@ ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
 ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
           "Uses timeline semaphore emulation even if native support exists.");
 
+// Vulkan Memory Allocator (VMA) flags
+#if VMA_RECORDING_ENABLED
+ABSL_FLAG(std::string, vma_recording_file, "",
+          "File path to write a CSV containing the VMA recording.");
+ABSL_FLAG(bool, vma_recording_flush_after_call, false,
+          "Flush the VMA recording file after every call (useful if "
+          "crashing/not exiting cleanly).");
+#endif  // VMA_RECORDING_ENABLED
+
 namespace iree {
 namespace hal {
 namespace vulkan {
@@ -103,6 +112,13 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   options.enable_renderdoc = absl::GetFlag(FLAGS_vulkan_renderdoc);
   options.device_options.force_timeline_semaphore_emulation =
       absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation);
+
+#if VMA_RECORDING_ENABLED
+  options.device_options.vma_options.recording_file =
+      absl::GetFlag(FLAGS_vma_recording_file);
+  options.device_options.vma_options.recording_flush_after_call =
+      absl::GetFlag(FLAGS_vma_recording_flush_after_call);
+#endif  // VMA_RECORDING_ENABLED
 
   // Create the driver and VkInstance.
   IREE_ASSIGN_OR_RETURN(auto driver,

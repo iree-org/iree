@@ -343,7 +343,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   // Create the device memory allocator.
   // TODO(benvanik): allow other types to be plugged in.
   IREE_ASSIGN_OR_RETURN(auto allocator,
-                        VmaAllocator::Create(physical_device, logical_device));
+                        VmaAllocator::Create(physical_device, logical_device,
+                                             std::move(options.vma_options)));
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -439,7 +440,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   // Create the device memory allocator.
   // TODO(benvanik): allow other types to be plugged in.
   IREE_ASSIGN_OR_RETURN(auto allocator,
-                        VmaAllocator::Create(physical_device, device_handle));
+                        VmaAllocator::Create(physical_device, device_handle,
+                                             std::move(options.vma_options)));
 
   bool has_dedicated_transfer_queues = transfer_queue_count > 0;
 

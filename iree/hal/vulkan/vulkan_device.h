@@ -33,6 +33,7 @@
 #include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/vma_allocator.h"
 
 namespace iree {
 namespace hal {
@@ -53,6 +54,9 @@ class VulkanDevice final : public Device {
   struct Options {
     // Extensibility descriptions the device.
     ExtensibilitySpec extensibility_spec;
+
+    // Options for Vulkan Memory Allocator (VMA).
+    VmaAllocator::Options vma_options;
 
     // Uses timeline semaphore emulation even if native support exists.
     bool force_timeline_semaphore_emulation = false;

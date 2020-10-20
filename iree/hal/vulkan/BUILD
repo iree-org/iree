@@ -430,7 +430,6 @@ cc_library(
         "//iree/hal:allocator",
         "//iree/hal:buffer",
         "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",

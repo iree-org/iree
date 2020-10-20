@@ -47,9 +47,20 @@ class VmaBuffer;
 //   https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/
 class VmaAllocator final : public Allocator {
  public:
+  struct Options {
+#if VMA_RECORDING_ENABLED
+    // File path to write a CSV containing the VMA recording.
+    std::string recording_file = "";
+
+    // Flush the VMA recording file after every call (useful if crashing or
+    // not exiting cleanly).
+    bool recording_flush_after_call = false;
+#endif  // VMA_RECORDING_ENABLED
+  };
+
   static StatusOr<std::unique_ptr<VmaAllocator>> Create(
       VkPhysicalDevice physical_device,
-      const ref_ptr<VkDeviceHandle>& logical_device);
+      const ref_ptr<VkDeviceHandle>& logical_device, Options options);
 
   ~VmaAllocator() override;
 

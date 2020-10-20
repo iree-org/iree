@@ -480,7 +480,6 @@ iree_cc_library(
   INCLUDES
     ${VMA_SRC_ROOT}
   DEPS
-    absl::flags
     absl::flat_hash_map
     absl::memory
     absl::synchronization
