@@ -12,16 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.13)
-
-project(IntegrationTest)
-include(iree_cc_binary)
+iree_bytecode_module(
+  NAME
+    simple_mul_bytecode_module
+  SRC
+    "simple_mul.mlir"
+  CC_NAMESPACE
+    "iree::java"
+  FLAGS
+    "-iree-mlir-to-vm-bytecode-module"
+    "-iree-hal-target-backends=vmla"
+)
 
 iree_cc_binary(
-NAME
- integration_test
-SRCS
- "integration_test.cc"
-DEPS
- bindings::java::com::google::iree::native::iree_cc_wrappers
+  NAME
+    integration_test
+   SRCS
+    "integration_test.cc"
+  DEPS
+     bindings::java::com::google::iree::native::cc_wrappers
+     bindings::javatests::com::google::iree::simple_mul_bytecode_module_cc
+     iree::base::status
 )
