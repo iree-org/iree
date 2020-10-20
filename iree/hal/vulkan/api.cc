@@ -206,7 +206,7 @@ VulkanDriver::Options ConvertDriverOptions(
   driver_options.api_version = options.api_version;
   driver_options.instance_extensibility =
       GetInstanceExtensibilitySpec(options.features);
-  driver_options.device_extensibility =
+  driver_options.device_options.extensibility_spec =
       GetDeviceExtensibilitySpec(options.features);
   return driver_options;
 }

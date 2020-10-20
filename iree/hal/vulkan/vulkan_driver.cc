@@ -161,9 +161,8 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
 
   return assign_ref(new VulkanDriver(
       std::move(syms), instance,
-      /*owns_instance=*/true, options.default_device_index,
-      std::move(debug_reporter), std::move(options.device_extensibility),
-      options.force_timeline_semaphore_emulation,
+      /*owns_instance=*/true, std::move(options.device_options),
+      options.default_device_index, std::move(debug_reporter),
       std::move(renderdoc_capture_manager)));
 }
 
@@ -210,26 +209,23 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
 
   return assign_ref(
       new VulkanDriver(std::move(syms), instance, /*owns_instance=*/false,
+                       std::move(options.device_options),
                        options.default_device_index, std::move(debug_reporter),
-                       std::move(options.device_extensibility),
-                       options.force_timeline_semaphore_emulation,
                        /*debug_capture_manager=*/nullptr));
 }
 
 VulkanDriver::VulkanDriver(
     ref_ptr<DynamicSymbols> syms, VkInstance instance, bool owns_instance,
-    int default_device_index, std::unique_ptr<DebugReporter> debug_reporter,
-    ExtensibilitySpec device_extensibility_spec,
-    bool force_timeline_semaphore_emulation,
+    VulkanDevice::Options device_options, int default_device_index,
+    std::unique_ptr<DebugReporter> debug_reporter,
     std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager)
     : Driver("vulkan"),
       syms_(std::move(syms)),
       instance_(instance),
       owns_instance_(owns_instance),
+      device_options_(std::move(device_options)),
       default_device_index_(default_device_index),
       debug_reporter_(std::move(debug_reporter)),
-      device_extensibility_spec_(std::move(device_extensibility_spec)),
-      force_timeline_semaphore_emulation_(force_timeline_semaphore_emulation),
       renderdoc_capture_manager_(std::move(renderdoc_capture_manager)) {}
 
 VulkanDriver::~VulkanDriver() {
@@ -290,14 +286,11 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   // Attempt to create the device.
   // This may fail if the device was enumerated but is in exclusive use,
   // disabled by the system, or permission is denied.
-  VulkanDevice::Options options;
-  options.extensibility_spec = device_extensibility_spec_;
-  options.force_timeline_semaphore_emulation =
-      force_timeline_semaphore_emulation_;
   IREE_ASSIGN_OR_RETURN(
-      auto device, VulkanDevice::Create(add_ref(this), instance(), device_info,
-                                        physical_device, options, syms(),
-                                        renderdoc_capture_manager_.get()));
+      auto device,
+      VulkanDevice::Create(add_ref(this), instance(), device_info,
+                           physical_device, device_options_, syms(),
+                           renderdoc_capture_manager_.get()));
 
   IREE_LOG(INFO) << "Created Vulkan Device: " << device->info().name();
 
@@ -314,14 +307,10 @@ StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
 
   // Attempt to create the device.
   // This may fail if the VkDevice does not support all necessary features.
-  VulkanDevice::Options options;
-  options.extensibility_spec = device_extensibility_spec_;
-  options.force_timeline_semaphore_emulation =
-      force_timeline_semaphore_emulation_;
   IREE_ASSIGN_OR_RETURN(
       auto device,
       VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
-                         logical_device, options, compute_queue_set,
+                         logical_device, device_options_, compute_queue_set,
                          transfer_queue_set, syms()));
   return device;
 }

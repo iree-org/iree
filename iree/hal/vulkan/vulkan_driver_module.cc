@@ -65,7 +65,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 
   // REQUIRED: these are required extensions that must be present for IREE to
   // work (such as those relied upon by SPIR-V kernels, etc).
-  options.device_extensibility.required_extensions.push_back(
+  options.device_options.extensibility_spec.required_extensions.push_back(
       VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
   // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
   // This extension was deprecated in Vulkan 1.1 as its functionality was
@@ -74,7 +74,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
   // Timeline semaphore support is optional and will be emulated if necessary.
-  options.device_extensibility.optional_extensions.push_back(
+  options.device_options.extensibility_spec.optional_extensions.push_back(
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   // Polyfill layer - enable if present (instead of our custom emulation).
   options.instance_extensibility.optional_layers.push_back(
@@ -95,13 +95,13 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   }
 
   if (absl::GetFlag(FLAGS_vulkan_push_descriptors)) {
-    options.device_extensibility.optional_extensions.push_back(
+    options.device_options.extensibility_spec.optional_extensions.push_back(
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
   }
 
   options.default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
   options.enable_renderdoc = absl::GetFlag(FLAGS_vulkan_renderdoc);
-  options.force_timeline_semaphore_emulation =
+  options.device_options.force_timeline_semaphore_emulation =
       absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation);
 
   // Create the driver and VkInstance.
