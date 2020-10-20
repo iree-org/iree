@@ -44,6 +44,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
@@ -493,6 +494,11 @@ endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
+endif()
+
+if(${IREE_BUILD_JAVA_BINDINGS})
+  add_subdirectory(bindings/java)
+  add_subdirectory(bindings/javatests)
 endif()
 
 add_subdirectory(iree/tools)
