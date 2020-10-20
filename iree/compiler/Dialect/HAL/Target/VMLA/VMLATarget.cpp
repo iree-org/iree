@@ -39,29 +39,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-namespace {
-
-bool areInterfacesEquivalent(IREE::HAL::InterfaceOp lhs,
-                             IREE::HAL::InterfaceOp rhs) {
-  auto lhsBindings = lhs.getBlock().getOps<IREE::HAL::InterfaceBindingOp>();
-  auto rhsBindings = rhs.getBlock().getOps<IREE::HAL::InterfaceBindingOp>();
-  auto lhsIt = lhsBindings.begin(), lhsEnd = lhsBindings.end();
-  auto rhsIt = rhsBindings.begin(), rhsEnd = rhsBindings.end();
-  for (; lhsIt != lhsEnd && rhsIt != rhsEnd; ++lhsIt, ++rhsIt) {
-    // Assume bindings are in order, check equivalence of each pairing.
-    if (!OperationEquivalence::isEquivalentTo(*lhsIt, *rhsIt)) return false;
-  }
-
-  if (lhsIt != lhsEnd || rhsIt != rhsEnd) {
-    // Not finished iterating through one, number of interface bindings differ.
-    return false;
-  }
-
-  return true;
-}
-
-}  // namespace
-
 VMLATargetOptions getVMLATargetOptionsFromFlags() {
   VMLATargetOptions targetOptions;
   // TODO(benvanik): flags.
@@ -163,8 +140,7 @@ class VMLATargetBackend final : public TargetBackend {
 
         IREE::HAL::InterfaceOp interfaceOpForExecutable;
         for (auto interfaceOp : interfaceOps) {
-          if (areInterfacesEquivalent(interfaceOp,
-                                      executableOp.getFirstInterfaceOp())) {
+          if (interfaceOp.isEquivalentTo(executableOp.getFirstInterfaceOp())) {
             interfaceOpForExecutable = interfaceOp;
             break;
           }
