@@ -303,6 +303,5 @@ build:windows --define with_default_optimizations=true
 # MSVC (Windows): Standards-conformant preprocessor mode
 # See https://docs.microsoft.com/en-us/cpp/preprocessor/preprocessor-experimental-overview
 build:windows --per_file_copt=tensorflow@/experimental:preprocessor
-build:windows --per_file_copt=tensorflow@/experimental:preprocessor
 
 ###############################################################################
