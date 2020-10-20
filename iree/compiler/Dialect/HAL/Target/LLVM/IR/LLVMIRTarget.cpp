@@ -14,19 +14,13 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/IR/LLVMIRTarget.h"
 
-#include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/Mutex.h"
 #include "llvm/Support/TargetSelect.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Target/LLVMIR.h"
 
 namespace mlir {
@@ -34,29 +28,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-class LLVMIRTargetBackend final : public TargetBackend {
+class LLVMIRTargetBackend final : public LLVMBaseTargetBackend {
  public:
-  LLVMIRTargetBackend(LLVMTargetOptions options)
-      : options_(std::move(options)) {}
+  explicit LLVMIRTargetBackend(LLVMTargetOptions options)
+      : LLVMBaseTargetBackend(options) {}
 
   // NOTE: we could vary these based on the options, such as by arch/etc.
   std::string name() const override { return "llvm_ir"; }
   std::string filter_pattern() const override { return "llvm-ir*"; }
-
-  void getDependentDialects(DialectRegistry& registry) const override {
-    // clang-format off
-    registry.insert<AffineDialect,
-                    linalg::LinalgDialect,
-                    LLVM::LLVMDialect,
-                    scf::SCFDialect,
-                    vector::VectorDialect>();
-    // clang-format on
-  }
-
-  void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
-                                    OpPassManager& passManager) override {
-    buildLLVMTransformPassPipeline(passManager);
-  }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpBuilder& executableBuilder) override {
@@ -121,18 +100,6 @@ class LLVMIRTargetBackend final : public TargetBackend {
 
     return success();
   }
-
-  std::array<Value, 3> calculateDispatchWorkgroupCount(
-      Location loc, IREE::HAL::ExecutableOp executableOp,
-      IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
-      OpBuilder& builder) override {
-    // For now we are not tiling and just dispatch everything as 1,1,1.
-    auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-    return {constantOne, constantOne, constantOne};
-  }
-
- private:
-  LLVMTargetOptions options_;
 };
 
 void registerLLVMIRTargetBackends(

@@ -28,14 +28,9 @@ iree_cc_library(
   DEPS
     LLVMCore
     LLVMSupport
-    MLIRAffine
-    MLIRLLVMIR
-    MLIRLinalg
-    MLIRSCF
     MLIRTargetLLVMIR
-    MLIRVector
-    iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
     iree::schemas::llvmir_executable_def_cc_fbs
