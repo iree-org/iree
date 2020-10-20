@@ -76,14 +76,10 @@ module {
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
   }
 }
-// TODO(hanchung): Make it just a copy op.
 // CHECK_LABEL: @pad_no_op
-//   CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
 //   CHECK-DAG: %[[OUT:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<12x4xf32>
 //   CHECK-DAG: %[[IN:.+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<12x4xf32>
-//       CHECK: linalg.fill(%[[OUT]], %[[CST]])
-//       CHECK: %[[SUBVIEW:.+]] = subview %[[OUT]][0, 0] [12, 4] [1, 1]
-//       CHECK: linalg.copy(%[[IN]], %[[SUBVIEW]])
+//   CHECK: linalg.copy(%[[IN]], %[[OUT]])
 
 // -----
 
