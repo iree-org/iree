@@ -217,6 +217,9 @@ void registerFlowTransformPassPipeline() {
 
 void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createCreateFuncsToInvokeExecOpsPass());
+  // Move all the constants to flow.variables.
+  passManager.addPass(createOutlineLargeConstantsPass(
+      /*minLargeConstantSize=*/0));
   passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
   passManager.addPass(IREE::Flow::createMergeExportedReflection());
   passManager.addPass(IREE::Flow::createFormStreamsPass());

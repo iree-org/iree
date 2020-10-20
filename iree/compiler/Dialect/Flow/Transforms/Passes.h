@@ -136,7 +136,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createCreateFuncsToInvokeExecOpsPass();
 // shaped, adjusting types, etc).
 
 // Outlines large tensor constants into flow.variables at the module level.
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass();
+//
+// NOTE: a total guess :) this feels like about the most per-dispatch-buffer
+// data we'd want to embed in the command buffer.
+static constexpr size_t kMinLargeConstantSize = 256;
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
+    size_t minLargeConstantSize = kMinLargeConstantSize);
 
 //===----------------------------------------------------------------------===//
 // Stream Formation and Folding

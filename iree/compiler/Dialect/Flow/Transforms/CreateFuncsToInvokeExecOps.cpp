@@ -26,7 +26,7 @@ namespace IREE {
 namespace Flow {
 
 // Walks through all the execuatable ops and creates Funcs to invoke them. The
-// input are provided using iree.unfoldable_constant.
+// input are provided using constants.
 class CreateFuncsToInvokeExecOpsPass
     : public PassWrapper<CreateFuncsToInvokeExecOpsPass,
                          OperationPass<ModuleOp>> {
@@ -57,9 +57,7 @@ class CreateFuncsToInvokeExecOpsPass
             auto attr = blockBuilder.getZeroAttr(inputType);
             auto cst = blockBuilder.create<ConstantOp>(moduleOp.getLoc(),
                                                        inputType, attr);
-            args.push_back(
-                blockBuilder.create<IREE::DoNotOptimizeOp>(loc, ValueRange{cst})
-                    .getResult(0));
+            args.push_back(cst);
           }
           // TODO(hanchung): Use a real workload instead? We can probably
           // calculate the workload from the results.
