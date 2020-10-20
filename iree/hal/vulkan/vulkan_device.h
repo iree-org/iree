@@ -52,7 +52,7 @@ struct QueueSet {
 class VulkanDevice final : public Device {
  public:
   struct Options {
-    // Extensibility descriptions the device.
+    // Extensibility descriptions for the device.
     ExtensibilitySpec extensibility_spec;
 
     // Options for Vulkan Memory Allocator (VMA).
