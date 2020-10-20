@@ -30,6 +30,10 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 
 docker_setup
 
+# The image hash is pinned to an older version than that reflected by the Docker
+# hierarchy because updating nvidia/vulkan causes everything to fail for some
+# reason.
+# TODO(#3550): Allow this to follow the checked-in Docker hierarchy.
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
   gcr.io/iree-oss/bazel-tensorflow-nvidia@sha256:754dc09c558157f82e9d53451486951fc096e8d2a2b9a1306a29ebfe9e0772df \

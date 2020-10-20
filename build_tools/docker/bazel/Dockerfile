@@ -52,9 +52,11 @@ COPY --from=install-bazel \
   /usr/bin/bazel-real \
   /usr/bin/
 
-# TF requires python2 numpy at configure time...
+# TF requires python and numpy at configure time...
 # TODO(#1737): Remove this
 RUN apt-get update \
-    && apt-get install -y python-pip \
-    && python -m pip install --upgrade pip \
-    && python -m pip install numpy
+    && apt-get install -y \
+      python3 \
+      python3-pip \
+    && python3 -m pip install --upgrade pip \
+    && python3 -m pip install numpy
