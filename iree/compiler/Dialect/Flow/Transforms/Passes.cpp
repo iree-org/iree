@@ -27,12 +27,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-namespace {
-static llvm::cl::opt<bool> exportDispatchFunctions(
-    "iree-flow-export-dispatch-functions",
-    llvm::cl::desc("Exports all the dispatch functions to the module"),
-    llvm::cl::init(false));
-}  // namespace
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   //----------------------------------------------------------------------------
@@ -210,18 +204,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(createSymbolDCEPass());
-
-  // Export all the dispatch functions. This creates functions and feeds
-  // iree.unfoldable_constant as inputs to the exported functions.
-  if (exportDispatchFunctions) {
-    passManager.addPass(IREE::Flow::createCreateFuncsToInvokeExecOpsPass());
-    passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
-    passManager.addPass(IREE::Flow::createMergeExportedReflection());
-    passManager.addPass(IREE::Flow::createFormStreamsPass());
-    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<FuncOp>(createCSEPass());
-    passManager.addPass(createSymbolDCEPass());
-  }
 }
 
 void registerFlowTransformPassPipeline() {
@@ -230,6 +212,25 @@ void registerFlowTransformPassPipeline() {
       "Runs the full IREE flow dialect transformation pipeline",
       [](OpPassManager &passManager) {
         buildFlowTransformPassPipeline(passManager);
+      });
+}
+
+void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(IREE::Flow::createCreateFuncsToInvokeExecOpsPass());
+  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
+  passManager.addPass(IREE::Flow::createMergeExportedReflection());
+  passManager.addPass(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addPass(createSymbolDCEPass());
+}
+
+void registerExportDispatchesTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-flow-export-dispatches",
+      "Runs the pipeline to export dispatch functions",
+      [](OpPassManager &passManager) {
+        buildExportDispatchesTransformPassPipeline(passManager);
       });
 }
 

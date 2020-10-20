@@ -52,7 +52,8 @@ LogicalResult convertToVMModule(ModuleOp moduleOp,
 //
 // Exposed via the --iree-mlir-to-vm-bytecode-module translation.
 LogicalResult translateFromMLIRToVMBytecodeModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
+    ModuleOp moduleOp, bool addExportDispatchesPipeline,
+    IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions,
     IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
 

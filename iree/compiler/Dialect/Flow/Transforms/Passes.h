@@ -46,6 +46,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
 void registerFlowTransformPassPipeline();
 
+// Adds a set of passes to the given pass manager that run the flow transforms
+// to export dispatch functions. This creates functions and feeds
+// iree.unfoldable_constant as inputs to the exported functions.
+//
+// The expected usage is to add passes right after
+// buildFlowTransformPassPipieline.
+void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager);
+
+void registerExportDispatchesTransformPassPipeline();
+
 //===----------------------------------------------------------------------===//
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
@@ -151,6 +161,7 @@ std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 
 inline void registerFlowPasses() {
   registerFlowTransformPassPipeline();
+  registerExportDispatchesTransformPassPipeline();
   createFlattenTuplesInCFGPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();

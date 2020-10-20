@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-transformation-pipeline -iree-flow-export-dispatch-functions %s | IreeFileCheck %s
+// RUN: iree-opt -iree-flow-transformation-pipeline -iree-flow-export-dispatches %s | IreeFileCheck %s
 
 module {
   func @two_dispatch() -> (tensor<5x5xf32>, tensor<3x5xf32>) attributes { iree.module.export } {
