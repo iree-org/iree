@@ -18,7 +18,6 @@
 #include <utility>
 
 #include "absl/container/inlined_vector.h"
-#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
@@ -221,24 +220,23 @@ absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> CreateCommandQueues(
 // static
 StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     ref_ptr<Driver> driver, VkInstance instance, const DeviceInfo& device_info,
-    VkPhysicalDevice physical_device,
-    const ExtensibilitySpec& extensibility_spec,
+    VkPhysicalDevice physical_device, Options options,
     const ref_ptr<DynamicSymbols>& syms,
-    bool force_timeline_semaphore_emulation,
     DebugCaptureManager* debug_capture_manager) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
 
-  if (!extensibility_spec.optional_layers.empty() ||
-      !extensibility_spec.required_layers.empty()) {
+  if (!options.extensibility_spec.optional_layers.empty() ||
+      !options.extensibility_spec.required_layers.empty()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Device layers are deprecated and unsupported by IREE";
   }
 
   // Find the extensions we need (or want) that are also available
   // on the device. This will fail when required ones are not present.
-  IREE_ASSIGN_OR_RETURN(auto enabled_extension_names,
-                        MatchAvailableDeviceExtensions(
-                            physical_device, extensibility_spec, *syms));
+  IREE_ASSIGN_OR_RETURN(
+      auto enabled_extension_names,
+      MatchAvailableDeviceExtensions(physical_device,
+                                     options.extensibility_spec, *syms));
   auto enabled_device_extensions =
       PopulateEnabledDeviceExtensions(enabled_extension_names);
 
@@ -323,7 +321,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   features2.pNext = &semaphore_features;
 
   if (!enabled_device_extensions.timeline_semaphore ||
-      force_timeline_semaphore_emulation) {
+      options.force_timeline_semaphore_emulation) {
     device_create_info.pNext = nullptr;
   } else {
     device_create_info.pNext = &features2;
@@ -384,7 +382,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
   if (syms->vkGetSemaphoreCounterValue == nullptr ||
-      force_timeline_semaphore_emulation) {
+      options.force_timeline_semaphore_emulation) {
     IREE_ASSIGN_OR_RETURN(semaphore_pool, TimePointSemaphorePool::Create(
                                               add_ref(logical_device)));
     IREE_ASSIGN_OR_RETURN(fence_pool,
@@ -406,11 +404,9 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
 // static
 StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
     ref_ptr<Driver> driver, const DeviceInfo& device_info,
-    VkPhysicalDevice physical_device, VkDevice logical_device,
-    const ExtensibilitySpec& extensibility_spec,
+    VkPhysicalDevice physical_device, VkDevice logical_device, Options options,
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
-    const ref_ptr<DynamicSymbols>& syms,
-    bool force_timeline_semaphore_emulation) {
+    const ref_ptr<DynamicSymbols>& syms) {
   IREE_TRACE_SCOPE0("VulkanDevice::Wrap");
 
   uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
@@ -427,9 +423,10 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   // Since the device is already created, we can't actually enable any
   // extensions or query if they are really enabled - we just have to trust
   // that the caller already enabled them for us (or we may fail later).
-  IREE_ASSIGN_OR_RETURN(auto enabled_extension_names,
-                        MatchAvailableDeviceExtensions(
-                            physical_device, extensibility_spec, *syms));
+  IREE_ASSIGN_OR_RETURN(
+      auto enabled_extension_names,
+      MatchAvailableDeviceExtensions(physical_device,
+                                     options.extensibility_spec, *syms));
   auto enabled_device_extensions =
       PopulateEnabledDeviceExtensions(enabled_extension_names);
 
@@ -467,7 +464,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   ref_ptr<TimePointSemaphorePool> semaphore_pool = nullptr;
   ref_ptr<TimePointFencePool> fence_pool = nullptr;
   if (syms->vkGetSemaphoreCounterValue == nullptr ||
-      force_timeline_semaphore_emulation) {
+      options.force_timeline_semaphore_emulation) {
     IREE_ASSIGN_OR_RETURN(
         semaphore_pool, TimePointSemaphorePool::Create(add_ref(device_handle)));
     IREE_ASSIGN_OR_RETURN(fence_pool,

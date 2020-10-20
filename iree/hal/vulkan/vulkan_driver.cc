@@ -17,7 +17,6 @@
 #include <memory>
 
 #include "absl/container/inlined_vector.h"
-#include "absl/flags/flag.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
@@ -291,12 +290,14 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   // Attempt to create the device.
   // This may fail if the device was enumerated but is in exclusive use,
   // disabled by the system, or permission is denied.
+  VulkanDevice::Options options;
+  options.extensibility_spec = device_extensibility_spec_;
+  options.force_timeline_semaphore_emulation =
+      force_timeline_semaphore_emulation_;
   IREE_ASSIGN_OR_RETURN(
-      auto device,
-      VulkanDevice::Create(add_ref(this), instance(), device_info,
-                           physical_device, device_extensibility_spec_, syms(),
-                           force_timeline_semaphore_emulation_,
-                           renderdoc_capture_manager_.get()));
+      auto device, VulkanDevice::Create(add_ref(this), instance(), device_info,
+                                        physical_device, options, syms(),
+                                        renderdoc_capture_manager_.get()));
 
   IREE_LOG(INFO) << "Created Vulkan Device: " << device->info().name();
 
@@ -313,12 +314,15 @@ StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
 
   // Attempt to create the device.
   // This may fail if the VkDevice does not support all necessary features.
+  VulkanDevice::Options options;
+  options.extensibility_spec = device_extensibility_spec_;
+  options.force_timeline_semaphore_emulation =
+      force_timeline_semaphore_emulation_;
   IREE_ASSIGN_OR_RETURN(
       auto device,
       VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
-                         logical_device, device_extensibility_spec_,
-                         compute_queue_set, transfer_queue_set, syms(),
-                         force_timeline_semaphore_emulation_));
+                         logical_device, options, compute_queue_set,
+                         transfer_queue_set, syms()));
   return device;
 }
 
