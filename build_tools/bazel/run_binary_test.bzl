@@ -32,12 +32,10 @@ run_binary_test(
 """
 
 def _run_binary_test_impl(ctx):
-    ctx.actions.run_shell(
-        inputs = [ctx.file.test_binary],
-        outputs = [ctx.outputs.executable],
-        command = "cp $1 $2",
-        arguments = [ctx.file.test_binary.path, ctx.outputs.executable.path],
-        mnemonic = "CopyExecutable",
+    ctx.actions.symlink(
+        target_file = ctx.executable.test_binary,
+        output = ctx.outputs.executable,
+        is_executable = True,
     )
 
     data_runfiles = ctx.runfiles(files = ctx.files.data)
@@ -54,7 +52,8 @@ run_binary_test = rule(
     attrs = {
         "test_binary": attr.label(
             mandatory = True,
-            allow_single_file = True,
+            executable = True,
+            cfg = "target",
         ),
         "data": attr.label_list(allow_empty = True, allow_files = True),
     },
