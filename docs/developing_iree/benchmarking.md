@@ -128,14 +128,23 @@ directory. They also use the Google Benchmark library as the above.
 When benchmarking, it's important to consider the configuration of your CPUs.
 Most notably, CPU scaling can give variable results, so you'll usually want to
 disable it. This can get pretty complex, but the most basic thing to do is to
-run all CPUs at maximum frequency.
+run all CPUs at maximum frequency. The other thing to consider is what CPU(s)
+your program is running on. Both of these get more complicated on mobile and in
+multithreaded workloads.
 
 ### Linux
 
 Google benchmark provides some
-[instructions](https://github.com/google/benchmark#disabling-cpu-frequency-scaling):
+[instructions](https://github.com/google/benchmark#disabling-cpu-frequency-scaling).
+Note that the library will print "CPU scaling is enabled" warnings for any
+configuration that
+[doesn't have the quota governor set to performance](https://github.com/google/benchmark/blob/3d1c2677686718d906f28c1d4da001c42666e6d2/src/sysinfo.cc#L228).
+Similarly the CPU frequency it reports is the
+[maximum frequency of cpu0](https://github.com/google/benchmark/blob/3d1c2677686718d906f28c1d4da001c42666e6d2/src/sysinfo.cc#L533),
+not the frequency of the processor it's actually running on. This means that
+more advanced configurations should ignore these messages.
 
-Turn off CPU scaling before benchmarking:
+Turn off CPU scaling before benchmarking.
 
 ```shell
 $ sudo cpupower frequency-set --governor performance
@@ -147,44 +156,123 @@ Restore CPU scaling after benchmarking:
 $ sudo cpupower frequency-set --governor powersave
 ```
 
+To learn more about different quota
+governor settings, see
+https://www.kernel.org/doc/Documentation/cpu-freq/governors.txt. To restrict
+which CPUs you run on, use the `taskset` command which takes a hexadecimal mask.
+
+To only run on the lowest-numbered CPU you can run
+
+```shell
+$ taskset 1 sleep 20 &
+```
+
+You can confirm that the process is running on the given CPU:
+
+```shell
+$ ps -o psr $!
+```
+
+Note that `$!` indicates the process ID of the last executed background command,
+so you can only use this shorthand if you didn't run any commands after the
+sleep. For more info on taskset, see https://linux.die.net/man/1/taskset.
+
 ### Android
 
+Read and understand the [Linux](#linux) instructions first.
+
 Android doesn't give us quite as nice tooling, but the principle is basically
-the same. You will likely need to be root (use `su` or `adb root`). The commands
-will depend on your exact phone and number of cores. First play around and make
-sure you understand what everything means.
+the same. One important difference is that thermal throttling is a much bigger
+concern on mobile. Without a cooling plate, it is likely that high clock speeds
+will overheat the device and engage thermal throttling, which will ignore
+whatever clock speeds you may have set to prevent things from catching on fire.
+Therefore the naive approach above is likely not a good idea.
 
-Some useful commands:
+You will likely need to be root (use `su` or `adb root`). The commands will
+depend on your exact phone and number of cores. First play around and make sure
+you understand what everything means. Note that each CPU has its own files which
+are used to control its behavior, but changes to a single CPU will sometimes
+affect others (see `/sys/devices/system/cpu/cpu0/cpufreq/affected_cpus`).
+
+Some useful files:
 
 ```shell
-$ cat /proc/cpuinfo
-$ cat /sys/devices/system/cpu/possible
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
-$ cat /sys/devices/system/cpu/cpu0/cpufreq/affected_cpus
-$ cat /sys/devices/system/cpu/cpu0/online
+/proc/cpuinfo
+/sys/devices/system/cpu/possible
+/sys/devices/system/cpu/present
+/sys/devices/system/cpu/cpu0/online
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+/sys/devices/system/cpu/cpu0/cpufreq/affected_cpus
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
 ```
 
-One common case is if you want to set the quota governor of 8 CPUs for
-performance. Make sure to check their current settings first so you can put them
-back when you're done.
+See the clockspeed of each CPU
 
 ```shell
-$ for i in `seq 0 7`; do cat "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; done
+$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
+    paste \
+      "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_cur_freq" \
+      "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_min_freq" \
+      "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_max_freq"; \
+done
 ```
 
+Before changing things, make sure to check the current scaling governor settings
+first so you can put them back when you're done.
+
 ```shell
-$ for i in `seq 0 7`; do echo performance > "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; done
+$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
+    cat "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
+done
 ```
 
-and then double check that all CPUs are now at their maximum frequency
+#### Single-Core Example
+
+Here's an example to run IREE in a single-threaded context on CPU 7 at its
+lowest clock speed.
+
+First we'll take control of the clockspeed by setting the governor to
+"userspace".
 
 ```shell
-$ for i in `seq 0 7`; do paste "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_cur_freq" "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_max_freq"; done
+$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
+  echo userspace > \
+    "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
+done
+```
+
+We can now set individual clock speeds. We'll pin cpu7 to its minimum frequency.
+We choose the minimum instead of the maximum here to mitigate thermal throttling
+concerns
+
+```shell
+$ cat /sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_min_freq > \
+/sys/devices/system/cpu/cpu7/cpufreq/scaling_setspeed
+```
+
+We can confirm the frequencies of all the CPUs by running the same command
+above. Now to run a command specifically on cpu7, use `taskset 80`
+(hex for 10000000):
+
+```shell
+$ tasket 80 sleep 20 &
+$ ps -o psr $!
+```
+
+Remember to cleanup when you're done! Here we'll set the scaling governor back
+to schedutil because that's what they were before on the particular device this,
+was tested on, but that may not exist on all devices.
+
+```shell
+$ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
+  echo schedutil > \
+    "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
+done
 ```
 
 TODO(scotttodd): Windows instructions
