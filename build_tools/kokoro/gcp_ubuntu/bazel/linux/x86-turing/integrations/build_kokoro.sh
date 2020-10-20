@@ -32,7 +32,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
-  gcr.io/iree-oss/bazel-tensorflow-nvidia@sha256:0ee91b72b8d05e28a7d172a4a326ca707ce7791b9df8882876c23d71b85eed00 \
+  gcr.io/iree-oss/bazel-tensorflow-nvidia@sha256:c5bd7fe75e43d53f5f5ee218558c9d128dfb8c8826d190fd54ba257cda783028 \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-turing/integrations/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
