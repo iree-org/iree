@@ -15,7 +15,7 @@
 # An image for building IREE with TensorFlow integrations using Bazel and
 # running Vulkan tests on an Nvidia GPU.
 
-FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
+FROM gcr.io/iree-oss/bazel-tensorflow-vulkan@sha256:396a23a0bf14c07c33a9702ac11a4d551101bc0a9ab7896d259dccdc552fd723 AS final
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y vulkan-sdk nvidia-driver-440
