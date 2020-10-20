@@ -28,15 +28,17 @@ class LLVMBaseTargetBackend : public TargetBackend {
  public:
   explicit LLVMBaseTargetBackend(LLVMTargetOptions options);
 
-  void getDependentDialects(DialectRegistry& registry) const override;
+  void getDependentDialects(DialectRegistry &registry) const override;
 
   void buildTranslationPassPipeline(ExecutableTargetOp targetOp,
-                                    OpPassManager& passManager) override;
+                                    OpPassManager &passManager) override;
+
+  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override;
 
   std::array<Value, 3> calculateDispatchWorkgroupCount(
       Location loc, IREE::HAL::ExecutableOp executableOp,
       IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
-      OpBuilder& builder) override;
+      OpBuilder &builder) override;
 
  protected:
   LLVMTargetOptions options_;
