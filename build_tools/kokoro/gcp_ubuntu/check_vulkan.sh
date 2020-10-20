@@ -18,7 +18,6 @@
 # Log some information about the environment, initialize the submodules and then
 # run the bazel integrations tests.
 
-set -e
 set -x
 
 # Print Vulkan related information: SDK version and GPU ICD version
