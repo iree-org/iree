@@ -38,7 +38,7 @@ class LLVMIRTargetBackend final : public LLVMBaseTargetBackend {
   std::string filter_pattern() const override { return "llvm-ir*"; }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
-                                    OpBuilder& executableBuilder) override {
+                                    OpBuilder &executableBuilder) override {
     // Perform the translation to LLVM in a separate context to avoid
     // multi-threading issues.
     llvm::LLVMContext context;

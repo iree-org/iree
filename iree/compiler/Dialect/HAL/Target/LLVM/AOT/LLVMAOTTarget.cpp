@@ -41,7 +41,7 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
   std::string filter_pattern() const override { return "dylib*"; }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
-                                    OpBuilder& executableBuilder) override {
+                                    OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
@@ -88,7 +88,7 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     }
 
     std::string sharedLibData;
-    const char* linkerToolPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
+    const char *linkerToolPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
     if (linkerToolPath != nullptr) {
       auto sharedLibDataStatus = linkLLVMAOTObjects(linkerToolPath, objData);
       if (!sharedLibDataStatus.ok()) {
