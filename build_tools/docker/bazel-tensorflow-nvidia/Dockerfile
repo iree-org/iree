@@ -19,12 +19,3 @@ FROM gcr.io/iree-oss/bazel-tensorflow-vulkan AS final
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y vulkan-sdk nvidia-driver-440
-
-# TODO: There's something screwy where rerunning apt-get breaks everything
-# TF requires python and numpy at configure time...
-RUN apt-get update \
-    && apt-get install -y \
-      python3 \
-      python3-pip \
-    && python3 -m pip install --upgrade pip \
-    && python3 -m pip install numpy
