@@ -18,5 +18,7 @@
 FROM gcr.io/iree-oss/cmake-python-vulkan AS final
 COPY --from=gcr.io/iree-oss/swiftshader /swiftshader /swiftshader
 
+RUN apt-get update && apt-get install -y vulkan-utils
+
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json

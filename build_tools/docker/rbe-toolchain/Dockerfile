@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y \
 
 # This commit fixed support for the max version of libstdc++6 available through
 # Ubuntu 16.04 apt.
-ARG SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
+ARG SWIFTSHADER_COMMIT=84f5eeb6dd9b225f465f93737fa76aad7de355cf
 
 RUN git clone https://github.com/google/swiftshader
 RUN cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd ..
