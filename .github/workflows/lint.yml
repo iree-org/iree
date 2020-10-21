@@ -65,6 +65,23 @@ jobs:
           printf "You can fix the lint errors above by running\n"
           printf "  git diff -U0 "${BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
 
+  pytype:
+    runs-on: ubuntu-18.04
+    env:
+      BASE_REF: ${{ github.base_ref }}
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Setting up python
+        uses: actions/setup-python@v2
+        # We have to explicitly fetch the base branch as well
+      - name: Fetching Base Branch
+        run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
+      - name: Install pytype
+        run: python3 -m pip install pytype
+      - name: Run pytype on changed files
+        run: ./build_tools/pytype/check_diff "${BASE_REF?}"
+
   clang-format:
     runs-on: ubuntu-18.04
     env:
