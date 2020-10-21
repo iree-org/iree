@@ -101,7 +101,7 @@ LLVM_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "linspace_test.py", # TODO(https://github.com/google/iree/issues/1521)
+    "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
@@ -123,7 +123,7 @@ VULKAN_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
-    "linspace_test.py", # TODO(https://github.com/google/iree/issues/1521)
+    "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
