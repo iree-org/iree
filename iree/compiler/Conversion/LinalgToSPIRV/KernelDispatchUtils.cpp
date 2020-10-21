@@ -244,7 +244,8 @@ LogicalResult getOpLaunchConfig(linalg::BatchMatmulOp op,
   return success();
 }
 
-/// The size of the co-operative matrix multiply operations on the device.
+/// Returns the size of the co-operative matrix multiply operations on the
+/// device.
 static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
     spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
     Type initType, Type resultType) {
@@ -302,8 +303,6 @@ static LogicalResult getConfigForCooperativeMatmul(
       !isMultipleOf(rhsShape[0], (*coopMatmulSize)[2]))
     return failure();
 
-  int64_t subgroupSize =
-      resourceLimits.subgroup_size().getValue().getSExtValue();
   if (options.useWorkgroupMemory) {
     numSubgroups[0] = 2;
     numSubgroups[1] = 2;
@@ -313,8 +312,8 @@ static LogicalResult getConfigForCooperativeMatmul(
   }
   numSubgroups[2] = 1;
 
-  // For now this is being hard-wired to be {2, 2}. This can actually be set to
-  // whatever, but ultimately depends on register pressure.
+  // For now this is being hard-wired to be {4, 4, 2}. This can actually be set
+  // to whatever, but ultimately depends on register pressure.
   const int64_t numVecMatmulPerSubgroupX = 4;
   const int64_t numVecMatmulPerSubgroupY = 4;
   const int64_t numVecMatmulPerSubgroupK = 2;
@@ -324,6 +323,8 @@ static LogicalResult getConfigForCooperativeMatmul(
       numVecMatmulPerSubgroupK * (*coopMatmulSize)[2]};
   tileSizes.emplace_back(std::move(ts));
 
+  int64_t subgroupSize =
+      resourceLimits.subgroup_size().getValue().getSExtValue();
   workgroupSize[0] = numSubgroups[0] * numSubgroups[1] * subgroupSize;
   workgroupSize[1] = 1;
   workgroupSize[2] = 1;

@@ -378,9 +378,10 @@ static void populateTilingToSubgroupPatterns(
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(subgroupDistributionOptions),
       linalg::LinalgMarker(
-          {Identifier::get(getWorkgroupMemoryMarker(), context),
-           Identifier::get(getWorkgroupMarker(), context)},
-          Identifier::get(getVectorizeMarker(), context)));
+          /*matchDisjunction=*/{Identifier::get(getWorkgroupMemoryMarker(),
+                                                context),
+                                Identifier::get(getWorkgroupMarker(), context)},
+          /*replacement=*/Identifier::get(getVectorizeMarker(), context)));
 }
 
 //====---------------------------------------------------------------------===//
