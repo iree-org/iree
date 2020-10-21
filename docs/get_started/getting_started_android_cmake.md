@@ -263,15 +263,15 @@ $ adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so
 ### Dylib LLVM AOT backend
 
 To compile IREE module for the target Android device (assume Android 10 AArc64)
-we need install the corresponding standalone toolchain and setting AOT linker
-path environment variable:
+we need to use the corresponding standalone toolchain (which can be found in
+ANDROID_NDK) and setting AOT linker path environment variable:
 
 ```shell
-$ export ANDROID_ARM64_TOOLCHAIN=/path/to/install/the/toolchain
-$ "${ANDROID_NDK?}/build/tools/make-standalone-toolchain.sh" --arch=arm64 --platform=android-29 \
-    --install-dir="${ANDROID_ARM64_TOOLCHAIN?}"
-$ export IREE_LLVMAOT_LINKER_PATH="${ANDROID_ARM64_TOOLCHAIN?}/aarch64-linux-android/bin/ld"
+$ export IREE_LLVMAOT_LINKER_PATH="${ANDROID_NDK?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ -static-libstdc++ -O3"
 ```
+
+`-static-libstdc++` is needed because some dynamic libraries would not be able
+to open.
 
 Translate a source MLIR into an IREE module:
 

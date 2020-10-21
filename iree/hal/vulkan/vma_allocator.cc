@@ -28,7 +28,8 @@ namespace vulkan {
 // static
 StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
     VkPhysicalDevice physical_device,
-    const ref_ptr<VkDeviceHandle>& logical_device, Options options) {
+    const ref_ptr<VkDeviceHandle>& logical_device, VkInstance instance,
+    Options options) {
   IREE_TRACE_SCOPE0("VmaAllocator::Create");
 
   const auto& syms = logical_device->syms();
@@ -69,6 +70,7 @@ StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
   create_info.flags = 0;
   create_info.physicalDevice = physical_device;
   create_info.device = *logical_device;
+  create_info.instance = instance;
   create_info.preferredLargeHeapBlockSize = 64 * 1024 * 1024;
   create_info.pAllocationCallbacks = logical_device->allocator();
   create_info.pDeviceMemoryCallbacks = nullptr;

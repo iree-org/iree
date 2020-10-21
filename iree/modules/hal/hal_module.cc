@@ -156,10 +156,13 @@ class HALModuleState final {
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait_with_deadline(
         semaphore.get(), 1ull, IREE_TIME_INFINITE_FUTURE));
 
-    for (auto& ref : deferred_releases_) {
-      iree_vm_ref_release(&ref);
+    {
+      IREE_TRACE_SCOPE0("HALModuleState::DeferredReleases");
+      for (auto& ref : deferred_releases_) {
+        iree_vm_ref_release(&ref);
+      }
+      deferred_releases_.clear();
     }
-    deferred_releases_.clear();
 
     return OkStatus();
   }

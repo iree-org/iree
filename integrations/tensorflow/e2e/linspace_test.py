@@ -37,7 +37,7 @@ class LinspaceModule(tf.Module):
 class LinspaceTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(LinspaceTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(LinspaceModule)
 
   def test_linspace(self):

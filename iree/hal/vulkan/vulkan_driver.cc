@@ -19,6 +19,7 @@
 #include "absl/container/inlined_vector.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
@@ -41,7 +42,11 @@ VkApplicationInfo GetDefaultApplicationInfo() {
   info.applicationVersion = 0;
   info.pEngineName = "IREE";
   info.engineVersion = 0;
-  info.apiVersion = VK_API_VERSION_1_0;
+#ifdef IREE_PLATFORM_ANDROID
+  info.apiVersion = VK_API_VERSION_1_1;
+#else
+  info.apiVersion = VK_API_VERSION_1_2;
+#endif
   return info;
 }
 
@@ -309,9 +314,9 @@ StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
   // This may fail if the VkDevice does not support all necessary features.
   IREE_ASSIGN_OR_RETURN(
       auto device,
-      VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
-                         logical_device, device_options_, compute_queue_set,
-                         transfer_queue_set, syms()));
+      VulkanDevice::Wrap(add_ref(this), instance(), device_info,
+                         physical_device, logical_device, device_options_,
+                         compute_queue_set, transfer_queue_set, syms()));
   return device;
 }
 

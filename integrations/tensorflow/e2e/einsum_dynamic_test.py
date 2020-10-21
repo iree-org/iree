@@ -82,7 +82,7 @@ class EinsumDynamicModule(tf.Module):
 class EinsumDynamicTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(EinsumDynamicTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(EinsumDynamicModule)
 
   # yapf: disable

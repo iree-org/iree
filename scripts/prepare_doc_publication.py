@@ -86,7 +86,7 @@ NAVI_ORDER_DICT = {
     # 'Getting Started' is 3.
     # 'Developing IREE' is 4.
     'design_roadmap.md': 5,
-    'milestones.md': 6,
+    'objectives.md': 6,
     'xla_op_coverage.md': 7,
     'tf_e2e_coverage.md': 8,
     'iree_community.md': 9,

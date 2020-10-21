@@ -237,8 +237,10 @@ const char *getTargetEnvForTriple(llvm::StringRef triple) {
 
   if (triple == "turing-t4-unknown-linux") {
     return R"(#vk.target_env<
-     v1.2, r(133), [VK_KHR_storage_buffer_storage_class,
-       VK_NV_cooperative_matrix], NVIDIA:DiscreteGPU, {
+     v1.2, r(133), [
+        VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
+        VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
+        VK_KHR_variable_pointers, VK_NV_cooperative_matrix], NVIDIA:DiscreteGPU, {
        maxComputeSharedMemorySize = 49152: i32,
        maxComputeWorkGroupInvocations = 1024: i32,
        maxComputeWorkGroupSize = dense<[2147483647, 65535, 65535]> : vector<3xi32>,

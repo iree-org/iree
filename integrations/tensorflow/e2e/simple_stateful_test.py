@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 class SimpleStatefulModule(tf.Module):
 
   def __init__(self):
-    super(SimpleStatefulModule, self).__init__()
+    super().__init__()
     self.counter = tf.Variable(0.0)
 
   @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
@@ -37,7 +37,7 @@ class SimpleStatefulModule(tf.Module):
 class StatefulTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(StatefulTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(SimpleStatefulModule)
 
   def test_stateful(self):

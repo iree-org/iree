@@ -15,6 +15,7 @@
 #include "iree/vm/instance.h"
 
 #include "iree/base/atomics.h"
+#include "iree/base/tracing.h"
 #include "iree/vm/builtin_types.h"
 
 struct iree_vm_instance {
@@ -24,24 +25,29 @@ struct iree_vm_instance {
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
     iree_allocator_t allocator, iree_vm_instance_t** out_instance) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_instance);
   *out_instance = NULL;
 
-  IREE_RETURN_IF_ERROR(iree_vm_register_builtin_types());
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types());
 
   iree_vm_instance_t* instance = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(iree_vm_instance_t), (void**)&instance));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, sizeof(iree_vm_instance_t),
+                                (void**)&instance));
   instance->allocator = allocator;
   iree_atomic_ref_count_init(&instance->ref_count);
 
   *out_instance = instance;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(instance);
   iree_allocator_free(instance->allocator, instance);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT void IREE_API_CALL

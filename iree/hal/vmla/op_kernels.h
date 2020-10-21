@@ -174,6 +174,15 @@ struct Sort {
                         absl::Span<int32_t> dst_buffer, ShapeSpan src_shape);
 };
 
+struct Fft {
+  template <typename T>
+  static Status Execute(absl::Span<const T> real_src_buffer,
+                        absl::Span<const T> imag_src_buffer,
+                        absl::Span<T> real_dst_buffer,
+                        absl::Span<T> imag_dst_buffer, ShapeSpan real_src_shape,
+                        ShapeSpan imag_src_shape);
+};
+
 struct Broadcast {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,

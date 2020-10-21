@@ -44,6 +44,7 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+option(IREE_BUILD_JAVA_BINDINGS "Builds the IREE java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
@@ -95,8 +96,7 @@ if( IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all" )
   set( IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS} )
   # For cross compilation towords Android, we don't want LLVM JIT HAL driver.
   if(ANDROID)
-    # TODO(ataei): Enable dylib/dylib-llvm-aot for android.
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM DyLib)
+    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD LLVM)
   endif()
 
   # For Apple platforms we need to use Metal instead of Vulkan.
@@ -494,6 +494,11 @@ endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
+endif()
+
+if(${IREE_BUILD_JAVA_BINDINGS})
+  add_subdirectory(bindings/java)
+  add_subdirectory(bindings/javatests)
 endif()
 
 add_subdirectory(iree/tools)

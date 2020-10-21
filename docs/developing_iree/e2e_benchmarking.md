@@ -178,12 +178,19 @@ weights. For example:
 # Enter the TensorFlow Bazel workspace.
 cd third_party/tensorflow/
 
-# Build the benchmark_model binary without RUY...
+# Build the benchmark_model binary.
 bazel build --copt=-mavx2 -c opt \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
-# ...or build the benchmark_model binary with RUY. This will overwrite the
+# By default, TFLite/x86 uses various matrix multiplication libraries.
+# It is possible to force it to only use Ruy for all matrix multiplications.
+# That is the default on ARM but not on x86. This will overwrite the
 # previous binary unless you move it.
+#
+# Note that Ruy takes care of -mavx2 and other AVX extensions internally,
+# so this passing this flag here isn't going to make a difference to
+# matrix multiplications. However, the rest of TFLite's kernels outside
+# of ruy will still benefit from -mavx2.
 bazel build --copt=-mavx2 -c opt \
   --define=tflite_with_ruy=true \
   //tensorflow/lite/tools/benchmark:benchmark_model
@@ -225,9 +232,6 @@ ls build-android/iree/tools/
 
 # Copy the benchmarking binary to phone.
 adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
-
-# Allow executing benchmarking file as a program.
-adb shell chmod +x /data/local/tmp/iree-benchmark-module
 ```
 
 ### 4.2 Push the IREE's compilation / benchmarking artifacts to the device
@@ -241,7 +245,7 @@ example:
 
 ```shell
 # Make a directory for the module/backend pair we want to benchmark.
-mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
+adb shell mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
 
 # Transfer the files.
 adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
@@ -252,7 +256,7 @@ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
 
 ```shell
 adb shell /data/local/tmp/iree-benchmark-module \
-  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
+  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile" \
   --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
 ```
 
@@ -277,6 +281,9 @@ in the following ways:
 
 ```shell
 # Build the benchmark_model binary without any add-ons.
+# Note that unlike TFLite/x86, TFLite/ARM uses Ruy by default for all
+# matrix multiplications (No need to pass tflite_with_ruy), except for some
+# matrix*vector products. Below we show how to force using ruy also for that.
 bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
@@ -289,20 +296,21 @@ adb shell chmod +x /data/local/tmp/benchmark_model
 ```
 
 ```shell
-# Build the benchmark_model binary with ruy.
-bazel build --copt=-mavx2 -c opt \
+# Build the benchmark_model binary using ruy even for matrix*vector
+# products. This is only worth trying in models that are heavy on matrix*vector
+# shapes, typically LSTMs and other RNNs.
+bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
-  --define=tflite_with_ruy=true \
   --copt=-DTFLITE_WITH_RUY_GEMV \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
 # Rename the binary for comparison with the standard benchmark_model.
 mv bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
-  bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy
-adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy \
+  bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv
+adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv \
   /data/local/tmp/
-adb shell chmod +x /data/local/tmp/benchmark_model_plus_ruy
+adb shell chmod +x /data/local/tmp/benchmark_model_plus_ruy_gemv
 ```
 
 ```shell
@@ -339,17 +347,15 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true
 ```
 
 ```shell
-# Benchmark with TFLite + RUY.
-adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy \
+# Benchmark with TFLite + RUY GEMV
+adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy_gemv \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true
 ```
 
 ```shell
@@ -359,7 +365,6 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true
 ```
 
 ```shell
@@ -369,7 +374,6 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --warmup_runs=1 \
   --num_threads=1 \
   --num_runs=10 \
-  --enable_op_profiling=true \
   --use_gpu=true
 ```
 
@@ -387,3 +391,30 @@ benchmark, as the `graph_path` file assumes that the graph has not moved. The
 name of the `.tflite` graph that you need to benchmark _may_ be different from
 the name of the trace that you want to benchmark, but you can use `cat` on
 the `graph_path` file to verify the correct `.tflite` filename if you're unsure.
+
+### Profile
+
+There are 2 profilers built into TFLite's `benchmark_model` program. Both of them impact latencies, so they should only be used to get a breakdown of the relative time spent in each operator type, they should not be enabled for the purpose of measuring a latency.
+
+The first is `enable_op_profiling`. It's based on timestamps before and after each op. It's a runtime commandline flag taken by `benchmark_model`. Example:
+
+```
+adb shell taskset f0 /data/local/tmp/benchmark_model \
+  --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
+  --warmup_runs=1 \
+  --num_threads=1 \
+  --num_runs=10 \
+  --enable_op_profiling=true
+```
+
+The second is `ruy_profiler`. Despite its name, it's available regardless of whether `ruy` is used for the matrix multiplications. It's a sampling profiler, which allows it to provide some more detailed informations, particularly on matrix multiplications. It's a build-time switch:
+
+```
+bazel build \
+  --define=ruy_profiler=true \
+  -c opt \
+  --config=android_arm64 \
+  //tensorflow/lite/tools/benchmark:benchmark_model
+```
+
+The binary thus built can be run like above, no commandline flag needed.

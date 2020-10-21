@@ -59,38 +59,39 @@ ABSL_FLAG(std::string, function_inputs_file, "",
 namespace iree {
 namespace {
 
+static void BenchmarkFunction(
+    const std::string& benchmark_name, iree_vm_context_t* context,
+    iree_vm_function_t function, iree_vm_list_t* inputs,
+    const std::vector<RawSignatureParser::Description>& output_descs,
+    benchmark::State& state) {
+  IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
+  IREE_TRACE_FRAME_MARK();
+
+  // Benchmarking loop.
+  for (auto _ : state) {
+    IREE_TRACE_SCOPE0("BenchmarkIteration");
+    IREE_TRACE_FRAME_MARK_NAMED("Iteration");
+    vm::ref<iree_vm_list_t> outputs;
+    IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
+                                      output_descs.size(),
+                                      iree_allocator_system(), &outputs));
+    IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr, inputs,
+                                 outputs.get(), iree_allocator_system()));
+  }
+}
+
 void RegisterModuleBenchmarks(
     const std::string& function_name, iree_vm_context_t* context,
     iree_vm_function_t function, iree_vm_list_t* inputs,
     const std::vector<RawSignatureParser::Description>& output_descs) {
   auto benchmark_name = "BM_" + function_name;
-  benchmark::RegisterBenchmark(
-      benchmark_name.c_str(),
-      [context, function, inputs,
-       output_descs](benchmark::State& state) -> void {
-        // Warmup run step.
-        {
-          vm::ref<iree_vm_list_t> outputs;
-          IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
-                                            output_descs.size(),
-                                            iree_allocator_system(), &outputs));
-          IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                       inputs, outputs.get(),
-                                       iree_allocator_system()));
-        }
-        // Benchmarking loop.
-        for (auto _ : state) {
-          // No status conversions and conditional returns in the benchmarked
-          // inner loop.
-          vm::ref<iree_vm_list_t> outputs;
-          IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr,
-                                            output_descs.size(),
-                                            iree_allocator_system(), &outputs));
-          IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                       inputs, outputs.get(),
-                                       iree_allocator_system()));
-        }
-      })
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [benchmark_name, context, function, inputs,
+                                output_descs](benchmark::State& state) -> void {
+                                 BenchmarkFunction(benchmark_name, context,
+                                                   function, inputs,
+                                                   output_descs, state);
+                               })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
@@ -107,6 +108,7 @@ void RegisterModuleBenchmarks(
 }
 
 Status GetModuleContentsFromFlags(std::string& module_data) {
+  IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = absl::GetFlag(FLAGS_module_file);
   IREE_ASSIGN_OR_RETURN(module_data, file_io::GetFileContents(module_file));
   return iree::OkStatus();
@@ -127,6 +129,8 @@ class IREEBenchmark {
         context_(nullptr),
         input_module_(nullptr){};
   ~IREEBenchmark() {
+    IREE_TRACE_SCOPE0("IREEBenchmark::dtor");
+
     // Order matters.
     inputs_.reset();
     iree_vm_module_release(hal_module_);
@@ -137,6 +141,8 @@ class IREEBenchmark {
   };
 
   Status Register() {
+    IREE_TRACE_SCOPE0("IREEBenchmark::Register");
+
     if (!instance_ || !device_ || !hal_module_ || !context_ || !input_module_) {
       IREE_RETURN_IF_ERROR(Init());
     }
@@ -152,6 +158,9 @@ class IREEBenchmark {
 
  private:
   Status Init() {
+    IREE_TRACE_SCOPE0("IREEBenchmark::Init");
+    IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
+
     IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(module_data_));
 
     IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
@@ -170,10 +179,14 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
         instance_, modules.data(), modules.size(), iree_allocator_system(),
         &context_));
+
+    IREE_TRACE_FRAME_MARK_END_NAMED("init");
     return iree::OkStatus();
   }
 
   Status RegisterSpecificFunction(const std::string& function_name) {
+    IREE_TRACE_SCOPE0("IREEBenchmark::RegisterSpecificFunction");
+
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(input_module_->lookup_function(
         input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
@@ -203,6 +216,7 @@ class IREEBenchmark {
   }
 
   Status RegisterAllExportedFunctions() {
+    IREE_TRACE_SCOPE0("IREEBenchmark::RegisterAllExportedFunctions");
     iree_vm_function_t function;
     iree_vm_module_signature_t signature =
         input_module_->signature(input_module_->self);
@@ -239,6 +253,8 @@ class IREEBenchmark {
 }  // namespace iree
 
 int main(int argc, char** argv) {
+  IREE_TRACE_SCOPE0("main");
+
   // We have to contend with two flag parsing libraries here: absl's and
   // benchmark's. To make matters worse, both define the `--help` flag. To
   // ensure that each is able to parse its own flags, we use an absl "internal"

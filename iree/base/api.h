@@ -540,6 +540,13 @@ typedef void* iree_status_t;
   if (IREE_UNLIKELY(var)) {                                                  \
     return IREE_STATUS_IMPL_ANNOTATE_SWITCH_(var, __VA_ARGS__);              \
   }
+#define IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_(tail_expr, var, ...)  \
+  iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_EXPR_)(__VA_ARGS__))); \
+  if (IREE_UNLIKELY(var)) {                                                  \
+    (tail_expr);                                                             \
+    return IREE_STATUS_IMPL_ANNOTATE_SWITCH_(var, __VA_ARGS__);              \
+  }
 #define IREE_STATUS_IMPL_IGNORE_ERROR_(var, expr) \
   iree_status_t var = (expr);                     \
   if (IREE_UNLIKELY(var)) iree_status_ignore(var);
@@ -552,6 +559,14 @@ typedef void* iree_status_t;
 #define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, expr, ...) \
   iree_status_t var = (expr);                                 \
   if (IREE_UNLIKELY(var)) return var;
+#undef IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_
+#define IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_(tail_expr, var, expr, \
+                                                       ...)                  \
+  iree_status_t var = (expr);                                                \
+  if (IREE_UNLIKELY(var)) {                                                  \
+    (tail_expr);                                                             \
+    return var;                                                              \
+  }
 #undef IREE_STATUS_IMPL_IGNORE_ERROR_
 #define IREE_STATUS_IMPL_IGNORE_ERROR_(var, expr) \
   iree_status_t var = (expr);                     \
@@ -591,6 +606,12 @@ typedef void* iree_status_t;
 #define IREE_RETURN_IF_ERROR(...)                       \
   IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(                \
       IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_IDENTITY_(__VA_ARGS__)))
+
+// IREE_RETURN_IF_ERROR with a custom expression to evaluate before returning.
+#define IREE_RETURN_AND_EVAL_IF_ERROR(tail_expr, ...)              \
+  IREE_STATUS_IMPL_RETURN_AND_EVAL_IF_API_ERROR_(                  \
+      tail_expr, IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), \
       IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_IDENTITY_(__VA_ARGS__)))
 
 // Ignores the status result of (expr) regardless of its value.

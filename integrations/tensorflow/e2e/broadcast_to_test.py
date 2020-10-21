@@ -34,7 +34,7 @@ class BroadcastToModule(tf.Module):
 class BroadcastToTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(BroadcastToTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(BroadcastToModule)
 
   def test_scalar_broadcast_to(self):

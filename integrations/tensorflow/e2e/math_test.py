@@ -46,7 +46,7 @@ class MathModule(tf.Module):
 class MathTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(MathTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(MathModule)
 
   # yapf: disable

@@ -60,7 +60,8 @@ class VmaAllocator final : public Allocator {
 
   static StatusOr<std::unique_ptr<VmaAllocator>> Create(
       VkPhysicalDevice physical_device,
-      const ref_ptr<VkDeviceHandle>& logical_device, Options options);
+      const ref_ptr<VkDeviceHandle>& logical_device, VkInstance instance,
+      Options options);
 
   ~VmaAllocator() override;
 

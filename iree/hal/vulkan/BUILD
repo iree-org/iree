@@ -491,6 +491,7 @@ cc_library(
         ":vulkan_device",
         "//iree/base:memory",
         "//iree/base:status",
+        "//iree/base:target_platform",
         "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",

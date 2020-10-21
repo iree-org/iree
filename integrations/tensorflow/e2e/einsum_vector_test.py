@@ -67,7 +67,7 @@ class EinsumVectorModule(tf.Module):
 class EinsumVectorTest(tf_test_utils.TracedModuleTestCase):
 
   def __init__(self, *args, **kwargs):
-    super(EinsumVectorTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._modules = tf_test_utils.compile_tf_module(EinsumVectorModule)
 
   # yapf: disable
