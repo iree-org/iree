@@ -527,10 +527,18 @@ class _TfFunctionWrapper(_FunctionWrapper):
   def __init__(self, f: Callable[..., Any]):
     self._f = f
 
-  def _convert_to_numpy(self, tensor: Any) -> Any:
-    if not isinstance(tensor, tf.Tensor):
-      return tensor
-    return _normalize_numpy(tensor.numpy())
+  def _convert_to_numpy(self, *tensors: Any) -> Any:
+    arrays = []
+    for tensor in tensors:
+      if not isinstance(tensor, tf.Tensor):
+        arrays.append(tensor)
+      else:
+        arrays.append(_normalize_numpy(tensor.numpy()))
+
+    arrays = tuple(arrays)
+    if len(arrays) == 1:
+      return arrays[0]
+    return arrays
 
   def __call__(self, *args, **kwargs):
     # TensorFlow will auto-convert all inbound args.

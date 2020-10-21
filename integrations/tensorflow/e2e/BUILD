@@ -71,6 +71,7 @@ TFLITE_FAILING = [
     "gather_test.py",
     "mandelbrot_test.py",
     "matrix_ops_dynamic_test.py",
+    "python_outputs_test.py",
     "resource_ops_test.py",
     "ring_buffer_test.py",
     "scatter_update_test.py",
@@ -85,6 +86,7 @@ VMLA_FAILING = [
     "einsum_static_test.py",
     "einsum_vector_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
+    "python_outputs_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
 ]
@@ -102,6 +104,7 @@ LLVM_FAILING = [
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
+    "python_outputs_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
@@ -122,6 +125,7 @@ VULKAN_FAILING = [
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
+    "python_outputs_test.py",
     "range_test.py",
     "ring_buffer_test.py",  # TODO(b/148747011)
     "scatter_update_test.py",
