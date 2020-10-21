@@ -39,6 +39,48 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+namespace {
+
+// Destructively merges |sourceModuleOp| into |targetModuleOp|.
+// |targetSymbolTable| is updated with the new symbols.
+void mergeModuleInto(IREE::VM::ModuleOp sourceModuleOp,
+                     IREE::VM::ModuleOp targetModuleOp,
+                     DenseMap<StringRef, Operation *> &targetSymbolMap) {
+  auto allOps = llvm::to_vector<8>(llvm::map_range(
+      sourceModuleOp.getBlock(), [&](Operation &op) { return &op; }));
+  for (auto &op : allOps) {
+    if (op->isKnownTerminator()) continue;
+    if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
+      if (targetSymbolMap.count(symbolInterface.getName())) {
+        // TODO(scotttodd): compare ops to ensure we aren't copying different
+        // things with the same name.
+        continue;
+      }
+      targetSymbolMap[symbolInterface.getName()] = op;
+    }
+    op->moveBefore(&targetModuleOp.getBlock().back());
+  }
+
+  // Now that we're done cloning its ops, delete the original target op.
+  sourceModuleOp.erase();
+}
+
+// Replaces each usage of an entry point with its original symbol name with a
+// new symbol name.
+void replaceEntryPointUses(mlir::ModuleOp moduleOp,
+                           const DenseMap<Attribute, Attribute> &replacements) {
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
+      auto it = replacements.find(dispatchOp.entry_point());
+      if (it != replacements.end()) {
+        dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
+      }
+    });
+  }
+}
+
+}  // namespace
+
 VMLATargetOptions getVMLATargetOptionsFromFlags() {
   VMLATargetOptions targetOptions;
   // TODO(benvanik): flags.
@@ -172,45 +214,6 @@ class VMLATargetBackend final : public TargetBackend {
     }
 
     return success();
-  }
-
-  // Destructively merges |sourceModuleOp| into |targetModuleOp|.
-  // |targetSymbolTable| is updated with the new symbols.
-  void mergeModuleInto(IREE::VM::ModuleOp sourceModuleOp,
-                       IREE::VM::ModuleOp targetModuleOp,
-                       DenseMap<StringRef, Operation *> &targetSymbolMap) {
-    auto allOps = llvm::to_vector<8>(llvm::map_range(
-        sourceModuleOp.getBlock(), [&](Operation &op) { return &op; }));
-    for (auto &op : allOps) {
-      if (op->isKnownTerminator()) continue;
-      if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
-        if (targetSymbolMap.count(symbolInterface.getName())) {
-          // TODO(scotttodd): compare ops to ensure we aren't copying different
-          // things with the same name.
-          continue;
-        }
-        targetSymbolMap[symbolInterface.getName()] = op;
-      }
-      op->moveBefore(&targetModuleOp.getBlock().back());
-    }
-
-    // Now that we're done cloning its ops, delete the original target op.
-    sourceModuleOp.erase();
-  }
-
-  // Replaces each usage of an entry point with its original symbol name with a
-  // new symbol name.
-  void replaceEntryPointUses(
-      mlir::ModuleOp moduleOp,
-      const DenseMap<Attribute, Attribute> &replacements) {
-    for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-      funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
-        auto it = replacements.find(dispatchOp.entry_point());
-        if (it != replacements.end()) {
-          dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
-        }
-      });
-    }
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
