@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/Shape/IR/Shape.h"      // from @llvm-project
-#include "mlir/Dialect/StandardOps/IR/Ops.h"  // from @llvm-project
-#include "mlir/Pass/Pass.h"                   // from @llvm-project
-#include "mlir/Support/LLVM.h"                // from @llvm-project
+#include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
@@ -26,6 +26,10 @@ namespace mlir {
 namespace mhlo {
 namespace {
 
+// This is a customizer version of the TF to XLA lowering in:
+//    tensorflow/compiler/mlir/xla/transforms/legalize_tf.cc
+// It does not require the same number of options as we can hardcode as the pass
+// the IREE requires.
 class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<chlo::HloClientDialect, mhlo::MhloDialect,
@@ -47,8 +51,7 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     OwningRewritePatternList patterns;
     // Note that the `OperationConverter` orders patterns lexicographically by:
     // 1) Ascending legalization depth (i.e., minimum number of patterns
-    // necessary
-    //    to arrive at conversion target).
+    // necessary to arrive at conversion target).
     // 2) Descending pattern benefit.
     // 3) Order of patterns in `OwningRewritePatternList`.
 
@@ -81,14 +84,14 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     while (true) {
       if (failed(
               applyPartialConversion(op, target, patterns, &unconvertedOps))) {
-        signalPassFailure();
+        return signalPassFailure();
       }
 
       if (prevUnconvertedOps == unconvertedOps) break;
 
       prevUnconvertedOps = std::move(unconvertedOps);
       if (failed(applyPatternsAndFoldGreedily(op, canonicalizePatterns))) {
-        signalPassFailure();
+        return signalPassFailure();
       }
     }
   }
