@@ -2,6 +2,7 @@
 layout: default
 permalink: objectives
 title: Short-term Objectives
+nav_order: 6
 ---
 
 # 2020 Q4 Objectives (OKRs)

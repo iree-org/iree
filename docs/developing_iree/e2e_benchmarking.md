@@ -419,7 +419,7 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
 The second is `ruy_profiler`. Despite its name, it's available regardless of whether `ruy` is used for the matrix multiplications. It's a sampling profiler, which allows it to provide some more detailed informations, particularly on matrix multiplications. It's a build-time switch:
 
 ```
-blaze build \
+bazel build \
   --define=ruy_profiler=true \
   -c opt \
   --config=android_arm64 \
