@@ -87,10 +87,10 @@ def save_input_values(inputs: Sequence[np.ndarray],
 
 
 def _setup_mlir_crash_reproducer(
-    function: Callable[[Any], Any],
+    function: Any,  # pytype doesn't support arbitrary Callable[*args, **kwargs]
     artifacts_dir: str,
     backend_id: str,
-) -> Callable[[Any], Any]:
+) -> Any:  # Callable[Any, Any]
   """Wraps `function` so that it a MLIR crash reproducer is saved if it crashes.
 
   Writes to `artifacts_dir/reproducer__{backend}.mlir` in the case of a crash.
@@ -253,6 +253,16 @@ def _incrementally_compile_tf_signature_def_saved_model(
                          exported_name, artifacts_dir)
 
 
+class _FunctionWrapper(object):
+
+  def __call__(self, *args, **kwargs):
+    raise NotImplementedError()
+
+  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
+    """Dummy function to match _IreeFunctionWrapper's API."""
+    return ("",), ("",)
+
+
 class CompiledModule(object):
   """Base class for the TF and IREE compiled modules."""
 
@@ -260,7 +270,7 @@ class CompiledModule(object):
       self,
       module_name: str,
       backend_info: "BackendInfo",
-      compiled_paths: Dict[str, str],
+      compiled_paths: Union[Dict[str, str], None],
   ):
     """Shared base constructor – not useful on its own.
 
@@ -344,18 +354,14 @@ class CompiledModule(object):
     """
     raise NotImplementedError()
 
+  def __getattr__(self, attr: str) -> _FunctionWrapper:
+    raise NotImplementedError()
+
   def iree_serializable(self):
     return False
 
   def tflite_serializable(self):
     return False
-
-
-class _FunctionWrapper(object):
-
-  def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
-    """Dummy function to match _IreeFunctionWrapper's API."""
-    return (), ()
 
 
 class _IreeFunctionWrapper(_FunctionWrapper):
@@ -681,7 +687,7 @@ def _get_concrete_functions(module_class: Type[tf.Module],
   instance = module_class()
   functions = []
   for name in exported_names:
-    functions.append(instance.__getattribute__(name).get_concrete_function())
+    functions.append(getattr(instance, name).get_concrete_function())
   return functions, exported_names
 
 
@@ -787,7 +793,8 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
   def __init__(self, interpreter: tf.lite.Interpreter):
     self._interpreter = interpreter
 
-  def __call__(self, *args, **kwargs) -> Tuple[Any]:
+  def __call__(self, *args,
+               **kwargs) -> Union[Dict[str, Any], Tuple[Any], np.ndarray]:
     if len(args) and len(kwargs):
       raise ValueError("Passing both args and kwargs is not supported by "
                        "_TfLiteFunctionWrapper")
@@ -823,13 +830,13 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
         outputs.append(value)
 
     # Process them to match the output of the tf.Module.
-    if not is_dict:
+    if is_dict:
+      return dict(outputs)
+    else:
       outputs = tuple(outputs)
       if len(outputs) == 1:
-        outputs = outputs[0]
-    else:
-      outputs = dict(outputs)
-    return outputs
+        return outputs[0]
+      return outputs
 
 
 class TfLiteCompiledModule(CompiledModule):
