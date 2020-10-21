@@ -20,6 +20,7 @@
 #include "absl/flags/flag.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
@@ -45,7 +46,11 @@ VkApplicationInfo GetDefaultApplicationInfo() {
   info.applicationVersion = 0;
   info.pEngineName = "IREE";
   info.engineVersion = 0;
-  info.apiVersion = VK_API_VERSION_1_0;
+#ifdef IREE_PLATFORM_ANDROID
+  info.apiVersion = VK_API_VERSION_1_1;
+#else
+  info.apiVersion = VK_API_VERSION_1_2;
+#endif
   return info;
 }
 

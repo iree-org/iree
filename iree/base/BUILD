@@ -395,7 +395,12 @@ cc_library(
     name = "synchronization",
     srcs = ["synchronization.c"],
     hdrs = ["synchronization.h"],
-    linkopts = ["-lpthread"],
+    linkopts = select({
+        "//iree:iree_is_msvc": [],
+        "//conditions:default": [
+            "-lpthread",
+        ],
+    }),
     deps = [
         ":api",
         ":atomics",
@@ -460,10 +465,13 @@ cc_library(
     copts = [
         "-D_GNU_SOURCE=1",
     ],
-    linkopts = [
-        "-ldl",
-        "-lpthread",
-    ],
+    linkopts = select({
+        "//iree:iree_is_msvc": [],
+        "//conditions:default": [
+            "-ldl",
+            "-lpthread",
+        ],
+    }),
     deps = [
         ":api",
         ":atomics",

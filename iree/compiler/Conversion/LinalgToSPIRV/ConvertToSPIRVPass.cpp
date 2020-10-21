@@ -204,7 +204,7 @@ class TransferToCoopMatLoadStore final : public SPIRVOpLowering<OpTy> {
     if (vecType.getRank() != 2) return failure();
     // TODO(thomasraoux): use coloumn major operand when TransfertRead +
     // TransposeOp.
-    if (!op.permutation_map().isIdentity()) return failure();
+    if (!op.permutation_map().isMinorIdentity()) return failure();
     if (op.masked() &&
         llvm::any_of(op.masked()->template cast<ArrayAttr>(),
                      [](mlir::Attribute maskedDim) {

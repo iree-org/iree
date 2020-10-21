@@ -85,11 +85,14 @@ def iree_flatbuffer_cc_library(**kwargs):
 def cc_binary(linkopts = [], **kwargs):
     """Wrapper around low-level cc_binary that adds flags."""
     _cc_binary(
-        linkopts = linkopts + [
-            # Just include libraries that should be presumed in 2020.
-            "-ldl",
-            "-lpthread",
-        ],
+        linkopts = linkopts + select({
+            "//iree:iree_is_msvc": [],
+            "//conditions:default": [
+                # Just include libraries that should be presumed in 2020.
+                "-ldl",
+                "-lpthread",
+            ],
+        }),
         **kwargs
     )
 
