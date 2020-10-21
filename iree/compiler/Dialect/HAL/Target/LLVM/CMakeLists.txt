@@ -28,6 +28,7 @@ iree_cc_library(
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions
+    LLVMSupport
     MLIRAffine
     MLIRLLVMIR
     MLIRLinalg

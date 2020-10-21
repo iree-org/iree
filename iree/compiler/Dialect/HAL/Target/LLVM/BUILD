@@ -42,6 +42,7 @@ cc_library(
         ":LLVMTargetOptions",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LinalgOps",
