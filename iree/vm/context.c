@@ -89,6 +89,8 @@ static iree_status_t iree_vm_context_query_module_state(
 static iree_status_t iree_vm_context_resolve_module_imports(
     iree_vm_context_t* context, iree_vm_module_t* module,
     iree_vm_module_state_t* module_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // NOTE: this has some bad characteristics, but the number of modules and the
   // number of imported functions should be relatively small (even if the number
   // of exported functions for particular modules is large).
@@ -96,7 +98,8 @@ static iree_status_t iree_vm_context_resolve_module_imports(
   for (int i = 0; i < module_signature.import_function_count; ++i) {
     iree_string_view_t full_name;
     iree_vm_function_signature_t expected_signature;
-    IREE_RETURN_IF_ERROR(
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
         module->get_function(module->self, IREE_VM_FUNCTION_LINKAGE_IMPORT, i,
                              /*out_function=*/NULL,
                              /*out_name=*/&full_name,
@@ -105,7 +108,8 @@ static iree_status_t iree_vm_context_resolve_module_imports(
     // Resolve the function to the module that contains it and return the
     // information.
     iree_vm_function_t import_function;
-    IREE_RETURN_IF_ERROR(
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
         iree_vm_context_resolve_function(context, full_name, &import_function));
 
     // Query the function signature from the module that contains it; we don't
@@ -127,6 +131,7 @@ static iree_status_t iree_vm_context_resolve_module_imports(
     if (expected_signature.calling_convention.size &&
         !iree_string_view_equal(import_signature.calling_convention,
                                 expected_signature.calling_convention)) {
+      IREE_TRACE_ZONE_END(z0);
       return iree_make_status(
           IREE_STATUS_INTERNAL,
           "import function signature mismatch between %.*s "
@@ -141,9 +146,12 @@ static iree_status_t iree_vm_context_resolve_module_imports(
           import_signature.calling_convention.data);
     }
 
-    IREE_RETURN_IF_ERROR(module->resolve_import(
-        module->self, module_state, i, &import_function, &import_signature));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, module->resolve_import(module->self, module_state, i,
+                                   &import_function, &import_signature));
   }
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -199,6 +207,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
     iree_vm_instance_t* instance, iree_vm_module_t** modules,
     iree_host_size_t module_count, iree_allocator_t allocator,
     iree_vm_context_t** out_context) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
@@ -231,10 +240,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
       iree_vm_context_register_modules(context, modules, module_count);
   if (!iree_status_is_ok(register_status)) {
     iree_vm_context_destroy(context);
+    IREE_TRACE_ZONE_END(z0);
     return register_status;
   }
 
   *out_context = context;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -317,9 +328,12 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
     }
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Try growing both our storage lists first, if needed.
   if (context->list.count + module_count > context->list.capacity) {
     if (context->is_static) {
+      IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "context was allocated as static and cannot "
                               "register modules after creation");
@@ -330,13 +344,16 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
       new_capacity = context->list.capacity * 2;
     }
     iree_vm_module_t** new_module_list;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        context->allocator, sizeof(iree_vm_module_t*) * new_capacity,
-        (void**)&new_module_list));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc(context->allocator,
+                                  sizeof(iree_vm_module_t*) * new_capacity,
+                                  (void**)&new_module_list));
     iree_vm_module_state_t** new_module_state_list;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        context->allocator, sizeof(iree_vm_module_state_t*) * new_capacity,
-        (void**)&new_module_state_list));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_allocator_malloc(context->allocator,
+                              sizeof(iree_vm_module_state_t*) * new_capacity,
+                              (void**)&new_module_state_list));
     memcpy(new_module_list, context->list.modules,
            sizeof(iree_vm_module_t*) * context->list.count);
     memcpy(new_module_state_list, context->list.module_states,
@@ -409,12 +426,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
     context->list.count = original_count;
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_function);
   memset(out_function, 0, sizeof(iree_vm_function_t));
 
@@ -422,6 +441,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
   iree_string_view_t function_name;
   if (iree_string_view_split(full_name, '.', &module_name, &function_name) ==
       -1) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "import name not fully-qualified (module.func): '%.*s'",
@@ -430,13 +450,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
 
   for (int i = (int)context->list.count - 1; i >= 0; --i) {
     iree_vm_module_t* module = context->list.modules[i];
-    if (iree_string_view_compare(module_name, iree_vm_module_name(module)) ==
-        0) {
-      return iree_vm_module_lookup_function_by_name(
+    if (iree_string_view_equal(module_name, iree_vm_module_name(module))) {
+      iree_status_t status = iree_vm_module_lookup_function_by_name(
           module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, out_function);
+      IREE_TRACE_ZONE_END(z0);
+      return status;
     }
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "module '%.*s' required for import '%.*s' not "
                           "registered with the context",

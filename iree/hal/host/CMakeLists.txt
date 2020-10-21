@@ -55,6 +55,7 @@ iree_cc_library(
   DEPS
     iree::base::logging
     iree::base::status
+    iree::base::tracing
     iree::hal::buffer
   PUBLIC
 )

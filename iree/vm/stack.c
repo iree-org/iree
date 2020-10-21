@@ -419,6 +419,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
   stack->frame_storage_size = new_top;
   stack->top = frame_header;
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  // TODO(benvanik): cache source location and query from module.
+  iree_string_view_t function_name = iree_vm_function_name(function);
+  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, function_name.data,
+                                      function_name.size);
+  callee_frame->trace_zone = z0;
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, frame_size);
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
   if (out_callee_frame) *out_callee_frame = callee_frame;
   return iree_ok_status();
 }
@@ -434,6 +443,8 @@ iree_vm_stack_function_leave(iree_vm_stack_t* stack) {
   if (stack->top->frame_cleanup_fn) {
     stack->top->frame_cleanup_fn(&stack->top->frame);
   }
+
+  IREE_TRACE_ZONE_END(stack->top->frame.trace_zone);
 
   // Restore the frame pointer to the caller.
   stack->frame_storage_size -= stack->top->frame_size;

@@ -66,8 +66,7 @@ Status FlatBufferFileBase::FromBuffer(Identifier identifier,
                                       std::function<void()> deleter,
                                       size_t root_type_size,
                                       VerifierFn verifier_fn) {
-  IREE_TRACE_SCOPE("FlatBufferFileBase::FromBuffer:size", int)
-  (static_cast<int>(buffer_data.size()));
+  IREE_TRACE_SCOPE();
 
   // Sanity check buffer for the minimum size as FlatBuffers doesn't.
   if (buffer_data.size() < 16) {

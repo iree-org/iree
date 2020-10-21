@@ -263,12 +263,12 @@ enum {
 
 // Begins a new zone with the given runtime dynamic string name.
 // The |value| string will be copied into the trace buffer.
-#define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length)   \
-  static const iree_tracing_location_t TracyConcat(                       \
-      __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
-                                            (uint32_t)__LINE__, 0};       \
-  iree_zone_id_t zone_id = iree_tracing_zone_begin_impl(                  \
-      &TracyConcat(__tracy_source_location, __LINE__), name, name_length);
+#define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length) \
+  static const iree_tracing_location_t TracyConcat(                     \
+      __tracy_source_location, __LINE__) = {0, __FUNCTION__, __FILE__,  \
+                                            (uint32_t)__LINE__, 0};     \
+  iree_zone_id_t zone_id = iree_tracing_zone_begin_impl(                \
+      &TracyConcat(__tracy_source_location, __LINE__), (name), (name_length));
 
 // Begins an externally defined zone with a dynamic source location.
 // The |file_name|, |function_name|, and optional |name| strings will be copied
@@ -279,6 +279,10 @@ enum {
   iree_zone_id_t zone_id = iree_tracing_zone_begin_external_impl(             \
       file_name, file_name_length, line, function_name, function_name_length, \
       name, name_length)
+
+// Appends an integer value to the parent zone. May be called multiple times.
+#define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value) \
+  ___tracy_emit_zone_value((struct ___tracy_c_zone_context){zone_id, 1}, value);
 
 // Appends a string value to the parent zone. May be called multiple times.
 // The |value| string will be copied into the trace buffer.
@@ -296,6 +300,11 @@ enum {
 // Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
 #define IREE_TRACE_ZONE_END(zone_id) \
   ___tracy_emit_zone_end((struct ___tracy_c_zone_context){zone_id, 1})
+
+// Ends the current zone before returning on a failure.
+// Sugar for IREE_TRACE_ZONE_END+IREE_RETURN_IF_ERROR.
+#define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
+  IREE_RETURN_AND_EVAL_IF_ERROR(IREE_TRACE_ZONE_END(zone_id), __VA_ARGS__)
 
 // Configures the named plot with an IREE_TRACING_PLOT_TYPE_* representation.
 #define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type) \
@@ -347,8 +356,11 @@ enum {
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                        \
     zone_id, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
+#define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, value, value_length)
 #define IREE_TRACE_ZONE_END(zone_id)
+#define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
+  IREE_RETURN_IF_ERROR(__VA_ARGS__)
 #define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type)
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value)
 #define IREE_TRACE_PLOT_VALUE_F32(name_literal, value)
@@ -411,17 +423,20 @@ void operator delete(void* ptr) noexcept;
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // TODO(#1886): update these to tracy and drop the 0.
-#define IREE_TRACE_SCOPE0(name_spec) ZoneScopedN(name_spec)
-#define IREE_TRACE_SCOPE(name_spec, ...)
-#define IREE_TRACE_EVENT0
+#define IREE_TRACE_SCOPE() ZoneScoped
+#define IREE_TRACE_SCOPE_DYNAMIC(name_cstr) \
+  ZoneTransientN(___tracy_scoped_zone, name_cstr, true)
+#define IREE_TRACE_SCOPE0(name_literal) ZoneScopedN(name_literal)
 #define IREE_TRACE_EVENT
+#define IREE_TRACE_EVENT0
 
 #else
 #define IREE_TRACE_THREAD_ENABLE(name)
-#define IREE_TRACE_SCOPE0(name_spec)
-#define IREE_TRACE_SCOPE(name_spec, ...) (void)
-#define IREE_TRACE_EVENT0
+#define IREE_TRACE_SCOPE()
+#define IREE_TRACE_SCOPE_DYNAMIC(name_string_view)
+#define IREE_TRACE_SCOPE0(name_literal)
 #define IREE_TRACE_EVENT(void)
+#define IREE_TRACE_EVENT0
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // TODO(benvanik): macros for LockableCtx / Lockable mutex tracking.

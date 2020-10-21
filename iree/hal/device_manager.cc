@@ -108,8 +108,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::TryAllocateDeviceVisibleBuffer(
     MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
     device_size_t allocation_size,
     absl::Span<const DevicePlacement> device_placements) {
-  IREE_TRACE_SCOPE("DeviceManager::TryAllocateDeviceVisibleBuffer:size", int)
-  (static_cast<int>(allocation_size));
+  IREE_TRACE_SCOPE0("DeviceManager::TryAllocateDeviceVisibleBuffer:size");
   if (!AnyBitSet(memory_type & MemoryType::kHostLocal)) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Host-local buffers require the kHostLocal bit: "
@@ -138,8 +137,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceVisibleBuffer(
     MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
     device_size_t allocation_size,
     absl::Span<const DevicePlacement> device_placements) {
-  IREE_TRACE_SCOPE("DeviceManager::AllocateDeviceVisibleBuffer:size", int)
-  (static_cast<int>(allocation_size));
+  IREE_TRACE_SCOPE0("DeviceManager::AllocateDeviceVisibleBuffer:size");
   if (!AnyBitSet(memory_type & MemoryType::kHostLocal)) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Host-local buffers require the kHostLocal bit: "
@@ -160,8 +158,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceLocalBuffer(
     MemoryTypeBitfield memory_type, BufferUsageBitfield buffer_usage,
     device_size_t allocation_size,
     absl::Span<const DevicePlacement> device_placements) {
-  IREE_TRACE_SCOPE("DeviceManager::AllocateDeviceLocalBuffer:size", int)
-  (static_cast<int>(allocation_size));
+  IREE_TRACE_SCOPE0("DeviceManager::AllocateDeviceLocalBuffer:size");
   if (!AnyBitSet(memory_type & MemoryType::kDeviceLocal)) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Device-local buffers require the kDeviceLocal bit: "
