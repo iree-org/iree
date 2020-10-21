@@ -38,6 +38,7 @@ cc_library(
         "LLVMBaseTarget.h",
     ],
     deps = [
+        ":LLVMIRPasses",
         ":LLVMTargetOptions",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",

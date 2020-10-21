@@ -26,6 +26,7 @@ iree_cc_library(
   SRCS
     "LLVMBaseTarget.cpp"
   DEPS
+    ::LLVMIRPasses
     ::LLVMTargetOptions
     MLIRAffine
     MLIRLLVMIR
