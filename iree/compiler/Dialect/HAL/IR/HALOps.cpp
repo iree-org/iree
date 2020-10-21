@@ -1501,21 +1501,14 @@ ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
 }
 
 bool InterfaceOp::isEquivalentTo(InterfaceOp other) {
-  auto bindings = getBlock().getOps<InterfaceBindingOp>();
-  auto otherBindings = other.getBlock().getOps<InterfaceBindingOp>();
-  auto it = bindings.begin(), lhsEnd = bindings.end();
-  auto otherIt = otherBindings.begin(), rhsEnd = otherBindings.end();
-  for (; it != lhsEnd && otherIt != rhsEnd; ++it, ++otherIt) {
-    // Assume bindings are in order, check equivalence of each pairing.
-    if (!OperationEquivalence::isEquivalentTo(*it, *otherIt)) return false;
-  }
-
-  if (it != lhsEnd || otherIt != rhsEnd) {
-    // Not finished iterating through one, number of interface bindings differ.
-    return false;
-  }
-
-  return true;
+  auto bindings = llvm::to_vector<4>(getBlock().getOps<InterfaceBindingOp>());
+  auto otherBindings =
+      llvm::to_vector<4>(other.getBlock().getOps<InterfaceBindingOp>());
+  return bindings.size() == otherBindings.size() &&
+         llvm::all_of(llvm::zip(bindings, otherBindings), [](auto bindings) {
+           return OperationEquivalence::isEquivalentTo(std::get<0>(bindings),
+                                                       std::get<1>(bindings));
+         });
 }
 
 //===----------------------------------------------------------------------===//
