@@ -28,4 +28,4 @@
 FROM gcr.io/iree-oss/cmake-python-vulkan AS final
 
 RUN apt-get update \
-  && apt-get install -y nvidia-driver-440
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y nvidia-driver-450

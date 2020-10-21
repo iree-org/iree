@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y \
 
 # This commit fixed support for the max version of libstdc++6 available through
 # Ubuntu 16.04 apt.
-ARG SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
+ARG SWIFTSHADER_COMMIT=84f5eeb6dd9b225f465f93737fa76aad7de355cf
 
 RUN git clone https://github.com/google/swiftshader
 RUN cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd ..
@@ -79,25 +79,12 @@ RUN apt-get update \
   && python3 -m pip install numpy
 
 ######################## Vulkan SDK ############################################
-ARG VULKAN_SDK_VERSION=1.2.141
 
-# Disable apt-key parse waring. If someone knows how to do whatever the "proper"
-# thing is then feel free. The warning complains about parsing apt-key output,
-# which we're not even doing.
-ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
+ARG VULKAN_SDK_VERSION=1.2.154.0
 
-RUN apt-get update \
-  && apt-get install apt-transport-https
+COPY --from=gcr.io/iree-oss/vulkan /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
-# Note that this image is based on Ubuntu 16.04 (xenial) as opposed to
-# Ubuntu 18.04 (bionic), which we use for our other images.
-RUN wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc \
-    | apt-key add - \
-  && wget -qO \
-    "/etc/apt/sources.list.d/lunarg-vulkan-${VULKAN_SDK_VERSION?}-xenial.list" \
-    "http://packages.lunarg.com/vulkan/${VULKAN_SDK_VERSION?}/lunarg-vulkan-${VULKAN_SDK_VERSION?}-xenial.list" \
-  && apt-get update \
-  && apt-get install -y vulkan-sdk
+ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
 
 ######################## Swiftshader ###########################################
 COPY --from=install-swiftshader /swiftshader /swiftshader
