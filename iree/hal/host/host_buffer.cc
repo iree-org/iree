@@ -20,6 +20,7 @@
 
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
+#include "iree/base/tracing.h"
 
 namespace iree {
 namespace hal {
@@ -36,6 +37,7 @@ HostBuffer::HostBuffer(Allocator* allocator, MemoryTypeBitfield memory_type,
       owns_data_(owns_data) {}
 
 HostBuffer::~HostBuffer() {
+  IREE_TRACE_SCOPE();
   if (owns_data_ && data_) {
     std::free(data_);
     data_ = nullptr;

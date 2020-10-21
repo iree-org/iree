@@ -16,6 +16,7 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
+#include "iree/base/tracing.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
@@ -79,15 +80,18 @@ static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
 // registered.
 static iree_status_t iree_vm_bytecode_module_resolve_types(
     iree_vm_TypeDef_vec_t type_defs, iree_vm_type_def_t* type_table) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
     type_table[i] = iree_vm_bytecode_module_resolve_type(type_def);
     if (!iree_vm_type_def_is_valid(type_table[i])) {
+      IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_NOT_FOUND,
                               "no type registered with name '%s'",
                               iree_vm_TypeDef_full_name(type_def));
     }
   }
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -249,6 +253,7 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
 
 static void iree_vm_bytecode_module_destroy(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_free(module->flatbuffer_allocator,
                       (void*)module->flatbuffer_data.data);
@@ -256,6 +261,8 @@ static void iree_vm_bytecode_module_destroy(void* self) {
   module->flatbuffer_allocator = iree_allocator_null();
 
   iree_allocator_free(module->allocator, module);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_string_view_t iree_vm_bytecode_module_name(void* self) {
@@ -544,6 +551,7 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
 static iree_status_t iree_vm_bytecode_module_alloc_state(
     void* self, iree_allocator_t allocator,
     iree_vm_module_state_t** out_module_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_module_state);
   *out_module_state = NULL;
 
@@ -556,8 +564,9 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
 
   // Allocate the storage for the structure and all its nested tables.
   iree_vm_bytecode_module_state_t* state = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, total_state_struct_size,
-                                             (void**)&state));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_state_struct_size,
+                                (void**)&state));
   state->allocator = allocator;
 
   // Perform layout to get the pointers into the storage for each nested table.
@@ -577,12 +586,14 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   }
 
   *out_module_state = (iree_vm_module_state_t*)state;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 static void iree_vm_bytecode_module_free_state(
     void* self, iree_vm_module_state_t* module_state) {
   if (!module_state) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_vm_bytecode_module_state_t* state =
       (iree_vm_bytecode_module_state_t*)module_state;
@@ -593,6 +604,8 @@ static void iree_vm_bytecode_module_free_state(
   }
 
   iree_allocator_free(state->allocator, module_state);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t iree_vm_bytecode_module_resolve_import(
@@ -645,7 +658,7 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // NOTE: any work here adds directly to the invocation time. Avoid doing too
   // much work or touching too many unlikely-to-be-cached structures (such as
   // walking the FlatBuffer, which may cause page faults).
-
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_result);
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
 
@@ -653,12 +666,15 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // allow exports here as well to make things easier to call externally.
   iree_vm_function_t function = call->function;
   if (function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
-        self, function.linkage, function.ordinal, &function, NULL, NULL));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_vm_bytecode_module_get_function(
+            self, function.linkage, function.ordinal, &function, NULL, NULL));
   }
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   if (function.ordinal >= module->function_descriptor_count) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "function ordinal out of range (0 < %u < %zu)",
                             function.ordinal,
@@ -688,28 +704,40 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
       flatbuffers_string_len(calling_convention);
   iree_string_view_t cconv_arguments = iree_string_view_empty();
   iree_string_view_t cconv_results = iree_string_view_empty();
-  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
-      &signature, &cconv_arguments, &cconv_results));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_function_call_get_cconv_fragments(
+              &signature, &cconv_arguments, &cconv_results));
 
   // Jump into the dispatch routine to execute bytecode until the function
   // either returns (synchronous) or yields (asynchronous).
-  return iree_vm_bytecode_dispatch(stack, module, call, cconv_arguments,
-                                   cconv_results, out_result);
+  iree_status_t status = iree_vm_bytecode_dispatch(
+      stack, module, call, cconv_arguments, cconv_results, out_result);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
     iree_const_byte_span_t flatbuffer_data,
     iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
 
-  IREE_RETURN_IF_ERROR(
-      iree_vm_bytecode_module_flatbuffer_verify(flatbuffer_data));
+  IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_vm_bytecode_module_flatbuffer_verify");
+  iree_status_t status =
+      iree_vm_bytecode_module_flatbuffer_verify(flatbuffer_data);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z1);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+  IREE_TRACE_ZONE_END(z1);
 
   iree_vm_BytecodeModuleDef_table_t module_def =
       iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
   if (!module_def) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "failed getting root from flatbuffer; expected identifier "
@@ -721,9 +749,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
       iree_vm_TypeDef_vec_len(type_defs) * sizeof(iree_vm_type_def_t);
 
   iree_vm_bytecode_module_t* module = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(iree_vm_bytecode_module_t) + type_table_size,
-      (void**)&module));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(
+              allocator, sizeof(iree_vm_bytecode_module_t) + type_table_size,
+              (void**)&module));
   module->allocator = allocator;
 
   iree_vm_FunctionDescriptor_vec_t function_descriptors =
@@ -748,6 +777,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
       iree_vm_bytecode_module_resolve_types(type_defs, module->type_table);
   if (!iree_status_is_ok(resolve_status)) {
     iree_allocator_free(allocator, module);
+    IREE_TRACE_ZONE_END(z0);
     return resolve_status;
   }
 
@@ -765,5 +795,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
       iree_vm_bytecode_module_get_function_reflection_attr;
 
   *out_module = &module->interface;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

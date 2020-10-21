@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "iree/base/atomics.h"
+#include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -138,9 +139,11 @@ iree_vm_function_call_release(iree_vm_function_call_t* call,
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   memset(module, 0, sizeof(iree_vm_module_t));
   module->self = self;
   iree_atomic_ref_count_init(&module->ref_count);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -225,8 +228,10 @@ iree_vm_function_signature(const iree_vm_function_t* function) {
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_vm_function_reflection_attr(const iree_vm_function_t* function,
                                  iree_string_view_t key) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_module_t* module = function->module;
   if (!module->get_function_reflection_attr) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_string_view_empty();
   }
   for (int index = 0;; ++index) {
@@ -239,9 +244,11 @@ iree_vm_function_reflection_attr(const iree_vm_function_t* function,
       break;
     }
     if (iree_string_view_compare(key, index_key) == 0) {
+      IREE_TRACE_ZONE_END(z0);
       return index_value;
     }
   }
+  IREE_TRACE_ZONE_END(z0);
   return iree_string_view_empty();
 }
 

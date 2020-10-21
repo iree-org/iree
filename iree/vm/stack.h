@@ -20,6 +20,7 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
+#include "iree/base/tracing.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 
@@ -85,6 +86,10 @@ typedef struct iree_vm_stack_frame {
   // offset (such as in the case of VM bytecode), a block identifier (compiled
   // code), etc.
   iree_vm_source_offset_t pc;
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  iree_zone_id_t trace_zone;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 } iree_vm_stack_frame_t;
 
 // Returns the implementation-defined frame storage associated with |frame|.

@@ -190,6 +190,7 @@ iree_cc_library(
     ::builtin_types
     iree::base::api
     iree::base::atomics
+    iree::base::tracing
   PUBLIC
 )
 
@@ -251,6 +252,7 @@ iree_cc_library(
     iree::base::alignment
     iree::base::api
     iree::base::atomics
+    iree::base::tracing
   PUBLIC
 )
 
