@@ -69,38 +69,6 @@ class VMLATargetBackend final : public TargetBackend {
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
-    // --- Linking overview ---
-    //
-    // We start with a `module` containing multiple `hal.executable`s, each with
-    // potentially multiple `hal.executable.target`s. We want to move all
-    // compatible VMLA functions into a new "linked" executable, de-duping
-    // symbols, and updating references as we go.
-    //
-    // Sample IR after:
-    //   hal.executable @linked_vmla {
-    //     hal.interface @legacy_io_0 { ... }
-    //     hal.interface @legacy_io_1 { ... }
-    //     hal.executable.target @vmla, filter="vmla" {
-    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-    //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
-    //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
-    //       module {
-    //         vm.module @module {
-    //           vm.func @main_0(...) { ... }
-    //           vm.func @main_1(...) { ... }
-    //           vm.func @main_2(...) { ... }
-    //         }
-    //       }
-    //     }
-    //   }
-    //   hal.executable @main_dispatch_0 {
-    //     hal.interface @legacy_io { ... }
-    //     hal.executable.target @other, filter="other" {
-    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-    //       module { ... }
-    //     }
-    //   }
-
     OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
     auto executableOps =
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());

@@ -264,7 +264,7 @@ class TargetBackend {
   //       hal.interface.binding @arg0, set=0, binding=0, ...
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
-  //     hal.executable.target "target-backend" {
+  //     hal.executable.target @target, filter="target-backend" {
   //       hal.executable.entry_point @main attributes {
   //         interface = @main_io,
   //         ordinal = 0 : i32,
@@ -277,7 +277,7 @@ class TargetBackend {
   // As output:
   //   hal.executable @some_executable {
   //     hal.interface @main_io ...
-  //     hal.executable.target "target-backend" {
+  //     hal.executable.target @target, filter="target-backend" {
   //       hal.executable.entry_point @main ...
   //       module { spv.module { ... } }
   //     }
@@ -289,10 +289,44 @@ class TargetBackend {
   virtual void buildTranslationPassPipeline(
       IREE::HAL::ExecutableTargetOp targetOp, OpPassManager &passManager) = 0;
 
-  // TODO(benvanik): define linkage rules.
-  // Major thing to figure out here is how to rewrite the executable references.
-  // We may want to move executable selection into the hal.device.switch of the
-  // dispatches so that they can be more easily replaced per-target.
+  // Links compatible executables within the provided |moduleOp| together into
+  // zero or more new linked executables. Implementations should move
+  // executable contents (including interfaces, entry points, and functions)
+  // into new executables and update any relevant references as they do so.
+  //
+  // Which executables to link together and how many new executables to produce
+  // are left to implementations to determine. For example, an implementation
+  // may choose to link all executables (even with different interfaces) into
+  // a single combined executable, or it could choose to limit the number linked
+  // together in order to shard binary size across multiple executables.
+  //
+  // The input |moduleOp| may contain executables containing multiple targets,
+  // so implementations should check target backend filters against their own
+  // `filter_pattern()` prior to modifying them.
+  //
+  // Sample output structure:
+  //   hal.executable @linked_executable {
+  //     hal.interface @legacy_io_0 { ... }
+  //     hal.interface @legacy_io_1 { ... }
+  //     hal.executable.target @target, filter="target-backend" {
+  //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
+  //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
+  //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
+  //       module {
+  //         func @main_0(...) { ... }
+  //         func @main_1(...) { ... }
+  //         func @main_2(...) { ... }
+  //       }
+  //     }
+  //   }
+  //   // Other targets within executables are not modified
+  //   hal.executable @main_dispatch_0 {
+  //     hal.interface @legacy_io { ... }
+  //     hal.executable.target @other, filter="other" {
+  //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
+  //       module { ... }
+  //     }
+  //   }
   virtual LogicalResult linkExecutables(mlir::ModuleOp moduleOp) {
     return success();
   }
