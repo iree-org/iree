@@ -21,6 +21,7 @@
 #include "absl/container/inlined_vector.h"
 #include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
+#include "iree/base/tracing.h"
 #include "iree/hal/executable_spec.h"
 #include "iree/hal/host/host_executable.h"
 
@@ -50,6 +51,10 @@ class DyLibExecutable final : public HostExecutable {
   std::string executable_library_temp_path_;
   std::unique_ptr<DynamicLibrary> executable_library_;
   absl::InlinedVector<void*, 4> entry_functions_;
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  absl::InlinedVector<const char*, 4> entry_names_;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 };
 
 }  // namespace dylib

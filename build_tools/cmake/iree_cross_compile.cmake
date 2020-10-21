@@ -85,6 +85,7 @@ function(iree_create_configuration CONFIG_NAME)
   iree_to_bool(_CONFIG_BUILD_SAMPLES "${IREE_${CONFIG_NAME}_BUILD_SAMPLES}")
   iree_to_bool(_CONFIG_BUILD_DEBUGGER "${IREE_${CONFIG_NAME}_BUILD_DEBUGGER}")
   iree_to_bool(_CONFIG_BUILD_PYTHON_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_PYTHON_BINDINGS}")
+  iree_to_bool(_CONFIG_BUILD_JAVA_BINDINGS "${IREE_${CONFIG_NAME}_BUILD_JAVA_BINDINGS}")
   iree_to_bool(_CONFIG_BUILD_EXPERIMENTAL "${IREE_${CONFIG_NAME}_BUILD_EXPERIMENTAL}")
 
   # Escape semicolons in the targets list so that CMake doesn't expand them to
@@ -115,6 +116,7 @@ function(iree_create_configuration CONFIG_NAME)
         -DIREE_BUILD_SAMPLES=${_CONFIG_BUILD_SAMPLES}
         -DIREE_BUILD_DEBUGGER=${_CONFIG_BUILD_DEBUGGER}
         -DIREE_BUILD_PYTHON_BINDINGS=${_CONFIG_BUILD_PYTHON_BINDINGS}
+        -DIREE_BUILD_JAVA_BINDINGS=${_CONFIG_BUILD_JAVA_BINDINGS}
         -DIREE_BUILD_EXPERIMENTAL=${_CONFIG_BUILD_EXPERIMENTAL}
         # LINT.ThenChange(
         #   https://github.com/google/iree/tree/main/CMakeLists.txt:iree_options,

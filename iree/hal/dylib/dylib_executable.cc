@@ -16,7 +16,6 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/file_io.h"
-#include "iree/base/tracing.h"
 #include "iree/schemas/dylib_executable_def_generated.h"
 
 namespace iree {
@@ -89,6 +88,10 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
              << "Could not find symbol: " << entry_points[i];
     }
     entry_functions_[i] = symbol;
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+    entry_names_[i] = entry_points[i]->c_str();
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   }
 
   return OkStatus();
@@ -96,6 +99,11 @@ Status DyLibExecutable::Initialize(ExecutableSpec spec) {
 
 struct DyLibDispatchState : public HostExecutable::DispatchState {
   DyLibDispatchState() = default;
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  const char* entry_name = nullptr;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
   void* entry_function = nullptr;
   absl::InlinedVector<void*, 4> args;
   absl::InlinedVector<int32_t, 4> push_constant;
@@ -111,6 +119,9 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
   }
 
   auto dispatch_state = make_ref<DyLibDispatchState>();
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  dispatch_state->entry_name = entry_names_[params.entry_point];
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   dispatch_state->entry_function = entry_functions_[params.entry_point];
 
   for (size_t set = 0; set < params.set_bindings.size(); ++set) {
@@ -135,8 +146,8 @@ DyLibExecutable::PrepareDispatch(const DispatchParams& params) {
 
 Status DyLibExecutable::DispatchTile(DispatchState* state,
                                      std::array<uint32_t, 3> workgroup_xyz) {
-  IREE_TRACE_SCOPE0("DyLibExecutable::DispatchTile");
   auto* dispatch_state = static_cast<DyLibDispatchState*>(state);
+  IREE_TRACE_SCOPE_DYNAMIC(dispatch_state->entry_name);
 
   auto entry_function =
       (void (*)(void**, int32_t*))dispatch_state->entry_function;

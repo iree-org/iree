@@ -55,6 +55,7 @@ cc_library(
     deps = [
         "//iree/base:logging",
         "//iree/base:status",
+        "//iree/base:tracing",
         "//iree/hal:buffer",
     ],
 )

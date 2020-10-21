@@ -156,8 +156,9 @@ VMLAExecutable::PrepareDispatch(const DispatchParams& params) {
 
 Status VMLAExecutable::DispatchTile(DispatchState* state,
                                     std::array<uint32_t, 3> workgroup_xyz) {
-  IREE_TRACE_SCOPE0("VMLAExecutable::DispatchTile");
   auto* dispatch_state = static_cast<VMLADispatchState*>(state);
+  IREE_TRACE_SCOPE_DYNAMIC(
+      iree_vm_function_name(&dispatch_state->function).data);
 
   auto* input_list_storage = alloca(dispatch_state->input_list_size);
   iree_vm_list_t* input_list = nullptr;
