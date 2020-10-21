@@ -833,10 +833,9 @@ class _TfLiteFunctionWrapper(_FunctionWrapper):
     if is_dict:
       return dict(outputs)
     else:
-      outputs = tuple(outputs)
       if len(outputs) == 1:
         return outputs[0]
-      return outputs
+      return tuple(outputs)
 
 
 class TfLiteCompiledModule(CompiledModule):
