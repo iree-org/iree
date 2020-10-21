@@ -67,6 +67,7 @@ TFLITE_FAILING = [
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
+    "fft_test.py",
     "finite_test.py",
     "gather_test.py",
     "mandelbrot_test.py",
@@ -84,6 +85,7 @@ VMLA_FAILING = [
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
+    "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "ring_buffer_test.py",  # TODO(b/148747011)
     "strings_test.py",
@@ -98,6 +100,7 @@ LLVM_FAILING = [
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
+    "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
@@ -118,6 +121,7 @@ VULKAN_FAILING = [
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
+    "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
