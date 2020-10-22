@@ -53,7 +53,6 @@ package(
 # backends.
 # keep sorted
 SPECIAL_CASES = [
-    "linspace_test.py",
     "mobile_bert_squad_test.py",
 ]
 
@@ -102,6 +101,7 @@ LLVM_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
@@ -123,6 +123,7 @@ VULKAN_FAILING = [
     "einsum_vector_test.py",
     "fft_test.py",  # TODO(natashaknk): Get this working after kernel is in.
     "fill_test.py",  # TODO(jennik): Get this test working on IREE.
+    "linspace_test.py",  # TODO(https://github.com/google/iree/issues/1521)
     "logical_ops_test.py",
     "mandelbrot_test.py",  # TODO(silvasean): Get this working on IREE.
     "matrix_ops_dynamic_test.py",
@@ -179,47 +180,6 @@ iree_e2e_test_suite(
         "iree_vmla": VMLA_FAILING,
         "iree_llvmjit": LLVM_FAILING,
         "iree_vulkan": VULKAN_FAILING,
-    },
-    reference_backend = "tf",
-    tags = [
-        "failing",
-        "manual",
-        "nokokoro",
-        "notap",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-# Special cases.
-
-# linspace_test passes internally, but fails in the OSS CI, so it needs
-# a "nokokoro" tag.
-iree_e2e_test_suite(
-    # TODO(#2082): `linspace_test.py` fails in the `bazel-tensorflow` image.
-    name = "linspace_tests",
-    backends_to_srcs = {
-        "tf": ["linspace_test.py"],
-        "iree_vmla": ["linspace_test.py"],
-    },
-    reference_backend = "tf",
-    tags = [
-        "manual",
-        "nokokoro",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-# TODO(laurenzo): Re-enable iree_vulkan once dynamic-slice is implemented
-# See https://github.com/google/iree/issues/1521
-iree_e2e_test_suite(
-    name = "linspace_tests_failing",
-    backends_to_srcs = {
-        "iree_llvmjit": ["linspace_test.py"],
-        "iree_vulkan": ["linspace_test.py"],
     },
     reference_backend = "tf",
     tags = [
