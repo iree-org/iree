@@ -72,9 +72,9 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
+        # Pytype does not support python3.9, which this action defaults to.
       - name: Setting up python
         uses: actions/setup-python@v2
-        # Pytype does not support python3.9, which this action defaults to.
         with:
           python-version: '3.8'
         # We have to explicitly fetch the base branch as well
