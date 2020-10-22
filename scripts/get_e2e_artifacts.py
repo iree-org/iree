@@ -17,6 +17,7 @@
 
 Example usage:
   python3 get_e2e_artifacts.py
+  python3 get_e2e_artifacts.py --test_suites=e2e_tests
 """
 
 import fileinput
@@ -39,8 +40,10 @@ SUITE_NAME_TO_TARGET = {
         '//integrations/tensorflow/e2e:mobile_bert_squad_tests',
     'keras_tests':
         '//integrations/tensorflow/e2e/keras:keras_tests',
-    'vision_external_tests':
-        '//integrations/tensorflow/e2e/keras:vision_external_tests',
+    'imagenet_external_tests':
+        '//integrations/tensorflow/e2e/keras:imagenet_external_tests',
+    'slim_vision_tests':
+        '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests',
 }
 SUITES_HELP = [f'`{name}`' for name in SUITE_NAME_TO_TARGET]
 SUITES_HELP = f'{", ".join(SUITES_HELP[:-1])} and {SUITES_HELP[-1]}'
@@ -118,6 +121,11 @@ def extract_artifacts(test_path: str, test_name: str, written_paths: Set[str],
                       paths_to_tests: Dict[str, str]):
   """Unzips all of the benchmarking artifacts for a given test and backend."""
   outputs = os.path.join(test_path, 'test.outputs', 'outputs.zip')
+  if FLAGS.dry_run not os.path.exists(outputs):
+    # The artifacts may or may not be present on disk during a dry run. If they
+    # are then we want to collision check them, but if they aren't that's fine.
+    return
+
   archive = zipfile.ZipFile(outputs)
   # Filter out directory names.
   filenames = [name for name in archive.namelist() if name[-1] != os.sep]
