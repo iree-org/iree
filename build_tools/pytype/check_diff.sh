@@ -43,7 +43,7 @@ function check_files() {
   fi
 
   echo "${@:2}" | \
-    xargs python3 -m pytype --disable=import-error,pyi-error -j $(nproc) -V 3.8
+    xargs python3 -m pytype --disable=import-error,pyi-error -j $(nproc)
   CODE="$?"
   echo
   if [[ "${CODE?}" -gt "${1?}" ]]; then
