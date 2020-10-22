@@ -9,9 +9,9 @@ func @f() -> (tensor<i32>) {
 
 // -----
 
-// expected-error@below {{The following operations cannot be legalized: tf.Const (count: 1). These legalization failure(s) may be due to missing TF to HLO lowerings and/or unsupported attributes, etc.}}
+// expected-error@+3 {{'tf.Const' op still existed}}
+// expected-error@below {{The following Tensorflow operations still remain}}
 func @f() -> (tensor<i32>) {
-  // expected-error@+1 {{'tf.Const' op is not legalizable}}
   %0 = "tf.Const"() {value = dense<-1> : tensor<i32>} : () -> tensor<i32>
   return %0 : tensor<i32>
 }

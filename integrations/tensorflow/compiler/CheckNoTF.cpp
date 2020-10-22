@@ -27,17 +27,17 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-class CheckNoTF : public PassWrapper<CheckNoTF, FunctionPass> {
+class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<chlo::HloClientDialect, mhlo::MhloDialect,
                     shape::ShapeDialect, StandardOpsDialect>();
   }
 
-  CheckNoTF() = default;
-  CheckNoTF(const CheckNoTF &) {}
+  CheckNoTensorflow() = default;
+  CheckNoTensorflow(const CheckNoTensorflow &) {}
 
-  /// Performs the lowering to XLA dialect.
+  /// Validates that no TensorFlow frontends ops are in the function.
   void runOnFunction() override {
     auto op = getFunction();
     auto context = op.getContext();
@@ -51,56 +51,49 @@ class CheckNoTF : public PassWrapper<CheckNoTF, FunctionPass> {
     });
 
     if (!illegalOps.empty()) {
-      EmitLegalizationErrors(op, illegalOps);
+      emitLegalizationErrors(op, illegalOps);
       return signalPassFailure();
     }
   }
 
   // Emits debug information which includes the number of ops of each type which
   // failed to legalize.
-  void EmitLegalizationErrors(Operation *op,
-                              const DenseSet<Operation *> &nonlegalized_ops) {
+  void emitLegalizationErrors(Operation *op,
+                              const DenseSet<Operation *> &nonlegalizedOps) {
     // Track the legalization failures by mapping op name to information about
     // that failure: the number of unlegalized occurrences of the op, and one
     // example operation that failed.
-    std::map<StringRef, std::pair<int, Operation *>> op_name_to_error_info;
-    DenseSet<Operation *> error_ops;
-    for (Operation *nonlegalized_op : nonlegalized_ops) {
+    std::map<StringRef, std::pair<int, Operation *>> opNametoErrorInfo;
+    for (Operation *nonlegalizedOp : nonlegalizedOps) {
       // Increment count of this legalization failure.
-      StringRef op_name = nonlegalized_op->getName().getStringRef();
+      StringRef op_name = nonlegalizedOp->getName().getStringRef();
       // If this emplace is successful, it's the first time we've encountered
       // this op type. Initialize count to 0 so that after increment, it is 1.
-      auto insertion_result = op_name_to_error_info.emplace(
-          op_name, std::make_pair(0, nonlegalized_op));
+      auto insertion_result = opNametoErrorInfo.emplace(
+          op_name, std::make_pair(0, nonlegalizedOp));
       ++insertion_result.first->second.first;
+      nonlegalizedOp->emitOpError() << "still existed";
     }
-    std::vector<std::string> error_messages;
-    error_messages.reserve(op_name_to_error_info.size());
-    for (const auto &op_info : op_name_to_error_info) {
-      error_messages.push_back(llvm::formatv("{0} (count: {1})", op_info.first,
-                                             op_info.second.first));
+
+    std::vector<std::string> errorMessages;
+    errorMessages.reserve(opNametoErrorInfo.size());
+    for (const auto &opInfo : opNametoErrorInfo) {
+      errorMessages.push_back(llvm::formatv("\t{0} (count: {1})", opInfo.first,
+                                             opInfo.second.first));
     }
     Location loc = op->getLoc();
     emitError(loc)
-        << "The following operations cannot be legalized: "
-        << llvm::join(error_messages, "; ")
-        << ". These legalization failure(s) may be due to missing TF "
-           "to HLO lowerings and/or unsupported attributes, etc.";
-    // Emit more information about the missing ops. This error message
-    // contains useful details beyond the op name (input and output shapes,
-    // attributes, etc.).
-    for (const auto &op_info : op_name_to_error_info) {
-      op_info.second.second->emitOpError() << "is not legalizable";
-    }
+        << "The following Tensorflow operations still remain: \n"
+        << llvm::join(errorMessages, "\n") << "\n";
   }
 };
 
-static PassRegistration<CheckNoTF> pass("iree-check-no-tf",
-                                        "Check that no TF remains");
+static PassRegistration<CheckNoTensorflow> pass(
+  "iree-check-no-tf", "Check that no TensorFlow frontend ops remain");
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createCheckNoTF() {
-  return std::make_unique<CheckNoTF>();
+  return std::make_unique<CheckNoTensorflow>();
 }
 
 }  // namespace iree_compiler
