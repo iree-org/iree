@@ -4647,14 +4647,14 @@ module {
 ```
 
 module {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+  hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -5092,7 +5092,7 @@ module {
     hal.device.switch(%dev : !hal.device)
     #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
-      hal.command_buffer.dispatch.symbol %arg3, @dot_ex_dispatch_0::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
+      hal.command_buffer.dispatch.symbol %arg3, @linked_llvm_ir::@llvm_ir::@dot_ex_dispatch_0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
@@ -5130,14 +5130,14 @@ module {
 ```
 
 module {
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+  hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -5576,7 +5576,7 @@ module {
     #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
       %0 = hal.command_buffer.device %arg3 : !hal.device
-      %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
+      %exe = hal.executable.lookup %0, @linked_llvm_ir : !hal.executable
       hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
@@ -5630,7 +5630,7 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
     #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
     %0 = hal.command_buffer.device %arg3 : !hal.device
-    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
+    %exe = hal.executable.lookup %0, @linked_llvm_ir : !hal.executable
     hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
@@ -5661,7 +5661,7 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
     #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
     %c1 = constant 1 : index
     %0 = hal.command_buffer.device %arg3 : !hal.device
-    %exe = hal.executable.lookup %0, @dot_ex_dispatch_0 : !hal.executable
+    %exe = hal.executable.lookup %0, @linked_llvm_ir : !hal.executable
     hal.command_buffer.dispatch %arg3, %exe, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     hal.return
   }
@@ -5737,7 +5737,7 @@ func @dot$sync(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_
 ```
 
 module {
-  hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
+  hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
     %dev = hal.ex.shared_device : !hal.device
@@ -5758,20 +5758,20 @@ module {
     hal.device.switch(%dev : !hal.device)
     #hal.device.match.id<"llvm-ir*">(%arg0 = %executable_cache_default : !hal.executable_cache) {
       %0 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-      %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %arg0, layout = %0, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-      hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+      %executable_linked_llvm_ir = hal.executable_cache.prepare %arg0, layout = %0, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+      hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
       hal.return
     }
     return %executable_cache_default : !hal.executable_cache
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+  hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -6210,7 +6210,7 @@ module {
     #hal.device.match.id<"llvm-ir*">(%arg2 = %c2048 : index, %arg3 = %cmd : !hal.command_buffer) {
       %c1 = constant 1 : index
       %1 = hal.command_buffer.device %arg3 : !hal.device
-      %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+      %2 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
       hal.command_buffer.dispatch %arg3, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
       hal.return
     }
@@ -6273,8 +6273,8 @@ func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_v
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-  hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+  %executable_linked_llvm_ir = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+  hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
   br ^bb3
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -6303,7 +6303,7 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
 ^bb1:  // pred: ^bb0
   %c1 = constant 1 : index
   %2 = hal.command_buffer.device %cmd : !hal.device
-  %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %3 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
   hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   br ^bb3
 ^bb2:  // pred: ^bb0
@@ -6357,7 +6357,7 @@ module {
     %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
     return %0 : i1
   }
-  hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
+  hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
     %dev = hal.ex.shared_device : !hal.device
@@ -6379,22 +6379,22 @@ module {
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-    hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+    %executable_linked_llvm_ir = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+    hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
     br ^bb3
   ^bb2:  // pred: ^bb0
     iree.unreachable
   ^bb3:  // pred: ^bb1
     return %executable_cache_default : !hal.executable_cache
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+  hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.target @llvm_ir, filter="llvm-ir*" {
-      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
+      hal.executable.entry_point @dot_ex_dispatch_0 attributes {interface = @legacy_io_0, ordinal = 0 : i32, signature = (tensor<32x1024xf32>, tensor<1024x64xf32>) -> tensor<32x64xf32>}
       module {
         llvm.func @dot_ex_dispatch_0(%arg0: !llvm.ptr<ptr<i8>>, %arg1: !llvm.ptr<i32>) {
           %0 = llvm.bitcast %arg0 : !llvm.ptr<ptr<i8>> to !llvm.ptr<struct<(ptr<float>, ptr<float>, ptr<float>)>>
@@ -6834,7 +6834,7 @@ module {
   ^bb1:  // pred: ^bb0
     %c1 = constant 1 : index
     %2 = hal.command_buffer.device %cmd : !hal.device
-    %3 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    %3 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
     hal.command_buffer.dispatch %cmd, %3, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     br ^bb3
   ^bb2:  // pred: ^bb0
@@ -6936,8 +6936,8 @@ func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_v
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-  hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+  %executable_linked_llvm_ir = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+  hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
   return %executable_cache_default : !hal.executable_cache
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -6953,8 +6953,8 @@ func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_v
   cond_br %0, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
   %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-  %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-  hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+  %executable_linked_llvm_ir = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+  hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
   return %executable_cache_default : !hal.executable_cache
 ^bb2:  // pred: ^bb0
   iree.unreachable
@@ -6963,8 +6963,8 @@ func @_executable_cache_initializer() -> !hal.executable_cache attributes {sym_v
 ```
 ### IR Dump After mlir::iree_compiler::IREE::HAL::SerializeExecutablesPass
 ```
-hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-  hal.interface @legacy_io {
+hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+  hal.interface @legacy_io_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -6992,7 +6992,7 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %2 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
   hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -7022,7 +7022,7 @@ func @dot(%arg0: !hal.buffer {iree.reflection = {}}, %arg1: !hal.buffer {iree.re
   %1 = hal.variable.load @_device_match_id_0 : i1
   cond_br %1, ^bb1, ^bb2
 ^bb1:  // pred: ^bb0
-  %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+  %2 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
   hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
   %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
   hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -7104,7 +7104,7 @@ module {
     %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
     return %0 : i1
   }
-  hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
+  hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
     %dev = hal.ex.shared_device : !hal.device
@@ -7126,14 +7126,14 @@ module {
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-    hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+    %executable_linked_llvm_ir = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+    hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
     return %executable_cache_default : !hal.executable_cache
   ^bb2:  // pred: ^bb0
     iree.unreachable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+  hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -7157,7 +7157,7 @@ module {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    %2 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -7202,7 +7202,7 @@ module {
     %0 = hal.device.match.id %dev, pattern = ["llvm-ir*"] : (!hal.device) -> i1
     return %0 : i1
   }
-  hal.variable @_executable_dot_ex_dispatch_0 mutable : !hal.executable attributes {sym_visibility = "private"}
+  hal.variable @_executable_linked_llvm_ir mutable : !hal.executable attributes {sym_visibility = "private"}
   hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout attributes {sym_visibility = "private"}
   func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
     %dev = hal.ex.shared_device : !hal.device
@@ -7224,14 +7224,14 @@ module {
     cond_br %0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
     %1 = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-    %executable_dot_ex_dispatch_0 = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @dot_ex_dispatch_0 : !hal.executable
-    hal.variable.store %executable_dot_ex_dispatch_0, @_executable_dot_ex_dispatch_0 : !hal.executable
+    %executable_linked_llvm_ir = hal.executable_cache.prepare %executable_cache_default, layout = %1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @linked_llvm_ir : !hal.executable
+    hal.variable.store %executable_linked_llvm_ir, @_executable_linked_llvm_ir : !hal.executable
     return %executable_cache_default : !hal.executable_cache
   ^bb2:  // pred: ^bb0
     iree.unreachable
   }
-  hal.executable @dot_ex_dispatch_0 attributes {sym_visibility = "private"} {
-    hal.interface @legacy_io {
+  hal.executable @linked_llvm_ir attributes {sym_visibility = "private"} {
+    hal.interface @legacy_io_0 {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -7255,7 +7255,7 @@ module {
     %1 = hal.variable.load @_device_match_id_0 : i1
     cond_br %1, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %2 = hal.variable.load @_executable_dot_ex_dispatch_0 : !hal.executable
+    %2 = hal.variable.load @_executable_linked_llvm_ir : !hal.executable
     hal.command_buffer.dispatch %cmd, %2, entry_point = 0, workgroup_xyz = [%c1, %c1, %c1]
     %memory_barrier = hal.make_memory_barrier "DispatchWrite", "DispatchRead" : tuple<i32, i32>
     hal.command_buffer.execution_barrier %cmd, "Dispatch|CommandRetire", "CommandIssue|Dispatch", memory_barriers=[%memory_barrier]
@@ -7303,7 +7303,7 @@ module {
       %0 = vm.call @hal.device.match.id(%ref, %_utf8_llvm_ir_D5501D78ED0E7043) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
       vm.return %0 : i32
     }
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !vm.ref<!hal.descriptor_set_layout>
     vm.func @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> attributes {sym_visibility = "private"} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -7330,7 +7330,7 @@ module {
     }
     vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+    vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
       %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
       %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -7341,12 +7341,12 @@ module {
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %c1280071245 = vm.const.i32 1280071245 : i32
       %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
+      %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
       %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-      %ref_1 = vm.switch.ref %0[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+      %ref_1 = vm.switch.ref %0[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
       %c7 = vm.const.i32 7 : i32
       %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_2, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %ref_2, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
       vm.return %ref_0 : !vm.ref<!hal.executable_cache>
     ^bb2:  // pred: ^bb0
       %c2 = vm.const.i32 2 : i32
@@ -7376,9 +7376,9 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
       %zero_7 = vm.const.i32.zero : i32
-      vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_linked_llvm_ir, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       %c20 = vm.const.i32 20 : i32
       %c5 = vm.const.i32 5 : i32
       %c8 = vm.const.i32 8 : i32
@@ -7481,7 +7481,7 @@ vm.module @module {
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_llvm_ir_D5501D78ED0E7043) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
     vm.return %0 : i32
   }
-  vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+  vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !vm.ref<!hal.descriptor_set_layout>
   vm.func @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -7508,7 +7508,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache init(@_executable_cache_initializer) : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+  vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
   vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -7519,12 +7519,12 @@ vm.module @module {
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %c1280071245 = vm.const.i32 1280071245 : i32
     %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-    %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
+    %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
     %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-    %ref_1 = vm.switch.ref %0[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+    %ref_1 = vm.switch.ref %0[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
     %c7 = vm.const.i32 7 : i32
     %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_2, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    vm.global.store.ref %ref_2, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
     vm.return %ref_0 : !vm.ref<!hal.executable_cache>
   ^bb2:  // pred: ^bb0
     %c2 = vm.const.i32 2 : i32
@@ -7554,9 +7554,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
     %zero_7 = vm.const.i32.zero : i32
-    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_linked_llvm_ir, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %c8 = vm.const.i32 8 : i32
@@ -7658,7 +7658,7 @@ vm.module @module {
     %0 = vm.call @hal.device.match.id(%ref, %_utf8_llvm_ir_D5501D78ED0E7043) : (!vm.ref<!hal.device>, !vm.ref<!iree.byte_buffer>) -> i32
     vm.return %0 : i32
   }
-  vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+  vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
   vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
   vm.func @_descriptor_set_layout_0_initializer() -> !vm.ref<!hal.descriptor_set_layout> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
@@ -7685,7 +7685,7 @@ vm.module @module {
   }
   vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
   vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-  vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+  vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
   vm.func @_executable_cache_initializer() -> !vm.ref<!hal.executable_cache> attributes {sym_visibility = "private"} {
     %ref = vm.call @hal.ex.shared_device() : () -> !vm.ref<!hal.device>
     %_utf8_default_7FD5254DFCA3A5D0 = vm.const.ref.rodata @_utf8_default_7FD5254DFCA3A5D0 : !vm.ref<!iree.byte_buffer>
@@ -7696,12 +7696,12 @@ vm.module @module {
     %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
     %c1280071245 = vm.const.i32 1280071245 : i32
     %0 = vm.call.variadic @hal.executable_cache.select_format(%ref_0, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-    %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
+    %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
     %null = vm.const.ref.zero : !vm.ref<!iree.byte_buffer>
-    %ref_1 = vm.switch.ref %0[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+    %ref_1 = vm.switch.ref %0[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
     %c7 = vm.const.i32 7 : i32
     %ref_2 = vm.call @hal.executable_cache.prepare(%ref_0, %_executable_layout_0, %c7, %ref_1) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-    vm.global.store.ref %ref_2, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    vm.global.store.ref %ref_2, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
     vm.return %ref_0 : !vm.ref<!hal.executable_cache>
   ^bb2:  // pred: ^bb0
     %c2 = vm.const.i32 2 : i32
@@ -7731,9 +7731,9 @@ vm.module @module {
     %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
     vm.cond_br %_device_match_id_0, ^bb1, ^bb2
   ^bb1:  // pred: ^bb0
-    %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+    %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
     %zero_7 = vm.const.i32.zero : i32
-    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_dot_ex_dispatch_0, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+    vm.call @hal.command_buffer.dispatch(%ref_3, %_executable_linked_llvm_ir, %zero_7, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
     %c20 = vm.const.i32 20 : i32
     %c5 = vm.const.i32 5 : i32
     %c8 = vm.const.i32 8 : i32
@@ -7843,12 +7843,12 @@ module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_llvm_ir_D5501D78ED0E7043 dense<[108, 108, 118, 109, 45, 105, 114, 42]> : vector<8xi8>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+    vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -7873,8 +7873,8 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_linked_llvm_ir, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -8000,10 +8000,10 @@ module {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+      %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
+      %ref_6 = vm.switch.ref %1[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
       %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %ref_7, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
       vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
       vm.return
     ^bb2:  // pred: ^bb0
@@ -8021,12 +8021,12 @@ module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_llvm_ir_D5501D78ED0E7043 dense<[108, 108, 118, 109, 45, 105, 114, 42]> : vector<8xi8>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+    vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8051,8 +8051,8 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_linked_llvm_ir, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -8178,10 +8178,10 @@ module {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+      %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
+      %ref_6 = vm.switch.ref %1[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
       %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %ref_7, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
       vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
       vm.return
     ^bb2:  // pred: ^bb0
@@ -8199,12 +8199,12 @@ module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_llvm_ir_D5501D78ED0E7043 dense<[108, 108, 118, 109, 45, 105, 114, 42]> : vector<8xi8>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+    vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8229,8 +8229,8 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_linked_llvm_ir, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -8328,10 +8328,10 @@ module {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+      %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
+      %ref_6 = vm.switch.ref %1[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
       %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %ref_7, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
       vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
       vm.return
     ^bb2:  // pred: ^bb0
@@ -8349,12 +8349,12 @@ module {
   vm.module @module {
     vm.global.i32 @_device_match_id_0 mutable : i32
     vm.rodata @_utf8_llvm_ir_D5501D78ED0E7043 dense<[108, 108, 118, 109, 45, 105, 114, 42]> : vector<8xi8>
-    vm.global.ref @_executable_dot_ex_dispatch_0 mutable : !vm.ref<!hal.executable>
+    vm.global.ref @_executable_linked_llvm_ir mutable : !vm.ref<!hal.executable>
     vm.global.ref @_descriptor_set_layout_0 mutable : !vm.ref<!hal.descriptor_set_layout>
     vm.global.ref @_executable_layout_0 mutable : !vm.ref<!hal.executable_layout>
     vm.global.ref @_executable_cache mutable : !vm.ref<!hal.executable_cache>
     vm.rodata @_utf8_default_7FD5254DFCA3A5D0 dense<[100, 101, 102, 97, 117, 108, 116]> : vector<7xi8>
-    vm.rodata @_dot_ex_dispatch_0_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
+    vm.rodata @_linked_llvm_ir_binary_llvm opaque<"", "0xDEADBEEF"> : vector<18504xi8>
     vm.func @dot(%arg0: !vm.ref<!hal.buffer>, %arg1: !vm.ref<!hal.buffer>) -> !vm.ref<!hal.buffer> attributes {noinline} {
       %c131072 = vm.const.i32 131072 : i32
       %c262144 = vm.const.i32 262144 : i32
@@ -8379,8 +8379,8 @@ module {
       %_device_match_id_0 = vm.global.load.i32 @_device_match_id_0 : i32
       vm.cond_br %_device_match_id_0, ^bb1, ^bb2
     ^bb1:  // pred: ^bb0
-      %_executable_dot_ex_dispatch_0 = vm.global.load.ref @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
-      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_dot_ex_dispatch_0, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+      %_executable_linked_llvm_ir = vm.global.load.ref @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
+      vm.call @hal.command_buffer.dispatch(%ref_2, %_executable_linked_llvm_ir, %zero, %c1, %c1, %c1) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
       vm.call.variadic @hal.command_buffer.execution_barrier(%ref_2, %c20, %c5, [%c8], []) : (!vm.ref<!hal.command_buffer>, i32, i32, i32 ..., i32 ...)
       vm.call @hal.command_buffer.end(%ref_2) : (!vm.ref<!hal.command_buffer>) -> ()
       vm.call @hal.ex.submit_and_wait(%ref, %ref_2) : (!vm.ref<!hal.device>, !vm.ref<!hal.command_buffer>) -> ()
@@ -8478,10 +8478,10 @@ module {
     ^bb1:  // pred: ^bb0
       %_executable_layout_0 = vm.global.load.ref @_executable_layout_0 : !vm.ref<!hal.executable_layout>
       %1 = vm.call.variadic @hal.executable_cache.select_format(%ref_5, [%c1280071245]) : (!vm.ref<!hal.executable_cache>, i32 ...) -> i32
-      %_dot_ex_dispatch_0_binary_llvm = vm.const.ref.rodata @_dot_ex_dispatch_0_binary_llvm : !vm.ref<!iree.byte_buffer>
-      %ref_6 = vm.switch.ref %1[%_dot_ex_dispatch_0_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
+      %_linked_llvm_ir_binary_llvm = vm.const.ref.rodata @_linked_llvm_ir_binary_llvm : !vm.ref<!iree.byte_buffer>
+      %ref_6 = vm.switch.ref %1[%_linked_llvm_ir_binary_llvm] else %null : !vm.ref<!iree.byte_buffer>
       %ref_7 = vm.call @hal.executable_cache.prepare(%ref_5, %_executable_layout_0, %c7, %ref_6) : (!vm.ref<!hal.executable_cache>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!iree.byte_buffer>) -> !vm.ref<!hal.executable>
-      vm.global.store.ref %ref_7, @_executable_dot_ex_dispatch_0 : !vm.ref<!hal.executable>
+      vm.global.store.ref %ref_7, @_executable_linked_llvm_ir : !vm.ref<!hal.executable>
       vm.global.store.ref %ref_5, @_executable_cache : !vm.ref<!hal.executable_cache>
       vm.return
     ^bb2:  // pred: ^bb0
