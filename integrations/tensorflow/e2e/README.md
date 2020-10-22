@@ -215,7 +215,8 @@ found in [this doc](https://google.github.io/iree/developing-iree/e2e-benchmarki
 ## Debugging Tests
 
 If the compiler fails to compile the program, then it will create a crash
-reproducer (see [MLIR documentation](https://mlir.llvm.org/docs/WritingAPass/)),
+reproducer (see
+[MLIR documentation](https://mlir.llvm.org/docs/PassManagement/#crash-and-failure-reproduction)),
 which then allows reproducing the bug with an appropriate "opt" tool. Further
 debugging iteration can happen in opt.
 
