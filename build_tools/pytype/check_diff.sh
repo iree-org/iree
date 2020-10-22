@@ -24,14 +24,14 @@ else
   FILES=$(git diff --name-only "${DIFF_TARGET?}" | grep '.*\.py')
 fi
 
-BASE=$(echo "${FILES?}" | grep -v '^[\./]*integrations/*')
+BASE=$(echo "${FILES?}" | grep -vP '^(\./)*integrations/*')
 IREE_TF=$(echo "${FILES?}" | \
-          grep '^[\./]*integrations/tensorflow/bindings/python/pyiree/tf/.*')
+          grep -P '^(\./)*integrations/tensorflow/bindings/python/pyiree/tf/.*')
 IREE_XLA=$(echo "${FILES?}" | \
-           grep '^[\./]*integrations/tensorflow/bindings/python/pyiree/xla/.*')
+           grep -P '^(\./)*integrations/tensorflow/bindings/python/pyiree/xla/.*')
 COMPILER=$(echo "${FILES?}" | \
-           grep '^[\./]*integrations/tensorflow/compiler/.*')
-E2E=$(echo "${FILES?}" | grep '^[\./]*integrations/tensorflow/e2e/.*')
+           grep -P '^(\./)*integrations/tensorflow/compiler/.*')
+E2E=$(echo "${FILES?}" | grep -P '^(\./)*integrations/tensorflow/e2e/.*')
 
 function check_files() {
   # $1: previous return code
