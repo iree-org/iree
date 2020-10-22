@@ -29,16 +29,16 @@ namespace HAL {
 
 // Creates target machine form target options.
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
-    const LLVMTargetOptions& options);
+    const LLVMTargetOptions &options);
 
 // Creates and runs LLVMIR optimization passes defined in LLVMTargetOptions.
-LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
-                              llvm::TargetMachine* machine,
-                              llvm::Module* module);
+LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
+                              llvm::TargetMachine *machine,
+                              llvm::Module *module);
 
 // Emits compiled module obj for the target machine.
-LogicalResult runEmitObjFilePasses(llvm::TargetMachine* machine,
-                                   llvm::Module* module, std::string* objData);
+LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
+                                   llvm::Module *module, std::string *objData);
 
 }  // namespace HAL
 }  // namespace IREE

@@ -30,6 +30,28 @@ endif()
 )
 
 cc_library(
+    name = "LLVMBaseTarget",
+    srcs = [
+        "LLVMBaseTarget.cpp",
+    ],
+    hdrs = [
+        "LLVMBaseTarget.h",
+    ],
+    deps = [
+        ":LLVMIRPasses",
+        ":LLVMTargetOptions",
+        "//iree/compiler/Conversion/LinalgToLLVM",
+        "//iree/compiler/Dialect/HAL/Target",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:VectorOps",
+    ],
+)
+
+cc_library(
     name = "LLVMIRPasses",
     srcs = [
         "LLVMIRPasses.cpp",

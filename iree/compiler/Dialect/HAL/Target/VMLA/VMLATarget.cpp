@@ -41,23 +41,42 @@ namespace HAL {
 
 namespace {
 
-bool areInterfacesEquivalent(IREE::HAL::InterfaceOp lhs,
-                             IREE::HAL::InterfaceOp rhs) {
-  auto lhsBindings = lhs.getBlock().getOps<IREE::HAL::InterfaceBindingOp>();
-  auto rhsBindings = rhs.getBlock().getOps<IREE::HAL::InterfaceBindingOp>();
-  auto lhsIt = lhsBindings.begin(), lhsEnd = lhsBindings.end();
-  auto rhsIt = rhsBindings.begin(), rhsEnd = rhsBindings.end();
-  for (; lhsIt != lhsEnd && rhsIt != rhsEnd; ++lhsIt, ++rhsIt) {
-    // Assume bindings are in order, check equivalence of each pairing.
-    if (!OperationEquivalence::isEquivalentTo(*lhsIt, *rhsIt)) return false;
+// Destructively merges |sourceModuleOp| into |targetModuleOp|.
+// |targetSymbolTable| is updated with the new symbols.
+void mergeModuleInto(IREE::VM::ModuleOp sourceModuleOp,
+                     IREE::VM::ModuleOp targetModuleOp,
+                     DenseMap<StringRef, Operation *> &targetSymbolMap) {
+  auto allOps = llvm::to_vector<8>(llvm::map_range(
+      sourceModuleOp.getBlock(), [&](Operation &op) { return &op; }));
+  for (auto &op : allOps) {
+    if (op->isKnownTerminator()) continue;
+    if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
+      if (targetSymbolMap.count(symbolInterface.getName())) {
+        // TODO(scotttodd): compare ops to ensure we aren't copying different
+        // things with the same name.
+        continue;
+      }
+      targetSymbolMap[symbolInterface.getName()] = op;
+    }
+    op->moveBefore(&targetModuleOp.getBlock().back());
   }
 
-  if (lhsIt != lhsEnd || rhsIt != rhsEnd) {
-    // Not finished iterating through one, number of interface bindings differ.
-    return false;
-  }
+  // Now that we're done cloning its ops, delete the original target op.
+  sourceModuleOp.erase();
+}
 
-  return true;
+// Replaces each usage of an entry point with its original symbol name with a
+// new symbol name.
+void replaceEntryPointUses(mlir::ModuleOp moduleOp,
+                           const DenseMap<Attribute, Attribute> &replacements) {
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
+      auto it = replacements.find(dispatchOp.entry_point());
+      if (it != replacements.end()) {
+        dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
+      }
+    });
+  }
 }
 
 }  // namespace
@@ -92,38 +111,6 @@ class VMLATargetBackend final : public TargetBackend {
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
-    // --- Linking overview ---
-    //
-    // We start with a `module` containing multiple `hal.executable`s, each with
-    // potentially multiple `hal.executable.target`s. We want to move all
-    // compatible VMLA functions into a new "linked" executable, de-duping
-    // symbols, and updating references as we go.
-    //
-    // Sample IR after:
-    //   hal.executable @linked_vmla {
-    //     hal.interface @legacy_io_0 { ... }
-    //     hal.interface @legacy_io_1 { ... }
-    //     hal.executable.target @vmla, filter="vmla" {
-    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-    //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
-    //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
-    //       module {
-    //         vm.module @module {
-    //           vm.func @main_0(...) { ... }
-    //           vm.func @main_1(...) { ... }
-    //           vm.func @main_2(...) { ... }
-    //         }
-    //       }
-    //     }
-    //   }
-    //   hal.executable @main_dispatch_0 {
-    //     hal.interface @legacy_io { ... }
-    //     hal.executable.target @other, filter="other" {
-    //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-    //       module { ... }
-    //     }
-    //   }
-
     OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
     auto executableOps =
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
@@ -163,8 +150,7 @@ class VMLATargetBackend final : public TargetBackend {
 
         IREE::HAL::InterfaceOp interfaceOpForExecutable;
         for (auto interfaceOp : interfaceOps) {
-          if (areInterfacesEquivalent(interfaceOp,
-                                      executableOp.getFirstInterfaceOp())) {
+          if (interfaceOp.isEquivalentTo(executableOp.getFirstInterfaceOp())) {
             interfaceOpForExecutable = interfaceOp;
             break;
           }
@@ -228,45 +214,6 @@ class VMLATargetBackend final : public TargetBackend {
     }
 
     return success();
-  }
-
-  // Destructively merges |sourceModuleOp| into |targetModuleOp|.
-  // |targetSymbolTable| is updated with the new symbols.
-  void mergeModuleInto(IREE::VM::ModuleOp sourceModuleOp,
-                       IREE::VM::ModuleOp targetModuleOp,
-                       DenseMap<StringRef, Operation *> &targetSymbolMap) {
-    auto allOps = llvm::to_vector<8>(llvm::map_range(
-        sourceModuleOp.getBlock(), [&](Operation &op) { return &op; }));
-    for (auto &op : allOps) {
-      if (op->isKnownTerminator()) continue;
-      if (auto symbolInterface = dyn_cast<SymbolOpInterface>(op)) {
-        if (targetSymbolMap.count(symbolInterface.getName())) {
-          // TODO(scotttodd): compare ops to ensure we aren't copying different
-          // things with the same name.
-          continue;
-        }
-        targetSymbolMap[symbolInterface.getName()] = op;
-      }
-      op->moveBefore(&targetModuleOp.getBlock().back());
-    }
-
-    // Now that we're done cloning its ops, delete the original target op.
-    sourceModuleOp.erase();
-  }
-
-  // Replaces each usage of an entry point with its original symbol name with a
-  // new symbol name.
-  void replaceEntryPointUses(
-      mlir::ModuleOp moduleOp,
-      const DenseMap<Attribute, Attribute> &replacements) {
-    for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-      funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
-        auto it = replacements.find(dispatchOp.entry_point());
-        if (it != replacements.end()) {
-          dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
-        }
-      });
-    }
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,

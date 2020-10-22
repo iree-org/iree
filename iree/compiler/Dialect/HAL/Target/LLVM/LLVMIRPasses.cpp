@@ -32,7 +32,7 @@ namespace IREE {
 namespace HAL {
 
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
-    const LLVMTargetOptions& targetOptions) {
+    const LLVMTargetOptions &targetOptions) {
   std::string errorMessage;
   auto target = llvm::TargetRegistry::lookupTarget(targetOptions.targetTriple,
                                                    errorMessage);
@@ -44,9 +44,9 @@ std::unique_ptr<llvm::TargetMachine> createTargetMachine(
   return machine;
 }
 
-LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
-                              llvm::TargetMachine* machine,
-                              llvm::Module* module) {
+LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
+                              llvm::TargetMachine *machine,
+                              llvm::Module *module) {
   llvm::LoopAnalysisManager loopAnalysisManager;
   llvm::FunctionAnalysisManager functionAnalysisManager;
   llvm::CGSCCAnalysisManager cGSCCAnalysisManager;
@@ -78,8 +78,8 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions& options,
   return success();
 }
 
-LogicalResult runEmitObjFilePasses(llvm::TargetMachine* machine,
-                                   llvm::Module* module, std::string* objData) {
+LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
+                                   llvm::Module *module, std::string *objData) {
   llvm::SmallVector<char, 0> stream_buffer;
   {
     // TODO(ataei): Use non legacy pass mamanger for this.
