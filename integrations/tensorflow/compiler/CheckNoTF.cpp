@@ -39,20 +39,20 @@ class CheckNoTF : public PassWrapper<CheckNoTF, FunctionPass> {
 
   /// Performs the lowering to XLA dialect.
   void runOnFunction() override {
-    auto op = getFunction();  
+    auto op = getFunction();
     auto context = op.getContext();
 
-    Dialect* dialect = context->getLoadedDialect("tf");
+    Dialect *dialect = context->getLoadedDialect("tf");
     DenseSet<Operation *> illegalOps;
     op.walk([&](Operation *op) {
-        if (op->getDialect() == dialect) {
-            illegalOps.insert(op);
-        }
+      if (op->getDialect() == dialect) {
+        illegalOps.insert(op);
+      }
     });
 
     if (!illegalOps.empty()) {
-        EmitLegalizationErrors(op, illegalOps);
-        return signalPassFailure();
+      EmitLegalizationErrors(op, illegalOps);
+      return signalPassFailure();
     }
   }
 
@@ -77,14 +77,15 @@ class CheckNoTF : public PassWrapper<CheckNoTF, FunctionPass> {
     std::vector<std::string> error_messages;
     error_messages.reserve(op_name_to_error_info.size());
     for (const auto &op_info : op_name_to_error_info) {
-      error_messages.push_back(
-          llvm::formatv("{0} (count: {1})", op_info.first, op_info.second.first));
+      error_messages.push_back(llvm::formatv("{0} (count: {1})", op_info.first,
+                                             op_info.second.first));
     }
     Location loc = op->getLoc();
-    emitError(loc) << "The following operations cannot be legalized: "
-                   << llvm::join(error_messages, "; ")
-                   << ". These legalization failure(s) may be due to missing TF "
-                      "to HLO lowerings and/or unsupported attributes, etc.";
+    emitError(loc)
+        << "The following operations cannot be legalized: "
+        << llvm::join(error_messages, "; ")
+        << ". These legalization failure(s) may be due to missing TF "
+           "to HLO lowerings and/or unsupported attributes, etc.";
     // Emit more information about the missing ops. This error message
     // contains useful details beyond the op name (input and output shapes,
     // attributes, etc.).
@@ -94,8 +95,8 @@ class CheckNoTF : public PassWrapper<CheckNoTF, FunctionPass> {
   }
 };
 
-static PassRegistration<CheckNoTF> pass(
-    "iree-check-no-tf", "Check that no TF remains");
+static PassRegistration<CheckNoTF> pass("iree-check-no-tf",
+                                        "Check that no TF remains");
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createCheckNoTF() {
