@@ -69,8 +69,8 @@ class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
       StringRef op_name = nonlegalizedOp->getName().getStringRef();
       // If this emplace is successful, it's the first time we've encountered
       // this op type. Initialize count to 0 so that after increment, it is 1.
-      auto insertion_result = opNametoErrorInfo.emplace(
-          op_name, std::make_pair(0, nonlegalizedOp));
+      auto insertion_result =
+          opNametoErrorInfo.emplace(op_name, std::make_pair(0, nonlegalizedOp));
       ++insertion_result.first->second.first;
       nonlegalizedOp->emitOpError() << "still existed";
     }
@@ -79,17 +79,16 @@ class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
     errorMessages.reserve(opNametoErrorInfo.size());
     for (const auto &opInfo : opNametoErrorInfo) {
       errorMessages.push_back(llvm::formatv("\t{0} (count: {1})", opInfo.first,
-                                             opInfo.second.first));
+                                            opInfo.second.first));
     }
     Location loc = op->getLoc();
-    emitError(loc)
-        << "The following Tensorflow operations still remain: \n"
-        << llvm::join(errorMessages, "\n") << "\n";
+    emitError(loc) << "The following Tensorflow operations still remain: \n"
+                   << llvm::join(errorMessages, "\n") << "\n";
   }
 };
 
 static PassRegistration<CheckNoTensorflow> pass(
-  "iree-check-no-tf", "Check that no TensorFlow frontend ops remain");
+    "iree-check-no-tf", "Check that no TensorFlow frontend ops remain");
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createCheckNoTF() {
