@@ -245,6 +245,7 @@ iree_e2e_test_suite(
         "guitar",
         "manual",
         "no-remote",
+        "nokokoro",
         "notap",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
