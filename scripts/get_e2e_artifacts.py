@@ -15,9 +15,17 @@
 # limitations under the License.
 """Runs all E2E TensorFlow tests and extracts their benchmarking artifacts.
 
-Example usage:
-  python3 get_e2e_artifacts.py
-  python3 get_e2e_artifacts.py --test_suites=e2e_tests
+Example usages:
+  # Run all test suites and collect their artifacts:
+  python3 ./scripts/get_e2e_artifacts.py
+
+  # Run the e2e_tests test suite and collect its artifacts:
+  python3 ./scripts/get_e2e_artifacts.py --test_suites=e2e_tests
+
+  # Run all test suites in parallel and then collect their artifacts:
+  bazel query //integrations/tensorflow/e2e/... | \
+    xargs bazel test --test_tag_filters="-failing"
+  python3 ./scripts/get_e2e_artifacts.py --run_test_suites=False
 """
 
 import fileinput
