@@ -249,7 +249,7 @@ class Trace:
   """Stores the inputs and outputs of a series of calls to a module."""
 
   def __init__(self,
-               module: tf_utils.CompiledModule,
+               module: Union[tf_utils.CompiledModule, None],
                function: Union[Callable[["TracedModule"], None], None],
                _load_dict: Dict[str, Any] = None):
     """Extracts metadata from module and function and initializes.
@@ -563,7 +563,7 @@ class TracedModule:
     self._module = module
     self._trace = trace
 
-  def _trace_call(self, method: Callable[..., Any], method_name: str):
+  def _trace_call(self, method: tf_utils._FunctionWrapper, method_name: str):
     """Decorates a CompiledModule method to capture its inputs and outputs."""
 
     def call(*args, **kwargs):
@@ -611,8 +611,8 @@ _global_modules = None
 
 
 def compile_tf_module(
-    module_class: Type[tf.Module], exported_names: Sequence[str] = ()
-) -> Callable[[Any], Any]:
+    module_class: Type[tf.Module],
+    exported_names: Sequence[str] = ()) -> Modules:
   """Compiles module_class to each backend that we test.
 
   Args:
@@ -648,11 +648,10 @@ def compile_tf_module(
   return _global_modules
 
 
-def compile_tf_signature_def_saved_model(saved_model_dir: str,
-                                         saved_model_tags: Set[str],
-                                         module_name: str, exported_name: str,
-                                         input_names: Sequence[str],
-                                         output_names: Sequence[str]):
+def compile_tf_signature_def_saved_model(
+    saved_model_dir: str, saved_model_tags: Set[str], module_name: str,
+    exported_name: str, input_names: Sequence[str],
+    output_names: Sequence[str]) -> Modules:
   """Compiles a SignatureDef SavedModel to each backend that we test.
 
   Args:
