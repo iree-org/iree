@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_CODEGENUTILS_FUNCTIONUTILS_H_
-#define IREE_COMPILER_TRANSLATION_CODEGENUTILS_FUNCTIONUTILS_H_
+#ifndef IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
+#define IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
 
 #include "mlir/IR/Function.h"
 
@@ -36,4 +36,4 @@ inline const char* getOperandResultNumAttrName() {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_CODEGENUTILS_FUNCTIONUTILS_H_
+#endif  // IREE_COMPILER_CONVERSION_CODEGENUTILS_FUNCTIONUTILS_H_
