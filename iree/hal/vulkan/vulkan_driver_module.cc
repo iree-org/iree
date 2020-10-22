@@ -30,6 +30,19 @@ ABSL_FLAG(bool, vulkan_debug_report, false,
           "Enables VK_EXT_debug_report and logs errors.");
 ABSL_FLAG(bool, vulkan_push_descriptors, true,
           "Enables use of vkCmdPushDescriptorSetKHR, if available.");
+ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
+ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
+ABSL_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
+          "Uses timeline semaphore emulation even if native support exists.");
+
+// Vulkan Memory Allocator (VMA) flags
+#if VMA_RECORDING_ENABLED
+ABSL_FLAG(std::string, vma_recording_file, "",
+          "File path to write a CSV containing the VMA recording.");
+ABSL_FLAG(bool, vma_recording_flush_after_call, false,
+          "Flush the VMA recording file after every call (useful if "
+          "crashing/not exiting cleanly).");
+#endif  // VMA_RECORDING_ENABLED
 
 namespace iree {
 namespace hal {
@@ -61,7 +74,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
 
   // REQUIRED: these are required extensions that must be present for IREE to
   // work (such as those relied upon by SPIR-V kernels, etc).
-  options.device_extensibility.required_extensions.push_back(
+  options.device_options.extensibility_spec.required_extensions.push_back(
       VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
   // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
   // This extension was deprecated in Vulkan 1.1 as its functionality was
@@ -70,7 +83,7 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
   // Timeline semaphore support is optional and will be emulated if necessary.
-  options.device_extensibility.optional_extensions.push_back(
+  options.device_options.extensibility_spec.optional_extensions.push_back(
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   // Polyfill layer - enable if present (instead of our custom emulation).
   options.instance_extensibility.optional_layers.push_back(
@@ -91,9 +104,21 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   }
 
   if (absl::GetFlag(FLAGS_vulkan_push_descriptors)) {
-    options.device_extensibility.optional_extensions.push_back(
+    options.device_options.extensibility_spec.optional_extensions.push_back(
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
   }
+
+  options.default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
+  options.enable_renderdoc = absl::GetFlag(FLAGS_vulkan_renderdoc);
+  options.device_options.force_timeline_semaphore_emulation =
+      absl::GetFlag(FLAGS_vulkan_force_timeline_semaphore_emulation);
+
+#if VMA_RECORDING_ENABLED
+  options.device_options.vma_options.recording_file =
+      absl::GetFlag(FLAGS_vma_recording_file);
+  options.device_options.vma_options.recording_flush_after_call =
+      absl::GetFlag(FLAGS_vma_recording_flush_after_call);
+#endif  // VMA_RECORDING_ENABLED
 
   // Create the driver and VkInstance.
   IREE_ASSIGN_OR_RETURN(auto driver,

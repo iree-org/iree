@@ -33,6 +33,7 @@
 #include "iree/hal/vulkan/emulated_timeline_semaphore.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/vma_allocator.h"
 
 namespace iree {
 namespace hal {
@@ -50,19 +51,29 @@ struct QueueSet {
 
 class VulkanDevice final : public Device {
  public:
+  struct Options {
+    // Extensibility descriptions for the device.
+    ExtensibilitySpec extensibility_spec;
+
+    // Options for Vulkan Memory Allocator (VMA).
+    VmaAllocator::Options vma_options;
+
+    // Uses timeline semaphore emulation even if native support exists.
+    bool force_timeline_semaphore_emulation = false;
+  };
+
   // Creates a device that manages its own VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Create(
       ref_ptr<Driver> driver, VkInstance instance,
       const DeviceInfo& device_info, VkPhysicalDevice physical_device,
-      const ExtensibilitySpec& extensibility_spec,
-      const ref_ptr<DynamicSymbols>& syms,
+      Options options, const ref_ptr<DynamicSymbols>& syms,
       DebugCaptureManager* debug_capture_manager);
 
   // Creates a device that wraps an externally managed VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Wrap(
       ref_ptr<Driver> driver, VkInstance instance,
       const DeviceInfo& device_info, VkPhysicalDevice physical_device,
-      VkDevice logical_device, const ExtensibilitySpec& extensibility_spec,
+      VkDevice logical_device, Options options,
       const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
       const ref_ptr<DynamicSymbols>& syms);
 

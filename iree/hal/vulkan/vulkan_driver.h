@@ -38,10 +38,21 @@ class VulkanDriver final : public Driver {
     // Driver creation will fail if the required version is not available.
     uint32_t api_version = VK_API_VERSION_1_0;
 
-    // Extensibility descriptions for instances and devices.
-    // Device descriptions will be used for all devices created by the driver.
+    // Extensibility descriptions for instances.
+    // See VulkanDevice::Options for device extensibility descriptions.
     ExtensibilitySpec instance_extensibility;
-    ExtensibilitySpec device_extensibility;
+
+    // Options to use for all devices created by the driver.
+    VulkanDevice::Options device_options;
+
+    // Index of the default Vulkan device to use within the list of available
+    // devices. Devices are discovered via vkEnumeratePhysicalDevices then
+    // considered "available" if compatible with the driver options.
+    int default_device_index = 0;
+
+    // Enables RenderDoc integration, connecting via RenderDoc's API and
+    // recording Vulkan calls for offline inspection and debugging.
+    bool enable_renderdoc = false;
   };
 
   // Creates a VulkanDriver that manages its own VkInstance.
@@ -86,15 +97,16 @@ class VulkanDriver final : public Driver {
  private:
   VulkanDriver(
       ref_ptr<DynamicSymbols> syms, VkInstance instance, bool owns_instance,
+      VulkanDevice::Options device_options, int default_device_index,
       std::unique_ptr<DebugReporter> debug_reporter,
-      ExtensibilitySpec device_extensibility_spec,
       std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager);
 
   ref_ptr<DynamicSymbols> syms_;
   VkInstance instance_;
   bool owns_instance_;
+  VulkanDevice::Options device_options_;
+  int default_device_index_;
   std::unique_ptr<DebugReporter> debug_reporter_;
-  ExtensibilitySpec device_extensibility_spec_;
   std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager_;
 };
 
