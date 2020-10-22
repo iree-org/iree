@@ -17,7 +17,6 @@
 #include <memory>
 
 #include "absl/container/inlined_vector.h"
-#include "absl/flags/flag.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
@@ -25,9 +24,6 @@
 #include "iree/hal/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
-
-ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
-ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
 
 namespace iree {
 namespace hal {
@@ -94,7 +90,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   // Note: RenderDoc assumes that only a single VkDevice is used:
   //   https://renderdoc.org/docs/behind_scenes/vulkan_support.html#current-support
   std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager;
-  if (absl::GetFlag(FLAGS_vulkan_renderdoc)) {
+  if (options.enable_renderdoc) {
     renderdoc_capture_manager = std::make_unique<RenderDocCaptureManager>();
     IREE_RETURN_IF_ERROR(renderdoc_capture_manager->Connect());
   }
@@ -168,11 +164,11 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
                             instance, syms, /*allocation_callbacks=*/nullptr));
   }
 
-  return assign_ref(new VulkanDriver(std::move(syms), instance,
-                                     /*owns_instance=*/true,
-                                     std::move(debug_reporter),
-                                     std::move(options.device_extensibility),
-                                     std::move(renderdoc_capture_manager)));
+  return assign_ref(new VulkanDriver(
+      std::move(syms), instance,
+      /*owns_instance=*/true, std::move(options.device_options),
+      options.default_device_index, std::move(debug_reporter),
+      std::move(renderdoc_capture_manager)));
 }
 
 // static
@@ -216,23 +212,25 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
   // created externally. Applications using this function must provide their
   // own RenderDoc / debugger integration as desired.
 
-  return assign_ref(new VulkanDriver(
-      std::move(syms), instance, /*owns_instance=*/false,
-      std::move(debug_reporter), std::move(options.device_extensibility),
-      /*debug_capture_manager=*/nullptr));
+  return assign_ref(
+      new VulkanDriver(std::move(syms), instance, /*owns_instance=*/false,
+                       std::move(options.device_options),
+                       options.default_device_index, std::move(debug_reporter),
+                       /*debug_capture_manager=*/nullptr));
 }
 
 VulkanDriver::VulkanDriver(
     ref_ptr<DynamicSymbols> syms, VkInstance instance, bool owns_instance,
+    VulkanDevice::Options device_options, int default_device_index,
     std::unique_ptr<DebugReporter> debug_reporter,
-    ExtensibilitySpec device_extensibility_spec,
     std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager)
     : Driver("vulkan"),
       syms_(std::move(syms)),
       instance_(instance),
       owns_instance_(owns_instance),
+      device_options_(std::move(device_options)),
+      default_device_index_(default_device_index),
       debug_reporter_(std::move(debug_reporter)),
-      device_extensibility_spec_(std::move(device_extensibility_spec)),
       renderdoc_capture_manager_(std::move(renderdoc_capture_manager)) {}
 
 VulkanDriver::~VulkanDriver() {
@@ -272,16 +270,15 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
 
   // Query available devices.
   IREE_ASSIGN_OR_RETURN(auto available_devices, EnumerateAvailableDevices());
-  int default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
-  if (default_device_index < 0 ||
-      default_device_index >= available_devices.size()) {
+  if (default_device_index_ < 0 ||
+      default_device_index_ >= available_devices.size()) {
     return NotFoundErrorBuilder(IREE_LOC)
-           << "Device index " << default_device_index << " not found "
+           << "Device index " << default_device_index_ << " not found "
            << "(of " << available_devices.size() << ")";
   }
 
   // Just create the first one we find.
-  return CreateDevice(available_devices[default_device_index].device_id());
+  return CreateDevice(available_devices[default_device_index_].device_id());
 }
 
 StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
@@ -297,7 +294,7 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   IREE_ASSIGN_OR_RETURN(
       auto device,
       VulkanDevice::Create(add_ref(this), instance(), device_info,
-                           physical_device, device_extensibility_spec_, syms(),
+                           physical_device, device_options_, syms(),
                            renderdoc_capture_manager_.get()));
 
   IREE_LOG(INFO) << "Created Vulkan Device: " << device->info().name();
@@ -316,10 +313,10 @@ StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
   // Attempt to create the device.
   // This may fail if the VkDevice does not support all necessary features.
   IREE_ASSIGN_OR_RETURN(
-      auto device, VulkanDevice::Wrap(
-                       add_ref(this), instance(), device_info, physical_device,
-                       logical_device, device_extensibility_spec_,
-                       compute_queue_set, transfer_queue_set, syms()));
+      auto device,
+      VulkanDevice::Wrap(add_ref(this), instance(), device_info,
+                         physical_device, logical_device, device_options_,
+                         compute_queue_set, transfer_queue_set, syms()));
   return device;
 }
 

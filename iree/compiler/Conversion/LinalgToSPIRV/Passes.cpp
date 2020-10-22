@@ -63,11 +63,6 @@ struct LinalgToSPIRVPassPipelineOptions
       llvm::cl::desc(
           "Enable use of vectorization in SPIR-V code generation pipeline"),
       llvm::cl::init(false)};
-  Option<bool> useVectorPass{
-      *this, "use-vector-pass",
-      llvm::cl::desc("Enable use of Linalg vectorization in SPIR-V code "
-                     "generation pipeline"),
-      llvm::cl::init(false)};
 };
 
 static void addLinalgToSPIRVPasses(OpPassManager &pm,
@@ -99,9 +94,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(options));
-  if (options.useVectorPass) {
-    pm.addPass(createLoadStoreVectorizationPass());
-  }
+  pm.addPass(createLoadStoreVectorizationPass());
   pm.addPass(createCanonicalizerPass());
 
   //===--------------------------------------------------------------------===//

@@ -81,7 +81,7 @@ TF_IMPORT_PASS_PIPELINE = (
     "canonicalize",
 
     # Legalize to XLA
-    "xla-legalize-tf{allow-partial-conversion=true}",
+    "iree-xla-legalize-tf",
     "canonicalize",
 
     # Now that the IR is starting to look nice, optimize global tensors.

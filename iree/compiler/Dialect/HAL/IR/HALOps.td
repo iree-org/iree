@@ -2124,6 +2124,10 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
     // TODO(benvanik): replace with a nested typed attr that works.
     // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
     ArrayAttr getExecutableSetLayoutsAttr();
+
+    // Returns true if the all bindings in the interface match exactly those
+    // in |other| (including order).
+    bool isEquivalentTo(IREE::HAL::InterfaceOp other);
   }];
 }
 

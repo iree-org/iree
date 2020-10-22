@@ -14,21 +14,12 @@
 
 #include "iree/hal/vulkan/vma_allocator.h"
 
-#include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_buffer.h"
-
-#if VMA_RECORDING_ENABLED
-ABSL_FLAG(std::string, vma_recording_file, "",
-          "File path to write a CSV containing the VMA recording.");
-ABSL_FLAG(bool, vma_recording_flush_after_call, false,
-          "Flush the VMA recording file after every call (useful if "
-          "crashing/not exiting cleanly).");
-#endif  // VMA_RECORDING_ENABLED
 
 namespace iree {
 namespace hal {
@@ -37,7 +28,8 @@ namespace vulkan {
 // static
 StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
     VkPhysicalDevice physical_device,
-    const ref_ptr<VkDeviceHandle>& logical_device, VkInstance instance) {
+    const ref_ptr<VkDeviceHandle>& logical_device, VkInstance instance,
+    Options options) {
   IREE_TRACE_SCOPE0("VmaAllocator::Create");
 
   const auto& syms = logical_device->syms();
@@ -66,10 +58,9 @@ StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
 
   VmaRecordSettings record_settings;
 #if VMA_RECORDING_ENABLED
-  record_settings.flags = absl::GetFlag(FLAGS_vma_recording_flush_after_call)
-                              ? VMA_RECORD_FLUSH_AFTER_CALL_BIT
-                              : 0;
-  record_settings.pFilePath = absl::GetFlag(FLAGS_vma_recording_file).c_str();
+  record_settings.flags =
+      options.recording_flush_after_call ? VMA_RECORD_FLUSH_AFTER_CALL_BIT : 0;
+  record_settings.pFilePath = options.recording_file.c_str();
 #else
   record_settings.flags = 0;
   record_settings.pFilePath = nullptr;

@@ -23,12 +23,12 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
 
-  // CHECK: spv.globalVariable @__resource_var_3_4__ bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.globalVariable @__resource_var_1_2__ bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.globalVariable @__resource_var_3_4_resource_variable__ bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.globalVariable @__resource_var_1_2_resource_variable__ bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.func @resource_variable()
   func @resource_variable() {
-    // CHECK: spv._address_of @__resource_var_1_2__ : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-    // CHECK: spv._address_of @__resource_var_3_4__ : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+    // CHECK: spv._address_of @__resource_var_1_2_resource_variable__ : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+    // CHECK: spv._address_of @__resource_var_3_4_resource_variable__ : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
     %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x4xf32>
     %1 = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x4xf32>
     return
@@ -37,6 +37,24 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SP
   hal.interface @legacy_io attributes {push_constants = 5 : i32, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  }
+}
+
+// -----
+
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>, vkspv.entry_point_schedule = ["ForwardPass_ex_dispatch_8_dispatch_0", "ForwardPass_ex_dispatch_8_dispatch_1"]} {
+  // CHECK: spv.globalVariable @__resource_var_0_0_dispatch_0__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<1 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+  // CHECK: spv.globalVariable @__resource_var_0_0_dispatch_1__ bind(0, 0) : !spv.ptr<!spv.struct<(!spv.array<4 x f32, stride=4> [0])>, StorageBuffer>
+  func @dispatch_1() attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}, vkspv.num_workgroups_fn = @ForwardPass_ex_dispatch_8_dispatch_1__num_workgroups__} {
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<4xf32>
+    return
+  }
+  func @dispatch_0() attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}, vkspv.num_workgroups_fn = @ForwardPass_ex_dispatch_8_dispatch_0__num_workgroups__} {
+    %0 = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<1xvector<4xf32>>
+    return
+  }
+  hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   }
 }
 

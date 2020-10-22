@@ -1500,6 +1500,17 @@ ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
       })));
 }
 
+bool InterfaceOp::isEquivalentTo(InterfaceOp other) {
+  auto bindings = llvm::to_vector<4>(getBlock().getOps<InterfaceBindingOp>());
+  auto otherBindings =
+      llvm::to_vector<4>(other.getBlock().getOps<InterfaceBindingOp>());
+  return bindings.size() == otherBindings.size() &&
+         llvm::all_of(llvm::zip(bindings, otherBindings), [](auto bindings) {
+           return OperationEquivalence::isEquivalentTo(std::get<0>(bindings),
+                                                       std::get<1>(bindings));
+         });
+}
+
 //===----------------------------------------------------------------------===//
 // hal.interface.binding
 //===----------------------------------------------------------------------===//

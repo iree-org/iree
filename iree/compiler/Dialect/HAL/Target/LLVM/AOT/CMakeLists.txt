@@ -35,14 +35,9 @@ iree_cc_library(
     LLVMSupport
     LLVMX86AsmParser
     LLVMX86CodeGen
-    MLIRAffine
-    MLIRLLVMIR
-    MLIRLinalg
-    MLIRSCF
     MLIRTargetLLVMIR
-    MLIRVector
-    iree::compiler::Conversion::LinalgToLLVM
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVM::LLVMBaseTarget
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMIRPasses
     iree::compiler::Dialect::HAL::Target::LLVM::LLVMTargetOptions
     iree::schemas::dylib_executable_def_cc_fbs
