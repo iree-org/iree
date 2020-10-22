@@ -80,7 +80,7 @@ jobs:
       - name: Install pytype
         run: python3 -m pip install pytype
       - name: Run pytype on changed files
-        run: ./build_tools/pytype/check_diff "${BASE_REF?}"
+        run: ./build_tools/pytype/check_diff.sh "${BASE_REF?}"
 
   clang-format:
     runs-on: ubuntu-18.04
