@@ -50,8 +50,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Setting up python
         uses: actions/setup-python@v2
-        # We have to explicitly fetch the base branch as well
       - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Install yapf
         run: python3 -m pip install yapf
@@ -72,13 +72,13 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
-        # Pytype does not support python3.9, which this action defaults to.
       - name: Setting up python
         uses: actions/setup-python@v2
         with:
+          # Pytype does not support python3.9, which this action defaults to.
           python-version: '3.8'
-        # We have to explicitly fetch the base branch as well
       - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Install pytype
         run: python3 -m pip install pytype
@@ -99,8 +99,8 @@ jobs:
           chmod +x /tmp/git-clang-format
       - name: Checking out repository
         uses: actions/checkout@v2
-        # We have to explicitly fetch the base branch as well
       - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
@@ -122,8 +122,8 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
-      # We have to explicitly fetch the base branch as well
       - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${BASE_REF?}:${BASE_REF?}"
       - name: Checking tabs
         run: ./scripts/check_tabs.sh "${BASE_REF?}"
