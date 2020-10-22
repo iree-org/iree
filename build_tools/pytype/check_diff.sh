@@ -14,6 +14,13 @@
 # limitations under the License.
 
 # Uses git diff to run pytype on changed files.
+# Example Usage:
+#   Defaults to comparing against 'main'.
+#     ./build_tools/pytype/check_diff.sh
+#   A specific branch can be specified.
+#     ./build_tools/pytype/check_diff.sh  google
+#   Or all python files outside of './third_party/' can be checked.
+#     ./build_tools/pytype/check_diff.sh  all
 
 DIFF_TARGET="${1:-main}"
 echo "Running pycheck against '${DIFF_TARGET?}'"
@@ -24,6 +31,9 @@ else
   FILES=$(git diff --name-only "${DIFF_TARGET?}" | grep '.*\.py')
 fi
 
+
+# We seperate the python files into multiple pytype calls because otherwise
+# Ninja gets confused. See https://github.com/google/pytype/issues/198
 BASE=$(echo "${FILES?}" | grep -vP '^(\./)?integrations/*')
 IREE_TF=$(echo "${FILES?}" | \
           grep -P '^(\./)?integrations/tensorflow/bindings/python/pyiree/tf/.*')
@@ -42,6 +52,8 @@ function check_files() {
     return "${1?}"
   fi
 
+  # We disable import-error because pytype doesn't have access to bazel.
+  # We disable pyi-error because of the way the bindings imports work.
   echo "${@:2}" | \
     xargs python3 -m pytype --disable=import-error,pyi-error -j $(nproc)
   EXIT_CODE="$?"
