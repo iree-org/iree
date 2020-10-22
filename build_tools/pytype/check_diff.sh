@@ -21,7 +21,7 @@ echo "Running pycheck against '${DIFF_TARGET?}'"
 if [[ "${DIFF_TARGET?}" = "all" ]]; then
   FILES=$(find -name "*\.py" -not -path "./third_party/*")
 else
-  FILES=$(git diff --name-only "${DIFF_TARGET}" | grep '.*\.py')
+  FILES=$(git diff --name-only "${DIFF_TARGET?}" | grep '.*\.py')
 fi
 
 BASE=$(echo "${FILES?}" | grep -v '^[\./]*integrations/*')
@@ -39,46 +39,46 @@ function check_files() {
   if [[ -z "${@:2}" ]]; then
     echo "No files to check."
     echo
-    return ${1?}
+    return "${1?}"
   fi
 
   echo "${@:2}" | \
     xargs python3 -m pytype --disable=import-error,pyi-error -j $(nproc)
-  CODE="$?"
+  EXIT_CODE="$?"
   echo
-  if [[ "${CODE?}" -gt "${1?}" ]]; then
-    return ${CODE?}
+  if [[ "${EXIT_CODE?}" -gt "${1?}" ]]; then
+    return "${EXIT_CODE?}"
   else
-    return ${1?}
+    return "${1?}"
   fi
 }
 
 MAX_CODE=0
 
 echo "Checking .py files outside of integrations/"
-check_files ${MAX_CODE?} ${BASE?}
-MAX_CODE=$?
+check_files "${MAX_CODE?}" "${BASE?}"
+MAX_CODE="$?"
 
 echo "Checking .py files in integrations/tensorflow/bindings/python/pyiree/tf/.*"
-check_files ${MAX_CODE?} ${IREE_TF?}
-MAX_CODE=$?
+check_files "${MAX_CODE?}" "${IREE_TF?}"
+MAX_CODE="$?"
 
 echo "Checking .py files in integrations/tensorflow/bindings/python/pyiree/xla/.*"
-check_files ${MAX_CODE?} ${IREE_XLA?}
-MAX_CODE=$?
+check_files "${MAX_CODE?}" "${IREE_XLA?}"
+MAX_CODE="$?"
 
 echo "Checking .py files in integrations/tensorflow/compiler/.*"
-check_files ${MAX_CODE?} ${COMPILER?}
-MAX_CODE=$?
+check_files "${MAX_CODE?}" "${COMPILER?}"
+MAX_CODE="$?"
 
 echo "Checking .py files in integrations/tensorflow/e2e/.*"
-check_files ${MAX_CODE?} ${E2E?}
-MAX_CODE=$?
+check_files "${MAX_CODE?}" "${E2E?}"
+MAX_CODE="$?"
 
 
 if [[ "${MAX_CODE?}" -ne "0" ]]; then
   echo "One or more pytype checks failed."
   echo "You can view these errors locally by running"
-  echo "  ./build_tools/pytype/check_diff.sh ${DIFF_TARGET}"
+  echo "  ./build_tools/pytype/check_diff.sh ${DIFF_TARGET?}"
   exit "${MAX_CODE?}"
 fi
