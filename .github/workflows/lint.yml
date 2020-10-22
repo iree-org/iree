@@ -74,8 +74,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Setting up python
         uses: actions/setup-python@v2
+        # Pytype does not support python3.9, which this action defaults to.
         with:
-          # Pytype does not support python3.9, which this action defaults to.
           python-version: '3.8'
         # We have to explicitly fetch the base branch as well
       - name: Fetching Base Branch
