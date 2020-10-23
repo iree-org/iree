@@ -21,11 +21,6 @@ Example usages:
 
   # Run the e2e_tests test suite and collect its artifacts:
   python3 ./scripts/get_e2e_artifacts.py --test_suites=e2e_tests
-
-  # Run all test suites in parallel and then collect their artifacts:
-  bazel query //integrations/tensorflow/e2e/... | \
-    xargs bazel test --test_tag_filters="-failing"
-  python3 ./scripts/get_e2e_artifacts.py --run_test_suites=False
 """
 
 import fileinput
@@ -129,7 +124,7 @@ def extract_artifacts(test_path: str, test_name: str, written_paths: Set[str],
                       paths_to_tests: Dict[str, str]):
   """Unzips all of the benchmarking artifacts for a given test and backend."""
   outputs = os.path.join(test_path, 'test.outputs', 'outputs.zip')
-  if FLAGS.dry_run not os.path.exists(outputs):
+  if FLAGS.dry_run and not os.path.exists(outputs):
     # The artifacts may or may not be present on disk during a dry run. If they
     # are then we want to collision check them, but if they aren't that's fine.
     return
@@ -155,17 +150,21 @@ def main(argv):
   # Convert test suite shorthands to full test suite targets.
   test_suites = [SUITE_NAME_TO_TARGET[suite] for suite in FLAGS.test_suites]
 
+  if FLAGS.run_test_suites:
+    # Use bazel test to execute all of the test suites in parallel.
+    command = [
+        'bazel', 'test', *test_suites, '--color=yes',
+        '--test_arg=--get_saved_model'
+    ]
+    print(f'Running: `{" ".join(command)}`')
+    if not FLAGS.dry_run:
+      subprocess.check_call(command)
+    print()
+
   written_paths = set()
   paths_to_tests = dict()
 
   for test_suite in test_suites:
-    if FLAGS.run_test_suites and not FLAGS.dry_run:
-      subprocess.check_call([
-          'bazel', 'test', test_suite, '--color=yes',
-          '--test_arg=--get_saved_model'
-      ])
-      print()
-
     # Extract all of the artifacts for this test suite.
     test_paths, test_names = get_test_paths_and_names(test_suite)
     for i, (test_path, test_name) in enumerate(zip(test_paths, test_names)):
