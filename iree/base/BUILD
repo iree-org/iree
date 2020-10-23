@@ -295,6 +295,7 @@ cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     deps = [
+        ":tracing",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/flags:flag",
     ],
