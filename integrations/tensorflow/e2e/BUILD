@@ -201,31 +201,11 @@ iree_e2e_test_suite(
         "tflite": ["mobile_bert_squad_test.py"],
         "iree_vmla": ["mobile_bert_squad_test.py"],
         "iree_llvmjit": ["mobile_bert_squad_test.py"],
-    },
-    reference_backend = "tf",
-    tags = [
-        "external",
-        "guitar",
-        "manual",
-        "no-remote",
-        "nokokoro",
-        "notap",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
-
-iree_e2e_test_suite(
-    name = "mobile_bert_squad_tests_failing",
-    size = "enormous",
-    backends_to_srcs = {
         "iree_vulkan": ["mobile_bert_squad_test.py"],
     },
     reference_backend = "tf",
     tags = [
         "external",
-        "failing",
         "guitar",
         "manual",
         "no-remote",
