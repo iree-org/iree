@@ -348,7 +348,7 @@ iree_cc_library(
     ::tracing
     absl::core_headers
     absl::flags
-    absl::strings
+    absl::str_format
   PUBLIC
 )
 
