@@ -45,3 +45,15 @@ iree_check_single_backend_test_suite(
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan_vector",
+    srcs = [
+        "compare.mlir",
+        "log_plus_one.mlir",
+        "pw_add_multiwg.mlir",
+    ],
+    compiler_flags = ["-iree-spirv-use-vector-pass"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
