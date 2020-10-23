@@ -63,23 +63,18 @@ class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
     // Track the legalization failures by mapping op name to information about
     // that failure: the number of unlegalized occurrences of the op, and one
     // example operation that failed.
-    std::map<StringRef, std::pair<int, Operation *>> opNametoErrorInfo;
+    std::map<StringRef, int> opNameCounts;
     for (Operation *nonlegalizedOp : nonlegalizedOps) {
-      // Increment count of this legalization failure.
-      StringRef op_name = nonlegalizedOp->getName().getStringRef();
-      // If this emplace is successful, it's the first time we've encountered
-      // this op type. Initialize count to 0 so that after increment, it is 1.
-      auto insertion_result =
-          opNametoErrorInfo.emplace(op_name, std::make_pair(0, nonlegalizedOp));
-      ++insertion_result.first->second.first;
-      nonlegalizedOp->emitOpError() << "still existed";
+      StringRef opName = nonlegalizedOp->getName().getStringRef();
+      opNameCounts[opName]++;
+      nonlegalizedOp->emitOpError() << "still exists";
     }
 
     std::vector<std::string> errorMessages;
-    errorMessages.reserve(opNametoErrorInfo.size());
-    for (const auto &opInfo : opNametoErrorInfo) {
+    errorMessages.reserve(opNameCounts.size());
+    for (const auto &opInfo : opNameCounts) {
       errorMessages.push_back(llvm::formatv("\t{0} (count: {1})", opInfo.first,
-                                            opInfo.second.first));
+                                            opInfo.second));
     }
     Location loc = op->getLoc();
     emitError(loc) << "The following Tensorflow operations still remain: \n"
