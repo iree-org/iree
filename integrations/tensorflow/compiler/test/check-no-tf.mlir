@@ -26,4 +26,3 @@ func @f(%arg0 : tensor<i32>) -> (tensor<i32>) {
   %1 = "tf.Add"(%arg0, %0) : (tensor<i32>, tensor<i32>) -> tensor<i32>
   return %1 : tensor<i32>
 }
-
