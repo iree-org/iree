@@ -49,19 +49,5 @@ StringRef getVectorizeMarker() { return "vectorize"; }
 
 StringRef getDeleteMarker() { return "delete"; }
 
-bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
-  StringAttr attr = op->getAttrOfType<StringAttr>(
-      linalg::LinalgTransforms::kLinalgTransformMarker);
-  return attr && (marker.empty() ||
-                  llvm::any_of(marker, [&attr](StringRef markerValue) {
-                    return attr.getValue() == markerValue;
-                  }));
-}
-
-void setMarker(Operation *op, StringRef marker) {
-  op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
-              StringAttr::get(marker, op->getContext()));
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir

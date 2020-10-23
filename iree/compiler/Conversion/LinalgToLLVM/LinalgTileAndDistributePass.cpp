@@ -165,7 +165,7 @@ void LinalgTileAndDistributePass::runOnOperation() {
       getOuterTileSizeFn =
           [&cpuKernelDispatch](OpBuilder &builder,
                                Operation *operation) -> SmallVector<Value, 4> {
-    ArrayRef<int64_t> tileSizes = cpuKernelDispatch.getTileSizes(operation);
+    auto tileSizes = cpuKernelDispatch.getTileSizes(operation);
     if (tileSizes.empty()) return {};
     SmallVector<Value, 4> tileSizesVal;
     tileSizesVal.reserve(tileSizes.size());
