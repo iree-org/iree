@@ -24,15 +24,15 @@ cc_library(
     name = "CodegenUtils",
     srcs = [
         "FunctionUtils.cpp",
+        "GetNumWorkgroups.cpp",
         "MarkerUtils.cpp",
         "MatmulCodegenStrategy.cpp",
-        "WorkgroupCalculation.cpp",
     ],
     hdrs = [
         "FunctionUtils.h",
+        "GetNumWorkgroups.h",
         "MarkerUtils.h",
         "MatmulCodegenStrategy.h",
-        "WorkgroupCalculation.h",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",

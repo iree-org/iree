@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
-#include "iree/compiler/Conversion/CodegenUtils/WorkgroupCalculation.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/MarkerUtils.h"
@@ -122,11 +122,11 @@ struct TileAndFuseToCPUThreads
   CPUKernelDispatch cpuKernelDispatch;
 };
 
-// We use |tiles| = |threads| no need to have iree.thread_id op.
-class RemoveNumThreads : public OpRewritePattern<IREE::NumThreadsOp> {
+// We use |tiles| = |threads| no need to have iree.workgroup_count op.
+class RemoveNumThreads : public OpRewritePattern<IREE::WorkgroupCountOp> {
  public:
-  using OpRewritePattern<IREE::NumThreadsOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::NumThreadsOp op,
+  using OpRewritePattern<IREE::WorkgroupCountOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::WorkgroupCountOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return failure();
@@ -149,8 +149,8 @@ void LinalgTileAndDistributePass::runOnOperation() {
           StringAttr attr =
               builder.getStringAttr(dimAttr[std::min<unsigned>(dim, 3)]);
           procInfo[numParallelDims - dim - 1] = {
-              builder.create<IREE::ThreadIdOp>(loc, indexType, attr),
-              builder.create<IREE::NumThreadsOp>(loc, indexType, attr)};
+              builder.create<IREE::WorkgroupCoordOp>(loc, indexType, attr),
+              builder.create<IREE::WorkgroupCountOp>(loc, indexType, attr)};
         }
         return procInfo;
       },

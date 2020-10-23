@@ -13,8 +13,8 @@ func @dynamic_matmul(%lhs: memref<?x?xf32>, %rhs: memref<?x?xf32>, %result: memr
 // CHECK: %[[CONST_0:.+]] = constant 0 : index
 // CHECK: %[[CONST_1:.+]] = constant 1 : index
 // CHECK: %[[DIM_K:.+]] = dim %[[LHS]], %[[CONST_1]]
-// CHECK: %[[THREAD_X_ID:.+]] = iree.thread_id  {dimension = "x"} : index
-// CHECK: %[[THREAD_Y_ID:.+]] = iree.thread_id  {dimension = "y"} : index
+// CHECK: %[[THREAD_X_ID:.+]] = iree.workgroup_coord  {dimension = "x"} : index
+// CHECK: %[[THREAD_Y_ID:.+]] = iree.workgroup_coord  {dimension = "y"} : index
 // CHECK:  scf.for %[[K:.+]] = %[[CONST_0]] to %[[DIM_K]]
 // CHECK:     %[[I:.+]] = affine.apply #[[MAP0]]()[%[[THREAD_Y_ID]]]
 // CHECK:     %[[DIM_I:.+]] = dim %[[LHS]], %[[CONST_0]]
@@ -45,8 +45,8 @@ func @static_matmul(%lhs: memref<16x4xf32>, %rhs: memref<4x8xf32>, %result: memr
 // CHECK: %[[CONST_0:.+]] = constant 0 : index
 // CHECK: %[[CONST_4:.+]] = constant 4 : index
 // CHECK: %[[CONST_1:.+]] = constant 1 : index
-// CHECK: %[[THREAD_X_ID:.+]] = iree.thread_id  {dimension = "x"} : index
-// CHECK: %[[THREAD_Y_ID:.+]] = iree.thread_id  {dimension = "y"} : index
+// CHECK: %[[THREAD_X_ID:.+]] = iree.workgroup_coord  {dimension = "x"} : index
+// CHECK: %[[THREAD_Y_ID:.+]] = iree.workgroup_coord  {dimension = "y"} : index
 // CHECK:  scf.for %[[K:.+]] = %[[CONST_0]] to %[[CONST_4]] step %[[CONST_1]] 
 // CHECK:    %[[I:.+]] = affine.apply #[[MAP0]]()[%[[THREAD_Y_ID]]]
 // CHECK:    %[[LHS_SUBVIEW:.+]] = subview %[[LHS]][%[[I]], %[[K]]] [2, 1] [1, 1]  : memref<16x4xf32> to memref<2x1xf32, #[[MAP1]]>

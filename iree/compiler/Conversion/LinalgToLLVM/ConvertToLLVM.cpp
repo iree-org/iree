@@ -168,7 +168,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // Get interface buffers from all the blocks.
     SmallVector<IREE::PlaceholderOp, 8> bufferOps;
     SmallVector<IREE::HAL::InterfaceLoadConstantOp, 8> loadOps;
-    SmallVector<IREE::ThreadIdOp, 3> threadIdOps;
+    SmallVector<IREE::WorkgroupCoordOp, 3> workgroupCoordOps;
     for (Block &block : funcOp.getBlocks()) {
       for (Operation &op : block) {
         if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
@@ -176,8 +176,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
         if (auto phOp = dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
           loadOps.push_back(phOp);
         }
-        if (auto threadIdOp = dyn_cast<IREE::ThreadIdOp>(op)) {
-          threadIdOps.push_back(threadIdOp);
+        if (auto threadIdOp = dyn_cast<IREE::WorkgroupCoordOp>(op)) {
+          workgroupCoordOps.push_back(threadIdOp);
         }
       }
     }
@@ -249,7 +249,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
         rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
                                  llvm::None));
 
-    // TODO(ataei): Bettery way of handling WorkgroupFunAttr.
+    // TODO(ataei): Constructor above should take all attributes.
     auto nmWorkgroupsFnAttrName = funcOp.getAttr(getNumWorkgroupsFnAttrName());
     if (nmWorkgroupsFnAttrName) {
       newFuncOp.setAttr(getNumWorkgroupsFnAttrName(), nmWorkgroupsFnAttrName);
@@ -305,9 +305,9 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
       rewriter.replaceOp(loadOp, dimConstantCasted);
     }
 
-    // Lower iree.thread_id ops to get indices from function arugments.
-    for (auto threadIdOp : threadIdOps) {
-      auto attr = threadIdOp.getAttrOfType<StringAttr>("dimension");
+    // Lower iree.workgroup_coord ops to get indices from function arugments.
+    for (auto workgroupCoordOp : workgroupCoordOps) {
+      auto attr = workgroupCoordOp.getAttrOfType<StringAttr>("dimension");
       int argIndex = -1;
       if (attr.getValue().str() == "x") {
         argIndex = 2;
@@ -316,11 +316,14 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
       } else if (attr.getValue().str() == "z") {
         argIndex = 4;
       } else {
+        return rewriter.notifyMatchFailure(
+            funcOp,
+            "Unable to map to workgroup coordinate : " + attr.getValue().str());
       }
       Value threadXIndex = builder.create<LLVM::ZExtOp>(
-          loc, typeConverter.convertType(threadIdOp.getType()),
+          loc, typeConverter.convertType(workgroupCoordOp.getType()),
           newFuncOp.getArgument(argIndex));
-      rewriter.replaceOp(threadIdOp, threadXIndex);
+      rewriter.replaceOp(workgroupCoordOp, threadXIndex);
     }
     rewriter.eraseOp(funcOp);
     return success();

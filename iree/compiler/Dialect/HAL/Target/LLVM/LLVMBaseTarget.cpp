@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 
-#include "iree/compiler/Conversion/CodegenUtils/WorkgroupCalculation.h"
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"

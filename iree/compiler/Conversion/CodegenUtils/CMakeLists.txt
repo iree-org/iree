@@ -19,14 +19,14 @@ iree_cc_library(
     CodegenUtils
   HDRS
     "FunctionUtils.h"
+    "GetNumWorkgroups.h"
     "MarkerUtils.h"
     "MatmulCodegenStrategy.h"
-    "WorkgroupCalculation.h"
   SRCS
     "FunctionUtils.cpp"
+    "GetNumWorkgroups.cpp"
     "MarkerUtils.cpp"
     "MatmulCodegenStrategy.cpp"
-    "WorkgroupCalculation.cpp"
   DEPS
     LLVMSupport
     MLIRAffine
