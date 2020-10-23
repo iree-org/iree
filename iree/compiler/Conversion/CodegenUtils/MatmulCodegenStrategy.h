@@ -42,7 +42,7 @@ struct Transformation {
 template <typename VectorOpType>
 struct UnrollVector : public Transformation {
   explicit UnrollVector(ArrayRef<int64_t> targetShape)
-      : targetShape(targetShape) {}
+      : targetShape(targetShape.begin(), targetShape.end()) {}
 
   OwningRewritePatternList buildRewritePatterns(
       MLIRContext *ctx, linalg::LinalgMarker m) override {
@@ -57,7 +57,7 @@ struct UnrollVector : public Transformation {
   }
 
  private:
-  ArrayRef<int64_t> targetShape;
+  SmallVector<int64_t, 4> targetShape;
 };
 
 /// Promotion transformation enqueues a particular stage-1 pattern for
