@@ -9,7 +9,7 @@ out e2e flows that cross the ML framework, compiler and runtime interactively.
 Run:
 
 ```shell
-./colab/start_colab_kernel.py
+$ python3 ./colab/start_colab_kernel.py
 ```
 
 This will start a jupyter notebook on port 8888. Then navigate to
@@ -33,15 +33,15 @@ Unless if you have setup Colab before, there is some setup:
 ### Install Jupyter (from https://jupyter.org/install)
 
 ```shell
-python3 -m pip install --upgrade pip
-python3 -m pip install jupyter
+$ python3 -m pip install --upgrade pip
+$ python3 -m pip install jupyter
 ```
 
 ### Setup colab (https://research.google.com/colaboratory/local-runtimes.html)
 
 ```shell
-python3 -m pip install jupyter_http_over_ws
-jupyter serverextension enable --py jupyter_http_over_ws
+$ python3 -m pip install jupyter_http_over_ws
+$ jupyter serverextension enable --py jupyter_http_over_ws
 ```
 
 ## Local and Hosted Runtimes
