@@ -130,11 +130,8 @@ Value getPushConstantValue(Operation *op, unsigned elementCount,
 spirv::GlobalVariableOp getOrInsertResourceVariable(Location loc, Type type,
                                                     unsigned set,
                                                     unsigned binding,
-                                                    StringRef funcName,
                                                     Block &block) {
-  auto name =
-      llvm::formatv("__resource_var_{0}_{1}_{2}__", set, binding, funcName)
-          .str();
+  auto name = llvm::formatv("__resource_var_{0}_{1}__", set, binding).str();
   for (auto varOp : block.getOps<spirv::GlobalVariableOp>()) {
     if (varOp.sym_name() == name) return varOp;
   }
@@ -371,10 +368,9 @@ LogicalResult IREEPlaceholderConverter::matchAndRewrite(
       SymbolTable::lookupNearestSymbolFrom(
           phOp, phOp.getAttrOfType<SymbolRefAttr>("binding")));
 
-  StringRef funcName = phOp.getParentOfType<spirv::FuncOp>().getName();
-  spirv::GlobalVariableOp varOp = getOrInsertResourceVariable(
-      phOp.getLoc(), convertedType, bindingOp.set(), bindingOp.binding(),
-      funcName, *moduleOp.getBody());
+  spirv::GlobalVariableOp varOp =
+      getOrInsertResourceVariable(phOp.getLoc(), convertedType, bindingOp.set(),
+                                  bindingOp.binding(), *moduleOp.getBody());
 
   rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(phOp, varOp);
   return success();

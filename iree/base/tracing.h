@@ -77,6 +77,10 @@
 // Tracy UI.
 #define IREE_TRACING_FEATURE_SLOW_LOCKS (1 << 5)
 
+// Forwards log messages to traces, which will be visible under "Messages" in
+// the Tracy UI.
+#define IREE_TRACING_FEATURE_LOG_MESSAGES (1 << 6)
+
 #if !defined(IREE_TRACING_MAX_CALLSTACK_DEPTH)
 // Tracing functions that capture stack traces will only capture up to N frames.
 // The overhead for stack walking scales linearly with the number of frames
@@ -95,7 +99,7 @@
 // overridden it with more specific settings.
 //
 // IREE_TRACING_MODE = 0: tracing disabled
-// IREE_TRACING_MODE = 1: instrumentation and basic statistics
+// IREE_TRACING_MODE = 1: instrumentation, log messages, and basic statistics
 // IREE_TRACING_MODE = 2: same as 1 with added allocation tracking
 // IREE_TRACING_MODE = 3: same as 2 with callstacks for allocations
 // IREE_TRACING_MODE = 4: same as 3 with callstacks for all instrumentation
@@ -105,20 +109,23 @@
 #undef IREE_TRACING_MAX_CALLSTACK_DEPTH
 #define IREE_TRACING_MAX_CALLSTACK_DEPTH 0
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 2
-#define IREE_TRACING_FEATURES             \
-  (IREE_TRACING_FEATURE_INSTRUMENTATION | \
-   IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
-#elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 3
 #define IREE_TRACING_FEATURES                 \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |     \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING | \
-   IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS)
+   IREE_TRACING_FEATURE_LOG_MESSAGES)
+#elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 3
+#define IREE_TRACING_FEATURES                   \
+  (IREE_TRACING_FEATURE_INSTRUMENTATION |       \
+   IREE_TRACING_FEATURE_ALLOCATION_TRACKING |   \
+   IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS | \
+   IREE_TRACING_FEATURE_LOG_MESSAGES)
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE >= 4
 #define IREE_TRACING_FEATURES                        \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |            \
    IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS | \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING |        \
-   IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS)
+   IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS |      \
+   IREE_TRACING_FEATURE_LOG_MESSAGES)
 #else
 #define IREE_TRACING_FEATURES 0
 #endif  // IREE_TRACING_MODE
@@ -336,11 +343,21 @@ enum {
 // The message text must be a compile-time string literal.
 #define IREE_TRACE_MESSAGE(level, value_literal) \
   ___tracy_emit_messageLC(value_literal, IREE_TRACING_MESSAGE_LEVEL_##level, 0)
+// Logs a message with the given color to the trace.
+// Standard colors are defined as IREE_TRACING_MESSAGE_LEVEL_* values.
+// The message text must be a compile-time string literal.
+#define IREE_TRACE_MESSAGE_COLORED(color, value_literal) \
+  ___tracy_emit_messageLC(value_literal, color, 0)
 // Logs a dynamically-allocated message at the given logging level to the trace.
 // The string |value| will be copied into the trace buffer.
 #define IREE_TRACE_MESSAGE_DYNAMIC(level, value, value_length) \
   ___tracy_emit_messageC(value, value_length,                  \
                          IREE_TRACING_MESSAGE_LEVEL_##level, 0)
+// Logs a dynamically-allocated message with the given color to the trace.
+// Standard colors are defined as IREE_TRACING_MESSAGE_LEVEL_* values.
+// The string |value| will be copied into the trace buffer.
+#define IREE_TRACE_MESSAGE_DYNAMIC_COLORED(color, value, value_length) \
+  ___tracy_emit_messageC(value, value_length, color, 0)
 
 // Utilities:
 #define IREE_TRACE_IMPL_GET_VARIADIC_HELPER_(_1, _2, _3, NAME, ...) NAME
@@ -370,7 +387,9 @@ enum {
 #define IREE_TRACE_FRAME_MARK_BEGIN_NAMED(name_literal)
 #define IREE_TRACE_FRAME_MARK_END_NAMED(name_literal)
 #define IREE_TRACE_MESSAGE(level, value_literal)
+#define IREE_TRACE_MESSAGE_COLORED(color, value_literal)
 #define IREE_TRACE_MESSAGE_DYNAMIC(level, value, value_length)
+#define IREE_TRACE_MESSAGE_DYNAMIC_COLORED(color, value, value_length)
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
 
 //===----------------------------------------------------------------------===//

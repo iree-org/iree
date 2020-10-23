@@ -17,6 +17,8 @@
 #include <string>
 
 #include "absl/flags/flag.h"
+#include "absl/strings/str_format.h"
+#include "iree/base/tracing.h"
 
 ABSL_FLAG(int, iree_minloglevel, 0,
           "Minimum logging level. 0 = INFO and above.");
@@ -88,6 +90,19 @@ void LogMessage::EmitLogMessage() {
   // TODO(scotttodd): Include current system time
   fprintf(stderr, "%c %s:%d] %s\n", "IWEF"[severity_], file_name_, line_,
           str().c_str());
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_LOG_MESSAGES
+  constexpr int kLevelColors[4] = {
+      IREE_TRACING_MESSAGE_LEVEL_INFO,     // INFO
+      IREE_TRACING_MESSAGE_LEVEL_WARNING,  // WARNING
+      IREE_TRACING_MESSAGE_LEVEL_ERROR,    // ERROR
+      IREE_TRACING_MESSAGE_LEVEL_ERROR,    // FATAL
+  };
+  std::string message =
+      absl::StrFormat("%s:%d] %s\n", file_name_, line_, str().c_str());
+  IREE_TRACE_MESSAGE_DYNAMIC_COLORED(kLevelColors[severity_], message.c_str(),
+                                     message.size());
+#endif  // IREE_TRACING_FEATURES& IREE_TRACING_FEATURE_LOG_MESSAGES
 }
 
 LogMessageFatal::LogMessageFatal(const char* file, int line)

@@ -29,6 +29,7 @@ struct SPIRVCodegenOptions {
   SmallVector<int64_t, 3> tileSizes = {};
   bool useWorkgroupMemory = false;
   bool useVectorization = false;
+  bool useVectorPass = false;
 };
 
 /// Pass to initialize the function that computes the number of workgroups for

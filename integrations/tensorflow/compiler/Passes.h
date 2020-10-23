@@ -40,6 +40,9 @@ createTFSavedModelLowerExportedFunctions();
 // Push resource casts forward to better propagate resource related shapes.
 std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCasts();
 
+// Validates whether any Tensorflow operations remain.
+std::unique_ptr<OperationPass<FuncOp>> createCheckNoTF();
+
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
 void createIreeTfImportPipeline(OpPassManager &pm);
