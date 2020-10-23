@@ -150,8 +150,7 @@ class VectorTransferWriteConversion
         loc, rewriter.getIndexType(), rewriter.getStringAttr("x"));
     Value index = rewriter.create<AddIOp>(loc, ThreadIndex, indices.back());
     indices.back() = index;
-    rewriter.create<StoreOp>(op.getLoc(), operands[0], operands[1], indices);
-    rewriter.eraseOp(op);
+    rewriter.replaceOpWithNewOp<StoreOp>(op, operands[0], operands[1], indices);
     return success();
   }
 };
@@ -216,8 +215,9 @@ class VectorTransferReadToLoad
                                 PatternRewriter &rewriter) const override {
     if (op.getVectorType().getNumElements() != 1 ||
         op.getMemRefType().getElementType() !=
-            op.getVectorType().getElementType())
+            op.getVectorType().getElementType()) {
       return failure();
+    }
     auto loc = op.getLoc();
     Value newOp = rewriter.create<LoadOp>(loc, op.memref(), op.indices());
     newOp =
@@ -238,9 +238,9 @@ class VectorTransferWriteToStore
                                 PatternRewriter &rewriter) const override {
     if (op.getVectorType().getNumElements() != 1 ||
         op.getMemRefType().getElementType() !=
-            op.getVectorType().getElementType())
+            op.getVectorType().getElementType()) {
       return failure();
-    op.vector();
+    }
     auto loc = op.getLoc();
     SmallVector<int64_t, 2> zero(op.getVectorType().getRank(), 0);
     Value scalarValue =
@@ -260,11 +260,12 @@ class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
     auto iteratorTypes = op.iterator_types().getValue();
-    if (!isParallelIterator(iteratorTypes[0]) ||
+    if (iteratorTypes.size() != 3 || !isParallelIterator(iteratorTypes[0]) ||
         !isParallelIterator(iteratorTypes[1]) ||
         !isReductionIterator(iteratorTypes[2]) ||
-        !isRowMajorMatmul(op.indexing_maps()))
+        !isRowMajorMatmul(op.indexing_maps())) {
       return failure();
+    }
     if (op.getLhsType().getNumElements() != 1) return failure();
     unsigned vecSize = op.getAccType().cast<VectorType>().getNumElements();
     if (!(vecSize >= 1 && vecSize <= 4)) return failure();
@@ -273,8 +274,7 @@ class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
         vecSize, op.getResultType().cast<VectorType>().getElementType());
     std::array<int64_t, 2> zero = {0, 0};
     Value lhs = rewriter.create<vector::ExtractOp>(loc, op.lhs(), zero);
-    Value rhs;
-    Value acc;
+    Value rhs, acc;
     if (vecSize == 1) {
       rhs = rewriter.create<vector::ExtractOp>(loc, op.rhs(), zero);
       acc = rewriter.create<vector::ExtractOp>(loc, op.acc(), zero);
