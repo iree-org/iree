@@ -242,13 +242,23 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     signatureConverter.addInputs(threadIdYTy);
     signatureConverter.addInputs(threadIdZTy);
 
-    // Create the new function's signature.
     Location loc = funcOp.getLoc();
+
+    // Construct newFunc with all attributes except return type & symbol name.
+    SmallVector<NamedAttribute, 4> funcAttrs;
+    for (auto attr : funcOp.getAttrs()) {
+      if (attr.first == SymbolTable::getSymbolAttrName() ||
+          attr.first == mlir::impl::getTypeAttrName()) {
+        continue;
+      }
+      funcAttrs.push_back(attr);
+    }
+
     auto newFuncOp = rewriter.create<FuncOp>(
         loc, funcOp.getName(),
         rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
                                  llvm::None),
-        funcOp.getAttrs());
+        funcAttrs);
 
     // Move all ops in the old function's region to the new function.
     rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),

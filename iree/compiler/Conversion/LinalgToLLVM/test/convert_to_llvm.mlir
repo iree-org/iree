@@ -90,9 +90,9 @@ hal.interface @legacy_io2 attributes {push_constants = 1 : i32, sym_visibility =
 // CHECK_LABEL: @distribute_lookup
 func @distribute_lookup() -> f32 {
   %0 = iree.placeholder for "interface buffer" {binding = @legacy_io3::@arg0} : memref<2x2x2xf32>
-  %1 = iree.thread_id {dimension = "x"} : index
-  %2 = iree.thread_id {dimension = "y"} : index
-  %3 = iree.thread_id {dimension = "z"} : index
+  %1 = iree.workgroup_coord {dimension = "x"} : index
+  %2 = iree.workgroup_coord {dimension = "y"} : index
+  %3 = iree.workgroup_coord {dimension = "z"} : index
   %4 = load %0[%1, %2, %3] : memref<2x2x2xf32>
   return %4 : f32
 }
