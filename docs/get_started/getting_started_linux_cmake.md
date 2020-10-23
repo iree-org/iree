@@ -72,7 +72,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
+$ cmake -G Ninja -B ../iree-build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
 ```
 
 > Tip:<br>
@@ -84,7 +84,7 @@ $ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 Build all targets:
 
 ```shell
-$ cmake --build build/
+$ cmake --build ../iree-build/
 ```
 
 ## What's next?
@@ -94,8 +94,8 @@ $ cmake --build build/
 Check out the contents of the 'tools' build directory:
 
 ```shell
-$ ls build/iree/tools
-$ ./build/iree/tools/iree-translate --help
+$ ls ../iree-build/iree/tools
+$ ../iree-build/iree/tools/iree-translate --help
 ```
 
 Translate a
@@ -103,8 +103,8 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
-    -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
+  -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading

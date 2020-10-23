@@ -32,17 +32,17 @@ and create the PR from there.
 
     ```shell
     # From your existing git repo
-    git remote rename origin upstream
-    git remote add origin git@github.com:<github_username>/iree.git
+    $ git remote rename origin upstream
+    $ git remote add origin git@github.com:<github_username>/iree.git
     ```
 
     b. If you haven't already cloned:
 
     ```shell
     # From whatever directory under which you want to nest your repo
-    git clone git@github.com:<github_username>/iree.git
-    cd iree
-    git remote add upstream git@github.com:google/iree.git
+    $ git clone git@github.com:<github_username>/iree.git
+    $ cd iree
+    $ git remote add upstream git@github.com:google/iree.git
     ```
 
     This is especially important for maintainers who have write access (so can
@@ -60,8 +60,8 @@ and create the PR from there.
     little trickier than it should be. You can also add this as a git alias.
 
     ```shell
-    git config alias.update "! /path/to/git-update"
-    git config alias.sync "update main"
+    $ git config alias.update "! /path/to/git-update"
+    $ git config alias.sync "update main"
     ```
 
 ## Useful Tools

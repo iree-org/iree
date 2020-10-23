@@ -68,14 +68,14 @@ $ build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmla \
   $PWD/iree/tools/test/simple.mlir \
-  -o /tmp/simple.module
+  -o /tmp/simple.vmfb
 ```
 
 Run a compiled module once:
 
 ```shell
 $ build/iree/tools/iree-run-module \
-  --module_file=/tmp/simple.module \
+  --module_file=/tmp/simple.vmfb \
   --driver=vmla \
   --entry_function=abs \
   --function_inputs="i32=-2"
@@ -85,7 +85,7 @@ Benchmark a compiled module, running it many times:
 
 ```shell
 $ build/iree/tools/iree-benchmark-module \
-  --module_file=/tmp/simple.module \
+  --module_file=/tmp/simple.vmfb \
   --driver=vmla \
   --entry_function=abs \
   --function_inputs="i32=-2"
@@ -137,7 +137,7 @@ an Android app:
 
 ```mlir
 func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32>
-  attributes { iree.module.export } {
+  attributes { iree.vmfb.export } {
   %0 = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
   return %0 : tensor<2x2xf32>
 }

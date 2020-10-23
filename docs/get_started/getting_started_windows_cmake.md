@@ -45,7 +45,7 @@ Visual Studio":
 *   Initialize MSVC by running `vcvarsall.bat`:
 
     ```powershell
-    > "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+    > & "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
     ```
 
 ## Clone and Build
@@ -70,7 +70,7 @@ clone the repository and initialize its submodules:
 Configure:
 
 ```powershell
-> cmake -G Ninja -B build\ .
+> cmake -G Ninja -B ..\iree-build\ .
 ```
 
 > Tip:<br>
@@ -82,7 +82,7 @@ Configure:
 Build all targets:
 
 ```powershell
-> cmake --build build\
+> cmake --build ..\iree-build\
 ```
 
 ## What's next?
@@ -92,8 +92,8 @@ Build all targets:
 Check out the contents of the 'tools' build directory:
 
 ```powershell
-> dir build\iree\tools
-> .\build\iree\tools\iree-translate.exe --help
+> dir ..\iree-build\iree\tools
+> ..\iree-build\iree\tools\iree-translate.exe --help
 ```
 
 Translate a
@@ -101,7 +101,7 @@ Translate a
 and execute a function in the compiled module:
 
 ```powershell
-> .\build\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+> ..\iree-build\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading

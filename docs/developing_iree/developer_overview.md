@@ -80,7 +80,7 @@ Here's an example of a small compiler pass running on a
 [test file](https://github.com/google/iree/blob/main/iree/compiler/Dialect/IREE/Transforms/test/drop_compiler_hints.mlir):
 
 ```shell
-$ bazel run iree/tools:iree-opt -- \
+$ ../iree-build/iree/tools/iree-opt \
   -split-input-file \
   -print-ir-before-all \
   -iree-drop-compiler-hints \
@@ -93,7 +93,7 @@ pipeline targeting the VMLA backend on the
 model file:
 
 ```shell
-$ bazel run iree/tools:iree-opt -- \
+$ ../iree-build/iree/tools/iree-opt \
   -iree-transformation-pipeline \
   -iree-hal-target-backends=vmla \
   $PWD/iree/test/e2e/models/fullyconnected.mlir
@@ -115,11 +115,11 @@ for more information.
 For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
-$ bazel run iree/tools:iree-translate -- \
+$ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmla \
   $PWD/iree/tools/test/simple.mlir \
-  -o /tmp/simple.module
+  -o /tmp/simple.vmfb
 ```
 
 Custom translations may also be layered on top of `iree-translate`, see
@@ -133,12 +133,12 @@ and executes an exported main function using the provided inputs.
 
 This program can be used in sequence with `iree-translate` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
-that executes the simple `simple.module` compiled from `simple.mlir` above on
+that executes the simple `simple.vmfb` compiled from `simple.mlir` above on
 IREE's VMLA driver:
 
 ```shell
-$ bazel run iree/tools:iree-run-module -- \
-  --module_file=/tmp/simple.module \
+$ ../iree-build/iree/tools:iree/run-module \
+  --module_file=/tmp/simple.vmfb \
   --driver=vmla \
   --entry_function=abs \
   --function_inputs="i32=-2"
@@ -153,16 +153,16 @@ runner for the IREE
 [check framework](https://github.com/google/iree/tree/main/docs/developing_iree/testing_guide.md#end-to-end-tests).
 
 ```shell
-$ bazel run iree/tools:iree-translate -- \
+$ ../iree-build/iree/tools/iree-translate \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmla \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
-  -o /tmp/abs.module
+  -o /tmp/abs.vmfb
 ```
 
 ```shell
-$ bazel run iree/modules/check:iree-check-module -- \
-  /tmp/abs.module \
+$ ../iree-build/iree/modules/check:iree/check-module \
+  /tmp/abs.vmfb \
   --driver=vmla
 ```
 
@@ -179,10 +179,10 @@ For example, to execute the contents of
 [iree/tools/test/simple.mlir](https://github.com/google/iree/blob/main/iree/tools/test/simple.mlir):
 
 ```shell
-$ bazel run iree/tools:iree-run-mlir -- \
+$ ../iree-build/iree/tools:iree/run-mlir \
   $PWD/iree/tools/test/simple.mlir \
-  --function-input="i32=-2" \
-  --iree-hal-target-backends=vmla
+  -function-input="i32=-2" \
+  -iree-hal-target-backends=vmla
 ```
 
 ### iree-dump-module
@@ -193,7 +193,7 @@ file.
 For example, to inspect the module translated above:
 
 ```shell
-$ bazel run iree/tools:iree-dump-module -- /tmp/simple.module
+$ ../iree-build/iree/tools:iree-dump-module -- /tmp/simple.b
 ```
 
 ### Useful generic flags
@@ -231,8 +231,8 @@ function.
 
 ### Useful Vulkan driver flags
 
-For IREE's Vulkan runtime driver, there are a few useful
-[flags](https://github.com/google/iree/blob/main/iree/hal/vulkan/vulkan_driver.cc):
+For IREE's Vulkan runtime driver, there are a few useful flags defined in
+[vulkan_driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/vulkan_driver_module.cc):
 
 #### `--vulkan_renderdoc`
 
@@ -242,9 +242,8 @@ a simple MLIR file with some sample input values and saves a RenderDoc capture
 to the default location on your system (e.g. `/tmp/RenderDoc/`):
 
 ```shell
-$ bazel build iree/tools:iree-run-mlir
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/renderdoc/lib/path \
-  bazel-bin/iree/tools/iree-run-mlir \
+$ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/renderdoc/lib/path \
+  ../iree-build/iree/tools/iree-run-mlir \
     $PWD/iree/samples/vulkan/simple_mul.mlir \
     -iree-hal-target-backends=vulkan-spirv \
     -function-input="4xf32=1,2,3,4" \
