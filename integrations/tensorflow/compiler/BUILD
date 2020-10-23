@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "tensorflow",
     srcs = [
+        "CheckNoTF.cpp",
         "LegalizeTF.cpp",
         "Passes.cpp",
         "PropagateResourceCasts.cpp",

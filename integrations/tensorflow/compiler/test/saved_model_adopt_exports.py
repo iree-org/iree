@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 SAVED_MODEL_IMPORT_PASSES = [
     "tf-executor-graph-pruning",
     "tf-standard-pipeline",
+    "iree-xla-legalize-tf",
     "iree-tf-import-pipeline",
     "canonicalize",
 ]
@@ -114,8 +115,8 @@ class T0002c_SimpleConst(tf.Module):
 # CHECK: attributes
 # CHECK-SAME: iree.module.export
 # CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I1!R1!"}
-# CHECK-DAG:   [[CONST_2xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>} : () -> tensor<2xf32>
-# CHECK-DAG:   [[CONST_3xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]> : tensor<3xf32>} : () -> tensor<3xf32>
+# CHECK-DAG:   [[CONST_2xf32:%.+]] = mhlo.constant dense<[0.000000e+00, 1.000000e+00]>
+# CHECK-DAG:   [[CONST_3xf32:%.+]] = mhlo.constant dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]>
 # CHECK-DAG:   flow.variable.store [[CONST_2xf32]], @v : tensor<2xf32>
 # CHECK-DAG:   flow.variable.store [[CONST_3xf32]], @v : tensor<3xf32>
 # CHECK: FINISH_TEST

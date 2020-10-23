@@ -64,6 +64,11 @@ void createIreeTfImportPipeline(OpPassManager &pm) {
   // - It removes tf_saved_model.semantics from the module, which we can only
   //   do at the very end.
   pm.addPass(createTFSavedModelLowerExportedFunctions());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Validate that all Tensorflow has been legalized away.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(createCheckNoTF());
 }
 
 static mlir::PassPipelineRegistration<> pipeline(
