@@ -67,12 +67,16 @@ static llvm::cl::opt<bool> useWorkgroupMemory(
 static llvm::cl::opt<bool> enableLICM(
     "enable-licm",
     llvm::cl::desc("Enable loop invariant hoisting optimizations"),
-    llvm::cl::value_desc("boolean"), llvm::cl::init(false));
+    llvm::cl::value_desc("boolean"), llvm::cl::init(true));
 
 static llvm::cl::opt<std::string> matType("matrix-type",
                                           llvm::cl::desc("Matrix element type"),
                                           llvm::cl::value_desc("type"),
                                           llvm::cl::init("i8xi8xi32"));
+
+static llvm::cl::opt<std::string> target(
+    "target", llvm::cl::desc("Platform target to decide the strategy"),
+    llvm::cl::value_desc("type"), llvm::cl::init(""));
 
 static void addLoweringPasses(mlir::PassManager &pm,
                               llvm::ArrayRef<int64_t> numWorkgroups,
@@ -245,10 +249,161 @@ static bool EqualOrClose(T a, T b) {
   return a == b;
 }
 
+static MatmulCodegenStrategy createPowerVRStrategy(int tileM, int tileN,
+                                                   int tileK, int warpSize) {
+  const std::array<int64_t, 3> nativeSize = {1, 1, 1};
+  linalg::LinalgLoopDistributionOptions WIDistribute;
+  linalg::LinalgLoopDistributionOptions WGDistribute;
+  WGDistribute.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  WGDistribute.procInfo = getGpuProcIds<gpu::BlockIdOp, gpu::GridDimOp>;
+
+  WIDistribute.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  WIDistribute.procInfo = [warpSize](OpBuilder &b, Location loc,
+                                     ArrayRef<Range> parallelLoopRanges) {
+    Type indexType = b.getIndexType();
+    SmallVector<linalg::ProcInfo, 2> procInfo(2);
+    procInfo[0] = {
+        b.create<gpu::ThreadIdOp>(loc, indexType, b.getStringAttr("x")),
+        b.create<ConstantIndexOp>(loc, warpSize)};
+    procInfo[1] = {b.create<ConstantIndexOp>(loc, 0),
+                   b.create<ConstantIndexOp>(loc, 1)};
+    return procInfo;
+  };
+  MatmulCodegenStrategy strategy;
+  SmallVector<int64_t, 2> promotionList;
+  // promote matrix B
+  promotionList.push_back(1);
+  strategy
+      .tile<linalg::MatmulOp>(
+          linalg::LinalgTilingOptions()
+              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+              .setTileSizes({tileM, tileN, tileK})
+              .setDistributionOptions(WGDistribute))
+      .setHoistInvariantCode(enableLICM);
+  if (useWorkgroupMemory) {
+    strategy.promote<linalg::MatmulOp>(
+        linalg::LinalgPromotionOptions()
+            .setAllocationDeallocationFns(
+                mlir::iree_compiler::allocateWorkgroupMemory,
+                mlir::iree_compiler::deallocateWorkgroupMemory)
+            .setCopyInOutFns(mlir::iree_compiler::copyToWorkgroupMemory,
+                             mlir::iree_compiler::copyToWorkgroupMemory)
+            .setOperandsToPromote(promotionList)
+            .setUseFullTileBuffers({false, false}));
+  }
+  strategy.tile<linalg::MatmulOp>(
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizes({1, tileN, tileK})
+          .setDistributionOptions(WIDistribute));
+  strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
+      nativeSize);
+  return strategy;
+}
+
+static MatmulCodegenStrategy createMaliStrategy(int tileM, int tileN, int tileK,
+                                                int warpSize) {
+  const std::array<int64_t, 3> nativeSize = {1, 4, 1};
+  linalg::LinalgLoopDistributionOptions WIDistribute;
+  linalg::LinalgLoopDistributionOptions WGDistribute;
+  WGDistribute.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  WGDistribute.procInfo = getGpuProcIds<gpu::BlockIdOp, gpu::GridDimOp>;
+
+  WIDistribute.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  WIDistribute.procInfo = [warpSize](OpBuilder &b, Location loc,
+                                     ArrayRef<Range> parallelLoopRanges) {
+    Type indexType = b.getIndexType();
+    SmallVector<linalg::ProcInfo, 2> procInfo(2);
+    procInfo[1] = {
+        b.create<gpu::ThreadIdOp>(loc, indexType, b.getStringAttr("x")),
+        b.create<ConstantIndexOp>(loc, warpSize)};
+    procInfo[0] = {b.create<ConstantIndexOp>(loc, 0),
+                   b.create<ConstantIndexOp>(loc, 1)};
+    return procInfo;
+  };
+  MatmulCodegenStrategy strategy;
+  strategy
+      .tile<linalg::MatmulOp>(
+          linalg::LinalgTilingOptions()
+              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+              .setTileSizes({tileM, tileN, tileK})
+              .setDistributionOptions(WGDistribute))
+      .setHoistInvariantCode(enableLICM);
+  strategy.tile<linalg::MatmulOp>(
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizes({tileM, tileN / warpSize, tileK})
+          .setDistributionOptions(WIDistribute));
+  strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
+      nativeSize);
+  return strategy;
+}
+
+static MatmulCodegenStrategy createTuringStrategy(int tileM, int tileN,
+                                                  int tileK) {
+  std::array<int64_t, 3> nativeSize;
+  if (matType == "i8xi8xi32")
+    nativeSize = {16, 16, 32};
+  else if (matType == "f16xf16xf16")
+    nativeSize = {16, 16, 16};
+  else if (matType == "f16xf16xf32")
+    nativeSize = {16, 16, 16};
+  else
+    llvm::errs() << "unsupported matrix type";
+  linalg::LinalgLoopDistributionOptions WGDistribute;
+  WGDistribute.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  WGDistribute.procInfo = getGpuProcIds<gpu::BlockIdOp, gpu::GridDimOp>;
+
+  linalg::LinalgLoopDistributionOptions SGDistribute;
+  SGDistribute.distributionMethod = {
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
+  SGDistribute.procInfo = getSubgroupIds;
+
+  MatmulCodegenStrategy strategy;
+  strategy
+      .tile<linalg::MatmulOp>(
+          linalg::LinalgTilingOptions()
+              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+              .setTileSizes({tileM, tileN, tileK})
+              .setDistributionOptions(WGDistribute))
+      .setHoistInvariantCode(enableLICM);
+  if (useWorkgroupMemory) {
+    strategy
+        .promote<linalg::MatmulOp>(
+            linalg::LinalgPromotionOptions()
+                .setAllocationDeallocationFns(
+                    mlir::iree_compiler::allocateWorkgroupMemory,
+                    mlir::iree_compiler::deallocateWorkgroupMemory)
+                .setCopyInOutFns(mlir::iree_compiler::copyToWorkgroupMemory,
+                                 mlir::iree_compiler::copyToWorkgroupMemory)
+                .setOperandsToPromote({0, 1})
+                .setUseFullTileBuffers({false, false}))
+        .tile<linalg::MatmulOp>(
+            linalg::LinalgTilingOptions()
+                .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+                .setTileSizes(
+                    {tileM / numSubgroupY, tileN / numSubgroupX, tileK})
+                .setDistributionOptions(SGDistribute));
+  }
+  strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
+      nativeSize);
+  return strategy;
+}
+
 template <typename SrcT, typename DstT>
 static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
-                   const std::array<int64_t, 3> &nativeSize, bool correctness) {
-  const int warpSize = 32;
+                   bool correctness, int warpSize) {
   const int resRows = m;
   const int resColumns = n;
   const int reductionSize = k;
@@ -294,45 +449,13 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
   options.loweringPasses = [&](mlir::PassManager &pm) {
     MatmulCodegenStrategy strategy;
 
-    linalg::LinalgLoopDistributionOptions WGDistribute;
-    WGDistribute.distributionMethod = {
-        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-        linalg::DistributionMethod::CyclicNumProcsEqNumIters};
-    WGDistribute.procInfo = getGpuProcIds<gpu::BlockIdOp, gpu::GridDimOp>;
-
-    linalg::LinalgLoopDistributionOptions SGDistribute;
-    SGDistribute.distributionMethod = {
-        linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-        linalg::DistributionMethod::CyclicNumProcsEqNumIters};
-    SGDistribute.procInfo = getSubgroupIds;
-
-    strategy
-        .tile<linalg::MatmulOp>(
-            linalg::LinalgTilingOptions()
-                .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-                .setTileSizes({tileM, tileN, tileK})
-                .setDistributionOptions(WGDistribute))
-        .setHoistInvariantCode(enableLICM);
-    if (useWorkgroupMemory) {
-      strategy
-          .promote<linalg::MatmulOp>(
-              linalg::LinalgPromotionOptions()
-                  .setAllocationDeallocationFns(
-                      mlir::iree_compiler::allocateWorkgroupMemory,
-                      mlir::iree_compiler::deallocateWorkgroupMemory)
-                  .setCopyInOutFns(mlir::iree_compiler::copyToWorkgroupMemory,
-                                   mlir::iree_compiler::copyToWorkgroupMemory)
-                  .setOperandsToPromote({0, 1})
-                  .setUseFullTileBuffers({false, false}))
-          .tile<linalg::MatmulOp>(
-              linalg::LinalgTilingOptions()
-                  .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-                  .setTileSizes(
-                      {tileM / numSubgroupY, tileN / numSubgroupX, tileK})
-                  .setDistributionOptions(SGDistribute));
+    if (target == "powerVR") {
+      strategy = createPowerVRStrategy(tileM, tileN, tileK, warpSize);
+    } else if (target == "NVTuring") {
+      strategy = createTuringStrategy(tileM, tileN, tileK);
+    } else if (target == "mali") {
+      strategy = createMaliStrategy(tileM, tileN, tileK, warpSize);
     }
-    strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
-        nativeSize);
     modelBuilder.getModuleRef()->walk(
         [&](FuncOp fn) { strategy.transform(fn); });
     addLoweringPasses(pm, {resColumns / tileN, resRows / tileM, 1},
@@ -394,27 +517,22 @@ static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
 }
 
 static void matMul(int m, int n, int k, int tileM, int tileN, int tileK,
-                   bool correctness) {
-  std::array<int64_t, 3> nativeMatSize;
+                   bool correctness, int warpSize) {
   if (matType == "i8xi8xi32") {
-    nativeMatSize = {16, 16, 32};
     return matMul<MatMulI8, MatMulI32>(m, n, k, tileM, tileN, tileK,
-                                       nativeMatSize, correctness);
+                                       correctness, warpSize);
   }
   if (matType == "f16xf16xf16") {
-    nativeMatSize = {16, 16, 16};
     return matMul<MatMulF16, MatMulF16>(m, n, k, tileM, tileN, tileK,
-                                        nativeMatSize, correctness);
+                                        correctness, warpSize);
   }
   if (matType == "f16xf16xf32") {
-    nativeMatSize = {16, 16, 16};
     return matMul<MatMulF16, MatMulF32>(m, n, k, tileM, tileN, tileK,
-                                        nativeMatSize, correctness);
+                                        correctness, warpSize);
   }
   if (matType == "f32xf32xf32") {
-    nativeMatSize = {1, 1, 1};
     return matMul<MatMulF32, MatMulF32>(m, n, k, tileM, tileN, tileK,
-                                        nativeMatSize, correctness);
+                                        correctness, warpSize);
   }
   llvm_unreachable("Unsupported matrix type");
 }
@@ -425,6 +543,10 @@ int main(int argc, char **argv) {
   // test specific option for a runtime support library.
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "BenchMatMulVectorGPU\n");
+  if (target.empty()) {
+    llvm::errs() << "No target specified.";
+    return 0;
+  }
   int m = 4096;
   int n = 4096;
   int k = 4096;
@@ -433,13 +555,42 @@ int main(int argc, char **argv) {
     n = 256;
     k = 256;
   }
+  int warpSize = 32;
+  std::pair<int, int> tileMRange;
+  std::pair<int, int> tileNRange;
+  std::pair<int, int> tileKRange;
+  if (target == "powerVR") {
+    m = std::max(m, 1024);
+    n = std::max(n, 1024);
+    k = std::max(k, 1024);
+    tileMRange = {32, 32};
+    tileNRange = {32, 32};
+    tileKRange = {4, 4};
+  } else if (target == "NVTuring") {
+    tileMRange = {32, 256};
+    tileNRange = {32, 256};
+    tileKRange = {32, 64};
+    // Workgroup memory requires at least a tile size of 128x128 to be able
+    // to do full speed copy from video memory to shared local memory.
+    if (useWorkgroupMemory) {
+      tileMRange.first = 128;
+      tileNRange.first = 128;
+    }
+  } else if (target == "mali") {
+    warpSize = 16;
+    tileMRange = {1, 8};
+    tileNRange = {64, 128};
+    tileKRange = {4, 4};
+  } else {
+    llvm::errs() << "Unknown target";
+    return 0;
+  }
+
   printf("Matrix size: %ix%ix%i\n", m, n, k);
-  for (int tileK = 32; tileK <= 64; tileK *= 2) {
-    for (int tileM = 32; tileM <= 256; tileM *= 2) {
-      for (int tileN = 32; tileN <= 256; tileN *= 2) {
-        // Workgroup memory requires at least a tile size of 128x128 to be able
-        // to do full speed copy from video memory to shared local memory.
-        if (useWorkgroupMemory && (tileM < 128 || tileN < 128)) continue;
+  for (int tileK = tileKRange.first; tileK <= tileKRange.second; tileK *= 2) {
+    for (int tileM = tileMRange.first; tileM <= tileMRange.second; tileM *= 2) {
+      for (int tileN = tileNRange.first; tileN <= tileNRange.second;
+           tileN *= 2) {
         printf("tileM=%i tileN=%i tileK=%i\n", tileM, tileN, tileK);
         // For non-power of two tile sizes, round up the matrix size to
         // be an even multiple of the tile size.
@@ -449,7 +600,8 @@ int main(int argc, char **argv) {
         auto paddedN = (n + tileN - 1) / tileN * tileN;
         auto paddedK = (k + tileK - 1) / tileK * tileK;
 
-        matMul(paddedM, paddedN, paddedK, tileM, tileN, tileK, correctness);
+        matMul(paddedM, paddedN, paddedK, tileM, tileN, tileK, correctness,
+               warpSize);
       }
     }
   }
