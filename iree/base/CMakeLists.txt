@@ -345,8 +345,10 @@ iree_cc_library(
   SRCS
     "logging.cc"
   DEPS
+    ::tracing
     absl::core_headers
     absl::flags
+    absl::str_format
   PUBLIC
 )
 
