@@ -65,7 +65,8 @@ class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
     for (Operation *nonlegalizedOp : nonlegalizedOps) {
       StringRef opName = nonlegalizedOp->getName().getStringRef();
       opNameCounts[opName]++;
-      nonlegalizedOp->emitOpError() << ": unlegalized TensorFlow op still exists";
+      nonlegalizedOp->emitOpError()
+          << ": unlegalized TensorFlow op still exists";
     }
 
     std::vector<std::string> errorMessages;
