@@ -64,6 +64,7 @@ struct ConvertVectorToGPUPass
 
  private:
   void tileAndVectorizeLinalgCopy(FuncOp funcOp, MLIRContext *context);
+  void lowerVectorOps(FuncOp funcOp, MLIRContext *context);
 };
 
 // Common class for all vector to GPU patterns.
@@ -204,10 +205,139 @@ void ConvertVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
   applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns);
 }
 
+// Convert vector transfer_read to a load if possible. This is the case only if
+// the element type of the memref matches the element type we want to load.
+class VectorTransferReadToLoad
+    : public OpRewritePattern<vector::TransferReadOp> {
+ public:
+  using OpRewritePattern<vector::TransferReadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getVectorType().getNumElements() != 1 ||
+        op.getMemRefType().getElementType() !=
+            op.getVectorType().getElementType())
+      return failure();
+    auto loc = op.getLoc();
+    Value newOp = rewriter.create<LoadOp>(loc, op.memref(), op.indices());
+    newOp =
+        rewriter.create<vector::BroadcastOp>(loc, op.getVectorType(), newOp);
+    rewriter.replaceOp(op, newOp);
+    return success();
+  }
+};
+
+// Convert vector transfer_write to a store if possible. This is the case only
+// if the element type of the memref matches the element type we want to store.
+class VectorTransferWriteToStore
+    : public OpRewritePattern<vector::TransferWriteOp> {
+ public:
+  using OpRewritePattern<vector::TransferWriteOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransferWriteOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getVectorType().getNumElements() != 1 ||
+        op.getMemRefType().getElementType() !=
+            op.getVectorType().getElementType())
+      return failure();
+    op.vector();
+    auto loc = op.getLoc();
+    SmallVector<int64_t, 2> zero(op.getVectorType().getRank(), 0);
+    Value scalarValue =
+        rewriter.create<vector::ExtractOp>(loc, op.vector(), zero);
+    rewriter.create<StoreOp>(loc, scalarValue, op.memref(), op.indices());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+// Lower vector contract to a single scalar or vector mulf+addf. Insert casts to
+// convert from 2D vector to 1D vector or scalar.
+class VectorContractLowering : public OpRewritePattern<vector::ContractionOp> {
+ public:
+  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ContractionOp op,
+                                PatternRewriter &rewriter) const override {
+    auto iteratorTypes = op.iterator_types().getValue();
+    if (!isParallelIterator(iteratorTypes[0]) ||
+        !isParallelIterator(iteratorTypes[1]) ||
+        !isReductionIterator(iteratorTypes[2]) ||
+        !isRowMajorMatmul(op.indexing_maps()))
+      return failure();
+    if (op.getLhsType().getNumElements() != 1) return failure();
+    unsigned vecSize = op.getAccType().cast<VectorType>().getNumElements();
+    if (!(vecSize >= 1 && vecSize <= 4)) return failure();
+    auto loc = op.getLoc();
+    VectorType vecType = VectorType::get(
+        vecSize, op.getResultType().cast<VectorType>().getElementType());
+    std::array<int64_t, 2> zero = {0, 0};
+    Value lhs = rewriter.create<vector::ExtractOp>(loc, op.lhs(), zero);
+    Value rhs;
+    Value acc;
+    if (vecSize == 1) {
+      rhs = rewriter.create<vector::ExtractOp>(loc, op.rhs(), zero);
+      acc = rewriter.create<vector::ExtractOp>(loc, op.acc(), zero);
+    } else {
+      lhs = rewriter.create<vector::BroadcastOp>(loc, vecType, lhs);
+      rhs = rewriter.create<vector::ShapeCastOp>(loc, vecType, op.rhs());
+      acc = rewriter.create<vector::ShapeCastOp>(loc, vecType, op.acc());
+    }
+    Value newOp = rewriter.create<MulFOp>(loc, lhs, rhs);
+    newOp = rewriter.create<AddFOp>(loc, newOp, acc);
+    if (vecSize == 1)
+      newOp =
+          rewriter.create<vector::BroadcastOp>(loc, op.getResultType(), newOp);
+    else
+      newOp =
+          rewriter.create<vector::ShapeCastOp>(loc, op.getResultType(), newOp);
+    rewriter.replaceOp(op, newOp);
+    return success();
+  }
+};
+
+// Lower ExtractStridedSliceOp to an ExtractOp instruction that can be natively
+// converted to SPIR-V. Add a BroadcastOp to keep the type consistent, we expect
+// the Broadcast to be removed by canonicalization.
+class ExtractStridedLowering
+    : public OpRewritePattern<vector::ExtractStridedSliceOp> {
+ public:
+  using OpRewritePattern<vector::ExtractStridedSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ExtractStridedSliceOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only handle cases extracting a degenerated vector so that we can generate
+    // an extractOp with scalar destination.
+    if (op.getResult().getType().cast<VectorType>().getNumElements() != 1)
+      return failure();
+    auto loc = op.getLoc();
+    SmallVector<int64_t, 4> offsets = llvm::to_vector<4>(
+        llvm::map_range(op.offsets().getAsRange<IntegerAttr>(),
+                        [](IntegerAttr attr) { return attr.getInt(); }));
+    offsets.resize(op.getVectorType().getRank(), 0);
+    Value newOp = rewriter.create<vector::ExtractOp>(loc, op.vector(), offsets);
+    newOp = rewriter.create<vector::BroadcastOp>(loc, op.getResult().getType(),
+                                                 newOp);
+    rewriter.replaceOp(op, newOp);
+    return success();
+  }
+};
+
+// Lower vector ops to instructions that can be later converted to SPIR-V.
+void ConvertVectorToGPUPass::lowerVectorOps(FuncOp funcOp,
+                                            MLIRContext *context) {
+  OwningRewritePatternList patterns;
+  patterns.insert<VectorContractLowering, VectorTransferReadToLoad,
+                  VectorTransferWriteToStore, ExtractStridedLowering>(context);
+  applyPatternsAndFoldGreedily(funcOp, patterns);
+}
+
 void ConvertVectorToGPUPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getOperation();
   tileAndVectorizeLinalgCopy(funcOp, context);
+
+  lowerVectorOps(funcOp, context);
 
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
   OwningRewritePatternList patterns;
