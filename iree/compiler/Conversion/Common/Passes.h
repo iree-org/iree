@@ -14,16 +14,14 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace common {
 
-std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass(
-    llvm::StringRef numWorkgroupsFnAttrName);
+/// Pass to initialize the function that computes the number of workgroups for
+/// each entry point function. The function is defined, but is populated later.
+std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
 
 /// Pass to legalize function that returns number of workgroups to use for
 /// launch to be runnable on the host.
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass(
-    llvm::StringRef numWorkgroupsFnAttrName);
+std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 
-}  // namespace common
 }  // namespace iree_compiler
 }  // namespace mlir

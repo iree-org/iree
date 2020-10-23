@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_CONVERSION_LINALGTOLLVM_ATTRIBUTES_H_
-#define IREE_COMPILER_CONVERSION_LINALGTOLLVM_ATTRIBUTES_H_
+#ifndef IREE_COMPILER_CONVERSION_COMMON_ATTRIBUTES_H_
+#define IREE_COMPILER_CONVERSION_COMMON_ATTRIBUTES_H_
 
 #include "llvm/ADT/StringRef.h"
 
@@ -23,10 +23,10 @@ namespace iree_compiler {
 /// Attribute on a entry point function that specifies which function computes
 /// the number of workgroups.
 inline llvm::StringRef getNumWorkgroupsFnAttrName() {
-  return "llvm.num_workgroups_fn";
+  return "hal.num_workgroups_fn";
 }
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_
+#endif  // IREE_COMPILER_CONVERSION_COMMON_ATTRIBUTES_H_

@@ -20,6 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "mlir/IR/Module.h"
@@ -28,7 +29,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace common {
+
 namespace {
 
 /// Pattern to legalize shapex.tie_shape operation to tie the shape of the
@@ -74,11 +75,9 @@ struct RemoveDeadPlaceholderOp : OpRewritePattern<IREE::PlaceholderOp> {
 /// use for launch to be runnable on the host-side.
 struct LegalizeNumWorkgroupsFnPass
     : public PassWrapper<LegalizeNumWorkgroupsFnPass, OperationPass<ModuleOp>> {
-  LegalizeNumWorkgroupsFnPass(llvm::StringRef numWorkgroupsFnAttrName)
-      : numWorkgroupsFnAttrName(numWorkgroupsFnAttrName) {}
+  LegalizeNumWorkgroupsFnPass() {}
   LegalizeNumWorkgroupsFnPass(const LegalizeNumWorkgroupsFnPass &pass) {}
   void runOnOperation() override;
-  llvm::StringRef numWorkgroupsFnAttrName;
 };
 }  // namespace
 
@@ -98,7 +97,7 @@ void LegalizeNumWorkgroupsFnPass::runOnOperation() {
   for (FuncOp fn : fns) {
     if (!isEntryPoint(fn)) continue;
     auto numWorkgroupsFnAttr =
-        fn.getAttrOfType<SymbolRefAttr>(numWorkgroupsFnAttrName);
+        fn.getAttrOfType<SymbolRefAttr>(getNumWorkgroupsFnAttrName());
     if (!numWorkgroupsFnAttr) continue;
     StringRef numWorkgroupsFnName = numWorkgroupsFnAttr.getLeafReference();
     FuncOp numWorkgroupsFn = symbolTable.lookup<FuncOp>(numWorkgroupsFnName);
@@ -112,11 +111,9 @@ void LegalizeNumWorkgroupsFnPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass(
-    llvm::StringRef numWorkgroupsFnAttrName) {
-  return std::make_unique<LegalizeNumWorkgroupsFnPass>(numWorkgroupsFnAttrName);
+std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass() {
+  return std::make_unique<LegalizeNumWorkgroupsFnPass>();
 }
 
-}  // namespace common
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRSPIRVSerialization
     MLIRSPIRVTransforms
     MLIRSupport
+    iree::compiler::Conversion::Common
     iree::compiler::Conversion::LinalgToSPIRV
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target

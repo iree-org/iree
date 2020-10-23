@@ -20,6 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -31,7 +32,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace common {
 
 static constexpr const char kNumWorkgroupsStr[] = "__num_workgroups__";
 
@@ -54,15 +54,12 @@ namespace {
 ///   `hal.interface.load.tensor`/`hal.interface.store.tensor` ops that are
 ///   later used in the generation of the function declared here.
 struct DeclareNumWorkgroupsFn : OpRewritePattern<FuncOp> {
-  DeclareNumWorkgroupsFn(MLIRContext *context,
-                         llvm::StringRef numWorkgroupsFnAttrName,
-                         PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit),
-        numWorkgroupsFnAttrName(numWorkgroupsFnAttrName) {}
+  DeclareNumWorkgroupsFn(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit) {}
   LogicalResult matchAndRewrite(FuncOp entryPointFn,
                                 PatternRewriter &rewriter) const override {
     if (!isEntryPoint(entryPointFn) ||
-        entryPointFn.getAttr(numWorkgroupsFnAttrName))
+        entryPointFn.getAttr(getNumWorkgroupsFnAttrName()))
       return failure();
     Region &body = entryPointFn.getBody();
     if (!llvm::hasSingleElement(body)) {
@@ -115,45 +112,37 @@ struct DeclareNumWorkgroupsFn : OpRewritePattern<FuncOp> {
         entryPointFn.getLoc(), entryPointFn.getName().str() + kNumWorkgroupsStr,
         rewriter.getFunctionType(argTypes, {indexType, indexType, indexType}));
     numWorkgroupsFn.setVisibility(FuncOp::Visibility::Private);
-    entryPointFn.setAttr(numWorkgroupsFnAttrName,
+    entryPointFn.setAttr(getNumWorkgroupsFnAttrName(),
                          rewriter.getSymbolRefAttr(numWorkgroupsFn));
     rewriter.updateRootInPlace(entryPointFn, []() {});
     return success();
   }
-
- private:
-  llvm::StringRef numWorkgroupsFnAttrName;
 };
 
 /// Pass to define the function for number of workgroups for every entry point
 /// function.
 struct DeclareNumWorkgroupsFnPass
     : public PassWrapper<DeclareNumWorkgroupsFnPass, OperationPass<ModuleOp>> {
-  DeclareNumWorkgroupsFnPass(llvm::StringRef numWorkgroupsFnAttrName)
-      : numWorkgroupsFnAttrName(numWorkgroupsFnAttrName) {}
+  DeclareNumWorkgroupsFnPass() = default;
   DeclareNumWorkgroupsFnPass(const DeclareNumWorkgroupsFnPass &pass) {}
   void runOnOperation() override;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
   }
-
-  llvm::StringRef numWorkgroupsFnAttrName;
 };
 }  // namespace
 
 void DeclareNumWorkgroupsFnPass::runOnOperation() {
   OwningRewritePatternList patterns;
   MLIRContext *context = &getContext();
-  patterns.insert<DeclareNumWorkgroupsFn>(context, numWorkgroupsFnAttrName);
+  patterns.insert<DeclareNumWorkgroupsFn>(context);
   applyPatternsAndFoldGreedily(getOperation(), patterns);
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass(
-    const llvm::StringRef numWorkgroupsFnAttrName) {
-  return std::make_unique<DeclareNumWorkgroupsFnPass>(numWorkgroupsFnAttrName);
+std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass() {
+  return std::make_unique<DeclareNumWorkgroupsFnPass>();
 }
 
-}  // namespace common
 }  // namespace iree_compiler
 }  // namespace mlir

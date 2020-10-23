@@ -14,9 +14,9 @@
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 
+#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -43,8 +43,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
   // Distribute linalg op among a 3d grid of parallel threads.
   if (llvmLinalgTileAndDistributePass) {
     passManager.addPass(createLinalgTileAndDistributePass());
-    passManager.addPass(common::createLegalizeNumWorkgroupsFnPass(
-        getNumWorkgroupsFnAttrName()));
+    passManager.addPass(createLegalizeNumWorkgroupsFnPass());
   }
 
   // Linalg.ConvOp -> (Img2Col packing + matmul)
@@ -71,8 +70,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
-  passManager.addPass(
-      common::createDeclareNumWorkgroupsFnPass(getNumWorkgroupsFnAttrName()));
+  passManager.addPass(createDeclareNumWorkgroupsFnPass());
 
   passManager.addPass(createInlinerPass());
 

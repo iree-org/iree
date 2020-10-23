@@ -28,9 +28,7 @@ iree_cc_library(
     "ConvertToGPUPass.cpp"
     "ConvertToSPIRVPass.cpp"
     "CooperativeMatrixAnalysis.cpp"
-    "DeclareNumWorkgroupsFnPass.cpp"
     "KernelDispatchUtils.cpp"
-    "LegalizeNumWorkgroupsFnPass.cpp"
     "LinalgTileAndFusePass.cpp"
     "MatMulVectorizationTest.cpp"
     "Passes.cpp"
@@ -62,6 +60,7 @@ iree_cc_library(
     MLIRVector
     MLIRVectorToSPIRV
     iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Conversion::Common
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg
     iree::compiler::Conversion::LinalgToVector

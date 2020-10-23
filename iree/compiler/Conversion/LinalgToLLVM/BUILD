@@ -29,7 +29,6 @@ cc_library(
         "Passes.cpp",
     ],
     hdrs = [
-        "Attributes.h",
         "KernelDispatch.h",
         "Passes.h",
     ],

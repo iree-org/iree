@@ -18,6 +18,7 @@ iree_cc_library(
   NAME
     Common
   HDRS
+    "Attributes.h"
     "Passes.h"
   SRCS
     "DeclareNumWorkgroupsFnPass.cpp"

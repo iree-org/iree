@@ -41,6 +41,7 @@ cc_library(
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
         "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/LinalgToLLVM",
         "//iree/compiler/Dialect/HAL/Target",
         "@llvm-project//llvm:Support",

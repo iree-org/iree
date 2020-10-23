@@ -18,7 +18,6 @@ iree_cc_library(
   NAME
     LinalgToLLVM
   HDRS
-    "Attributes.h"
     "KernelDispatch.h"
     "Passes.h"
   SRCS

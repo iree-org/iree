@@ -25,6 +25,7 @@ cc_library(
         "LegalizeNumWorkgroupsFnPass.cpp",
     ],
     hdrs = [
+        "Attributes.h",
         "Passes.h",
     ],
     deps = [
