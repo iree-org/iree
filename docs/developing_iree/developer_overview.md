@@ -117,9 +117,9 @@ For example, to translate `simple.mlir` to an IREE module:
 ```shell
 $ bazel run iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmla \
   $PWD/iree/tools/test/simple.mlir \
-  -o /tmp/simple.module
+  -o /tmp/simple.vmfb
 ```
 
 Custom translations may also be layered on top of `iree-translate`, see
@@ -133,12 +133,12 @@ and executes an exported main function using the provided inputs.
 
 This program can be used in sequence with `iree-translate` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
-that executes the simple `simple.module` compiled from `simple.mlir` above on
+that executes the simple `simple.vmfb` compiled from `simple.mlir` above on
 IREE's VMLA driver:
 
 ```shell
 $ bazel run iree/tools:iree-run-module -- \
-  --module_file=/tmp/simple.module \
+  --module_file=/tmp/simple.vmfb \
   --driver=vmla \
   --entry_function=abs \
   --function_inputs="i32=-2"
@@ -155,14 +155,14 @@ runner for the IREE
 ```shell
 $ bazel run iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=vmla \
+  -iree-hal-target-backends=vmla \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
-  -o /tmp/abs.module
+  -o /tmp/abs.vmfb
 ```
 
 ```shell
 $ bazel run iree/modules/check:iree-check-module -- \
-  /tmp/abs.module \
+  /tmp/abs.vmfb \
   --driver=vmla
 ```
 
@@ -181,8 +181,8 @@ For example, to execute the contents of
 ```shell
 $ bazel run iree/tools:iree-run-mlir -- \
   $PWD/iree/tools/test/simple.mlir \
-  --function-input="i32=-2" \
-  --iree-hal-target-backends=vmla
+  -function-input="i32=-2" \
+  -iree-hal-target-backends=vmla
 ```
 
 ### iree-dump-module
@@ -193,7 +193,7 @@ file.
 For example, to inspect the module translated above:
 
 ```shell
-$ bazel run iree/tools:iree-dump-module -- /tmp/simple.module
+$ bazel run iree/tools:iree-dump-module -- /tmp/simple.vmfb
 ```
 
 ### Useful generic flags
@@ -231,8 +231,8 @@ function.
 
 ### Useful Vulkan driver flags
 
-For IREE's Vulkan runtime driver, there are a few useful
-[flags](https://github.com/google/iree/blob/main/iree/hal/vulkan/vulkan_driver.cc):
+For IREE's Vulkan runtime driver, there are a few useful flags defined in
+[vulkan_driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/vulkan_driver_module.cc):
 
 #### `--vulkan_renderdoc`
 
