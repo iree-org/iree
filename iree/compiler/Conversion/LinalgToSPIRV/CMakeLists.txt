@@ -62,6 +62,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     MLIRVector
+    MLIRVectorToSPIRV
     iree::compiler::Conversion::CodegenUtils
     iree::compiler::Conversion::HLOToHLO
     iree::compiler::Conversion::HLOToLinalg

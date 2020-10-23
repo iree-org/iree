@@ -76,6 +76,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorToSPIRV",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo:legalize_to_linalg",
     ],

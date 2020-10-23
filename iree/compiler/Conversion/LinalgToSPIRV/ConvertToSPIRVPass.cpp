@@ -30,6 +30,7 @@
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
+#include "mlir/Conversion/VectorToSPIRV/ConvertVectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
@@ -402,6 +403,8 @@ void ConvertToSPIRVPass::runOnOperation() {
                              patterns);
   // Pull in standard patterns to convert arithmetic ops and others.
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+  // Pull in vector patterns to convert vector ops.
+  mlir::populateVectorToSPIRVPatterns(context, typeConverter, patterns);
   // Pull in builtin func to spv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
   auto &cooperativeMatrixAnalysis = getAnalysis<CooperativeMatrixAnalysis>();
