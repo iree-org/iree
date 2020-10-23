@@ -60,14 +60,12 @@ class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
   // failed to legalize.
   void emitLegalizationErrors(Operation *op,
                               const DenseSet<Operation *> &nonlegalizedOps) {
-    // Track the legalization failures by mapping op name to information about
-    // that failure: the number of unlegalized occurrences of the op, and one
-    // example operation that failed.
+    // Print op errors for each of the TensorFlow ops that still remain.
     std::map<StringRef, int> opNameCounts;
     for (Operation *nonlegalizedOp : nonlegalizedOps) {
       StringRef opName = nonlegalizedOp->getName().getStringRef();
       opNameCounts[opName]++;
-      nonlegalizedOp->emitOpError() << "still exists";
+      nonlegalizedOp->emitOpError() << ": unlegalized TensorFlow op still exists";
     }
 
     std::vector<std::string> errorMessages;
