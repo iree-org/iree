@@ -75,7 +75,7 @@ def IREE_PlaceholderOp : IREE_Op<"placeholder", [MemoryEffects<[MemAlloc]>]> {
   let assemblyFormat = [{ `for` $purpose attr-dict `:` type($output) }];
 }
 
-def IREE_WorkgroupCoordOp : IREE_Op<"workgroup_coord"> {
+def IREE_WorkgroupCoordOp : IREE_PureOp<"workgroup_coord"> {
   let summary = "Get grid index of an iree workgoup among a specific dimension.";
   let description = [{
     IREE workgroups are logically distributed among a hypergrid, each point sampled 
@@ -95,7 +95,7 @@ def IREE_WorkgroupCoordOp : IREE_Op<"workgroup_coord"> {
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def IREE_WorkgroupCountOp : IREE_Op<"workgoup_count"> {
+def IREE_WorkgroupCountOp : IREE_PureOp<"workgoup_count"> {
   let summary = "Get grid size of an iree thread among a specific dimension";
   let description = [{
     Get grid size of an iree workgroups among a specific dimension

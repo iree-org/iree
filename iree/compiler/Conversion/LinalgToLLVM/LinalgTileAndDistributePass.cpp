@@ -122,17 +122,6 @@ struct TileAndFuseToCPUThreads
   CPUKernelDispatch cpuKernelDispatch;
 };
 
-// We use |tiles| = |threads| no need to have iree.workgroup_count op.
-class RemoveNumThreads : public OpRewritePattern<IREE::WorkgroupCountOp> {
- public:
-  using OpRewritePattern<IREE::WorkgroupCountOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::WorkgroupCountOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return failure();
-  }
-};
-
 }  // namespace
 
 void LinalgTileAndDistributePass::runOnOperation() {
@@ -198,9 +187,6 @@ void LinalgTileAndDistributePass::runOnOperation() {
         context, dependenceGraph, cpuKernelDispatch, linalgTilingOptions,
         linalg::LinalgMarker(ArrayRef<Identifier>(),
                              Identifier::get(getCPUThreadsMarker(), context)));
-
-    // We distribute amont equal number of threads iree.num_threads is unused.
-    patterns.insert<RemoveNumThreads>(context);
 
     // Tile and distribute to CPU threads.
     applyPatternsAndFoldGreedily(funcOp, patterns);
