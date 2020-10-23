@@ -17,6 +17,7 @@
 #include <string>
 
 #include "absl/flags/flag.h"
+#include "absl/strings/str_format.h"
 #include "iree/base/tracing.h"
 
 ABSL_FLAG(int, iree_minloglevel, 0,
@@ -97,10 +98,10 @@ void LogMessage::EmitLogMessage() {
       IREE_TRACING_MESSAGE_LEVEL_ERROR,    // ERROR
       IREE_TRACING_MESSAGE_LEVEL_ERROR,    // FATAL
   };
-  char buffer[120];
-  int n =
-      snprintf(buffer, 120, "%s:%d] %s\n", file_name_, line_, str().c_str());
-  IREE_TRACE_MESSAGE_DYNAMIC_COLORED(kLevelColors[severity_], buffer, n);
+  std::string message =
+      absl::StrFormat("%s:%d] %s\n", file_name_, line_, str().c_str());
+  IREE_TRACE_MESSAGE_DYNAMIC_COLORED(kLevelColors[severity_], message.c_str(),
+                                     message.size());
 #endif  // IREE_TRACING_FEATURES& IREE_TRACING_FEATURE_LOG_MESSAGES
 }
 
