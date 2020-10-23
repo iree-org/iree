@@ -247,13 +247,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     auto newFuncOp = rewriter.create<FuncOp>(
         loc, funcOp.getName(),
         rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
-                                 llvm::None));
-
-    // TODO(ataei): Constructor above should take all attributes.
-    auto nmWorkgroupsFnAttrName = funcOp.getAttr(getNumWorkgroupsFnAttrName());
-    if (nmWorkgroupsFnAttrName) {
-      newFuncOp.setAttr(getNumWorkgroupsFnAttrName(), nmWorkgroupsFnAttrName);
-    }
+                                 llvm::None),
+        funcOp.getAttrs());
 
     // Move all ops in the old function's region to the new function.
     rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
