@@ -73,8 +73,8 @@ class CheckNoTensorflow : public PassWrapper<CheckNoTensorflow, FunctionPass> {
     std::vector<std::string> errorMessages;
     errorMessages.reserve(opNameCounts.size());
     for (const auto &opInfo : opNameCounts) {
-      errorMessages.push_back(llvm::formatv("\t{0} (count: {1})", opInfo.first,
-                                            opInfo.second));
+      errorMessages.push_back(
+          llvm::formatv("\t{0} (count: {1})", opInfo.first, opInfo.second));
     }
     Location loc = op->getLoc();
     emitError(loc) << "The following Tensorflow operations still remain: \n"
