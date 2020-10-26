@@ -214,6 +214,28 @@ void registerFlowTransformPassPipeline() {
       });
 }
 
+void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(IREE::Flow::createCreateFuncsToInvokeExecOpsPass());
+  // Move all the constants to flow.variables.
+  passManager.addPass(createOutlineLargeConstantsPass(
+      /*minLargeConstantSize=*/0));
+  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
+  passManager.addPass(IREE::Flow::createMergeExportedReflection());
+  passManager.addPass(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addPass(createSymbolDCEPass());
+}
+
+void registerExportDispatchesTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-flow-export-dispatches",
+      "Runs the pipeline to export dispatch functions",
+      [](OpPassManager &passManager) {
+        buildExportDispatchesTransformPassPipeline(passManager);
+      });
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

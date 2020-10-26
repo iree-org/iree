@@ -21,6 +21,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CreateFuncsToInvokeExecOps.cpp",
         "DispatchConfig.cpp",
         "DispatchabilityAnalysis.cpp",
         "FlattenTuplesInCFG.cpp",

@@ -29,20 +29,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// NOTE: a total guess :) this feels like about the most per-dispatch-buffer
-// data we'd want to embed in the command buffer.
-// TODO(benvanik): make a pass option so users can override.
-static constexpr size_t kMinLargeConstantSize = 256;
-
 // Returns true if |constantOp| is large enough to be considered for pooling.
 // Some constants are small enough that inlining them into the ringbuffer is
 // more efficient and fewer bindings.
-static bool isConstantLarge(ConstantOp constantOp) {
+static bool isConstantLarge(ConstantOp constantOp,
+                            size_t minLargeConstantSize) {
   auto type = constantOp.getType();
   if (auto shapedType = type.dyn_cast<RankedTensorType>()) {
     size_t unpackedByteLength =
         (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) / 8;
-    if (unpackedByteLength >= kMinLargeConstantSize) {
+    if (unpackedByteLength >= minLargeConstantSize) {
       return true;
     }
   }
@@ -52,12 +48,13 @@ static bool isConstantLarge(ConstantOp constantOp) {
 // Returns a list of all large constants in the module.
 // Only walks top-level functions and ops to avoid pulling constants out of
 // executables.
-static std::vector<ConstantOp> findLargeConstantsInModule(ModuleOp moduleOp) {
+static std::vector<ConstantOp> findLargeConstantsInModule(
+    ModuleOp moduleOp, size_t minLargeConstantSize) {
   std::vector<ConstantOp> largeConstantOps;
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     for (auto &block : funcOp.getBlocks()) {
       for (auto constantOp : block.getOps<ConstantOp>()) {
-        if (isConstantLarge(constantOp)) {
+        if (isConstantLarge(constantOp, minLargeConstantSize)) {
           largeConstantOps.push_back(constantOp);
         }
       }
@@ -69,6 +66,10 @@ static std::vector<ConstantOp> findLargeConstantsInModule(ModuleOp moduleOp) {
 class OutlineLargeConstantsPass
     : public PassWrapper<OutlineLargeConstantsPass, OperationPass<ModuleOp>> {
  public:
+  OutlineLargeConstantsPass() = default;
+  OutlineLargeConstantsPass(size_t minLargeConstantSize)
+      : minLargeConstantSize(minLargeConstantSize){};
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect>();
   }
@@ -84,7 +85,8 @@ class OutlineLargeConstantsPass
     // Create all top-level flow.variables from large constants in the module.
     OpBuilder moduleBuilder(&moduleOp.getBody()->front());
     std::vector<std::pair<ConstantOp, IREE::Flow::VariableOp>> replacements;
-    for (auto &largeConstantOp : findLargeConstantsInModule(moduleOp)) {
+    for (auto &largeConstantOp :
+         findLargeConstantsInModule(moduleOp, minLargeConstantSize)) {
       std::string name;
       do {
         name = baseName + std::to_string(uniqueId++);
@@ -115,15 +117,23 @@ class OutlineLargeConstantsPass
       constantOp.erase();
     }
   }
+
+ private:
+  size_t minLargeConstantSize;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass() {
-  return std::make_unique<OutlineLargeConstantsPass>();  // NOLINT
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
+    size_t minLargeConstantSize) {
+  return std::make_unique<OutlineLargeConstantsPass>(
+      minLargeConstantSize);  // NOLINT
 }
 
 static PassRegistration<OutlineLargeConstantsPass> pass(
     "iree-flow-outline-large-constants",
-    "Outlines large tensor constants into flow.variables at the module level.");
+    "Outlines large tensor constants into flow.variables at the module level.",
+    [] {
+      return std::make_unique<OutlineLargeConstantsPass>(kMinLargeConstantSize);
+    });
 
 }  // namespace Flow
 }  // namespace IREE
