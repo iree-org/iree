@@ -39,11 +39,13 @@ class DecomposeClampOp : public OpRewritePattern<mhlo::ClampOp> {
     // clamp(a, x, b) = min(max(a, x), b)
     Location loc = op.getLoc();
     Value cmpMin = rewriter.create<mhlo::CompareOp>(
-        loc, op.min(), op.operand(), rewriter.getStringAttr("LT"));
+        loc, op.min(), op.operand(), rewriter.getStringAttr("LT"),
+        /*compare_type=*/StringAttr());
     Value selectMin = rewriter.create<mhlo::SelectOp>(loc, operandType, cmpMin,
                                                       op.operand(), op.min());
     Value cmpMax = rewriter.create<mhlo::CompareOp>(
-        loc, selectMin, op.max(), rewriter.getStringAttr("LT"));
+        loc, selectMin, op.max(), rewriter.getStringAttr("LT"),
+        /*compare_type=*/StringAttr());
     Value selectMax = rewriter.create<mhlo::SelectOp>(loc, operandType, cmpMax,
                                                       selectMin, op.max());
     rewriter.replaceOp(op, selectMax);
