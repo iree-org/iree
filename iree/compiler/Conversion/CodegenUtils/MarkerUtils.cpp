@@ -21,6 +21,34 @@
 namespace mlir {
 namespace iree_compiler {
 
+struct VectorTransforms {
+  static const StringLiteral kVectorTransformMarker;
+};
+const StringLiteral VectorTransforms::kVectorTransformMarker =
+    "__internal_vector_transform__";
+
+StringRef getFusedMarker() { return "fused_numprocs_ge_numiters"; }
+
+StringRef getWorkgroupMarker() { return "workgroup"; }
+
+StringRef getWorkgroupMemoryMarker() { return "workgroup_memory"; }
+
+StringRef getWorkgroupNumItemsGENumItersMarker() {
+  return "workgroup_numprocs_ge_numiters";
+}
+
+StringRef getWorkgroupMemoryNumItemsGENumItersMarker() {
+  return "workgroup_memory_numprocs_ge_numiters";
+}
+
+StringRef getCopyToWorkgroupMemoryMarker() {
+  return "copy_to_workgroup_memory";
+}
+
+StringRef getVectorizeMarker() { return "vectorize"; }
+
+StringRef getDeleteMarker() { return "delete"; }
+
 bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
       linalg::LinalgTransforms::kLinalgTransformMarker);

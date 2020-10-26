@@ -30,6 +30,27 @@ namespace mlir {
 class Operation;
 namespace iree_compiler {
 
+/// Marker to denote that a linalg operation has been partitioned to
+/// workgroups.
+StringRef getWorkgroupMarker();
+
+/// Marker to denote that a linalg operation has been partitioned to
+/// workgroups and operands promoted to scratchspace memory.
+StringRef getWorkgroupMemoryMarker();
+
+/// Marker for copy operations that are moving data from StorageClass to
+/// Workgroup memory.
+StringRef getCopyToWorkgroupMemoryMarker();
+
+/// Marker for operations that are going to be vectorized.
+StringRef getVectorizeMarker();
+
+/// Marker for tagging an operation for deletion. Tile and fuse pattern does
+/// not delete the original operation to not invalidate the
+/// `linalg::LinalgDependenceGraph` data structure. Instead it is marked with
+/// a marker that can be used later to delete these operations.
+StringRef getDeleteMarker();
+
 /// Returns true if an operation has the specified `marker`. When `marker` is
 /// empty, returns true if the operation has any marker.
 bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
@@ -40,4 +61,4 @@ void setMarker(Operation *, StringRef);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_MARKERUTILS_H_
+#endif  // IREE_COMPILER_CONVERSION_CODEGENUTILS_MARKERUTILS_H_

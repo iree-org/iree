@@ -52,7 +52,7 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
     passManager.addPass(createConvImg2ColMatmulConversionPass());
   }
   // Linalg -> Vectors Ops.
-  // passManager.addPass(createMatMulTileAndVectorizePass());
+  passManager.addPass(createMatMulTileAndVectorizePass());
   // Linalg -> SCF
   passManager.addPass(createConvertLinalgToLoopsPass());
   passManager.addPass(createCanonicalizerPass());
