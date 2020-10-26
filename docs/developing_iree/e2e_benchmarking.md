@@ -29,7 +29,7 @@ TensorFlow models, and gathers their compilation and benchmarking artifacts in
 # By default `get_e2e_artifacts.py` will run all of our test suites, including
 # those that take a long time to complete, so we specify
 # `--test_suites=e2e_tests` to only run the smaller tests.
-python3 ./scripts/get_e2e_artifacts.py --test_suites=e2e_tests
+$ python3 ./scripts/get_e2e_artifacts.py --test_suites=e2e_tests
 ```
 
 Each test/module has a folder with the following artifacts (filtered to only
@@ -107,7 +107,7 @@ The vision tests take a while to run, so we exclude them from the CI and
 wildcard expansion. They can be run by invoking the following test suite:
 
 ```shell
-python3 ./scripts/get_e2e_artifacts.py --test_suites=vision_external_tests
+$ python3 ./scripts/get_e2e_artifacts.py --test_suites=vision_external_tests
 ```
 
 The previous command compiles `MobileNet`, `MobileNetV2` and `ResNet50` to run
@@ -123,7 +123,7 @@ You can manually get the benchmarking artifacts for a specific test by using
 automatically store the benchmarking artifacts in `/tmp/iree/modules/`.
 
 ```shell
-bazel run //integrations/tensorflow/e2e:matrix_ops_static_test_manual -- \
+$ bazel run //integrations/tensorflow/e2e:matrix_ops_static_test_manual -- \
   --target_backends=iree_vmla,tflite
 ```
 
@@ -135,7 +135,7 @@ This step is optional, but allows running the benchmarks without running `bazel`
 at the same time.
 
 ```shell
-bazel build -c opt //iree/tools:iree-benchmark-module
+$ bazel build -c opt //iree/tools:iree-benchmark-module
 ```
 
 This creates `bazel-bin/iree/tools/iree-benchmark-module`. The rest of the guide
@@ -166,7 +166,7 @@ For example, if we wanted to benchmark a static left-hand-side batched matmul
 using `MatrixOpsStaticModule` on VMLA we would run the following command:
 
 ```shell
-./bazel-bin/iree/tools/iree-benchmark-module \
+$ ./bazel-bin/iree/tools/iree-benchmark-module \
   --flagfile="/tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile"
 ```
 
@@ -175,7 +175,7 @@ benchmark `ResNet50`, `MobileNet` or `MobileNetV2` with `cifar10` or `imagenet`
 weights. For example:
 
 ```shell
-./bazel-bin/iree/tools/iree-benchmark-module \
+$ ./bazel-bin/iree/tools/iree-benchmark-module \
   --flagfile="/tmp/iree/modules/ResNet50/cifar10/iree_vmla/traces/predict/flagfile"
 ```
 
@@ -185,10 +185,10 @@ weights. For example:
 
 ```shell
 # Enter the TensorFlow Bazel workspace.
-cd third_party/tensorflow/
+$ cd third_party/tensorflow/
 
 # Build the benchmark_model binary.
-bazel build --copt=-mavx2 -c opt \
+$ bazel build --copt=-mavx2 -c opt \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
 # By default, TFLite/x86 uses various matrix multiplication libraries.
@@ -200,12 +200,12 @@ bazel build --copt=-mavx2 -c opt \
 # so this passing this flag here isn't going to make a difference to
 # matrix multiplications. However, the rest of TFLite's kernels outside
 # of ruy will still benefit from -mavx2.
-bazel build --copt=-mavx2 -c opt \
+$ bazel build --copt=-mavx2 -c opt \
   --define=tflite_with_ruy=true \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
 # The binary can now be found in the following directory:
-ls bazel-bin/tensorflow/lite/tools/benchmark/
+$ ls bazel-bin/tensorflow/lite/tools/benchmark/
 ```
 
 ### 3.2 Benchmark the model on TFLite
@@ -218,7 +218,7 @@ example we can run the benchmark as follows:
 
 ```shell
 # Run within `third_party/tensorflow/`.
-./bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
+$ ./bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
   --graph=$(cat "/tmp/iree/modules/MatrixOpsStaticModule/tflite/traces/matmul_lhs_batch/graph_path") \
   --warmup_runs=1 \
   --num_threads=1 \
@@ -237,10 +237,10 @@ your environment to cross-compile to Android can be found
 ```shell
 # After following the instructions above up to 'Build all targets', the
 # iree-benchmark-module binary should be in the following directory:
-ls build-android/iree/tools/
+$ ls build-android/iree/tools/
 
 # Copy the benchmarking binary to phone.
-adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
+$ adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
 ```
 
 ### 4.2 Push the IREE's compilation / benchmarking artifacts to the device
@@ -254,17 +254,17 @@ example:
 
 ```shell
 # Make a directory for the module/backend pair we want to benchmark.
-adb shell mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
+$ adb shell mkdir -p /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
 
 # Transfer the files.
-adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
+$ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmla/* \
   /data/local/tmp/MatrixOpsStaticModule/iree_vmla/
 ```
 
 ### 4.3 Benchmark the module
 
 ```shell
-adb shell /data/local/tmp/iree-benchmark-module \
+$ adb shell /data/local/tmp/iree-benchmark-module \
   --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/traces/matmul_lhs_batch/flagfile" \
   --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmla/compiled.vmfb"
 ```
@@ -293,46 +293,46 @@ in the following ways:
 # Note that unlike TFLite/x86, TFLite/ARM uses Ruy by default for all
 # matrix multiplications (No need to pass tflite_with_ruy), except for some
 # matrix*vector products. Below we show how to force using ruy also for that.
-bazel build -c opt \
+$ bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
 # Copy the benchmarking binary to phone and allow execution.
-adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
+$ adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
   /data/local/tmp
-adb shell chmod +x /data/local/tmp/benchmark_model
+$ adb shell chmod +x /data/local/tmp/benchmark_model
 ```
 
 ```shell
 # Build the benchmark_model binary using ruy even for matrix*vector
 # products. This is only worth trying in models that are heavy on matrix*vector
 # shapes, typically LSTMs and other RNNs.
-bazel build -c opt \
+$ bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
   --copt=-DTFLITE_WITH_RUY_GEMV \
   //tensorflow/lite/tools/benchmark:benchmark_model
 
 # Rename the binary for comparison with the standard benchmark_model.
-mv bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
+$ mv bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
   bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv
-adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv \
+$ adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_ruy_gemv \
   /data/local/tmp/
-adb shell chmod +x /data/local/tmp/benchmark_model_plus_ruy_gemv
+$ adb shell chmod +x /data/local/tmp/benchmark_model_plus_ruy_gemv
 ```
 
 ```shell
 # Build the benchmark_model binary with flex.
-bazel build -c opt \
+$ bazel build -c opt \
   --config=android_arm64 \
   --cxxopt='--std=c++17' \
   //tensorflow/lite/tools/benchmark:benchmark_model_plus_flex
 
 # Copy the benchmarking binary to phone and allow execution.
-adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_flex \
+$ adb push bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model_plus_flex \
   /data/local/tmp
-adb shell chmod +x /data/local/tmp/benchmark_model_plus_flex
+$ adb shell chmod +x /data/local/tmp/benchmark_model_plus_flex
 ```
 
 Alternatively, you can download and install the
@@ -344,14 +344,14 @@ you'll have to modify the benchmarking commands below slightly, as shown in
 
 ```shell
 # Copy the data over to the phone.
-mkdir -p /data/local/tmp/MatrixOpsStaticModule/tflite
-adb push /tmp/iree/modules/MatrixOpsStaticModule/tflite/* \
+$ mkdir -p /data/local/tmp/MatrixOpsStaticModule/tflite
+$ adb push /tmp/iree/modules/MatrixOpsStaticModule/tflite/* \
   /data/local/tmp/MatrixOpsStaticModule/tflite/
 ```
 
 ```shell
 # Benchmark with TFLite.
-adb shell taskset f0 /data/local/tmp/benchmark_model \
+$ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
@@ -360,7 +360,7 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
 
 ```shell
 # Benchmark with TFLite + RUY GEMV
-adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy_gemv \
+$ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy_gemv \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
@@ -369,7 +369,7 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_ruy_gemv \
 
 ```shell
 # Benchmark with TFLite + Flex.
-adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
+$ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
@@ -378,7 +378,7 @@ adb shell taskset f0 /data/local/tmp/benchmark_model_plus_flex \
 
 ```shell
 # Benchmark with TFLite running on GPU.
-adb shell taskset f0 /data/local/tmp/benchmark_model \
+$ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
@@ -391,7 +391,7 @@ information for GPU you can run the following script:
 
 ```shell
 # Op profiling on GPU using OpenCL backend.
-sh tensorflow/lite/delegates/gpu/cl/testing/run_performance_profiling.sh \
+$ sh tensorflow/lite/delegates/gpu/cl/testing/run_performance_profiling.sh \
   -m /data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite
 ```
 
@@ -403,12 +403,16 @@ the `graph_path` file to verify the correct `.tflite` filename if you're unsure.
 
 ### Profile
 
-There are 2 profilers built into TFLite's `benchmark_model` program. Both of them impact latencies, so they should only be used to get a breakdown of the relative time spent in each operator type, they should not be enabled for the purpose of measuring a latency.
+There are 2 profilers built into TFLite's `benchmark_model` program. Both of
+them impact latencies, so they should only be used to get a breakdown of the
+relative time spent in each operator type, they should not be enabled for the
+purpose of measuring a latency.
 
-The first is `enable_op_profiling`. It's based on timestamps before and after each op. It's a runtime commandline flag taken by `benchmark_model`. Example:
+The first is `enable_op_profiling`. It's based on timestamps before and after
+each op. It's a runtime command-line flag taken by `benchmark_model`. Example:
 
 ```
-adb shell taskset f0 /data/local/tmp/benchmark_model \
+$ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
   --num_threads=1 \
@@ -416,14 +420,17 @@ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --enable_op_profiling=true
 ```
 
-The second is `ruy_profiler`. Despite its name, it's available regardless of whether `ruy` is used for the matrix multiplications. It's a sampling profiler, which allows it to provide some more detailed informations, particularly on matrix multiplications. It's a build-time switch:
+The second is `ruy_profiler`. Despite its name, it's available regardless of
+whether `ruy` is used for the matrix multiplications. It's a sampling profiler,
+which allows it to provide some more detailed information, particularly on
+matrix multiplications. It's a build-time switch:
 
 ```
-bazel build \
+$ bazel build \
   --define=ruy_profiler=true \
   -c opt \
   --config=android_arm64 \
   //tensorflow/lite/tools/benchmark:benchmark_model
 ```
 
-The binary thus built can be run like above, no commandline flag needed.
+The binary thus built can be run like above, no command-line flag needed.

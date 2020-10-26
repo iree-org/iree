@@ -56,8 +56,8 @@ Run the test:
 ```powershell
 # -- CMake --
 > set VK_LOADER_DEBUG=all
-> cmake --build build\ --target iree_hal_vulkan_dynamic_symbols_test
-> .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
+> cmake --build ..\iree-build\ --target iree_hal_vulkan_dynamic_symbols_test
+> ..\iree-build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
 
 # -- Bazel --
 > bazel test iree/hal/vulkan:dynamic_symbols_test --test_env=VK_LOADER_DEBUG=all
@@ -72,8 +72,8 @@ Run the
 ```powershell
 # -- CMake --
 > set VK_LOADER_DEBUG=all
-> cmake --build build\ --target iree_hal_cts_driver_test
-> .\build\iree\hal\cts\iree_hal_cts_driver_test.exe
+> cmake --build ..\iree-build\ --target iree_hal_cts_driver_test
+> ..\iree-build\iree\hal\cts\iree_hal_cts_driver_test.exe
 
 # -- Bazel --
 > bazel test iree/hal/cts:driver_test --test_env=VK_LOADER_DEBUG=all --test_output=all
@@ -122,11 +122,11 @@ Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate.exe`:
 
 ```powershell
 # -- CMake --
-> cmake --build build\ --target iree_tools_iree-translate
-> .\build\iree\tools\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
+> cmake --build ..\iree-build\ --target iree_tools_iree-translate
+> ..\iree-build\iree\tools\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.vmfb
 
 # -- Bazel --
-> bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
+> bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.vmfb
 ```
 
 > Tip
@@ -140,11 +140,11 @@ Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
 
 ```powershell
 # -- CMake --
-> cmake --build build\ --target iree_tools_iree-run-module
-> .\build\iree\tools\iree-run-module.exe -module_file=.\build\module.fb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
+> cmake --build ..\iree-build\ --target iree_tools_iree-run-module
+> ..\iree-build\iree\tools\iree-run-module.exe -module_file=.\build\module.vmfb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
 
 # -- Bazel --
-> bazel run iree/tools:iree-run-module -- -module_file=.\build\module.fb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
+> bazel run iree/tools:iree-run-module -- -module_file=.\build\module.vmfb -driver=vulkan -entry_function=abs -function_inputs="i32=-2"
 ```
 
 ## Running IREE's Vulkan Samples
@@ -153,8 +153,8 @@ Install the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/), then run:
 
 ```powershell
 # -- CMake --
-> cmake --build build\ --target iree_samples_vulkan_vulkan_inference_gui
-> .\build\iree\samples\vulkan\vulkan_inference_gui.exe
+> cmake --build ..\iree-build\ --target iree_samples_vulkan_vulkan_inference_gui
+> ..\iree-build\iree\samples\vulkan\vulkan_inference_gui.exe
 
 # -- Bazel --
 > bazel run iree/samples/vulkan:vulkan_inference_gui
