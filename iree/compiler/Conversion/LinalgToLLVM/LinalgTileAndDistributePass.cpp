@@ -18,7 +18,6 @@
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/KernelDispatch.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/MarkerUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -96,9 +95,8 @@ struct TileAndFuseToCPUThreads
       : Base(context, dependenceGraph, tilingOptions,
              linalg::LinalgFusionOptions().setIndicesToFuse({2}), marker,
              marker,
-             linalg::LinalgMarker(
-                 ArrayRef<Identifier>(),
-                 Identifier::get(getCPUDeleteMarker(), context)),
+             linalg::LinalgMarker(ArrayRef<Identifier>(),
+                                  Identifier::get(getDeleteMarker(), context)),
              benefit),
         dependenceGraph(dependenceGraph),
         cpuKernelDispatch(cpuKernelDispatch) {}
@@ -186,7 +184,7 @@ void LinalgTileAndDistributePass::runOnOperation() {
                     TileToCPUThreads<linalg::MatmulOp>>(
         context, dependenceGraph, cpuKernelDispatch, linalgTilingOptions,
         linalg::LinalgMarker(ArrayRef<Identifier>(),
-                             Identifier::get(getCPUThreadsMarker(), context)));
+                             Identifier::get(getWorkgroupMarker(), context)));
 
     // Tile and distribute to CPU threads.
     applyPatternsAndFoldGreedily(funcOp, patterns);
@@ -203,7 +201,7 @@ void LinalgTileAndDistributePass::runOnOperation() {
 
     // Delete the ops that are marked for deletion.
     funcOp.walk([](linalg::LinalgOp linalgOp) {
-      if (hasMarker(linalgOp.getOperation(), getCPUDeleteMarker()))
+      if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
         linalgOp.getOperation()->erase();
     });
   }

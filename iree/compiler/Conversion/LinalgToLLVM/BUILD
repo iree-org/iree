@@ -25,14 +25,12 @@ cc_library(
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
         "LinalgTileAndDistributePass.cpp",
-        "MarkerUtils.cpp",
         "MatMulVectorization.cpp",
         "Passes.cpp",
     ],
     hdrs = [
         "Attributes.h",
         "KernelDispatch.h",
-        "MarkerUtils.h",
         "Passes.h",
     ],
     deps = [

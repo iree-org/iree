@@ -20,14 +20,12 @@ iree_cc_library(
   HDRS
     "Attributes.h"
     "KernelDispatch.h"
-    "MarkerUtils.h"
     "Passes.h"
   SRCS
     "ConvImg2ColMatmulConversion.cpp"
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
     "LinalgTileAndDistributePass.cpp"
-    "MarkerUtils.cpp"
     "MatMulVectorization.cpp"
     "Passes.cpp"
   DEPS
