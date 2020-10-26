@@ -108,12 +108,12 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:       vm.module @linked_module {
 //  CHECK-NEXT:         vm.rodata @reduction_ex_dispatch_0_const dense<0.000000e+00> : tensor<1xf32>
 //  CHECK-NEXT:         vm.func @reduction_ex_dispatch_0(%arg0: !vm.ref<!vmla.interface>, %arg1: i32, %arg2: i32, %arg3: i32) {
-//  CHECK-NEXT:           %zero = vm.const.i32.zero : i32
-//  CHECK-NEXT:           %c128 = vm.const.i32 128 : i32
-//  CHECK-NEXT:           %c16 = vm.const.i32 16 : i32
-//  CHECK-NEXT:           %c4 = vm.const.i32 4 : i32
-//  CHECK-NEXT:           %c8 = vm.const.i32 8 : i32
-//  CHECK-NEXT:           %c1 = vm.const.i32 1 : i32
+//   CHECK-DAG:           %zero = vm.const.i32.zero : i32
+//   CHECK-DAG:           %c128 = vm.const.i32 128 : i32
+//   CHECK-DAG:           %c16 = vm.const.i32 16 : i32
+//   CHECK-DAG:           %c4 = vm.const.i32 4 : i32
+//   CHECK-DAG:           %c8 = vm.const.i32 8 : i32
+//   CHECK-DAG:           %c1 = vm.const.i32 1 : i32
 //  CHECK-NEXT:           %reduction_ex_dispatch_0_const = vm.const.ref.rodata @reduction_ex_dispatch_0_const : !vm.ref<!iree.byte_buffer>
 //  CHECK-NEXT:           %ref = vm.call @vmla.buffer.const(%reduction_ex_dispatch_0_const) : (!vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:           %ref_0 = vm.call @vmla.buffer.alloc(%c4) : (i32) -> !vm.ref<!vmla.buffer>

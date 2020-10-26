@@ -26,10 +26,12 @@ iree_cc_library(
     "MarkPublicSymbolsExported.cpp"
     "OrdinalAllocation.cpp"
     "Passes.cpp"
+    "SinkDefiningOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRPass
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
