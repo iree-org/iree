@@ -48,7 +48,7 @@ struct UnrollVector : public Transformation {
       MLIRContext *ctx, linalg::LinalgMarker m) override {
     OwningRewritePatternList vectorUnrollPatterns;
     vectorUnrollPatterns.insert<vector::UnrollVectorPattern<VectorOpType>>(
-        targetShape, ctx);
+        ctx, vector::UnrollVectorOptions().setNativeShape(targetShape));
     vector::populateVectorToVectorCanonicalizationPatterns(vectorUnrollPatterns,
                                                            ctx);
     vector::populateVectorToVectorTransformationPatterns(vectorUnrollPatterns,
