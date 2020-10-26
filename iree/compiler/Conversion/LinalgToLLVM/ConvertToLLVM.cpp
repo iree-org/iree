@@ -168,7 +168,7 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // Get interface buffers from all the blocks.
     SmallVector<IREE::PlaceholderOp, 8> bufferOps;
     SmallVector<IREE::HAL::InterfaceLoadConstantOp, 8> loadOps;
-    SmallVector<IREE::WorkgroupCoordOp, 3> workgroupCoordOps;
+    SmallVector<IREE::WorkgroupIdOp, 3> workgroupIdOps;
     for (Block &block : funcOp.getBlocks()) {
       for (Operation &op : block) {
         if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
@@ -176,8 +176,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
         if (auto phOp = dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
           loadOps.push_back(phOp);
         }
-        if (auto threadIdOp = dyn_cast<IREE::WorkgroupCoordOp>(op)) {
-          workgroupCoordOps.push_back(threadIdOp);
+        if (auto threadIdOp = dyn_cast<IREE::WorkgroupIdOp>(op)) {
+          workgroupIdOps.push_back(threadIdOp);
         }
       }
     }
@@ -310,8 +310,8 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
       rewriter.replaceOp(loadOp, dimConstantCasted);
     }
 
-    // Lower iree.workgroup_coord ops to get indices from function arugments.
-    for (auto workgroupCoordOp : workgroupCoordOps) {
+    // Lower iree.workgroup_idd ops to get indices from function arugments.
+    for (auto workgroupCoordOp : workgroupIdOps) {
       auto attr = workgroupCoordOp.getAttrOfType<StringAttr>("dimension");
       int argIndex = -1;
       if (attr.getValue().str() == "x") {

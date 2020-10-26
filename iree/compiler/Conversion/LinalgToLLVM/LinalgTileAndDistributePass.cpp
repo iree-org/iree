@@ -136,8 +136,8 @@ void LinalgTileAndDistributePass::runOnOperation() {
           StringAttr attr =
               builder.getStringAttr(dimAttr[std::min<unsigned>(dim, 3)]);
           procInfo[numParallelDims - dim - 1] = {
-              builder.create<IREE::WorkgroupCoordOp>(loc, indexType, attr),
-              builder.create<IREE::WorkgroupCountOp>(loc, indexType, attr)};
+              builder.create<IREE::WorkgroupIdOp>(loc, indexType, attr),
+              builder.create<IREE::WorkgroupIdOp>(loc, indexType, attr)};
         }
         return procInfo;
       },
