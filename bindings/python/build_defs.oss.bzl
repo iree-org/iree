@@ -24,13 +24,19 @@ PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
 PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 PYTHON_CPP_EXTRA_DEPS = []
 
-PYBIND_COPTS = [
-    "-fexceptions",
-]
+PYBIND_COPTS = select({
+    "//iree:iree_is_msvc": [],
+    "//conditions:default": [
+        "-fexceptions",
+    ],
+})
 
-PYBIND_FEATURES = [
-    "-use_header_modules",  # Incompatible with exceptions builds.
-]
+PYBIND_FEATURES = select({
+    "//iree:iree_is_msvc": [],
+    "//conditions:default": [
+        "-use_header_modules",  # Incompatible with exceptions builds.
+    ],
+})
 
 PYBIND_EXTENSION_COPTS = [
     "-fvisibility=hidden",
