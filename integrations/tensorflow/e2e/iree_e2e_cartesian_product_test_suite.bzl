@@ -227,7 +227,12 @@ def iree_e2e_cartesian_product_test_suite(
             tests = tests,
             # Add "+failing" to only include tests in `tests` that have the
             # "failing" tag.
-            tags = tags + ["+failing"],
+            tags = tags + [
+                "+failing",
+                "manual",
+                "nokokoro",
+                "notap",
+            ],
             # If there are kwargs that need to be passed here which only apply
             # to the generated tests and not to test_suite, they should be
             # extracted into separate named arguments.

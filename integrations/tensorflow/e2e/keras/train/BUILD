@@ -16,6 +16,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+    "iree_py_binary",
 )
 load(
     "//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
@@ -28,10 +29,27 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+[
+    iree_py_binary(
+        name = src.replace(".py", "_manual"),
+        srcs = [src],
+        main = src,
+        python_version = "PY3",
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    for src in glob(["*_test.py"])
+]
+
 iree_e2e_cartesian_product_test_suite(
-    name = "train_tests",
-    srcs = ["model_train_test.py"],
+    name = "classification_training_tests",
+    srcs = ["classification_training_test.py"],
     failing_configurations = [
+        {
+            # TFLite doesn't support training.
+            "target_backends": "tflite",
+        },
         {
             "target_backends": [
                 "tflite",
@@ -43,9 +61,15 @@ iree_e2e_cartesian_product_test_suite(
     ],
     flags_to_values = {
         "reference_backend": "tf",
-        "optimizer_name": [
-            "sgd",
+        "optimizer": [
+            "adadelta",
+            "adagrad",
             "adam",
+            "adamax",
+            "ftrl",
+            "nadam",
+            "rmsprop",
+            "sgd",
         ],
         "target_backends": [
             "tf",
@@ -55,13 +79,49 @@ iree_e2e_cartesian_product_test_suite(
             "iree_vulkan",
         ],
     },
-    main = "model_train_test.py",
-    tags = [
-        "guitar",
-        "manual",
-        "nokokoro",
-        "notap",
+    main = "classification_training_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
+)
+
+iree_e2e_cartesian_product_test_suite(
+    name = "regression_training_tests",
+    srcs = ["regression_training_test.py"],
+    failing_configurations = [
+        {
+            # TFLite doesn't support training.
+            "target_backends": "tflite",
+        },
+        {
+            "target_backends": [
+                "iree_vmla",  # TODO(b/157581521)
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+    ],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "optimizer": [
+            "adadelta",
+            "adagrad",
+            "adam",
+            "adamax",
+            "ftrl",
+            "nadam",
+            "rmsprop",
+            "sgd",
+        ],
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "regression_training_test.py",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
