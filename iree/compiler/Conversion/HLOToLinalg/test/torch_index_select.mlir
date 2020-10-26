@@ -1,21 +1,19 @@
-// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-hlo-to-linalg-on-tensors %s | IreeFileCheck %s
 
 //    CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0)>
 //    CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 module {
   //      CHECK: func @torch_select_index
-  //  CHECK-DAG: %[[INPUT:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<5x1x5xi32>
-  //  CHECK-DAG: %[[INDEX:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<2xi32>
-  //  CHECK-DAG: %[[OUTPUT:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<2x1x5xi32>
+  //  CHECK-DAG: %[[INPUT:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<5x1x5xi32>
+  //  CHECK-DAG: %[[INDEX:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<2xi32>
   //      CHECK: linalg.indexed_generic {
   // CHECK-SAME:   indexing_maps
   // CHECK-SAME:   #[[MAP0]], #[[MAP1]]
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel"]
-  // CHECK-SAME: ins(%[[INDEX]] : memref<2xi32>)
-  // CHECK-SAME: outs(%[[OUTPUT]] : memref<2x1x5xi32>)
-  // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[J:.+]]: index, %[[K:.+]]: index, %[[VAL:.+]]: i32, %{{.+}}: i32):
+  // CHECK-SAME: ins(%[[INDEX]] : tensor<2xi32>)
+  // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[J:.+]]: index, %[[K:.+]]: index, %[[VAL:.+]]: i32):
   //      CHECK:   %[[CAST:.+]] = index_cast %[[VAL]] : i32 to index
-  //      CHECK:   %[[VAL2:.+]] = load %[[INPUT]][%[[CAST]], %[[J]], %[[K]]] : memref<5x1x5xi32>
+  //      CHECK:   %[[VAL2:.+]] = extract_element %[[INPUT]][%[[CAST]], %[[J]], %[[K]]] : tensor<5x1x5xi32>
   //      CHECK:   linalg.yield %[[VAL2]] : i32
   func @torch_select_index() {
     %c0 = constant 0 : index
@@ -40,18 +38,16 @@ module {
 //    CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0) -> ()>
 //    CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0) -> (d0)>
 module {
-  //  CHECK-DAG: %[[INPUT:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x8xf32>
-  //  CHECK-DAG: %[[INDEX:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<i32>
-  //  CHECK-DAG: %[[OUTPUT:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<8xf32>
+  //  CHECK-DAG: %[[INPUT:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4x8xf32>
+  //  CHECK-DAG: %[[INDEX:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<i32>
   //      CHECK: linalg.indexed_generic {
   // CHECK-SAME:   indexing_maps
   // CHECK-SAME:   #[[MAP0]], #[[MAP1]]
   // CHECK-SAME:   iterator_types = ["parallel"]
-  // CHECK-SAME: ins(%[[INDEX]] : memref<i32>)
-  // CHECK-SAME: outs(%[[OUTPUT]] : memref<8xf32>)
-  // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[VAL:.+]]: i32, %{{.+}}: f32):
+  // CHECK-SAME: ins(%[[INDEX]] : tensor<i32>)
+  // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[VAL:.+]]: i32):
   //      CHECK:   %[[CAST:.+]] = index_cast %[[VAL]] : i32 to index
-  //      CHECK:   %[[VAL2:.+]] = load %[[INPUT]][%[[CAST]], %[[I]]] : memref<4x8xf32>
+  //      CHECK:   %[[VAL2:.+]] = extract_element %[[INPUT]][%[[CAST]], %[[I]]] : tensor<4x8xf32>
   //      CHECK:   linalg.yield %[[VAL2]] : f32
   func @torch_select_index_scalar() {
     %c0 = constant 0 : index
@@ -76,18 +72,16 @@ module {
 //    CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //    CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 module {
-  //  CHECK-DAG: %[[INPUT:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg0} : memref<4x7x8x2xf32>
-  //  CHECK-DAG: %[[INDEX:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@arg1} : memref<4x1xi32>
-  //  CHECK-DAG: %[[OUTPUT:[a-zA-Z0-9$._-]+]] = iree.placeholder for "interface buffer" {binding = @legacy_io::@ret0} : memref<4x7x1x2xf32>
+  //  CHECK-DAG: %[[INPUT:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4x7x8x2xf32>
+  //  CHECK-DAG: %[[INDEX:.+]] = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0 : tensor<4x1xi32>
   //      CHECK: linalg.indexed_generic {
   // CHECK-SAME:   indexing_maps
   // CHECK-SAME:   #[[MAP0]], #[[MAP1]]
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-  // CHECK-SAME: ins(%[[INDEX]] : memref<4x1xi32>)
-  // CHECK-SAME: outs(%[[OUTPUT]] : memref<4x7x1x2xf32>)
-  // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[J:.+]]: index, %[[K:.+]]: index, %[[L:.+]]: index, %[[VAL:.+]]: i32, %{{.+}}: f32):
+  // CHECK-SAME: ins(%[[INDEX]] : tensor<4x1xi32>)
+  // CHECK-NEXT: ^{{.+}}(%[[I:.+]]: index, %[[J:.+]]: index, %[[K:.+]]: index, %[[L:.+]]: index, %[[VAL:.+]]: i32):
   //      CHECK:   %[[CAST:.+]] = index_cast %[[VAL]] : i32 to index
-  //      CHECK:   %[[VAL2:.+]] = load %[[INPUT]][%[[I]], %[[J]], %[[CAST]], %[[L]]] : memref<4x7x8x2xf32>
+  //      CHECK:   %[[VAL2:.+]] = extract_element %[[INPUT]][%[[I]], %[[J]], %[[CAST]], %[[L]]] : tensor<4x7x8x2xf32>
   //      CHECK:   linalg.yield %[[VAL2]] : f32
   func @torch_select_index_batch() {
     %c0 = constant 0 : index
