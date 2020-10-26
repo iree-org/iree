@@ -84,7 +84,7 @@ by IREE.
 Build all targets:
 
 ```shell
-$ cmake --build build/
+$ cmake --build ../iree-build/
 ```
 
 ## What's next?
@@ -94,8 +94,8 @@ $ cmake --build build/
 Check out the contents of the 'tools' build directory:
 
 ```shell
-$ ls build/iree/tools
-$ ./build/iree/tools/iree-translate --help
+$ ls ../iree-build/iree/tools
+$ ../iree-build/iree/tools/iree-translate --help
 ```
 
 Translate a
@@ -103,15 +103,15 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
-    -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir \
+  -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
 
 *   For an introduction to IREE's project structure and developer tools, see
     [Developer Overview](../developing_iree/developer_overview.md).
-*   To understand how IREE implements HAL over Metal, see
+*   To understand how IREE implements a HAL driver using Metal, see
     [Metal HAL Driver](../design_docs/metal_hal_driver.md). <!-- TODO: Link to
     macOS versions of these guides once they are developed.
 *   To use IREE's Python bindings, see

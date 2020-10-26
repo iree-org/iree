@@ -103,7 +103,12 @@ cc_library(
         "dynamic_library_win32.cc",
     ],
     hdrs = ["dynamic_library.h"],
-    linkopts = ["-ldl"],
+    linkopts = select({
+        "//iree:iree_is_msvc": [],
+        "//conditions:default": [
+            "-ldl",
+        ],
+    }),
     deps = [
         ":logging",
         ":status",

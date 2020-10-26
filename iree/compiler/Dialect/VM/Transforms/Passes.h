@@ -83,6 +83,14 @@ std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createOrdinalAllocationPass();
 
 //===----------------------------------------------------------------------===//
+// Optimization passes
+//===----------------------------------------------------------------------===//
+
+// Sinks defining ops with few uses to their use-sites to reduce the total
+// number of live registers at the cost of additional storage requirements.
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createSinkDefiningOpsPass();
+
+//===----------------------------------------------------------------------===//
 // Test passes
 //===----------------------------------------------------------------------===//
 
@@ -100,6 +108,7 @@ inline void registerVMPasses() {
   createHoistInlinedRodataPass();
   createGlobalInitializationPass();
   createOrdinalAllocationPass();
+  createSinkDefiningOpsPass();
 }
 
 inline void registerVMTestPasses() {

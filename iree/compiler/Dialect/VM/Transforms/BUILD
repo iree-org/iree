@@ -27,6 +27,7 @@ cc_library(
         "MarkPublicSymbolsExported.cpp",
         "OrdinalAllocation.cpp",
         "Passes.cpp",
+        "SinkDefiningOps.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -42,6 +43,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",

@@ -46,6 +46,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
 void registerFlowTransformPassPipeline();
 
+// Adds a set of passes to the given pass manager that run the flow transforms
+// to export dispatch functions.
+//
+// The expected usage is to add passes right after
+// buildFlowTransformPassPipieline.
+void buildExportDispatchesTransformPassPipeline(OpPassManager &passManager);
+
+void registerExportDispatchesTransformPassPipeline();
+
 //===----------------------------------------------------------------------===//
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
@@ -116,6 +125,9 @@ createRematerializeDispatchConstantsPass();
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 
+// Exports all the dispatch functions to the module.
+std::unique_ptr<OperationPass<ModuleOp>> createCreateFuncsToInvokeExecOpsPass();
+
 //===----------------------------------------------------------------------===//
 // Optimizations
 //===----------------------------------------------------------------------===//
@@ -124,7 +136,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 // shaped, adjusting types, etc).
 
 // Outlines large tensor constants into flow.variables at the module level.
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass();
+//
+// NOTE: a total guess :) this feels like about the most per-dispatch-buffer
+// data we'd want to embed in the command buffer.
+static constexpr size_t kMinLargeConstantSize = 256;
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
+    size_t minLargeConstantSize = kMinLargeConstantSize);
 
 //===----------------------------------------------------------------------===//
 // Stream Formation and Folding
@@ -148,6 +165,7 @@ std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 
 inline void registerFlowPasses() {
   registerFlowTransformPassPipeline();
+  registerExportDispatchesTransformPassPipeline();
   createFlattenTuplesInCFGPass();
   createLegalizeInputTypesPass();
   createHLOPreprocessingPass();
@@ -162,6 +180,7 @@ inline void registerFlowPasses() {
   createRematerializeDispatchConstantsPass();
   createOutlineDispatchRegionsPass();
   createOutlineLargeConstantsPass();
+  createCreateFuncsToInvokeExecOpsPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();
 }

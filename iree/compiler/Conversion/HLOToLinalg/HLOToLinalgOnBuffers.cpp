@@ -704,88 +704,6 @@ LogicalResult SliceOpConversion::apply(
 }
 
 //===----------------------------------------------------------------------===//
-// mhlo.torch_index_select conversion patterns.
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Converts xla-hlo.torch_index_select op to a linalg.indexed_generic op.
-/// Different from other ops on buffers, torch_index_select op needs indirect
-/// access based on the `index` operand. Thus, an accessing on buffer is
-/// involved inside the indexed_generic op and the input buffer is not passed as
-/// an argument of the op. However, it doesn't affect anything on dependency
-/// graph. It is just a magic buffer outside operations.
-struct TorchIndexSelectOpConversion
-    : public ConvertToLinalgBufferOp<TorchIndexSelectOpConversion,
-                                     mhlo::TorchIndexSelectOp> {
-  using ConvertToLinalgBufferOp<
-      TorchIndexSelectOpConversion,
-      mhlo::TorchIndexSelectOp>::ConvertToLinalgBufferOp;
-
-  LogicalResult apply(mhlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
-                      ArrayRef<Value> resultBuffers,
-                      ConversionPatternRewriter &rewriter) const;
-};
-}  // namespace
-
-LogicalResult TorchIndexSelectOpConversion::apply(
-    mhlo::TorchIndexSelectOp op, ArrayRef<Value> inputBuffers,
-    ArrayRef<Value> resultBuffers, ConversionPatternRewriter &rewriter) const {
-  mhlo::TorchIndexSelectOp::Adaptor adaptor(inputBuffers);
-  int axis = op.dim();
-  int batch = op.batch_dims();
-  auto indexShapeType = adaptor.index().getType().dyn_cast<ShapedType>();
-  int nIndices = indexShapeType.getRank();
-  auto inputShapeType = adaptor.input().getType().dyn_cast<ShapedType>();
-  if (axis < 0) axis += inputShapeType.getRank();
-  if (batch < 0) batch += nIndices;
-
-  Location loc = op.getLoc();
-  Value output = op.getResult();
-  int rank = output.getType().cast<ShapedType>().getRank();
-  SmallVector<AffineMap, 2> indexingMaps;
-  SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < batch; ++i) exprs.push_back(rewriter.getAffineDimExpr(i));
-  for (int i = 0, e = nIndices - batch; i < e; ++i)
-    exprs.push_back(rewriter.getAffineDimExpr(axis + i));
-  indexingMaps.emplace_back(
-      AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
-  indexingMaps.emplace_back(rewriter.getMultiDimIdentityMap(rank));
-  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
-      loc, /*resultTensors=*/ArrayRef<Type>{}, /*inputs=*/adaptor.index(),
-      /*outputBuffers=*/resultBuffers, /*initTensors=*/ValueRange{},
-      indexingMaps, getParallelAndReductionIterators(rank, /*nReduction=*/0));
-
-  SmallVector<Type, 4> bodyArgTypes, opResultTypes;
-  SmallVector<Value, 2> linalgOpArgs = {adaptor.index(), resultBuffers[0]};
-  // Add a block to the region.
-  auto *region = &linalgOp.region();
-  auto *block = rewriter.createBlock(region, region->end());
-  bodyArgTypes.append(rank, rewriter.getIndexType());
-  for (auto blockArgs : linalgOpArgs) {
-    bodyArgTypes.push_back(
-        blockArgs.getType().cast<ShapedType>().getElementType());
-  }
-  block->addArguments(bodyArgTypes);
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToEnd(block);
-
-  SmallVector<Value, 4> indices;
-  Value castedValue = rewriter.create<IndexCastOp>(
-      loc, block->getArgument(rank), rewriter.getIndexType());
-  for (int i = 0; i < axis; ++i) {
-    indices.push_back(block->getArgument(i));
-  }
-  indices.push_back(castedValue);
-  for (int i = axis + nIndices - batch; i < rank; ++i) {
-    indices.push_back(block->getArgument(i));
-  }
-
-  Value res = rewriter.create<LoadOp>(loc, adaptor.input(), indices);
-  rewriter.create<linalg::YieldOp>(loc, res);
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // mhlo.reduce_window conversion patterns and utility functions.
 //===----------------------------------------------------------------------===//
 
@@ -1222,6 +1140,31 @@ struct TensorReshapeOpConversion
 }  // namespace
 
 //===----------------------------------------------------------------------===//
+// std.extract_element op conversion.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A pattern to replace ExtractElementOp with LoadOp. Typically, this comes
+/// from indirect access in Linalg ops on tensors, eg, TorchIndexSelectOp. The
+/// pattern expects other patterns to convert the operand to MemRefType.
+struct ExtractElementOpPattern final
+    : public OpConversionPattern<ExtractElementOp> {
+  using OpConversionPattern<ExtractElementOp>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      ExtractElementOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!operands[0].getType().isa<MemRefType>()) {
+      return op.emitError("expected operands[0] to be a MemRefType");
+    }
+    ExtractElementOpAdaptor adaptor(operands);
+    rewriter.replaceOpWithNewOp<LoadOp>(op, operands[0], adaptor.indices());
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
 // hal.interface.*.tensor and shapex.* conversion.
 //===----------------------------------------------------------------------===//
 
@@ -1473,8 +1416,7 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       DotGeneralOpConversion, LinalgOpOnTensorConversion<linalg::GenericOp>,
       LinalgOpOnTensorConversion<linalg::IndexedGenericOp>, PadOpConversion,
       ReduceOpConversion, ReduceWindowOpConversion, SliceOpConversion,
-      TensorReshapeOpConversion, TorchIndexSelectOpConversion>(
-      context, resultTensorToBufferMap);
+      TensorReshapeOpConversion>(context, resultTensorToBufferMap);
   // Reduce region operation conversions.
   patterns.insert<ReduceRegionXLAOpConversion<mhlo::AddOp>,
                   ReduceRegionXLAOpConversion<mhlo::MinOp>,
@@ -1500,6 +1442,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   patterns.insert<HALInterfaceLoadTensorOpEraser, ShapeOpPattern>(
       context, resultTensorToBufferMap);
   patterns.insert<HALInterfaceStoreTensorOpEraser>(context, outputBufferMap);
+  patterns.insert<ExtractElementOpPattern>(context);
 
   ConversionTarget target(*context);
   // Make sure all XLA HLO ops are converted to Linalg ops after this pass.
@@ -1507,7 +1450,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // All Linalg ops should operate on buffers. So hal.interface.*.tensor ops
   // should be gone.
   target.addIllegalOp<IREE::HAL::InterfaceLoadTensorOp,
-                      IREE::HAL::InterfaceStoreTensorOp>();
+                      IREE::HAL::InterfaceStoreTensorOp, ExtractElementOp>();
   target.addDynamicallyLegalOp<Shape::TieShapeOp>(
       [](Shape::TieShapeOp op) -> bool {
         return op.operand().getType().isa<MemRefType>();

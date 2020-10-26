@@ -40,10 +40,10 @@ Shortcut commands (read below for full documentation):
 
 ```shell
 # Update SUBMODULE_VERSIONS from current git submodule pointers
-./scripts/git/submodule_versions.py export
+$ ./scripts/git/submodule_versions.py export
 
 # Update current git submodule pointers based on SUBMODULE_VERSIONS
-./scripts/git/submodule_versions.py import
+$ ./scripts/git/submodule_versions.py import
 ```
 
 ### The special relationship with LLVM and TensorFlow
@@ -122,7 +122,7 @@ To generate it, run:
 ```shell
 # Performs a submodule sync+update and stages an updated SUBMODULE_VERSIONS
 # file.
-./scripts/git/submodule_versions.py export
+$ ./scripts/git/submodule_versions.py export
 ```
 
 If you don't know if this is required, you may run:
@@ -131,7 +131,7 @@ If you don't know if this is required, you may run:
 # The check command is intended to eventually be usable as a git hook
 # for verification of consistency between SUBMODULE_VERSIONS and the
 # corresponding local git state.
-./scripts/git/submodule_versions.py check
+$ ./scripts/git/submodule_versions.py check
 ```
 
 #### Pulling dependency changes
@@ -142,7 +142,7 @@ the current git state:
 ```shell
 # Updates the commit hash of any entries in SUBMODULE_VERSIONS that differ
 # and stages the changes.
-./scripts/git/submodule_versions.py import
+$ ./scripts/git/submodule_versions.py import
 ```
 
 This will stage any needed changes to the submodules to bring them up to date

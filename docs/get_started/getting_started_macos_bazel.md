@@ -69,9 +69,9 @@ Run all core tests that pass on our OSS CI:
 
 ```shell
 $ bazel test -k //iree/... \
-    --test_env=IREE_VULKAN_DISABLE=1 \
-    --build_tag_filters="-nokokoro" \
-    --test_tag_filters="--nokokoro,-driver=vulkan"
+  --test_env=IREE_VULKAN_DISABLE=1 \
+  --build_tag_filters="-nokokoro" \
+  --test_tag_filters="--nokokoro,-driver=vulkan"
 ```
 
 > Tip:<br>
@@ -89,11 +89,11 @@ by git. The recommended contents for Linux/macOS are:
 ```shell
 build --disk_cache=/tmp/bazel-cache
 
-# Use --config=debug to compile iree and llvm without optimizations
+# Use --config=debug to compile IREE and LLVM without optimizations
 # and with assertions enabled.
 build:debug --config=asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-O0' --strip=never
 
-# Use --config=asserts to enable assertions in iree and llvm.
+# Use --config=asserts to enable assertions in IREE and LLVM.
 build:asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-UNDEBUG'
 ```
 
@@ -120,7 +120,7 @@ and execute a function in the compiled module:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir \
-    -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+  -function-input="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
