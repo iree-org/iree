@@ -46,17 +46,7 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
     // multi-threading issues.
     llvm::LLVMContext context;
 
-    // Remove all private functions, e.g tile size calcuations.
-    SmallVector<FuncOp, 4> nonPublicFn;
-    for (auto func : targetOp.getInnerModule().getOps<FuncOp>()) {
-      if (SymbolTable::getSymbolVisibility(func) !=
-          SymbolTable::Visibility::Public) {
-        nonPublicFn.push_back(func);
-      }
-    }
-    for (auto func : nonPublicFn) {
-      func.erase();
-    }
+    iree::DyLibExecutableDefT dyLibExecutableDef;
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
@@ -66,7 +56,6 @@ class LLVMAOTTargetBackend final : public LLVMBaseTargetBackend {
       return failure();
     }
 
-    iree::DyLibExecutableDefT dyLibExecutableDef;
     // Create invocation function an populate entry_points.
     auto entryPointOps = targetOp.getBlock().getOps<ExecutableEntryPointOp>();
 

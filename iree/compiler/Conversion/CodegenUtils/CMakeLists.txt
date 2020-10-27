@@ -20,14 +20,10 @@ iree_cc_library(
   HDRS
     "ForOpCanonicalization.h"
     "FunctionUtils.h"
-    "GetNumWorkgroups.h"
-    "MarkerUtils.h"
     "MatmulCodegenStrategy.h"
   SRCS
     "ForOpCanonicalization.cpp"
     "FunctionUtils.cpp"
-    "GetNumWorkgroups.cpp"
-    "MarkerUtils.cpp"
     "MatmulCodegenStrategy.cpp"
   DEPS
     LLVMSupport
@@ -43,9 +39,5 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorToSCF
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::Shape::IR
   PUBLIC
 )

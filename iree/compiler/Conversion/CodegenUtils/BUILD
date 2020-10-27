@@ -25,22 +25,14 @@ cc_library(
     srcs = [
         "ForOpCanonicalization.cpp",
         "FunctionUtils.cpp",
-        "GetNumWorkgroups.cpp",
-        "MarkerUtils.cpp",
         "MatmulCodegenStrategy.cpp",
     ],
     hdrs = [
         "ForOpCanonicalization.h",
         "FunctionUtils.h",
-        "GetNumWorkgroups.h",
-        "MarkerUtils.h",
         "MatmulCodegenStrategy.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:Analysis",
