@@ -12,27 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_
-#define IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_
-
-#include "llvm/ADT/StringRef.h"
-
 namespace mlir {
 namespace iree_compiler {
 
-/// Attribute on a module op to denote the scheduling order of entry points.
-/// The attribute value is expected to be an array of entry point name strings.
-inline llvm::StringRef getEntryPointScheduleAttrName() {
-  return "vkspv.entry_point_schedule";
-}
+/// Pass to legalize function that returns number of workgroups to use for
+/// launch to be runnable on the host.
+std::unique_ptr<OperationPass<ModuleOp>> createLegalizeNumWorkgroupsFnPass();
 
-/// Attribute on a entry point function that specifies which function computes
-/// the number of workgroups.
-inline llvm::StringRef getNumWorkgroupsFnAttrName() {
-  return "vkspv.num_workgroups_fn";
-}
+/// Pass to initialize the function that computes the number of workgroups for
+/// each entry point function. The function is defined, but is populated later.
+std::unique_ptr<OperationPass<ModuleOp>> createDeclareNumWorkgroupsFnPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_CONVERSION_LINALGTOSPIRV_ATTRIBUTES_H_

@@ -41,7 +41,7 @@ module attributes {
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @conv_no_padding()
-    attributes {vkspv.num_workgroups_fn = @conv_no_padding__num_workgroups__} {
+    attributes {hal.num_workgroups_fn = @conv_no_padding__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?x?x?xf32>
     %1 = iree.placeholder for "interace buffer"
@@ -65,8 +65,8 @@ module attributes {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @conv_no_padding()
+//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
@@ -113,7 +113,7 @@ module attributes {
     [Shader], [SPV_KHR_storage_buffer_storage_class]>,
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @matmul() attributes {vkspv.num_workgroups_fn = @matmul__num_workgroups__} {
+  func @matmul() attributes {hal.num_workgroups_fn = @matmul__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?xf32>
     %1 = iree.placeholder for "interace buffer"
@@ -138,8 +138,8 @@ module attributes {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
 //   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 16)>
 //       CHECK: func @matmul()
+//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   local_size = dense<[16, 8, 1]>
-//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
@@ -182,7 +182,7 @@ module attributes {
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @pooling_sum_no_padding()
-    attributes {vkspv.num_workgroups_fn = @pooling_sum_no_padding__num_workgroups__} {
+    attributes {hal.num_workgroups_fn = @pooling_sum_no_padding__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?xf32>
     %1 = iree.placeholder for "interace buffer"
@@ -206,8 +206,8 @@ module attributes {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @pooling_sum_no_padding()
+//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
@@ -247,7 +247,7 @@ module attributes {
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @pooling_max_4D()
-    attributes {vkspv.num_workgroups_fn = @pooling_max_4D__num_workgroups__} {
+    attributes {hal.num_workgroups_fn = @pooling_max_4D__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?x?x?xf32>
     %1 = iree.placeholder for "interace buffer"
@@ -272,8 +272,8 @@ module attributes {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //       CHECK: func @pooling_max_4D()
+//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   local_size = dense<[32, 4, 1]>
-//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[ARG0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = iree.placeholder {{.*}} {binding = @legacy_io::@ret0
@@ -311,7 +311,7 @@ module attributes {
     [Shader], [SPV_KHR_storage_buffer_storage_class]>,
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @matmul_fusion() attributes {vkspv.num_workgroups_fn = @matmul_fusion__num_workgroups__} {
+  func @matmul_fusion() attributes {hal.num_workgroups_fn = @matmul_fusion__num_workgroups__} {
     %0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<?x?xf32>
     %1 = iree.placeholder for "interace buffer"

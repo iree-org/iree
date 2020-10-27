@@ -14,7 +14,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
+#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -39,64 +40,6 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
       loc, commandBuffer, IREE::HAL::ExecutionStageBitfield::Dispatch,
       IREE::HAL::ExecutionStageBitfield::Dispatch,
       ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
-}
-
-/// The codegeneration emits a function `numWorkgroupsFn` for each entry point
-/// function. This function has arguments the !shapex.ranked_shape for all the
-/// input and output shaped types. Using this the function returns the number of
-/// workgroups to use. To use this function on the host side, generate the
-/// !shapex.ranked_shape values that describe the shape of the inputs and
-/// outputs of the dispatch region and "inline" the function body.
-static std::array<Value, 3> calculateWorkgroupCountFromNumWorkgroupsFn(
-    Location loc, FuncOp numWorkgroupsFn, IREE::HAL::InterfaceOp interface,
-    ArrayRef<Optional<TensorRewriteAdaptor>> operands,
-    ArrayRef<Optional<TensorRewriteAdaptor>> results,
-    ConversionPatternRewriter &rewriter) {
-  std::array<Value, 3> returnValue = {nullptr, nullptr, nullptr};
-  // TODO: This is really just inlining a function. For now assume that the
-  // `numWorkgroupsFn` has a single block to make inlining easier.
-  if (!numWorkgroupsFn || !llvm::hasSingleElement(numWorkgroupsFn))
-    return returnValue;
-  SmallVector<SmallVector<Value, 4>, 4> shapeValues;
-  shapeValues.reserve(operands.size() + results.size());
-  auto getShapeValuesFn =
-      [&](ArrayRef<Optional<TensorRewriteAdaptor>> values) -> LogicalResult {
-    for (auto val : values) {
-      if (!val) continue;
-      Optional<SmallVector<Value, 4>> shape = val->getShapeDims(rewriter);
-      if (!shape) return emitError(loc, "shape computation for operand failed");
-      shapeValues.push_back(shape.getValue());
-    }
-    return success();
-  };
-  if (failed(getShapeValuesFn(operands)) || failed(getShapeValuesFn(results)))
-    return returnValue;
-  BlockAndValueMapping mapper;
-  for (Operation &op : numWorkgroupsFn.front()) {
-    if (isa<mlir::ReturnOp>(op)) {
-      for (unsigned i = 0, e = std::min<unsigned>(3, op.getNumOperands());
-           i != e; ++i) {
-        returnValue[i] = mapper.lookupOrNull(op.getOperand(i));
-      }
-      break;
-    }
-    if (auto shapeOp = dyn_cast<Shape::RankedDimOp>(op)) {
-      if (BlockArgument arg = shapeOp.shape().dyn_cast<BlockArgument>()) {
-        auto &dimValues = shapeValues[arg.getArgNumber()];
-        mapper.map(shapeOp.result(), dimValues[shapeOp.getIndex()]);
-        continue;
-      }
-      return returnValue;
-    }
-    // If all its operands are mapped, clone it.
-    if (llvm::all_of(op.getOperands(), [&mapper](Value operand) {
-          return mapper.contains(operand);
-        })) {
-      rewriter.clone(op, mapper);
-      continue;
-    }
-  }
-  return returnValue;
 }
 
 SPIRVTargetBackend::SPIRVTargetBackend(SPIRVCodegenOptions options)

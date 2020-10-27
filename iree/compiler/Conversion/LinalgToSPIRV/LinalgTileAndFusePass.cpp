@@ -18,10 +18,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
+#include "iree/compiler/Conversion/CodegenUtils/MarkerUtils.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/Attributes.h"
+#include "iree/compiler/Conversion/Common/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/KernelDispatchUtils.h"
-#include "iree/compiler/Conversion/LinalgToSPIRV/MarkerUtils.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Utils.h"
@@ -153,7 +154,8 @@ struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
         failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
-             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
+             rewriter, linalgOp, funcOp, getNumWorkgroupsFnAttrName(),
+             launchConfig.getTileSizes(op, 0))))) {
       return failure();
     }
     setMarker(op, getDeleteMarker());
@@ -194,7 +196,8 @@ struct TileAndFuseToWorkgroupsPattern
         failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
         (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
          failed(createNumWorkgroupsFromResultShape(
-             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
+             rewriter, linalgOp, funcOp, getNumWorkgroupsFnAttrName(),
+             launchConfig.getTileSizes(op, 0))))) {
       return failure();
     }
     return success();

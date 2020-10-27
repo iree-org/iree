@@ -74,7 +74,7 @@ module attributes {
     [Shader], [SPV_KHR_storage_buffer_storage_class]>,
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @parallel_4D_static() attributes {vkspv.num_workgroups_fn = @parallel_4D_static__num_workgroups__} {
+  func @parallel_4D_static() attributes {hal.num_workgroups_fn = @parallel_4D_static__num_workgroups__} {
     %arg0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<3x4x5x6xf32>
     %arg1 = iree.placeholder for "interace buffer"
@@ -103,8 +103,8 @@ module attributes {
   }
 }
 // CHECK-LABEL: func @parallel_4D_static()
+//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   local_size = dense<[32, 1, 1]>
-//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:     %[[C360:.+]] = constant 360 : index
 //   CHECK-DAG:     %[[C120:.+]] = constant 120 : index
 //   CHECK-DAG:     %[[C30:.+]] = constant 30 : index
@@ -145,7 +145,7 @@ module attributes {
     [Shader], [SPV_KHR_storage_buffer_storage_class]>,
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-  func @scalar_add() attributes {vkspv.num_workgroups_fn = @scalar_add__num_workgroups__} {
+  func @scalar_add() attributes {hal.num_workgroups_fn = @scalar_add__num_workgroups__} {
     %arg0 = iree.placeholder for "interace buffer"
       {binding = @legacy_io::@arg0, operand_result_index = 0 : i32} : memref<f32>
     %arg1 = iree.placeholder for "interace buffer"
@@ -172,7 +172,7 @@ module attributes {
   }
 }
 // CHECK-LABEL: func @scalar_add()
-//  CHECK-SAME:   vkspv.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   hal.num_workgroups_fn = @[[NUM_WORKGROUPS_FN:[a-zA-Z0-9_]+]]
 //       CHECK:     load
 //  CHECK-NEXT:     load
 //  CHECK-NEXT:     addf
