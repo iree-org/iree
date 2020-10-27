@@ -17,6 +17,7 @@
 #include "experimental/ModelBuilder/ModelRunner.h"
 #include "experimental/ModelBuilder/VulkanWrapperPass.h"
 #include "iree/base/initializer.h"
+#include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
 #include "iree/compiler/Conversion/CodegenUtils/MatmulCodegenStrategy.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/MemorySpace.h"
 #include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
@@ -88,6 +89,7 @@ static void addLoweringPasses(mlir::PassManager &pm,
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::iree_compiler::createVectorizeMemref());
   pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::iree_compiler::createForOpCanonicalizationPass());
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::iree_compiler::createConvertToSPIRVPass());
 
@@ -342,8 +344,9 @@ static MatmulCodegenStrategy createMaliStrategy(int tileM, int tileN, int tileK,
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizes({tileM, tileN / warpSize, tileK})
           .setDistributionOptions(WIDistribute));
-  strategy.vectorize<linalg::MatmulOp>().unrollVector<vector::ContractionOp>(
-      nativeSize);
+  strategy.vectorize<linalg::MatmulOp>()
+      .unrollVector<vector::TransferReadOp>({1, 4})
+      .unrollVector<vector::ContractionOp>(nativeSize);
   return strategy;
 }
 
@@ -560,9 +563,9 @@ int main(int argc, char **argv) {
   std::pair<int, int> tileNRange;
   std::pair<int, int> tileKRange;
   if (target == "powerVR") {
-    m = std::max(m, 1024);
-    n = std::max(n, 1024);
-    k = std::max(k, 1024);
+    m = std::min(m, 1024);
+    n = std::min(n, 1024);
+    k = std::min(k, 1024);
     tileMRange = {32, 32};
     tileNRange = {32, 32};
     tileKRange = {4, 4};
