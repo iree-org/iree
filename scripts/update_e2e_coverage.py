@@ -71,7 +71,6 @@ SINGLE_SOURCE_SUITES = {
 TARGET_EXCLUSION_FILTERS = [
     r'mobilenet_v1_.*',  # Slim vision MobileNetV1.
     r'mobilenet_v2_.*',  # Slim vision MobileNetV2.
-    r'amoebanet_a_n18_f448',  # SavedModelV2 not available.
 ]
 
 # The symbols to show in the table if the operation is supported or not.
@@ -194,6 +193,11 @@ def generate_table(test_suite):
   # Generate the coverage table as a 2D array.
   rows = [first_row, second_row]
   for row_id, backends in sorted(table.items()):
+    # If the reference backend if failing then there is no reason to show the
+    # coverage of the other backends.
+    if not backends[ordered_backends.index(REFERENCE_BACKEND)]:
+      continue
+
     # Skip any rows defined in the TARGET_EXCLUSION_FILTERS.
     if any(re.match(pattern, row_id) for pattern in TARGET_EXCLUSION_FILTERS):
       continue
