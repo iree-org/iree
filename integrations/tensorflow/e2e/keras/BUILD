@@ -434,6 +434,8 @@ iree_e2e_cartesian_product_test_suite(
     main = "keyword_spotting_streaming_test.py",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "@kws_streaming//:models_lib",
+        "@kws_streaming//:train_lib",
     ],
 )
 
@@ -485,5 +487,7 @@ iree_e2e_cartesian_product_test_suite(
     main = "keyword_spotting_streaming_test.py",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "@kws_streaming//:models_lib",
+        "@kws_streaming//:train_lib",
     ],
 )

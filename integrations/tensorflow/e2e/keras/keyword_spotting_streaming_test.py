@@ -26,19 +26,12 @@ from pyiree.tf.support import tf_test_utils
 from pyiree.tf.support import tf_utils
 import tensorflow.compat.v2 as tf
 
-# We need to make python aware of the kws_streaming module in third_party, which
-# does not come with bazel BUILD files.
-source_path = str(pathlib.Path(__file__).resolve())
-iree_dir = source_path.replace(
-    "integrations/tensorflow/e2e/keras/keyword_spotting_streaming_test.py", "")
-google_research_dir = os.path.join(iree_dir, 'third_party/google-research')
-sys.path.append(google_research_dir)
-
 from kws_streaming.layers import modes
 from kws_streaming.models import model_params
 from kws_streaming.models import models
 from kws_streaming.models import utils
 from kws_streaming.train import model_flags
+
 FLAGS = flags.FLAGS
 
 ALL_MODELS = list(model_params.HOTWORD_MODEL_PARAMS.keys())

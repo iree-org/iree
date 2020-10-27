@@ -59,6 +59,3 @@
 [submodule "third_party/cpuinfo"]
 	path = third_party/cpuinfo
 	url = https://github.com/pytorch/cpuinfo.git
-[submodule "third_party/google-research"]
-	path = third_party/google-research
-	url = https://github.com/google-research/google-research.git
