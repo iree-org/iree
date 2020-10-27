@@ -21,11 +21,6 @@ import re
 import subprocess
 from typing import Sequence
 
-BAZEL_FILTERS = [
-    r'Loading: [0-9]+ packages loaded',
-    r'.*Using python binary from PYTHON_BIN = .*'
-]
-
 
 def create_markdown_table(rows: Sequence[Sequence[str]]):
   """Converts a 2D array to a Markdown table."""
@@ -34,8 +29,7 @@ def create_markdown_table(rows: Sequence[Sequence[str]]):
 
 def check_and_get_output_lines(command: Sequence[str],
                                dry_run: bool = False,
-                               log_stderr: bool = True,
-                               stderr_filters: Sequence[str] = ()):
+                               log_stderr: bool = True):
   print(f'Running: `{" ".join(command)}`')
   if dry_run:
     return None, None
@@ -46,8 +40,7 @@ def check_and_get_output_lines(command: Sequence[str],
 
   if log_stderr:
     for line in process.stderr.splitlines():
-      if not any(re.match(pattern, line) for pattern in stderr_filters):
-        print(line)
+      print(line)
 
   process.check_returncode()
 
@@ -60,11 +53,17 @@ def get_test_targets(test_suite_path: str):
   # We use two queries here because the return code for a failed query is
   # unfortunately the same as the return code for a bazel configuration error.
   target_dir = test_suite_path.split(':')[0]
-  query = ['bazel', 'query', f'{target_dir}/...']
-  targets = check_and_get_output_lines(query, stderr_filters=BAZEL_FILTERS)
+  query = [
+      'bazel', 'query', '--noshow_loading_progress', '--noshow_progress',
+      f'{target_dir}/...'
+  ]
+  targets = check_and_get_output_lines(query)
   if test_suite_path not in targets:
     return []
 
-  query = ['bazel', 'query', f'tests({test_suite_path})']
-  tests = check_and_get_output_lines(query, stderr_filters=BAZEL_FILTERS)
+  query = [
+      'bazel', 'query', '--noshow_loading_progress', '--noshow_progress',
+      f'tests({test_suite_path})'
+  ]
+  tests = check_and_get_output_lines(query)
   return tests
