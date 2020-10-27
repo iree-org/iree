@@ -43,7 +43,7 @@ class StripAndSplatConstantVariablesPass
     // Use a heuristic to space out splat values in hopes of avoiding NaN and
     // INF values at runtime:
     //   floats: 1/1, 1/2, 1/3, ...
-    //   ints: 1, 2, 3, 4
+    //   ints: 1, 2, 3, 4, ...
     // TODO(scotttodd): flags to control numbers used (all 0, all 1, increasing)
     int replaceIndex = 1;
 
@@ -72,7 +72,6 @@ class StripAndSplatConstantVariablesPass
       builder.setInsertionPointAfter(op);
       auto newOp = builder.create<VariableOp>(
           op.getLoc(), op.sym_name(), op.is_mutable(), op.type(), newValue);
-
       SymbolTable::setSymbolVisibility(newOp,
                                        SymbolTable::getSymbolVisibility(op));
       newOp.setAttr("noinline", UnitAttr::get(builder.getContext()));
