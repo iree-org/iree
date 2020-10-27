@@ -25,6 +25,15 @@ build --compilation_mode=opt
 common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
+# Enables unix-style runfiles link trees (requires symlink permission).
+# https://docs.bazel.build/versions/master/windows.html#enable-symlink-support
+# See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
+# Generally: Enable Developer Mode in the Developer Settings page of the
+# system settings. Matches --enable_runfiles in the msvc config, but this is a
+# startup option, so cannot be in a config. Doesn't hurt anything on non-windows
+# platforms though.
+startup --windows_enable_symlinks
+
 
 # TODO: Transition to the explicit init_py mechanism. See #2405
 # This is commented out while considering transition path but left as a
@@ -255,13 +264,16 @@ build:_msvc_base --define=iree_is_msvc=true
 # Disable warnings for dependencies. We don't control these.
 # absl forces /W3 in their copts, so we exclude them to avoid D9025
 build:_msvc_base --per_file_copt=+external,-com_google_absl@/w
-# And some more explicit disables. For some reason `/w` doesn't work for these
-# although it does catch some other warnings...
-build:_msvc_base --per_file_copt=external@/wd4244 # possible loss of data
+
+# And some more explicit disables. For some reason the `/w` on external doesn't
+# work for these, maybe they come from headers?
+build:_msvc_base --copt=/wd4244 # possible loss of data
 build:_msvc_base --copt=/wd4624 # destructor was implicitly defined as deleted
 build:_msvc_base --copt=/wd4005 # macro redefinition
 build:_msvc_base --copt=/wd4267 # initializing: possible loss of data
 build:_msvc_base --copt=/wd4141 # inline used more than once
+# new warning with the standards-compliant preprocessor. winbase itself is not standards-compliant
+build:_msvc_base --copt=/wd5105
 build:_msvc_base --per_file_copt=mkl_dnn@/wd4551 # missing argument list
 build:_msvc_base --per_file_copt=mkl_dnn@/wd4068 # unknown pragma
 build:_msvc_base --per_file_copt=farmhash@/wd4319 # zero extending to T of greater size
@@ -270,25 +282,26 @@ build:_msvc_base --linkopt=/IGNORE:4217 # mismatch import/export declspec
 build:_msvc_base --linkopt=/IGNORE:4001 # no object files
 
 # Enables unix-style runfiles link trees (requires symlink permission).
+# https://docs.bazel.build/versions/master/windows.html#enable-symlink-support
 # See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
 # Generally: Enable Developer Mode in the Developer Settings page of the
 # system settings.
-build:_msvc_base --experimental_enable_runfiles
+build:_msvc_base --enable_runfiles
 # Flags to make tensorflow build.
 # Some of these are also of general use and fine to enable globally for windows.
 build:_msvc_base --copt=/arch:AVX
 # Host and target are the same in windows so don't waste time building both.
 build:_msvc_base --distinct_host_configuration=false
 # Avoids incompatible versions of winsock and other badness.
-build:_msvc_base --copt=/DWIN32_LEAN_AND_MEAN --host_copt=/DWIN32_LEAN_AND_MEAN
+build:_msvc_base --copt=/DWIN32_LEAN_AND_MEAN
 # Why are min/max macros? No one knows.
-build:_msvc_base --copt=/DNOMINMAX --host_copt=/DNOMINMAX
+build:_msvc_base --copt=/DNOMINMAX
 # Yay for security warnings. Boo for non-standard.
-build:_msvc_base --copt=/D_CRT_SECURE_NO_WARNINGS --host_copt=/D_CRT_SECURE_NO_WARNINGS
+build:_msvc_base --copt=/D_CRT_SECURE_NO_WARNINGS
 # TensorFlow requires the "monolithic" build mode for now on Windows.
 build:_msvc_base --define framework_shared_object=false
 # Necessary for M_* math constants.
-build:_msvc_base --copt=/D_USE_MATH_DEFINES --host_copt=/D_USE_MATH_DEFINES
+build:_msvc_base --copt=/D_USE_MATH_DEFINES
 
 # Workaround WinGDI.h defining `ERROR`, which conflicts with logging macros.
 # Note that IREE and TensorFlow both `#undef ERROR` and define their own
