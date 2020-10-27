@@ -759,6 +759,7 @@ void ConvertToGPUPass::runOnOperation() {
                   MapLinalgOpToLocalInvocationId<linalg::PoolingMinOp>,
                   MapLinalgOpToLocalInvocationId<linalg::PoolingSumOp>,
                   RemoveLinalgRange, SerializeParallelLoopPattern>(context);
+  FrozenRewritePatternList frozenPatterns(std::move(patterns));
 
   for (FuncOp funcOp : getOperation().getOps<FuncOp>()) {
     if (!isEntryPoint(funcOp)) continue;
@@ -767,7 +768,7 @@ void ConvertToGPUPass::runOnOperation() {
       funcOp.emitError("unhandled dispatch function with multiple blocks");
       return signalPassFailure();
     }
-    if (failed(applyFullConversion(funcOp, target, patterns)))
+    if (failed(applyFullConversion(funcOp, target, frozenPatterns)))
       return signalPassFailure();
   }
 }

@@ -425,8 +425,9 @@ void ConvertToSPIRVPass::runOnOperation() {
     functions.push_back(fn);
   }
 
+  FrozenRewritePatternList frozenPatterns(std::move(patterns));
   for (FuncOp fn : functions)
-    if (failed(applyFullConversion(fn, *target, patterns)))
+    if (failed(applyFullConversion(fn, *target, frozenPatterns)))
       return signalPassFailure();
 
   // Collect all SPIR-V ops into a spv.module.

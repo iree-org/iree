@@ -100,7 +100,7 @@ class ConvertToHALPass
     // that don't need anything HAL-specific to pass through. This is handled by
     // the fallback type legality support of the
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
-                                      patterns))) {
+                                      std::move(patterns)))) {
       return signalPassFailure();
     }
   }

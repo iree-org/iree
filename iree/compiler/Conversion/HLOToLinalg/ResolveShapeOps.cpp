@@ -26,6 +26,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -104,7 +105,8 @@ void ResolveShapeOpsPass::runOnFunction() {
   ConversionTarget target(*context);
   target.addIllegalOp<DimOp>();
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-  if (failed(applyFullConversion(getFunction(), target, dimPatterns))) {
+  if (failed(
+          applyFullConversion(getFunction(), target, std::move(dimPatterns)))) {
     return signalPassFailure();
   }
 
@@ -114,7 +116,7 @@ void ResolveShapeOpsPass::runOnFunction() {
 
   // Then elide all shapex.tie_shape ops and canonicalize shapex.ranked_dim
   // given that we don't need the shape annotation anymore.
-  applyPatternsAndFoldGreedily(getFunction(), shapePatterns);
+  applyPatternsAndFoldGreedily(getFunction(), std::move(shapePatterns));
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createResolveShapeOpsPass() {

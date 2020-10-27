@@ -33,6 +33,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 
@@ -398,7 +399,8 @@ class PreConversionLoweringPass
     // conversions.
     OwningRewritePatternList greedyPatterns;
     mhlo::PopulateComplexLoweringPatterns(context, &greedyPatterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), greedyPatterns))) {
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(greedyPatterns)))) {
       return signalPassFailure();
     }
 
@@ -422,7 +424,8 @@ class PreConversionLoweringPass
     target.addIllegalOp<mhlo::FftOp>();
     patterns.insert<LowerFftOp>(context);
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       return signalPassFailure();
     }
   }

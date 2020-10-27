@@ -1470,7 +1470,7 @@ void ConvertHLOToLinalgOnBuffersPass::runOnFunction() {
   // Let the rest fall through.
   target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-  if (failed(applyFullConversion(getFunction(), target, patterns))) {
+  if (failed(applyFullConversion(getFunction(), target, std::move(patterns)))) {
     return signalPassFailure();
   }
 }

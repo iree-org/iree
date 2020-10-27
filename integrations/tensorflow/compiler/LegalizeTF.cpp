@@ -16,6 +16,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "tensorflow/compiler/mlir/hlo/include/mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
@@ -81,16 +82,20 @@ class LegalizeTF : public PassWrapper<LegalizeTF, FunctionPass> {
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
 
+    FrozenRewritePatternList frozenPatterns(std::move(patterns));
+    FrozenRewritePatternList frozenCanonicalizePatterns(
+        std::move(canonicalizePatterns));
     while (true) {
-      if (failed(
-              applyPartialConversion(op, target, patterns, &unconvertedOps))) {
+      if (failed(applyPartialConversion(op, target, frozenPatterns,
+                                        &unconvertedOps))) {
         return signalPassFailure();
       }
 
       if (prevUnconvertedOps == unconvertedOps) break;
 
       prevUnconvertedOps = std::move(unconvertedOps);
-      if (failed(applyPatternsAndFoldGreedily(op, canonicalizePatterns))) {
+      if (failed(
+              applyPatternsAndFoldGreedily(op, frozenCanonicalizePatterns))) {
         return signalPassFailure();
       }
     }
