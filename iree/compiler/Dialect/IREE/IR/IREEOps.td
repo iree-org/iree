@@ -95,7 +95,7 @@ def IREE_WorkgroupIdOp : IREE_PureOp<"workgroup_id"> {
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def IREE_WorkgroupCountOp : IREE_PureOp<"workgoup_count"> {
+def IREE_WorkgroupSizeOp: IREE_PureOp<"workgoup_size"> {
   let summary = "Get grid size of an iree thread among a specific dimension";
   let description = [{
     Get grid size of an iree workgroups among a specific dimension
