@@ -28,7 +28,7 @@ echo "Running pycheck against '${DIFF_TARGET?}'"
 if [[ "${DIFF_TARGET?}" = "all" ]]; then
   FILES=$(find -name "*\.py" -not -path "./third_party/*")
 else
-  FILES=$(git diff --name-only "${DIFF_TARGET?}" | grep '.*\.py')
+  FILES=$(git diff --diff-filter=d --name-only "${DIFF_TARGET?}" | grep '.*\.py')
 fi
 
 

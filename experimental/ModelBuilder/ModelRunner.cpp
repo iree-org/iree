@@ -103,7 +103,7 @@ void mlir::ModelRunner::compile(
 
   // Obtain the execution engine.
   auto created = mlir::ExecutionEngine::create(
-      *module, transformer,
+      *module, /*llvmModuleBuilder=*/nullptr, transformer,
       static_cast<llvm::CodeGenOpt::Level>(compilationOptions.llcOptLevel),
       libs,
       /*enableObjectCache=*/true,
