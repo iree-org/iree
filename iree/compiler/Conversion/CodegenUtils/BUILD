@@ -30,7 +30,6 @@ cc_library(
         "MatmulCodegenStrategy.cpp",
     ],
     hdrs = [
-        "Attributes.h",
         "ForOpCanonicalization.h",
         "FunctionUtils.h",
         "GetNumWorkgroups.h",

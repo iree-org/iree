@@ -18,7 +18,6 @@ iree_cc_library(
   NAME
     CodegenUtils
   HDRS
-    "Attributes.h"
     "ForOpCanonicalization.h"
     "FunctionUtils.h"
     "GetNumWorkgroups.h"
