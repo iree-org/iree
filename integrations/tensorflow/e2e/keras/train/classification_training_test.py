@@ -71,7 +71,6 @@ class ClassificationTrainingModule(tf.Module):
     x = tf.keras.layers.Dense(NUM_CLASSES)(inputs)
     outputs = tf.keras.layers.Softmax()(x)
     self.model = tf.keras.Model(inputs, outputs)
-    print(self.model)
 
     self.loss = tf.keras.losses.SparseCategoricalCrossentropy()
     self.optimizer = tf.keras.optimizers.get(FLAGS.optimizer)
