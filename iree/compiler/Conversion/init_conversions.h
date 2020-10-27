@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 #define IREE_COMPILER_CONVERSION_INIT_CONVERSIONS_H_
 
+#include "iree/compiler/Conversion/CodegenUtils/ForOpCanonicalization.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
@@ -50,6 +51,7 @@ inline void registerLinalgToSPIRVPasses() {
     createSplitDispatchFunctionPass();
     createVectorToGPUPass();
     createMatMulTileAndVectorizeGPUPass();
+    createForOpCanonicalizationPass();
     createVectorizeMemref();
     return true;
   }();
