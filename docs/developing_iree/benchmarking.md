@@ -101,9 +101,56 @@ Remember to [restore CPU scaling](#cpu-configuration) when you're done.
 
 ## Microbenchmarks
 
-We also benchmark the performance of individual parts (more of these coming
-soon) of the IREE system in isolation. These measurements provide more targeted
-metrics to direct development work.
+We also benchmark the performance of individual parts of the IREE system in
+isolation. IREE breaks a model down to dispatch functions. To benchmark all the
+dispatch functions, generate an IREE module with
+`-iree-mlir-to-benchmark-vm-bytecode-module` for the target backend:
+
+```
+$ build/iree/tools/iree-translate \
+  -iree-mlir-to-benchmark-vm-bytecode-module \
+  -iree-hal-target-backends=vmla \
+  iree/test/e2e/models/fullyconnected.mlir \
+  -o /tmp/fullyconnected.vmfb
+```
+
+and then benchmark all exported dispatch function (and all exported functions)
+in that module:
+
+```
+$ build/iree/tools/iree-benchmark-module
+  --module_file=/tmp/fullyconnected.vmfb
+  --driver=vmla
+```
+
+Without specifying any `entry_function`, `iree-benchmark-module` will register
+all exported functions (and dispatch functions) to benchmarking if they do not
+have to specify inputs.
+
+You will see output like:
+
+```
+Run on (72 X 3700 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x36)
+  L1 Instruction 32 KiB (x36)
+  L2 Unified 1024 KiB (x36)
+  L3 Unified 25344 KiB (x2)
+Load Average: 4.39, 5.72, 6.76
+***WARNING*** CPU scaling is enabled, the benchmark real time measurements may
+be noisy and will incur extra overhead.
+---------------------------------------------------------------------------------------------
+Benchmark                                                   Time             CPU   Iterations
+---------------------------------------------------------------------------------------------
+BM_main_ex_dispatch_0_entry/process_time/real_time      0.039 ms        0.044 ms        40915
+BM_main_ex_dispatch_1_entry/process_time/real_time      0.047 ms        0.053 ms        12670
+BM_main_ex_dispatch_2_entry/process_time/real_time      0.046 ms        0.055 ms        14894
+BM_main_ex_dispatch_3_entry/process_time/real_time      0.042 ms        0.052 ms        22019
+BM_main_ex_dispatch_4_entry/process_time/real_time      0.046 ms        0.056 ms        15462
+BM_main_ex_dispatch_5_entry/process_time/real_time      0.030 ms        0.037 ms        18872
+BM_main_ex_dispatch_6_entry/process_time/real_time      0.048 ms        0.058 ms        14637
+BM_main/process_time/real_time                          0.102 ms        0.112 ms         7235
+```
 
 ### Bytecode Module Benchmarks
 
