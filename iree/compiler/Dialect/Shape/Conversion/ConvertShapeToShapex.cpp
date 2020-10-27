@@ -250,7 +250,8 @@ class ConvertShapeToShapex
     patterns.insert<ConvertToExtentTensorOp>(context);
     patterns.insert<ConvertTensorCastOp>(context);
 
-    if (failed(applyPartialConversion(module, conversionTarget, patterns))) {
+    if (failed(applyPartialConversion(module, conversionTarget,
+                                      std::move(patterns)))) {
       return signalPassFailure();
     }
   }

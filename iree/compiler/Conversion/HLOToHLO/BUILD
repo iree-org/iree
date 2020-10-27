@@ -27,9 +27,9 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/hlo",
     ],
 )

@@ -37,6 +37,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/FoldUtils.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-linalg-tile-and-fuse"
 
@@ -404,7 +405,7 @@ static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
   AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  applyPatternsAndFoldGreedily(op, canonicalizationPatterns);
+  applyPatternsAndFoldGreedily(op, std::move(canonicalizationPatterns));
 }
 
 //====---------------------------------------------------------------------===//
@@ -482,7 +483,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       OwningRewritePatternList firstLevelTilingPatterns;
       populateTilingToWorkgroupPatterns(context, dependenceGraph, launchConfig,
                                         firstLevelTilingPatterns);
-      applyPatternsAndFoldGreedily(funcOp, firstLevelTilingPatterns);
+      applyPatternsAndFoldGreedily(funcOp, std::move(firstLevelTilingPatterns));
       applyCanonicalizationPatterns(context, funcOp);
 
       // Delete the ops that are marked for deletion.
@@ -504,7 +505,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       // which requires some folding to trigger.
       OwningRewritePatternList promotionPatterns;
       populatePromotionPatterns(context, promotionPatterns);
-      applyPatternsAndFoldGreedily(funcOp, promotionPatterns);
+      applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
       applyCanonicalizationPatterns(context, funcOp);
 
       LLVM_DEBUG({
@@ -519,7 +520,8 @@ void LinalgTileAndFusePass::runOnOperation() {
         OwningRewritePatternList secondLevelTilingPatterns;
         populateTilingToSubgroupPatterns(context, launchConfig,
                                          secondLevelTilingPatterns);
-        applyPatternsAndFoldGreedily(funcOp, secondLevelTilingPatterns);
+        applyPatternsAndFoldGreedily(funcOp,
+                                     std::move(secondLevelTilingPatterns));
         applyCanonicalizationPatterns(context, funcOp);
 
         LLVM_DEBUG({
@@ -533,7 +535,7 @@ void LinalgTileAndFusePass::runOnOperation() {
         OwningRewritePatternList vectorizationPatterns;
         populateVectorizationPatterns(context, launchConfig,
                                       vectorizationPatterns);
-        applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns);
+        applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Vectorization ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -544,7 +546,7 @@ void LinalgTileAndFusePass::runOnOperation() {
       {
         OwningRewritePatternList vectorUnrollPatterns;
         populateVectorUnrollPatterns(context, vectorUnrollPatterns);
-        applyPatternsAndFoldGreedily(funcOp, vectorUnrollPatterns);
+        applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Vector Unroll ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());

@@ -17,6 +17,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -39,7 +40,7 @@ class CleanupShapePlaceholdersPass
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     patterns.insert<CleanupTieShapePattern>(&getContext());
-    applyPatternsAndFoldGreedily(getFunction(), patterns);
+    applyPatternsAndFoldGreedily(getFunction(), std::move(patterns));
   }
 };
 

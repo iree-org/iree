@@ -294,7 +294,8 @@ struct LoadStoreVectorizationPass
               return llvm::any_of(op->getOperandTypes(), isVectorType) ||
                      llvm::any_of(op->getResultTypes(), isVectorType);
             }));
-    if (failed(applyPartialConversion(getOperation(), target, patterns)))
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns))))
       return signalPassFailure();
   }
 };

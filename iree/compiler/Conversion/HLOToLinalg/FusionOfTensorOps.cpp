@@ -25,7 +25,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -76,12 +76,15 @@ struct FusionOfTensorOpsPass
     MLIRContext *context = op->getContext();
     interfacePatterns.insert<FuseWithHALInterfaceLoadTensor,
                              FuseWithHALInterfaceStoreTensor>(context);
-    applyPatternsAndFoldGreedily(op->getRegions(), interfacePatterns);
+    FrozenRewritePatternList frozenInterfacePatterns(
+        std::move(interfacePatterns));
+
+    applyPatternsAndFoldGreedily(op->getRegions(), frozenInterfacePatterns);
 
     populateLinalgTensorOpsFusionPatterns(context, fusionPatterns);
-    applyPatternsAndFoldGreedily(op->getRegions(), fusionPatterns);
+    applyPatternsAndFoldGreedily(op->getRegions(), std::move(fusionPatterns));
 
-    applyPatternsAndFoldGreedily(op->getRegions(), interfacePatterns);
+    applyPatternsAndFoldGreedily(op->getRegions(), frozenInterfacePatterns);
   }
 };
 }  // namespace
