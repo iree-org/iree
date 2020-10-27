@@ -21,7 +21,8 @@ namespace mlir {
 class FunctionPass;
 namespace iree_compiler {
 
-/// Pass to do canonicalization on loop carried value for For ops.
+/// An ad-hoc pass to canonicalize selected loop carried dependencies on
+/// scf.for.
 std::unique_ptr<FunctionPass> createForOpCanonicalizationPass();
 
 }  // namespace iree_compiler

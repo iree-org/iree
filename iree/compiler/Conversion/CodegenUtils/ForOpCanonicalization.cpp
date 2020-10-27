@@ -58,15 +58,15 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
  public:
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
-  Value FoldCarryDep(scf::ForOp forOp, Operation* op, Operation* source,
-                     Value argValue) const {
-    if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(op)) {
-      if (auto souceOp = dyn_cast<vector::ShapeCastOp>(source)) {
+  Value FoldCarryDep(scf::ForOp forOp, Operation* ivUser,
+                     Operation* ivDef) const {
+    if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(ivUser)) {
+      if (auto souceOp = dyn_cast<vector::ShapeCastOp>(ivDef)) {
         if (shapeCast.getType() == souceOp.source().getType())
           return souceOp.source();
       }
-    } else if (auto extractOp = dyn_cast<vector::ExtractOp>(op)) {
-      if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(source)) {
+    } else if (auto extractOp = dyn_cast<vector::ExtractOp>(ivUser)) {
+      if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(ivDef)) {
         if (extractOp.getType() == broadcastOp.getSourceType())
           return broadcastOp.source();
       }
@@ -89,28 +89,24 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
     SmallVector<unsigned, 8> iteratorFolded;
     SmallVector<Operation*, 8> resultOps;
     auto terminator = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
-    SmallVector<Value, 8> returnValues(terminator.getOperands().begin(),
-                                       terminator.getOperands().end());
-    SmallVector<Value, 8> initArgs(forOp.getIterOperands().begin(),
-                                   forOp.getIterOperands().end());
+    auto returnValues = llvm::to_vector<8>(terminator.getOperands());
+    auto initArgs = llvm::to_vector<8>(forOp.getIterOperands());
     for (auto it : llvm::enumerate(forOp.getRegionIterArgs())) {
       if (!it.value().hasOneUse()) continue;
       Operation* op = it.value().use_begin()->getOwner();
       if (!isa<vector::ShapeCastOp, vector::ExtractOp>(op)) continue;
       Operation* returnValDef = returnValues[it.index()].getDefiningOp();
-      Value newReturn =
-          FoldCarryDep(forOp, op, returnValDef, initArgs[it.index()]);
-      if (newReturn) {
-        iteratorFolded.push_back(it.index());
-        resultOps.push_back(returnValDef);
-        returnValues[it.index()] = newReturn;
+      Value newReturn = FoldCarryDep(forOp, op, returnValDef);
+      if (!newReturn) continue;
+      iteratorFolded.push_back(it.index());
+      resultOps.push_back(returnValDef);
+      returnValues[it.index()] = newReturn;
 
-        BlockAndValueMapping mapping;
-        mapping.map(op->getOperand(0), initArgs[it.index()]);
-        initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
-      }
+      BlockAndValueMapping mapping;
+      mapping.map(op->getOperand(0), initArgs[it.index()]);
+      initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
     }
-    if (iteratorFolded.empty()) return failure();
+    if (iteratorFolded.empty()) return success();
     auto newLoop =
         rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.lowerBound(),
                                     forOp.upperBound(), forOp.step(), initArgs);
@@ -129,9 +125,7 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
       SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[en.index()]);
       oldOp->replaceAllUsesWith(arg);
     }
-    auto a = forOp.getParentOp();
     rewriter.replaceOp(forOp, repResults);
-    a->dump();
     return success();
   }
 };
@@ -152,8 +146,9 @@ std::unique_ptr<FunctionPass> createForOpCanonicalizationPass() {
 }
 
 static PassRegistration<ForOpCanonicalizationPass> pass(
-    "iree-codegen-forop-canonicalizatio-pass",
-    "Canonicalize for op loop carried dependency",
+    "iree-codegen-canonicalize-scf-for",
+    "An ad-hoc pass to canonicalize selected loop carried dependencies on "
+    "scf.for",
     [] { return std::make_unique<ForOpCanonicalizationPass>(); });
 
 }  // namespace iree_compiler

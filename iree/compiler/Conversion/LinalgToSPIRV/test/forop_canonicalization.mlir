@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-codegen-forop-canonicalizatio-pass | FileCheck %s
+// RUN: iree-opt %s -iree-codegen-canonicalize-scf-for | FileCheck %s
 
 func @loop_carried_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
   %c0 = constant 0 : index
