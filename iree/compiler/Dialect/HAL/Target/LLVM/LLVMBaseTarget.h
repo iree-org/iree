@@ -35,8 +35,10 @@ class LLVMBaseTargetBackend : public TargetBackend {
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override;
 
-  LogicalResult recordDispatch(Location loc, DispatchState dispatchState,
-                               DeviceSwitchRewriter &switchRewriter) override;
+  std::array<Value, 3> calculateDispatchWorkgroupCount(
+      Location loc, IREE::HAL::ExecutableOp executableOp,
+      IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
+      OpBuilder &builder) override;
 
  protected:
   LLVMTargetOptions options_;

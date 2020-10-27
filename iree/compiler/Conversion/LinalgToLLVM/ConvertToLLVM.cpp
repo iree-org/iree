@@ -12,14 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Conversion/CodegenUtils/FunctionUtils.h"
-#include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -141,11 +137,10 @@ bool operator<(IREE::HAL::InterfaceBindingOp aOp,
 }
 
 // Change signature of entry function to func
-// clang-format off
-// entry_func(%packed_buffers_arg_ptr: !<llvm.int8**>, thread_idx: !llvm.i32, thread_idy: !llvm.i32, thread_idz: !llvm.i32) and lower IREE and HAL ops to
+// entry_func(%packed_buffers_arg_ptr:
+// !<llvm.int8**>, %push_constant: !<llvm.int64*>) and lower IREE and HAL ops to
 // corresponding LLVMIR ops to construct memref descriptors and load
 // push_constant values.
-// clang-format on
 class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
  public:
   explicit ConvertFuncWithHALInterface(MLIRContext *context,
@@ -168,16 +163,12 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     // Get interface buffers from all the blocks.
     SmallVector<IREE::PlaceholderOp, 8> bufferOps;
     SmallVector<IREE::HAL::InterfaceLoadConstantOp, 8> loadOps;
-    SmallVector<IREE::WorkgroupIdOp, 3> workgroupIdOps;
     for (Block &block : funcOp.getBlocks()) {
       for (Operation &op : block) {
         if (auto phOp = dyn_cast<IREE::PlaceholderOp>(op))
           bufferOps.push_back(phOp);
         if (auto phOp = dyn_cast<IREE::HAL::InterfaceLoadConstantOp>(op)) {
           loadOps.push_back(phOp);
-        }
-        if (auto threadIdOp = dyn_cast<IREE::WorkgroupIdOp>(op)) {
-          workgroupIdOps.push_back(threadIdOp);
         }
       }
     }
@@ -226,39 +217,22 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
     }
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
-    // clang-format off
-    // func foo(%packed_buffer_args: !llvm<i8**>, %push_constant: !llvm<i32*>, thread_idx: i32, thread_idy, thread_idz: i32)
-    // clang-format on
+
+    // func foo(%packed_buffer_args: !llvm<i8**>, %push_constant: !llvm<i32*>)
     MLIRContext *context = rewriter.getContext();
     auto packedBuffersArgsTy =
         LLVM::LLVMType::getInt8PtrTy(context).getPointerTo();
     auto pushConstantArgTy = LLVM::LLVMType::getInt32Ty(context).getPointerTo();
-    auto threadIdXTy = LLVM::LLVMType::getInt32Ty(context);
-    auto threadIdYTy = LLVM::LLVMType::getInt32Ty(context);
-    auto threadIdZTy = LLVM::LLVMType::getInt32Ty(context);
     signatureConverter.addInputs(packedBuffersArgsTy);
     signatureConverter.addInputs(pushConstantArgTy);
-    signatureConverter.addInputs(threadIdXTy);
-    signatureConverter.addInputs(threadIdYTy);
-    signatureConverter.addInputs(threadIdZTy);
 
+    // Create the new function's signature.
     Location loc = funcOp.getLoc();
-
-    // Construct newFunc with all attributes except return type & symbol name.
-    SmallVector<NamedAttribute, 4> funcAttrs;
-    for (auto attr : funcOp.getAttrs()) {
-      if (attr.first == SymbolTable::getSymbolAttrName() ||
-          attr.first == mlir::impl::getTypeAttrName()) {
-        continue;
-      }
-      funcAttrs.push_back(attr);
-    }
-
     auto newFuncOp = rewriter.create<FuncOp>(
         loc, funcOp.getName(),
         rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
                                  llvm::None),
-        funcAttrs);
+        ArrayRef<NamedAttribute>());
 
     // Move all ops in the old function's region to the new function.
     rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
@@ -310,26 +284,6 @@ class ConvertFuncWithHALInterface : public ConvertToLLVMPattern {
       rewriter.replaceOp(loadOp, dimConstantCasted);
     }
 
-    // Lower iree.workgroup_idd ops to get indices from function arugments.
-    for (auto workgroupCoordOp : workgroupIdOps) {
-      auto attr = workgroupCoordOp.getAttrOfType<StringAttr>("dimension");
-      int argIndex = -1;
-      if (attr.getValue().str() == "x") {
-        argIndex = 2;
-      } else if (attr.getValue().str() == "y") {
-        argIndex = 3;
-      } else if (attr.getValue().str() == "z") {
-        argIndex = 4;
-      } else {
-        return rewriter.notifyMatchFailure(
-            funcOp,
-            "Unable to map to workgroup coordinate : " + attr.getValue().str());
-      }
-      Value threadXIndex = builder.create<LLVM::ZExtOp>(
-          loc, typeConverter.convertType(workgroupCoordOp.getType()),
-          newFuncOp.getArgument(argIndex));
-      rewriter.replaceOp(workgroupCoordOp, threadXIndex);
-    }
     rewriter.eraseOp(funcOp);
     return success();
   }
@@ -398,21 +352,9 @@ void ConvertToLLVMPass::runOnOperation() {
                   RemoveInterfaceOpPattern>(&getContext(), converter);
   LLVMConversionTarget target(getContext());
   target.addLegalOp<ModuleOp, ModuleTerminatorOp>();
-
-  // Pass through workspace count calculation. This isn't going to be translated
-  // to LLVM.
-  // TODO(ataei): Should be handled somewhere else ?
-  target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
-                                    IREEDialect>(
-      Optional<ConversionTarget::DynamicLegalityCallbackFn>([](Operation *op) {
-        auto funcOp = dyn_cast<FuncOp>(op->getParentOp());
-        if (funcOp && !isEntryPoint(funcOp)) return true;
-        return false;
-      }));
-
+  target.addIllegalOp<IREE::PlaceholderOp>();
   target.addDynamicallyLegalOp<FuncOp>([](FuncOp funcOp) {
     bool any = false;
-    if (!isEntryPoint(funcOp)) return true;
     funcOp.walk([&](IREE::PlaceholderOp placeholderOp) { any = true; });
     return any ? false : true;
   });
