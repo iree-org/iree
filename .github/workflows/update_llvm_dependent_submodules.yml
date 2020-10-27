@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Creates a PR to update the TF submodule to HEAD & copy the latest
-# version of the LLVM Bazel BUILD files from TF.
+# Creates a PR to update all LLVM-dependent submodules to the current LLVM
+# commit in the repo.
 
-name: Update TensorFlow
+name: Synchronize LLVM Dependents
 
 on:
   schedule:
     # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
-    - cron: '0 */6 * * *'
+    - cron: "0 */6 * * *"
 
 jobs:
   update_tf:
@@ -38,24 +38,26 @@ jobs:
         run: ./scripts/git/update_to_llvm_syncpoint.py
       - name: Calculating SHAs
         run: |
-          echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
           echo "::set-env name=LLVM_SHA::$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)"
+          echo "::set-env name=TF_SHA::$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
+          echo "::set-env name=LLVM_BAZEL_SHA::$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)"
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
           # Personal token is required to trigger additional automation (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
-          commit-message: "Integrate TF at tensorflow/tensorflow@${{ env.TF_SHA }}"
-          title: "Integrate TF at tensorflow/tensorflow@${{ env.TF_SHA }}"
+          commit-message: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
+          title: "Synchronize submodules with LLVM at llvm/llvm-project@${{ env.LLVM_SHA }}"
           body: |
-            Updates TF to
+            Updates LLVM dependencies to match
+            [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }}).
+            - llvm-bazel to
+              [${{ env.LLVM_BAZEL_SHA }}](https://github.com/google/llvm-bazel/commit/${{ env.LLVM_BAZEL_SHA }})
+            - TensorFlow to
             [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
-            matching
-            [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }})
-            and copies over the LLVM BUILD files.
 
             `./scripts/git/update_to_llvm_syncpoint.py`
 
-            Automated submodule bump from .github/workflows/update_tf.yml
+            Automated submodule bump from .github/workflows/update_llvm_dependent_submodules.yml
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
           branch: "auto_submodule_update"
