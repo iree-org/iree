@@ -30,8 +30,12 @@ class ConvTransposeModule(tf.Module):
     input_sizes = [1, 1, 264, 16]
     strides = [1, 1, 8, 1]
     padding = "VALID"
-    return tf.nn.conv2d_transpose(
-        out_backprop, filt, input_sizes, strides, padding, name="result")
+    return tf.nn.conv2d_transpose(out_backprop,
+                                  filt,
+                                  input_sizes,
+                                  strides,
+                                  padding,
+                                  name="result")
 
 
 class ConvTransposeTest(tf_test_utils.TracedModuleTestCase):
