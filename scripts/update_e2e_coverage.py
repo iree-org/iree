@@ -209,7 +209,7 @@ def generate_table(test_suite):
   # Generate the coverage table as a 2D array.
   rows = [first_row, second_row]
   for row_id, backends in sorted(table.items()):
-    # If the reference backend if failing then there is no reason to show the
+    # If the reference backend is failing then there is no reason to show the
     # coverage of the other backends.
     if not backends[ordered_backends.index(REFERENCE_BACKEND)]:
       continue

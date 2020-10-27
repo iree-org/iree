@@ -375,6 +375,27 @@ iree_py_binary(
 )
 
 # Keyword Spotting Tests:
+KEYWORD_SPOTTING_MODELS = [
+    "svdf",
+    "svdf_resnet",
+    "ds_cnn",
+    "gru",
+    "lstm",
+    "cnn_stride",
+    "cnn",
+    "tc_resnet",
+    "crnn",
+    "dnn",
+    "att_rnn",
+    "att_mh_rnn",
+    "mobilenet",
+    "mobilenet_v2",
+    "xception",
+    "inception",
+    "inception_resnet",
+    "ds_tc_resnet",
+]
+
 iree_e2e_cartesian_product_test_suite(
     name = "keyword_spotting_tests",
     srcs = ["keyword_spotting_streaming_test.py"],
@@ -401,24 +422,7 @@ iree_e2e_cartesian_product_test_suite(
     flags_to_values = {
         "reference_backend": "tf",
         "mode": "non_streaming",
-        "model": [
-            "svdf",
-            "ds_cnn",
-            "gru",
-            "lstm",
-            "cnn_stride",
-            "cnn",
-            "tc_resnet",
-            "crnn",
-            "dnn",
-            "att_rnn",
-            "att_mh_rnn",
-            "mobilenet",
-            "mobilenet_v2",
-            "inception",
-            "inception_resnet",
-            "ds_tc_resnet",
-        ],
+        "model": KEYWORD_SPOTTING_MODELS,
         "target_backends": [
             "tf",
             "tflite",
@@ -442,7 +446,7 @@ iree_e2e_cartesian_product_test_suite(
             "target_backends": "tflite",
         },
         {
-            # These models do not support streaming.
+            # These models do not currently support streaming.
             "model": [
                 "att_mh_rnn",
                 "att_rnn",
@@ -469,26 +473,7 @@ iree_e2e_cartesian_product_test_suite(
     flags_to_values = {
         "reference_backend": "tf",
         "mode": "internal_streaming",
-        "model": [
-            "svdf",
-            "svdf_resnet",
-            "ds_cnn",
-            "gru",
-            "lstm",
-            "cnn_stride",
-            "cnn",
-            "tc_resnet",
-            "crnn",
-            "dnn",
-            "att_rnn",
-            "att_mh_rnn",
-            "mobilenet",
-            "mobilenet_v2",
-            "xception",
-            "inception",
-            "inception_resnet",
-            "ds_tc_resnet",
-        ],
+        "model": KEYWORD_SPOTTING_MODELS,
         "target_backends": [
             "tf",
             "tflite",
