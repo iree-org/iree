@@ -14,8 +14,8 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -87,7 +87,7 @@ class ResolveEntryPointOrdinalsPass
     OwningRewritePatternList patterns;
     patterns.insert<ResolveCommandBufferDispatchOrdinals>(context);
     patterns.insert<ResolveCommandBufferDispatchIndirectOrdinals>(context);
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

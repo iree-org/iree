@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     MLIRIR
     MLIRPass
-    MLIRSCFToStandard
+    MLIRTransformUtils
     tensorflow::mlir_hlo
   PUBLIC
 )

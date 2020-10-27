@@ -14,8 +14,8 @@
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -203,7 +203,7 @@ void ConvImg2ColMatmulConversionPass::runOnFunction() {
   auto context = funcOp.getContext();
   OwningRewritePatternList patterns;
   populateConvImg2ColMatmulConversionPatterns(context, patterns);
-  applyPatternsAndFoldGreedily(funcOp, patterns);
+  applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 std::unique_ptr<FunctionPass> createConvImg2ColMatmulConversionPass() {

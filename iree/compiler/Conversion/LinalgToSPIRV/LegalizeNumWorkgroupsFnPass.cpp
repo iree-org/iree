@@ -26,6 +26,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -94,6 +95,7 @@ void LegalizeNumWorkgroupsFnPass::runOnOperation() {
   MLIRContext *context = &getContext();
   populateLegalizeNumWorkgroupsFnPattern(context, patterns);
 
+  FrozenRewritePatternList frozenPatterns(std::move(patterns));
   SymbolTable symbolTable(module.getOperation());
   for (FuncOp fn : fns) {
     if (!isEntryPoint(fn)) continue;
@@ -107,7 +109,7 @@ void LegalizeNumWorkgroupsFnPass::runOnOperation() {
           << numWorkgroupsFnName;
       return signalPassFailure();
     }
-    if (failed(applyPatternsAndFoldGreedily(numWorkgroupsFn, patterns)))
+    if (failed(applyPatternsAndFoldGreedily(numWorkgroupsFn, frozenPatterns)))
       return signalPassFailure();
   }
 }

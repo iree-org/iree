@@ -145,7 +145,8 @@ struct ConvertHLOToLinalgOnTensorsPass
     // Let the rest fall through.
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-    if (failed(applyPartialConversion(getFunction(), target, patterns))) {
+    if (failed(applyPartialConversion(getFunction(), target,
+                                      std::move(patterns)))) {
       signalPassFailure();
     }
   }
