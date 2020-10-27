@@ -33,6 +33,9 @@ set -e
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
 # for further details about the Vulkan loader and ICDs.
 
+SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
+SWIFTSHADER_DIR=/tmp/swiftshader_install
+
 # Check that we're in the project root so our relative paths work as expected.
 if [[ $(basename "$PWD") != "iree" ]]; then
     >&2 echo "******************************************************"
@@ -41,12 +44,27 @@ if [[ $(basename "$PWD") != "iree" ]]; then
     exit 1
 fi
 
+#  Clone swiftshader and checkout the appropriate commit.
+if [[ ! -d "/tmp/swiftshader_install" ]]; then
+  git clone https://github.com/google/swiftshader "${SWIFTSHADER_DIR?}"
+fi
+IREE_DIR=$(pwd)
+cd "${SWIFTSHADER_DIR?}"
+git pull origin master --ff-only
+git checkout "${SWIFTSHADER_COMMIT?}"
+cd "${IREE_DIR?}"
+
 # Generate build system in build-swiftshader/ for third_party/swiftshader/.
 #
 # Options:
 #   - 64 bit platform and host compiler
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
+
+if [[ -d "build-swiftshader" ]]; then
+  rm -rf build-swiftshader/
+fi
+
 cmake -B build-swiftshader/ \
     -GNinja \
     -DSWIFTSHADER_BUILD_VULKAN=ON \
@@ -55,7 +73,7 @@ cmake -B build-swiftshader/ \
     -DSWIFTSHADER_BUILD_GLES_CM=OFF \
     -DSWIFTSHADER_BUILD_PVR=OFF \
     -DSWIFTSHADER_BUILD_TESTS=OFF \
-    third_party/swiftshader/
+    "${SWIFTSHADER_DIR?}"
 
 # Build the project, choosing just the vk_swiftshader target.
 cmake --build build-swiftshader/ --config Release --target vk_swiftshader
