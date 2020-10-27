@@ -37,6 +37,10 @@ BACKENDS_TO_TITLES = collections.OrderedDict([
     ('iree_vulkan', 'vulkan-spirv'),
 ])
 
+KWS_LINK = (
+    'https://github.com/google-research/google-research/tree/master/kws_streaming'
+)
+KWS_LINK = f'[Keyword Spotting Streaming]({KWS_LINK})'
 TEST_SUITES_TO_HEADERS = {
     '//integrations/tensorflow/e2e:e2e_tests':
         'End to end TensorFlow tests',
@@ -44,6 +48,10 @@ TEST_SUITES_TO_HEADERS = {
         'End to end test of MobileBert on SQuAD',
     '//integrations/tensorflow/e2e/keras:keras_tests':
         'End to end tests written using tf.keras',
+    '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
+        f'End to end tests of {KWS_LINK} models',
+    '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
+        f'End to end tests of {KWS_LINK} models in internal streaming mode',
     '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
         'End to end tests of tf.keras.applications vision models on Imagenet',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
@@ -53,6 +61,10 @@ TEST_SUITES_TO_HEADERS = {
 # Key to use as the name of the rows in the left column for each test in the
 # suite.
 TEST_SUITE_TO_ROW_ID_KEY = {
+    '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
+        'model',
+    '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
+        'model',
     '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
         'model',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
@@ -62,6 +74,10 @@ TEST_SUITE_TO_ROW_ID_KEY = {
 # Some test suites are generated from a single source. This allows us to point
 # to the right test file when generating test URLs.
 SINGLE_SOURCE_SUITES = {
+    '//integrations/tensorflow/e2e/keras:keyword_spotting_tests':
+        'keyword_spotting_streaming_test',
+    '//integrations/tensorflow/e2e/keras:keyword_spotting_internal_streaming_tests':
+        'keyword_spotting_streaming_test',
     '//integrations/tensorflow/e2e/keras:imagenet_external_tests':
         'vision_model_test',
     '//integrations/tensorflow/e2e/slim_vision_models:slim_vision_tests':
