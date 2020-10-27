@@ -18,9 +18,11 @@ iree_cc_library(
   NAME
     CodegenUtils
   HDRS
+    "ForOpCanonicalization.h"
     "FunctionUtils.h"
     "MatmulCodegenStrategy.h"
   SRCS
+    "ForOpCanonicalization.cpp"
     "FunctionUtils.cpp"
     "MatmulCodegenStrategy.cpp"
   DEPS

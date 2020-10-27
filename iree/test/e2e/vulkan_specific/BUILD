@@ -53,7 +53,7 @@ iree_check_single_backend_test_suite(
         "log_plus_one.mlir",
         "pw_add_multiwg.mlir",
     ],
-    compiler_flags = ["-iree-spirv-use-vector-pass"],
+    compiler_flags = ["-iree-spirv-use-vectorize-memref-pass"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

@@ -256,10 +256,10 @@ const char *getTargetEnvForTriple(llvm::StringRef triple) {
          mSize = 8: i32, nSize = 8: i32, kSize = 32: i32, aType = i8,
          bType = i8, cType = i32, resultType = i32, scope = 3: i32
        }, {
-         mSize = 8: i32, nSize = 8: i32, kSize = 16: i32, aType = f16,
+         mSize = 16: i32, nSize = 16: i32, kSize = 16: i32, aType = f16,
          bType = f16, cType = f16, resultType = f16, scope = 3: i32
        }, {
-         mSize = 8: i32, nSize = 8: i32, kSize = 16: i32, aType = f16,
+         mSize = 16: i32, nSize = 16: i32, kSize = 16: i32, aType = f16,
          bType = f16, cType = f32, resultType = f32, scope = 3: i32
        }]
     }>)";

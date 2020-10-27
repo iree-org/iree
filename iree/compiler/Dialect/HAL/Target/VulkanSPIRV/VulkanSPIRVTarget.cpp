@@ -48,10 +48,10 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
-  static llvm::cl::opt<bool> clUseVectorPass(
-      "iree-spirv-use-vector-pass",
+  static llvm::cl::opt<bool> clUseVectorizeMemrefPass(
+      "iree-spirv-use-vectorize-memref-pass",
       llvm::cl::desc(
-          "Enable use of Linalg vectorization in SPIR-V code generation"),
+          "Enable use of Memref vectorization in SPIR-V code generation"),
       llvm::cl::init(false));
 
   static llvm::cl::opt<bool> clUseWorkgroupMemory(
@@ -87,7 +87,8 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   targetOptions.codegenOptions.tileSizes.assign(clTileSizes.begin(),
                                                 clTileSizes.end());
   targetOptions.codegenOptions.useWorkgroupMemory = clUseWorkgroupMemory;
-  targetOptions.codegenOptions.useVectorPass = clUseVectorPass;
+  targetOptions.codegenOptions.useVectorizeMemrefPass =
+      clUseVectorizeMemrefPass;
   if (!clVulkanTargetEnv.empty()) {
     targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   } else {

@@ -378,8 +378,11 @@ static void populateTilingToSubgroupPatterns(
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(subgroupDistributionOptions),
-      linalg::LinalgMarker(Identifier::get(getWorkgroupMarker(), context),
-                           Identifier::get(getVectorizeMarker(), context)));
+      linalg::LinalgMarker(
+          /*matchDisjunction=*/{Identifier::get(getWorkgroupMemoryMarker(),
+                                                context),
+                                Identifier::get(getWorkgroupMarker(), context)},
+          /*replacement=*/Identifier::get(getVectorizeMarker(), context)));
 }
 
 //====---------------------------------------------------------------------===//
@@ -403,6 +406,19 @@ static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
   AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   applyPatternsAndFoldGreedily(op, std::move(canonicalizationPatterns));
+}
+
+//====---------------------------------------------------------------------===//
+// Patterns for unrolling vectors.
+//====---------------------------------------------------------------------===//
+
+static void populateVectorUnrollPatterns(MLIRContext *context,
+                                         OwningRewritePatternList &patterns) {
+  patterns.insert<vector::UnrollVectorPattern<vector::ContractionOp>>(
+      context,
+      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorSize));
+  vector::populateVectorToVectorCanonicalizationPatterns(patterns, context);
+  vector::populateVectorToVectorTransformationPatterns(patterns, context);
 }
 
 void LinalgTileAndFusePass::runOnOperation() {
@@ -477,6 +493,12 @@ void LinalgTileAndFusePass::runOnOperation() {
       });
     }
 
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After First level of tile+distribute ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     if (options.useWorkgroupMemory) {
       // The promotion patterns are put separate from the tiling patterns to
       // make sure that the allocated scratchspace memory is constant sizes
@@ -485,20 +507,52 @@ void LinalgTileAndFusePass::runOnOperation() {
       populatePromotionPatterns(context, promotionPatterns);
       applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
       applyCanonicalizationPatterns(context, funcOp);
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After Promotion  ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     if (options.useVectorization) {
-      OwningRewritePatternList secondLevelTilingPatterns;
-      populateTilingToSubgroupPatterns(context, launchConfig,
-                                       secondLevelTilingPatterns);
-      applyPatternsAndFoldGreedily(funcOp,
-                                   std::move(secondLevelTilingPatterns));
-      applyCanonicalizationPatterns(context, funcOp);
+      {
+        OwningRewritePatternList secondLevelTilingPatterns;
+        populateTilingToSubgroupPatterns(context, launchConfig,
+                                         secondLevelTilingPatterns);
+        applyPatternsAndFoldGreedily(funcOp,
+                                     std::move(secondLevelTilingPatterns));
+        applyCanonicalizationPatterns(context, funcOp);
 
-      OwningRewritePatternList vectorizationPatterns;
-      populateVectorizationPatterns(context, launchConfig,
-                                    vectorizationPatterns);
-      applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After Second level Tiling  ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
+
+      {
+        OwningRewritePatternList vectorizationPatterns;
+        populateVectorizationPatterns(context, launchConfig,
+                                      vectorizationPatterns);
+        applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After Vectorization ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
+
+      {
+        OwningRewritePatternList vectorUnrollPatterns;
+        populateVectorUnrollPatterns(context, vectorUnrollPatterns);
+        applyPatternsAndFoldGreedily(funcOp, std::move(vectorUnrollPatterns));
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After Vector Unroll ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
     }
 
     launchConfig.finalize(funcOp);

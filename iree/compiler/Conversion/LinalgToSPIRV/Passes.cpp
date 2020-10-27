@@ -63,12 +63,18 @@ struct LinalgToSPIRVPassPipelineOptions
       llvm::cl::desc(
           "Enable use of vectorization in SPIR-V code generation pipeline"),
       llvm::cl::init(false)};
-  Option<bool> useVectorPass{
-      *this, "use-vector-pass",
-      llvm::cl::desc("Enable use of Linalg vectorization in SPIR-V code "
+  Option<bool> useVectorizeMemrefPass{
+      *this, "use-vectorize-memref-pass",
+      llvm::cl::desc("Enable use of Vector loads/stores in SPIR-V code "
                      "generation pipeline"),
       llvm::cl::init(false)};
+  Option<bool> useWorkgroupMemory{
+      *this, "use-workgroup-memory",
+      llvm::cl::desc(
+          "Enable use of workgroup memory in SPIR-V code generation pipeline"),
+      llvm::cl::init(false)};
 };
+}  // namespace
 
 static void addLinalgToSPIRVPasses(OpPassManager &pm,
                                    const SPIRVCodegenOptions &options) {
@@ -99,7 +105,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //===--------------------------------------------------------------------===//
   pm.addPass(createSplitDispatchFunctionPass());
   pm.addPass(createLinalgTileAndFusePass(options));
-  if (options.useVectorPass) {
+  if (options.useVectorizeMemrefPass) {
     pm.addPass(createLoadStoreVectorizationPass());
   }
   pm.addPass(createCanonicalizerPass());
@@ -113,6 +119,9 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   //   - Linalg ops are converted to loop.for ops and mapped to workitems.
   //===--------------------------------------------------------------------===//
   pm.addPass(createConvertToGPUPass());
+  if (options.useVectorization) {
+    pm.addPass(createVectorToGPUPass());
+  }
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -163,6 +172,11 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  if (options.useVectorization) {
+    pm.addPass(createVectorizeMemref());
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
+  }
 
   //===--------------------------------------------------------------------===//
   // Final conversion to SPIR-V dialect.
@@ -186,7 +200,6 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   spirvModulePM.addPass(createCSEPass());
   spirvModulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
-}  // namespace
 
 void buildSPIRVTransformPassPipeline(OpPassManager &pm,
                                      const SPIRVCodegenOptions &options) {
@@ -255,6 +268,8 @@ static SPIRVCodegenOptions initializeCodegenOptions(
     const LinalgToSPIRVPassPipelineOptions &options) {
   SPIRVCodegenOptions codegenOptions;
   codegenOptions.useVectorization = options.useVectorization;
+  codegenOptions.useWorkgroupMemory = options.useWorkgroupMemory;
+  codegenOptions.useVectorizeMemrefPass = options.useVectorizeMemrefPass;
   return codegenOptions;
 }
 
