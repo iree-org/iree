@@ -23,12 +23,14 @@ package(
 cc_library(
     name = "CodegenUtils",
     srcs = [
+        "ForOpCanonicalization.cpp",
         "FunctionUtils.cpp",
         "GetNumWorkgroups.cpp",
         "MarkerUtils.cpp",
         "MatmulCodegenStrategy.cpp",
     ],
     hdrs = [
+        "ForOpCanonicalization.h",
         "FunctionUtils.h",
         "GetNumWorkgroups.h",
         "MarkerUtils.h",
