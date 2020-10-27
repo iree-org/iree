@@ -31,6 +31,10 @@ class OperationFolder;
 class OpBuilder;
 class LogicalResult;
 
+namespace linalg {
+class LinalgOp;
+}
+
 namespace iree_compiler {
 
 static constexpr int kNumGPUDims = 3;
@@ -52,6 +56,12 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
 /// known to be greater than equal to the number of iteration of loops the
 /// copy is lowered to.
 LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst);
+
+/// Function to get number of outer parallel loops of a linalgOp
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
+
+/// Function to insert synchronization across workgroup.
+LogicalResult insertBarrier(OpBuilder &b, Location loc);
 
 class GPUGlobalId;
 class GPUGlobalCount;

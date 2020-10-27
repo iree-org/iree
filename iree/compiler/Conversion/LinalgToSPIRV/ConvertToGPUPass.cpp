@@ -609,9 +609,7 @@ struct MapLinalgOpToLocalInvocationId : public OpConversionPattern<LinalgOpTy> {
           return outputType &&
                  outputType.getMemorySpace() == getWorkgroupMemorySpace();
         })) {
-      rewriter.create<spirv::ControlBarrierOp>(
-          linalgOp.getLoc(), spirv::Scope::Workgroup, spirv::Scope::Workgroup,
-          spirv::MemorySemantics::AcquireRelease);
+      insertBarrier(rewriter, linalgOp.getLoc());
     }
     rewriter.eraseOp(linalgOp);
     return success();
@@ -716,9 +714,7 @@ struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
           return output.getType().cast<MemRefType>().getMemorySpace() ==
                  getWorkgroupMemorySpace();
         })) {
-      rewriter.create<spirv::ControlBarrierOp>(
-          linalgOp.getLoc(), spirv::Scope::Workgroup, spirv::Scope::Workgroup,
-          spirv::MemorySemantics::AcquireRelease);
+      insertBarrier(rewriter, linalgOp.getLoc());
     }
     rewriter.eraseOp(linalgOp);
     return success();

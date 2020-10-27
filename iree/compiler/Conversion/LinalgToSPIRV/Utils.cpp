@@ -25,6 +25,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Identifier.h"
@@ -63,6 +64,13 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
                                         ArrayRef<Value> boundingSubViewSize,
                                         OperationFolder *folder) {
+  OpBuilder::InsertionGuard guard(b);
+  FuncOp funcOp = subview.getParentOfType<FuncOp>();
+  if (!funcOp) {
+    subview.emitError("expected op to be within std.func");
+    return llvm::None;
+  }
+  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
   // The bounding subview size is expected to be constant. This specified the
   // shape of the allocation.
   SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
@@ -79,9 +87,28 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &b, SubViewOp subview,
 }
 
 LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  auto allocOp = buffer.getDefiningOp<AllocOp>();
-  b.create<DeallocOp>(allocOp.getLoc(), buffer);
+  // For now dont deallocate the memory. Only allocations of workgroup memory is
+  // handled, and handling deallocation for this isnt really needed.
+  MemRefType bufferType = buffer.getType().dyn_cast<MemRefType>();
+  if (!bufferType) return failure();
+  return success(bufferType.getMemorySpace() == getWorkgroupMemorySpace());
+}
+
+LogicalResult insertBarrier(OpBuilder &b, Location loc) {
+  b.create<spirv::ControlBarrierOp>(loc, spirv::Scope::Workgroup,
+                                    spirv::Scope::Workgroup,
+                                    spirv::MemorySemantics::AcquireRelease);
   return success();
+}
+
+unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while([](Attribute attr) -> bool {
+        return attr.cast<StringAttr>().getValue() ==
+               getParallelIteratorTypeName();
+      })
+      .size();
 }
 
 template <typename GPUIdOp, typename GPUCountOp>

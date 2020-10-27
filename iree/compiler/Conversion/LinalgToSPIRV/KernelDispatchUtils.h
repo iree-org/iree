@@ -39,6 +39,7 @@ class ShapedType;
 class Value;
 
 namespace linalg {
+class LinalgDependenceGraph;
 class LinalgOp;
 }  // namespace linalg
 namespace iree_compiler {
@@ -95,7 +96,9 @@ class LaunchConfig {
   /// - tile sizes for each level,
   /// - the workgroup size, and
   /// - number of subgroups to use.
-  LogicalResult init(MLIRContext *context, const SPIRVCodegenOptions &options,
+  LogicalResult init(MLIRContext *context,
+                     const linalg::LinalgDependenceGraph &dependenceGraph,
+                     const SPIRVCodegenOptions &options,
                      ArrayRef<Operation *> linalgOps);
 
   /// Remove attributed added to operations for retrieving tile size

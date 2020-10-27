@@ -108,6 +108,18 @@ struct LinalgTileAndFusePass
 };
 }  // namespace
 
+/// Apply canonicalizations related to tiling to make promotion/vectorization
+/// easier.
+static LogicalResult applyCanonicalizationPatterns(MLIRContext *context,
+                                                   Operation *op) {
+  OwningRewritePatternList canonicalizationPatterns;
+  canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
+  AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
+  return applyPatternsAndFoldGreedily(op, canonicalizationPatterns);
+}
+
 //===----------------------------------------------------------------------===//
 // Patterns to tile computation to map to workgroups.
 //===----------------------------------------------------------------------===//
@@ -122,127 +134,324 @@ static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
      linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
 
-namespace {
-/// Pattern for tiling operations. Updates the workgroup size in the surrounding
-/// function operation if tiling succeeds, and generates the function that
-/// computes the number of workgroups for the launch.
-template <typename LinalgOpTy>
-struct TileToWorkgroupsPattern : public linalg::LinalgBaseTilingPattern {
-  using Base = linalg::LinalgBaseTilingPattern;
-  TileToWorkgroupsPattern(MLIRContext *context,
-                          const linalg::LinalgDependenceGraph &dependenceGraph,
-                          linalg::LinalgTilingOptions options,
-                          linalg::LinalgMarker marker,
-                          const LaunchConfig &launchConfig,
-                          PatternBenefit benefit = 1)
-      : Base(LinalgOpTy::getOperationName(), context, options, marker, benefit),
-        dependenceGraph(dependenceGraph),
-        launchConfig(launchConfig) {}
+/// Returns true if the two maps have identical result exprs. One map might have
+/// a different dimensionality compared to another, but it is assumed that the
+/// dimension correspond exactly.
+static bool indexingMapsMatch(AffineMap lhs, AffineMap rhs) {
+  ArrayRef<AffineExpr> lhsResults = lhs.getResults();
+  ArrayRef<AffineExpr> rhsResults = rhs.getResults();
+  if (lhsResults.size() != rhsResults.size()) return false;
+  for (unsigned i = 0, e = lhs.getNumResults(); i != e; ++i) {
+    if (lhsResults[i] != rhsResults[i]) return false;
+  }
+  return true;
+}
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    // Find the parent FuncOp before tiling. If tiling succeeds, the op will be
-    // erased.
-    FuncOp funcOp = op->getParentOfType<FuncOp>();
-    SmallVector<Value, 4> tensorResults;
-    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
-    if (!funcOp || dependenceGraph.hasDependentOperations(linalgOp) ||
-        failed(Base::matchAndRewriteBase(op, rewriter, tensorResults)) ||
-        !tensorResults.empty() ||
-        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
-        (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
-         failed(createNumWorkgroupsFromResultShape(
-             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
-      return failure();
-    }
-    setMarker(op, getDeleteMarker());
+/// Inserts barrier between producer and consumer if the data crosses thread
+/// boundary, i.e. if the data is produced by one thread and consumer by the
+/// same thread, no barrier is inserted.
+static LogicalResult insertBarrier(linalg::LinalgOp producer,
+                                   unsigned producerIdx,
+                                   linalg::LinalgOp consumer,
+                                   unsigned consumerIdx, OpBuilder &builder) {
+  if (indexingMapsMatch(producer.getOutputIndexingMap(producerIdx),
+                        consumer.getIndexingMap(consumerIdx)))
     return success();
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(consumer);
+  return insertBarrier(builder, consumer.getLoc());
+}
+
+static SubViewOp getPromotedSubviewOfSameSize(SubViewOp subView, Value source,
+                                              OpBuilder &builder) {
+  Value zero = builder.create<ConstantIndexOp>(subView.getLoc(), 0);
+  SmallVector<Value, 4> offsets(source.getType().cast<ShapedType>().getRank(),
+                                zero);
+  SmallVector<Value, 4> sizes =
+      subView.getOrCreateSizes(builder, subView.getLoc());
+  SmallVector<Value, 4> strides =
+      subView.getOrCreateStrides(builder, subView.getLoc());
+  return builder.create<SubViewOp>(subView.getLoc(), source, offsets, sizes,
+                                   strides);
+}
+
+/// Promotes the fused index to use workgroup memory.
+static LogicalResult promoteFusedView(linalg::LinalgOp producer,
+                                      unsigned producerIdx,
+                                      linalg::LinalgOp consumer,
+                                      unsigned consumerIdx,
+                                      OpBuilder &builder) {
+  if (!producer.hasBufferSemantics() || !consumer.hasBufferSemantics()) {
+    return consumer.emitError(
+        "promotion only possible for operations with buffer semantics");
   }
 
-  const linalg::LinalgDependenceGraph &dependenceGraph;
-  const LaunchConfig &launchConfig;
-};
-
-/// Pattern for tile + fuse of operations. Updates the workgroup size in the
-/// surrounding function operation if tiling succeeds, and generates the
-/// function that computes the number of workgroups for the launch..
-template <typename LinalgOpTy>
-struct TileAndFuseToWorkgroupsPattern
-    : public linalg::LinalgTileAndFusePattern<LinalgOpTy> {
-  using Base = linalg::LinalgTileAndFusePattern<LinalgOpTy>;
-  TileAndFuseToWorkgroupsPattern(
-      MLIRContext *context,
-      const linalg::LinalgDependenceGraph &dependenceGraph,
-      linalg::LinalgTilingOptions tilingOptions, linalg::LinalgMarker marker,
-      const LaunchConfig &launchConfig, PatternBenefit benefit = 1)
-      : Base(context, dependenceGraph, tilingOptions,
-             linalg::LinalgFusionOptions().setIndicesToFuse({2}), marker,
-             marker,
-             linalg::LinalgMarker(ArrayRef<Identifier>(),
-                                  Identifier::get(getDeleteMarker(), context)),
-             benefit),
-        dependenceGraph(dependenceGraph),
-        launchConfig(launchConfig) {}
-
-  virtual LogicalResult matchAndRewrite(Operation *op,
-                                        PatternRewriter &rewriter) const {
-    FuncOp funcOp = op->getParentOfType<FuncOp>();
-    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
-    if (!funcOp || !dependenceGraph.hasDependentOperations(linalgOp) ||
-        failed(Base::matchAndRewrite(op, rewriter)) ||
-        failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
-        (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
-         failed(createNumWorkgroupsFromResultShape(
-             rewriter, linalgOp, funcOp, launchConfig.getTileSizes(op, 0))))) {
-      return failure();
-    }
-    return success();
+  SubViewOp promotedConsumerSubview =
+      consumer.getShapedOperands()[consumerIdx].getDefiningOp<SubViewOp>();
+  if (!promotedConsumerSubview) {
+    return consumer.emitError("expected operand ")
+           << consumerIdx
+           << " to be result of a subview operation, possible attempt of "
+              "promotion without tiling";
   }
 
-  const linalg::LinalgDependenceGraph &dependenceGraph;
-  const LaunchConfig &launchConfig;
-};
-}  // namespace
+  MemRefType fusedProducerOperandType =
+      producer.getOutputShapedType(producerIdx).cast<MemRefType>();
+  if (fusedProducerOperandType.getMemorySpace() == getWorkgroupMemorySpace()) {
+    return producer.emitError("unhandled producer operand already promoted");
+  }
+  SubViewOp promotedProducerSubview =
+      producer.getOutputBuffers()[producerIdx].getDefiningOp<SubViewOp>();
+  if (!promotedProducerSubview) {
+    return producer.emitError("expected output ")
+           << producerIdx
+           << " to be result of a subview operation, possible attempt of "
+              "promotion without fusion";
+  }
 
-/// Populate patterns for first-level tiling.
-static void populateTilingToWorkgroupPatterns(
+  Optional<linalg::PromotionInfo> promotionInfo = llvm::None;
+
+  // If the view in the consumer has already been promoted, use the same source.
+  if (consumer.getShapedType(consumerIdx).cast<MemRefType>().getMemorySpace() ==
+      getWorkgroupMemorySpace()) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(producer);
+    promotionInfo = {promotedConsumerSubview.source(), promotedConsumerSubview};
+    SubViewOp subview = getPromotedSubviewOfSameSize(
+        promotedProducerSubview, promotionInfo->fullLocalView, builder);
+    producer.getOperation()->setOperand(producer.getNumInputs() + producerIdx,
+                                        subview.getResult());
+  } else {
+    promotionInfo = linalg::promoteSubviewAsNewBuffer(
+        builder, consumer.getLoc(), promotedConsumerSubview,
+        allocateWorkgroupMemory);
+    if (!promotionInfo) {
+      return consumer.emitError("failed to promote operand ")
+             << consumerIdx << " to new buffer";
+    }
+    consumer.getOperation()->setOperand(consumerIdx,
+                                        promotionInfo->partialLocalView);
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(producer);
+    SubViewOp subview = getPromotedSubviewOfSameSize(
+        promotedProducerSubview, promotionInfo->fullLocalView, builder);
+    producer.getOperation()->setOperand(producer.getNumInputs() + producerIdx,
+                                        subview.getResult());
+    deallocateWorkgroupMemory(builder, promotionInfo->fullLocalView);
+  }
+
+  return insertBarrier(producer, producerIdx, consumer, consumerIdx, builder);
+}
+
+/// Fuses operations in `fusableOps` that can be fused with the
+/// `tiledOp`. `fusableOps` is expected to be a sequence of linalg operations
+/// with buffer semantic. `linalgOp` is the original untiled operation of this
+/// op used to get dependence information from `dependenceGraph`. Note
+/// `fusableOps` expects the last entry to be `linalgOp`.
+static Optional<SmallVector<linalg::LinalgOp, 2>> fuseOperationChain(
+    linalg::LinalgOp linalgOp, linalg::LinalgOp tiledOp,
+    ArrayRef<Operation *> fusableOps,
+    const linalg::LinalgDependenceGraph &dependenceGraph, OpBuilder &builder,
+    bool doPromotion = true) {
+  SmallVector<linalg::LinalgOp, 2> fusedLinalgOps(fusableOps.size(), nullptr);
+  fusedLinalgOps.back() = tiledOp;
+  for (unsigned i = fusableOps.size() - 1; i > 0; i--) {
+    linalg::LinalgOp consumer = fusableOps[i];
+    linalg::LinalgOp tiledConsumer = fusedLinalgOps[i];
+    linalg::LinalgOp producer = fusableOps[i - 1];
+    Optional<linalg::LinalgDependenceGraph::LinalgDependenceGraphElem>
+        dependence = llvm::None;
+    for (auto it : dependenceGraph.getDependentOperationsInto(consumer)) {
+      if (it.dependentOpView.op == producer) {
+        dependence = it;
+        break;
+      }
+    }
+    if (!dependence) {
+      consumer.emitError(
+          "unable to find dependence information to previous operation in "
+          "chain");
+      return llvm::None;
+    }
+
+    Optional<unsigned> producerIdx =
+        producer.getIndexOfOutputBuffer(dependence->dependentOpView.view);
+    Optional<unsigned> consumerIdx =
+        consumer.getIndexOfShapedOperand(dependence->indexingView);
+    assert(producerIdx && consumerIdx &&
+           "unable to find index of the fused view in producer/consumer");
+    builder.setInsertionPoint(tiledConsumer);
+    edsc::ScopedContext context(builder, linalgOp.getLoc());
+    linalg::LinalgOp fusedOp =
+        fuse(builder, producer, *producerIdx, tiledConsumer, *consumerIdx);
+    fusedLinalgOps[i - 1] = fusedOp;
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After fusion ---\n";
+      linalgOp.getOperation()->getParentOp()->print(
+          llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    if (doPromotion) {
+      // Promote the shared view to use workgroup memory.
+      if (failed(promoteFusedView(fusedOp, *producerIdx, tiledConsumer,
+                                  *consumerIdx, builder))) {
+        return llvm::None;
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After promotion ---\n";
+      linalgOp.getOperation()->getParentOp()->print(
+          llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+  return fusedLinalgOps;
+}
+
+struct TiledAndFusedLinalgOp {
+  SmallVector<linalg::LinalgOp, 2> fusedOps;
+  SmallVector<Operation *, 8> fusedLoops;
+  SmallVector<SmallVector<Operation *, 8>, 2> unfusedLoops;
+};
+
+/// Tile + fuse the sequence of linalg operations in
+/// `linalgOps`. `numFusedLoops` is the number of fused inter-tile loops to
+/// generate assuming its valid to do so. `tileSizes` is a list of tile sizes to
+/// use for each of the operation in `linalgOps`.
+static Optional<TiledAndFusedLinalgOp> tileAndFuseLinalgOpsImpl(
     MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    const LaunchConfig &launchConfig, OwningRewritePatternList &patterns) {
-  // Function to compute first level tiling values.
-  std::function<SmallVector<Value, 4>(OpBuilder &, Operation *)>
-      getOuterTileSizeFn =
-          [&launchConfig](OpBuilder &builder,
-                          Operation *operation) -> SmallVector<Value, 4> {
-    ArrayRef<int64_t> tileSizes = launchConfig.getTileSizes(operation, 0);
-    if (tileSizes.empty()) return {};
-    SmallVector<Value, 4> tileSizesVal;
-    tileSizesVal.reserve(tileSizes.size());
-    for (auto val : tileSizes) {
-      tileSizesVal.push_back(
-          builder.create<ConstantIndexOp>(operation->getLoc(), val));
-    }
-    return tileSizesVal;
-  };
-  patterns.insert<TileAndFuseToWorkgroupsPattern<linalg::BatchMatmulOp>,
-                  TileAndFuseToWorkgroupsPattern<linalg::ConvOp>,
-                  TileAndFuseToWorkgroupsPattern<linalg::MatmulOp>,
-                  TileAndFuseToWorkgroupsPattern<linalg::PoolingMaxOp>,
-                  TileAndFuseToWorkgroupsPattern<linalg::PoolingMinOp>,
-                  TileAndFuseToWorkgroupsPattern<linalg::PoolingSumOp>,
-                  TileToWorkgroupsPattern<linalg::BatchMatmulOp>,
-                  TileToWorkgroupsPattern<linalg::ConvOp>,
-                  TileToWorkgroupsPattern<linalg::MatmulOp>,
-                  TileToWorkgroupsPattern<linalg::PoolingMaxOp>,
-                  TileToWorkgroupsPattern<linalg::PoolingMinOp>,
-                  TileToWorkgroupsPattern<linalg::PoolingSumOp>>(
-      context, dependenceGraph,
+    ArrayRef<Operation *> linalgOps, ArrayRef<ArrayRef<int64_t>> tileSizes,
+    unsigned numFusedLoops, bool doPromotion = true) {
+  assert(!linalgOps.empty());
+  assert(linalgOps.size() == tileSizes.size() &&
+         "expected as many tile sizes as ops");
+  OpBuilder builder(context);
+  linalg::LinalgOp lastLinalgOp = cast<linalg::LinalgOp>(linalgOps.back());
+
+  builder.setInsertionPoint(lastLinalgOp);
+
+  // First tile the last operation by the number of fused loops.
+  Optional<linalg::TiledLinalgOp> tiledOp = linalg::tileLinalgOp(
+      builder, lastLinalgOp,
       linalg::LinalgTilingOptions()
-          .setDistributionOptions(workgroupDistributionOptions)
-          .setTileSizeComputationFunction(getOuterTileSizeFn)
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops),
-      linalg::LinalgMarker(ArrayRef<Identifier>(),
-                           Identifier::get(getWorkgroupMarker(), context)),
-      launchConfig);
+          .setTileSizes(
+              ArrayRef<int64_t>(tileSizes.back()).take_front(numFusedLoops))
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setDistributionOptions(workgroupDistributionOptions));
+  if (!tiledOp) {
+    lastLinalgOp.emitError("failed to tile operation");
+    return llvm::None;
+  }
+  assert(tiledOp->tensorResults.empty() &&
+         "unexpected tensor results for tiled operation");
+
+  // Fuse the chain of linalg operations.
+  Optional<SmallVector<linalg::LinalgOp, 2>> fusedOps =
+      fuseOperationChain(lastLinalgOp, tiledOp->op, linalgOps, dependenceGraph,
+                         builder, doPromotion);
+  if (!fusedOps) {
+    return llvm::None;
+  }
+
+  TiledAndFusedLinalgOp tiledAndFusedOp;
+  tiledAndFusedOp.fusedLoops = tiledOp->loops;
+  tiledAndFusedOp.fusedOps = *fusedOps;
+
+  // Based on the tile sizes some of the loops that are not fused may need to be
+  // tiled as well. Do those now.
+  tiledAndFusedOp.unfusedLoops.resize(linalgOps.size());
+  auto makeUnfusedTileSizes = [&numFusedLoops](ArrayRef<int64_t> opTileSizes) {
+    SmallVector<int64_t, 4> tileSizes(opTileSizes.begin(), opTileSizes.end());
+    for (unsigned i : llvm::seq<unsigned>(
+             0, std::min<unsigned>(numFusedLoops, opTileSizes.size()))) {
+      tileSizes[i] = 0;
+    }
+    return tileSizes;
+  };
+
+  for (unsigned i : llvm::seq<unsigned>(0, tileSizes.size())) {
+    linalg::LinalgOp fusedOp = tiledAndFusedOp.fusedOps[i];
+    assert(fusedOp && "expected fused operation");
+    auto unfusedTileSize = makeUnfusedTileSizes(tileSizes[i]);
+    if (llvm::any_of(unfusedTileSize,
+                     [](int64_t size) -> bool { return size; })) {
+      OpBuilder::InsertionGuard insertionGuard(builder);
+      builder.setInsertionPoint(fusedOp);
+      Optional<linalg::TiledLinalgOp> unfusedTilingOp = linalg::tileLinalgOp(
+          builder, fusedOp,
+          linalg::LinalgTilingOptions()
+              .setTileSizes(unfusedTileSize)
+              .setLoopType(linalg::LinalgTilingLoopType::Loops));
+      if (!unfusedTilingOp) {
+        fusedOp.emitError("failed to tile unfused loops of fused op");
+        return llvm::None;
+      }
+      fusedOp.erase();
+      tiledAndFusedOp.fusedOps[i] = unfusedTilingOp->op;
+      tiledAndFusedOp.unfusedLoops[i] = unfusedTilingOp->loops;
+    }
+  }
+  return tiledAndFusedOp;
+}
+
+static LogicalResult tileAndFuseLinalgOps(
+    FuncOp funcOp, const linalg::LinalgDependenceGraph &dependenceGraph,
+    ArrayRef<Operation *> linalgOps, const LaunchConfig &launchConfig,
+    bool doPromotion = true) {
+  // Find the ops that are to be tiled and the op that forms the root operation.
+  linalg::LinalgOp rootOperation = nullptr;
+  for (Operation *op : linalgOps) {
+    if (isa<linalg::MatmulOp, linalg::ConvOp, linalg::PoolingMaxOp,
+            linalg::PoolingMinOp, linalg::PoolingSumOp>(op)) {
+      rootOperation = cast<linalg::LinalgOp>(op);
+      break;
+    }
+  }
+  // If there is no root operation, there is nothing to do
+  if (!rootOperation) return success();
+
+  unsigned numFusedLoops = getNumOuterParallelLoops(rootOperation);
+  SmallVector<ArrayRef<int64_t>, 4> tileSizes;
+  for (Operation *op : linalgOps) {
+    ArrayRef<int64_t> opTileSizes = launchConfig.getTileSizes(op, 0);
+    if (opTileSizes.size() < numFusedLoops) {
+      return op->emitError("invalid tile size for operation, need at least ")
+             << opTileSizes.size() << " to be able to fuse with root operation";
+    }
+    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
+    if (opTileSizes.size() > linalgOp.getNumLoops()) {
+      opTileSizes = opTileSizes.take_front(linalgOp.getNumLoops());
+    }
+    tileSizes.push_back(opTileSizes);
+  }
+  Optional<TiledAndFusedLinalgOp> tiledAndFused =
+      tileAndFuseLinalgOpsImpl(funcOp.getContext(), dependenceGraph, linalgOps,
+                               tileSizes, numFusedLoops, doPromotion);
+  if (!tiledAndFused) return failure();
+
+  // // Update the launch information.
+  // OpBuilder builder(funcOp.getContext());
+  // if (failed(updateWorkGroupSize(funcOp, launchConfig.getWorkgroupSize())) ||
+  //     (funcOp.getAttr(getNumWorkgroupsFnAttrName()) &&
+  //      failed(createNumWorkgroupsFromResultShape(
+  //          builder, rootOperation, funcOp,
+  //          launchConfig.getTileSizes(rootOperation, 0))))) {
+  //   return failure();
+  // }
+
+  // Mark the tiled and fused ops with "workgroup" marker.
+  for (auto fusedOp : tiledAndFused->fusedOps) {
+    setMarker(fusedOp, getWorkgroupMarker());
+  }
+  // Mark the original operations as to be deleted.
+  for (auto originalOp : linalgOps) {
+    setMarker(originalOp, getDeleteMarker());
+  }
+
+  return applyCanonicalizationPatterns(funcOp.getContext(), funcOp);
 }
 
 //===----------------------------------------------------------------------===//
@@ -396,17 +605,6 @@ static void populateVectorizationPatterns(MLIRContext *context,
       linalg::LinalgMarker(Identifier::get(getVectorizeMarker(), context)));
 }
 
-/// Apply canonicalizations related to tiling to make promotion/vectorization
-/// easier.
-static void applyCanonicalizationPatterns(MLIRContext *context, Operation *op) {
-  OwningRewritePatternList canonicalizationPatterns;
-  canonicalizationPatterns.insert<AffineMinCanonicalizationPattern>(context);
-  AffineApplyOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  AffineMinOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  SubViewOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  applyPatternsAndFoldGreedily(op, canonicalizationPatterns);
-}
-
 //====---------------------------------------------------------------------===//
 // Patterns for unrolling vectors.
 //====---------------------------------------------------------------------===//
@@ -449,7 +647,10 @@ void LinalgTileAndFusePass::runOnOperation() {
     LaunchConfig launchConfig;
     SmallVector<Operation *, 4> linalgOpsVec(linalgOps.begin(),
                                              linalgOps.end());
-    if (failed(launchConfig.init(context, options, linalgOpsVec))) {
+    linalg::Aliases aliases;
+    linalg::LinalgDependenceGraph dependenceGraph(aliases, linalgOpsVec);
+    if (failed(launchConfig.init(context, dependenceGraph, options,
+                                 linalgOpsVec))) {
       funcOp.emitError("unable to find launch configuration");
       return signalPassFailure();
     }
@@ -473,24 +674,17 @@ void LinalgTileAndFusePass::runOnOperation() {
       }
     });
 
-    {
-      // Compute the Linalg Dependence Graph.
-      linalg::Aliases aliases;
-      linalg::LinalgDependenceGraph dependenceGraph =
-          linalg::LinalgDependenceGraph::buildDependenceGraph(aliases, funcOp);
-
-      OwningRewritePatternList firstLevelTilingPatterns;
-      populateTilingToWorkgroupPatterns(context, dependenceGraph, launchConfig,
-                                        firstLevelTilingPatterns);
-      applyPatternsAndFoldGreedily(funcOp, firstLevelTilingPatterns);
-      applyCanonicalizationPatterns(context, funcOp);
-
-      // Delete the ops that are marked for deletion.
-      funcOp.walk([](linalg::LinalgOp linalgOp) {
-        if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
-          linalgOp.getOperation()->erase();
-      });
+    // Tile + fuse + promote to map to workgroups.
+    if (failed(tileAndFuseLinalgOps(funcOp, dependenceGraph, linalgOpsVec,
+                                    launchConfig))) {
+      return signalPassFailure();
     }
+
+    // Delete the ops that are marked for deletion.
+    funcOp.walk([](linalg::LinalgOp linalgOp) {
+      if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
+        linalgOp.getOperation()->erase();
+    });
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After First level of tile+distribute ---\n";
@@ -504,8 +698,11 @@ void LinalgTileAndFusePass::runOnOperation() {
       // which requires some folding to trigger.
       OwningRewritePatternList promotionPatterns;
       populatePromotionPatterns(context, promotionPatterns);
-      applyPatternsAndFoldGreedily(funcOp, promotionPatterns);
-      applyCanonicalizationPatterns(context, funcOp);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, promotionPatterns)) ||
+          failed(applyCanonicalizationPatterns(context, funcOp))) {
+        funcOp.emitError("promotion to workgroup memory failed");
+        return signalPassFailure();
+      }
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After Promotion  ---\n";
@@ -519,8 +716,12 @@ void LinalgTileAndFusePass::runOnOperation() {
         OwningRewritePatternList secondLevelTilingPatterns;
         populateTilingToSubgroupPatterns(context, launchConfig,
                                          secondLevelTilingPatterns);
-        applyPatternsAndFoldGreedily(funcOp, secondLevelTilingPatterns);
-        applyCanonicalizationPatterns(context, funcOp);
+        if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                                secondLevelTilingPatterns)) ||
+            failed(applyCanonicalizationPatterns(context, funcOp))) {
+          funcOp.emitError("second level of tiling failed");
+          return signalPassFailure();
+        }
 
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Second level Tiling  ---\n";
@@ -533,7 +734,12 @@ void LinalgTileAndFusePass::runOnOperation() {
         OwningRewritePatternList vectorizationPatterns;
         populateVectorizationPatterns(context, launchConfig,
                                       vectorizationPatterns);
-        applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns);
+        if (failed(
+                applyPatternsAndFoldGreedily(funcOp, vectorizationPatterns)) ||
+            failed(applyCanonicalizationPatterns(context, funcOp))) {
+          funcOp.emitError("vectorization failed");
+          return signalPassFailure();
+        }
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Vectorization ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -544,7 +750,12 @@ void LinalgTileAndFusePass::runOnOperation() {
       {
         OwningRewritePatternList vectorUnrollPatterns;
         populateVectorUnrollPatterns(context, vectorUnrollPatterns);
-        applyPatternsAndFoldGreedily(funcOp, vectorUnrollPatterns);
+        if (failed(
+                applyPatternsAndFoldGreedily(funcOp, vectorUnrollPatterns)) ||
+            failed(applyCanonicalizationPatterns(context, funcOp))) {
+          funcOp.emitError("unrolling vectors failed");
+          return signalPassFailure();
+        }
         LLVM_DEBUG({
           llvm::dbgs() << "--- After Vector Unroll ---\n";
           funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -554,11 +765,6 @@ void LinalgTileAndFusePass::runOnOperation() {
     }
 
     launchConfig.finalize(funcOp);
-    SmallVector<linalg::LinalgOp, 1> toDelete;
-    funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (hasMarker(linalgOp.getOperation(), getDeleteMarker()))
-        linalgOp.erase();
-    });
   }
 }
 
