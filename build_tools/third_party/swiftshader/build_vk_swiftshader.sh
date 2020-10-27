@@ -34,27 +34,19 @@ set -e
 # for further details about the Vulkan loader and ICDs.
 
 SWIFTSHADER_COMMIT=6287c18b1d249152563f0cb2d5cb0c6d0eb9e3d6
-SWIFTSHADER_DIR=/tmp/swiftshader_install
+SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
 
-# Check that we're in the project root so our relative paths work as expected.
-if [[ $(basename "$PWD") != "iree" ]]; then
-    >&2 echo "******************************************************"
-    >&2 echo "* This script should be run from IREE's project root *"
-    >&2 echo "******************************************************"
-    exit 1
-fi
+# Ensure that we're at the top level iree/ git directory.
+IREE_DIR="$(git rev-parse --show-toplevel)"
 
 #  Clone swiftshader and checkout the appropriate commit.
-if [[ ! -d "/tmp/swiftshader_install" ]]; then
-  git clone https://github.com/google/swiftshader "${SWIFTSHADER_DIR?}"
-fi
-IREE_DIR=$(pwd)
+git clone https://github.com/google/swiftshader "${SWIFTSHADER_DIR?}"
 cd "${SWIFTSHADER_DIR?}"
 git pull origin master --ff-only
 git checkout "${SWIFTSHADER_COMMIT?}"
 cd "${IREE_DIR?}"
 
-# Generate build system in build-swiftshader/ for third_party/swiftshader/.
+# Generate build system in build-swiftshader/
 #
 # Options:
 #   - 64 bit platform and host compiler
