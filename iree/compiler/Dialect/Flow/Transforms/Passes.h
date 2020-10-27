@@ -160,6 +160,18 @@ std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Simplification and Development Tools
+//===----------------------------------------------------------------------===//
+
+// Strips constant flow.variables and replaces them with splats.
+// This destructively removes data (often model weights and other parameters)
+// and is intended for use as a development tool.
+// TODO(scotttodd): pass pipeline with this and other development passes to
+//                  generate test cases / models suitable for check-in
+std::unique_ptr<OperationPass<ModuleOp>>
+createStripAndSplatConstantVariablesPass();
+
+//===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
@@ -183,6 +195,7 @@ inline void registerFlowPasses() {
   createCreateFuncsToInvokeExecOpsPass();
   createFormStreamsPass();
   createHoistUnstreamableOpsPass();
+  createStripAndSplatConstantVariablesPass();
 }
 
 }  // namespace Flow
