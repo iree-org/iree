@@ -42,11 +42,23 @@ class LLVMIRTargetBackend final : public LLVMBaseTargetBackend {
     // Perform the translation to LLVM in a separate context to avoid
     // multi-threading issues.
     llvm::LLVMContext context;
+    // Remove all private functions, e.g tile size calcuations.
+    SmallVector<FuncOp, 4> nonPublicFn;
+    for (auto func : targetOp.getInnerModule().getOps<FuncOp>()) {
+      if (SymbolTable::getSymbolVisibility(func) !=
+          SymbolTable::Visibility::Public) {
+        nonPublicFn.push_back(func);
+      }
+    }
+    for (auto func : nonPublicFn) {
+      func.erase();
+    }
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
     auto llvmModule =
         mlir::translateModuleToLLVMIR(targetOp.getInnerModule(), context);
+
     if (!llvmModule) {
       return targetOp.emitError("Failed to translate executable to LLVM IR");
     }

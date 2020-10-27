@@ -14,6 +14,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMBaseTarget.h"
 
+#include "iree/compiler/Conversion/CodegenUtils/GetNumWorkgroups.h"
+#include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -183,13 +185,78 @@ LogicalResult LLVMBaseTargetBackend::linkExecutables(mlir::ModuleOp moduleOp) {
   return success();
 }
 
-std::array<Value, 3> LLVMBaseTargetBackend::calculateDispatchWorkgroupCount(
-    Location loc, IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
-    OpBuilder &builder) {
-  // For now we are not tiling and just dispatch everything as 1,1,1.
-  auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-  return {constantOne, constantOne, constantOne};
+LogicalResult LLVMBaseTargetBackend::recordDispatch(
+    Location loc, DispatchState dispatchState,
+    DeviceSwitchRewriter &switchRewriter) {
+  IREE::HAL::ExecutableOp executableOp = dispatchState.executableOp;
+  ModuleOp llvmIRModuleOp;
+  for (auto executableTargetOp :
+       executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
+    if (matchPattern(executableTargetOp.target_backend_filter(),
+                     filter_pattern())) {
+      ModuleOp innerModuleOp = executableTargetOp.getInnerModule();
+      llvmIRModuleOp = innerModuleOp;
+      break;
+    }
+  }
+  if (!llvmIRModuleOp)
+    return executableOp.emitError("unable to find executable llvmIR module");
+
+  SmallVector<LLVM::LLVMFuncOp, 2> entryPointFns;
+  for (LLVM::LLVMFuncOp funcOp : llvmIRModuleOp.getOps<LLVM::LLVMFuncOp>()) {
+    if (SymbolTable::getSymbolVisibility(funcOp) ==
+        SymbolTable::Visibility::Public) {
+      entryPointFns.push_back(funcOp);
+    }
+  }
+
+  auto *region = switchRewriter.addConditionRegion(
+      IREE::HAL::DeviceMatchIDAttr::get(filter_pattern(), loc.getContext()),
+      {
+          dispatchState.workload,
+          dispatchState.commandBuffer,
+      });
+  auto &entryBlock = region->front();
+  ConversionPatternRewriter &rewriter = switchRewriter.getRewriter();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToEnd(&entryBlock);
+
+  auto commandBuffer = entryBlock.getArgument(1);
+  for (auto it : llvm::enumerate(entryPointFns)) {
+    LLVM::LLVMFuncOp funcOp = it.value();
+    FlatSymbolRefAttr numWorkgroupsFnAttr =
+        funcOp.getAttrOfType<FlatSymbolRefAttr>(getNumWorkgroupsFnAttrName());
+    if (!numWorkgroupsFnAttr) {
+      return funcOp.emitError("expected llvm.num_workgroups_fn ");
+    }
+    std::array<Value, 3> workgroupCount = {nullptr, nullptr, nullptr};
+    FuncOp numWorkgroupsFn = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
+        funcOp.getParentOfType<ModuleOp>(), numWorkgroupsFnAttr));
+    if (!numWorkgroupsFn) {
+      return funcOp.emitError("unable to find function ")
+             << numWorkgroupsFnAttr
+             << " that computes the number of workgroups to use";
+    }
+    workgroupCount =
+        iree_compiler::utils::calculateWorkgroupCountFromNumWorkgroupsFn(
+            loc, numWorkgroupsFn,
+            dispatchState.executableOp.getFirstInterfaceOp(),
+            dispatchState.operands, dispatchState.results, rewriter);
+
+    if (llvm::any_of(workgroupCount,
+                     [](Value v) -> bool { return v == nullptr; })) {
+      auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+      rewriter.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
+          loc, commandBuffer, dispatchState.entryPointOp, constantOne,
+          constantOne, constantOne);
+    } else {
+      rewriter.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
+          loc, commandBuffer, dispatchState.entryPointOp, workgroupCount[0],
+          workgroupCount[1], workgroupCount[2]);
+    }
+  }
+  rewriter.create<IREE::HAL::ReturnOp>(loc);
+  return success();
 }
 
 }  // namespace HAL

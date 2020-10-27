@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Utilities for working with IREE MLIR types.
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -21,36 +19,23 @@ package(
 )
 
 cc_library(
-    name = "CodegenUtils",
+    name = "Common",
     srcs = [
-        "FunctionUtils.cpp",
-        "GetNumWorkgroups.cpp",
-        "MarkerUtils.cpp",
-        "MatmulCodegenStrategy.cpp",
+        "DeclareNumWorkgroupsFnPass.cpp",
+        "LegalizeNumWorkgroupsFnPass.cpp",
     ],
     hdrs = [
-        "FunctionUtils.h",
-        "GetNumWorkgroups.h",
-        "MarkerUtils.h",
-        "MatmulCodegenStrategy.h",
+        "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Conversion/CodegenUtils",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//iree/compiler/Dialect/HAL/Utils",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
-        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorOps",
-        "@llvm-project//mlir:VectorToSCF",
+        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
     ],
 )

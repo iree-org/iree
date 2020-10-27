@@ -23,14 +23,19 @@ cc_library(
     srcs = [
         "ConvImg2ColMatmulConversion.cpp",
         "ConvertToLLVM.cpp",
+        "KernelDispatch.cpp",
+        "LinalgTileAndDistributePass.cpp",
         "MatMulVectorization.cpp",
         "Passes.cpp",
     ],
     hdrs = [
+        "Attributes.h",
+        "KernelDispatch.h",
         "Passes.h",
     ],
     deps = [
         "//iree/compiler/Conversion/CodegenUtils",
+        "//iree/compiler/Conversion/Common",
         "//iree/compiler/Conversion/HLOToHLO",
         "//iree/compiler/Conversion/HLOToLinalg",
         "//iree/compiler/Dialect/HAL/IR",
@@ -43,6 +48,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",

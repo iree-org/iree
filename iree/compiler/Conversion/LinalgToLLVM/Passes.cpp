@@ -14,7 +14,9 @@
 
 #include "iree/compiler/Conversion/HLOToLinalg/Passes.h"
 
+#include "iree/compiler/Conversion/Common/Passes.h"
 #include "iree/compiler/Conversion/HLOToHLO/Passes.h"
+#include "iree/compiler/Conversion/LinalgToLLVM/Attributes.h"
 #include "iree/compiler/Conversion/LinalgToLLVM/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -32,7 +34,19 @@ static llvm::cl::opt<bool> convImg2ColConversion(
                    "linag.matmul"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> llvmLinalgTileAndDistributePass(
+    "iree-codegen-linalg-to-llvm-tile-and-distrobute",
+    llvm::cl::desc("Tile and distribute linalg ops among iree threads"),
+    llvm::cl::init(false));
+
 void addLinalgToLLVMPasses(OpPassManager &passManager) {
+  // Distribute linalg op among a 3d grid of parallel threads.
+  if (llvmLinalgTileAndDistributePass) {
+    passManager.addPass(createLinalgTileAndDistributePass());
+    passManager.addPass(common::createLegalizeNumWorkgroupsFnPass(
+        getNumWorkgroupsFnAttrName()));
+  }
+
   // Linalg.ConvOp -> (Img2Col packing + matmul)
   if (convImg2ColConversion) {
     passManager.addPass(createConvImg2ColMatmulConversionPass());
@@ -57,6 +71,9 @@ void addLinalgToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(
+      common::createDeclareNumWorkgroupsFnPass(getNumWorkgroupsFnAttrName()));
+
   passManager.addPass(createInlinerPass());
 
   // Propagates dynamic shapes computation on tensors.

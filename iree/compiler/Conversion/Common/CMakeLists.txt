@@ -14,28 +14,23 @@
 
 iree_add_all_subdirs()
 
-iree_check_single_backend_test_suite(
+iree_cc_library(
   NAME
-    check_llvm-ir-conv_img2col
+    Common
+  HDRS
+    "Passes.h"
   SRCS
-    "conv.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-conv-img2col-conversion"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-ir-dot_tile_and_distribute
-  SRCS
-    "dot.mlir"
-  TARGET_BACKEND
-    llvm-ir
-  DRIVER
-    llvm
-  COMPILER_FLAGS
-    "-iree-codegen-linalg-to-llvm-tile-and-distrobute"
+    "DeclareNumWorkgroupsFnPass.cpp"
+    "LegalizeNumWorkgroupsFnPass.cpp"
+  DEPS
+    MLIRIR
+    MLIRPass
+    MLIRSCFToStandard
+    MLIRStandard
+    iree::compiler::Conversion::CodegenUtils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    tensorflow::mlir_hlo
+  PUBLIC
 )
