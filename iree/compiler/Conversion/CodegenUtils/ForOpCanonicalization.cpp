@@ -80,8 +80,7 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
     rewriter.mergeBlocks(source, dest, dest->getArguments());
     // Replace the yield op by one that returns only the used values.
     auto yieldOp = cast<scf::YieldOp>(dest->getTerminator());
-    rewriter.updateRootInPlace(
-        yieldOp, [&]() { yieldOp.getOperation()->setOperands(results); });
+    yieldOp.getOperation()->setOperands(results);
   }
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
@@ -103,7 +102,7 @@ class ForOpArgFolding final : public OpRewritePattern<scf::ForOp> {
       returnValues[it.index()] = newReturn;
 
       BlockAndValueMapping mapping;
-      mapping.map(op->getOperand(0), initArgs[it.index()]);
+      mapping.map(it.value(), initArgs[it.index()]);
       initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
     }
     if (iteratorFolded.empty()) return success();
