@@ -47,19 +47,12 @@ def FLOW_VariableOp : FLOW_Op<"variable", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, StringRef name,
-      bool isMutable, FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}
-    }]>,
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, StringRef name,
-      bool isMutable, Type type, Attribute initialValue,
-      ArrayRef<NamedAttribute> attrs = {}
-    }]>,
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, StringRef name, bool isMutable,
-      Type type, ArrayRef<NamedAttribute> attrs = {}
-    }]>,
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable,
+      "FuncOp":$initializer, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+      "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    OpBuilderDAG<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
   let verifier = [{ return verifyVariableOp(*this); }];
@@ -236,11 +229,8 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &state, ArrayRef<Type> resultTypes,
-      Value workload, ValueRange args,
-      ArrayRef<NamedAttribute> attributes = {}
-    }]>,
+    OpBuilderDAG<(ins "ArrayRef<Type>":$resultTypes, "Value":$workload,
+      "ValueRange":$args, CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
   let hasCanonicalizer = 1;
@@ -259,10 +249,9 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result
-    }], [{
-      build(builder, result, llvm::None);
+    OpBuilderDAG<(ins),
+    [{
+      build($_builder, $_state, llvm::None);
     }]>,
   ];
 }
@@ -293,9 +282,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &state, StringRef name
-    }]>,
+    OpBuilderDAG<(ins "StringRef":$name)>,
   ];
 
   let extraClassDeclaration = [{
@@ -359,10 +346,8 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, DispatchEntryOp entryPoint,
-      Value workload, ArrayRef<Type> results, ValueRange operands = {}
-    }]>,
+    OpBuilderDAG<(ins "DispatchEntryOp":$entryPoint, "Value":$workload,
+      "ArrayRef<Type>":$results, CArg<"ValueRange", "{}">:$operands)>,
   ];
 
   let extraClassDeclaration = [{
@@ -643,10 +628,8 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &state, ArrayRef<Type> resultTypes,
-      ValueRange args, ArrayRef<NamedAttribute> attributes = {}
-    }]>,
+    OpBuilderDAG<(ins "ArrayRef<Type>":$resultTypes, "ValueRange":$args,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
   let hasCanonicalizer = 1;

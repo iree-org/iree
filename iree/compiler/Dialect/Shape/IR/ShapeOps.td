@@ -130,9 +130,7 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
   let builders = [
     // Short-hand for building with a shape equivalent to the tensor operand
     // and 'index' dim type.
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, Value operand
-    }]>,
+    OpBuilderDAG<(ins "Value":$operand)>,
   ];
 
   let extraClassDeclaration = [{
@@ -208,9 +206,7 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, Type type
-      }]>,
+    OpBuilderDAG<(ins "Type":$type)>,
   ];
   let verifier = [{ return verify$cppClass(*this); }];
 }
@@ -258,15 +254,9 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
   let verifier = [{ return verify$cppClass(*this); }];
 
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result,
-      Type dimType, Value shape, int index
-    }]>,
+    OpBuilderDAG<(ins "Type":$dimType, "Value":$shape, "int":$index)>,
     // dimType is defaulted to IndexType.
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result,
-      Value shape, int index
-    }]>,
+    OpBuilderDAG<(ins "Value":$shape, "int":$index)>,
   ];
 
   let extraClassDeclaration = [{
@@ -297,12 +287,8 @@ def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
   let assemblyFormat = "$shape `:` type($shape) `->` type($result) attr-dict";
 
   let builders = [
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, Type dimType, Value shape
-    }]>,
-    OpBuilder<[{
-      OpBuilder &builder, OperationState &result, Value shape
-    }]>,
+    OpBuilderDAG<(ins "Type":$dimType, "Value":$shape)>,
+    OpBuilderDAG<(ins "Value":$shape)>,
   ];
 
   let extraClassDeclaration = [{

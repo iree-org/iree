@@ -40,7 +40,8 @@ def TFStrings_ToStringOp : TFStrings_Op<"to_string"> {
   }];
   let arguments = (ins TFStrings_Value: $arguments);
   let results = (outs TFStrings_String: $result);
-  let builders = [OpBuilder<"Value value">];
+  let builders = [
+    OpBuilderDAG<(ins "Value":$value)>];
 }
 
 def TFStrings_ToStringTensorOp : TFStrings_Op<"to_string_tensor"> {
@@ -50,7 +51,8 @@ def TFStrings_ToStringTensorOp : TFStrings_Op<"to_string_tensor"> {
   }];
   let arguments = (ins TFStrings_ValueTensor: $arguments);
   let results = (outs TFStrings_StringTensor: $result);
-  let builders = [OpBuilder<"Value value">];
+  let builders = [
+    OpBuilderDAG<(ins "Value":$value)>];
 }
 
 def TFStrings_StringTensorToStringOp : TFStrings_Op<"string_tensor_to_string"> {
@@ -60,7 +62,8 @@ def TFStrings_StringTensorToStringOp : TFStrings_Op<"string_tensor_to_string"> {
   }];
   let arguments = (ins TFStrings_StringTensor: $arguments);
   let results = (outs TFStrings_String: $result);
-  let builders = [OpBuilder<"Value value">];
+  let builders = [
+    OpBuilderDAG<(ins "Value":$value)>];
 }
 
 #endif  // TFSTRINGS
