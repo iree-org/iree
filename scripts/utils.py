@@ -54,15 +54,16 @@ def get_test_targets(test_suite_path: str):
   # unfortunately the same as the return code for a bazel configuration error.
   target_dir = test_suite_path.split(':')[0]
   query = [
-      'bazel', 'query', '--noshow_loading_progress', '--noshow_progress',
-      f'{target_dir}/...'
+      'bazel', 'query', '--ui_event_filters=-DEBUG',
+      '--noshow_loading_progress', '--noshow_progress', f'{target_dir}/...'
   ]
   targets = check_and_get_output_lines(query)
   if test_suite_path not in targets:
     return []
 
   query = [
-      'bazel', 'query', '--noshow_loading_progress', '--noshow_progress',
+      'bazel', 'query', '--ui_event_filters=-DEBUG',
+      '--noshow_loading_progress', '--noshow_progress',
       f'tests({test_suite_path})'
   ]
   tests = check_and_get_output_lines(query)
