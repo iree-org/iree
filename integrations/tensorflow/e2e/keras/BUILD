@@ -80,6 +80,7 @@ Command arguments description:
 ]
 
 SPECIAL_CASES = [
+    "keyword_spotting_streaming_test.py",
     "vision_model_test.py",
 ]
 
@@ -370,5 +371,123 @@ iree_py_binary(
     srcs_version = "PY2AND3",
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)
+
+# Keyword Spotting Tests:
+KEYWORD_SPOTTING_MODELS = [
+    "svdf",
+    "svdf_resnet",
+    "ds_cnn",
+    "gru",
+    "lstm",
+    "cnn_stride",
+    "cnn",
+    "tc_resnet",
+    "crnn",
+    "dnn",
+    "att_rnn",
+    "att_mh_rnn",
+    "mobilenet",
+    "mobilenet_v2",
+    "xception",
+    "inception",
+    "inception_resnet",
+    "ds_tc_resnet",
+]
+
+iree_e2e_cartesian_product_test_suite(
+    name = "keyword_spotting_tests",
+    srcs = ["keyword_spotting_streaming_test.py"],
+    failing_configurations = [
+        {
+            # Failing on IREE:
+            "model": [
+                "att_mh_rnn",  # b/147824465
+                "att_rnn",  # b/147824465
+                "crnn",  # b/162067867
+                "ds_tc_resnet",
+                "gru",  # b/162067867
+                "lstm",  # b/162067867
+                "svdf_resnet",  # b/171512071
+                "xception",  # b/171512071
+            ],
+            "target_backends": [
+                "iree_vmla",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+    ],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "mode": "non_streaming",
+        "model": KEYWORD_SPOTTING_MODELS,
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "keyword_spotting_streaming_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "@kws_streaming//:models_lib",
+        "@kws_streaming//:train_lib",
+    ],
+)
+
+iree_e2e_cartesian_product_test_suite(
+    name = "keyword_spotting_internal_streaming_tests",
+    srcs = ["keyword_spotting_streaming_test.py"],
+    failing_configurations = [
+        {
+            # TFLite cannot compile variables.
+            "target_backends": "tflite",
+        },
+        {
+            # These models do not currently support streaming.
+            "model": [
+                "att_mh_rnn",
+                "att_rnn",
+                "ds_cnn",
+                "inception",
+                "inception_resnet",
+                "mobilenet",
+                "mobilenet_v2",
+                "svdf_resnet",
+                "tc_resnet",
+                "xception",
+            ],
+        },
+        {
+            # Failing on IREE:
+            "model": "ds_tc_resnet",
+            "target_backends": [
+                "iree_vmla",
+                "iree_llvmjit",
+                "iree_vulkan",
+            ],
+        },
+    ],
+    flags_to_values = {
+        "reference_backend": "tf",
+        "mode": "internal_streaming",
+        "model": KEYWORD_SPOTTING_MODELS,
+        "target_backends": [
+            "tf",
+            "tflite",
+            "iree_vmla",
+            "iree_llvmjit",
+            "iree_vulkan",
+        ],
+    },
+    main = "keyword_spotting_streaming_test.py",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "@kws_streaming//:models_lib",
+        "@kws_streaming//:train_lib",
     ],
 )
