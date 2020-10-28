@@ -98,7 +98,7 @@ The vision tests take a while to run, so we exclude them from the CI and
 wildcard expansion. They can be run by invoking the following test suite:
 
 ```shell
-$ python3 ./scripts/get_e2e_artifacts.py --test_suites=vision_external_tests
+$ python3 ./scripts/get_e2e_artifacts.py --test_suites=imagenet_non_hermetic_tests
 ```
 
 The previous command compiles `MobileNet`, `MobileNetV2` and `ResNet50` to run

@@ -164,7 +164,7 @@ iree_e2e_test_suite(
 )
 
 iree_e2e_cartesian_product_test_suite(
-    name = "large_cifar10_internal_tests",
+    name = "large_cifar10_tests",
     size = "large",
     srcs = ["vision_model_test.py"],
     flags_to_values = {
@@ -194,7 +194,7 @@ iree_e2e_cartesian_product_test_suite(
 )
 
 iree_e2e_cartesian_product_test_suite(
-    name = "enormous_cifar10_internal_tests",
+    name = "enormous_cifar10_tests",
     size = "enormous",
     srcs = ["vision_model_test.py"],
     failing_configurations = [
@@ -248,8 +248,9 @@ iree_e2e_cartesian_product_test_suite(
     ],
 )
 
+# 'non_hermetic' tests use real model weights to test numerical correctness.
 iree_e2e_cartesian_product_test_suite(
-    name = "cifar10_external_tests",
+    name = "cifar10_non_hermetic_tests",
     size = "large",
     srcs = ["vision_model_test.py"],
     flags_to_values = {
@@ -284,8 +285,9 @@ iree_e2e_cartesian_product_test_suite(
     ],
 )
 
+# 'non_hermetic' tests use real model weights to test numerical correctness.
 iree_e2e_cartesian_product_test_suite(
-    name = "imagenet_external_tests",
+    name = "imagenet_non_hermetic_tests",
     size = "enormous",
     srcs = ["vision_model_test.py"],
     failing_configurations = [
