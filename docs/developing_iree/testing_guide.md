@@ -192,7 +192,7 @@ drivers).
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/test/e2e/xla_ops/check_vmla_vmla_floor.mlir
+$ ctest -R iree/test/e2e/xla_ops:check_vmla_vmla_floor.mlir
 ```
 
 With Bazel, run this from the repo root:
